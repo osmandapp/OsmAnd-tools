@@ -368,7 +368,7 @@ public class RouteRelationExtractor {
 		if (!MapUtils.areLatLonEqual(lastLatLon[0], lastLatLon[1],
 				points.get(0).getLatitude(), points.get(0).getLongitude(), precisionLatLonEquals)) {
 			GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
-			trkSegment.getExtensionsToWrite().put("relation_track", "yes");
+//			trkSegment.getExtensionsToWrite().put("relation_track", "yes");
 			trkSegment.getExtensionsToWrite().put("osmid", String.valueOf(current.getId()));
 			track.segments.add(trkSegment);
 			currentSegment[0] = trkSegment;
@@ -382,11 +382,20 @@ public class RouteRelationExtractor {
 	}
 
 	private void addNode(GPXFile gpxFile, Node node) {
+		final Map<String, String> skipNodeByTags = Map.of(
+				"information", "guidepost"
+		);
 		if (node != null && !node.getTags().isEmpty()) {
+			for (String k : skipNodeByTags.keySet()) {
+				final String nodeTagValue = node.getTags().get(k);
+				if (nodeTagValue != null && nodeTagValue.equals(skipNodeByTags.get(k))) {
+					return;
+				}
+			}
 			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 			wptPt.lat = node.getLatitude();
 			wptPt.lon = node.getLongitude();
-			wptPt.getExtensionsToWrite().put("relation_point", "yes");
+//			wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			wptPt.getExtensionsToWrite().put("osmid", String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
