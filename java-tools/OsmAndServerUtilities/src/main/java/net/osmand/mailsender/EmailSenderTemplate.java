@@ -399,7 +399,7 @@ public class EmailSenderTemplate {
 		private SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
-		private final String SENDGRID_ENFORCED = null; // ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // temporarily
+		private final String MSN_DOMAINS = ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // USE_SENDGRID_FOR_MSN
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -418,7 +418,7 @@ public class EmailSenderTemplate {
 		}
 
 		private boolean enforceViaSendGrid(String to) {
-			return SENDGRID_ENFORCED != null && to.matches(SENDGRID_ENFORCED);
+			return System.getenv("USE_SENDGRID_FOR_MSN") != null && MSN_DOMAINS != null && to.matches(MSN_DOMAINS);
 		}
 
 		private Mail mail;

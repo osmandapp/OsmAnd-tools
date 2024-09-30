@@ -6,6 +6,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
@@ -18,14 +19,11 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
-import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
-import static net.osmand.data.MapObject.unzipContent;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
@@ -44,8 +42,8 @@ public class WikiService {
 	private static final String THUMB_PREFIX = "320px-";
 	protected static final boolean FILENAME = true;
 
-	private static final int LIMIT_QUERY = 1000;
-	private static final int LIMITI_QUERY = 25;
+	private static final int LIMIT_OBJS_QUERY = 1000;
+	private static final int LIMIT_PHOTOS_QUERY = 100;
 	
 	private static final int FILTER_ZOOM_LEVEL = 15;
 	
@@ -66,13 +64,13 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, null,"imgLat", "imgLon", null);
+				+ " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY, null,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
 		String query = String.format("SELECT id, mediaId, imageTitle, date, author, license " +
 				"FROM wikiimages WHERE id = %d " +
-				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
+				"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
 		
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
 			Feature f = new Feature(Geometry.point(new LatLon(lat, lon)));
@@ -102,9 +100,7 @@ public class WikiService {
 		
 		String zoomCondition = "";
 		if (zoom < FILTER_ZOOM_LEVEL) {
-			zoomCondition = "AND wlat != 0 AND wlon != 0 "
-					+ "AND ROUND(lat, 3) = ROUND(wlat, 3) "
-					+ "AND ROUND(lon, 3) = ROUND(wlon, 3) ";
+			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
 		}
 		
 		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
@@ -128,7 +124,7 @@ public class WikiService {
 				+ osmidCondition
 				+ osmcntFilter
 				+ " " + subtypeFilter
-				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
+				+ " ORDER BY qrank DESC LIMIT " + LIMIT_OBJS_QUERY;
 		
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
@@ -388,22 +384,43 @@ public class WikiService {
 	}
 	
 	private void handleArticleAndCategoryQueries(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
-		if (articleId != null && !Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
+		if (articleId != null && !Algorithms.isEmpty(articleId)) {
+			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
+			String finalArticleId = articleId;
 			processImageQuery(
 					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
-							"ORDER BY type = 'P18' ? 0 : 1/(1 + views) DESC LIMIT " + LIMITI_QUERY,
-					ps -> ps.setString(1, articleId.substring(1)),
+							"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, finalArticleId),
 					rowCallbackHandler);
 		}
 		
 		if (categoryName != null && !Algorithms.isEmpty(categoryName)) {
-			processImageQuery(
-					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = " +
-							"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
-							"AND type = 'P373' AND namespace = 6 ORDER BY views ASC LIMIT " + LIMITI_QUERY,
-					ps -> ps.setString(1, categoryName.replace(' ', '_')),
-					rowCallbackHandler);
+			boolean found = findImagesByCatWithWikidataid(categoryName, rowCallbackHandler);
+			
+			if (!found) {
+				processImageQuery(
+						"SELECT imgName AS imageTitle, '' AS date, '' AS author, '' AS license " +
+								"FROM wiki.categoryimages WHERE catName = ? ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+						ps -> ps.setString(1, categoryName.replace(' ', '_')),
+						rowCallbackHandler);
+			}
 		}
+	}
+	
+	private boolean findImagesByCatWithWikidataid(String categoryName, RowCallbackHandler rowCallbackHandler) {
+		AtomicBoolean found = new AtomicBoolean(false);
+		
+		processImageQuery(
+				"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = " +
+						"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
+						"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+				ps -> ps.setString(1, categoryName.replace(' ', '_')),
+				rs -> {
+					rowCallbackHandler.processRow(rs);
+					found.set(true);
+				});
+		
+		return found.get();
 	}
 	
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
@@ -428,4 +445,18 @@ public class WikiService {
 		}
 		return id;
 	}
+	
+	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
+		List<Feature> features = images.stream().map(imageDetails -> {
+			Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
+			feature.properties.put("imageTitle", imageDetails.get("image"));
+			feature.properties.put("date", imageDetails.get("date"));
+			feature.properties.put("author", imageDetails.get("author"));
+			feature.properties.put("license", imageDetails.get("license"));
+			return feature;
+		}).toList();
+		
+		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+	
 }

@@ -162,4 +162,14 @@ public class SearchController {
         String content = wikiService.getWikivoyageContent(title, lang);
         return ResponseEntity.ok(gson.toJson(content));
     }
+    
+    @GetMapping(path = {"/get-poi-photos"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getPoiPhotos(@RequestParam(required = false) String article,
+                                               @RequestParam(required = false) String category,
+                                               @RequestParam(required = false) String wiki) {
+        Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(article, category, wiki);
+        FeatureCollection featureCollection = wikiService.convertToFeatureCollection(images);
+        return ResponseEntity.ok(gson.toJson(featureCollection));
+    }
 }

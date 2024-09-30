@@ -1744,4 +1744,12 @@ public class OsmAndMapsService {
 		}
 		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
 	}
+
+	public BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
+		int type, int size, int zoom, int x, int y) throws IOException {
+		if (nativelib == null) {
+			return null;
+		}
+		return nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+	}
 }

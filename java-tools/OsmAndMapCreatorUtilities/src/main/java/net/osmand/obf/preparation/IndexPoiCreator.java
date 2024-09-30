@@ -68,6 +68,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					8, 0.55f);
 			for (Map.Entry<Boundary, List<City>> entry : cityDataStorage.boundaryToContainingCities.entrySet()) {
 				Boundary b = entry.getKey();
+				if (b.getCityType() == null || !b.getCityType().storedAsSeparateAdminEntity()) {
+					continue;
+				}
 				Multipolygon m = b.getMultipolygon();
 				QuadRect bboxLatLon = m.getLatLonBbox();
 				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
@@ -87,16 +90,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				List<String> tags = new ArrayList<>();
 				String name = city.getName();
 				if (!Algorithms.isEmpty(name)) {
-					tags.add("addr:city");
+					tags.add("name");
 					tags.add(name);
 				}
 				Map<String, String> otherNames = city.getNamesMap(true);
 				for (Map.Entry<String, String> nameEntry : otherNames.entrySet()) {
 					if (allLanguages.contains(nameEntry.getKey())) {
-						tags.add("addr:city:" + nameEntry.getKey());
+						tags.add("name:" + nameEntry.getKey());
 						tags.add(nameEntry.getValue());
 					}
 				}
+
+				tags.add("place");
+				tags.add(city.getType().name().toLowerCase());
 
 				if (tags.isEmpty()) {
 					continue;
