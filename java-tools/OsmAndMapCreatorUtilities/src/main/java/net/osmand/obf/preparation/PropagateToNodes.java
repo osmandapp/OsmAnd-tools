@@ -61,6 +61,10 @@ public class PropagateToNodes {
 		this.renderingTypes = renderingTypes;
 		initPropagateToNodes();
 	}
+	
+	public boolean isEmpty() {
+		return propagateTagsByNodeId.isEmpty();
+	}
 
 	public void registerNode(PropagateFromWayToNode node) {
 		List<PropagateFromWayToNode> lst = propagateTagsByNodeId.get(node.id);
@@ -111,7 +115,9 @@ public class PropagateToNodes {
 				return w;
 			}
 		}
-		return new PropagateFromWayToNode(way, start, end);
+		PropagateFromWayToNode pwn = new PropagateFromWayToNode(way, start, end);
+		resultIds.add(pwn);
+		return pwn;
 	}
 
 	public List<PropagateFromWayToNode> propagateTagsFromWays(Way w) {
@@ -218,7 +224,7 @@ public class PropagateToNodes {
 		if (list == null) {
 			return;
 		}
-		for(PropagateFromWayToNode l : list) {
+		for (PropagateFromWayToNode l : list) {
 			for (Map.Entry<String, String> entry : l.tags.entrySet()) {
 				if (n.getTag(entry.getKey()) == null && entry.getValue() != null) {
 					n.putTag(entry.getKey(), entry.getValue());

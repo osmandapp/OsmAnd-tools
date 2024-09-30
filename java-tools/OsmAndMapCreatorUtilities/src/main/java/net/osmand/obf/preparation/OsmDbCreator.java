@@ -377,18 +377,22 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			}
 			long id = convertId(e);
 			if (propagateToNodes != null && e instanceof Way) {
+				boolean empty = propagateToNodes.isEmpty();
 				List<PropagateFromWayToNode> propagatedNodeIds = propagateToNodes.propagateTagsFromWays((Way) e);
 				if (propagatedNodeIds != null) {
+					if (empty) {
+						executeNodesBatch(true); // commit for proper select
+					}
 					for (int i = 0; i < propagatedNodeIds.size(); i++) {
 						PropagateFromWayToNode pn = propagatedNodeIds.get(i);
-						LatLon latLon = pn.getLatLon(getNode(((Way) e).getNodeIds().get(pn.start)),
-								getNode(((Way) e).getNodeIds().get(pn.start)));
-						if (latLon == null) {
-							continue;
-						}
 						if (pn.id < 0) {
+							LatLon latLon = pn.getLatLon(getNode(((Way) e).getNodeIds().get(pn.start)),
+									getNode(((Way) e).getNodeIds().get(pn.end)));
+							if (latLon == null) {
+								continue;
+							}	
 							pn.id = generatedId--;
-							prepNode.setLong(1, id);
+							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
 							prepNode.setDouble(3, latLon.getLongitude());
 							prepNode.setBytes(4, new ByteArrayOutputStream().toByteArray());
@@ -402,11 +406,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 						}
 						propagateToNodes.registerNode(pn);
 					}
-					if (currentCountNode >= BATCH_SIZE_OSM) {
-						prepNode.executeBatch();
-						dbConn.commit(); // clear memory
-						currentCountNode = 0;
-					}
+					executeNodesBatch(false);
 					if (propagateCount >= BATCH_SIZE_OSM) {
 						prepPropagateNode.executeBatch();
 						dbConn.commit(); // clear memory
@@ -419,18 +419,13 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				if (!e.getTags().isEmpty()) {
 					allNodes++;
 				}
-				// TODO insert node itself after PropagateFromWayToNode
 				prepNode.setLong(1, id);
 				prepNode.setDouble(2, ((Node) e).getLatitude());
 				prepNode.setDouble(3, ((Node) e).getLongitude());
 				prepNode.setBytes(4, tags.toByteArray());
 				prepNode.setBoolean(5, false);
 				prepNode.addBatch();
-				if (currentCountNode >= BATCH_SIZE_OSM) {
-					prepNode.executeBatch();
-					dbConn.commit(); // clear memory
-					currentCountNode = 0;
-				}
+				executeNodesBatch(false);
 			} else if (e instanceof Way) {
 				allWays++;
 				int ord = 0;
@@ -484,12 +479,20 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		return false;
 	}
 
+	private void executeNodesBatch(boolean force) throws SQLException {
+		if (currentCountNode >= BATCH_SIZE_OSM || force) {
+			prepNode.executeBatch();
+			dbConn.commit(); // clear memory
+			currentCountNode = 0;
+		}
+	}
+
 
 
 	private Node getNode(long l) throws SQLException {
 		selectNode.setLong(1, l);
 		ResultSet q = selectNode.executeQuery();
-		if(q.next()) {
+		if (q.next()) {
 			return new Node(q.getDouble(1), q.getDouble(2), l);
 		}
 		return null;

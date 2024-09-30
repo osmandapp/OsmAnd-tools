@@ -211,6 +211,7 @@ public class IndexCreator {
 			}
 		}
 		if (propagateToNodes != null && e instanceof Node) {
+			System.out.println(e.getId() + "---");
 			propagateToNodes.propagateTagsToNode((Node) e);
 		}
 		if (settings.indexPOI) {
@@ -871,9 +872,9 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/andorra_europe.pbf";
-//		String file = rootFolder + "../temp/map.osm";
-		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "../temp/andorra_europe.pbf";
+		String file = rootFolder + "../temp/map.osm";
+//		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
