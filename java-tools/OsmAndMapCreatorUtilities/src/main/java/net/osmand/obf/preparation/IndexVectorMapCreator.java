@@ -928,6 +928,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 						boolean skipPoint = true;
 						for (PropagateFromWayToNode p : linkedPropagate) {
 							for (PropagateRuleFromWayToNode n : p.rls) {
+								// TODO here it's not correct as we should delete exactly tags that are related to ignoreBorderPoint
+								// now we if just 1 propagation is successful all tags are added
 								if (!n.ignoreBorderPoint) {
 									skipPoint = false;
 									break;

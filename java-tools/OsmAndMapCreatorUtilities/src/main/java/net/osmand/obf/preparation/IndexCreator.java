@@ -735,7 +735,7 @@ public class IndexCreator {
 							}
 							rules.get(n.rule).add(n);
 						}
-						System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
+//						System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
 						for (PropagateRule rule : rules.keySet()) {
 							if (rule.type != PropagateToNodesType.BORDER) {
 								continue;
