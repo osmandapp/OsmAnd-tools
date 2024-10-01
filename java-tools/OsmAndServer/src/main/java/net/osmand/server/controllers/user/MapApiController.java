@@ -75,7 +75,7 @@ import org.xmlpull.v1.XmlPullParserException;
 @RequestMapping("/mapapi")
 public class MapApiController {
 
-	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
+	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
@@ -379,6 +379,7 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		List <UserFileNoData> filesToIgnore = new ArrayList<>();
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
@@ -392,6 +393,11 @@ public class MapApiController {
 							: userdataService.getInputStream(uf);
 					if (in != null) {
 						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+						if (gpxFile.error != null) {
+							LOG.error("list-files: ignore corrupted-gpx-file (" + uf.id + ") " + uf.name);
+							filesToIgnore.add(nd);
+							continue;
+						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
 							if (gpxFile.metadata != null) {
@@ -432,6 +438,7 @@ public class MapApiController {
 				addDeviceInformation(nd, devices);
 			}
 		}
+		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
