@@ -8,11 +8,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.ImageIO;
@@ -28,11 +24,7 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
-import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
-import net.osmand.obf.preparation.PropagateToNodes.PropagateRule;
-import net.osmand.obf.preparation.PropagateToNodes.PropagateRuleFromWayToNode;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -216,7 +208,7 @@ public class IndexCreator {
 			}
 		}
 		if (propagateToNodes != null && e instanceof Node) {
-			propagateToNodes.propagateTagsToNode((Node) e);
+			propagateToNodes.propagateTagsToNode((Node) e, true);
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
@@ -725,38 +717,7 @@ public class IndexCreator {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 				Way w = (Way) e;
-				for (long nodeId : w.getNodeIds().toArray()) {
-					List<PropagateRuleFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByEndpoint(nodeId);
-					if (linkedPropagate != null) {
-						Map<PropagateRule, List<PropagateRuleFromWayToNode>> rules = new HashMap<>();
-						for (PropagateRuleFromWayToNode n : linkedPropagate) {
-							if (!rules.containsKey(n.rule)) {
-								rules.put(n.rule, new ArrayList<>());
-							}
-							rules.get(n.rule).add(n);
-						}
-//						System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
-						for (PropagateRule rule : rules.keySet()) {
-							if (rule.type != PropagateToNodesType.BORDER) {
-								continue;
-							}
-							boolean thisWayPartOfBorder = false;
-							List<PropagateRuleFromWayToNode> propagatedBorders = rules.get(rule);
-							for (PropagateRuleFromWayToNode p : propagatedBorders) {
-								if (p.way.wayId == w.getId() >> OsmDbCreator.SHIFT_ID) {
-									thisWayPartOfBorder = true;
-								}
-							}
-							if (!thisWayPartOfBorder) {
-								for (PropagateRuleFromWayToNode p : propagatedBorders) {
-									if (p.rule.applicable(w)) {
-										p.ignoreBorderPoint = false;
-									}
-								}
-							}
-						}
-					}
-				}
+				propagateToNodes.calculateBorderPoints(w);
 				iterateMainEntity(e, ctx, icc);
 			}
 		});

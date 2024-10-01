@@ -20,8 +20,6 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
-import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
-import net.osmand.obf.preparation.PropagateToNodes.PropagateRuleFromWayToNode;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -923,20 +921,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 ResultSet rs = selectData.executeQuery();
                 if (rs.next()) {
                 	long cid = convertGeneratedIdToObfWrite(id);
+                	boolean allowWaySimplification = level.getMaxZoom() > 15;
+                    byte[] types = rs.getBytes(4);
+                    List<MapRulType> mainTypes = new ArrayList<>();
+                    for (int j = 0; j < types.length; j += 2) {
+                        int ids = Algorithms.parseSmallIntFromBytes(types, j);
+                        MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
+                        if ("railway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
+                            allowWaySimplification = false;
+                        }
+                        mainTypes.add(mapRulType);
+                    }
+                	// only nodes
 					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
-						List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByNodeId(cid >> 1);
-						boolean skipPoint = true;
-						for (PropagateFromWayToNode p : linkedPropagate) {
-							for (PropagateRuleFromWayToNode n : p.rls) {
-								// TODO here it's not correct as we should delete exactly tags that are related to ignoreBorderPoint
-								// now we if just 1 propagation is successful all tags are added
-								if (!n.ignoreBorderPoint) {
-									skipPoint = false;
-									break;
-								}
-							}
-						}
-						if (skipPoint) {
+						propagateToNodes.calculateBorderPointMainTypes(cid >> 1, mainTypes);
+						if(mainTypes.size() == 0) {
 							continue;
 						}
 					}
@@ -949,17 +948,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                     }
                     tempNames.clear();
                     decodeNames(rs.getString(6), tempNames);
-                    boolean allowWaySimplification = level.getMaxZoom() > 15;
-                    byte[] types = rs.getBytes(4);
-                    int[] typeUse = new int[types.length / 2];
-                    for (int j = 0; j < types.length; j += 2) {
-                        int ids = Algorithms.parseSmallIntFromBytes(types, j);
-                        MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
-                        if ("railway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
-                            allowWaySimplification = false;
-                        }
-                        typeUse[j / 2] = mapRulType.getTargetId();
-                    }
+                    int[] typeUse = new int[mainTypes.size()];                    
+					for (int k = 0; k < typeUse.length; k++) {
+						typeUse[k] = mainTypes.get(k).getTargetId();
+					}
                     byte[] addTypes = rs.getBytes(5);
                     int[] addtypeUse = null;
                     if (addTypes != null) {
