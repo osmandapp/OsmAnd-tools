@@ -925,12 +925,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 	long cid = convertGeneratedIdToObfWrite(id);
 					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
 						List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByNodeId(cid >> 1);
-						boolean skipPoint = false;
-						// TODO we should skip certain tags... (osmand live ?)
+						boolean skipPoint = true;
 						for (PropagateFromWayToNode p : linkedPropagate) {
 							for (PropagateRuleFromWayToNode n : p.rls) {
-								if (n.ignoreBorderPoint) {
-									skipPoint = true;
+								if (!n.ignoreBorderPoint) {
+									skipPoint = false;
 									break;
 								}
 							}

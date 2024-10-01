@@ -18,7 +18,7 @@ public class PropagateToNodes {
 
     private MapRenderingTypesEncoder renderingTypes;
     private TLongObjectHashMap<List<PropagateFromWayToNode>> propagateTagsByNodeId = new TLongObjectHashMap<>();
-    private TLongObjectHashMap<List<PropagateFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
+    private TLongObjectHashMap<List<PropagateRuleFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
     private Map<String, List<PropagateRule>> propagateRulesByTag = new HashMap<>();
 
     
@@ -37,6 +37,7 @@ public class PropagateToNodes {
     	public final PropagateRule rule;
 		public final Map<String, String> tags = new HashMap<>();
 		public boolean ignoreBorderPoint;
+		public long osmId; // connected point
 		
 		public PropagateRuleFromWayToNode(PropagateFromWayToNode propagateFromWayToNode, PropagateRule rule) {
 			this.way = propagateFromWayToNode;
@@ -47,9 +48,10 @@ public class PropagateToNodes {
     
 	public static class PropagateFromWayToNode {
 		public long id; // negative ids - artificial node
-		public long osmId; // first point (main point)
 		public long wayId;
 		public int start;
+		public long startId;
+		public long endId;
 		public int end;
 		public List<PropagateRuleFromWayToNode> rls = new ArrayList<>();
 
@@ -57,9 +59,10 @@ public class PropagateToNodes {
 			this.end = end;
 			this.start = start;
 			wayId = way.getId();
-			osmId = way.getNodeIds().get(start);
+			this.startId = way.getNodeIds().get(start);
+			this.endId = way.getNodeIds().get(end);
 			if (start == end) {
-				this.id = osmId;
+				this.id = way.getNodeIds().get(start);
 			} else {
 				this.id = -1;
 			}
@@ -74,11 +77,16 @@ public class PropagateToNodes {
 		}
 
 		public void applyRule(PropagateRule rule) {
+			applyRule(rule, false);
+		}
+		
+		public void applyRule(PropagateRule rule, boolean end) {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
 			String propagateTag = rule.tag;
 			if (rule.tagPrefix != null) {
 				propagateTag = rule.tagPrefix + propagateTag;
 			}
+			rl.osmId = end ? endId : startId;
 			rl.tags.put(propagateTag, rule.value);
 			if (rule.type == PropagateToNodesType.BORDER) {
 				rl.ignoreBorderPoint = true;
@@ -105,15 +113,17 @@ public class PropagateToNodes {
 		}
 		lst.add(node);
 
-		lst = propagateTagsByOsmNodeId.get(node.osmId);
-		if (lst == null) {
-			lst = new ArrayList<PropagateToNodes.PropagateFromWayToNode>();
-			propagateTagsByOsmNodeId.put(node.osmId, lst);
+		for (PropagateRuleFromWayToNode pn : node.rls) {
+			List<PropagateRuleFromWayToNode> l = propagateTagsByOsmNodeId.get(pn.osmId);
+			if (l == null) {
+				l = new ArrayList<PropagateRuleFromWayToNode>();
+				propagateTagsByOsmNodeId.put(pn.osmId, l);
+			}
+			l.add(pn);
 		}
-		lst.add(node);
 	}
 	
-	public List<PropagateFromWayToNode> getPropagateByEndpoint(long nodeId) {
+	public List<PropagateRuleFromWayToNode> getPropagateByEndpoint(long nodeId) {
 		return propagateTagsByOsmNodeId.get(nodeId);
 	}
 
@@ -171,7 +181,7 @@ public class PropagateToNodes {
 				getNode(resultWay, w, 0, 1).applyRule(rule);
 				break;
 			case END:
-				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule);
+				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
 				break;
 			case CENTER:
 				if (allIds.size() == 2) {
@@ -182,7 +192,7 @@ public class PropagateToNodes {
 				break;
 			case BORDER:
 				getNode(resultWay, w, 0, 1).applyRule(rule);
-				getNode(resultWay, w, allIds.size() - 1, allIds.size() - 2).applyRule(rule);
+				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
 				break;
 			case NONE:
 				break;

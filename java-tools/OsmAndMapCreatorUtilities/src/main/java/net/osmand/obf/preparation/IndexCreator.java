@@ -726,18 +726,16 @@ public class IndexCreator {
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 				Way w = (Way) e;
 				for (long nodeId : w.getNodeIds().toArray()) {
-					List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByEndpoint(nodeId);
+					List<PropagateRuleFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByEndpoint(nodeId);
 					if (linkedPropagate != null) {
-						
 						Map<PropagateRule, List<PropagateRuleFromWayToNode>> rules = new HashMap<>();
-						for (PropagateFromWayToNode p : linkedPropagate) {
-							for(PropagateRuleFromWayToNode n : p.rls) {
-								if(!rules.containsKey(n.rule)) {
-									rules.put(n.rule, new ArrayList<>());
-								}
-								rules.get(n.rule).add(n);
+						for (PropagateRuleFromWayToNode n : linkedPropagate) {
+							if (!rules.containsKey(n.rule)) {
+								rules.put(n.rule, new ArrayList<>());
 							}
+							rules.get(n.rule).add(n);
 						}
+						System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
 						for (PropagateRule rule : rules.keySet()) {
 							if (rule.type != PropagateToNodesType.BORDER) {
 								continue;
@@ -749,9 +747,7 @@ public class IndexCreator {
 									thisWayPartOfBorder = true;
 								}
 							}
-							// TODO bug way with only 2 points !
 							if (!thisWayPartOfBorder) {
-//								System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
 								for (PropagateRuleFromWayToNode p : propagatedBorders) {
 									if (p.rule.applicable(w)) {
 										p.ignoreBorderPoint = false;
