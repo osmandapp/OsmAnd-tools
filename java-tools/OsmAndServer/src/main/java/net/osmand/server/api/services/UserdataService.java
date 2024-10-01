@@ -103,7 +103,8 @@ public class UserdataService {
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
-
+    private static final String CR_SANITIZE = "$0D"; // \r
+    private static final String LF_SANITIZE = "$0A"; // \n
 
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
@@ -204,6 +205,7 @@ public class UserdataService {
     public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
         List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
         List<UserFileNoData> fl;
+
         if (types != null) {
             for (String t : types) {
                 fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
@@ -218,10 +220,26 @@ public class UserdataService {
                     filesRepository.listFilesByUserid(userId, name, null);
             allFiles.addAll(fl);
         }
+
+        sanitizeFileNames(allFiles);
         return getUserFilesResults(allFiles, userId, allVersions);
     }
 
-    private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
+	private void sanitizeFileNames(List<UserFileNoData> files) {
+		for(UserFileNoData f : files) {
+			f.name = sanitizeEncode(f.name);
+		}
+	}
+
+	private String sanitizeEncode(String name) {
+		return name.replace("\r", CR_SANITIZE).replace("\n", LF_SANITIZE);
+	}
+
+	private String sanitizeDecode(String name) {
+		return name.replace(CR_SANITIZE, "\r").replace(LF_SANITIZE, "\n");
+	}
+
+	private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
         PremiumUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
@@ -521,7 +539,8 @@ public class UserdataService {
 				bin = getInputStream(dev, userFile);
 			}
 
-            response.setHeader("Content-Disposition", "attachment; filename=" + URLEncoder.encode(userFile.name));
+            String safeDownloadName = URLEncoder.encode(sanitizeEncode(userFile.name));
+            response.setHeader("Content-Disposition", "attachment; filename=" + safeDownloadName);
             // InputStream bin = fl.data.getBinaryStream();
 
             String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -646,6 +665,7 @@ public class UserdataService {
         if (dev == null) {
             return null;
         }
+        name = sanitizeDecode(name);
         if (updatetime != null) {
             return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
                     new Date(updatetime));
@@ -653,7 +673,7 @@ public class UserdataService {
             return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
         }
     }
-    
+
     public PremiumUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         if (dev == null) {
             return null;
