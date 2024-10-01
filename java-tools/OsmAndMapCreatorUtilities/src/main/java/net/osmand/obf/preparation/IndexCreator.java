@@ -751,7 +751,7 @@ public class IndexCreator {
 							}
 							// TODO bug way with only 2 points !
 							if (!thisWayPartOfBorder) {
-								System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
+//								System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
 								for (PropagateRuleFromWayToNode p : propagatedBorders) {
 									if (p.rule.applicable(w)) {
 										p.ignoreBorderPoint = false;
