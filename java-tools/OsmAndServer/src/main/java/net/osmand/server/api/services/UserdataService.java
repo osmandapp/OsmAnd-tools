@@ -3,7 +3,6 @@ package net.osmand.server.api.services;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -536,21 +535,10 @@ public class UserdataService {
             }
             response.setContentType(APPLICATION_OCTET_STREAM.getType());
             byte[] buf = new byte[BUFFER_SIZE];
-            boolean validatedGpxHeader = false;
             int r;
             OutputStream ous = gzout && !gzin ? new GZIPOutputStream(response.getOutputStream()) : response.getOutputStream();
 			if (bin != null) {
 				while ((r = bin.read(buf)) != -1) {
-					if (!validatedGpxHeader && (FILE_TYPE_GPX.equals(type) || FILE_TYPE_FAVOURITES.equals(type))) {
-						String check = new String(buf, 0, r, StandardCharsets.UTF_8);
-						if (check.startsWith("< =\"1.1\" =\"OsmAnd")) {
-							LOG.error("download-file: ignore corrupted-gpx-file (" + userFile.id + ") " + userFile.name);
-							break; // do not spread corrupted gpx files (Issue #20934)
-						} else {
-							LOG.error("debug (" + check + ")");
-						}
-						validatedGpxHeader = true;
-					}
 					ous.write(buf, 0, r);
 				}
 			}
