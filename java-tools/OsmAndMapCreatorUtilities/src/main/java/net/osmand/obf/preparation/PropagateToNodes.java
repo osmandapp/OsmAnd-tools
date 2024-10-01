@@ -359,8 +359,8 @@ public class PropagateToNodes {
 		if (linkedPropagate == null) {
 			return;
 		}
-		long wayId = (nodeId >> 10) >> OsmDbCreator.SHIFT_ID;
-		System.out.println(wayId + " " + ((nodeId >> OsmDbCreator.SHIFT_ID) - (wayId << 10l)));
+//		long wayId = (nodeId >> 10) >> OsmDbCreator.SHIFT_ID;
+//		System.out.println(wayId + " " + ((nodeId >> OsmDbCreator.SHIFT_ID) - (wayId << 10l)));
 		Iterator<MapRulType> it = mainTypes.iterator();
 		while (it.hasNext()) {
 			MapRulType type = it.next();
