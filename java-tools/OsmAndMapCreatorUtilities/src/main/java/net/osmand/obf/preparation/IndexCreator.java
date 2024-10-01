@@ -8,8 +8,11 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import javax.imageio.ImageIO;
@@ -26,6 +29,8 @@ import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateRule;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateRuleFromWayToNode;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -723,22 +728,34 @@ public class IndexCreator {
 				for (long nodeId : w.getNodeIds().toArray()) {
 					List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByEndpoint(nodeId);
 					if (linkedPropagate != null) {
-						boolean thisWayPartOfBorder = false;
+						
+						Map<PropagateRule, List<PropagateRuleFromWayToNode>> rules = new HashMap<>();
 						for (PropagateFromWayToNode p : linkedPropagate) {
-							if (p.wayId == w.getId() >> OsmDbCreator.SHIFT_ID && p.type == PropagateToNodesType.BORDER) {
-								thisWayPartOfBorder = true;
+							for(PropagateRuleFromWayToNode n : p.rls) {
+								if(!rules.containsKey(n.rule)) {
+									rules.put(n.rule, new ArrayList<>());
+								}
+								rules.get(n.rule).add(n);
 							}
 						}
-						String hwTag = w.getTag("highway");
-						String access = w.getTag("access"); // TODO but with 2 points
-						if (!thisWayPartOfBorder && hwTag != null && !"private".equals(access) &&
-								!hwTag.equals("service") && 
-								!hwTag.equals("path") && !hwTag.equals("footway") && !hwTag.equals("cycleway")
-								) {
-							// TODO check only && highway >= residential
-							for (PropagateFromWayToNode p : linkedPropagate) {
-								if (p.type == PropagateToNodesType.BORDER) {
-									p.ignoreBorderPoint = false;
+						for (PropagateRule rule : rules.keySet()) {
+							if (rule.type != PropagateToNodesType.BORDER) {
+								continue;
+							}
+							boolean thisWayPartOfBorder = false;
+							List<PropagateRuleFromWayToNode> propagatedBorders = rules.get(rule);
+							for (PropagateRuleFromWayToNode p : propagatedBorders) {
+								if (p.way.wayId == w.getId() >> OsmDbCreator.SHIFT_ID) {
+									thisWayPartOfBorder = true;
+								}
+							}
+							// TODO bug way with only 2 points !
+							if (!thisWayPartOfBorder) {
+								System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
+								for (PropagateRuleFromWayToNode p : propagatedBorders) {
+									if (p.rule.applicable(w)) {
+										p.ignoreBorderPoint = false;
+									}
 								}
 							}
 						}
@@ -876,7 +893,7 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
-		String file = rootFolder + "../temp/access3.osm";
+		String file = rootFolder + "../temp/map.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";

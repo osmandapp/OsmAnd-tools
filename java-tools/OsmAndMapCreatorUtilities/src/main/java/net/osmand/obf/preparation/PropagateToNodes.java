@@ -32,15 +32,26 @@ public class PropagateToNodes {
 		}
     }
     
+    public static class PropagateRuleFromWayToNode {
+    	public final PropagateFromWayToNode way;
+    	public final PropagateRule rule;
+		public final Map<String, String> tags = new HashMap<>();
+		public boolean ignoreBorderPoint;
+		
+		public PropagateRuleFromWayToNode(PropagateFromWayToNode propagateFromWayToNode, PropagateRule rule) {
+			this.way = propagateFromWayToNode;
+			this.rule = rule;
+		}
+		
+    }
+    
 	public static class PropagateFromWayToNode {
 		public long id; // negative ids - artificial node
 		public long osmId; // first point (main point)
-		public Map<String, String> tags = new HashMap<>();
 		public long wayId;
-		public PropagateToNodesType type;
 		public int start;
 		public int end;
-		public boolean ignoreBorderPoint;
+		public List<PropagateRuleFromWayToNode> rls = new ArrayList<>();
 
 		public PropagateFromWayToNode(Way way, int start, int end) {
 			this.end = end;
@@ -62,12 +73,18 @@ public class PropagateToNodes {
 					st.getLongitude() / 2 + en.getLongitude() / 2);
 		}
 
-		public void addTag(String tag, String value, PropagateToNodesType type) {
-			tags.put(tag, value);
-			this.type = type;
-			if (type == PropagateToNodesType.BORDER) {
-				ignoreBorderPoint = true;
+		public void applyRule(PropagateRule rule) {
+			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
+			String propagateTag = rule.tag;
+			if (rule.tagPrefix != null) {
+				propagateTag = rule.tagPrefix + propagateTag;
 			}
+			rl.tags.put(propagateTag, rule.value);
+			if (rule.type == PropagateToNodesType.BORDER) {
+				rl.ignoreBorderPoint = true;
+			}
+			this.rls.add(rl);
+
 		}
 	}
 
@@ -144,33 +161,28 @@ public class PropagateToNodes {
 
 		PropagateWayWithNodes resultWay = new PropagateWayWithNodes(allIds.size());
 		for (PropagateRule rule : rulesToApply) {
-			String propagateTag = rule.tag;
-			if (rule.tagPrefix != null) {
-				propagateTag = rule.tagPrefix + propagateTag;
-			}
 			switch (rule.type) {
 			case ALL:
 				for (int i = 0; i < w.getNodes().size(); i++) {
-					getNode(resultWay, w, i, i).addTag(propagateTag, rule.value, rule.type);
+					getNode(resultWay, w, i, i).applyRule(rule);
 				}
 				break;
 			case START:
-				getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, 0, 1).applyRule(rule);
 				break;
 			case END:
-				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule);
 				break;
 			case CENTER:
 				if (allIds.size() == 2) {
-					getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
+					getNode(resultWay, w, 0, 1).applyRule(rule);
 				} else {
-					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).addTag(propagateTag, rule.value,
-							rule.type);
+					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule);
 				}
 				break;
 			case BORDER:
-				getNode(resultWay, w, 0, 1).addTag(propagateTag, rule.value, rule.type);
-				getNode(resultWay, w, allIds.size() - 1, allIds.size() - 2).addTag(propagateTag, rule.value, rule.type);
+				getNode(resultWay, w, 0, 1).applyRule(rule);
+				getNode(resultWay, w, allIds.size() - 1, allIds.size() - 2).applyRule(rule);
 				break;
 			case NONE:
 				break;
@@ -189,23 +201,10 @@ public class PropagateToNodes {
 			for (PropagateRule rule : list) {
 				String entityTag = w.getTag(tag);
 				if (entityTag != null && entityTag.equals(rule.value)) {
-					boolean propIf = true;
-					if (rule.propIf != null) {
-						propIf = false;
-						for (Map.Entry<String, String> entry : rule.propIf.entrySet()) {
-							String ifTag = w.getTag(entry.getKey());
-							if (ifTag != null) {
-								if (entry.getValue() == null || ifTag.equals(entry.getValue())) {
-									propIf = true;
-									break;
-								}
-							}
-						}
-					}
+					boolean propIf = rule.applicable(w);
 					if (propIf) {
 						if (rulesToApply == null) {
 							rulesToApply = new ArrayList<>();
-
 						}
 						if (!rulesToApply.contains(rule)) {
 							rulesToApply.add(rule);
@@ -217,12 +216,15 @@ public class PropagateToNodes {
 		return rulesToApply;
 	}
 
+	
+
 	public void propagateTagsToWayNodes(Way w) {
 		if (propagateTagsByNodeId.isEmpty()) {
 			return;
 		}
 		List<Node> nodes = w.getNodes();
 		for (Node n : nodes) {
+			// TODO doesn't work correctly with border points (can't ignore them)
 			propagateTagsToNode(n);
 		}
 	}
@@ -236,26 +238,63 @@ public class PropagateToNodes {
 		if (list == null) {
 			return;
 		}
-		for (PropagateFromWayToNode l : list) {
-			for (Map.Entry<String, String> entry : l.tags.entrySet()) {
-				if (n.getTag(entry.getKey()) == null && entry.getValue() != null) {
-					n.putTag(entry.getKey(), entry.getValue());
+		for (PropagateFromWayToNode ways : list) {
+			for (PropagateRuleFromWayToNode w : ways.rls) {
+				for (Map.Entry<String, String> entry : w.tags.entrySet()) {
+					if (n.getTag(entry.getKey()) == null && entry.getValue() != null) {
+						n.putTag(entry.getKey(), entry.getValue());
+					}
 				}
 			}
 		}
 	}
 
-	private static class PropagateRule {
+	public static class PropagateRule {
 		public String tag;
-		String value;
-		PropagateToNodesType type;
-		String tagPrefix;
-		Map<String, String> propIf;
+		public String value;
+		public final PropagateToNodesType type;
+		public String tagPrefix;
+		public Map<String, String> propIf;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix, Map<String, String> propIf) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
 			this.propIf = propIf;
+		}
+
+		
+		public boolean applicable(Way w) {
+			boolean res = true;
+			if (propIf != null) {
+				res = false;
+				for (Map.Entry<String, String> entry : propIf.entrySet()) {
+					String tagValue = w.getTag(entry.getKey());
+					if (tagValue != null) {
+						if (entry.getValue() == null) {
+							res = true;
+						} else {
+							String[] allValues = entry.getValue().split(",");
+							boolean allNegs = true;
+							for (String v : allValues) {
+								if (v.startsWith("~")) {
+									if (v.equals("~" + tagValue)) {
+										return false;
+									}
+								} else {
+									allNegs = false;
+									if (v.equals(tagValue)) {
+										res = true;
+									}
+								}
+							}
+							if (allNegs) {
+								res = true;
+							}
+						}
+					}
+				}
+			}
+			return res;
 		}
 	}
 

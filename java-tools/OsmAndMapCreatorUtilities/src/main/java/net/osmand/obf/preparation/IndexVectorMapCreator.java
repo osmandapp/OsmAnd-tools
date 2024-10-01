@@ -21,6 +21,7 @@ import java.util.TreeMap;
 
 import net.osmand.data.*;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
+import net.osmand.obf.preparation.PropagateToNodes.PropagateRuleFromWayToNode;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -925,11 +926,13 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
 						List<PropagateFromWayToNode> linkedPropagate = propagateToNodes.getPropagateByNodeId(cid >> 1);
 						boolean skipPoint = false;
-						// TODO osmand_change=delete should be added? or not???
+						// TODO we should skip certain tags... (osmand live ?)
 						for (PropagateFromWayToNode p : linkedPropagate) {
-							if (p.ignoreBorderPoint) {
-								skipPoint = true;
-								break;
+							for (PropagateRuleFromWayToNode n : p.rls) {
+								if (n.ignoreBorderPoint) {
+									skipPoint = true;
+									break;
+								}
 							}
 						}
 						if (skipPoint) {
