@@ -732,7 +732,9 @@ public class IndexCreator {
 						String hwTag = w.getTag("highway");
 						String access = w.getTag("access"); // TODO but with 2 points
 						if (!thisWayPartOfBorder && hwTag != null && !"private".equals(access) &&
-								!hwTag.equals("service")) {
+								!hwTag.equals("service") && 
+								!hwTag.equals("path") && !hwTag.equals("footway") && !hwTag.equals("cycleway")
+								) {
 							// TODO check only && highway >= residential
 							for (PropagateFromWayToNode p : linkedPropagate) {
 								if (p.type == PropagateToNodesType.BORDER) {
@@ -874,7 +876,7 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
-		String file = rootFolder + "../temp/map.osm";
+		String file = rootFolder + "../temp/access3.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
