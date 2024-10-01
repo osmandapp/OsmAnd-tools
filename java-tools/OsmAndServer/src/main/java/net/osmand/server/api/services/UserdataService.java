@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -520,7 +521,7 @@ public class UserdataService {
 				bin = getInputStream(dev, userFile);
 			}
 
-            response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
+            response.setHeader("Content-Disposition", "attachment; filename=" + URLEncoder.encode(userFile.name));
             // InputStream bin = fl.data.getBinaryStream();
 
             String acceptEncoding = request.getHeader("Accept-Encoding");
