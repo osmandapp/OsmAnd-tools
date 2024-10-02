@@ -7,7 +7,7 @@ import net.osmand.util.CollectionUtils;
 import java.io.File;
 
 public enum FileSubtype {
-    UNKNOWN("", null),
+    UNKNOWN("", ""),
     OTHER("other", ""),
     ROUTING_CONFIG("routing_config", IndexConstants.ROUTING_PROFILES_DIR),
     RENDERING_STYLE("rendering_style", IndexConstants.RENDERERS_DIR),
