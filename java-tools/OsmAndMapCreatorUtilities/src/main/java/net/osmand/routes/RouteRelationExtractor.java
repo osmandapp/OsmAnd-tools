@@ -1,6 +1,5 @@
 package net.osmand.routes;
 
-
 import net.osmand.IProgress;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
@@ -10,6 +9,7 @@ import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
 import net.osmand.obf.preparation.OsmDbCreator;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Node;
@@ -18,6 +18,9 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.render.RenderingRuleProperty;
+import net.osmand.render.RenderingRuleSearchRequest;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -43,7 +46,6 @@ import static net.osmand.gpx.GPXUtilities.writeNotNullText;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
-
 	private boolean DEBUG = false;
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
 	int countFiles;
@@ -272,9 +274,6 @@ public class RouteRelationExtractor {
 			gpxFile.metadata.getExtensionsToWrite().remove("colour");
 			gpxFile.metadata.getExtensionsToWrite().put("color", e.getTags().get("colour"));
 		}
-//		if (e.getTags().get("width") == null) {
-//			gpxFile.metadata.getExtensionsToWrite().put("width", "medium"); // default (bad) TODO
-//		}
 		File gpxDir = getGpxDirectory(resultFile);
 
 //		DEBUG = e.getId() == 16676577; // TODO remove debug
@@ -392,10 +391,15 @@ public class RouteRelationExtractor {
 					return;
 				}
 			}
+			String gpxIcon = evalGpxIconByOsmTags(node.getTags());
+			if (gpxIcon == null) {
+				return;
+			}
 			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 			wptPt.lat = node.getLatitude();
 			wptPt.lon = node.getLongitude();
 //			wptPt.getExtensionsToWrite().put("relation_point", "yes");
+			wptPt.getExtensionsToWrite().put("icon", gpxIcon); // will be gpx_icon
 			wptPt.getExtensionsToWrite().put("osmid", String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
@@ -414,6 +418,84 @@ public class RouteRelationExtractor {
 			gpxFile.addPoint(wptPt);
 			countNodes++;
 		}
+	}
+
+	private MapRenderingTypesEncoder renderingTypes;
+	private RenderingRulesStorage renderingRules;
+	final int evalGpxIconZoom = 19;
+
+	private String evalGpxIconByOsmTags(Map<String, String> osmTags) {
+		if (renderingTypes == null) {
+			renderingTypes = new MapRenderingTypesEncoder("basemap");
+		}
+
+		if (renderingRules == null) {
+			renderingRules = RenderingRulesStorage.initFromResources("default", "default.render.xml");
+		}
+
+		final Map<String, String> transformedTags = renderingTypes.transformTags(osmTags,
+				Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+
+		final RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(renderingRules);
+
+		for (RenderingRuleProperty customProp : renderingRules.PROPS.getCustomRules()) {
+			if (customProp.isBoolean()) {
+				searchRequest.setBooleanFilter(customProp, false);
+			} else {
+				searchRequest.setStringFilter(customProp, "");
+			}
+		}
+
+		Map<String, Integer> iconOrderMap = new HashMap<>();
+
+		for (Map.Entry<String, String> entry : transformedTags.entrySet()) {
+			final String tag = entry.getKey();
+			final String value = entry.getValue();
+			searchRequest.setStringFilter(renderingRules.PROPS.R_TAG, tag);
+			searchRequest.setStringFilter(renderingRules.PROPS.R_VALUE, value);
+			searchRequest.setIntFilter(renderingRules.PROPS.R_MINZOOM, evalGpxIconZoom);
+			searchRequest.setIntFilter(renderingRules.PROPS.R_MAXZOOM, evalGpxIconZoom);
+
+			searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, ""); // parent - no additional
+			searchRequest.search(RenderingRulesStorage.POINT_RULES);
+
+			int iconOrder = 0;
+			String iconName = null;
+
+			if (searchRequest.isFound()) {
+				iconName = searchRequest.getStringPropertyValue(searchRequest.ALL.R_ICON);
+				iconOrder = searchRequest.getIntPropertyValue(searchRequest.ALL.R_ICON_ORDER);
+
+				for (Map.Entry<String, String> additional : transformedTags.entrySet()) {
+					final String aTag = additional.getKey();
+					final String aValue = additional.getValue();
+
+					searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, aTag + "=" + aValue); // children
+					searchRequest.search(RenderingRulesStorage.POINT_RULES);
+
+					if (searchRequest.isFound()) {
+						String childIconName = searchRequest.getStringPropertyValue(searchRequest.ALL.R_ICON);
+						if (childIconName != null && (iconName == null || !iconName.equals(childIconName))) {
+							iconOrder = searchRequest.getIntPropertyValue(searchRequest.ALL.R_ICON_ORDER);
+							iconName = childIconName;
+							break; // 1 is enough
+						}
+					}
+				}
+			}
+
+			if (iconName != null) {
+				iconOrderMap.put(iconName, iconOrder);
+			}
+		}
+
+		if (!iconOrderMap.isEmpty()) {
+			Map.Entry<String, Integer> bestIcon =
+					Collections.min(iconOrderMap.entrySet(), Comparator.comparingInt(Map.Entry::getValue));
+			return bestIcon.getKey();
+		}
+
+		return null;
 	}
 
 	static class AccessorForRelationExtract extends OsmDbAccessor {
