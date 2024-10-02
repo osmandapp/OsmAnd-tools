@@ -1,13 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.sql.*;
-import java.util.Map.Entry;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -27,6 +19,13 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.sql.*;
+import java.util.Map.Entry;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -397,13 +396,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 								propagateToNodes.registerNode(pn);
 							}
 						} else if (pnodes.points[i] != null) { // in between points
-							LatLon latLon = pn.getLatLon(getNode(oldNodeIds.get(pn.start)),getNode(oldNodeIds.get(pn.end)));
-							if (latLon == null) {
+							Node startNode = getNode(oldNodeIds.get(pn.start));
+							Node endNode = getNode(oldNodeIds.get(pn.end));
+							LatLon latLon = pn.getLatLon(startNode, endNode);
+							if (latLon == null || startNode == null) {
 								continue;
 							}
-							// TODO fix overlap with multipolygons (constants)
-							pn.id = ((e.getId() << 10l) + pn.start) << SHIFT_ID; // 6 to compensate geohash
-//							System.out.println("Way -- " + e.getId()+ " " + pn.start + " --- " + pn.id);
+							long startId = startNode.getId();
+							long geoHash = ((startId >> 1) & ((1 << (SHIFT_ID - 1)) - 1));
+							geoHash++;
+							geoHash &= (1 << (SHIFT_ID - 1)) - 1; // check overflow 100000 >> 00000
+							pn.id = ((startId >> SHIFT_ID) << SHIFT_ID) + (geoHash << 1);
 							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
