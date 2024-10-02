@@ -394,7 +394,7 @@ public class MapApiController {
 					if (in != null) {
 						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
 						if (gpxFile.error != null) {
-							LOG.error("list-files: ignore corrupted-gpx-file (" + uf.id + ") " + uf.name);
+							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
 							filesToIgnore.add(nd);
 							continue;
 						}
