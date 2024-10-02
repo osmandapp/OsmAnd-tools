@@ -273,6 +273,14 @@ public class PropagateToNodes {
 			return value;
 		}
 		
+		public String getWayTag() {
+			return tag;
+		}
+		
+		public String getWayValue() {
+			return value;
+		}
+		
 		public String getPropagateTag() {
 			String propagateTag = tag;
 			if (tagPrefix != null) {
@@ -344,7 +352,7 @@ public class PropagateToNodes {
 					}
 					if (!thisWayPartOfBorder) {
 						for (PropagateRuleFromWayToNode p : propagatedBorders) {
-							if (p.rule.applicable(w)) {
+							if (p.rule.applicable(w) && !p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
 								p.ignoreBorderPoint = false;
 							}
 						}
