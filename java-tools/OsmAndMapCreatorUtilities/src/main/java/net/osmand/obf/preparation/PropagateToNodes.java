@@ -186,6 +186,11 @@ public class PropagateToNodes {
 				}
 				break;
 			case BORDER:
+				// fix for all interconnected roads assign on each point (not needed & more computational power)
+//				for (int i = 0; i < allIds.size() - 1; i++) {
+//					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
+//					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
+//				}
 				getNode(resultWay, w, 0, 1).applyRule(rule);
 				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
 				break;
