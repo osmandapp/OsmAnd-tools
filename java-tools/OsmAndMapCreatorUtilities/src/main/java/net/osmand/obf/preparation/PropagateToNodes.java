@@ -86,7 +86,7 @@ public class PropagateToNodes {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
 			rl.osmId = end ? endId : startId;
 			rl.tags.put(rule.getPropagateTag(), rule.getPropagateValue());
-			if (rule.type == PropagateToNodesType.BORDER) {
+			if (rule.type.isBorder()) {
 				rl.ignoreBorderPoint = true;
 			}
 			this.rls.add(rl);
@@ -185,14 +185,20 @@ public class PropagateToNodes {
 					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule);
 				}
 				break;
-			case BORDER:
-				// fix for all interconnected roads assign on each point (not needed & more computational power)
+			case BORDERIN:
+				// possible fix for all interconnected roads assign on each point (not needed & more computational power)
 //				for (int i = 0; i < allIds.size() - 1; i++) {
 //					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
 //					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
 //				}
 				getNode(resultWay, w, 0, 1).applyRule(rule);
 				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
+				break;
+			case BORDEROUT:
+				// fix for all interconnected roads assign on each point (not needed & more computational power)
+				for (int i = 0; i < allIds.size(); i++) {
+					getNode(resultWay, w, i, i).applyRule(rule);
+				}
 				break;
 			case NONE:
 				break;
@@ -249,7 +255,7 @@ public class PropagateToNodes {
 		}
 		for (PropagateFromWayToNode ways : list) {
 			for (PropagateRuleFromWayToNode w : ways.rls) {
-				if (!includeBorder && w.rule.type == PropagateToNodesType.BORDER) {
+				if (!includeBorder && w.rule.type.isBorder()) {
 					continue;
 				}
 				for (Map.Entry<String, String> entry : w.tags.entrySet()) {
@@ -345,7 +351,7 @@ public class PropagateToNodes {
 				}
 //				System.out.println("W" + (w.getId() >> OsmDbCreator.SHIFT_ID));
 				for (PropagateRule rule : rules.keySet()) {
-					if (rule.type != PropagateToNodesType.BORDER) {
+					if (!rule.type.isBorder()) {
 						continue;
 					}
 					boolean thisWayPartOfBorder = false;
