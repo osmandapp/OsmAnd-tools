@@ -1,13 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.sql.*;
-import java.util.Map.Entry;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -27,6 +19,13 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.sql.*;
+import java.util.Map.Entry;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -401,9 +400,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 							if (latLon == null) {
 								continue;
 							}
-							// TODO fix overlap with multipolygons (constants)
-							pn.id = ((e.getId() << 10l) + pn.start) << SHIFT_ID; // 6 to compensate geohash
-//							System.out.println("Way -- " + e.getId()+ " " + pn.start + " --- " + pn.id);
+							int mask = (1 << (SHIFT_ID - 1)) - 1;
+							long geoHash = ((id >> 1) & mask);
+							geoHash++;
+							geoHash &= mask;
+							pn.id = ((id >> SHIFT_ID) << SHIFT_ID) + (geoHash << 1) + EntityType.WAY.ordinal();
 							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
