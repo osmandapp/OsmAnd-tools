@@ -30,6 +30,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xmlpull.v1.XmlPullParserException;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.nio.file.Files;
@@ -103,8 +105,8 @@ public class RouteRelationExtractor {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
 //			s.add("germany-latest.osm.gz");
-			s.add("slovakia-latest.osm.gz");
-//			s.add("malta-latest.osm.gz");
+//			s.add("slovakia-latest.osm.gz");
+			s.add("malta-latest.osm.gz");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
 			// TODO specify source file, tmp folder, result file // finally clean up the folder
@@ -274,6 +276,11 @@ public class RouteRelationExtractor {
 			gpxFile.metadata.getExtensionsToWrite().remove("colour");
 			gpxFile.metadata.getExtensionsToWrite().put("color", e.getTags().get("colour"));
 		}
+
+//		gpxTrackTags.put("gpx_bg", "orange_hexagon_3_road_shield"); // TODO eval
+		//		String gpxIcon = searchGpxIconByOsmTags(node.getTags());
+		gpxFile.metadata.getExtensionsToWrite().put("bg", "orange_hexagon_3_road_shield"); // will be gpx_bg
+
 		File gpxDir = getGpxDirectory(resultFile);
 
 //		DEBUG = e.getId() == 16676577; // TODO remove debug
@@ -294,7 +301,7 @@ public class RouteRelationExtractor {
 		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
 			if (entry.getKey().getType() == Entity.EntityType.WAY) {
 				if ("yes".equals(entry.getValue().getTag("area"))) {
-					continue;
+					continue; // https://www.openstreetmap.org/way/746544031
 				}
 				waysToJoin.add((Way) entry.getValue());
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
@@ -325,6 +332,7 @@ public class RouteRelationExtractor {
 		}
 	}
 
+	// TODO need another approach to join in case of A D C B E -> A B C D E
 	private boolean shouldReversePoints(Way current, Way prev, Way next) {
 		if (prev != null && !prev.getNodes().isEmpty()) {
 			Node currentLast = current.getLastNode();
@@ -391,7 +399,7 @@ public class RouteRelationExtractor {
 					return;
 				}
 			}
-			String gpxIcon = evalGpxIconByOsmTags(node.getTags());
+			String gpxIcon = searchGpxIconByOsmTags(node.getTags());
 			if (gpxIcon == null) {
 				return;
 			}
@@ -420,79 +428,102 @@ public class RouteRelationExtractor {
 		}
 	}
 
+	@Nullable
+	private String searchGpxIconByOsmTags(@Nonnull Map<String, String> tags) {
+		initTypesRulesSearch();
+		return searchPropertyByOsmTags(tags, renderingRules.PROPS.R_ICON, renderingRules.PROPS.R_ICON_ORDER);
+	}
+
+	@Nullable
+	private String searchTextShieldByOsmTags(@Nonnull Map<String, String> tags) {
+		initTypesRulesSearch();
+		return searchPropertyByOsmTags(tags, renderingRules.PROPS.R_TEXT_SHIELD, renderingRules.PROPS.R_TEXT_ORDER);
+	}
+
 	private MapRenderingTypesEncoder renderingTypes;
 	private RenderingRulesStorage renderingRules;
-	final int evalGpxIconZoom = 19;
+	private RenderingRuleSearchRequest searchRequest;
+	private final int SEARCH_ZOOM = 19;
 
-	private String evalGpxIconByOsmTags(Map<String, String> osmTags) {
+	private void initTypesRulesSearch() {
 		if (renderingTypes == null) {
 			renderingTypes = new MapRenderingTypesEncoder("basemap");
 		}
-
 		if (renderingRules == null) {
 			renderingRules = RenderingRulesStorage.initFromResources("default", "default.render.xml");
 		}
+		if (searchRequest == null) {
+			searchRequest = new RenderingRuleSearchRequest(renderingRules);
+			for (RenderingRuleProperty customProp : renderingRules.PROPS.getCustomRules()) {
+				if (customProp.isBoolean()) {
+					searchRequest.setBooleanFilter(customProp, false);
+				} else {
+					searchRequest.setStringFilter(customProp, "");
+				}
+			}
+			searchRequest.setIntFilter(renderingRules.PROPS.R_MINZOOM, SEARCH_ZOOM);
+			searchRequest.setIntFilter(renderingRules.PROPS.R_MAXZOOM, SEARCH_ZOOM);
+		}
+	}
+
+	@Nullable
+	private String searchPropertyByOsmTags(@Nonnull Map<String, String> osmTags,
+	                                       @Nonnull RenderingRuleProperty mainStringProperty,
+	                                       @Nullable RenderingRuleProperty orderIntProperty) {
+		initTypesRulesSearch();
+
+		Map<String, Integer> resultOrderMap = new HashMap<>();
 
 		final Map<String, String> transformedTags = renderingTypes.transformTags(osmTags,
 				Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
-
-		final RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(renderingRules);
-
-		for (RenderingRuleProperty customProp : renderingRules.PROPS.getCustomRules()) {
-			if (customProp.isBoolean()) {
-				searchRequest.setBooleanFilter(customProp, false);
-			} else {
-				searchRequest.setStringFilter(customProp, "");
-			}
-		}
-
-		Map<String, Integer> iconOrderMap = new HashMap<>();
 
 		for (Map.Entry<String, String> entry : transformedTags.entrySet()) {
 			final String tag = entry.getKey();
 			final String value = entry.getValue();
 			searchRequest.setStringFilter(renderingRules.PROPS.R_TAG, tag);
 			searchRequest.setStringFilter(renderingRules.PROPS.R_VALUE, value);
-			searchRequest.setIntFilter(renderingRules.PROPS.R_MINZOOM, evalGpxIconZoom);
-			searchRequest.setIntFilter(renderingRules.PROPS.R_MAXZOOM, evalGpxIconZoom);
-
 			searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, ""); // parent - no additional
+
+			int order = 0;
+			String result = null;
 			searchRequest.search(RenderingRulesStorage.POINT_RULES);
 
-			int iconOrder = 0;
-			String iconName = null;
-
 			if (searchRequest.isFound()) {
-				iconName = searchRequest.getStringPropertyValue(searchRequest.ALL.R_ICON);
-				iconOrder = searchRequest.getIntPropertyValue(searchRequest.ALL.R_ICON_ORDER);
+				result = searchRequest.getStringPropertyValue(mainStringProperty);
+				order = orderIntProperty != null ? searchRequest.getIntPropertyValue(orderIntProperty) : 0;
 
+				// Cycle tags to visit "additional" rules. TODO: think how to optimize.
 				for (Map.Entry<String, String> additional : transformedTags.entrySet()) {
 					final String aTag = additional.getKey();
 					final String aValue = additional.getValue();
 
-					searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, aTag + "=" + aValue); // children
+					if (aTag.equals(tag) && aValue.equals(value)) {
+						continue;
+					}
+
+					searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, aTag + "=" + aValue);
 					searchRequest.search(RenderingRulesStorage.POINT_RULES);
 
 					if (searchRequest.isFound()) {
-						String childIconName = searchRequest.getStringPropertyValue(searchRequest.ALL.R_ICON);
-						if (childIconName != null && (iconName == null || !iconName.equals(childIconName))) {
-							iconOrder = searchRequest.getIntPropertyValue(searchRequest.ALL.R_ICON_ORDER);
-							iconName = childIconName;
-							break; // 1 is enough
+						String childResult = searchRequest.getStringPropertyValue(mainStringProperty);
+						if (childResult != null && (result == null || !result.equals(childResult))) {
+							order = orderIntProperty != null ? searchRequest.getIntPropertyValue(orderIntProperty) : 0;
+							result = childResult;
+							break; // enough
 						}
 					}
 				}
 			}
 
-			if (iconName != null) {
-				iconOrderMap.put(iconName, iconOrder);
+			if (result != null) {
+				resultOrderMap.put(result, order);
 			}
 		}
 
-		if (!iconOrderMap.isEmpty()) {
-			Map.Entry<String, Integer> bestIcon =
-					Collections.min(iconOrderMap.entrySet(), Comparator.comparingInt(Map.Entry::getValue));
-			return bestIcon.getKey();
+		if (!resultOrderMap.isEmpty()) {
+			Map.Entry<String, Integer> bestResult =
+					Collections.min(resultOrderMap.entrySet(), Comparator.comparingInt(Map.Entry::getValue));
+			return bestResult.getKey();
 		}
 
 		return null;

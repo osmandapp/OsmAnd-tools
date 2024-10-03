@@ -51,6 +51,9 @@ import net.osmand.util.MapAlgorithms;
 import net.osmand.util.MapUtils;
 import rtree.RTree;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 public class OsmGpxWriteContext {
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
@@ -327,12 +330,13 @@ public class OsmGpxWriteContext {
 
 	private void addGpxInfoTags(Map<String, String> gpxTrackTags, OsmGpxFile gpxInfo, String routeIdPrefix) {
 		if (gpxInfo != null) {
-			gpxTrackTags.put("route_id", routeIdPrefix + gpxInfo.id);
-			gpxTrackTags.put("ref", Objects.requireNonNullElse(gpxInfo.ref, gpxInfo.id % 1000 + ""));
+			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("name", gpxInfo.name);
 			gpxTrackTags.put("route_name", gpxInfo.name);
-			gpxTrackTags.put("user", gpxInfo.user);
+			gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("description", gpxInfo.description);
+			gpxTrackTags.put("route_id", routeIdPrefix + gpxInfo.id);
+
 			if (gpxInfo.timestamp.getTime() > 0) {
 				gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			}
@@ -583,6 +587,32 @@ public class OsmGpxWriteContext {
 			if (ref != null) {
 				this.ref = ref;
 			}
+		}
+
+		@Nonnull
+		public String getPrettyRef() {
+			if (!Algorithms.isEmpty(ref)) {
+				return ref;
+			}
+			if (!Algorithms.isEmpty(name)) {
+				String prettyRef = "";
+				final String [] words = name.split(" ");
+				for (int i = 0; i < words.length; i++) {
+					// Tour du Mont Blanc (France, Italy, Switzerland) => TMB
+					// Camino de Santiago (Spain) => CS
+					// Appalachian Trail (USA) => AT
+					if (words[i].length() >= 3 && Character.isLetter(words[i].charAt(0))) {
+						prettyRef += words[i].toUpperCase().charAt(0);
+					}
+					if (prettyRef.length() >= 3) {
+						break;
+					}
+				}
+				if (prettyRef.length() > 0) {
+					return prettyRef;
+				}
+			}
+			return "" + id % 1000; // default ref is always required
 		}
 	}
 
