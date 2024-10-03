@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -106,13 +107,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private static boolean VALIDATE_DUPLICATE = false;
     private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
     private BasemapProcessor checkSeaTile;
+	private PropagateToNodes propagateToNodes;
 
     public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-            IndexCreatorSettings settings) {
+            IndexCreatorSettings settings, PropagateToNodes propagateToNodes) {
         this.logMapDataWarn = logMapDataWarn;
         this.mapZooms = mapZooms;
         this.settings = settings;
         this.renderingTypes = renderingTypes;
+		this.propagateToNodes = propagateToNodes;
         lowLevelWays = -1;
     }
 
@@ -721,7 +724,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             for (int level = 0; level < mapZooms.size(); level++) {
                 processMainEntity(e, originalId, assignedId, level, tags);
             }
-
             createCenterNodeForSmallIsland(e, tags, originalId);
         }
     }
@@ -902,8 +904,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     }
 
     public void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer,
-            PreparedStatement selectData,
-            TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable,
+            PreparedStatement selectData, TLongObjectHashMap<BinaryFileReference> bounds, Map<String, Integer> tempStringTable,
             LinkedHashMap<MapRulType, String> tempNames, MapZoomPair level)
             throws IOException, RTreeException, SQLException {
         Element[] e = parent.getAllElements();
@@ -916,11 +917,29 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 long id = e[i].getPtr();
                 selectData.setLong(1, id);
                 // selectData = mapConnection.prepareStatement("SELECT area, coordinates,
-                // innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id
-                // = ?");
+                // innerPolygons, types, additionalTypes, name FROM binary_map_objects WHERE id = ?");
                 ResultSet rs = selectData.executeQuery();
                 if (rs.next()) {
-                    long cid = convertGeneratedIdToObfWrite(id);
+                	long cid = convertGeneratedIdToObfWrite(id);
+                	boolean allowWaySimplification = level.getMaxZoom() > 15;
+                    byte[] types = rs.getBytes(4);
+                    List<MapRulType> mainTypes = new ArrayList<>();
+                    for (int j = 0; j < types.length; j += 2) {
+                        int ids = Algorithms.parseSmallIntFromBytes(types, j);
+                        MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
+                        if ("railway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
+                            allowWaySimplification = false;
+                        }
+                        mainTypes.add(mapRulType);
+                    }
+                	// only nodes
+					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
+						propagateToNodes.calculateBorderPointMainTypes(cid >> 1, mainTypes);
+						if(mainTypes.size() == 0) {
+							continue;
+						}
+					}
+                    
                     if (dataBlock == null) {
                         baseId = cid;
                         dataBlock = writer.createWriteMapDataBlock(baseId);
@@ -929,17 +948,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                     }
                     tempNames.clear();
                     decodeNames(rs.getString(6), tempNames);
-                    boolean allowWaySimplification = level.getMaxZoom() > 15;
-                    byte[] types = rs.getBytes(4);
-                    int[] typeUse = new int[types.length / 2];
-                    for (int j = 0; j < types.length; j += 2) {
-                        int ids = Algorithms.parseSmallIntFromBytes(types, j);
-                        MapRulType mapRulType = renderingTypes.getTypeByInternalId(ids);
-                        if ("railway".equals(mapRulType.getTag()) && "tram".equals(mapRulType.getValue())) {
-                            allowWaySimplification = false;
-                        }
-                        typeUse[j / 2] = mapRulType.getTargetId();
-                    }
+                    int[] typeUse = new int[mainTypes.size()];                    
+					for (int k = 0; k < typeUse.length; k++) {
+						typeUse[k] = mainTypes.get(k).getTargetId();
+					}
                     byte[] addTypes = rs.getBytes(5);
                     int[] addtypeUse = null;
                     if (addTypes != null) {
@@ -1138,17 +1150,15 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         stat.close();
     }
 
-    private PreparedStatement createStatementMapBinaryInsert(Connection conn) throws SQLException {
-        return conn
-                .prepareStatement(
-                        "insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates) values(?, ?, ?, ?, ?, ?, ?, ?)");
-    }
+	private PreparedStatement createStatementMapBinaryInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement(
+				"insert into binary_map_objects(id, area, coordinates, innerPolygons, types, additionalTypes, name, labelCoordinates) values(?, ?, ?, ?, ?, ?, ?, ?)");
+	}
 
-    private PreparedStatement createStatementLowLevelMapBinaryInsert(Connection conn) throws SQLException {
-        return conn
-                .prepareStatement(
-                        "insert into low_level_map_objects(id, start_node, end_node, name, nodes, type, addType, level) values(?, ?, ?, ?, ?, ?, ?, ?)");
-    }
+	private PreparedStatement createStatementLowLevelMapBinaryInsert(Connection conn) throws SQLException {
+		return conn.prepareStatement(
+				"insert into low_level_map_objects(id, start_node, end_node, name, nodes, type, addType, level) values(?, ?, ?, ?, ?, ?, ?, ?)");
+	}
 
     private void insertLowLevelMapBinaryObject(int level, int zoom, TIntArrayList types, TIntArrayList addTypes,
             long id, List<Node> in, TreeMap<MapRulType, String> namesUse)

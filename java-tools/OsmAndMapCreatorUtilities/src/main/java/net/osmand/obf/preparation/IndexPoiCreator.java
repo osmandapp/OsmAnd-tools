@@ -229,7 +229,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
 		poiPreparedStatement.setInt(7, amenity.getOrder());
-
 		int topIndex = 8;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			String val = amenity.getAdditionalInfo(entry.getKey().replace(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX, ""));
@@ -357,10 +356,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		stat.close();
 
 		// create prepared statment
-		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority"
-						+ getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() +  ")");
+		poiPreparedStatement = poiConnection.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE
+				+ "(id, x, y, type, subtype, additionalTags, priority" + getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-2$ //$NON-NLS-2$
+				"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() + ")");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);

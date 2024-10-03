@@ -1,5 +1,24 @@
 package net.osmand.obf.preparation;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.zip.GZIPInputStream;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.xmlpull.v1.XmlPullParserException;
+
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
@@ -17,19 +36,7 @@ import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.util.Algorithms;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.xmlpull.v1.XmlPullParserException;
 import rtree.RTreeException;
-
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import java.io.*;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.zip.GZIPInputStream;
 
 /**
  * http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing#Is_inside.2Foutside
@@ -201,7 +208,7 @@ public class IndexCreator {
 			}
 		}
 		if (propagateToNodes != null && e instanceof Node) {
-			propagateToNodes.propagateTagsToNode((Node) e);
+			propagateToNodes.propagateTagsToNode((Node) e, true);
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
@@ -505,7 +512,7 @@ public class IndexCreator {
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
-		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
@@ -709,6 +716,8 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+				Way w = (Way) e;
+				propagateToNodes.calculateBorderPoints(w);
 				iterateMainEntity(e, ctx, icc);
 			}
 		});
@@ -840,9 +849,10 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "../temp/Diff-end.osm";
-		String file = rootFolder + "../temp/map.osm";
-		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "../temp/andorra_europe.pbf";
+//		String file = rootFolder + "../temp/map.osm";
+		String file = rootFolder + "../temp/test_access.osm";
+//		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
