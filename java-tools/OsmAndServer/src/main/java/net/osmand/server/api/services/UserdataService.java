@@ -832,6 +832,8 @@ public class UserdataService {
                     .filter(type -> type.startsWith(FILE_TYPE))
                     .collect(Collectors.toList());
             if (!fileTypes.isEmpty()) {
+                LOG.error("name: " + sf.name);
+                LOG.error("subtype: " + FileSubtype.getSubtypeByFileName(sf.name));
                 String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
                 if (!currentFileSubType.equals("")) {
                     return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
