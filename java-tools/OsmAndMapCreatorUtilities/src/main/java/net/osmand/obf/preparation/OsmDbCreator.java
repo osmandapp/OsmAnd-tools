@@ -1,17 +1,10 @@
 package net.osmand.obf.preparation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.sql.*;
-import java.util.Map.Entry;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
+import net.osmand.binary.ObfConstants;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.obf.preparation.PropagateToNodes.PropagateFromWayToNode;
@@ -27,6 +20,14 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.Map.Entry;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -56,6 +57,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
+	private HashMap<Long, Integer> propagatedNodesCache = new HashMap<>();//key way_id, value - count
 	
 	
 
@@ -401,9 +403,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 							if (latLon == null) {
 								continue;
 							}
-							// TODO fix overlap with multipolygons (constants)
-							pn.id = ((e.getId() << 10l) + pn.start) << SHIFT_ID; // 6 to compensate geohash
-//							System.out.println("Way -- " + e.getId()+ " " + pn.start + " --- " + pn.id);
+							int cnt = propagatedNodesCache.getOrDefault(e.getId(), 0);
+							cnt++;
+							if (cnt > ObfConstants.MAX_COUNT_PROPAGATED_NODES) {
+								log.error("Maximum number " + ObfConstants.MAX_COUNT_PROPAGATED_NODES + " of propagated nodes reached for way:" + e.getId());
+								break;
+							}
+							propagatedNodesCache.put(e.getId(), cnt);
+							pn.id = (1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1)) + (e.getId() << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + cnt;
 							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());

@@ -1,11 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.data.LatLon;
@@ -13,8 +7,11 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+
+import java.util.*;
 
 public class PropagateToNodes {
 
@@ -378,8 +375,6 @@ public class PropagateToNodes {
 		if (linkedPropagate == null) {
 			return;
 		}
-//		long wayId = (nodeId >> 10) >> OsmDbCreator.SHIFT_ID;
-//		System.out.println(wayId + " " + ((nodeId >> OsmDbCreator.SHIFT_ID) - (wayId << 10l)));
 		Iterator<MapRulType> it = mainTypes.iterator();
 		while (it.hasNext()) {
 			MapRulType type = it.next();
@@ -400,6 +395,21 @@ public class PropagateToNodes {
 				it.remove();
 			}
 		}
+	}
+
+	public boolean ignoreBorderPoint(long nodeId, PoiType poiType) {
+		List<PropagateFromWayToNode> linkedPropagate = getPropagateByNodeId(nodeId);
+		if (linkedPropagate == null) {
+			return false;
+		}
+		for (PropagateFromWayToNode p : linkedPropagate) {
+			for (PropagateRuleFromWayToNode n : p.rls) {
+				if (poiType.getOsmTag().equals(n.rule.getPropagateTag()) && poiType.getOsmValue().equals(n.rule.getPropagateValue())) {
+					return n.ignoreBorderPoint;
+				}
+			}
+		}
+		return false;
 	}
 
 }

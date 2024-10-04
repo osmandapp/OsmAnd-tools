@@ -1,14 +1,17 @@
 package net.osmand.obf.diff;
 
 import com.google.protobuf.CodedOutputStream;
-
 import com.google.protobuf.Message;
+import gnu.trove.iterator.TLongIterator;
+import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TLongLongMap;
+import gnu.trove.map.hash.TLongLongHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
@@ -17,10 +20,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
@@ -30,42 +30,18 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
 import org.apache.commons.logging.Log;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.TreeMap;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import gnu.trove.iterator.TIntIterator;
-import gnu.trove.iterator.TLongIterator;
-import gnu.trove.iterator.TLongObjectIterator;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntLongMap;
-import gnu.trove.map.TLongLongMap;
-import gnu.trove.map.hash.TIntLongHashMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TLongLongHashMap;
-import gnu.trove.map.hash.TLongObjectHashMap;
 import rtree.LeafElement;
 import rtree.RTree;
 import rtree.RTreeException;
 import rtree.Rect;
+
+import java.io.*;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class ObfFileInMemory {
 	private static final int ZOOM_LEVEL_POI = 15;
@@ -206,7 +182,7 @@ public class ObfFileInMemory {
 			MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexPOI = true;
-			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
+			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, null);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
 			for (Map<String, Amenity> mp : poiObjects.valueCollection()) {

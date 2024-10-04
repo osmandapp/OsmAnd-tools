@@ -1,29 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-
-import net.osmand.data.*;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -31,31 +7,33 @@ import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
+import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.data.*;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
-import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.OsmMapUtils;
-import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import rtree.Element;
-import rtree.IllegalValueException;
-import rtree.LeafElement;
-import rtree.RTree;
-import rtree.RTreeException;
-import rtree.RTreeInsertException;
-import rtree.Rect;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import rtree.*;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.sql.*;
+import java.util.*;
 
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
@@ -100,8 +78,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private RTree[] mapTree = null;
     private Connection mapConnection;
 
-    private static int SHIFT_MULTIPOLYGON_IDS = 43;
-    private static int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
     private static int DUPLICATE_SPLIT = 5;
     public TLongHashSet generatedIds = new TLongHashSet();
     private static boolean VALIDATE_DUPLICATE = false;
@@ -136,11 +112,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             }
 
         }
-        return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) + (sum % 63));
+        return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) + (sum % 63));
     }
 
     private long assignIdBasedOnOriginalSplit(EntityId originalId) {
-        return genId(SHIFT_NON_SPLIT_EXISTING_IDS, originalId.getId());
+        return genId(ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS, originalId.getId());
     }
 
     private long genId(int baseShift, long id) {
