@@ -1,8 +1,7 @@
 package net.osmand.server.api.services;
 
 import java.io.*;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
@@ -31,6 +30,8 @@ import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
+
+import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 @Service
 public class WikiService {
@@ -86,8 +87,51 @@ public class WikiService {
 		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 	
+	public String getWikiRawDataFromCache(String url) {
+		String query = "SELECT raw_data FROM wiki.imagesrawdata WHERE url = ? LIMIT 1";
+		return jdbcTemplate.query(query, ps -> ps.setString(1, url), rs -> {
+			if (rs.next()) {
+				return rs.getString("raw_data");
+			}
+			return null;
+		});
+	}
+	
+	public void saveWikiRawDataToCache(String url, String rawData) {
+		String query = "INSERT INTO wiki.imagesrawdata (url, raw_data) VALUES (?, ?)";
+		jdbcTemplate.update(query, ps -> {
+			ps.setString(1, url);
+			ps.setString(2, rawData);
+		});
+	}
+	
+	
+	public String parseRawImageInfo(String dataUrl) throws IOException {
+		URL url = new URL(dataUrl);
+		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		connection.setRequestMethod("GET");
+		
+		BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+		String inputLine;
+		StringBuilder content = new StringBuilder();
+		
+		while ((inputLine = in.readLine()) != null) {
+			content.append(inputLine).append("\n");
+		}
+		in.close();
+		connection.disconnect();
+		return content.toString();
+	}
+	
 	public Map<String, String> parseImageInfo(String data) {
 		return WikiImagesUtil.INSTANCE.parseWikiText(data);
+	}
+	
+	public Map<String, String> parseImageInfo(String rawData, String title, String lang) throws SQLException, IOException {
+		Map<String, String> result = new HashMap<>();
+		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, lang, title, null);
+		
+		return result;
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
