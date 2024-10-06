@@ -10,6 +10,7 @@ import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
 import net.osmand.obf.preparation.OsmDbCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Node;
@@ -18,9 +19,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
-import net.osmand.render.RenderingRuleProperty;
-import net.osmand.render.RenderingRuleSearchRequest;
-import net.osmand.render.RenderingRulesStorage;
+import net.osmand.render.FindByRenderingTypesRules;
 import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -30,8 +29,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xmlpull.v1.XmlPullParserException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.nio.file.Files;
@@ -55,6 +52,17 @@ public class RouteRelationExtractor {
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
 	private final double precisionLatLonEquals = 1e-5;
+
+	private String[] customStyles = {
+			"default.render.xml",
+			"routes.addon.render.xml"
+	};
+	private static final Map<String, String> customProperties = Map.of(
+			"hikingRoutesOSMC", "walkingRoutesOSMC",
+			"showCycleRoutes", "true"
+			// TODO add other switches
+	);
+	private FindByRenderingTypesRules finder = new FindByRenderingTypesRules(customStyles, customProperties);
 	private final String[] filteredTags = {
 			"-bus",
 			"-road",
@@ -265,25 +273,25 @@ public class RouteRelationExtractor {
 		System.out.println("Wrote result into " + resultFile.getName() + " in " + deltaTime + " sec.");
 	}
 
-	private void saveGpx(Entity e, Map<EntityId, Entity> additionalEntities, File resultFile) {
+	private void saveGpx(Entity relation, Map<EntityId, Entity> children, File resultFile) {
+//		DEBUG = relation.getId() == 13168625; // TODO remove debug
+
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
-		gpxFile.metadata.name = Objects.requireNonNullElse(e.getTag("name"), String.valueOf(e.getId()));
-		gpxFile.metadata.desc = e.getTag("description"); // nullable
-		gpxFile.metadata.getExtensionsToWrite().putAll(e.getTags());
-		gpxFile.metadata.getExtensionsToWrite().put("relation_gpx", "yes");
-		gpxFile.metadata.getExtensionsToWrite().put("osmid", String.valueOf(e.getId()));
-		if (e.getTags().get("colour") != null) {
-			gpxFile.metadata.getExtensionsToWrite().remove("colour");
-			gpxFile.metadata.getExtensionsToWrite().put("color", e.getTags().get("colour"));
+		gpxFile.metadata.name = Objects.requireNonNullElse(relation.getTag("name"), String.valueOf(relation.getId()));
+		gpxFile.metadata.desc = relation.getTag("description"); // nullable
+
+		Map <String, String> metadataExtensions = gpxFile.metadata.getExtensionsToWrite();
+
+		metadataExtensions.putAll(relation.getTags());
+		metadataExtensions.put("osmid", String.valueOf(relation.getId()));
+		metadataExtensions.put("relation_gpx", "yes"); // render route:segment distinctly
+
+		if (relation.getTags().get("colour") != null) {
+			metadataExtensions.remove("colour");
+			metadataExtensions.put("color", relation.getTags().get("colour"));
 		}
 
-//		gpxTrackTags.put("gpx_bg", "orange_hexagon_3_road_shield"); // TODO eval
-		//		String gpxIcon = searchGpxIconByOsmTags(node.getTags());
-		gpxFile.metadata.getExtensionsToWrite().put("bg", "orange_hexagon_3_road_shield"); // will be gpx_bg
-
 		File gpxDir = getGpxDirectory(resultFile);
-
-//		DEBUG = e.getId() == 16676577; // TODO remove debug
 
 		try {
 			if (!gpxDir.exists()) {
@@ -297,13 +305,36 @@ public class RouteRelationExtractor {
 		track.name = gpxFile.metadata.name;
 		gpxFile.tracks.add(track);
 
+		RelationTagsPropagation transformer = new RelationTagsPropagation();
+		try {
+			transformer.handleRelationPropogatedTags((Relation)relation, finder.renderingTypes, null,
+					MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+		} catch (SQLException ex) {
+			throw new RuntimeException(ex);
+		}
+
 		List<Way> waysToJoin = new ArrayList<>();
-		for (Map.Entry<EntityId, Entity> entry : additionalEntities.entrySet()) {
+		for (Map.Entry<EntityId, Entity> entry : children.entrySet()) {
 			if (entry.getKey().getType() == Entity.EntityType.WAY) {
-				if ("yes".equals(entry.getValue().getTag("area"))) {
-					continue; // https://www.openstreetmap.org/way/746544031
+				Way way = (Way) entry.getValue();
+				if ("yes".equals(way.getTag("area"))) {
+					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
-				waysToJoin.add((Way) entry.getValue());
+				waysToJoin.add(way);
+				transformer.addPropogatedTags(finder.renderingTypes,
+						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
+				Map<String, String> props = finder.searchOsmcPropertiesByFinalTags(way.getTags());
+				if (props != null) {
+					if (props.get("textShield") != null) {
+						props.put("bg", props.get("textShield")); // will be gpx_bg
+						props.remove("textShield");
+					}
+					if (props.get("color") != null) {
+						// color is forced by osmc_waycolor
+						metadataExtensions.remove("colour");
+					}
+					metadataExtensions.putAll(props);
+				}
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
 			}
@@ -317,7 +348,7 @@ public class RouteRelationExtractor {
 					i < waysToJoin.size() - 1 ? waysToJoin.get(i + 1) : null);
 		}
 
-		File outFile = new File(gpxDir, e.getId() + GPX_GZ_FILE_EXT);
+		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
 			OutputStream outputStream = new FileOutputStream(outFile);
 			outputStream = new GZIPOutputStream(outputStream);
@@ -332,7 +363,7 @@ public class RouteRelationExtractor {
 		}
 	}
 
-	// TODO need another approach to join in case of A D C B E -> A B C D E
+	// TODO need another approach for join in case of A D C B E -> A B C D E
 	private boolean shouldReversePoints(Way current, Way prev, Way next) {
 		if (prev != null && !prev.getNodes().isEmpty()) {
 			Node currentLast = current.getLastNode();
@@ -399,7 +430,7 @@ public class RouteRelationExtractor {
 					return;
 				}
 			}
-			String gpxIcon = searchGpxIconByOsmTags(node.getTags());
+			String gpxIcon = finder.searchGpxIconByNode(node);
 			if (gpxIcon == null) {
 				return;
 			}
@@ -426,107 +457,6 @@ public class RouteRelationExtractor {
 			gpxFile.addPoint(wptPt);
 			countNodes++;
 		}
-	}
-
-	@Nullable
-	private String searchGpxIconByOsmTags(@Nonnull Map<String, String> tags) {
-		initTypesRulesSearch();
-		return searchPropertyByOsmTags(tags, renderingRules.PROPS.R_ICON, renderingRules.PROPS.R_ICON_ORDER);
-	}
-
-	@Nullable
-	private String searchTextShieldByOsmTags(@Nonnull Map<String, String> tags) {
-		initTypesRulesSearch();
-		return searchPropertyByOsmTags(tags, renderingRules.PROPS.R_TEXT_SHIELD, renderingRules.PROPS.R_TEXT_ORDER);
-	}
-
-	private MapRenderingTypesEncoder renderingTypes;
-	private RenderingRulesStorage renderingRules;
-	private RenderingRuleSearchRequest searchRequest;
-	private final int SEARCH_ZOOM = 19;
-
-	private void initTypesRulesSearch() {
-		if (renderingTypes == null) {
-			renderingTypes = new MapRenderingTypesEncoder("basemap");
-		}
-		if (renderingRules == null) {
-			renderingRules = RenderingRulesStorage.initFromResources("default", "default.render.xml");
-		}
-		if (searchRequest == null) {
-			searchRequest = new RenderingRuleSearchRequest(renderingRules);
-			for (RenderingRuleProperty customProp : renderingRules.PROPS.getCustomRules()) {
-				if (customProp.isBoolean()) {
-					searchRequest.setBooleanFilter(customProp, false);
-				} else {
-					searchRequest.setStringFilter(customProp, "");
-				}
-			}
-			searchRequest.setIntFilter(renderingRules.PROPS.R_MINZOOM, SEARCH_ZOOM);
-			searchRequest.setIntFilter(renderingRules.PROPS.R_MAXZOOM, SEARCH_ZOOM);
-		}
-	}
-
-	@Nullable
-	private String searchPropertyByOsmTags(@Nonnull Map<String, String> osmTags,
-	                                       @Nonnull RenderingRuleProperty mainStringProperty,
-	                                       @Nullable RenderingRuleProperty orderIntProperty) {
-		initTypesRulesSearch();
-
-		Map<String, Integer> resultOrderMap = new HashMap<>();
-
-		final Map<String, String> transformedTags = renderingTypes.transformTags(osmTags,
-				Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
-
-		for (Map.Entry<String, String> entry : transformedTags.entrySet()) {
-			final String tag = entry.getKey();
-			final String value = entry.getValue();
-			searchRequest.setStringFilter(renderingRules.PROPS.R_TAG, tag);
-			searchRequest.setStringFilter(renderingRules.PROPS.R_VALUE, value);
-			searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, ""); // parent - no additional
-
-			int order = 0;
-			String result = null;
-			searchRequest.search(RenderingRulesStorage.POINT_RULES);
-
-			if (searchRequest.isFound()) {
-				result = searchRequest.getStringPropertyValue(mainStringProperty);
-				order = orderIntProperty != null ? searchRequest.getIntPropertyValue(orderIntProperty) : 0;
-
-				// Cycle tags to visit "additional" rules. TODO: think how to optimize.
-				for (Map.Entry<String, String> additional : transformedTags.entrySet()) {
-					final String aTag = additional.getKey();
-					final String aValue = additional.getValue();
-
-					if (aTag.equals(tag) && aValue.equals(value)) {
-						continue;
-					}
-
-					searchRequest.setStringFilter(renderingRules.PROPS.R_ADDITIONAL, aTag + "=" + aValue);
-					searchRequest.search(RenderingRulesStorage.POINT_RULES);
-
-					if (searchRequest.isFound()) {
-						String childResult = searchRequest.getStringPropertyValue(mainStringProperty);
-						if (childResult != null && (result == null || !result.equals(childResult))) {
-							order = orderIntProperty != null ? searchRequest.getIntPropertyValue(orderIntProperty) : 0;
-							result = childResult;
-							break; // enough
-						}
-					}
-				}
-			}
-
-			if (result != null) {
-				resultOrderMap.put(result, order);
-			}
-		}
-
-		if (!resultOrderMap.isEmpty()) {
-			Map.Entry<String, Integer> bestResult =
-					Collections.min(resultOrderMap.entrySet(), Comparator.comparingInt(Map.Entry::getValue));
-			return bestResult.getKey();
-		}
-
-		return null;
 	}
 
 	static class AccessorForRelationExtract extends OsmDbAccessor {

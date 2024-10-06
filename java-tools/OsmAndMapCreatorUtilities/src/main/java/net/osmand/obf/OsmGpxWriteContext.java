@@ -303,7 +303,7 @@ public class OsmGpxWriteContext {
 	}
 
 	public void endDocument() throws IOException {
-		if(serializer != null) {
+		if (serializer != null) {
 			serializer.endDocument();
 			serializer.flush();
 			outputStream.close();
@@ -427,28 +427,6 @@ public class OsmGpxWriteContext {
 				tagValue(serializer, "hdop", latLonFormat.format(p.getHdop()));
 			}
 		}
-
-//		int relationTagsAdded = 0;
-//		final String[] relationRoutePointTags = {
-//				"information",
-//				"tourism",
-//				"historic",
-//				"religion",
-//				"hiking",
-//				"operator",
-//				"network",
-//				"highway" // turning_cycle 279100634
-//		};
-//		Map<String, String> extensions = p.getExtensionsToRead();
-//		for (String t : relationRoutePointTags) {
-//			if (extensions.get(t) != null) {
-//				tagValue(serializer, t, extensions.get(t));
-//				relationTagsAdded++;
-//			}
-//		}
-//		if (relationTagsAdded > 0) {
-//			tagValue(serializer, "gpx_icon", "none");
-//		}
 
 		serializer.endTag(null, "node");
 	}
