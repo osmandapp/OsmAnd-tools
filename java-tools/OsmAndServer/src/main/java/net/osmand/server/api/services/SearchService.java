@@ -2,10 +2,7 @@ package net.osmand.server.api.services;
 
 import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
@@ -57,11 +54,9 @@ public class SearchService {
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
     
-    private static final int SHIFT_MULTIPOLYGON_IDS = 43;
-    private static final int SHIFT_NON_SPLIT_EXISTING_IDS = 41;
     private static final int DUPLICATE_SPLIT = 5;
-    public static final long RELATION_BIT = 1L << SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
-    public static final long SPLIT_BIT = 1L << SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
+    public static final long RELATION_BIT = 1L << ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
+    public static final long SPLIT_BIT = 1L << ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
     private static final String DELIMITER = " ";
     

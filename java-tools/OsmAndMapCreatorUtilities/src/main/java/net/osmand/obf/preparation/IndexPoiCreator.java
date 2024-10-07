@@ -5,6 +5,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.ObfConstants;
 import net.osmand.data.*;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.*;
@@ -38,7 +39,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
@@ -55,11 +55,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private QuadTree<Multipolygon> cityQuadTree;
 	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
 	private Map<Long, List<Integer>> poiTagGroups = new HashMap<>();
+	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
+	private PropagateToNodes propagateToNodes;
+	private HashMap<String, PoiType> propagatedPoiTypeCache = new HashMap<>();
 
-	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, PropagateToNodes propagateToNodes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
+		this.propagateToNodes = propagateToNodes;
 	}
 
 	public void storeCities(CityDataStorage cityDataStorage) {
@@ -122,7 +126,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
-		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
+		return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
 	}
 	
 	private long genId(int baseShift, long id) {
@@ -157,10 +161,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 //				id = GENERATE_OBJ_ID--;
 				id = assignIdForMultipolygon((Relation) e);
 			} else if(id > 0) {
-				// keep backward compatibility for ids (osm editing)
-				id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
-				if (id % 2 != (e.getId() % 2)) {
-					id ^= 1;
+				boolean isPropagated = e.getId() > PROPAGATED_NODE_BIT;
+				if (isPropagated) {
+					id = e.getId();
+				} else {
+					// keep backward compatibility for ids (osm editing)
+					id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
+					if (id % 2 != (e.getId() % 2)) {
+						id ^= 1;
+					}
 				}
 			}
 			for (Amenity a : tempAmenityList) {
@@ -229,7 +238,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
 		poiPreparedStatement.setInt(7, amenity.getOrder());
-
 		int topIndex = 8;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			String val = amenity.getAdditionalInfo(entry.getKey().replace(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX, ""));
@@ -357,10 +365,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		stat.close();
 
 		// create prepared statment
-		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority"
-						+ getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() +  ")");
+		poiPreparedStatement = poiConnection.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE
+				+ "(id, x, y, type, subtype, additionalTags, priority" + getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-2$ //$NON-NLS-2$
+				"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() + ")");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
@@ -573,6 +580,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
+					if (poi.id > PROPAGATED_NODE_BIT) {
+						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
+						if (propagateToNodes.ignoreBorderPoint(poi.id, propagatedPoiType)) {
+							continue;
+						}
+					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
 							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
 				}
@@ -594,6 +607,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
 					List<Integer> tagGroupIds = poiTagGroups.get(id);
+					if (id > PROPAGATED_NODE_BIT) {
+						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
+						if (propagateToNodes.ignoreBorderPoint(id, propagatedPoiType)) {
+							continue;
+						}
+					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
 							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, tagGroupIds);
@@ -1026,5 +1045,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return sql;
 		}
 		return "";
+	}
+
+	private PoiType getPropagatedPoiType(String subtype) {
+		PoiType poiType = null;
+		if (propagatedPoiTypeCache.containsKey(subtype)) {
+			return propagatedPoiTypeCache.get(subtype);
+		}
+		poiType = poiTypes.getPoiTypeByKey(subtype);
+		propagatedPoiTypeCache.put(subtype, poiType);
+		return poiType;
 	}
 }

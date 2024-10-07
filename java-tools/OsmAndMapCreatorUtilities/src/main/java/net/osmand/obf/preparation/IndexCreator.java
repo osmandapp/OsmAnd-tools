@@ -201,7 +201,7 @@ public class IndexCreator {
 			}
 		}
 		if (propagateToNodes != null && e instanceof Node) {
-			propagateToNodes.propagateTagsToNode((Node) e);
+			propagateToNodes.propagateTagsToNode((Node) e, true);
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.iterateEntity(e, ctx, icc);
@@ -389,7 +389,7 @@ public class IndexCreator {
 
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
 					settings.zoomWaySmoothness);
-			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes)
+			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes, null)
 					: null;
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
@@ -503,9 +503,9 @@ public class IndexCreator {
 
 		this.propagateToNodes = new PropagateToNodes(renderingTypes);
 		this.indexTransportCreator = new IndexTransportCreator(settings);
-		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
+		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, propagateToNodes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
-		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
 
@@ -709,6 +709,8 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.WAY, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+				Way w = (Way) e;
+				propagateToNodes.calculateBorderPoints(w);
 				iterateMainEntity(e, ctx, icc);
 			}
 		});
@@ -840,9 +842,10 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "../temp/Diff-end.osm";
-		String file = rootFolder + "../temp/map.osm";
-		// String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "../temp/andorra_europe.pbf";
+//		String file = rootFolder + "../temp/map.osm";
+		String file = rootFolder + "../temp/test_access.osm";
+//		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 
