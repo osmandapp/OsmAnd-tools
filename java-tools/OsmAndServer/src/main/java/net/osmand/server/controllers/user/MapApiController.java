@@ -75,11 +75,12 @@ import org.xmlpull.v1.XmlPullParserException;
 @RequestMapping("/mapapi")
 public class MapApiController {
 
-	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
+	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
+	private static final String FAV_POINT_GROUPS = "pointGroups";
 
 	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
 
@@ -378,6 +379,7 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		List <UserFileNoData> filesToIgnore = new ArrayList<>();
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
@@ -391,6 +393,11 @@ public class MapApiController {
 							: userdataService.getInputStream(uf);
 					if (in != null) {
 						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+						if (gpxFile.error != null) {
+							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							filesToIgnore.add(nd);
+							continue;
+						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
 							if (gpxFile.metadata != null) {
@@ -407,7 +414,7 @@ public class MapApiController {
 								groupInfo.put("hidden", String.valueOf(isHidden(group)));
 								pointGroupsAnalysis.put(k, groupInfo);
 							});
-							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
+							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
@@ -431,6 +438,7 @@ public class MapApiController {
 				addDeviceInformation(nd, devices);
 			}
 		}
+		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
@@ -470,7 +478,10 @@ public class MapApiController {
 	}
 
 	private boolean analysisPresentFavorites(String tag, JsonObject details) {
-		return details != null && details.has(tag + DONE_SUFFIX)
+		return details != null
+				&& details.has(tag + DONE_SUFFIX)
+				&& details.has(FAV_POINT_GROUPS)
+				&& !details.get(FAV_POINT_GROUPS).getAsString().equals("{}")
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
