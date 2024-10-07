@@ -830,13 +830,16 @@ public class UserdataService {
         if (currentFileType.equals(FILE_TYPE)) {
             List<String> fileTypes = filterTypes.stream()
                     .filter(type -> type.startsWith(FILE_TYPE))
-                    .collect(Collectors.toList());
+                    .toList();
             if (!fileTypes.isEmpty()) {
-                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
-                if (!currentFileSubType.equals("")) {
-                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
-                } else {
-                    return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                String subtypeFolder = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder();
+                if (subtypeFolder != null) {
+                    String currentFileSubType = subtypeFolder.replace("/", "");
+                    if (!currentFileSubType.equals("")) {
+                        return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
+                    } else {
+                        return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                    }
                 }
             }
         }
