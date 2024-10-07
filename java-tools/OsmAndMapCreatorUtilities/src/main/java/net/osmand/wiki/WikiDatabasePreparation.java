@@ -34,6 +34,7 @@ import java.util.TreeSet;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import javax.annotation.Nullable;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -202,12 +203,12 @@ public class WikiDatabasePreparation {
 	}
 	
 	public static String removeMacroBlocks(StringBuilder text,
-	                                       Map<String, String> webBlockResults,
+	                                       @Nullable Map<String, String> webBlockResults,
 	                                       Map<WikivoyageTemplates, List<String>> blockResults,
-	                                       List<Map<PoiFieldType, Object>> pois,
+	                                       @Nullable List<Map<PoiFieldType, Object>> pois,
 	                                       String lang,
 	                                       String title,
-	                                       WikiDBBrowser browser)
+	                                       @Nullable WikiDBBrowser browser)
 			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -391,6 +392,11 @@ public class WikiDatabasePreparation {
 	 * @param webBlockResults A map to store the parsed author, date, and description fields
 	 */
 	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults) {
+		
+		if (webBlockResults == null) {
+			return;
+		}
+		
 		String author = DEFAULT_STRING;
 		String date = DEFAULT_STRING;
 		Map<String, String> description = new HashMap<>();
@@ -426,28 +432,26 @@ public class WikiDatabasePreparation {
 				}
 			}
 		}
-		
-		if (webBlockResults != null) {
-			webBlockResults.put(AUTHOR, author);
-			webBlockResults.put(DATE, date);
-			
-			for (Map.Entry<String, String> entry : description.entrySet()) {
-				if (entry.getKey().equals(lang)) {
-					webBlockResults.put(DESCRIPTION, entry.getValue());
-				}
-			}
-			
-			// If no description was found in the target language, fallback to English description (default language)
-			if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-				webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
-			}
-			
-			// If no description for English either, fallback to the first available description
-			if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
-				webBlockResults.put(DESCRIPTION, description.values().iterator().next());
-			}
-		}
-	}
+        
+        webBlockResults.put(AUTHOR, author);
+        webBlockResults.put(DATE, date);
+        
+        for (Map.Entry<String, String> entry : description.entrySet()) {
+            if (entry.getKey().equals(lang)) {
+                webBlockResults.put(DESCRIPTION, entry.getValue());
+            }
+        }
+        
+        // If no description was found in the target language, fallback to English description (default language)
+        if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+            webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
+        }
+        
+        // If no description for English either, fallback to the first available description
+        if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
+            webBlockResults.put(DESCRIPTION, description.values().iterator().next());
+        }
+    }
 	
 	/**
 	 * Parses the License block after =={{int:license-header}}== and extracts the license information.
@@ -458,6 +462,11 @@ public class WikiDatabasePreparation {
 	 * @param webBlockResults A map to store the parsed license field
 	 */
 	private static void parseLicenseBlock(String val, Map<String, String> webBlockResults) {
+		
+		if (webBlockResults == null) {
+			return;
+		}
+		
 		final String LICENSE = "license";
 		List<String> licenses = new ArrayList<>();
 		
@@ -489,7 +498,7 @@ public class WikiDatabasePreparation {
 			licenses.add(part);
 		}
 		
-		if (webBlockResults != null && !licenses.isEmpty()) {
+		if (!licenses.isEmpty()) {
 			webBlockResults.put(LICENSE, String.join(", ", licenses));
 		}
 	}

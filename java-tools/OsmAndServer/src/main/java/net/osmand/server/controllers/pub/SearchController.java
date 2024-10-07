@@ -126,28 +126,32 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
                                                  @RequestParam(required = false) String imageTitle,
-                                                 @RequestParam(required = false) String lang,
-                                                 @RequestParam(required = false) String rawData) throws IOException, SQLException {
-        if (data != null) {
+                                                 @RequestParam(required = false) String lang) throws IOException, SQLException {
+        if (imageTitle == null && data == null) {
+            return ResponseEntity.badRequest().body("Required imageTitle or data!");
+        }
+        
+        if (imageTitle == null) {
             // old parsing
             Map<String, String> info = wikiService.parseImageInfo(data);
             return ResponseEntity.ok(gson.toJson(info));
         }
+        
         String url = "https://commons.wikimedia.org/wiki/File:" + imageTitle + "?action=raw";
-        String rawWikiData = rawData;
-        if (rawWikiData == null) {
-            rawWikiData = wikiService.getWikiRawDataFromCache(url);
+        
+        if (data == null) {
+            data = wikiService.getWikiRawDataFromCache(url);
         }
-        if (rawWikiData == null) {
-            rawWikiData = wikiService.parseRawImageInfo(url);
-            if (rawWikiData != null) {
-                wikiService.saveWikiRawDataToCache(url, rawWikiData);
+        if (data == null) {
+            data = wikiService.parseRawImageInfo(url);
+            if (data != null) {
+                wikiService.saveWikiRawDataToCache(url, data);
             }
         }
-        if (rawWikiData == null) {
+        if (data == null) {
             return ResponseEntity.badRequest().body("Error get image info!");
         }
-        Map<String, String> info = wikiService.parseImageInfo(rawWikiData, imageTitle, lang);
+        Map<String, String> info = wikiService.parseImageInfo(data, imageTitle, lang);
         return ResponseEntity.ok(gson.toJson(info));
     }
     

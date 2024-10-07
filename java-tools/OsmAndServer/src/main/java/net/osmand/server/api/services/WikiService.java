@@ -105,22 +105,44 @@ public class WikiService {
 		});
 	}
 	
-	
-	public String parseRawImageInfo(String dataUrl) throws IOException {
-		URL url = new URL(dataUrl);
-		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-		connection.setRequestMethod("GET");
-		
-		BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-		String inputLine;
-		StringBuilder content = new StringBuilder();
-		
-		while ((inputLine = in.readLine()) != null) {
-			content.append(inputLine).append("\n");
+	public String parseRawImageInfo(String dataUrl) {
+		HttpURLConnection connection = null;
+		try {
+			URL url = new URL(dataUrl);
+			connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.setRequestProperty("User-Agent", "OsmAnd Java Server");
+			
+			int responseCode = connection.getResponseCode();
+			String rawData;
+			BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+			String inputLine;
+			StringBuilder content = new StringBuilder();
+			
+			while ((inputLine = in.readLine()) != null) {
+				content.append(inputLine).append("\n");
+			}
+			in.close();
+			rawData = content.toString();
+			
+			if (responseCode != HttpURLConnection.HTTP_OK) {
+				logError(dataUrl, responseCode, rawData);
+				return null;
+			}
+			return rawData;
+		} catch (IOException e) {
+			logError(dataUrl, -1, e.getMessage());
+			return null;
+		} finally {
+			if (connection != null) {
+				connection.disconnect();
+			}
 		}
-		in.close();
-		connection.disconnect();
-		return content.toString();
+	}
+	
+	private void logError(String url, int code, String content) {
+		String shortenedContent = content != null && content.length() > 20 ? content.substring(0, 20) + "..." : content;
+		log.error("Error while reading url: " + url + " code: " + code + " content: " + shortenedContent);
 	}
 	
 	public Map<String, String> parseImageInfo(String data) {
