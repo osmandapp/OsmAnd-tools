@@ -23,7 +23,8 @@ public enum FileSubtype {
     MULTIMEDIA_NOTES("multimedia_notes", IndexConstants.AV_INDEX_DIR),
     NAUTICAL_DEPTH("nautical_depth", IndexConstants.NAUTICAL_INDEX_DIR),
     FAVORITES_BACKUP("favorites_backup", IndexConstants.BACKUP_INDEX_DIR),
-    COLOR_PALETTE("color_palette", IndexConstants.COLOR_PALETTE_DIR);
+    COLOR_PALETTE("color_palette", IndexConstants.COLOR_PALETTE_DIR),
+    TERRAIN_DATA("terrain", IndexConstants.GEOTIFF_DIR);
     
     private final String subtypeName;
     private final String subtypeFolder;
@@ -90,6 +91,11 @@ public enum FileSubtype {
                     break;
                 case COLOR_PALETTE:
                     if (name.endsWith(IndexConstants.TXT_EXT)) {
+                        return subtype;
+                    }
+                    break;
+                case TERRAIN_DATA:
+                    if (name.endsWith(IndexConstants.TIF_EXT)) {
                         return subtype;
                     }
                     break;
