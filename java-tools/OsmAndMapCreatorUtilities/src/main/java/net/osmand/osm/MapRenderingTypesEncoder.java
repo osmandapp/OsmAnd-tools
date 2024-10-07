@@ -1,31 +1,17 @@
 package net.osmand.osm;
 
 import gnu.trove.list.array.TIntArrayList;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-
 import net.osmand.PlatformUtil;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
-
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
+
+import java.util.*;
+import java.util.Map.Entry;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
