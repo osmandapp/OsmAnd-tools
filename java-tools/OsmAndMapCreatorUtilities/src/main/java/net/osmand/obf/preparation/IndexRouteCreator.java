@@ -375,7 +375,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		List<MapPointName> pointNamesEmp = new ArrayList<MapPointName>();
 		try {
 			for (int j = 0; j < outTypes.size(); j++) {
-				Algorithms.writeInt(btypes, outTypes.get(j));
+				Algorithms.writeSmallInt(btypes, outTypes.get(j));
 			}
 			int pointIndex = 0;
 
@@ -387,7 +387,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					TIntArrayList types = pointTypes.get(n.getId());
 					if (types != null) {
 						for (int j = 0; j < types.size(); j++) {
-							Algorithms.writeInt(bpointTypes, types.get(j));
+							Algorithms.writeSmallInt(bpointTypes, types.get(j));
 						}
 					}
 					TIntObjectHashMap<String> namesP = pointNamesRaw.get(n.getId());
@@ -399,7 +399,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							pointNamesEmp.add(obj);
 						}
 					}
-					Algorithms.writeInt(bpointTypes, 0);
+					Algorithms.writeSmallInt(bpointTypes, 0);
 					// write coordinates
 					int y = MapUtils.get31TileNumberY(n.getLatitude());
 					int x = MapUtils.get31TileNumberX(n.getLongitude());
@@ -499,27 +499,16 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<MapRouteType, String> e : tempNames.entrySet()) {
 			if (e.getValue() != null) {
-				b.append(SPECIAL_CHAR).append(intToStr(e.getKey().getInternalId())).append(e.getValue());
+				b.append(SPECIAL_CHAR).append((char)e.getKey().getInternalId()).append(e.getValue());
 			}
 		}
 		return b.toString();
 	}
 
-	private static int strToInt(String str, int idx) {
-		return (int) str.charAt(idx) << 16 | (int) str.charAt(idx + 1);
-	}
-
-	private static StringBuilder intToStr(int value) {
-		char[] ch = new char[2];
-		ch[0] = (char) (value >> 16 & 0xFFFF);
-		ch[1] = (char) (value & 0xFFFF);
-		return new StringBuilder().append(ch[0]).append(ch[1]);
-	}
-
 	protected String encodeListNames(List<MapPointName> tempNames) {
 		StringBuilder b = new StringBuilder();
 		for (MapPointName e : tempNames) {
-			b.append(SPECIAL_CHAR).append(intToStr(e.nameTypeInternalId)).append(intToStr(e.pointIndex)).append(e.name);
+				b.append(SPECIAL_CHAR).append((char)e.nameTypeInternalId).append((char) e.pointIndex).append(e.name);
 		}
 		return b.toString();
 	}
@@ -1291,13 +1280,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
-				int n = name.indexOf(SPECIAL_CHAR, i + 3);
-				int ch = strToInt(name, i + 1);
+				int n = name.indexOf(SPECIAL_CHAR, i + 2);
+				int ch = (short) name.charAt(i + 1);
 				MapRouteType rt = routeTypes.getTypeByInternalId(ch);
 				if (n == -1) {
-					tempNames.put(rt, name.substring(i + 3));
+					tempNames.put(rt, name.substring(i + 2));
 				} else {
-					tempNames.put(rt, name.substring(i + 3, n));
+					tempNames.put(rt, name.substring(i + 2, n));
 				}
 				i = n;
 			}
@@ -1306,10 +1295,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		protected void decodeListNames(String name, List<MapPointName> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
-				int n = name.indexOf(SPECIAL_CHAR, i + 5);
-				int ch = strToInt(name, i + 1);
-				int index = strToInt(name, i + 3);
-				String pointName = n == -1 ? name.substring(i + 5) : name.substring(i + 5, n);
+				int n = name.indexOf(SPECIAL_CHAR, i + 3);
+				int ch = (short) name.charAt(i + 1);
+				int index = (short) name.charAt(i + 2);
+				String pointName = n == -1 ? name.substring(i + 3) : name.substring(i + 3, n);
 				MapPointName pn = new MapPointName(ch, index, pointName);
 				pn.nameTypeTargetId = routeTypes.getTypeByInternalId(ch).getTargetId();
 				tempNames.add(pn);
@@ -1341,10 +1330,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					decodeNames(rs.getString(5), wayNames);
 					
 					byte[] types = rs.getBytes(1);
-					this.wayTypes = new int[types.length / 4];
-					for (int j = 0; j < types.length; j += 4) {
-						int ids = Algorithms.parseIntFromBytes(types, j);
-						wayTypes[j / 4] = routeTypes.getTypeByInternalId(ids).getTargetId();
+					this.wayTypes = new int[types.length / 2];
+					for (int j = 0; j < types.length; j += 2) {
+						int ids = Algorithms.parseSmallIntFromBytes(types, j);
+						wayTypes[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
 					
 					byte[] pointTypes = rs.getBytes(2);
