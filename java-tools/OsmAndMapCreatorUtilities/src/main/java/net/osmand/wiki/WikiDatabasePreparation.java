@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -39,6 +41,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import info.bliki.wiki.model.WikiModel;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -77,6 +80,7 @@ public class WikiDatabasePreparation {
 	private static final int SHORT_PARAGRAPH = 10;
 	
 	public static final String DEFAULT_STRING = "Unknown";
+	public static final String DEFAULT_LANG = "en";
 
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT,
@@ -395,7 +399,7 @@ public class WikiDatabasePreparation {
 	 * @param lang            The target language code to extract the description
 	 * @param webBlockResults A map to store the parsed author, date, and description fields
 	 */
-	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults) {
+	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults) throws IOException {
 		
 		if (webBlockResults == null) {
 			return;
@@ -409,7 +413,6 @@ public class WikiDatabasePreparation {
 		final String AUTHOR = "author";
 		final String DATE = "date";
 		final String DESCRIPTION = "description";
-		final String DEFAULT_LANG = "en";
 		
 		// Clean up the input string by removing extra spaces and newlines
 		val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
@@ -627,7 +630,7 @@ public class WikiDatabasePreparation {
 		if (parts.size() == 1 && author.equals(DEFAULT_STRING)) {
 			author = parts.get(0).trim();
 		}
-		
+		author = author.replaceAll("\\[+|]+", "");
 		return author;
 	}
 	
@@ -661,6 +664,7 @@ public class WikiDatabasePreparation {
 				date = dateValue.split(" ")[0].trim();
 			}
 		}
+		date = date.replaceAll("\\[+|]+", "");
 		return date;
 	}
 	
@@ -669,7 +673,7 @@ public class WikiDatabasePreparation {
 	 * |description={{uk|1=Kyiv Pechersk Lavra}} => Kyiv Pechersk Lavra
 	 * |description=Some text description => Some text description
 	 */
-	private static Map<String, String> parseDescription(String line) {
+	private static Map<String, String> parseDescription(String line) throws IOException {
 		Map<String, String> result = new HashMap<>();
 		String descriptionBlock = line;
 		
@@ -698,6 +702,7 @@ public class WikiDatabasePreparation {
 			
 			if (openBraces == 0) {
 				String description = getDescString(descriptionBlock, langEnd, currentIndex);
+				description = description.replaceAll("\\[+|]+", "");
 				result.put(lang, description);
 				// Move to the next block
 				descriptionBlock = descriptionBlock.substring(currentIndex).trim();
@@ -705,7 +710,36 @@ public class WikiDatabasePreparation {
 				break;  // If closing brace is not found, exit
 			}
 		}
+		if (result.isEmpty()) {
+			// If no language block was found, use the whole description as the default language
+			String description = descriptionBlock.substring(12).trim();
+			final WikiModel wikiModel = new WikiModel("", "");
+			StringBuilder plainStr = new StringBuilder(wikiModel.render(new PlainTextConverter(true), description));
+			List<String> links = parseLinks(description);
+			if (!links.isEmpty()) {
+				plainStr.append("\n\nLinks:");
+				for (int i = 0; i < links.size(); i++) {
+					plainStr.append("\n[").append(i + 1).append("] ").append(links.get(i));
+				}
+			}
+			
+			result.put(DEFAULT_LANG, plainStr.toString());
+		}
+		
 		return result;
+	}
+	
+	private static List<String> parseLinks(String description) {
+		List<String> links = new ArrayList<>();
+		String regex = "\\[(http\\S+)\\s([^]]+)]";
+		Pattern pattern = Pattern.compile(regex);
+		Matcher matcher = pattern.matcher(description);
+		
+		while (matcher.find()) {
+			String link = matcher.group(1); //url
+			links.add(link);
+		}
+		return links;
 	}
 	
 	private static String getDescString(String descriptionBlock, int langEnd, int currentIndex) {
