@@ -164,23 +164,15 @@ public class WikiService {
 	}
 	
 	private String processLicense(String license) {
+		license = license.replace("[[", "").replace("]]", "");
+		// Remove hyphens after "CC" and "PD"
+		license = license.replace("CC-", "CC ");
+		license = license.replace("PD-", "PD ");
+		
+		// Remove hyphen before "expired"
+		license = license.replace("-expired", " expired");
 		license = license.toUpperCase();
-		String[] parts = license.split("-");
-		if (parts.length > 1) {
-			String lastPart = parts[parts.length - 1];
-			StringBuilder sb = new StringBuilder();
-			if (parts[0].equals("CC")) {
-				sb.append(parts[0]).append(" ").append(parts[1]);
-			}
-			if (parts.length > 2) {
-				lastPart = " " + lastPart;
-			}
-			for (int i = 2; i < parts.length - 1; i++) {
-				sb.append("-").append(parts[i]);
-			}
-			sb.append(" ").append(lastPart);
-			return sb.toString();
-		}
+		
 		return license;
 	}
 	

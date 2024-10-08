@@ -223,6 +223,7 @@ public class WikiDatabasePreparation {
 		final String LICENSE_HEADER = "=={{int:license-header}}==";
 		
 		boolean isLicenseBlock = false;
+		List<String> licenseBlock = new ArrayList<>();
 		
 		for (int i = 0; i < text.length(); ) {
 			int leftChars = text.length() - i - 1;
@@ -297,8 +298,7 @@ public class WikiDatabasePreparation {
 				int endInd = i;
 				String val = text.substring(beginInd, endInd);
 				if (isLicenseBlock) {
-					parseLicenseBlock(val, webBlockResults);
-					isLicenseBlock = false;
+					licenseBlock.add(val);
 				}
 				beginInd = 0;
 				String vallc = val.toLowerCase().trim();
@@ -345,6 +345,10 @@ public class WikiDatabasePreparation {
 			} else if (openCnt == 0) {
 				int headerLvl = 0;
 				int indexCopy = i;
+				if (isLicenseBlock) {
+					parseLicenseBlock(licenseBlock, webBlockResults);
+					isLicenseBlock = false;
+				}
 				if (i > 0 && text.charAt(i - 1) != '=') {
 					headerLvl = calculateHeaderLevel(text, i);
 					indexCopy = indexCopy + headerLvl;
@@ -410,7 +414,7 @@ public class WikiDatabasePreparation {
 		// Clean up the input string by removing extra spaces and newlines
 		val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
 		
-		List<String> parts = splitByPipeOutsideBraces(val);
+		List<String> parts = splitByPipeOutsideBraces(val, true);
 		
 		boolean inInformationBlock = false;
 		
@@ -458,10 +462,10 @@ public class WikiDatabasePreparation {
 	 * This method checks the provided `val` string, splits it by '|' symbols outside braces,
 	 * and looks for the license field in the License block.
 	 *
-	 * @param val             The raw input string containing the =={{int:license-header}}== block
+	 * @param vals 		  The raw input string containing the License block
 	 * @param webBlockResults A map to store the parsed license field
 	 */
-	private static void parseLicenseBlock(String val, Map<String, String> webBlockResults) {
+	private static void parseLicenseBlock(List<String> vals, Map<String, String> webBlockResults) {
 		
 		if (webBlockResults == null) {
 			return;
@@ -469,33 +473,39 @@ public class WikiDatabasePreparation {
 		
 		final String LICENSE = "license";
 		List<String> licenses = new ArrayList<>();
-		
-		val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
-		List<String> parts = splitByPipeOutsideBraces(val);
-		
-		for (String part : parts) {
-			part = part.trim();
+		for (String val : vals) {
+			val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
+			List<String> parts = splitByPipeOutsideBraces(val, false);
 			
-			if (part.contains("=") && !part.startsWith("{{")) {
-				continue;
-			}
-			
-			if (part.equalsIgnoreCase("self")) {
-				continue;
-			}
-			if (part.startsWith("author")) {
-				List<String> authorParts = splitByPipeOutsideBraces(part);
-				authorParts.removeIf(p -> p.trim().startsWith("author"));
-				if (!authorParts.isEmpty()) {
-					licenses.addAll(authorParts);
+			for (String part : parts) {
+				part = part.trim();
+				
+				if (part.equalsIgnoreCase("self")) {
+					continue;
 				}
-				continue;
+				if (part.contains("|")) {
+					for (String subPart : part.split("\\|")) {
+						if (subPart.startsWith("country=")) {
+							part = part.replace("|" + subPart, "");
+						}
+					}
+					part = part.replaceAll("\\|", " - ");
+				}
+				
+				if (part.startsWith("author")) {
+					List<String> authorParts = splitByPipeOutsideBraces(part, true);
+					authorParts.removeIf(p -> p.trim().startsWith("author"));
+					if (!authorParts.isEmpty()) {
+						licenses.addAll(authorParts);
+					}
+					continue;
+				}
+				if (part.startsWith("{{") && part.endsWith("}}")) {
+					continue;
+				}
+				
+				licenses.add(part);
 			}
-			if (part.startsWith("{{") && part.endsWith("}}")) {
-				continue;
-			}
-			
-			licenses.add(part);
 		}
 		
 		if (!licenses.isEmpty()) {
@@ -503,7 +513,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	private static List<String> splitByPipeOutsideBraces(String input) {
+	private static List<String> splitByPipeOutsideBraces(String input, boolean splitByPipe) {
 		List<String> parts = new ArrayList<>();
 		StringBuilder currentPart = new StringBuilder();
 		int curlyBraceDepth = 0;  // To track the nesting level inside {{ }}
@@ -535,7 +545,7 @@ public class WikiDatabasePreparation {
 			}
 			
 			// Split by '|' if we are not inside {{ }} or [[ ]]
-			else if (c == '|' && curlyBraceDepth == 0 && squareBraceDepth == 0) {
+			else if (c == '|' && curlyBraceDepth == 0 && squareBraceDepth == 0 && splitByPipe) {
 				parts.add(currentPart.toString().trim());
 				currentPart.setLength(0); // Clear the current string for the next part
 			} else {
@@ -570,7 +580,7 @@ public class WikiDatabasePreparation {
 			line = line.substring(7).trim();
 		}
 		
-		List<String> parts = splitByPipeOutsideBraces(line);
+		List<String> parts = splitByPipeOutsideBraces(line, true);
 		
 		for (String part : parts) {
 			if (part.startsWith("{{") && part.contains("|")) {
