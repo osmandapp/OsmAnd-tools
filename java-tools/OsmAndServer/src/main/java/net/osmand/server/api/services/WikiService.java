@@ -152,8 +152,36 @@ public class WikiService {
 	public Map<String, String> parseImageInfo(String rawData, String title, String lang) throws SQLException, IOException {
 		Map<String, String> result = new HashMap<>();
 		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, lang, title, null);
-		
+		prepareMetaData(result);
 		return result;
+	}
+	
+	private void prepareMetaData(Map<String, String> metaData) {
+		String license = metaData.get("license");
+		if (license != null) {
+			metaData.put("license", processLicense(license));
+		}
+	}
+	
+	private String processLicense(String license) {
+		license = license.toUpperCase();
+		String[] parts = license.split("-");
+		if (parts.length > 1) {
+			String lastPart = parts[parts.length - 1];
+			StringBuilder sb = new StringBuilder();
+			if (parts[0].equals("CC")) {
+				sb.append(parts[0]).append(" ").append(parts[1]);
+			}
+			if (parts.length > 2) {
+				lastPart = " " + lastPart;
+			}
+			for (int i = 2; i < parts.length - 1; i++) {
+				sb.append("-").append(parts[i]);
+			}
+			sb.append(" ").append(lastPart);
+			return sb.toString();
+		}
+		return license;
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
