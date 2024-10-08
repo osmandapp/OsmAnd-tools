@@ -472,7 +472,8 @@ public class OsmGpxWriteContext {
 		settings.indexAddress = false;
 		settings.indexPOI = true;
 		settings.indexTransport = false;
-		settings.indexRouting = false;
+		settings.indexRouting = true;
+		settings.srtmDataFolderUrl = System.getenv("SRTM_DIRECTORY");
 		RTree.clearCache();
 		try {
 			tmpFolder.mkdirs();
