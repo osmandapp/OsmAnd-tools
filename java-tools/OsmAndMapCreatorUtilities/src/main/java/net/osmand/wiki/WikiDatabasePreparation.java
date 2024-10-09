@@ -722,7 +722,7 @@ public class WikiDatabasePreparation {
 		}
 		if (result.isEmpty()) {
 			// If no language block was found, use the whole description as the default language
-			String description = descriptionBlock.substring(12).trim();
+			String description = descriptionBlock.replaceFirst("(?i).*description\\s*=\\s*", "").trim();
 			final WikiModel wikiModel = new WikiModel("", "");
 			StringBuilder plainStr = new StringBuilder(wikiModel.render(new PlainTextConverter(true), description));
 			List<String> links = parseLinks(description);
