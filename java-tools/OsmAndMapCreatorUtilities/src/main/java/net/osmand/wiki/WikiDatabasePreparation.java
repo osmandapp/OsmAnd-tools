@@ -707,6 +707,9 @@ public class WikiDatabasePreparation {
 			}
 			
 			String lang = descriptionBlock.substring(langStart, langEnd).trim();
+			if (lang.length() > 5) {
+				break;  // If the language code is too long, exit loop
+			}
 			
 			// Look for the description part
 			int descStart = descriptionBlock.indexOf("|1=", langEnd) != -1
