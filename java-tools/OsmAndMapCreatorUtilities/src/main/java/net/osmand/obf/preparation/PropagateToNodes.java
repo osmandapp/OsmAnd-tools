@@ -103,7 +103,11 @@ public class PropagateToNodes {
 		for (List<PropagateRule> rules : propagateRulesByTag.values()) {
 			 for (PropagateRule r : rules) {
 				Map<String, String> tags = new HashMap<>();
-				tags.put(r.tag, r.value);
+				String tag = r.tag;
+				if (!Algorithms.isEmpty(r.tagPrefix)) {
+					tag = r.tagPrefix + r.tag;
+				}
+				tags.put(tag, r.value);
 				tags = renderingTypes.transformTags(tags, Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
 				if (!Algorithms.isEmpty(tags)) {
 					convertedPropagatedTags.put(r, tags);
