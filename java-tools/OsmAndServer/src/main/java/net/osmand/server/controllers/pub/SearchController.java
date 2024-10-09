@@ -139,6 +139,10 @@ public class SearchController {
         
         String url = "https://commons.wikimedia.org/wiki/File:" + imageTitle + "?action=raw";
         
+        if (data != null) {
+            // save immediately to cache
+            wikiService.saveWikiRawDataToCache(url, data);
+        }
         if (data == null) {
             data = wikiService.getWikiRawDataFromCache(url);
         }
@@ -153,6 +157,28 @@ public class SearchController {
         }
         Map<String, String> info = wikiService.parseImageInfo(data, imageTitle, lang);
         return ResponseEntity.ok(gson.toJson(info));
+    }
+    
+    @MultiPlatform
+    @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseImagesListInfo(@RequestBody(required = false) Map<String, String> data,
+                                                      @RequestParam(required = false) String lang) throws IOException, SQLException {
+        if (data == null) {
+            return ResponseEntity.badRequest().body("Required data!");
+        }
+        Map<String, Map<String, String>> result = new HashMap<>();
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            String imageTitle = entry.getKey();
+            String rawData = entry.getValue();
+            // save to cache
+            String url = "https://commons.wikimedia.org/wiki/File:" + imageTitle + "?action=raw";
+            wikiService.saveWikiRawDataToCache(url, rawData);
+            
+            Map<String, String> info = wikiService.parseImageInfo(rawData, imageTitle, lang);
+            result.put(imageTitle, info);
+        }
+        return ResponseEntity.ok(gson.toJson(result));
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
