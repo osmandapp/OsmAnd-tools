@@ -489,8 +489,9 @@ public class WikiDatabasePreparation {
 					continue;
 				}
 				if (part.contains("|")) {
-					for (String subPart : part.split("\\|")) {
-						if (subPart.startsWith("country=")) {
+					List<String> subParts = splitByPipeOutsideBraces(part, true);
+					for (String subPart : subParts) {
+						if (subPart.startsWith("country=") || subPart.startsWith("author=")) {
 							part = part.replace("|" + subPart, "");
 						}
 					}
@@ -589,6 +590,9 @@ public class WikiDatabasePreparation {
 		List<String> parts = splitByPipeOutsideBraces(line, true);
 		
 		for (String part : parts) {
+			if (part.contains("edited by")) {
+				part = part.substring(0, part.indexOf("edited by")).trim();
+			}
 			if (part.startsWith("Publisher:")) {
 				part = part.substring("Publisher:".length()).trim();
 			}
