@@ -8,8 +8,10 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.PoiType;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 
 import java.util.*;
 
@@ -19,7 +21,7 @@ public class PropagateToNodes {
     private TLongObjectHashMap<List<PropagateFromWayToNode>> propagateTagsByNodeId = new TLongObjectHashMap<>();
     private TLongObjectHashMap<List<PropagateRuleFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
     private Map<String, List<PropagateRule>> propagateRulesByTag = new HashMap<>();
-
+    private Map<PropagateRule, Map<String, String>> convertedPropagatedTags = new HashMap<>();
     
     public static class PropagateWayWithNodes {
     	
@@ -94,6 +96,24 @@ public class PropagateToNodes {
 	public PropagateToNodes(MapRenderingTypesEncoder renderingTypes) {
 		this.renderingTypes = renderingTypes;
 		initPropagateToNodes();
+		initConvertedTags();
+	}
+
+	private void initConvertedTags() {
+		for (List<PropagateRule> rules : propagateRulesByTag.values()) {
+			 for (PropagateRule r : rules) {
+				Map<String, String> tags = new HashMap<>();
+				String tag = r.tag;
+				if (!Algorithms.isEmpty(r.tagPrefix)) {
+					tag = r.tagPrefix + r.tag;
+				}
+				tags.put(tag, r.value);
+				tags = renderingTypes.transformTags(tags, Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+				if (!Algorithms.isEmpty(tags)) {
+					convertedPropagatedTags.put(r, tags);
+				}
+			}
+		}
 	}
 	
 	public boolean isNoRegisteredNodes() {
@@ -381,7 +401,18 @@ public class PropagateToNodes {
 			int delete = 0;
 			for (PropagateFromWayToNode p : linkedPropagate) {
 				for (PropagateRuleFromWayToNode n : p.rls) {
-					if (type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue())) {
+					boolean isEqual = type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue());
+					boolean isConverted = false;
+					if (!isEqual) {
+						Map<String, String> convertedTags = convertedPropagatedTags.get(n.rule);
+						if (convertedTags != null) {
+							String value = convertedTags.get(type.getTag());
+							if (!Algorithms.isEmpty(value) && value.equals(type.getValue())) {
+								isConverted = true;
+							}
+						}
+					}
+					if (isEqual || isConverted) {
 						if (n.ignoreBorderPoint && delete == 0) {
 							delete = 1;
 						} else if (!n.ignoreBorderPoint) {
