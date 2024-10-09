@@ -428,13 +428,13 @@ public class WikiDatabasePreparation {
 			}
 			
 			if (inInformationBlock) {
-				if (line.toLowerCase().startsWith(AUTHOR + "=")) {
+				if (line.toLowerCase().startsWith(AUTHOR)) {
 					author = parseAuthor(line);
 				}
-				if (line.toLowerCase().startsWith(DATE + "=")) {
+				if (line.toLowerCase().startsWith(DATE)) {
 					date = parseDate(line);
 				}
-				if (line.toLowerCase().startsWith(DESCRIPTION + "=")) {
+				if (line.toLowerCase().startsWith(DESCRIPTION)) {
 					description = parseDescription(line);
 				}
 			}
@@ -579,8 +579,8 @@ public class WikiDatabasePreparation {
 	private static String parseAuthor(String line) {
 		String author = DEFAULT_STRING;
 		
-		if (line.toLowerCase().startsWith("author=")) {
-			line = line.substring(7).trim();
+		if (line.toLowerCase().matches(".*author\\s*=\\s*.*")) {
+			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
 		}
 		
 		List<String> parts = splitByPipeOutsideBraces(line, true);
@@ -651,9 +651,8 @@ public class WikiDatabasePreparation {
 	private static String parseDate(String line) {
 		String date = DEFAULT_STRING;
 		
-		int dateIndex = line.toLowerCase().indexOf("date=");
-		if (dateIndex != -1) {
-			String dateValue = line.substring(dateIndex + 5).trim();
+		if (line.toLowerCase().matches(".*date\\s*=\\s*.*")) {
+			String dateValue = line.replaceFirst("(?i).*date\\s*=\\s*", "").trim();
 			if (dateValue.startsWith("{{")) {
 				int start = dateValue.indexOf("{{") + 2;
 				int end = dateValue.indexOf("}}", start);
