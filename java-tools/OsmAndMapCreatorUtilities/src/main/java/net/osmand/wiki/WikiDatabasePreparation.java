@@ -608,10 +608,16 @@ public class WikiDatabasePreparation {
 					}
 				}
 				break;
-			} else if (part.startsWith("[[User:")) {
-				int start = part.indexOf("[[User:") + 7;
-				int end = part.indexOf("]]", start);
-				String userSection = part.substring(start, end);
+			} else if (part.startsWith("{{User:") || part.startsWith("[[User:")) {
+				int start = part.indexOf(":") + 1;
+				int end = part.indexOf("/", start);
+				
+				if (end == -1) {
+					end = part.indexOf(part.startsWith("{{") ? "}}" : "]]", start);
+				}
+				
+				String userSection = part.substring(start, end).trim();
+				
 				if (userSection.contains("|")) {
 					author = userSection.split("\\|")[1].trim();
 				} else {
@@ -680,16 +686,21 @@ public class WikiDatabasePreparation {
 		while (descriptionBlock.contains("{{") && descriptionBlock.contains("}}")) {
 			// Find the start of the language
 			int langStart = descriptionBlock.indexOf("{{") + 2;
-			int langEnd = descriptionBlock.indexOf("|1=", langStart);
+			int langEnd = descriptionBlock.indexOf("|", langStart); // Look for the first "|"
 			if (langEnd == -1) {
-				break;  // If |1= is not found, exit
+				break;  // If no "|", exit loop
 			}
 			
 			String lang = descriptionBlock.substring(langStart, langEnd).trim();
 			
+			// Look for the description part
+			int descStart = descriptionBlock.indexOf("|1=", langEnd) != -1
+					? descriptionBlock.indexOf("|1=", langEnd) + 3  // If "|1=" exists, use it
+					: langEnd + 1;  // Otherwise, start right after the first "|"
+			
 			// Count braces to correctly finish the language block
 			int openBraces = 1;  // We are already inside the first {{
-			int currentIndex = langEnd + 3;
+			int currentIndex = descStart;
 			
 			while (openBraces > 0 && currentIndex < descriptionBlock.length()) {
 				if (descriptionBlock.startsWith("{{", currentIndex)) {
@@ -701,7 +712,7 @@ public class WikiDatabasePreparation {
 			}
 			
 			if (openBraces == 0) {
-				String description = getDescString(descriptionBlock, langEnd, currentIndex);
+				String description = getDescString(descriptionBlock, descStart, currentIndex);
 				description = description.replaceAll("\\[+|]+", "");
 				result.put(lang, description);
 				// Move to the next block
@@ -742,8 +753,8 @@ public class WikiDatabasePreparation {
 		return links;
 	}
 	
-	private static String getDescString(String descriptionBlock, int langEnd, int currentIndex) {
-		String description = descriptionBlock.substring(langEnd + 3, currentIndex).trim();
+	private static String getDescString(String descriptionBlock, int descStart, int currentIndex) {
+		String description = descriptionBlock.substring(descStart, currentIndex).trim();
 		
 		// Remove nested templates and links inside the description
 		description = description.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
