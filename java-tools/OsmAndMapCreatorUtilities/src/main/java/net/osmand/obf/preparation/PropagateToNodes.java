@@ -1,19 +1,24 @@
 package net.osmand.obf.preparation;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
+import net.osmand.osm.MapRenderingTypes.PropagateToNode;
+import net.osmand.osm.MapRenderingTypes.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
-
-import java.util.*;
 
 public class PropagateToNodes {
 
@@ -147,11 +152,9 @@ public class PropagateToNodes {
 		Map<String, MapRenderingTypes.MapRulType> ruleTypes = renderingTypes.getEncodingRuleTypes();
 		for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
-			if (ruleType.isPropagateToNodes()) {
-				PropagateToNodesType type = ruleType.getPropagateToNodesType();
-				String prefix = ruleType.getPropagateToNodesPrefix();
-				Map<String, String> propIf = ruleType.getPropagateIf();
-				PropagateRule rule = new PropagateRule(type, prefix, propIf);
+			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
+				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix, 
+						d.propagateIf);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -216,8 +219,6 @@ public class PropagateToNodes {
 				for (int i = 0; i < allIds.size(); i++) {
 					getNode(resultWay, w, i, i).applyRule(rule);
 				}
-				break;
-			case NONE:
 				break;
 			}
 		}

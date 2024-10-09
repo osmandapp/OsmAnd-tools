@@ -19,6 +19,7 @@ import org.xmlpull.v1.XmlPullParser;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.PlatformUtil;
+import net.osmand.osm.MapRenderingTypes.PropagateToNode;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
@@ -249,19 +250,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return a;
 	}
 
+	@Override
+	protected void parsePropagate(XmlPullParser parser, MapRulType parentType) {
+		PropagateToNode ptype = parsePropagateType(parser);
+		if (ptype != null && parentType != null) {
+			parentType.propagateToNodes.add(ptype);
+		}
+	}
 
 
 	@Override
-	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
+	protected MapRulType parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
 		String seq = parser.getAttributeValue("", "seq");
-		if(Algorithms.isEmpty(seq)) {
+		if (Algorithms.isEmpty(seq)) {
 			seq = "1:1";
 		}
+		MapRulType mainType = null;
 		String[] ls = seq.split(":");
 		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
 			String tag = lc(parser.getAttributeValue("", "tag"), ind);
-			MapRulType rtype = parseBaseRuleType(parser, parent, tag);
-			registerMapRule(parser, rtype);
+			mainType = parseBaseRuleType(parser, parent, tag);
+			registerMapRule(parser, mainType);
 			if ("true".equals(parser.getAttributeValue("", "lang"))) {
 				for (String lng : langs) {
 					tag = lc(parser.getAttributeValue("", "tag"), ind) + ":" + lng;
@@ -272,6 +281,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 			}
 		}
+		return mainType;
 	}
 
 
