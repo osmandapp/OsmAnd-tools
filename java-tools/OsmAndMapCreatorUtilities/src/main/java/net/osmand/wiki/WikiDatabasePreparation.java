@@ -658,10 +658,16 @@ public class WikiDatabasePreparation {
 				int end = dateValue.indexOf("}}", start);
 				if (end != -1) {
 					String[] dateParts = dateValue.substring(start, end).split("\\|");
-					for (String part : dateParts) {
-						if (part.matches("\\d{4}-\\d{2}-\\d{2}")) {
-							date = part.trim();
-							break;
+					// If the template is "other date", it indicates an approximate date (e.g., "ca 1900")
+					if (dateParts.length > 1 && dateParts[0].equalsIgnoreCase("other date")) {
+						date = String.join(" ", Arrays.copyOfRange(dateParts, 1, dateParts.length)).trim();
+					} else {
+						// Find the part matching the format YYYY-MM-DD
+						for (String part : dateParts) {
+							if (part.matches("\\d{4}-\\d{2}-\\d{2}")) {
+								date = part.trim();
+								break;
+							}
 						}
 					}
 				}
