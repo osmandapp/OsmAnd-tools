@@ -491,7 +491,8 @@ public class WikiDatabasePreparation {
 				if (part.contains("|")) {
 					List<String> subParts = splitByPipeOutsideBraces(part, true);
 					for (String subPart : subParts) {
-						if (subPart.startsWith("country=") || subPart.startsWith("author=")) {
+						if (subPart.toLowerCase().matches(".*country\\s*=\\s*.*")
+								|| subPart.toLowerCase().matches(".*author\\s*=\\s*.*")) {
 							part = part.replace("|" + subPart, "");
 						}
 					}
