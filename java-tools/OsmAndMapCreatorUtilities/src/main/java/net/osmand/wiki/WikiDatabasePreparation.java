@@ -485,7 +485,7 @@ public class WikiDatabasePreparation {
 			for (String part : parts) {
 				part = part.trim();
 				
-				if (part.equalsIgnoreCase("self")) {
+				if (part.equalsIgnoreCase("self") || part.contains("status=")) {
 					continue;
 				}
 				if (part.contains("|")) {

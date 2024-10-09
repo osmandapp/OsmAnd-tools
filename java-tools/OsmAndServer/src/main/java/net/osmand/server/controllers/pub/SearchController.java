@@ -2,6 +2,8 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -136,8 +138,8 @@ public class SearchController {
             Map<String, String> info = wikiService.parseImageInfo(data);
             return ResponseEntity.ok(gson.toJson(info));
         }
-        
-        String url = "https://commons.wikimedia.org/wiki/File:" + imageTitle + "?action=raw";
+        String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+        String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
         
         if (data != null) {
             // save immediately to cache
@@ -172,7 +174,8 @@ public class SearchController {
             String imageTitle = entry.getKey();
             String rawData = entry.getValue();
             // save to cache
-            String url = "https://commons.wikimedia.org/wiki/File:" + imageTitle + "?action=raw";
+            String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+            String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
             wikiService.saveWikiRawDataToCache(url, rawData);
             
             Map<String, String> info = wikiService.parseImageInfo(rawData, imageTitle, lang);
