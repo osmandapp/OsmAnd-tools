@@ -220,6 +220,7 @@ public class WikiDatabasePreparation {
 		int headerCount = 0;
 		
 		final String TAG_INFORMATION = "information";
+		final String TAG_ARTWORK = "artwork";
 		final String TAG_GALLERY = "gallery";
 		final String TAG_WEATHER_BOX = "weather box";
 		final String TAG_WIDE_IMAGE = "wide image";
@@ -312,7 +313,7 @@ public class WikiDatabasePreparation {
 					parseAndAppendWeatherTable(val, bld);
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
-				} else if (vallc.startsWith(TAG_INFORMATION)) {
+				} else if (vallc.startsWith(TAG_INFORMATION) || vallc.startsWith(TAG_ARTWORK)) {
 					parseInformationBlock(val, lang, webBlockResults);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
@@ -410,6 +411,7 @@ public class WikiDatabasePreparation {
 		Map<String, String> description = new HashMap<>();
 		
 		final String INFORMATION = "Information";
+		final String ARTWORK = "Artwork";
 		final String AUTHOR = "author";
 		final String DATE = "date";
 		final String DESCRIPTION = "description";
@@ -423,7 +425,7 @@ public class WikiDatabasePreparation {
 		
 		for (String line : parts) {
 			line = line.trim();
-			if (line.startsWith(INFORMATION)) {
+			if (line.startsWith(INFORMATION) || line.startsWith(ARTWORK)) {
 				inInformationBlock = true;
 			}
 			
@@ -583,9 +585,13 @@ public class WikiDatabasePreparation {
 			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
 		}
 		
+		List<String> templatesToHandle = Arrays.asList("User", "Creator");
 		List<String> parts = splitByPipeOutsideBraces(line, true);
 		
 		for (String part : parts) {
+			if (part.startsWith("Publisher:")) {
+				part = part.substring("Publisher:".length()).trim();
+			}
 			if (part.startsWith("{{") && part.contains("|")) {
 				if (part.contains("author=")) {
 					String authorPart = part.substring(part.indexOf("author=") + 7).trim();
@@ -608,28 +614,32 @@ public class WikiDatabasePreparation {
 					}
 				}
 				break;
-			} else if (part.startsWith("{{User:") || part.startsWith("[[User:")) {
-				int start = part.indexOf(":") + 1;
-				int end = part.indexOf("/", start);
-				
-				if (end == -1) {
-					end = part.indexOf(part.startsWith("{{") ? "}}" : "]]", start);
-				}
-				
-				String userSection = part.substring(start, end).trim();
-				
-				if (userSection.contains("|")) {
-					author = userSection.split("\\|")[1].trim();
-				} else {
-					author = userSection.trim();
-				}
-				break;
 			} else if (part.startsWith("[http") && part.contains(" ")) {
 				author = part.substring(part.indexOf(" ") + 1, part.indexOf("]")).trim();
 				break;
 			} else if (part.startsWith("[http") && !part.contains(" ")) {
 				author = DEFAULT_STRING;
 				break;
+			}
+			
+			for (String template : templatesToHandle) {
+				if (part.startsWith("{{" + template + ":") || part.startsWith("[[" + template + ":")) {
+					int start = part.indexOf(":") + 1;
+					int end = part.indexOf("/", start);
+					
+					if (end == -1) {
+						end = part.indexOf(part.startsWith("{{") ? "}}" : "]]", start);
+					}
+					
+					String userSection = part.substring(start, end).trim();
+					
+					if (userSection.contains("|")) {
+						author = userSection.split("\\|")[1].trim();
+					} else {
+						author = userSection.trim();
+					}
+					break;
+				}
 			}
 		}
 		
