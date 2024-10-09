@@ -111,8 +111,9 @@ public class OsmGpxWriteContext {
 
 		if (gpxFile.getMetadata() != null) {
 			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
-			gpxInfo.updateName(metaExtensions.get("name"));
 			gpxInfo.updateRef(metaExtensions.get("ref"));
+			gpxInfo.updateName(metaExtensions.get("name"));
+			gpxInfo.updateDescription(metaExtensions.get("description"));
 			String osmId = metaExtensions.get("osmid");
 			if (osmId != null) {
 				gpxInfo.id = Long.parseLong(osmId);
@@ -123,6 +124,7 @@ public class OsmGpxWriteContext {
 			boolean validTrack = false;
 			for (Track t : gpxFile.getTracks()) {
 				gpxInfo.updateName(t.getName());
+				gpxInfo.updateDescription(t.getDesc());
 				for (TrkSegment s : t.getSegments()) {
 					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
@@ -156,6 +158,7 @@ public class OsmGpxWriteContext {
 		} else {
 			for (Track t : gpxFile.getTracks()) {
 				gpxInfo.updateName(t.getName());
+				gpxInfo.updateDescription(t.getDesc());
 				for (TrkSegment s : t.getSegments()) {
 					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
@@ -567,6 +570,13 @@ public class OsmGpxWriteContext {
 				this.ref = ref;
 			}
 		}
+
+		public void updateDescription(String description) {
+			if (description != null) {
+				this.description = description;
+			}
+		}
+
 
 		@Nonnull
 		public String getPrettyRef() {
