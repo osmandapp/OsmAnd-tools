@@ -55,6 +55,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
+	public static final String OSM_TAG_PREFIX = "osm_";
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
 	public int tracks = 0;
@@ -111,10 +112,10 @@ public class OsmGpxWriteContext {
 
 		if (gpxFile.getMetadata() != null) {
 			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
-			gpxInfo.updateRef(metaExtensions.get("ref"));
-			gpxInfo.updateName(metaExtensions.get("name"));
-			gpxInfo.updateDescription(metaExtensions.get("description"));
-			String osmId = metaExtensions.get("osmid");
+			gpxInfo.updateRef(metaExtensions.get(OSM_TAG_PREFIX + "ref"));
+			gpxInfo.updateName(metaExtensions.get(OSM_TAG_PREFIX + "name"));
+			gpxInfo.updateDescription(metaExtensions.get(OSM_TAG_PREFIX + "description"));
+			String osmId = metaExtensions.get(OSM_TAG_PREFIX + "id");
 			if (osmId != null) {
 				gpxInfo.id = Long.parseLong(osmId);
 			}
@@ -179,7 +180,7 @@ public class OsmGpxWriteContext {
 					}
 					long endid = ordinalId;
 					serializer.startTag(null, "way");
-					String osmId = s.getExtensionsToRead().get("osmid");
+					String osmId = s.getExtensionsToRead().get(OSM_TAG_PREFIX + "id");
 					if (osmId != null) {
 						long negWayId = -Long.parseLong(osmId);
 						serializer.attribute(null, "id", negWayId + "");
@@ -212,7 +213,7 @@ public class OsmGpxWriteContext {
 			}
 
 			for (WptPt p : gpxFile.getPointsList()) {
-				String osmId = p.getExtensionsToRead().get("osmid");
+				String osmId = p.getExtensionsToRead().get(OSM_TAG_PREFIX + "id");
 				long nid = osmId != null ? -Long.parseLong(osmId) : ordinalId--;
 				if (gpxInfo != null) {
 					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
@@ -249,7 +250,7 @@ public class OsmGpxWriteContext {
 		final String[] unprefixOsmAndTags = {
 				"width",
 				"color",
-				"network",
+				// "network",
 				"relation_gpx"
 		};
 		if (extensions != null) {
