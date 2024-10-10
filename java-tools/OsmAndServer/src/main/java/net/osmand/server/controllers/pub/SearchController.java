@@ -2,8 +2,12 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.*;
 
+import net.osmand.server.utils.MultiPlatform;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,17 +22,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.google.gson.Gson;
 
-import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
-import net.osmand.data.Street;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
@@ -125,11 +123,65 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
+    @MultiPlatform
     @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseImageInfo(@RequestBody String data) {
-        Map<String, String> info = wikiService.parseImageInfo(data);
+    public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
+                                                 @RequestParam(required = false) String imageTitle,
+                                                 @RequestParam(required = false) String lang) throws IOException, SQLException {
+        if (imageTitle == null && data == null) {
+            return ResponseEntity.badRequest().body("Required imageTitle or data!");
+        }
+        
+        if (imageTitle == null) {
+            // old parsing
+            Map<String, String> info = wikiService.parseImageInfo(data);
+            return ResponseEntity.ok(gson.toJson(info));
+        }
+        String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+        String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
+        
+        if (data != null) {
+            // save immediately to cache
+            wikiService.saveWikiRawDataToCache(url, data);
+        }
+        if (data == null) {
+            data = wikiService.getWikiRawDataFromCache(url);
+        }
+        if (data == null) {
+            data = wikiService.parseRawImageInfo(url);
+            if (data != null) {
+                wikiService.saveWikiRawDataToCache(url, data);
+            }
+        }
+        if (data == null) {
+            return ResponseEntity.badRequest().body("Error get image info!");
+        }
+        Map<String, String> info = wikiService.parseImageInfo(data, imageTitle, lang);
         return ResponseEntity.ok(gson.toJson(info));
+    }
+    
+    @MultiPlatform
+    @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseImagesListInfo(@RequestBody(required = false) Map<String, String> data,
+                                                      @RequestParam(required = false) String lang) throws IOException, SQLException {
+        if (data == null) {
+            return ResponseEntity.badRequest().body("Required data!");
+        }
+        Map<String, Map<String, String>> result = new HashMap<>();
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            String imageTitle = entry.getKey();
+            String rawData = entry.getValue();
+            // save to cache
+            String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+            String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
+            wikiService.saveWikiRawDataToCache(url, rawData);
+            
+            Map<String, String> info = wikiService.parseImageInfo(rawData, imageTitle, lang);
+            result.put(imageTitle, info);
+        }
+        return ResponseEntity.ok(gson.toJson(result));
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
