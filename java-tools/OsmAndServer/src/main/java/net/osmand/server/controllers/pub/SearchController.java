@@ -187,7 +187,6 @@ public class SearchController {
                 saveToCache = true;
             }
         }
-        
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
             String rawData = wikiImageInfo.data();
