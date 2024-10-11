@@ -768,7 +768,7 @@ public class WikiDatabasePreparation {
 	
 	private static List<String> parseLinks(String description) {
 		List<String> links = new ArrayList<>();
-		String regex = "\\[(https?://\\S+|httpx://\\S+)\\s([^]]+)]";
+		String regex = "\\[(https?://\\S+)\\s([^]]+)]";
 		Pattern pattern = Pattern.compile(regex);
 		Matcher matcher = pattern.matcher(description);
 		
