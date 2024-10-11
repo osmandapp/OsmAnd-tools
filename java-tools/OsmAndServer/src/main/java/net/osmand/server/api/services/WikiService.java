@@ -112,6 +112,7 @@ public class WikiService {
 	
 	
 	public String parseRawImageInfo(String imageTitle) {
+		// https://dumps.wikimedia.org/commonswiki/
 		HttpURLConnection connection = null;
 		String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
 		String urlStr = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
