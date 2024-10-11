@@ -52,7 +52,6 @@ import net.osmand.util.MapUtils;
 import rtree.RTree;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
 	public static final String OSM_TAG_PREFIX = "osm_";
@@ -149,8 +148,8 @@ public class OsmGpxWriteContext {
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-				addMetadataTags(gpxTrackTags, gpxFile.getMetadata());
-				addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead());
+				addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
+				addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 				addAnalysisTags(gpxTrackTags, analysis);
 				serializeTags(extraTrackTags, gpxTrackTags);
@@ -202,8 +201,8 @@ public class OsmGpxWriteContext {
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-					addMetadataTags(gpxTrackTags, gpxFile.getMetadata());
-					addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead());
+					addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
+					addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 					addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
@@ -246,22 +245,27 @@ public class OsmGpxWriteContext {
 		}
 	}
 
-	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
-		final String[] unprefixOsmAndTags = {
+	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
+		final String[] notPrefixedOsmAndTags = {
 				"width",
 				"color",
-				// "network",
-				"relation_gpx"
+				"relation_gpx",
+				// "text" is not prefixed and used to update gpxInfo.ref (as the main real/synthetic GPX ref)
+				// "ref", "name", "description", and some other generic tags might be already added w/o prefix
 		};
-		if (extensions != null) {
+		if (extensions != null && !extensions.isEmpty()) {
 			if (extensions.containsKey("color")) {
 				// prioritize osmand:color over GPX color
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
 			}
-			for (String unprefix : unprefixOsmAndTags) {
-				if (extensions.containsKey(unprefix)) {
-					gpxTrackTags.put(unprefix, extensions.get(unprefix));
+			if (extensions.containsKey("text")) {
+				gpxInfo.updateRef(extensions.get("text"));
+				gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
+			}
+			for (String notPrefixed : notPrefixedOsmAndTags) {
+				if (extensions.containsKey(notPrefixed)) {
+					gpxTrackTags.put(notPrefixed, extensions.get(notPrefixed));
 				}
 			}
 			for (String key : extensions.keySet()) {
@@ -269,9 +273,9 @@ public class OsmGpxWriteContext {
 			}
 		}
 	}
-	private void addMetadataTags(Map<String, String> gpxTrackTags, Metadata metadata) {
+	private void addMetadataTags(Map<String, String> gpxTrackTags, Metadata metadata, OsmGpxFile gpxInfo) {
 		if (metadata != null) {
-			addExtensionsTags(gpxTrackTags, metadata.getExtensionsToRead());
+			addExtensionsTags(gpxTrackTags, metadata.getExtensionsToRead(), gpxInfo);
 		}
 	}
 
@@ -586,7 +590,7 @@ public class OsmGpxWriteContext {
 			}
 			if (!Algorithms.isEmpty(name)) {
 				String prettyRef = "";
-				final String [] words = name.split(" ");
+				final String[] words = name.split("[\\s()]+");
 				for (int i = 0; i < words.length; i++) {
 					// Tour du Mont Blanc (France, Italy, Switzerland) => TMB
 					// Camino de Santiago (Spain) => CS

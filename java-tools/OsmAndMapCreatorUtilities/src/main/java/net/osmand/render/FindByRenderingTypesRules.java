@@ -158,6 +158,9 @@ public class FindByRenderingTypesRules {
 						result.put("color", searchTags.get(key));
 					}
 				}
+				if (routeNameTag != null) {
+					result.put("text", searchTags.get(routeNameTag));
+				}
 				return result;
 			}
 		}

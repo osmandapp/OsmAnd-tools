@@ -114,9 +114,9 @@ public class RouteRelationExtractor {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
 //			s.add("germany-latest.osm.gz");
-//			s.add("slovakia-latest.osm.gz");
+			s.add("slovakia-latest.osm.gz");
 //			s.add("malta-latest.osm.gz");
-			s.add("andorra-latest.osm.gz");
+//			s.add("andorra-latest.osm.gz");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
 			// TODO specify source file, tmp folder, result file // finally clean up the folder
@@ -337,6 +337,11 @@ public class RouteRelationExtractor {
 					if (props.get("color") != null) {
 						// color is forced by osmc_waycolor
 						metadataExtensions.remove("colour");
+					}
+					if (props.get("text") != null && metadataExtensions.get(OSM_TAG_PREFIX + "ref") != null
+						&& props.get("text").equalsIgnoreCase(metadataExtensions.get(OSM_TAG_PREFIX + "ref"))
+					) {
+						props.remove("text"); // avoid useless "text"
 					}
 					metadataExtensions.putAll(props);
 				}
