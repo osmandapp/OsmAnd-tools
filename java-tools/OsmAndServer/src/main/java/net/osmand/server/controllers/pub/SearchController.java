@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
 
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.utils.MultiPlatform;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,17 @@ public class SearchController {
     
     @Autowired
     SearchService searchService;
+    
+    @Autowired
+    protected PremiumUserDevicesRepository devicesRepository;
+    
+    private PremiumUserDevicesRepository.PremiumUserDevice checkToken(int deviceId, String accessToken) {
+        PremiumUserDevicesRepository.PremiumUserDevice d = devicesRepository.findById(deviceId);
+        if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
+            return d;
+        }
+        return null;
+    }
     
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<String> search(@RequestParam double lat,
@@ -137,14 +150,9 @@ public class SearchController {
             Map<String, String> info = wikiService.parseImageInfo(data);
             return ResponseEntity.ok(gson.toJson(info));
         }
+        // ignore data for new parsing
+        data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
         
-        if (data != null) {
-            // save immediately to cache
-            wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
-        }
-        if (data == null) {
-            data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
-        }
         if (data == null) {
             data = wikiService.parseRawImageInfo(imageTitle);
             if (data != null) {
@@ -164,19 +172,36 @@ public class SearchController {
     @MultiPlatform
     @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseImagesListInfo(@RequestBody(required = false) List<WikiImageInfo> data,
-                                                      @RequestParam(required = false) String lang) {
+    public ResponseEntity<String> parseImagesListInfo(@RequestBody List<WikiImageInfo> data,
+                                                      @RequestParam String lang,
+                                                      @RequestParam(name = "deviceid", required = false) int deviceId,
+                                                      @RequestParam(name = "accessToken", required = false) String accessToken) {
         if (data == null) {
             return ResponseEntity.badRequest().body("Required data!");
         }
+        boolean saveToCache = false;
+        if (deviceId != 0 && accessToken != null) {
+            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
+            if (dev != null) {
+                saveToCache = true;
+            }
+        }
         Map<String, Map<String, String>> result = new HashMap<>();
-        data.forEach(wikiImageInfo -> {
+        for (WikiImageInfo wikiImageInfo : data) {
             if (wikiImageInfo.data != null) {
-                // save immediately to cache
                 String title = wikiImageInfo.title();
                 Long pageId = wikiImageInfo.pageId();
-                String rawData = wikiImageInfo.data();
-                wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                String rawData;
+                if (saveToCache) {
+                    // save immediately to cache
+                    rawData = wikiImageInfo.data();
+                    wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                } else {
+                    rawData = wikiService.parseRawImageInfo(title);
+                    if (rawData != null) {
+                        wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                    }
+                }
                 Map<String, String> info = null;
                 try {
                     info = wikiService.parseImageInfo(rawData, title, lang);
@@ -185,7 +210,7 @@ public class SearchController {
                 }
                 result.put(title, info);
             }
-        });
+        }
         return ResponseEntity.ok(gson.toJson(result));
     }
     
