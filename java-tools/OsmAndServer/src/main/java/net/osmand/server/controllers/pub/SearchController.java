@@ -179,6 +179,7 @@ public class SearchController {
         if (data == null) {
             return ResponseEntity.badRequest().body("Required data!");
         }
+        // validate user
         boolean saveToCache = false;
         if (deviceId != 0 && accessToken != null) {
             PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
@@ -186,22 +187,27 @@ public class SearchController {
                 saveToCache = true;
             }
         }
+        
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
-            if (wikiImageInfo.data != null) {
-                String title = wikiImageInfo.title();
-                Long pageId = wikiImageInfo.pageId();
-                String rawData;
-                if (saveToCache) {
-                    // save immediately to cache
-                    rawData = wikiImageInfo.data();
-                    wikiService.saveWikiRawDataToCache(title, pageId, rawData);
-                } else {
-                    rawData = wikiService.parseRawImageInfo(title);
-                    if (rawData != null) {
-                        wikiService.saveWikiRawDataToCache(title, pageId, rawData);
-                    }
+            String rawData = wikiImageInfo.data();
+            String title = wikiImageInfo.title();
+            Long pageId = wikiImageInfo.pageId();
+            if (rawData != null && saveToCache) {
+                // save immediately to cache
+                wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+            } else {
+                if (rawData == null) {
+                    rawData = wikiService.getWikiRawDataFromCache(title, pageId);
                 }
+                if (rawData == null) {
+                    rawData = wikiService.parseRawImageInfo(title);
+                }
+                if (rawData != null) {
+                    wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                }
+            }
+            if (rawData != null) {
                 Map<String, String> info = null;
                 try {
                     info = wikiService.parseImageInfo(rawData, title, lang);
