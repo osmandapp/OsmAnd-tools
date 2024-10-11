@@ -2,8 +2,6 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -128,6 +126,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
                                                  @RequestParam(required = false) String imageTitle,
+                                                 @RequestParam(required = false) Long pageId,
                                                  @RequestParam(required = false) String lang) throws IOException, SQLException {
         if (imageTitle == null && data == null) {
             return ResponseEntity.badRequest().body("Required imageTitle or data!");
@@ -138,20 +137,18 @@ public class SearchController {
             Map<String, String> info = wikiService.parseImageInfo(data);
             return ResponseEntity.ok(gson.toJson(info));
         }
-        String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
-        String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
         
         if (data != null) {
             // save immediately to cache
-            wikiService.saveWikiRawDataToCache(url, data);
+            wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
         }
         if (data == null) {
-            data = wikiService.getWikiRawDataFromCache(url);
+            data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
         }
         if (data == null) {
-            data = wikiService.parseRawImageInfo(url);
+            data = wikiService.parseRawImageInfo(imageTitle);
             if (data != null) {
-                wikiService.saveWikiRawDataToCache(url, data);
+                wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
             }
         }
         if (data == null) {
@@ -161,26 +158,34 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(info));
     }
     
+    public record WikiImageInfo(String title, Long pageId, String data) {
+    }
+    
     @MultiPlatform
     @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseImagesListInfo(@RequestBody(required = false) Map<String, String> data,
-                                                      @RequestParam(required = false) String lang) throws IOException, SQLException {
+    public ResponseEntity<String> parseImagesListInfo(@RequestBody(required = false) List<WikiImageInfo> data,
+                                                      @RequestParam(required = false) String lang) {
         if (data == null) {
             return ResponseEntity.badRequest().body("Required data!");
         }
         Map<String, Map<String, String>> result = new HashMap<>();
-        for (Map.Entry<String, String> entry : data.entrySet()) {
-            String imageTitle = entry.getKey();
-            String rawData = entry.getValue();
-            // save to cache
-            String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
-            String url = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
-            wikiService.saveWikiRawDataToCache(url, rawData);
-            
-            Map<String, String> info = wikiService.parseImageInfo(rawData, imageTitle, lang);
-            result.put(imageTitle, info);
-        }
+        data.forEach(wikiImageInfo -> {
+            if (wikiImageInfo.data != null) {
+                // save immediately to cache
+                String title = wikiImageInfo.title();
+                Long pageId = wikiImageInfo.pageId();
+                String rawData = wikiImageInfo.data();
+                wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                Map<String, String> info = null;
+                try {
+                    info = wikiService.parseImageInfo(rawData, title, lang);
+                } catch (SQLException | IOException e) {
+                    LOGGER.error("Error parse image info: " + title, e);
+                }
+                result.put(title, info);
+            }
+        });
         return ResponseEntity.ok(gson.toJson(result));
     }
     

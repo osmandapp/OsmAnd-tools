@@ -87,28 +87,36 @@ public class WikiService {
 		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 	
-	public String getWikiRawDataFromCache(String url) {
-		String query = "SELECT raw_data FROM wiki.imagesrawdata WHERE url = ? LIMIT 1";
-		return jdbcTemplate.query(query, ps -> ps.setString(1, url), rs -> {
+	public String getWikiRawDataFromCache(String imageTitle, Long pageId) {
+		String query = "SELECT data FROM wiki.imagesrawdata WHERE title = ? AND pageId = ? LIMIT 1";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, imageTitle);
+			ps.setLong(2, pageId);
+		}, rs -> {
 			if (rs.next()) {
-				return rs.getString("raw_data");
+				return rs.getString("data");
 			}
 			return null;
 		});
 	}
 	
-	public void saveWikiRawDataToCache(String url, String rawData) {
-		String query = "INSERT INTO wiki.imagesrawdata (url, raw_data) VALUES (?, ?)";
+	
+	public void saveWikiRawDataToCache(String imageTitle, Long pageId, String rawData) {
+		String query = "INSERT INTO wiki.imagesrawdata (pageId, title, data) VALUES (?, ?, ?)";
 		jdbcTemplate.update(query, ps -> {
-			ps.setString(1, url);
-			ps.setString(2, rawData);
+			ps.setLong(1, pageId);
+			ps.setString(2, imageTitle);
+			ps.setString(3, rawData);
 		});
 	}
 	
-	public String parseRawImageInfo(String dataUrl) {
+	
+	public String parseRawImageInfo(String imageTitle) {
 		HttpURLConnection connection = null;
+		String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+		String urlStr = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
 		try {
-			URL url = new URL(dataUrl);
+			URL url = new URL(urlStr);
 			connection = (HttpURLConnection) url.openConnection();
 			connection.setRequestMethod("GET");
 			connection.setRequestProperty("User-Agent", "OsmAnd Java Server");
@@ -126,12 +134,12 @@ public class WikiService {
 			rawData = content.toString();
 			
 			if (responseCode != HttpURLConnection.HTTP_OK) {
-				logError(dataUrl, responseCode, rawData);
+				logError(urlStr, responseCode, rawData);
 				return null;
 			}
 			return rawData;
 		} catch (IOException e) {
-			logError(dataUrl, -1, e.getMessage());
+			logError(urlStr, -1, e.getMessage());
 			return null;
 		} finally {
 			if (connection != null) {
