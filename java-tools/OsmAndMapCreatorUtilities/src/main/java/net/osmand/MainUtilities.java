@@ -1,5 +1,35 @@
 package net.osmand;
 
+import net.osmand.binary.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.*;
+import net.osmand.obf.diff.ObfDiffGenerator;
+import net.osmand.obf.diff.ObfDiffMerger;
+import net.osmand.obf.diff.ObfRegionSplitter;
+import net.osmand.obf.diff.RelationDiffGenerator;
+import net.osmand.obf.preparation.*;
+import net.osmand.osm.FilterOsmByTags;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.render.OsmAndTestStyleRenderer;
+import net.osmand.render.RenderingRulesStorage;
+import net.osmand.render.RenderingRulesStoragePrinter;
+import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.router.*;
+import net.osmand.router.tester.RandomRouteTester;
+import net.osmand.travel.TravelGuideCreatorMain;
+import net.osmand.travel.WikivoyageDataGenerator;
+import net.osmand.travel.WikivoyageGenOSM;
+import net.osmand.travel.WikivoyageLangPreparation;
+import net.osmand.util.*;
+import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.WikipediaByCountryDivider;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -11,61 +41,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
-import net.osmand.binary.MapZooms;
-import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.BinaryComparator;
-import net.osmand.obf.BinaryInspector;
-import net.osmand.obf.BinaryMerger;
-import net.osmand.obf.GenerateRegionTags;
-import net.osmand.obf.IconVisibility;
-import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.obf.diff.ObfDiffGenerator;
-import net.osmand.obf.diff.ObfDiffMerger;
-import net.osmand.obf.diff.ObfRegionSplitter;
-import net.osmand.obf.diff.RelationDiffGenerator;
-import net.osmand.obf.preparation.BasemapProcessor;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexHeightData;
-import net.osmand.obf.preparation.OceanTilesCreator;
-import net.osmand.osm.FilterOsmByTags;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.render.OsmAndTestStyleRenderer;
-import net.osmand.render.RenderingRulesStorage;
-import net.osmand.render.RenderingRulesStoragePrinter;
-import net.osmand.render.SvgMapLegendGenerator;
-import net.osmand.router.HHRoutingOBFWriter;
-import net.osmand.router.HHRoutingShortcutCreator;
-import net.osmand.router.HHRoutingSubGraphCreator;
-import net.osmand.router.HHRoutingTopGraphCreator;
-import net.osmand.router.TestHHRouting;
-import net.osmand.router.tester.RandomRouteTester;
-import net.osmand.travel.TravelGuideCreatorMain;
-import net.osmand.travel.WikivoyageDataGenerator;
-import net.osmand.travel.WikivoyageGenOSM;
-import net.osmand.travel.WikivoyageLangPreparation;
-import net.osmand.util.Algorithms;
-import net.osmand.util.CombineSRTMIntoFile;
-import net.osmand.util.ConvertLargeRasterSqliteIntoRegions;
-import net.osmand.util.CountryOcbfGeneration;
-import net.osmand.util.FixBasemapRoads;
-import net.osmand.util.GenerateExtractScript;
-import net.osmand.util.IndexBatchCreator;
-import net.osmand.util.IndexUploader;
-import net.osmand.util.ResourceDeleter;
-import net.osmand.util.TileListsForRegions;
-import net.osmand.util.WeatherPrepareRasterSqliteRegions;
-import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.WikipediaByCountryDivider;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class MainUtilities {
 	private static Log log = PlatformUtil.getLog(MainUtilities.class);
@@ -298,6 +273,9 @@ public class MainUtilities {
 				it.remove();
 			} else if (s.startsWith("--chars-build-addr-nameindex=")) {
 				settings.charsToBuildAddressNameIndex = Integer.parseInt(s.substring("--chars-build-addr-nameindex=".length()));
+				it.remove();
+			} else if (s.startsWith("--ignore-propagate")) {
+				settings.ignorePropagate = true;
 				it.remove();
 			}
 		}
