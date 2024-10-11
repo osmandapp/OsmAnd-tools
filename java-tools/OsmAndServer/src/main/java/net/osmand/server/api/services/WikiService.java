@@ -113,6 +113,10 @@ public class WikiService {
 	
 	public String parseRawImageInfo(String imageTitle) {
 		// https://dumps.wikimedia.org/commonswiki/
+		if (!isValidImageTitle(imageTitle)) {
+			logError("Invalid image title", -1, imageTitle);
+			return null;
+		}
 		HttpURLConnection connection = null;
 		String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
 		String urlStr = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
@@ -147,6 +151,14 @@ public class WikiService {
 				connection.disconnect();
 			}
 		}
+	}
+	
+	private boolean isValidImageTitle(String imageTitle) {
+		if (imageTitle.length() > 255) {
+			return false;
+		}
+		String regex = "^[^\\\\/:*?\"<>|]+$"; // Disallow invalid characters
+		return imageTitle.matches(regex);
 	}
 	
 	private void logError(String url, int code, String content) {

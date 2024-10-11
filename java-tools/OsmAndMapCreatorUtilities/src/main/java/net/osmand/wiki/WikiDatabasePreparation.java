@@ -768,7 +768,7 @@ public class WikiDatabasePreparation {
 	
 	private static List<String> parseLinks(String description) {
 		List<String> links = new ArrayList<>();
-		String regex = "\\[(http\\S+)\\s([^]]+)]";
+		String regex = "\\[(https?://\\S+|httpx://\\S+)\\s([^]]+)]";
 		Pattern pattern = Pattern.compile(regex);
 		Matcher matcher = pattern.matcher(description);
 		
@@ -1423,8 +1423,8 @@ public class WikiDatabasePreparation {
 		List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 		String lang = "de";
 		String title = "page";
-		CustomWikiModel wikiModel = new CustomWikiModel("http://" + lang + ".wikipedia.org/wiki/${image}",
-				"http://" + lang + ".wikpedia.org/wiki/${title}", null, true);
+		CustomWikiModel wikiModel = new CustomWikiModel("https://" + lang + ".wikipedia.org/wiki/${image}",
+				"https://" + lang + ".wikpedia.org/wiki/${title}", null, true);
 		String rawWikiText = WikiDatabasePreparation.removeMacroBlocks(input, null, macros, pois, lang, title, null);
 
 //		System.out.println(text);
@@ -1861,8 +1861,8 @@ public class WikiDatabasePreparation {
 						if (wikiId != 0) {
 							try {
 								CustomWikiModel wikiModel = new CustomWikiModel(
-										"http://" + lang + ".wikipedia.org/wiki/${image}",
-										"http://" + lang + ".wikpedia.org/wiki/${title}", imageUrlStorage, true);
+										"https://" + lang + ".wikipedia.org/wiki/${image}",
+										"https://" + lang + ".wikpedia.org/wiki/${title}", imageUrlStorage, true);
 								String rawWikiText = removeMacroBlocks(ctext, null, new HashMap<>(), null, lang,
 										title.toString(), null);
 								plainStr = generateHtmlArticle(rawWikiText, wikiModel);
