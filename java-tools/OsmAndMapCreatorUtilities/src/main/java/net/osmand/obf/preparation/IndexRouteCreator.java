@@ -271,7 +271,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// Load point with tags!
 				ctx.loadEntityWay(e);
 				if (propagateToNodes != null) {
-					propagateToNodes.propagateTagsToWayNodes(e);
+					propagateToNodes.propagateTagsToWayNodesNoBorderRule(e);
 				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);

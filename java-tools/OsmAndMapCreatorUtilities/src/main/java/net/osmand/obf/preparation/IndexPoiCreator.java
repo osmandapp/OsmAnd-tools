@@ -1,40 +1,15 @@
 package net.osmand.obf.preparation;
 
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.data.Amenity;
+import net.osmand.binary.ObfConstants;
+import net.osmand.data.*;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.*;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.PoiType;
-import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
@@ -42,6 +17,14 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.sql.*;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -56,7 +39,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	private static int SHIFT_MULTIPOLYGON_IDS = 43;
 	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
@@ -69,11 +51,73 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
 	private Map<String, HashSet<String>> topIndexAdditional;
+	private Set<String> topIndexKeys = new HashSet<>();
+	private QuadTree<Multipolygon> cityQuadTree;
+	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
+	private Map<Long, List<Integer>> poiTagGroups = new HashMap<>();
+	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
+	private PropagateToNodes propagateToNodes;
+	private HashMap<String, PoiType> propagatedPoiTypeCache = new HashMap<>();
 
-	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, PropagateToNodes propagateToNodes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
+		this.propagateToNodes = propagateToNodes;
+	}
+
+	public void storeCities(CityDataStorage cityDataStorage) {
+		if (cityDataStorage != null) {
+			cityQuadTree = new QuadTree<Multipolygon>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE),
+					8, 0.55f);
+			for (Map.Entry<Boundary, List<City>> entry : cityDataStorage.boundaryToContainingCities.entrySet()) {
+				Boundary b = entry.getKey();
+				if (b.getCityType() == null || !b.getCityType().storedAsSeparateAdminEntity()) {
+					continue;
+				}
+				Multipolygon m = b.getMultipolygon();
+				QuadRect bboxLatLon = m.getLatLonBbox();
+				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
+				int right = MapUtils.get31TileNumberX(bboxLatLon.right);
+				int top = MapUtils.get31TileNumberY(bboxLatLon.top);
+				int bottom = MapUtils.get31TileNumberY(bboxLatLon.bottom);
+				QuadRect bbox = new QuadRect(left, top, right, bottom);
+				cityQuadTree.insert(m, bbox);
+			}
+
+			cityTagsGroup = new HashMap<>();
+			int id = 1;
+			Set<String> allLanguages =new HashSet<>(Arrays.asList(MapRenderingTypes.langs));
+			for (Map.Entry<City, Boundary> entry : cityDataStorage.cityBoundaries.entrySet()) {
+				City city = entry.getKey();
+				Boundary boundary = entry.getValue();
+				List<String> tags = new ArrayList<>();
+				String name = city.getName();
+				if (!Algorithms.isEmpty(name)) {
+					tags.add("name");
+					tags.add(name);
+				}
+				Map<String, String> otherNames = city.getNamesMap(true);
+				for (Map.Entry<String, String> nameEntry : otherNames.entrySet()) {
+					if (allLanguages.contains(nameEntry.getKey())) {
+						tags.add("name:" + nameEntry.getKey());
+						tags.add(nameEntry.getValue());
+					}
+				}
+
+				tags.add("place");
+				tags.add(city.getType().name().toLowerCase());
+
+				if (tags.isEmpty()) {
+					continue;
+				}
+
+				PoiCreatorTagGroup poiCreatorTagGroup = new PoiCreatorTagGroup(id, tags);
+				List<PoiCreatorTagGroup> tagGroups = cityTagsGroup.computeIfAbsent(boundary.getMultipolygon(), s -> new ArrayList<>());
+				tagGroups.add(poiCreatorTagGroup);
+				id++;
+			}
+		}
 	}
 
 	public void setPoiTypes(MapPoiTypes poiTypes) {
@@ -82,7 +126,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private long assignIdForMultipolygon(Relation orig) {
 		long ll = orig.getId();
-		return genId(SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
+		return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
 	}
 	
 	private long genId(int baseShift, long id) {
@@ -117,10 +161,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 //				id = GENERATE_OBJ_ID--;
 				id = assignIdForMultipolygon((Relation) e);
 			} else if(id > 0) {
-				// keep backward compatibility for ids (osm editing)
-				id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
-				if (id % 2 != (e.getId() % 2)) {
-					id ^= 1;
+				boolean isPropagated = e.getId() > PROPAGATED_NODE_BIT;
+				if (isPropagated) {
+					id = e.getId();
+				} else {
+					// keep backward compatibility for ids (osm editing)
+					id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
+					if (id % 2 != (e.getId() % 2)) {
+						id ^= 1;
+					}
 				}
 			}
 			for (Amenity a : tempAmenityList) {
@@ -189,7 +238,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setString(5, amenity.getSubType());
 		poiPreparedStatement.setString(6, encodeAdditionalInfo(amenity, amenity.getName()));
 		poiPreparedStatement.setInt(7, amenity.getOrder());
-
 		int topIndex = 8;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			String val = amenity.getAdditionalInfo(entry.getKey().replace(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX, ""));
@@ -244,6 +292,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			String topIndexKey = MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + e.getKey();
 			if (poiTypes.topIndexPoiAdditional.containsKey(topIndexKey)) {
+				topIndexKeys.add(topIndexKey);
 				rulType = getOrCreate(topIndexKey, e.getValue(), false);
 				if (rulType.getValue() != null) {
 					if (b.length() > 0) {
@@ -316,10 +365,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		stat.close();
 
 		// create prepared statment
-		poiPreparedStatement = poiConnection
-				.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE + "(id, x, y, type, subtype, additionalTags, priority"
-						+ getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-1$//$NON-NLS-2$
-						"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() +  ")");
+		poiPreparedStatement = poiConnection.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE
+				+ "(id, x, y, type, subtype, additionalTags, priority" + getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-2$ //$NON-NLS-2$
+				"VALUES (?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() + ")");
 		pStatements.put(poiPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
@@ -331,6 +379,34 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int maxX = 0;
 		int minY = Integer.MAX_VALUE;
 		int maxY = 0;
+	}
+
+	public static class PoiCreatorTagGroup {
+		int id;
+		List<String> tagValues;
+
+		PoiCreatorTagGroup(int id, List<String> tagValues) {
+			this.id = id;
+			this.tagValues = tagValues;
+		}
+	}
+
+	public static class PoiCreatorTagGroups {
+		HashSet<Integer> ids;
+		HashSet<PoiCreatorTagGroup> tagGroups;
+
+		public void addTagGroup(List<PoiCreatorTagGroup> poiCreatorTagGroups) {
+			for (PoiCreatorTagGroup poiCreatorTagGroup : poiCreatorTagGroups) {
+				if (ids == null) {
+					ids = new HashSet<>();
+					tagGroups = new HashSet<>();
+				}
+				if (!ids.contains(poiCreatorTagGroup.id)) {
+					ids.add(poiCreatorTagGroup.id);
+					tagGroups.add(poiCreatorTagGroup);
+				}
+			}
+		}
 	}
 
 	public static class PoiCreatorCategories {
@@ -504,8 +580,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
+					if (poi.id > PROPAGATED_NODE_BIT) {
+						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
+						if (propagateToNodes != null && propagateToNodes.ignoreBorderPoint(poi.id, propagatedPoiType)) {
+							continue;
+						}
+					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
 				}
 
 			} else {
@@ -524,9 +606,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					String type = rset.getString(4);
 					String subtype = rset.getString(5);
+					List<Integer> tagGroupIds = poiTagGroups.get(id);
+					if (id > PROPAGATED_NODE_BIT) {
+						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
+						if (propagateToNodes.ignoreBorderPoint(id, propagatedPoiType)) {
+							continue;
+						}
+					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
-							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY);
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, tagGroupIds);
 				}
 				rset.close();
 			}
@@ -546,13 +635,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		topIndexAdditional = new HashMap<>();
 		ResultSet rs;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
+			if (!topIndexKeys.contains(entry.getKey())) {
+				continue;
+			}
 			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount = minCount > 0 ? minCount : PoiType.DEFAULT_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : PoiType.DEFAULT_MAX_PER_MAP;
-			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, " + column +
-					" from poi where " + column + " is not NULL group by " + column+ " having cnt > " + minCount +
+			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\"" +
+					" from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
 					" order by cnt desc");
 			HashSet<String> set = new HashSet<>();
 			while (rs.next()) {
@@ -608,8 +700,30 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
 
+			List<PoiCreatorTagGroup> tagGroups = new ArrayList<>();
+			if (cityQuadTree != null) {
+				List<Multipolygon> result = new ArrayList<>();
+				cityQuadTree.queryInBox(new QuadRect(x, y, x, y), result);
+				if (result.size() > 0) {
+					LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+					for (Multipolygon multipolygon : result) {
+						if (multipolygon.containsPoint(latLon)) {
+							if (!cityTagsGroup.containsKey(multipolygon)) {
+								log.error("Multipolygon for POI is not found!!! " + type + " " + subtype + " " + latLon.toString());
+							} else {
+								List<PoiCreatorTagGroup> list = cityTagsGroup.get(multipolygon);
+								tagGroups.addAll(list);
+							}
+						}
+					}
+				}
+			}
+
 			Tree<PoiTileBox> prevTree = rootZoomsTree;
 			rootZoomsTree.getNode().categories.addCategory(type, subtype, additionalTags);
+			if (tagGroups.size() > 0) {
+				rootZoomsTree.getNode().tagGroups.addTagGroup(tagGroups);
+			}
 			for (int i = zoomToStart; i <= ZOOM_TO_SAVE_END; i++) {
 				int xs = x >> (31 - i);
 				int ys = y >> (31 - i);
@@ -631,6 +745,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					prevTree.addSubTree(subtree);
 				}
 				subtree.getNode().categories.addCategory(type, subtype, additionalTags);
+				subtree.getNode().tagGroups.addTagGroup(tagGroups);
 
 				prevTree = subtree;
 			}
@@ -649,6 +764,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), 
 					namesIndex, otherNames);
 
+			List<Integer> tagGroupIds = new ArrayList<>();
+			for (PoiCreatorTagGroup p : tagGroups) {
+				tagGroupIds.add(p.id);
+			}
 			if (useInMemoryCreator) {
 				if (prevTree.getNode().poiData == null) {
 					prevTree.getNode().poiData = new ArrayList<PoiData>();
@@ -660,8 +779,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.subtype = subtype;
 				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
+				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
 
+			} else {
+				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
 		log.info("Poi processing finished");
@@ -722,6 +844,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			writer.writePoiCategories(boxCats);
 		}
 
+		PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
+		writer.writePoiTagGroups(tagGroups);
+
 		if (!end) {
 			for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
 				writePoiBoxes(writer, subTree, startFpPoiIndex, fpToWriteSeeks, globalCategories);
@@ -737,6 +862,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		String subtype;
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
+		List<Integer> tagGroups = new ArrayList<>();
 	}
 
 	public static class PoiTileBox {
@@ -745,6 +871,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int zoom;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
+		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
 
 		public int getX() {
 			return x;
@@ -891,7 +1018,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (poiTypes != null && poiTypes.topIndexPoiAdditional.size() > 0) {
 			String sql = "";
 			for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
-				sql += entry.getKey() + " varchar(2048), ";
+				sql += "\"" + entry.getKey() + "\" varchar(2048), ";
 			}
 			return sql;
 		}
@@ -902,7 +1029,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (poiTypes != null && poiTypes.topIndexPoiAdditional.size() > 0) {
 			String sql = "";
 			for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
-				sql += " ," + entry.getKey();
+				sql += " ,\"" + entry.getKey() + "\"";
 			}
 			return sql;
 		}
@@ -918,5 +1045,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return sql;
 		}
 		return "";
+	}
+
+	private PoiType getPropagatedPoiType(String subtype) {
+		PoiType poiType = null;
+		if (propagatedPoiTypeCache.containsKey(subtype)) {
+			return propagatedPoiTypeCache.get(subtype);
+		}
+		poiType = poiTypes.getPoiTypeByKey(subtype);
+		propagatedPoiTypeCache.put(subtype, poiType);
+		return poiType;
 	}
 }

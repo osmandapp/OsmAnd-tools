@@ -3,7 +3,6 @@ package net.osmand.server.osmgpx;
 
 import static net.osmand.util.Algorithms.readFromInputStream;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +44,9 @@ import javax.xml.stream.XMLStreamException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.shared.data.KQuadRect;
+import okio.Source;
+import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -63,10 +65,9 @@ import org.xmlpull.v1.XmlPullParserException;
 import net.osmand.IProgress;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
-import net.osmand.data.QuadRect;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.OsmGpxWriteContext.OsmGpxFile;
@@ -130,9 +131,9 @@ public class DownloadOsmGPX {
 		DownloadOsmGPX utility = new DownloadOsmGPX();
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
-			ByteArrayInputStream is = new ByteArrayInputStream(gpx.getBytes());
+			Source src = new Buffer().write(gpx.getBytes());
+			GpxUtilities.INSTANCE.loadGpxFile(src);
 			System.out.println(gpx);
-			GPXUtilities.loadGPXFile(is);
 		} else if ("test".equals(main)) {
 			QueryParams qp = new QueryParams();
 			// qp.minlat = qp.maxlat = 52.35;
@@ -303,9 +304,9 @@ public class DownloadOsmGPX {
 				}
 			}
 
-			ByteArrayInputStream is = new ByteArrayInputStream(Algorithms.gzipToString(cont).getBytes());
-			GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
+			Source src = new Buffer().write(Algorithms.gzipToString(cont).getBytes());
+			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
 			ctx.writeTrack(gpxInfo, null, gpxFile, analysis, "OG");
 		}
 		ctx.endDocument();
@@ -488,7 +489,7 @@ public class DownloadOsmGPX {
 						wdata.addBatch();
 					}
 				}
-				GPXFile res = calculateMinMaxLatLon(r);
+				GpxFile res = calculateMinMaxLatLon(r);
 				if (res != null && r.minlat != OsmGpxFile.ERROR_NUMBER && r.minlon != OsmGpxFile.ERROR_NUMBER) {
 					wgpx.ps.setDouble(1, r.minlat);
 					wgpx.ps.setDouble(2, r.minlon);
@@ -566,17 +567,17 @@ public class DownloadOsmGPX {
 		commitAllStatements();
 	}
 
-	private GPXFile calculateMinMaxLatLon(OsmGpxFile r) {
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(new ByteArrayInputStream(r.gpx.getBytes()));
-		if (gpxFile.error == null) {
-			QuadRect rect = gpxFile.getBounds(r.lat, r.lon);
-			r.minlon = rect.left;
-			r.minlat = rect.bottom;
-			r.maxlon = rect.right;
-			r.maxlat = rect.top;
+	private GpxFile calculateMinMaxLatLon(OsmGpxFile r) {
+		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(new Buffer().write(r.gpx.getBytes()));
+		if (gpxFile.getError() == null) {
+			KQuadRect rect = gpxFile.getBounds(r.lat, r.lon);
+			r.minlon = rect.getLeft();
+			r.minlat = rect.getBottom();
+			r.maxlon = rect.getRight();
+			r.maxlat = rect.getTop();
 			return gpxFile;
 		} else {
-			errorReadingGpx(r, gpxFile.error);
+			errorReadingGpx(r, gpxFile.getError());
 			return null;
 		}
 	}

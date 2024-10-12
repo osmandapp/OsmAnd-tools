@@ -12,6 +12,7 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
@@ -275,6 +276,7 @@ public class WebGpxParser {
     
     public void addRoutePoints(GPXFile gpxFile, TrackData gpxData) {
         Map<Integer, List<Point>> trackPointsMap = new HashMap<>();
+        AtomicBoolean skip = new AtomicBoolean(false);
         gpxFile.routes.forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
             int index = gpxFile.routes.indexOf(route);
@@ -291,6 +293,10 @@ public class WebGpxParser {
                     boolean isLastPoint = route.points.indexOf(p) == route.points.size() - 1;
                     Point routePoint = new Point(p);
                     int currTrkPointInd;
+                    if (routePoint.geometry == null && routePoint.geometrySize == 0) {
+                        skip.set(true);
+                        return;
+                    }
                     if (routePoint.geometrySize == -1) {
                         currTrkPointInd = findNearestPoint(trackPoints, routePoint);
                     } else {
@@ -302,6 +308,9 @@ public class WebGpxParser {
                     }
                     prevTrkPointInd = addTrkptToRoutePoint(currTrkPointInd, prevTrkPointInd, routePoint, trackPoints, routePoints);
                 }
+                if (skip.get()) {
+                    return;
+                }
                 int indTrack = getTrackBySegmentIndex(gpxData, index);
                 List<Point> routeP = trackPointsMap.get(indTrack);
                 if (routeP != null) {
@@ -311,6 +320,9 @@ public class WebGpxParser {
                 }
             }
         });
+        if (skip.get()) {
+            return;
+        }
         gpxData.tracks.forEach(track -> track.points = trackPointsMap.get(gpxData.tracks.indexOf(track)));
     }
     

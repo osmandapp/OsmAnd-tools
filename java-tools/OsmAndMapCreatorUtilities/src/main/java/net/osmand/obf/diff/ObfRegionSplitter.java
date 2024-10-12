@@ -25,12 +25,12 @@ public class ObfRegionSplitter {
 	
 	public static void main(String[] args) throws IOException {
 		if(args.length == 1 && args[0].equals("test")) {
-			args = new String[6];
-			args[0] = "/Users/macmini/OsmAnd/overpass/23_03_09_24_00.obf";
-			args[1] = "/Users/macmini/OsmAnd/overpass/split_obf/";
+			args = new String[4];
+			args[0] = "~/24_08_04_21_40.obf";
+			args[1] = "~/Desktop/split/";
 			args[2] = "";
-			args[3] = "_23_03_10";
-			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
+			args[3] = "_24_08_04_21_40";
+//			args[4] = "--srtm=/Users/macmini/OsmAnd/overpass/srtm/";
 		}
 		if (args.length <= 3) {
 			System.err.println("Usage: <path_to_world_obf_diff> <path_to_result_folder> <subfolder_name> <file_suffix> --srtm=<folder with srtm>");
@@ -367,13 +367,13 @@ public class ObfRegionSplitter {
 		for (MapZoomPair p : allMapObjects.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> objects = allMapObjects.get(p);
 			for (BinaryMapDataObject obj : objects.valueCollection()) {
+				if (isPossibleVandalism(obj)) {
+					continue;
+				}
 				int x = obj.getPoint31XTile(0);
 				int y = obj.getPoint31YTile(0);
 				List<BinaryMapDataObject> l = osmandRegions.query(x, y);
 				for (BinaryMapDataObject b : l) {
-					if (isPossibleVandalism(b)) {
-						continue;
-					}
 					if (OsmandRegions.contain(b, x, y)) {
 						String dw = osmandRegions.getDownloadName(b);
 						WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dw);

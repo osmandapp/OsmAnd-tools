@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.imageio.ImageIO;
 
 import net.osmand.router.*;
+import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -1670,7 +1671,7 @@ public class OsmAndMapsService {
 		return osmandRegions;
 	}
 
-	public File getObf(Map<String, GPXFile> files)
+	public File getObf(Map<String, GpxFile> files)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		File tmpOsm = File.createTempFile("gpx_obf", ".osm.gz");
 		File tmpFolder = new File(tmpOsm.getParentFile(), String.valueOf(System.currentTimeMillis()));
@@ -1742,5 +1743,13 @@ public class OsmAndMapsService {
 			return style;
 		}
 		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
+	}
+
+	public BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
+		int type, int size, int zoom, int x, int y) throws IOException {
+		if (nativelib == null) {
+			return null;
+		}
+		return nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
 	}
 }

@@ -507,7 +507,7 @@ public class IndexHeightData {
 		wg.dist = wg.dists.get(wg.dists.size() - 1);
 		double prevUpDownDist = 0;
 		double prevUpDownH = 0;
-		
+
 		double prevGraphDist = 0;
 		double prevGraphH = 0;
 		for (int i = 0; i < wg.dists.size(); i++) {
@@ -524,6 +524,7 @@ public class IndexHeightData {
 					wg.sumEle += h;
 					wg.eleCount++;
 				}
+
 				if (sumdist >= prevUpDownDist + DIST_STEP) {
 					if (h > prevUpDownH) {
 						wg.up += (h - prevUpDownH);
@@ -531,6 +532,7 @@ public class IndexHeightData {
 						wg.down += (prevUpDownH - h);
 					}
 					prevUpDownDist = sumdist;
+					prevUpDownH = h;
 				}
 				
 				while (sumdist >= prevGraphDist + DIST_STEP) {

@@ -21,9 +21,9 @@ import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long> {
 	
 	
-	PremiumUser findByEmail(String email);
+	PremiumUser findByEmailIgnoreCase(String email);
     
-    int deleteByEmail(String email);
+    int deleteByEmailIgnoreCase(String email);
 	
 	PremiumUser findByOrderid(String orderid);
     

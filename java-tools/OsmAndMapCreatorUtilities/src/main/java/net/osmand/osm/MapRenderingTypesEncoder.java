@@ -1,12 +1,9 @@
 package net.osmand.osm;
 
-import gnu.trove.list.array.TIntArrayList;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -17,15 +14,17 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+
+import gnu.trove.list.array.TIntArrayList;
 import net.osmand.PlatformUtil;
+import net.osmand.osm.MapRenderingTypes.PropagateToNode;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
@@ -251,19 +250,27 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return a;
 	}
 
+	@Override
+	protected void parsePropagate(XmlPullParser parser, MapRulType parentType) {
+		PropagateToNode ptype = parsePropagateType(parser);
+		if (ptype != null && parentType != null) {
+			parentType.propagateToNodes.add(ptype);
+		}
+	}
 
 
 	@Override
-	protected void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
+	protected MapRulType parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parent) {
 		String seq = parser.getAttributeValue("", "seq");
-		if(Algorithms.isEmpty(seq)) {
+		if (Algorithms.isEmpty(seq)) {
 			seq = "1:1";
 		}
+		MapRulType mainType = null;
 		String[] ls = seq.split(":");
 		for (int ind = Integer.parseInt(ls[0]); ind <= Integer.parseInt(ls[1]); ind++) {
 			String tag = lc(parser.getAttributeValue("", "tag"), ind);
-			MapRulType rtype = parseBaseRuleType(parser, parent, tag);
-			registerMapRule(parser, rtype);
+			mainType = parseBaseRuleType(parser, parent, tag);
+			registerMapRule(parser, mainType);
 			if ("true".equals(parser.getAttributeValue("", "lang"))) {
 				for (String lng : langs) {
 					tag = lc(parser.getAttributeValue("", "tag"), ind) + ":" + lng;
@@ -274,6 +281,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				}
 			}
 		}
+		return mainType;
 	}
 
 
@@ -1453,8 +1461,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			result += 9;
 			result_bicycle_routing += 9;
 		} else if ("grass".equals(surface)) {
-			result += 10;
-			result_bicycle_routing += 10;
+			result += 12;
+			result_bicycle_routing += 12;
 		} else if ("cobblestone".equals(surface)) {
 			result += 11;
 			result_bicycle_routing += 11;

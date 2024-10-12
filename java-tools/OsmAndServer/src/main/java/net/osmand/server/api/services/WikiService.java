@@ -1,13 +1,17 @@
 package net.osmand.server.api.services;
 
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 import com.clickhouse.data.value.UnsignedLong;
+import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -15,10 +19,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
-import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -40,8 +42,14 @@ public class WikiService {
 	private static final String THUMB_PREFIX = "320px-";
 	protected static final boolean FILENAME = true;
 
-	private static final int LIMIT_QUERY = 1000;
-	private static final int LIMITI_QUERY = 25;
+	private static final int LIMIT_OBJS_QUERY = 1000;
+	private static final int LIMIT_PHOTOS_QUERY = 100;
+	
+	private static final int FILTER_ZOOM_LEVEL = 15;
+	
+	private static final Map<Integer, Set<String>> EXCLUDED_POI_SUBTYPES_BY_ZOOM = Map.of(FILTER_ZOOM_LEVEL, Set.of("commercial", "battlefield"));
+	
+	
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
 	
@@ -56,13 +64,13 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_QUERY, "imgLat", "imgLon", null);
+				+ " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY, null,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
 		String query = String.format("SELECT id, mediaId, imageTitle, date, author, license " +
 				"FROM wikiimages WHERE id = %d " +
-				"ORDER BY views DESC LIMIT " + LIMIT_QUERY, id);
+				"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
 		
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
 			Feature f = new Feature(Geometry.point(new LatLon(lat, lon)));
@@ -78,17 +86,112 @@ public class WikiService {
 		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 	
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
-		String filterQuery = filters.isEmpty() ? "" : "AND poitype IN (" + filters.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ")";
+	public Map<String, String> parseImageInfo(String data) {
+		return WikiImagesUtil.INSTANCE.parseWikiText(data);
+	}
+	
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
+		String filterQuery = "";
+		List<Object> filterParams = new ArrayList<>();
+		if (!filters.isEmpty()) {
+			filterQuery = "AND poitype IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
+			filterParams.addAll(filters);
+		}
+		
+		String zoomCondition = "";
+		if (zoom < FILTER_ZOOM_LEVEL) {
+			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
+		}
+		
+		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
+		
+		String osmidCondition = "";
+		String osmcntFilter = "";
+		if (zoom < FILTER_ZOOM_LEVEL) {
+			osmidCondition = "AND osmid != 0 ";
+			osmcntFilter = "AND osmcnt < 4 ";
+		}
+		
+		String subtypeFilter = "";
+		if (!excludedPoiSubtypes.isEmpty()) {
+			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
+		}
+		
 		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks "
 				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
 				+ filterQuery
-				+ " ORDER BY qrank DESC LIMIT " + LIMIT_QUERY;
+				+ zoomCondition
+				+ osmidCondition
+				+ osmcntFilter
+				+ " " + subtypeFilter
+				+ " ORDER BY qrank DESC LIMIT " + LIMIT_OBJS_QUERY;
 		
-		return getPoiData(northWest, southEast, query, "lat", "lon", lang);
+		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
 	
-	public FeatureCollection getPoiData(String northWest, String southEast, String query, String lat, String lon, String lang) {
+	private static Set<String> getExcludedTypes(Map<Integer, Set<String>> map, int zoom) {
+		return map.entrySet().stream()
+				.filter(entry -> entry.getKey() >= zoom)
+				.flatMap(entry -> entry.getValue().stream())
+				.collect(Collectors.toSet());
+	}
+	
+	public String getWikipediaContent(String title, String lang) {
+		String query = "SELECT hex(zipContent) AS ziphex FROM wiki.wiki_content WHERE title = ? AND lang = ?";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, title);
+			ps.setString(2, lang);
+		}, rs -> {
+			if (rs.next()) {
+				String contentHex = rs.getString("ziphex");
+				byte[] contentBytes = HexFormat.of().parseHex(contentHex);
+				if (contentBytes != null) {
+					return unzipContent(contentBytes);
+				}
+			}
+			return null;
+		});
+	}
+	
+	public String getWikivoyageContent(String title, String lang) {
+		String query = "SELECT hex(content_gz) AS ziphex FROM wiki.wikivoyage_articles WHERE title = ? AND lang = ?";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, title);
+			ps.setString(2, lang);
+		}, rs -> {
+			if (rs.next()) {
+				String contentHex = rs.getString("ziphex");
+				byte[] contentBytes = HexFormat.of().parseHex(contentHex);
+				if (contentBytes != null) {
+					return unzipContent(contentBytes);
+				}
+			}
+			return null;
+		});
+	}
+	
+	public String unzipContent(byte[] compressedContent) {
+		if (compressedContent == null || compressedContent.length == 0) {
+			return null;
+		}
+		
+		try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(compressedContent);
+		     GZIPInputStream gzipInputStream = new GZIPInputStream(byteArrayInputStream);
+		     InputStreamReader inputStreamReader = new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8);
+		     BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
+			
+			StringBuilder output = new StringBuilder();
+			String line;
+			while ((line = bufferedReader.readLine()) != null) {
+				output.append(line);
+			}
+			return output.toString();
+		} catch (IOException e) {
+			return null;
+		}
+	}
+	
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, String lat, String lon, String lang) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
@@ -213,6 +316,9 @@ public class WikiService {
 						ps.setDouble(3, west);
 						ps.setDouble(4, east);
 					}
+					for (int i = 0; i < filterParams.size(); i++) {
+						ps.setObject(5 + i, filterParams.get(i));
+					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
 	}
@@ -225,90 +331,132 @@ public class WikiService {
 	public Set<String> processWikiImages(String articleId, String categoryName, String wiki) {
 		Set<String> images = new LinkedHashSet<>();
 		if (config.wikiInitialized()) {
-			RowCallbackHandler h = new RowCallbackHandler() {
-
-				@Override
-				public void processRow(ResultSet rs) throws SQLException {
-					if (FILENAME) {
-						images.add(WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + rs.getString(1));
-					} else {
-						String imageTitle = rs.getString(1);
-						try {
-							imageTitle = URLDecoder.decode(imageTitle, "UTF-8");
-							String[] hash = getHash(imageTitle);
-							imageTitle = URLEncoder.encode(imageTitle, "UTF-8");
-							String prefix = THUMB_PREFIX;
-							String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
-							images.add(IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/"
-									+ prefix + imageTitle + suffix);
-						} catch (UnsupportedEncodingException e) {
-							System.err.println(e.getMessage());
-						}
-					}
-				}
+			RowCallbackHandler h = rs -> {
+				String imageTitle = rs.getString("imageTitle");
+				images.add(createImageUrl(imageTitle));
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
-				String title = wiki;
-				String lang = "";
-				int url = title.indexOf(".wikipedia.org/wiki/");
-				if (url > 0) {
-					String prefix = title.substring(0, url);
-					lang = prefix.substring(prefix.lastIndexOf("/") + 1, prefix.length());
-					title = title.substring(url + ".wikipedia.org/wiki/".length());
-				} else if (title.indexOf(":") > 0) {
-					String[] s = wiki.split(":");
-					title = s[1];
-					lang = s[0];
-				}
-				String id = null;
-				ResultSetExtractor<String> rse = new ResultSetExtractor<String>() {
-
-					@Override
-					public String extractData(ResultSet rs) throws SQLException, DataAccessException {
-						if(rs.next()) {
-							return rs.getString(1);
-						}
-						return null;
-					}
-				};
-				if (lang.length() == 0) {
-					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where title = ? ", rse, title);
-				} else {
-					id = jdbcTemplate.query("SELECT id from wiki.wiki_mapping where lang = ? and title = ? ", rse, lang,
-							title);
-				}
-				if (id != null) {
-					articleId = "Q" + id;
-				}
+				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
-			if (!Algorithms.isEmpty(articleId) && articleId.startsWith("Q")) {
-				String aid = articleId;
-				jdbcTemplate.query(
-						"SELECT imageTitle from wiki.wikiimages where id = ? and namespace = 6 "
-								+ " order by type='P18' ? 0 : 1/(1+views) desc limit " + LIMITI_QUERY,
-						new PreparedStatementSetter() {
-
-							@Override
-							public void setValues(PreparedStatement ps) throws SQLException {
-								ps.setString(1, aid.substring(1));
-							}
-						}, h);
-			}
-			if (!Algorithms.isEmpty(categoryName)) {
-				jdbcTemplate.query("SELECT imageTitle from wiki.wikiimages where id = "
-						+ " (select any(id) from wiki.wikiimages where imageTitle = ? and namespace = 14) "
-						+ " and type='P373' and namespace = 6 order by views asc limit " + LIMITI_QUERY,
-						new PreparedStatementSetter() {
-
-							@Override
-							public void setValues(PreparedStatement ps) throws SQLException {
-								ps.setString(1, categoryName.replace(' ', '_'));
-							}
-						}, h);
-			}
+			handleArticleAndCategoryQueries(articleId, categoryName, h);
 		}
-		
 		return images;
 	}
-
+	
+	
+	public Set<Map<String, Object>> processWikiImagesWithDetails(String articleId, String categoryName, String wiki) {
+		Set<Map<String, Object>> imagesWithDetails = new LinkedHashSet<>();
+		
+		if (config.wikiInitialized()) {
+			RowCallbackHandler h = rs -> {
+				Map<String, Object> imageDetails = new HashMap<>();
+				String imageTitle = rs.getString("imageTitle");
+				
+				imageDetails.put("image", createImageUrl(imageTitle));
+				imageDetails.put("date", rs.getString("date"));
+				imageDetails.put("author", rs.getString("author"));
+				imageDetails.put("license", rs.getString("license"));
+				
+				imagesWithDetails.add(imageDetails);
+			};
+			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
+				articleId = retrieveArticleIdFromWikiUrl(wiki);
+			}
+			handleArticleAndCategoryQueries(articleId, categoryName, h);
+		}
+		return imagesWithDetails;
+	}
+	
+	private String createImageUrl(String imageTitle) {
+		if (FILENAME) {
+			return WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + imageTitle;
+		} else {
+			imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
+			String[] hash = getHash(imageTitle);
+			imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+			String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
+			return IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/" + THUMB_PREFIX + imageTitle + suffix;
+		}
+	}
+	
+	private void processImageQuery(String query, PreparedStatementSetter pss, RowCallbackHandler rowCallbackHandler) {
+		jdbcTemplate.query(query, pss, rowCallbackHandler);
+	}
+	
+	private void handleArticleAndCategoryQueries(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+		if (articleId != null && !Algorithms.isEmpty(articleId)) {
+			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
+			String finalArticleId = articleId;
+			processImageQuery(
+					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
+							"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, finalArticleId),
+					rowCallbackHandler);
+		}
+		
+		if (categoryName != null && !Algorithms.isEmpty(categoryName)) {
+			boolean found = findImagesByCatWithWikidataid(categoryName, rowCallbackHandler);
+			
+			if (!found) {
+				processImageQuery(
+						"SELECT imgName AS imageTitle, '' AS date, '' AS author, '' AS license " +
+								"FROM wiki.categoryimages WHERE catName = ? ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+						ps -> ps.setString(1, categoryName.replace(' ', '_')),
+						rowCallbackHandler);
+			}
+		}
+	}
+	
+	private boolean findImagesByCatWithWikidataid(String categoryName, RowCallbackHandler rowCallbackHandler) {
+		AtomicBoolean found = new AtomicBoolean(false);
+		
+		processImageQuery(
+				"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = " +
+						"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
+						"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+				ps -> ps.setString(1, categoryName.replace(' ', '_')),
+				rs -> {
+					rowCallbackHandler.processRow(rs);
+					found.set(true);
+				});
+		
+		return found.get();
+	}
+	
+	private String retrieveArticleIdFromWikiUrl(String wiki) {
+		String title = wiki;
+		String lang = "";
+		int urlIndex = title.indexOf(".wikipedia.org/wiki/");
+		if (urlIndex > 0) {
+			String prefix = title.substring(0, urlIndex);
+			lang = prefix.substring(prefix.lastIndexOf("/") + 1);
+			title = title.substring(urlIndex + ".wikipedia.org/wiki/".length());
+		} else if (title.indexOf(":") > 0) {
+			String[] s = wiki.split(":");
+			title = s[1];
+			lang = s[0];
+		}
+		
+		String id;
+		if (lang.isEmpty()) {
+			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ?", String.class, title);
+		} else {
+			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?", String.class, lang, title);
+		}
+		return id;
+	}
+	
+	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
+		List<Feature> features = images.stream().map(imageDetails -> {
+			Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
+			feature.properties.put("imageTitle", imageDetails.get("image"));
+			feature.properties.put("date", imageDetails.get("date"));
+			feature.properties.put("author", imageDetails.get("author"));
+			feature.properties.put("license", imageDetails.get("license"));
+			return feature;
+		}).toList();
+		
+		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+	
 }

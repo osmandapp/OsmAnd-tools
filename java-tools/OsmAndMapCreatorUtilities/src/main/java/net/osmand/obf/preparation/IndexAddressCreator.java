@@ -74,17 +74,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	// MEMORY address : address structure
 	// load it in memory
-	private Map<EntityId, City> cities = new LinkedHashMap<EntityId, City>();
 	private List<Long> debugCityIds = new ArrayList<>();
-	private static final double CITY_VILLAGE_DIST = 10000;
-	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
-	private static final double CITY_DIST = 50000;
-	private DataTileManager<City> cityManager = new DataTileManager<City>(10);
 	private List<Relation> postalCodeRelations = new ArrayList<Relation>();
 	private Map<Entity, Boundary> postcodeBoundaries = new HashMap<>();
-	private Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
-	private Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
-	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
 	private TLongHashSet visitedBoundaryWays = new TLongHashSet();
 
 	private boolean normalizeStreets;
@@ -101,14 +93,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	DBStreetDAO streetDAO;
 	private PreparedStatement postcodeSetStat;
 	private IndexCreatorSettings settings;
+	private CityDataStorage cityDataStorage;
 
 
 	public IndexAddressCreator(Log logMapDataWarn, IndexCreatorSettings settings) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.settings = settings;
 		streetDAO = loadInMemory ? new CachedDBStreetDAO() : new DBStreetDAO();
+		cityDataStorage = new CityDataStorage();
 	}
 
+	public CityDataStorage getCityDataStorage() {
+		return cityDataStorage;
+	}
 
 
 	public void registerCityIfNeeded(Entity e) {
@@ -125,12 +122,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private void regCity(City city, Entity e) {
 		LatLon l = city.getLocation();
 		if (city.getType() != null && !Algorithms.isEmpty(city.getName()) && l != null) {
-			if (city.getType() == CityType.CITY || city.getType() == CityType.TOWN) {
-				cityManager.registerObject(l.getLatitude(), l.getLongitude(), city);
-			} else {
-				cityVillageManager.registerObject(l.getLatitude(), l.getLongitude(), city);
-			}
-			cities.put(EntityId.valueOf(e), city);
+			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
 		}
 	}
@@ -142,9 +134,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
-			List<City> citiesToSearch = new ArrayList<City>();
-			citiesToSearch.addAll(cityManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), CITY_DIST));
-			citiesToSearch.addAll(cityVillageManager.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), CITY_VILLAGE_DIST));
+			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
 
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
@@ -199,7 +189,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				putCityBoundary(boundary, cityFound);
 			} else {
 				logBoundaryChanged(boundary, null, 0, 0);
-				notAssignedBoundaries.add(boundary);
+				cityDataStorage.addNotAssignedBoundary(boundary);
 			}
 			attachAllCitiesToBoundary(boundary);
 		} else if (boundary != null) {
@@ -222,31 +212,23 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private void attachAllCitiesToBoundary(Boundary boundary) {
-		List<City> list = new ArrayList<City>(1);
-		for (City c : cities.values()) {
-			if (boundary.containsPoint(c.getLocation())) {
-				list.add(c);
-			}
-		}
-		if (list.size() > 0) {
-			boundaryToContainingCities.put(boundary, list);
-		}
+		cityDataStorage.attachAllCitiesToBoundary(boundary);
 	}
 
 	public void tryToAssignBoundaryToFreeCities(IProgress progress) {
-		progress.startWork(cities.size());
+		progress.startWork(cityDataStorage.citiesSize());
 		// Why to do this? This is completely incorrect to do with suburbs because it assigns boundary that is much bigger
 		// than suburb and after that findCityPart works incorrectly
 		//for cities without boundaries, try to find the right one
 		int smallestAdminLevel = 7; //start at level 8 for now...
-		for (City c : cities.values()) {
+		for (City c : cityDataStorage.getAllCities()) {
 			progress.progress(1);
-			Boundary cityB = cityBoundaries.get(c);
+			Boundary cityB = cityDataStorage.getBoundaryByCity(c);
 			if (cityB == null && (c.getType() == CityType.CITY || c.getType() == CityType.TOWN)) {
 				LatLon location = c.getLocation();
 				Boundary smallestBoundary = null;
 				// try to found boundary
-				for (Boundary b : notAssignedBoundaries) {
+				for (Boundary b : cityDataStorage.getNotAssignedBoundaries()) {
 					if (b.getAdminLevel() >= smallestAdminLevel) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
 							// the bigger the admin level, the smaller the boundary :-)
@@ -257,7 +239,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				if (smallestBoundary != null) {
 					putCityBoundary(smallestBoundary, c);
-					notAssignedBoundaries.remove(smallestBoundary);
+					cityDataStorage.removeNotAssignedBoundary(smallestBoundary);
 				}
 			}
 		}
@@ -333,9 +315,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
-		final Boundary oldBoundary = cityBoundaries.get(cityFound);
+		final Boundary oldBoundary = cityDataStorage.getBoundaryByCity(cityFound);
 		if (oldBoundary == null) {
-			cityBoundaries.put(cityFound, boundary);
+			cityDataStorage.setCityBoundary(cityFound, boundary);
 			logBoundaryChanged(boundary, cityFound,
 					getCityBoundaryImportance(boundary, cityFound), 100);
 			return oldBoundary;
@@ -349,7 +331,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int old = getCityBoundaryImportance(oldBoundary, cityFound);
 			int n = getCityBoundaryImportance(boundary, cityFound);
 			if (n < old) {
-				cityBoundaries.put(cityFound, boundary);
+				cityDataStorage.setCityBoundary(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound, n, old);
 			}
 			return oldBoundary;
@@ -634,9 +616,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = normalizeStreetName(name, location, icc);
 		Set<City> result = new LinkedHashSet<City>();
-		List<City> nearestObjects = new ArrayList<City>();
-		nearestObjects.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_DIST));
-		nearestObjects.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_VILLAGE_DIST));
+		List<City> nearestObjects = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude());
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
 			if (!c.getType().storedAsSeparateAdminEntity()) {
@@ -645,7 +625,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 
-			Boundary boundary = cityBoundaries.get(c);
+			Boundary boundary = cityDataStorage.getBoundaryByCity(c);
 			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
 				// revert due to massive problems with suburb, village and other inside city objects
 				//if (boundary != null && boundary.getCityType() != null && boundary.getCityType().storedAsSeparateAdminEntity()) {
@@ -677,7 +657,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			    	break;
     			} else if (!result.contains(c)) {
 	    			// city doesn't have boundary or there is a mistake in boundaries and we found nothing before
-	    			if (!cityBoundaries.containsKey(c) || result.isEmpty()) {
+	    			if (!cityDataStorage.isCityHasBoundary(c) || result.isEmpty()) {
 	    				result.add(c);
 	    			}
 		    	}
@@ -750,13 +730,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private String findCityPart(LatLon location, City city) {
 		String cityPart = city.getName();
 		boolean found = false;
-		Boundary cityBoundary = cityBoundaries.get(city);
+		Boundary cityBoundary = cityDataStorage.getBoundaryByCity(city);
 		if (cityBoundary != null) {
-			List<City> subcities = boundaryToContainingCities.get(cityBoundary);
+			List<City> subcities = cityDataStorage.getCityListByBoundary(cityBoundary);
 			if (subcities != null) {
 				for (City subpart : subcities) {
 					if (subpart != city) {
-						Boundary subBoundary = cityBoundaries.get(subpart);
+						Boundary subBoundary = cityDataStorage.getBoundaryByCity(subpart);
 						if (cityBoundary != null && subBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel()) {
 							// old code
 							cityPart = findNearestCityOrSuburb(subBoundary, location); // subpart.getName();
@@ -772,7 +752,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (!found) {
-			Boundary b = cityBoundaries.get(city);
+			Boundary b = cityDataStorage.getBoundaryByCity(city);
 			cityPart = findNearestCityOrSuburb(b, location);
 		}
 		return cityPart;
@@ -784,10 +764,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<City> list = new ArrayList<City>();
 		if (greatestBoundary != null) {
 			result = greatestBoundary.getName();
-			list = boundaryToContainingCities.get(greatestBoundary);
+			list = cityDataStorage.getCityListByBoundary(greatestBoundary);
 		} else {
-			list.addAll(cityManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_DIST));
-			list.addAll(cityVillageManager.getClosestObjects(location.getLatitude(), location.getLongitude(), CITY_VILLAGE_DIST));
+			list = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude());
 		}
 		if (list != null) {
 			for (City c : list) {
@@ -1062,7 +1041,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	public void writeCitiesIntoDb() throws SQLException {
-		for (City c : cities.values()) {
+		for (City c : cityDataStorage.getAllCities()) {
 			if (c.getType().storedAsSeparateAdminEntity()) {
 				writeCity(c);
 			}
@@ -1668,7 +1647,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			cities.get(type).add(city);
 
 			if (DEBUG_FULL_NAMES) {
-				Boundary cityB = cityBoundaries.get(city);
+				Boundary cityB = cityDataStorage.getBoundaryByCity(city);
 				if (cityB != null) {
 					city.setName(city.getName() + " " + cityB.getAdminLevel() + ":" + cityB.getName());
 				}

@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.*;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -19,6 +20,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.controllers.user.MapApiController;
@@ -33,12 +36,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
@@ -102,7 +103,8 @@ public class UserdataService {
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
-
+    private static final String CR_SANITIZE = "$0D"; // \r
+    private static final String LF_SANITIZE = "$0A"; // \n
 
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
@@ -129,6 +131,38 @@ public class UserdataService {
     public static final String INFO_EXT = ".info";
 
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
+    
+    private static final int MAX_ATTEMPTS_PER_DAY = 100;
+    private final Cache<String, RequestData> requestTracker = CacheBuilder.newBuilder()
+            .expireAfterWrite(24, TimeUnit.HOURS)
+            .build();
+    
+    private static class RequestData {
+        public int checkCount;
+        public long lastCheckTime;
+        
+        public RequestData(int checkCount, long lastCheckTime) {
+            this.checkCount = checkCount;
+            this.lastCheckTime = lastCheckTime;
+        }
+    }
+    
+    private ResponseEntity<String> trackRequest(HttpServletRequest request) {
+        String ipAddress = request.getRemoteAddr();
+        RequestData checkData = requestTracker.getIfPresent(ipAddress);
+        
+        if (checkData == null) {
+            checkData = new RequestData(0, System.currentTimeMillis());
+        }
+        if (checkData.checkCount >= MAX_ATTEMPTS_PER_DAY) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many requests. Try again later.");
+        }
+        checkData.checkCount++;
+        checkData.lastCheckTime = System.currentTimeMillis();
+        requestTracker.put(ipAddress, checkData);
+        
+        return null;
+    }
 
     public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
     	PremiumUser user = usersRepository.findById(dev.userid);
@@ -171,6 +205,7 @@ public class UserdataService {
     public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
         List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
         List<UserFileNoData> fl;
+
         if (types != null) {
             for (String t : types) {
                 fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
@@ -185,10 +220,26 @@ public class UserdataService {
                     filesRepository.listFilesByUserid(userId, name, null);
             allFiles.addAll(fl);
         }
+
+        sanitizeFileNames(allFiles);
         return getUserFilesResults(allFiles, userId, allVersions);
     }
 
-    private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
+	private void sanitizeFileNames(List<UserFileNoData> files) {
+		for(UserFileNoData f : files) {
+			f.name = sanitizeEncode(f.name);
+		}
+	}
+
+	private String sanitizeEncode(String name) {
+		return name.replace("\r", CR_SANITIZE).replace("\n", LF_SANITIZE);
+	}
+
+	private String sanitizeDecode(String name) {
+		return name.replace(CR_SANITIZE, "\r").replace(LF_SANITIZE, "\n");
+	}
+
+	private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
         PremiumUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
@@ -317,38 +368,70 @@ public class UserdataService {
     }
 
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
-        if (password.length() < 6) {
-            throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 6 symbols");
+        if (password.length() < 8) {
+            throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 8 symbols");
         }
         return registerNewDevice(email, token, TOKEN_DEVICE_WEB, encoder.encode(password), lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
     }
 
-	public ResponseEntity<String> webUserRegister(@RequestParam(name = "email", required = true) String email,
-	                                              @RequestParam(name = "lang", required = false) String lang)
-			throws IOException {
-		// allow to register only with small case
+	public ResponseEntity<String> webUserRegister(String email, String lang, boolean isNew, HttpServletRequest request) {
+        ResponseEntity<String> response = trackRequest(request);
+        if (response != null) {
+            return response;
+        }
+        
 		email = email.toLowerCase().trim();
-		if (!email.contains("@")) {
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
+		if (!emailSender.isEmail(email)) {
+            return ResponseEntity.badRequest().body("Email is not valid.");
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
-		if (pu == null) {
-			throw new OsmAndPublicApiException(ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-		}
-		// we don't validate cause there are free users
-//		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-//		if (errorMsg != null) {
-//			throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-//		}
-		pu.tokendevice = TOKEN_DEVICE_WEB;
-		if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-			pu.token = (new Random().nextInt(8999) + 1000) + "";
-		}
-		pu.tokenTime = new Date();
-		usersRepository.saveAndFlush(pu);
-		emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        if (isNew) {
+            if (pu != null) {
+                List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(pu.id);
+                if (devices != null && !devices.isEmpty()) {
+                    return ResponseEntity.badRequest().body("An account is already registered with this email address.");
+                }
+            } else {
+                pu = new PremiumUsersRepository.PremiumUser();
+                pu.email = email;
+                pu.regTime = new Date();
+            }
+        }
+		if (pu != null) {
+            pu.tokendevice = TOKEN_DEVICE_WEB;
+            if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
+                pu.token = (new Random().nextInt(8999) + 1000) + "";
+            }
+            pu.tokenTime = new Date();
+            usersRepository.saveAndFlush(pu);
+            emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
+		} else {
+            return ResponseEntity.badRequest().body("error_email");
+        }
+  
 		return ok();
 	}
+    
+    public ResponseEntity<String> validateToken(String email, String token) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("error_email");
+        }
+        if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
+                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            wearOutToken(pu);
+            return ResponseEntity.badRequest().body("error_token");
+        }
+        return ok();
+    }
+    
+    public ResponseEntity<String> checkUserEmail(String email) {
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        if (pu == null) {
+            return ResponseEntity.badRequest().body("error_email");
+        }
+        return ok();
+    }
 
     public ResponseEntity<String> ok() {
         return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
@@ -381,7 +464,7 @@ public class UserdataService {
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             LOG.error("device-register: email is not found (" + email + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -398,11 +481,15 @@ public class UserdataService {
         pu.tokenTime = null;
         PremiumUserDevicesRepository.PremiumUserDevice device = new PremiumUserDevicesRepository.PremiumUserDevice();
         PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
-        while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
-                deviceId)) != null) {
-            LOG.error("device-register: call delete-same-device (" + email + ")");
-            devicesRepository.delete(sameDevice);
-        }
+	    if (Algorithms.isEmpty(deviceId)) {
+		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
+	    } else {
+		    while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
+				    deviceId)) != null) {
+			    LOG.error("device-register: call delete-same-device (" + email + ")");
+			    devicesRepository.delete(sameDevice);
+		    }
+	    }
         device.lang = lang;
         device.brand = brand;
         device.model = model;
@@ -452,7 +539,8 @@ public class UserdataService {
 				bin = getInputStream(dev, userFile);
 			}
 
-            response.setHeader("Content-Disposition", "attachment; filename=" + userFile.name);
+            String safeDownloadName = URLEncoder.encode(sanitizeEncode(userFile.name));
+            response.setHeader("Content-Disposition", "attachment; filename=" + safeDownloadName);
             // InputStream bin = fl.data.getBinaryStream();
 
             String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -577,6 +665,7 @@ public class UserdataService {
         if (dev == null) {
             return null;
         }
+        name = sanitizeDecode(name);
         if (updatetime != null) {
             return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
                     new Date(updatetime));
@@ -584,7 +673,7 @@ public class UserdataService {
             return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
         }
     }
-    
+
     public PremiumUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         if (dev == null) {
             return null;
@@ -762,13 +851,16 @@ public class UserdataService {
         if (currentFileType.equals(FILE_TYPE)) {
             List<String> fileTypes = filterTypes.stream()
                     .filter(type -> type.startsWith(FILE_TYPE))
-                    .collect(Collectors.toList());
+                    .toList();
             if (!fileTypes.isEmpty()) {
-                String currentFileSubType = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder().replace("/","");
-                if (!currentFileSubType.equals("")) {
-                    return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
-                } else {
-                    return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                String subtypeFolder = FileSubtype.getSubtypeByFileName(sf.name).getSubtypeFolder();
+                if (subtypeFolder != null) {
+                    String currentFileSubType = subtypeFolder.replace("/", "");
+                    if (!currentFileSubType.equals("")) {
+                        return fileTypes.stream().anyMatch(type -> currentFileSubType.equalsIgnoreCase(StringUtils.substringAfter(type, FILE_TYPE + "_")));
+                    } else {
+                        return fileTypes.contains(FILE_TYPE_MAPS) || fileTypes.contains(FILE_TYPE_OTHER);
+                    }
                 }
             }
         }
@@ -949,7 +1041,7 @@ public class UserdataService {
             wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
-                    int numOfUsersDelete = usersRepository.deleteByEmail(pu.email);
+                    int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
@@ -1013,7 +1105,7 @@ public class UserdataService {
         if (token == null) {
             return ResponseEntity.badRequest().body("Token is not valid");
         }
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(username);
+        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
@@ -1041,7 +1133,7 @@ public class UserdataService {
 
     public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
         // validate new email
-        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmail(username);
+        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmailIgnoreCase(username);
         if (tempUser == null) {
             return ResponseEntity.badRequest().body("Something went wrong with your new email");
         }

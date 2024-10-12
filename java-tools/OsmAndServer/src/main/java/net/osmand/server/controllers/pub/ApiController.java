@@ -308,13 +308,19 @@ public class ApiController {
 
     // /api/wiki_place?category=Sora%20(Italy)
     // /api/wiki_place?article=Q51838 
-	@GetMapping(path = {"/wiki_place"})
-	@ResponseBody
-	public String geWikiPlace(@RequestParam(required = false) String article,
-	                        @RequestParam(required = false) String category, @RequestParam(required = false) String wiki) {
-		Set<String> images = wikiService.processWikiImages(article, category, wiki);
-		return gson.toJson(Collections.singletonMap("features", images));
-	}
+    @GetMapping(path = {"/wiki_place"})
+    @ResponseBody
+    public String geWikiPlace(@RequestParam(required = false) String article,
+                              @RequestParam(required = false) String category,
+                              @RequestParam(required = false) String wiki,
+                              @RequestParam(required = false, defaultValue = "false") boolean addMetaData) {
+	    if (addMetaData) {
+		    Set<Map<String, Object>> imagesWithDetails = wikiService.processWikiImagesWithDetails(article, category, wiki);
+		    return gson.toJson(Collections.singletonMap("features-v2", imagesWithDetails));
+	    }
+	    Set<String> images = wikiService.processWikiImages(article, category, wiki);
+	    return gson.toJson(Collections.singletonMap("features", images));
+    }
 
     @GetMapping(path = {"/mapillary/get_photo"})
     @ResponseBody
@@ -532,7 +538,7 @@ public class ApiController {
 			}
 			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
 		}
-    	unsubscribedRepo.deleteAllByEmail(email);
+    	unsubscribedRepo.deleteAllByEmailIgnoreCase(email);
     	return "pub/email/subscribe";
     }
 
@@ -543,7 +549,7 @@ public class ApiController {
 								  @RequestParam() Long finishDate,
 								  @RequestParam() Integer nd,
 								  @RequestParam() Integer ns,
-								  @RequestParam() String aid,
+								  @RequestParam(required = false) String aid,
 								  @RequestParam() String version,
 								  @RequestParam() String lang,
 								  @RequestParam() MultipartFile file) throws IOException, SQLException {

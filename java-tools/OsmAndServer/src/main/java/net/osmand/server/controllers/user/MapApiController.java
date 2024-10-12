@@ -2,6 +2,9 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import okio.GzipSource;
+import okio.Okio;
+
 import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -29,6 +32,8 @@ import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
@@ -70,11 +75,12 @@ import org.xmlpull.v1.XmlPullParserException;
 @RequestMapping("/mapapi")
 public class MapApiController {
 
-	protected static final Log LOGGER = LogFactory.getLog(MapApiController.class);
+	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String METADATA = "metadata";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
+	private static final String FAV_POINT_GROUPS = "pointGroups";
 
 	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
 
@@ -168,10 +174,15 @@ public class MapApiController {
 	private ResponseEntity<String> okStatus() {
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "ok")));
 	}
-
-	@PostMapping(path = { "/auth/login" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request, java.security.Principal user) throws ServletException {
-		if (user != null) {
+	
+	@PostMapping(path = {"/auth/login"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> loginUser(@RequestBody UserPasswordPost credentials,
+	                                        HttpServletRequest request,
+	                                        java.security.Principal user) throws ServletException {
+		final String EMAIL_ERROR = "error_email";
+		final String PASSWORD_ERROR = "error_password";
+		
+		if (user != null && !user.getName().equals(credentials.username)) {
 			request.logout();
 		}
 		String username = credentials.username;
@@ -179,11 +190,17 @@ public class MapApiController {
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> response = userdataService.checkUserEmail(username);
+		if (response.getStatusCodeValue() != 200) {
+			return ResponseEntity.badRequest().body(EMAIL_ERROR);
+		}
+		
 		UsernamePasswordAuthenticationToken pwt = new UsernamePasswordAuthenticationToken(username, password);
 		try {
 			authManager.authenticate(pwt);
 		} catch (AuthenticationException e) {
-			return ResponseEntity.badRequest().body(String.format("Authentication '%s' has failed", username));
+			return ResponseEntity.badRequest().body(PASSWORD_ERROR);
 		}
 		request.login(username, password);
 
@@ -204,17 +221,21 @@ public class MapApiController {
 	}
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
+	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials) {
 		String username = credentials.username;
 		String password = credentials.password;
 		String token = credentials.token;
-		if (username == null || password == null || token == null) {
-			return ResponseEntity.badRequest().body("Username, password and token are required");
+		if (username == null || password == null) {
+			return ResponseEntity.badRequest().body("Username and password are required");
 		}
+		
+		ResponseEntity<String> validRes = userdataService.validateToken(username, token);
+		if (validRes.getStatusCodeValue() != 200) {
+			return validRes;
+		}
+		
 		ResponseEntity<String> res = userdataService.webUserActivate(username, token, password, credentials.lang);
 		if (res.getStatusCodeValue() < 300) {
-			request.logout();
-			request.login(username, password);
 			return okStatus();
 		}
 		return res;
@@ -225,14 +246,30 @@ public class MapApiController {
 		request.logout();
 		return okStatus();
 	}
-
-	@PostMapping(path = { "/auth/register" }, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials, @RequestParam String lang) throws IOException {
+	
+	@PostMapping(path = {"/auth/register"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials,
+	                                              @RequestParam String lang,
+	                                              @RequestParam boolean isNew,
+	                                              HttpServletRequest request) {
 		String username = credentials.username;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
-		return userdataService.webUserRegister(username, lang);
+		return userdataService.webUserRegister(username, lang, isNew, request);
+	}
+	
+	@PostMapping(path = {"/auth/validate-token"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials) {
+		String username = credentials.username;
+		String token = credentials.token;
+		if (username == null) {
+			return ResponseEntity.badRequest().body("Username and token are required");
+		}
+		if (token == null) {
+			return ResponseEntity.badRequest().body("Token are required");
+		}
+		return userdataService.validateToken(username, token);
 	}
 
 	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
@@ -342,6 +379,7 @@ public class MapApiController {
 			return tokenNotValid();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		List <UserFileNoData> filesToIgnore = new ArrayList<>();
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
@@ -355,6 +393,11 @@ public class MapApiController {
 							: userdataService.getInputStream(uf);
 					if (in != null) {
 						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+						if (gpxFile.error != null) {
+							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							filesToIgnore.add(nd);
+							continue;
+						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
 							if (gpxFile.metadata != null) {
@@ -371,7 +414,7 @@ public class MapApiController {
 								groupInfo.put("hidden", String.valueOf(isHidden(group)));
 								pointGroupsAnalysis.put(k, groupInfo);
 							});
-							uf.details.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
+							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
@@ -395,6 +438,7 @@ public class MapApiController {
 				addDeviceInformation(nd, devices);
 			}
 		}
+		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 	
@@ -434,7 +478,10 @@ public class MapApiController {
 	}
 
 	private boolean analysisPresentFavorites(String tag, JsonObject details) {
-		return details != null && details.has(tag + DONE_SUFFIX)
+		return details != null
+				&& details.has(tag + DONE_SUFFIX)
+				&& details.has(FAV_POINT_GROUPS)
+				&& !details.get(FAV_POINT_GROUPS).getAsString().equals("{}")
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
@@ -628,12 +675,12 @@ public class MapApiController {
 		FileInputStream fis = null;
 		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			Map<String, GPXFile> files = new HashMap<>();
+			Map<String, GpxFile> files = new HashMap<>();
 			for (String name : names) {
 				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
 				if (userFile != null) {
 					is = userdataService.getInputStream(dev, userFile);
-					GPXFile file = GPXUtilities.loadGPXFile(new GZIPInputStream(is), null, false);
+					GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
 					files.put(name, file);
 				}
 			}
@@ -727,7 +774,7 @@ public class MapApiController {
 				return response;
 			}
 			// check if new email is not registered
-			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmail(email);
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
 			if (pu != null) {
 				return ResponseEntity.badRequest().body("User was already registered with such email");
 			}

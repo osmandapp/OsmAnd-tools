@@ -9,6 +9,10 @@ compileJava {
 	dependsOn collectTestResources
 }
 
+processTestResources {
+        dependsOn collectTestResources
+}
+
 
 task collectMdpiIcons(type: Sync) {
 	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
@@ -25,12 +29,21 @@ compileJava {
 	dependsOn collectMdpiIcons, collectFonts
 }
 
+processResources {
+        dependsOn collectMdpiIcons, collectFonts
+}
+
+
 configurations.all {
 	exclude group: 'xml-apis', module: 'xml-apis'
 }
 
+
+
 dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
+
+	implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
 
 	implementation project(':OsmAnd-java'), {
 		// TODO exclude for java 11
@@ -39,8 +52,8 @@ dependencies {
 		// xmlpull
 		// xml-apis
 		// xwiki...rendering-xml
-           exclude module:'gnu.trove.osmand'
-        }
+		exclude module:'gnu.trove.osmand'
+	}
 
 	testImplementation project(':OsmAnd-java')
 	//testImplementation files(project(':OsmAnd-java').sourceSets.test.output.classesDirs.filter {  } )
@@ -51,11 +64,11 @@ dependencies {
 	implementation 'com.google.code.findbugs:jsr305:3.0.2'
 	implementation 'com.google.code.gson:gson:2.8.2'
 	implementation 'org.xerial:sqlite-jdbc:3.7.2'
-       
+
 	implementation platform('software.amazon.awssdk:bom:2.15.0')
         implementation 'software.amazon.awssdk:s3'
         implementation 'software.amazon.awssdk:batch'
-        
+
     implementation ('com.github.docker-java:docker-java:3.3.1') {
     	exclude (group: 'org.slf4j', module: 'slf4j-api')
     	exclude (group: 'org.slf4j', module: 'jcl-over-slf4j')
@@ -85,7 +98,7 @@ dependencies {
 	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
 	implementation 'com.twelvemonkeys.imageio:imageio-core:3.3.2'
 	implementation 'it.geosolutions.imageio-ext:imageio-ext-tiff:1.4.9'
- 
+
 	// Wikimedia projects
 	implementation 'info.bliki.wiki:bliki-core:3.1.0'
 	implementation 'org.xwiki.commons:xwiki-commons-component-default:7.1-milestone-2'

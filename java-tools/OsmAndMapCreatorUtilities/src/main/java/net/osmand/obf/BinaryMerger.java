@@ -1,38 +1,8 @@
 package net.osmand.obf;
 
 
-import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.SQLException;
-import java.text.Collator;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
-
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
-
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -43,18 +13,8 @@ import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.data.Amenity;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.Postcode;
-import net.osmand.data.Street;
-import net.osmand.obf.preparation.BinaryFileReference;
-import net.osmand.obf.preparation.BinaryMapIndexWriter;
-import net.osmand.obf.preparation.IndexAddressCreator;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexCreatorSettings;
-import net.osmand.obf.preparation.IndexPoiCreator;
+import net.osmand.data.*;
+import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Node;
 import net.osmand.util.Algorithms;
@@ -62,7 +22,19 @@ import net.osmand.util.CountryOcbfGeneration;
 import net.osmand.util.CountryOcbfGeneration.CountryRegion;
 import net.osmand.util.IndexUploader;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
 import rtree.RTreeException;
+
+import java.io.*;
+import java.sql.SQLException;
+import java.text.Collator;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import static net.osmand.obf.preparation.IndexCreator.REMOVE_POI_DB;
 
 public class BinaryMerger {
 
@@ -84,14 +56,8 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Switzerland_europe_merge.obf",
-					System.getProperty("maps.dir") + "Switzerland_basel_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_bern_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_central_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_eastern_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_lake-geneva_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_ticino_europe_2.obf_",
-					System.getProperty("maps.dir") + "Switzerland_zurich_europe_2.obf_",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.owiki.obf",
+					System.getProperty("maps.dir") + "Ukraine_europe_2.wiki.obf"
 			});
 		} else {
 			in.merger(args);
@@ -357,11 +323,19 @@ public class BinaryMerger {
 	}
 
 	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
-		return new ArrayList<String>(Arrays.asList(index.getRegionNames().get(0).split("_")));
+		List<String> name = index.getRegionNames();
+		if (name.size() > 0) {
+			return Arrays.asList(name.get(0).split("_"));
+		}
+		return Collections.emptyList();
 	}
 
 	private String extractCountryName(BinaryMapIndexReader index) {
-		return extractCountryAndRegionNames(index).get(0);
+		List<String> lst = extractCountryAndRegionNames(index);
+		if (lst.size() > 0) {
+			return lst.get(0);
+		}
+		return null;
 	}
 
 	private String extractRegionName(BinaryMapIndexReader index) {
@@ -459,8 +433,11 @@ public class BinaryMerger {
 			throws IOException {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		Set<String> attributeTagsTableSet = new TreeSet<String>();
-		for (int i = 0; i != addressRegions.length; i++) {
+		for (int i = 0; i < addressRegions.length; i++) {
 			AddressRegion region = addressRegions[i];
+			if (region == null) {
+				continue;
+			}
 			attributeTagsTableSet.addAll(region.getAttributeTagsTable());
 		}
 		writer.startWriteAddressIndex(name, attributeTagsTableSet);
@@ -477,6 +454,9 @@ public class BinaryMerger {
 			Map<Long, City> cityIds = new HashMap<Long, City>();
 			for (int i = 0; i < addressRegions.length; i++) {
 				AddressRegion region = addressRegions[i];
+				if (region == null) {
+					continue;
+				}
 				final BinaryMapIndexReader index = indexes[i];
 				for (City city : index.getCities(region, null, type)) {
 					normalizePostcode(city, extractCountryName(index));
@@ -550,7 +530,7 @@ public class BinaryMerger {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
 		
-		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
+		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, null);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
 		final TLongHashSet set = new TLongHashSet();

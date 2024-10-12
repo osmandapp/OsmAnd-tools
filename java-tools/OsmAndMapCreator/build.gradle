@@ -2,8 +2,7 @@ jar {
 	doFirst {
 		manifest {
 			attributes('Main-Class': project.getProperty('mainClassAttribute'),
-				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' ')
-				   )
+				   'Class-Path': configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join(' '))
 		}
 	}
 }
@@ -27,10 +26,10 @@ task downloadCoreJni(type: Download)  {
 
 task buildDistribution(type: Zip) {
 	dependsOn jar
-	// from(configurations.runtimeClasspath.allArtifacts.files) {
-	// 	rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
-	// //	into '.'
-	// }
+	from(configurations.runtimeClasspath.allArtifacts.files) {
+		rename { it.contains("OsmAnd") ? it.replace("-master-snapshot", '') : it }
+		into '.'
+	}
 	from('build/libs/OsmAndMapCreator-master-snapshot.jar') {
 		into '.'
 		rename { 'OsmAndMapCreator.jar' }
@@ -56,7 +55,7 @@ task buildDistribution(type: Zip) {
 		include 'logging.properties'
 	}
 
-	archiveName 'OsmAndMapCreator.zip'
+	archiveFileName = 'OsmAndMapCreator.zip'
 }
 
 compileJava {
@@ -67,6 +66,7 @@ dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
 
 	implementation project(':OsmAnd-java')
+	implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
 	implementation project(':OsmAndMapCreatorUtilities')
 
 	implementation group: 'commons-logging', name: 'commons-logging', version: '1.2'
