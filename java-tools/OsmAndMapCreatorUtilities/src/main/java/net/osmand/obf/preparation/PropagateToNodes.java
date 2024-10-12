@@ -154,7 +154,7 @@ public class PropagateToNodes {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
 				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix, 
-						d.propagateIf);
+						d.propagateNetworkIf, d.propagateIf);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -235,7 +235,7 @@ public class PropagateToNodes {
 			for (PropagateRule rule : list) {
 				String entityTag = w.getTag(tag);
 				if (entityTag != null && entityTag.equals(rule.value)) {
-					boolean propIf = rule.applicable(w);
+					boolean propIf = rule.applicableBorder(w);
 					if (propIf) {
 						if (rulesToApply == null) {
 							rulesToApply = new ArrayList<>();
@@ -290,12 +290,15 @@ public class PropagateToNodes {
 		public String value;
 		public final PropagateToNodesType type;
 		public String tagPrefix;
-		public Map<String, String> propIf;
+		public Map<String, String> propMapIf;
+		public Map<String, String> propNetworkIf;
 
-		public PropagateRule(PropagateToNodesType type, String tagPrefix, Map<String, String> propIf) {
+		public PropagateRule(PropagateToNodesType type, String tagPrefix,
+				Map<String, String> propNetworkIf, Map<String, String> propMapIf) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
-			this.propIf = propIf;
+			this.propMapIf = propMapIf;
+			this.propNetworkIf = propNetworkIf;
 		}
 
 		public String getPropagateValue() {
@@ -318,38 +321,57 @@ public class PropagateToNodes {
 			return propagateTag;
 		}
 		
-		public boolean applicable(Way w) {
-			boolean res = true;
-			if (propIf != null) {
-				res = false;
-				for (Map.Entry<String, String> entry : propIf.entrySet()) {
-					String tagValue = w.getTag(entry.getKey());
-					if (tagValue != null) {
-						if (entry.getValue() == null) {
-							res = true;
-						} else {
-							String[] allValues = entry.getValue().split(",");
-							boolean allNegs = true;
-							for (String v : allValues) {
-								if (v.startsWith("~")) {
-									if (v.equals("~" + tagValue)) {
-										return false;
-									}
-								} else {
-									allNegs = false;
-									if (v.equals(tagValue)) {
-										res = true;
-									}
+		public boolean applicableBorder(Way w) {
+			if (!value.equals(w.getTag(tag))) {
+				return false;
+			}
+			if (propNetworkIf != null && !applicable(w, propNetworkIf)) {
+				return false;
+			}
+			if (propMapIf != null && !applicable(w, propMapIf)) {
+				return false;
+			}
+			return true;
+		}
+		
+		public boolean applicableNetwork(Way w) {
+			if (propNetworkIf != null) {
+				return applicable(w, propNetworkIf);
+			}
+			return true;
+		}
+
+		private boolean applicable(Way w, Map<String, String> propMap) {
+			for (Map.Entry<String, String> entry : propMap.entrySet()) {
+				String tagValue = w.getTag(entry.getKey());
+				if (tagValue == null) {
+					return false;
+				} else {
+					if (entry.getValue() == null) {
+						// value present
+					} else {
+						String[] allValues = entry.getValue().split(",");
+						boolean allNegs = true;
+						boolean match = false;
+						for (String v : allValues) {
+							if (v.startsWith("~")) {
+								if (v.equals("~" + tagValue)) {
+									return false;
+								}
+							} else {
+								allNegs = false;
+								if (v.equals(tagValue)) {
+									match = true;
 								}
 							}
-							if (allNegs) {
-								res = true;
-							}
+						}
+						if (!allNegs && !match) {
+							return false;
 						}
 					}
 				}
 			}
-			return res;
+			return true;
 		}
 	}
 
@@ -381,7 +403,9 @@ public class PropagateToNodes {
 					}
 					if (!thisWayPartOfBorder) {
 						for (PropagateRuleFromWayToNode p : propagatedBorders) {
-							if (p.rule.applicable(w) && !p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
+							if (p.rule.applicableNetwork(w) && 
+									
+									!p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
 								p.ignoreBorderPoint = false;
 							}
 						}
