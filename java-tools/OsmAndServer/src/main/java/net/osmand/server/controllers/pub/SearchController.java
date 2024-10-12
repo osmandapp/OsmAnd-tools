@@ -2,8 +2,12 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.*;
 
+import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.utils.MultiPlatform;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,17 +22,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.google.gson.Gson;
 
-import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
-import net.osmand.data.Street;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
@@ -47,6 +45,17 @@ public class SearchController {
     
     @Autowired
     SearchService searchService;
+    
+    @Autowired
+    protected PremiumUserDevicesRepository devicesRepository;
+    
+    private PremiumUserDevicesRepository.PremiumUserDevice checkToken(int deviceId, String accessToken) {
+        PremiumUserDevicesRepository.PremiumUserDevice d = devicesRepository.findById(deviceId);
+        if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
+            return d;
+        }
+        return null;
+    }
     
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<String> search(@RequestParam double lat,
@@ -125,11 +134,89 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(collection));
     }
     
+    @MultiPlatform
     @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseImageInfo(@RequestBody String data) {
-        Map<String, String> info = wikiService.parseImageInfo(data);
+    public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
+                                                 @RequestParam(required = false) String imageTitle,
+                                                 @RequestParam(required = false) Long pageId,
+                                                 @RequestParam(required = false) String lang) throws IOException, SQLException {
+        if (imageTitle == null && data == null) {
+            return ResponseEntity.badRequest().body("Required imageTitle or data!");
+        }
+        
+        if (imageTitle == null) {
+            // old parsing
+            Map<String, String> info = wikiService.parseImageInfo(data);
+            return ResponseEntity.ok(gson.toJson(info));
+        }
+        // ignore data for new parsing
+        data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
+        
+        if (data == null) {
+            data = wikiService.parseRawImageInfo(imageTitle);
+            if (data != null) {
+                wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
+            }
+        }
+        if (data == null) {
+            return ResponseEntity.badRequest().body("Error get image info!");
+        }
+        Map<String, String> info = wikiService.parseImageInfo(data, imageTitle, lang);
         return ResponseEntity.ok(gson.toJson(info));
+    }
+    
+    public record WikiImageInfo(String title, Long pageId, String data) {
+    }
+    
+    @MultiPlatform
+    @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseImagesListInfo(@RequestBody List<WikiImageInfo> data,
+                                                      @RequestParam String lang,
+                                                      @RequestParam(name = "deviceid", required = false) int deviceId,
+                                                      @RequestParam(name = "accessToken", required = false) String accessToken) {
+        if (data == null) {
+            return ResponseEntity.badRequest().body("Required data!");
+        }
+        // validate user
+        boolean saveToCache = false;
+        if (deviceId != 0 && accessToken != null) {
+            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
+            if (dev != null) {
+                saveToCache = true;
+            }
+        }
+        Map<String, Map<String, String>> result = new HashMap<>();
+        for (WikiImageInfo wikiImageInfo : data) {
+            String rawData = wikiImageInfo.data();
+            String title = wikiImageInfo.title();
+            Long pageId = wikiImageInfo.pageId();
+            if (rawData != null && saveToCache) {
+                // save immediately to cache
+                wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+            } else {
+                if (rawData == null) {
+                    rawData = wikiService.getWikiRawDataFromCache(title, pageId);
+                }
+                if (rawData == null) {
+                    rawData = wikiService.parseRawImageInfo(title);
+                }
+                if (rawData != null) {
+                    wikiService.saveWikiRawDataToCache(title, pageId, rawData);
+                }
+            }
+            if (rawData != null) {
+                Map<String, String> info = null;
+                try {
+                    info = wikiService.parseImageInfo(rawData, title, lang);
+                } catch (SQLException | IOException e) {
+                    LOGGER.error("Error parse image info: " + title, e);
+                }
+                result.put(title, info);
+            }
+        }
+        return ResponseEntity.ok(gson.toJson(result));
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
