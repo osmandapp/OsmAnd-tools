@@ -108,6 +108,7 @@ public class FindByRenderingTypesRules {
 	public Map<String, String> searchOsmcPropertiesByFinalTags(@Nonnull Map<String, String> tags) {
 		final String FIRST = "_1", ROUTE_PREFIX = "route_";
 		final String OSMC_TEXT_SUFFIX = "_1_osmc_text", OSMC_WAYCOLOR_SUFFIX = "_osmc_waycolor";
+		// TODO tags-transfor _1_osmc_text => shield_text, etc
 
 		String routeTypeTag = null;
 		for (String key : tags.keySet()) {
@@ -159,7 +160,7 @@ public class FindByRenderingTypesRules {
 					}
 				}
 				if (routeNameTag != null) {
-					result.put("text", searchTags.get(routeNameTag));
+					result.put("shield_text", searchTags.get(routeNameTag));
 				}
 				return result;
 			}

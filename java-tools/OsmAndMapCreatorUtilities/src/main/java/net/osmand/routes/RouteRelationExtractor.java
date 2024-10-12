@@ -291,7 +291,7 @@ public class RouteRelationExtractor {
 		metadataExtensions.put(OSM_TAG_PREFIX + "id", String.valueOf(relation.getId()));
 		metadataExtensions.put("relation_gpx", "yes"); // render route:segment distinctly
 
-		if (relation.getTags().get("colour") != null) {
+		if (relation.getTags().containsKey("colour")) {
 			metadataExtensions.remove("colour");
 			metadataExtensions.put("color", relation.getTags().get("colour"));
 		}
@@ -330,18 +330,26 @@ public class RouteRelationExtractor {
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				Map<String, String> props = finder.searchOsmcPropertiesByFinalTags(way.getTags());
 				if (props != null) {
-					if (props.get("textShield") != null) {
-						props.put("bg", props.get("textShield")); // will be gpx_bg
-						props.remove("textShield");
+					final Map<String, String> convertProps = Map.of(
+							"icon", "shield_fg",
+							"icon_2", "shield_fg_2",
+							"textShield", "shield_bg"
+//							"textcolor", "shield_textcolor",
+//							"text", "shield_text"
+					);
+					for (String key : convertProps.keySet()) {
+						if (props.containsKey(key)) {
+							props.put(convertProps.get(key), props.get(key));
+							props.remove(key);
+						}
 					}
-					if (props.get("color") != null) {
+					if (props.containsKey("color")) {
 						// color is forced by osmc_waycolor
 						metadataExtensions.remove("colour");
 					}
-					if (props.get("text") != null && metadataExtensions.get(OSM_TAG_PREFIX + "ref") != null
-						&& props.get("text").equalsIgnoreCase(metadataExtensions.get(OSM_TAG_PREFIX + "ref"))
-					) {
-						props.remove("text"); // avoid useless "text"
+					if (props.containsKey("shield_text")
+							&& !metadataExtensions.containsKey(OSM_TAG_PREFIX + "osmc:symbol")) {
+						props.remove("shield_text"); // avoid useless synthetic osmc_text
 					}
 					metadataExtensions.putAll(props);
 				}
@@ -448,7 +456,7 @@ public class RouteRelationExtractor {
 			wptPt.lat = node.getLatitude();
 			wptPt.lon = node.getLongitude();
 //			wptPt.getExtensionsToWrite().put("relation_point", "yes");
-			wptPt.getExtensionsToWrite().put("icon", gpxIcon); // will be gpx_icon
+			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
 			wptPt.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {

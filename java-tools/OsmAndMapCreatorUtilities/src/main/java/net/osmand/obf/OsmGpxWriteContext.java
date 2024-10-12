@@ -246,11 +246,13 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
-		final String[] notPrefixedOsmAndTags = {
-				"width",
-				"color",
+		final String[] asIsTagsByPrefix = {
+				"gpx_",
+				"osm_",
+				"shield_",
+				"width", // TODO gpx_width ?
+				"color", // TODO gpx_color ?
 				"relation_gpx",
-				// "text" is not prefixed and used to update gpxInfo.ref (as the main real/synthetic GPX ref)
 				// "ref", "name", "description", and some other generic tags might be already added w/o prefix
 		};
 		if (extensions != null && !extensions.isEmpty()) {
@@ -259,17 +261,25 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
 			}
-			if (extensions.containsKey("text")) {
-				gpxInfo.updateRef(extensions.get("text"));
-				gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
+			if (extensions.containsKey("shield_text")) {
+				gpxInfo.updateRef(extensions.get("shield_text")); // update from osmc_text
+				gpxTrackTags.put("ref", gpxInfo.getPrettyRef()); // "osm_ref" will be kept as is
 			}
-			for (String notPrefixed : notPrefixedOsmAndTags) {
-				if (extensions.containsKey(notPrefixed)) {
-					gpxTrackTags.put(notPrefixed, extensions.get(notPrefixed));
-				}
-			}
+//			for (String prefix : asIsTagsByPrefix) {
+//				if (extensions.containsKey(prefix)) {
+//					gpxTrackTags.put(prefix, extensions.get(prefix));
+//				}
+//			}
 			for (String key : extensions.keySet()) {
-				gpxTrackTags.put(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key));
+				String outputKey = OBF_GPX_EXTENSION_TAG_PREFIX + key; // gpx_ by default
+				for (String asIsPrefix : asIsTagsByPrefix) {
+					if (key.startsWith(asIsPrefix)) {
+						outputKey = key;
+						break;
+					}
+				}
+				// tags will be filtered by rendering/poi types
+				gpxTrackTags.put(outputKey, extensions.get(key));
 			}
 		}
 	}
@@ -391,6 +401,10 @@ public class OsmGpxWriteContext {
 		serializer.attribute(null, "id", id + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
+		Map<String, String> pointExtensions = p.getExtensionsToRead();
+		for (String key : pointExtensions.keySet()) {
+			tagValue(serializer, key, pointExtensions.get(key));
+		}
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
 			tagValue(serializer, "route_type", "track_point");
@@ -477,11 +491,15 @@ public class OsmGpxWriteContext {
 		
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
-		settings.indexAddress = false;
 		settings.indexPOI = true;
+		settings.indexAddress = false;
+		settings.indexRouting = false;
 		settings.indexTransport = false;
-		settings.indexRouting = true;
-		settings.srtmDataFolderUrl = System.getenv("SRTM_DIRECTORY");
+		String srtmDirectory = System.getenv("SRTM_DIRECTORY");
+		if (srtmDirectory != null) {
+			settings.indexRouting = true;
+			settings.srtmDataFolderUrl = srtmDirectory;
+		}
 		RTree.clearCache();
 		try {
 			tmpFolder.mkdirs();
@@ -586,7 +604,8 @@ public class OsmGpxWriteContext {
 		@Nonnull
 		public String getPrettyRef() {
 			if (!Algorithms.isEmpty(ref)) {
-				return ref;
+				final int MAX_REF_LENGTH = 7;
+				return ref.substring(0, Math.min(ref.length(), MAX_REF_LENGTH));
 			}
 			if (!Algorithms.isEmpty(name)) {
 				String prettyRef = "";
