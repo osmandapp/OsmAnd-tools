@@ -57,11 +57,19 @@ public class RouteRelationExtractor {
 	private String[] customStyles = {
 			"default.render.xml",
 			"routes.addon.render.xml"
+			// "skimap.render.xml" // could work instead of default.render.xml but not together
 	};
 	private static final Map<String, String> customProperties = Map.of(
+			// routes.addon.render.xml
+			"showCycleRoutes", "true",
+			"showMtbRoutes", "true",
 			"hikingRoutesOSMC", "walkingRoutesOSMC",
-			"showCycleRoutes", "true"
-			// TODO add other switches
+			"showDirtbikeTrails", "true",
+			"horseRoutes", "true",
+			"showFitnessTrails", "true",
+			"showRunningRoutes", "true",
+			"whiteWaterSports", "true" // default.render.xml
+			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
 	private FindByRenderingTypesRules finder = new FindByRenderingTypesRules(customStyles, customProperties);
 	private final String[] filteredTags = {
