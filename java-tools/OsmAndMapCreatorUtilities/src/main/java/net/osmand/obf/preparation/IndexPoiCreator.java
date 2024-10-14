@@ -70,27 +70,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (cityDataStorage != null) {
 			cityQuadTree = new QuadTree<Multipolygon>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE),
 					8, 0.55f);
-			for (Map.Entry<Boundary, List<City>> entry : cityDataStorage.boundaryToContainingCities.entrySet()) {
-				Boundary b = entry.getKey();
-				if (b.getCityType() == null || !b.getCityType().storedAsSeparateAdminEntity()) {
-					continue;
-				}
-				Multipolygon m = b.getMultipolygon();
-				QuadRect bboxLatLon = m.getLatLonBbox();
-				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
-				int right = MapUtils.get31TileNumberX(bboxLatLon.right);
-				int top = MapUtils.get31TileNumberY(bboxLatLon.top);
-				int bottom = MapUtils.get31TileNumberY(bboxLatLon.bottom);
-				QuadRect bbox = new QuadRect(left, top, right, bottom);
-				cityQuadTree.insert(m, bbox);
-			}
-
 			cityTagsGroup = new HashMap<>();
 			int id = 1;
 			Set<String> allLanguages =new HashSet<>(Arrays.asList(MapRenderingTypes.langs));
 			for (Map.Entry<City, Boundary> entry : cityDataStorage.cityBoundaries.entrySet()) {
+				Boundary b = entry.getValue();
 				City city = entry.getKey();
-				Boundary boundary = entry.getValue();
+				if (city.getType() == null || !city.getType().storedAsSeparateAdminEntity()) {
+					continue;
+				}
+
 				List<String> tags = new ArrayList<>();
 				String name = city.getName();
 				if (!Algorithms.isEmpty(name)) {
@@ -113,9 +102,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 
 				PoiCreatorTagGroup poiCreatorTagGroup = new PoiCreatorTagGroup(id, tags);
-				List<PoiCreatorTagGroup> tagGroups = cityTagsGroup.computeIfAbsent(boundary.getMultipolygon(), s -> new ArrayList<>());
+				List<PoiCreatorTagGroup> tagGroups = cityTagsGroup.computeIfAbsent(b.getMultipolygon(), s -> new ArrayList<>());
 				tagGroups.add(poiCreatorTagGroup);
 				id++;
+
+				Multipolygon m = b.getMultipolygon();
+				QuadRect bboxLatLon = m.getLatLonBbox();
+				int left = MapUtils.get31TileNumberX(bboxLatLon.left);
+				int right = MapUtils.get31TileNumberX(bboxLatLon.right);
+				int top = MapUtils.get31TileNumberY(bboxLatLon.top);
+				int bottom = MapUtils.get31TileNumberY(bboxLatLon.bottom);
+				QuadRect bbox = new QuadRect(left, top, right, bottom);
+				cityQuadTree.insert(m, bbox);
 			}
 		}
 	}
