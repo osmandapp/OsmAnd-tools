@@ -250,9 +250,8 @@ public class OsmGpxWriteContext {
 				"gpx_",
 				"osm_",
 				"shield_",
-				"width", // TODO gpx_width ?
-				"color", // TODO gpx_color ?
 				"relation_gpx",
+				"color", // will be transformed to color_$color during the OBF-generation process
 				// "ref", "name", "description", and some other generic tags might be already added w/o prefix
 		};
 		if (extensions != null && !extensions.isEmpty()) {
