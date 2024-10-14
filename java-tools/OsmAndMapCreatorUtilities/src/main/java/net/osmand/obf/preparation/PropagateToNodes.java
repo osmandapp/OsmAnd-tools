@@ -394,20 +394,10 @@ public class PropagateToNodes {
 					if (!rule.type.isBorder()) {
 						continue;
 					}
-					boolean thisWayPartOfBorder = false;
 					List<PropagateRuleFromWayToNode> propagatedBorders = rules.get(rule);
 					for (PropagateRuleFromWayToNode p : propagatedBorders) {
-						if (p.way.wayId == w.getId() >> OsmDbCreator.SHIFT_ID) {
-							thisWayPartOfBorder = true;
-						}
-					}
-					if (!thisWayPartOfBorder) {
-						for (PropagateRuleFromWayToNode p : propagatedBorders) {
-							if (p.rule.applicableNetwork(w) && 
-									
-									!p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
-								p.ignoreBorderPoint = false;
-							}
+						if (p.rule.applicableNetwork(w) && !p.rule.applicableBorder(w)) {
+							p.ignoreBorderPoint = false;
 						}
 					}
 				}
