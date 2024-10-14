@@ -1559,7 +1559,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
+	protected static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
 		File wikiDB = new File(sqliteFileName);
 		log.info("Processing wikidata regions...");
 		DBDialect dialect = DBDialect.SQLITE;
