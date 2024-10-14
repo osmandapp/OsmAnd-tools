@@ -19,6 +19,15 @@ public class FindByRenderingTypesRules {
 	public final MapRenderingTypesEncoder renderingTypes;
 	private final RenderingRuleSearchRequest searchRequest;
 
+	private static final Map<String, String> suffixOsmcTagsToResult = Map.of(
+			"icon", "shield_fg",
+			"icon_2", "shield_fg_2",
+			"textShield", "shield_bg",
+			"_osmc_waycolor", "color",
+			"_osmc_text", "shield_text",
+			"_osmc_textcolor", "shield_textcolor"
+	);
+
 	public FindByRenderingTypesRules() {
 		this(new String[]{"default.render.xml"}, null);
 	}
@@ -82,8 +91,8 @@ public class FindByRenderingTypesRules {
 	}
 
 	private static Map<String, String> readRenderingConstantsFromIS(InputStream is) throws XmlPullParserException, IOException {
-		Map<String, String> renderingConstants = new LinkedHashMap<String, String>();
-		try {
+		Map<String, String> renderingConstants = new LinkedHashMap<>();
+		try (is) {
 			XmlPullParser parser = PlatformUtil.newXMLPullParser();
 			parser.setInput(is, "UTF-8");
 			int tok;
@@ -98,17 +107,13 @@ public class FindByRenderingTypesRules {
 					}
 				}
 			}
-		} finally {
-			is.close();
 		}
 		return renderingConstants;
 	}
 
 	@Nullable
 	public Map<String, String> searchOsmcPropertiesByFinalTags(@Nonnull Map<String, String> tags) {
-		final String FIRST = "_1", ROUTE_PREFIX = "route_";
-		final String OSMC_TEXT_SUFFIX = "_1_osmc_text", OSMC_WAYCOLOR_SUFFIX = "_osmc_waycolor";
-		// TODO tags-transfor _1_osmc_text => shield_text, etc
+		final String FIRST = "_1", ROUTE_PREFIX = "route_", OSMC_TEXT_SUFFIX = "_1_osmc_text";
 
 		String routeTypeTag = null;
 		for (String key : tags.keySet()) {
@@ -149,18 +154,18 @@ public class FindByRenderingTypesRules {
 				String val = searchRequest.getStringPropertyValue(p);
 				String validated = substituteAndValidate(val, searchTags);
 				if (validated != null) {
-					result.put(key, validated);
+					String convertedKey = suffixOsmcTagsToResult.get(key);
+					result.put(convertedKey == null ? key : convertedKey, validated);
 				}
 			}
 
 			if (!result.isEmpty()) {
 				for (String key : searchTags.keySet()) {
-					if (key.endsWith(OSMC_WAYCOLOR_SUFFIX)) {
-						result.put("color", searchTags.get(key));
+					for (String suffix : suffixOsmcTagsToResult.keySet()) {
+						if (key.endsWith(suffix)) {
+							result.put(suffixOsmcTagsToResult.get(suffix), searchTags.get(key));
+						}
 					}
-				}
-				if (routeNameTag != null) {
-					result.put("shield_text", searchTags.get(routeNameTag));
 				}
 				return result;
 			}

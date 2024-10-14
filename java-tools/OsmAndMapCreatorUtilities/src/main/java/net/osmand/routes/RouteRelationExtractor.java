@@ -330,26 +330,15 @@ public class RouteRelationExtractor {
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				Map<String, String> props = finder.searchOsmcPropertiesByFinalTags(way.getTags());
 				if (props != null) {
-					final Map<String, String> convertProps = Map.of(
-							"icon", "shield_fg",
-							"icon_2", "shield_fg_2",
-							"textShield", "shield_bg"
-//							"textcolor", "shield_textcolor",
-//							"text", "shield_text"
-					);
-					for (String key : convertProps.keySet()) {
-						if (props.containsKey(key)) {
-							props.put(convertProps.get(key), props.get(key));
-							props.remove(key);
-						}
-					}
 					if (props.containsKey("color")) {
 						// color is forced by osmc_waycolor
 						metadataExtensions.remove("colour");
 					}
-					if (props.containsKey("shield_text")
+					if ((props.containsKey("shield_text") || props.containsKey("shield_textcolor"))
 							&& !metadataExtensions.containsKey(OSM_TAG_PREFIX + "osmc:symbol")) {
-						props.remove("shield_text"); // avoid useless synthetic osmc_text
+						// avoid synthetic osmc
+						props.remove("shield_text");
+						props.remove("shield_textcolor");
 					}
 					metadataExtensions.putAll(props);
 				}
