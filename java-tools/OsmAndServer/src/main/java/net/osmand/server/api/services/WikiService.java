@@ -1,8 +1,7 @@
 package net.osmand.server.api.services;
 
 import java.io.*;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
@@ -31,6 +30,8 @@ import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
+
+import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 @Service
 public class WikiService {
@@ -86,8 +87,114 @@ public class WikiService {
 		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 	
+	public String getWikiRawDataFromCache(String imageTitle, Long pageId) {
+		String query = "SELECT data FROM wiki.imagesrawdata WHERE title = ? AND pageId = ? LIMIT 1";
+		return jdbcTemplate.query(query, ps -> {
+			ps.setString(1, imageTitle);
+			ps.setLong(2, pageId);
+		}, rs -> {
+			if (rs.next()) {
+				return rs.getString("data");
+			}
+			return null;
+		});
+	}
+	
+	
+	public void saveWikiRawDataToCache(String imageTitle, Long pageId, String rawData) {
+		String query = "INSERT INTO wiki.imagesrawdata (pageId, title, data) VALUES (?, ?, ?)";
+		jdbcTemplate.update(query, ps -> {
+			ps.setLong(1, pageId);
+			ps.setString(2, imageTitle);
+			ps.setString(3, rawData);
+		});
+	}
+	
+	
+	public String parseRawImageInfo(String imageTitle) {
+		// https://dumps.wikimedia.org/commonswiki/
+		if (!isValidImageTitle(imageTitle)) {
+			logError("Invalid image title", -1, imageTitle);
+			return null;
+		}
+		HttpURLConnection connection = null;
+		String encodedImageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
+		String urlStr = "https://commons.wikimedia.org/wiki/File:" + encodedImageTitle + "?action=raw";
+		try {
+			URL url = new URL(urlStr);
+			connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.setRequestProperty("User-Agent", "OsmAnd Java Server");
+			
+			int responseCode = connection.getResponseCode();
+			String rawData;
+			BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+			String inputLine;
+			StringBuilder content = new StringBuilder();
+			
+			while ((inputLine = in.readLine()) != null) {
+				content.append(inputLine).append("\n");
+			}
+			in.close();
+			rawData = content.toString();
+			
+			if (responseCode != HttpURLConnection.HTTP_OK) {
+				logError(urlStr, responseCode, rawData);
+				return null;
+			}
+			return rawData;
+		} catch (IOException e) {
+			logError(urlStr, -1, e.getMessage());
+			return null;
+		} finally {
+			if (connection != null) {
+				connection.disconnect();
+			}
+		}
+	}
+	
+	private boolean isValidImageTitle(String imageTitle) {
+		if (imageTitle.length() > 255) {
+			return false;
+		}
+		String regex = "^[^\\\\/:*?\"<>|]+$"; // Disallow invalid characters
+		return imageTitle.matches(regex);
+	}
+	
+	private void logError(String url, int code, String content) {
+		String shortenedContent = content != null && content.length() > 20 ? content.substring(0, 20) + "..." : content;
+		log.error("Error while reading url: " + url + " code: " + code + " content: " + shortenedContent);
+	}
+	
 	public Map<String, String> parseImageInfo(String data) {
 		return WikiImagesUtil.INSTANCE.parseWikiText(data);
+	}
+	
+	public Map<String, String> parseImageInfo(String rawData, String title, String lang) throws SQLException, IOException {
+		Map<String, String> result = new HashMap<>();
+		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, lang, title, null);
+		prepareMetaData(result);
+		return result;
+	}
+	
+	private void prepareMetaData(Map<String, String> metaData) {
+		String license = metaData.get("license");
+		if (license != null) {
+			metaData.put("license", processLicense(license));
+		}
+	}
+	
+	private String processLicense(String license) {
+		license = license.replace("[[", "").replace("]]", "");
+		// Remove hyphens after "CC" and "PD"
+		license = license.replace("CC-", "CC ");
+		license = license.replace("PD-", "PD ");
+		
+		// Remove hyphen before "expired"
+		license = license.replace("-expired", " expired");
+		license = license.toUpperCase();
+		
+		return license;
 	}
 	
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {

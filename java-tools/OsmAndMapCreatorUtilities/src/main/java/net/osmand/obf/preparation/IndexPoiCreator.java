@@ -582,7 +582,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					if (poi.id > PROPAGATED_NODE_BIT) {
 						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
-						if (propagateToNodes.ignoreBorderPoint(poi.id, propagatedPoiType)) {
+						if (propagateToNodes != null && propagateToNodes.ignoreBorderPoint(poi.id, propagatedPoiType)) {
 							continue;
 						}
 					}

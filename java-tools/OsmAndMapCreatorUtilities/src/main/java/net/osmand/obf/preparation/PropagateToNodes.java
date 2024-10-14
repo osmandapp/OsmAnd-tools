@@ -1,17 +1,24 @@
 package net.osmand.obf.preparation;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
-import net.osmand.osm.MapRenderingTypes.MapRulType.PropagateToNodesType;
+import net.osmand.osm.MapRenderingTypes.PropagateToNode;
+import net.osmand.osm.MapRenderingTypes.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.PoiType;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
-
-import java.util.*;
+import net.osmand.util.Algorithms;
 
 public class PropagateToNodes {
 
@@ -19,7 +26,7 @@ public class PropagateToNodes {
     private TLongObjectHashMap<List<PropagateFromWayToNode>> propagateTagsByNodeId = new TLongObjectHashMap<>();
     private TLongObjectHashMap<List<PropagateRuleFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
     private Map<String, List<PropagateRule>> propagateRulesByTag = new HashMap<>();
-
+    private Map<PropagateRule, Map<String, String>> convertedPropagatedTags = new HashMap<>();
     
     public static class PropagateWayWithNodes {
     	
@@ -94,6 +101,24 @@ public class PropagateToNodes {
 	public PropagateToNodes(MapRenderingTypesEncoder renderingTypes) {
 		this.renderingTypes = renderingTypes;
 		initPropagateToNodes();
+		initConvertedTags();
+	}
+
+	private void initConvertedTags() {
+		for (List<PropagateRule> rules : propagateRulesByTag.values()) {
+			 for (PropagateRule r : rules) {
+				Map<String, String> tags = new HashMap<>();
+				String tag = r.tag;
+				if (!Algorithms.isEmpty(r.tagPrefix)) {
+					tag = r.tagPrefix + r.tag;
+				}
+				tags.put(tag, r.value);
+				tags = renderingTypes.transformTags(tags, Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+				if (!Algorithms.isEmpty(tags)) {
+					convertedPropagatedTags.put(r, tags);
+				}
+			}
+		}
 	}
 	
 	public boolean isNoRegisteredNodes() {
@@ -127,11 +152,9 @@ public class PropagateToNodes {
 		Map<String, MapRenderingTypes.MapRulType> ruleTypes = renderingTypes.getEncodingRuleTypes();
 		for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
-			if (ruleType.isPropagateToNodes()) {
-				PropagateToNodesType type = ruleType.getPropagateToNodesType();
-				String prefix = ruleType.getPropagateToNodesPrefix();
-				Map<String, String> propIf = ruleType.getPropagateIf();
-				PropagateRule rule = new PropagateRule(type, prefix, propIf);
+			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
+				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix, 
+						d.propagateNetworkIf, d.propagateIf);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -197,8 +220,6 @@ public class PropagateToNodes {
 					getNode(resultWay, w, i, i).applyRule(rule);
 				}
 				break;
-			case NONE:
-				break;
 			}
 		}
 		return resultWay;
@@ -214,7 +235,7 @@ public class PropagateToNodes {
 			for (PropagateRule rule : list) {
 				String entityTag = w.getTag(tag);
 				if (entityTag != null && entityTag.equals(rule.value)) {
-					boolean propIf = rule.applicable(w);
+					boolean propIf = rule.applicableBorder(w);
 					if (propIf) {
 						if (rulesToApply == null) {
 							rulesToApply = new ArrayList<>();
@@ -269,12 +290,15 @@ public class PropagateToNodes {
 		public String value;
 		public final PropagateToNodesType type;
 		public String tagPrefix;
-		public Map<String, String> propIf;
+		public Map<String, String> propMapIf;
+		public Map<String, String> propNetworkIf;
 
-		public PropagateRule(PropagateToNodesType type, String tagPrefix, Map<String, String> propIf) {
+		public PropagateRule(PropagateToNodesType type, String tagPrefix,
+				Map<String, String> propNetworkIf, Map<String, String> propMapIf) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
-			this.propIf = propIf;
+			this.propMapIf = propMapIf;
+			this.propNetworkIf = propNetworkIf;
 		}
 
 		public String getPropagateValue() {
@@ -297,38 +321,57 @@ public class PropagateToNodes {
 			return propagateTag;
 		}
 		
-		public boolean applicable(Way w) {
-			boolean res = true;
-			if (propIf != null) {
-				res = false;
-				for (Map.Entry<String, String> entry : propIf.entrySet()) {
-					String tagValue = w.getTag(entry.getKey());
-					if (tagValue != null) {
-						if (entry.getValue() == null) {
-							res = true;
-						} else {
-							String[] allValues = entry.getValue().split(",");
-							boolean allNegs = true;
-							for (String v : allValues) {
-								if (v.startsWith("~")) {
-									if (v.equals("~" + tagValue)) {
-										return false;
-									}
-								} else {
-									allNegs = false;
-									if (v.equals(tagValue)) {
-										res = true;
-									}
+		public boolean applicableBorder(Way w) {
+			if (!value.equals(w.getTag(tag))) {
+				return false;
+			}
+			if (propNetworkIf != null && !applicable(w, propNetworkIf)) {
+				return false;
+			}
+			if (propMapIf != null && !applicable(w, propMapIf)) {
+				return false;
+			}
+			return true;
+		}
+		
+		public boolean applicableNetwork(Way w) {
+			if (propNetworkIf != null) {
+				return applicable(w, propNetworkIf);
+			}
+			return true;
+		}
+
+		private boolean applicable(Way w, Map<String, String> propMap) {
+			for (Map.Entry<String, String> entry : propMap.entrySet()) {
+				String tagValue = w.getTag(entry.getKey());
+				if (tagValue == null) {
+					return false;
+				} else {
+					if (entry.getValue() == null) {
+						// value present
+					} else {
+						String[] allValues = entry.getValue().split(",");
+						boolean allNegs = true;
+						boolean match = false;
+						for (String v : allValues) {
+							if (v.startsWith("~")) {
+								if (v.equals("~" + tagValue)) {
+									return false;
+								}
+							} else {
+								allNegs = false;
+								if (v.equals(tagValue)) {
+									match = true;
 								}
 							}
-							if (allNegs) {
-								res = true;
-							}
+						}
+						if (!allNegs && !match) {
+							return false;
 						}
 					}
 				}
 			}
-			return res;
+			return true;
 		}
 	}
 
@@ -360,7 +403,9 @@ public class PropagateToNodes {
 					}
 					if (!thisWayPartOfBorder) {
 						for (PropagateRuleFromWayToNode p : propagatedBorders) {
-							if (p.rule.applicable(w) && !p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
+							if (p.rule.applicableNetwork(w) && 
+									
+									!p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
 								p.ignoreBorderPoint = false;
 							}
 						}
@@ -381,7 +426,18 @@ public class PropagateToNodes {
 			int delete = 0;
 			for (PropagateFromWayToNode p : linkedPropagate) {
 				for (PropagateRuleFromWayToNode n : p.rls) {
-					if (type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue())) {
+					boolean isEqual = type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue());
+					boolean isConverted = false;
+					if (!isEqual) {
+						Map<String, String> convertedTags = convertedPropagatedTags.get(n.rule);
+						if (convertedTags != null) {
+							String value = convertedTags.get(type.getTag());
+							if (!Algorithms.isEmpty(value) && value.equals(type.getValue())) {
+								isConverted = true;
+							}
+						}
+					}
+					if (isEqual || isConverted) {
 						if (n.ignoreBorderPoint && delete == 0) {
 							delete = 1;
 						} else if (!n.ignoreBorderPoint) {

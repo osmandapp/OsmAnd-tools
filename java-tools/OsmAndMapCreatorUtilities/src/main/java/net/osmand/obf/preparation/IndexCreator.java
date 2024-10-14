@@ -282,7 +282,9 @@ public class IndexCreator {
 
 		// 1. Loading osm file
 		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift) : new OsmDbCreator();
-		dbCreator.setPropagateToNodes(propagateToNodes);
+		if (!this.settings.ignorePropagate) {
+			dbCreator.setPropagateToNodes(propagateToNodes);
+		}
 		
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$

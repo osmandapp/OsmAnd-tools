@@ -1,10 +1,10 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.data.Multipolygon;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-
-import net.osmand.data.Multipolygon;
 
 public class IndexCreatorSettings {
 	
@@ -67,7 +67,8 @@ public class IndexCreatorSettings {
 	public boolean indexMultipolygon = true;
 	
     public boolean indexByProximity = true;
-	
+
+    public boolean ignorePropagate = false;
 
 	public String getString(String key) {
 		// IndexCreator.INDEX_LO_LEVEL_WAYS
