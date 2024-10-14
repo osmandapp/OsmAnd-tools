@@ -72,6 +72,7 @@ public class WikipediaByCountryDivider {
 				inspectWikiFile(sqliteFileName);
 				break;
 			case "generate_country_sqlite":
+				WikiDatabasePreparation.processWikidataRegions(sqliteFileName);
 				generateCountrySqlite(folder, sqliteFileName, skip);
 				break;
 			case "generate_test_obf":
