@@ -1568,7 +1568,7 @@ public class WikiDatabasePreparation {
 		regions.prepareFile();
 		regions.cacheAllCountries();
 		PreparedStatement wikiRegionPrep = conn
-				.prepareStatement("INSERT INTO wiki_region(id, regionName) VALUES(?, ? )");
+				.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		ResultSet rs = conn.createStatement().executeQuery("SELECT id, lat, lon from wiki_coords");
 		int batch = 0;
 		List<String> rgs = new ArrayList<String>();
