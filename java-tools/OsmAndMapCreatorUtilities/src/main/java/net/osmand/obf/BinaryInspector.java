@@ -62,7 +62,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "Test-tunnels.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

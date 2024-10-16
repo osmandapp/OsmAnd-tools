@@ -34,7 +34,7 @@ public class PropagateToNodes {
     	boolean empty = true;
     	
 		public PropagateWayWithNodes(int oldNodes) {
-			points = new PropagateFromWayToNode[2 *oldNodes - 1];
+			points = new PropagateFromWayToNode[3 * (oldNodes - 1) + 1];
 		}
     }
     
@@ -60,10 +60,12 @@ public class PropagateToNodes {
 		public long endId;
 		public int end;
 		public List<PropagateRuleFromWayToNode> rls = new ArrayList<>();
+		public boolean dir;
 
-		public PropagateFromWayToNode(Way way, int start, int end) {
+		public PropagateFromWayToNode(Way way, int start, int end, boolean dir) {
 			this.end = end;
 			this.start = start;
+			this.dir = dir;
 			wayId = way.getId();
 			this.startId = way.getNodeIds().get(start);
 			this.endId = way.getNodeIds().get(end);
@@ -82,13 +84,10 @@ public class PropagateToNodes {
 					st.getLongitude() / 2 + en.getLongitude() / 2);
 		}
 
-		public void applyRule(PropagateRule rule) {
-			applyRule(rule, false);
-		}
 		
-		public void applyRule(PropagateRule rule, boolean end) {
+		public void applyRule(PropagateRule rule) {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
-			rl.osmId = end ? endId : startId;
+			rl.osmId = dir ? startId : endId;
 			rl.tags.put(rule.getPropagateTag(), rule.getPropagateValue());
 			if (rule.type.isBorder()) {
 				rl.ignoreBorderPoint = true;
@@ -166,12 +165,21 @@ public class PropagateToNodes {
 		}
 	}
 
-	public PropagateFromWayToNode getNode(PropagateWayWithNodes rWay, Way way, int start, int end) {
-		if (rWay.points[start + end] == null) {
-			rWay.points[start + end] = new PropagateFromWayToNode(way, start, end);
+	public PropagateFromWayToNode getNode(PropagateWayWithNodes rWay, Way way, int point, Boolean forward) {
+		int start, end, ind;
+		if (forward == null) {
+			start = end = point;
+			ind = 3 * point;
+		} else {
+			start = forward ? point : point - 1;
+			end = forward ? point + 1 : point;
+			ind = 3 * start + (forward ? 1 : 2);
+		}
+		if (rWay.points[ind] == null) {
+			rWay.points[ind] = new PropagateFromWayToNode(way, start, end, forward == null ? true : forward);
 		}
 		rWay.empty = false;
-		return rWay.points[start + end];
+		return rWay.points[ind];
 	}
 
 	public PropagateWayWithNodes propagateTagsFromWays(Way w) {
@@ -189,27 +197,27 @@ public class PropagateToNodes {
 			switch (rule.type) {
 			case ALL:
 				for (int i = 0; i < w.getNodes().size(); i++) {
-					getNode(resultWay, w, i, i).applyRule(rule);
+					getNode(resultWay, w, i, null).applyRule(rule);
 				}
 				break;
 			case START:
-				getNode(resultWay, w, 0, 1).applyRule(rule);
+				getNode(resultWay, w, 0, true).applyRule(rule);
 				break;
 			case END:
-				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
+				getNode(resultWay, w, allIds.size() - 1, false).applyRule(rule);
 				break;
 			case CENTER:
 				if (allIds.size() == 2) {
-					getNode(resultWay, w, 0, 1).applyRule(rule);
+					getNode(resultWay, w, 0, true).applyRule(rule);
 				} else {
-					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule);
+					getNode(resultWay, w, allIds.size() / 2, true).applyRule(rule);
 				}
 				break;
 			case BORDERIN:
 				// possible fix for all interconnected roads assign on each point (not needed & more computational power)
 				for (int i = 0; i < allIds.size() - 1; i++) {
-					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
-					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
+					getNode(resultWay, w, i, true).applyRule(rule);
+					getNode(resultWay, w, i + 1, false).applyRule(rule);
 				}
 //				getNode(resultWay, w, 0, 1).applyRule(rule);
 //				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
@@ -217,7 +225,7 @@ public class PropagateToNodes {
 			case BORDEROUT:
 				// fix for all interconnected roads assign on each point (not needed & more computational power)
 				for (int i = 0; i < allIds.size(); i++) {
-					getNode(resultWay, w, i, i).applyRule(rule);
+					getNode(resultWay, w, i, null).applyRule(rule);
 				}
 				break;
 			}
@@ -343,7 +351,16 @@ public class PropagateToNodes {
 
 		private boolean applicable(Way w, Map<String, String> propMap) {
 			for (Map.Entry<String, String> entry : propMap.entrySet()) {
-				String tagValue = w.getTag(entry.getKey());
+				String propTag = entry.getKey();
+				if (propTag.startsWith("~")) {
+					String tagValue = w.getTag(propTag.substring(1));
+					boolean noValue = Algorithms.isEmpty(tagValue) || "no".equals(tagValue);
+					if (!noValue) {
+						return false;
+					}
+					continue;
+				}
+				String tagValue = w.getTag(propTag);
 				if (tagValue == null) {
 					return false;
 				} else {

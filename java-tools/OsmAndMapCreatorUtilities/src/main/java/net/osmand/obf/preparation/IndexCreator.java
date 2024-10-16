@@ -846,6 +846,7 @@ public class IndexCreator {
 
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/map.osm";
+//		String file = rootFolder + "../temp/test-tunnels.osm";
 		String file = rootFolder + "../temp/test_access.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";

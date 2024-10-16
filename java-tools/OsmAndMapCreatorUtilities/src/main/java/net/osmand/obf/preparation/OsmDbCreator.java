@@ -26,7 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
-import java.util.HashMap;
 import java.util.Map.Entry;
 
 public class OsmDbCreator implements IOsmStorageFilter {
@@ -57,7 +56,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
-	private HashMap<Long, Integer> propagatedNodesCache = new HashMap<>();//key way_id, value - count
 	
 	
 
@@ -388,10 +386,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					TLongArrayList nodeIds = ((Way) e).getNodeIds();
 					TLongArrayList oldNodeIds = new TLongArrayList(nodeIds);
 					nodeIds.clear();
+					long newInd = 0;
 					for (int i = 0; i < pnodes.points.length; i++) {
 						PropagateFromWayToNode pn = pnodes.points[i];
-						if (i % 2 == 0) {
-							nodeIds.add(oldNodeIds.get(i / 2));
+						if (i % 3 == 0) {
+							nodeIds.add(oldNodeIds.get(i / 3));
 							if (pn != null) {
 								prepPropagateNode.setLong(1, pn.id);
 								prepPropagateNode.addBatch();
@@ -403,14 +402,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 							if (latLon == null) {
 								continue;
 							}
-							int cnt = propagatedNodesCache.getOrDefault(e.getId(), 0);
-							cnt++;
-							if (cnt > ObfConstants.MAX_COUNT_PROPAGATED_NODES) {
-								log.error("Maximum number " + ObfConstants.MAX_COUNT_PROPAGATED_NODES + " of propagated nodes reached for way:" + e.getId());
+							long wayId = e.getId(); 
+							if (wayId < 0) {
+								wayId = Math.abs(wayId) % (1l << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - ObfConstants.SHIFT_PROPAGATED_NODES_BITS - 1));
+							}
+							pn.id = ObfConstants.PROPAGATE_NODE_BIT + (wayId << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + newInd++; //+ i;
+							if (i > ObfConstants.MAX_ID_PROPAGATED_NODES) {
+								log.error("Maximum number " + ObfConstants.MAX_ID_PROPAGATED_NODES + " of propagated nodes reached for way:" + e.getId());
+								nodeIds.clear();
+								nodeIds.addAll(oldNodeIds);
 								break;
 							}
-							propagatedNodesCache.put(e.getId(), cnt);
-							pn.id = (1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1)) + (e.getId() << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + cnt;
 							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
