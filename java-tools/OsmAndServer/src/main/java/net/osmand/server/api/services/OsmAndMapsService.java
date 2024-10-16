@@ -9,27 +9,20 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
-import javax.imageio.ImageIO;
 
 import net.osmand.router.*;
+import net.osmand.server.tileManager.TileMemoryCache;
+import net.osmand.server.tileManager.VectorMetatile;
 import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,12 +48,10 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
-import net.osmand.NativeJavaRendering.RenderingImageContext;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -77,8 +68,6 @@ import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.render.RenderingRuleProperty;
-import net.osmand.render.RenderingRulesStorage;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
@@ -90,15 +79,13 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.server.tileManager.TileServerConfig;
 
 @Service
 public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
 
-	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 80;
-	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
 	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
-	private static final int ZOOM_EN_PREFERRED_LANG = 6;
 
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
@@ -117,15 +104,11 @@ public class OsmAndMapsService {
 	private static final String INTERACTIVE_KEY = "int";
 	private static final String DEFAULT_INTERACTIVE_STYLE = "hd";
 	private static final String INTERACTIVE_STYLE_DELIMITER = "-";
-	
-	
+
+
 	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 
 	CachedOsmandIndexes cacheFiles = null;
-
-	AtomicInteger cacheTouch = new AtomicInteger(0);
-
-	Map<String, VectorMetatile> tileCache = new ConcurrentHashMap<>();
 
 	List<RoutingCacheContext> routingCaches = new ArrayList<>();
 
@@ -134,7 +117,7 @@ public class OsmAndMapsService {
 	File tempDir;
 
 	@Autowired
-	VectorTileServerConfig config;
+    TileServerConfig tileConfig;
 
 	@Autowired
 	RoutingServerConfig routingConfig;
@@ -464,201 +447,14 @@ public class OsmAndMapsService {
 		}
 	}
 
-	@Configuration
-	@ConfigurationProperties("tile-server")
-	public static class VectorTileServerConfig {
-
-		@Value("${tile-server.obf.location}")
-		String obfLocation;
-
-		@Value("${tile-server.obf.ziplocation}")
-		String obfZipLocation;
-
-		@Value("${tile-server.cache.location}")
-		String cacheLocation;
-
-		@Value("${tile-server.cache.max-zoom}")
-		int maxZoomCache = 16;
-
-		@Value("${tile-server.metatile-size}")
-		int metatileSize;
-
-		public String initErrorMessage;
-
-		public Map<String, VectorStyle> style = new TreeMap<String, VectorStyle>();
-
-		public void setStyle(Map<String, String> style) {
-			for (Entry<String, String> e : style.entrySet()) {
-				VectorStyle vectorStyle = new VectorStyle();
-				vectorStyle.key = e.getKey();
-				vectorStyle.name = "";
-				vectorStyle.maxZoomCache = maxZoomCache;
-				// fast log_2_n calculation
-				vectorStyle.metaTileSizeLog = 31 - Integer.numberOfLeadingZeros(Math.max(256, metatileSize)) - 8;
-				vectorStyle.tileSizeLog = 31 - Integer.numberOfLeadingZeros(256) - 8;
-				for (String s : e.getValue().split(",")) {
-					String value = s.substring(s.indexOf('=') + 1);
-					if (s.startsWith("style=")) {
-						vectorStyle.name = value;
-					} else if (s.startsWith("tilesize=")) {
-						vectorStyle.tileSizeLog = 31 - Integer.numberOfLeadingZeros(Integer.parseInt(value)) - 8;
-					} else if (s.startsWith("metatilesize=")) {
-						vectorStyle.metaTileSizeLog = 31 - Integer.numberOfLeadingZeros(Integer.parseInt(value)) - 8;
-					}
-				}
-				try {
-					vectorStyle.storage = NativeJavaRendering.parseStorage(vectorStyle.name + ".render.xml");
-					for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
-						if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
-								&& !"ui_hidden".equals(p.getCategory())) {
-							vectorStyle.properties.add(p);
-						}
-					}
-				} catch (Exception e1) {
-					LOGGER.error(String.format("Error init rendering style %s: %s", vectorStyle.name + ".render.xml",
-							e1.getMessage()), e1);
-				}
-				this.style.put(vectorStyle.key, vectorStyle);
-			}
-		}
-
-	}
-
-	public static class VectorStyle {
-		public transient RenderingRulesStorage storage;
-		public List<RenderingRuleProperty> properties = new ArrayList<RenderingRuleProperty>();
-		public String key;
-		public String name;
-		public int maxZoomCache;
-		public int tileSizeLog;
-		public int metaTileSizeLog;
-	}
-
-	public static class VectorMetatile implements Comparable<VectorMetatile> {
-
-		public BufferedImage runtimeImage;
-		public long lastAccess;
-		public final String key;
-		public final int z;
-		public final int left;
-		public final int top;
-		public final int metaSizeLog;
-		public final int tileSizeLog;
-		public final VectorStyle style;
-		private final VectorTileServerConfig cfg;
-		private JsonObject info;
-		private final String interactiveKey;
-
-		public VectorMetatile(VectorTileServerConfig cfg, String tileId, VectorStyle style, int z, int left, int top,
-				int metaSizeLog, int tileSizeLog, String interactiveKey) {
-			this.cfg = cfg;
-			this.style = style;
-			this.metaSizeLog = metaSizeLog;
-			this.tileSizeLog = tileSizeLog;
-			this.key = tileId;
-			this.left = left;
-			this.top = top;
-			this.z = z;
-			this.interactiveKey = interactiveKey;
-			touch();
-		}
-		
-		public String getInteractiveKey() {
-			return interactiveKey;
-		}
-		
-		public void setInfo(JsonObject info) {
-			this.info = info;
-		}
-		
-		public JsonObject getInfo() {
-			return info;
-		}
-
-		public void touch() {
-			lastAccess = System.currentTimeMillis();
-		}
-
-		@Override
-		public int compareTo(VectorMetatile o) {
-			return Long.compare(lastAccess, o.lastAccess);
-		}
-
-		public BufferedImage readSubImage(BufferedImage img, int x, int y) {
-			int subl = x - ((x >> metaSizeLog) << metaSizeLog);
-			int subt = y - ((y >> metaSizeLog) << metaSizeLog);
-			int tilesize = 256 << tileSizeLog;
-			return img.getSubimage(subl * tilesize, subt * tilesize, tilesize, tilesize);
-		}
-
-		public BufferedImage getCacheRuntimeImage() throws IOException {
-			BufferedImage img = runtimeImage;
-			if (img != null) {
-				return img;
-			}
-			File cf = getCacheFile(".png");
-			if (cf != null && cf.exists()) {
-				runtimeImage = ImageIO.read(cf);
-				return runtimeImage;
-			}
-			return null;
-		}
-		
-		public JsonObject getCacheRuntimeInfo() throws IOException {
-			JsonObject tileInfo = getInfo();
-			if (tileInfo != null) {
-				return tileInfo;
-			}
-			File cf = getCacheFile(".json.gz");
-			if (cf != null && cf.exists()) {
-				try (GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(cf));
-				     Reader reader = new InputStreamReader(gzip, StandardCharsets.UTF_8)) {
-					JsonParser parser = new JsonParser();
-					tileInfo = parser.parse(reader).getAsJsonObject();
-					return tileInfo;
-				}
-			}
-			return null;
-		}
-
-		public File getCacheFile(String ext) {
-			if (z > cfg.maxZoomCache || cfg.cacheLocation == null || cfg.cacheLocation.isEmpty()) {
-				return null;
-			}
-			int x = left >> (31 - z) >> metaSizeLog;
-			int y = top >> (31 - z) >> metaSizeLog;
-			StringBuilder loc = new StringBuilder();
-			
-//			if (ext.equals(".json")) {
-//				loc.append("info").append("/");
-//			}
-			
-			loc.append(interactiveKey != null ? interactiveKey : style.key).append("/").append(z);
-			while (x >= MAX_FILES_PER_FOLDER) {
-				int nx = x % MAX_FILES_PER_FOLDER;
-				loc.append("/").append(nx);
-				x = (x - nx) / MAX_FILES_PER_FOLDER;
-			}
-			loc.append("/").append(x);
-			while (y >= MAX_FILES_PER_FOLDER) {
-				int ny = y % MAX_FILES_PER_FOLDER;
-				loc.append("/").append(ny);
-				y = (y - ny) / MAX_FILES_PER_FOLDER;
-			}
-			loc.append("/").append(y);
-			loc.append("-").append(metaSizeLog).append("-").append(tileSizeLog).append(ext);
-			return new File(cfg.cacheLocation, loc.toString());
-		}
-	}
-
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
-		if (config != null && !Algorithms.isEmpty(config.obfZipLocation) && !Algorithms.isEmpty(config.obfLocation)) {
-			for (File zipFile : new File(config.obfZipLocation).listFiles()) {
+		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
+			for (File zipFile : new File(tileConfig.obfZipLocation).listFiles()) {
 				if (zipFile.getName().endsWith(".obf.zip")) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
-					File target = new File(config.obfLocation, fn);
-					File targetTemp = new File(config.obfLocation, fn + ".new");
+					File target = new File(tileConfig.obfLocation, fn);
+					File targetTemp = new File(tileConfig.obfLocation, fn + ".new");
 					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
@@ -691,53 +487,24 @@ public class OsmAndMapsService {
 		}
 	}
 
-	public VectorTileServerConfig getConfig() {
-		return config;
-	}
-
 	public RoutingServerConfig getRoutingConfig() {
 		return routingConfig;
 	}
 
-	public VectorStyle getStyle(String style) {
-		return config.style.get(style);
-	}
-
-	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
-		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
-		int left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
-		if (left < 0) {
-			left = 0;
-		}
-		int top = ((y >> metaSizeLog) << metaSizeLog) << (31 - z);
-		if (top < 0) {
-			top = 0;
-		}
-		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
-		String tileId = encode(key, left >> (31 - z), top >> (31 - z), z, metaSizeLog,
-				vectorStyle.tileSizeLog);
-		VectorMetatile tile = tileCache.get(tileId);
-		if (tile == null) {
-			tile = new VectorMetatile(config, tileId, vectorStyle, z, left, top, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
-			tileCache.put(tile.key, tile);
-		}
-		return tile;
-	}
-
 	public boolean validateAndInitConfig() throws IOException {
-		if (nativelib == null && config.initErrorMessage == null) {
+		if (nativelib == null && tileConfig.initErrorMessage == null) {
 			osmandRegions = new OsmandRegions();
 			osmandRegions.prepareFile();
 			synchronized (this) {
-				if (!(nativelib == null && config.initErrorMessage == null)) {
-					return config.initErrorMessage == null;
+				if (!(nativelib == null && tileConfig.initErrorMessage == null)) {
+					return tileConfig.initErrorMessage == null;
 				}
-				if (config.obfLocation == null || config.obfLocation.isEmpty()) {
-					config.initErrorMessage = "Files location is not specified";
+				if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
+					tileConfig.initErrorMessage = "Files location is not specified";
 				} else {
-					File obfLocationF = new File(config.obfLocation);
+					File obfLocationF = new File(tileConfig.obfLocation);
 					if (!obfLocationF.exists()) {
-						config.initErrorMessage = "Files location is not specified";
+						tileConfig.initErrorMessage = "Files location is not specified";
 					}
 				}
 				tempDir = Files.createTempDirectory("osmandserver").toFile();
@@ -758,11 +525,10 @@ public class OsmAndMapsService {
 					fous.close();
 					ios.close();
 				}
-				nativelib = NativeJavaRendering.getDefault(null, config.obfLocation, fontsFolder.getAbsolutePath());
-
+				nativelib = NativeJavaRendering.getDefault(null, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
 			}
 		}
-		return config.initErrorMessage == null;
+		return tileConfig.initErrorMessage == null;
 	}
 	public String validateNativeLib() {
 		if (nativelib == null) {
@@ -771,141 +537,9 @@ public class OsmAndMapsService {
 		return null;
 	}
 
-	public ResponseEntity<String> renderMetaTile(VectorMetatile tile)
-			throws IOException, XmlPullParserException, SAXException {
-		// don't synchronize this to not block routing
-		synchronized (config) {
-			// for local debug :
-			// VectorMetatile rendered = null;
-			VectorMetatile rendered = tileCache.get(tile.key);
-			if (rendered != null && rendered.runtimeImage != null) {
-				tile.runtimeImage = rendered.runtimeImage;
-				tile.setInfo(rendered.getInfo());
-				return null;
-			}
-			int imgTileSize = (256 << tile.tileSizeLog) << Math.min(tile.z, tile.metaSizeLog);
-			int tilesize = (1 << Math.min(31 - tile.z + tile.metaSizeLog, 31));
-			if (tilesize <= 0) {
-				tilesize = Integer.MAX_VALUE;
-			}
-			int right = tile.left + tilesize;
-			if (right <= 0) {
-				right = Integer.MAX_VALUE;
-			}
-			int bottom = tile.top + tilesize;
-			if (bottom <= 0) {
-				bottom = Integer.MAX_VALUE;
-			}
-			long now = System.currentTimeMillis();
-			String props = String.format("density=%d,textScale=%d", 1 << tile.tileSizeLog, 1 << tile.tileSizeLog);
-			if (tile.z < ZOOM_EN_PREFERRED_LANG) {
-				props += ",lang=en";
-			}
-			if (nativelib == null) {
-				return null;
-			}
-			if (!tile.style.name.equalsIgnoreCase(nativelib.getRenderingRuleStorage().getName())) {
-				nativelib.loadRuleStorage(tile.style.name + ".render.xml", props);
-			} else {
-				nativelib.setRenderingProps(props);
-			}
-			RenderingImageContext ctx = new RenderingImageContext(tile.left, right, tile.top, bottom, tile.z);
-			
-			if (tile.getInteractiveKey() != null) {
-				ctx.saveTextTile = true;
-			}
-			
-			if (ctx.width > 8192) {
-				return ResponseEntity.badRequest().body("Metatile exceeds 8192x8192 size");
-
-			}
-			if (imgTileSize != ctx.width << tile.tileSizeLog || imgTileSize != ctx.height << tile.tileSizeLog) {
-				return ResponseEntity.badRequest().body(String.format("Metatile has wrong size (%d != %d)", imgTileSize,
-						ctx.width << tile.tileSizeLog));
-			}
-			
-			NativeJavaRendering.RenderingImageResult result = nativelib.renderImage(ctx);
-			tile.runtimeImage = result.getImage();
-			if (tile.runtimeImage != null) {
-				tile.setInfo(result.getGenerationResult().getInfo());
-				File cacheFile = tile.getCacheFile(".png");
-				if (cacheFile != null) {
-					cacheFile.getParentFile().mkdirs();
-					if (cacheFile.getParentFile().exists()) {
-						ImageIO.write(tile.runtimeImage, "png", cacheFile);
-						buildCacheFileInfo(tile);
-					}
-				}
-			}
-			String msg = String.format("Rendered %d %d at %d (%s %s): %dx%d - %d ms", tile.left, tile.top, tile.z,
-					tile.style.name, props, ctx.width, ctx.height, (int) (System.currentTimeMillis() - now));
-			System.out.println(msg);
-			// LOGGER.debug();
-			return null;
-		}
-	}
-	
-	private void buildCacheFileInfo(VectorMetatile tile) throws IOException {
-		File cacheFileInfo = tile.getCacheFile(".json.gz");
-		if (cacheFileInfo != null) {
-			cacheFileInfo.getParentFile().mkdirs();
-			if (cacheFileInfo.getParentFile().exists()) {
-				JsonObject info = tile.getInfo();
-				if (info != null) {
-					try (GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(cacheFileInfo));
-					     Writer writer = new OutputStreamWriter(gzip, StandardCharsets.UTF_8)) {
-						writer.write(info.toString());
-					}
-				}
-			}
-		}
-	}
-
-	public void cleanupCache() {
-		int version = cacheTouch.incrementAndGet();
-		// so with atomic only 1 thread will get % X == 0
-		if (version % MAX_RUNTIME_IMAGE_CACHE_SIZE == 0 && version > 0) {
-			cacheTouch.set(0);
-			TreeSet<VectorMetatile> sortCache = new TreeSet<>(tileCache.values());
-			List<VectorMetatile> imageTiles = new ArrayList<>();
-			for (VectorMetatile vm : sortCache) {
-				if (vm.runtimeImage != null) {
-					imageTiles.add(vm);
-				}
-			}
-			if (imageTiles.size() >= MAX_RUNTIME_IMAGE_CACHE_SIZE) {
-				for (int i = 0; i < MAX_RUNTIME_IMAGE_CACHE_SIZE / 2; i++) {
-					VectorMetatile vm = imageTiles.get(i);
-					vm.runtimeImage = null;
-				}
-			}
-			if (tileCache.size() >= MAX_RUNTIME_TILES_CACHE_SIZE) {
-				Iterator<VectorMetatile> it = sortCache.iterator();
-				while (tileCache.size() >= MAX_RUNTIME_TILES_CACHE_SIZE / 2 && it.hasNext()) {
-					VectorMetatile metatTile = it.next();
-					tileCache.remove(metatTile.key);
-				}
-			}
-		}
-	}
-
-	private static String encode(String style, int x, int y, int z, int metasizeLog, int tileSizeLog) {
-		// long l = 0 ;
-		// int shift = 0;
-		// l += ((long) tileSizeLog) << shift; // 0-2
-		// shift += 2;
-		// l += ((long) metasizeLog) << shift; // 0-4
-		// shift += 3;
-		// l += ((long) z) << shift; // 1-22
-		// shift += 5;
-		// l += ((long) x) << shift;
-		// shift += z;
-		// l += ((long) y) << shift;
-		// shift += z;
-		StringBuilder sb = new StringBuilder();
-		return sb.append(style).append('-').append(metasizeLog).append('-').append(tileSizeLog).append('/').append(z)
-				.append('/').append(x).append('/').append(y).toString();
-	}
+    public ResponseEntity<String> renderMetaTile(VectorMetatile tile, TileMemoryCache<VectorMetatile> tileMemoryCache) throws XmlPullParserException, IOException, SAXException {
+        return tile.renderMetaTile(nativelib, tileMemoryCache);
+    }
 
 	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
@@ -1488,7 +1122,7 @@ public class OsmAndMapsService {
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
 		ref.readers.put(reader, true);
 		ref.fileIndex = cacheFiles.addToCache(reader, target);
-		cacheFiles.writeToFile(new File(config.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		cacheFiles.writeToFile(new File(tileConfig.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
 		}
@@ -1527,7 +1161,7 @@ public class OsmAndMapsService {
 		}
 		return prepareMaps(files, bbox, maxNumberMaps);
 	}
-	
+
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
 		initObfReaders();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
@@ -1639,7 +1273,7 @@ public class OsmAndMapsService {
 		if (cacheFiles != null) {
 			return;
 		}
-		File mapsFolder = new File(config.obfLocation);
+		File mapsFolder = new File(tileConfig.obfLocation);
 		cacheFiles = new CachedOsmandIndexes();
 		if (mapsFolder.exists()) {
 			File cacheFile = new File(mapsFolder, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
@@ -1662,9 +1296,8 @@ public class OsmAndMapsService {
 	}
 
 	public ResponseEntity<String> errorConfig() {
-		VectorTileServerConfig config = getConfig();
 		return ResponseEntity.badRequest()
-				.body("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
+				.body("Tile service is not initialized: " + (tileConfig == null ? "" : tileConfig.initErrorMessage));
 	}
 
 	public OsmandRegions getOsmandRegions() {
@@ -1689,7 +1322,7 @@ public class OsmAndMapsService {
 
 		return targetObf;
 	}
-	
+
 	public JsonObject getTileInfo(JsonObject tileInfo, int x, int y, int z) {
 		JsonObject subInfo = new JsonObject();
 		JsonArray featuresArray = tileInfo.getAsJsonArray("features");
@@ -1698,46 +1331,46 @@ public class OsmAndMapsService {
 			JsonObject featureObject = featuresArray.get(i).getAsJsonObject();
 			JsonObject geometryObject = featureObject.getAsJsonObject("geometry");
 			JsonArray coordinatesArray = geometryObject.getAsJsonArray("coordinates");
-			
+
 			for (int j = 0; j < coordinatesArray.size(); j++) {
 				JsonArray pointArray = coordinatesArray.get(j).getAsJsonArray();
 				double lat = pointArray.get(0).getAsDouble();
 				double lon = pointArray.get(1).getAsDouble();
-				
+
 				if (isPointInTile(lat, lon, x, y, z)) {
 					newFeaturesArray.add(featureObject);
 					break;
 				}
 			}
 		}
-		
+
 		subInfo.addProperty("type", "FeatureCollection");
 		subInfo.add("features", newFeaturesArray);
-		
+
 		return subInfo;
 	}
-	
+
 	private boolean isPointInTile(double lat, double lon, int tileX, int tileY, int zoom) {
-		
+
 		double xmin = MapUtils.getLongitudeFromTile(zoom, tileX);
 		double xmax = MapUtils.getLongitudeFromTile(zoom, tileX + 1);
 		double ymin = MapUtils.getLatitudeFromTile(zoom, tileY + 1);
 		double ymax = MapUtils.getLatitudeFromTile(zoom, tileY);
-		
+
 		if (lat < ymin || lat >= ymax) {
 			return false;
 		}
-		
+
 		if (lon < xmin || lon >= xmax) {
 			return false;
 		}
 		return true;
 	}
-	
+
 	public String getInteractiveKeyMap(String style) {
 		return style.startsWith(INTERACTIVE_KEY) ? style + INTERACTIVE_STYLE_DELIMITER + DEFAULT_INTERACTIVE_STYLE : null;
 	}
-	
+
 	public String getMapStyle(String style, String interactiveKey) {
 		if (interactiveKey == null) {
 			return style;

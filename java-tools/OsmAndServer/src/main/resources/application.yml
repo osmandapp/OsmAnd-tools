@@ -30,7 +30,7 @@ osmand:
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
-  
+
 server:
   port: 8080
   servlet.session:
@@ -53,7 +53,7 @@ tile-server:
   routeObf.location: ${ROUTE_OBF_LOCATION:}
   metatile-size: 2048 # render tiles as 2048 x 2048
   style:
-    df: style=default,tilesize=256 
+    df: style=default,tilesize=256
     hd: style=default,tilesize=512
     topo: style=topo,tilesize=256
     topo-hd: style=topo,tilesize=512
@@ -65,8 +65,9 @@ tile-server:
     touring: style=Touring-view_(more-contrast-and-details),tilesize=256
   cache:
     location: ${TILE_SERVER_CACHE_LOCATION:tiles}
-    max-zoom: 16 
-  
+    heightmap-location: ${TILE_SERVER_CACHE_LOCATION:heightmaps}
+    max-zoom: 16
+
 management:
   endpoints:
     web:
@@ -87,7 +88,7 @@ spring:
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   changesetdatasource:
-    url: 
+    url:
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   wikidatasource:
@@ -96,10 +97,10 @@ spring:
     password: ${WIKI_DB_PWD:}
     driverClassname: ${WIKI_DBCLASS_NAME:}
   monitordatasource:
-    url: 
-    username: 
-    password: 
-    driverClassname: 
+    url:
+    username:
+    password:
+    driverClassname:
   web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/
@@ -113,7 +114,7 @@ spring:
            clientSecret: ${GITHUB_CLIENT_SECRET:180c2863aaabb15c7e779bb192c88f1a726507d5}
            scope: read:org,user:email
            # creds for localhost
-  
+
 
 # classpath:/static/
 
@@ -121,10 +122,10 @@ mapillary.accesstoken: ${MAPILLARY_ACCESS_TOKEN:}
 
 monitoring:
   enabled: false
-  changes.feed: 
+  changes.feed:
   changes.publish.channel:
-  project.db: 
-  project.token:  
+  project.db:
+  project.token:
 
 geoip.url: "http://localhost:8081/json/"
 
