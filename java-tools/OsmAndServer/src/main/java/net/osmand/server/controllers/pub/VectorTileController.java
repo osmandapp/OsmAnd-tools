@@ -33,15 +33,15 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/tile")
 public class VectorTileController {
 
-    protected static final Log LOGGER = LogFactory.getLog(VectorTileController.class);
+	protected static final Log LOGGER = LogFactory.getLog(VectorTileController.class);
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
-    @Autowired
-    TileServerConfig config;
+	@Autowired
+	TileServerConfig config;
 
-    private final TileMemoryCache<VectorMetatile> tileMemoryCache = new TileMemoryCache<>();
+	private final TileMemoryCache<VectorMetatile> tileMemoryCache = new TileMemoryCache<>();
 
 	Gson gson = new Gson();
 
@@ -49,6 +49,7 @@ public class VectorTileController {
 		return ResponseEntity.badRequest()
 				.body(msg);
 	}
+
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
 		for (VectorStyle vectorStyle : config.style.values()) {
@@ -96,7 +97,7 @@ public class VectorTileController {
 				return ResponseEntity.badRequest().body("Unexpected error during rendering");
 			}
 		}
-        tileMemoryCache.cleanupCache();
+		tileMemoryCache.cleanupCache();
 		BufferedImage subimage = tile.readSubImage(img, x, y);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
@@ -119,20 +120,20 @@ public class VectorTileController {
 		if (tileInfo == null) {
 			return ResponseEntity.badRequest().body("Unexpected error during rendering");
 		}
-        tileMemoryCache.cleanupCache();
+		tileMemoryCache.cleanupCache();
 
 		return ResponseEntity.ok(String.valueOf(tileInfo));
 	}
 
-    public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
-        int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
-        String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
-        String tileId = config.createTileId(key, x, y, z, metaSizeLog, vectorStyle.tileSizeLog);
-        VectorMetatile tile = tileMemoryCache.get(tileId);
-        if (tile == null) {
-            tile = new VectorMetatile(config, tileId, vectorStyle, z, x, y, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
-            tileMemoryCache.put(tile.key, tile);
-        }
-        return tile;
-    }
+	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
+		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
+		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
+		String tileId = config.createTileId(key, x, y, z, metaSizeLog, vectorStyle.tileSizeLog);
+		VectorMetatile tile = tileMemoryCache.get(tileId);
+		if (tile == null) {
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, x, y, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
+			tileMemoryCache.put(tile.key, tile);
+		}
+		return tile;
+	}
 }

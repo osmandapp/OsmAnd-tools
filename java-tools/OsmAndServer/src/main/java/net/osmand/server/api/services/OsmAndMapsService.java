@@ -117,7 +117,7 @@ public class OsmAndMapsService {
 	File tempDir;
 
 	@Autowired
-    TileServerConfig tileConfig;
+	TileServerConfig tileConfig;
 
 	@Autowired
 	RoutingServerConfig routingConfig;
@@ -135,9 +135,11 @@ public class OsmAndMapsService {
 		ASTAR_2PHASE_JAVA("A* 2-phase Java"),
 		ASTAR_2PHASE_CPP("A* 2-phase C++");
 		private final String description;
+
 		ServerRoutingTypes(String description) {
 			this.description = description;
 		}
+
 		public static Map<String, String> getSelectList(boolean car) {
 			Map<String, String> list = new LinkedHashMap<>();
 			for (ServerRoutingTypes type : ServerRoutingTypes.values()) {
@@ -168,9 +170,11 @@ public class OsmAndMapsService {
 		ROUTING_JAVA("Routing-based Java"),
 		ROUTING_CPP("Routing-based C++");
 		private final String description;
+
 		ServerApproximationTypes(String description) {
 			this.description = description;
 		}
+
 		public static Map<String, String> getSelectList() {
 			Map<String, String> list = new LinkedHashMap<>();
 			for (ServerApproximationTypes type : ServerApproximationTypes.values()) {
@@ -309,7 +313,8 @@ public class OsmAndMapsService {
 			} else if (incompleteFlag != null) {
 				incompleteFlag[0] = true;
 			}
-		};
+		}
+		;
 		return res;
 	}
 
@@ -342,7 +347,7 @@ public class OsmAndMapsService {
 				RoutingCacheContext r = routingCaches.remove(routingCaches.size() - 1);
 				removed.add(r);
 			}
-			for (int i = 0; i < routingCaches.size();) {
+			for (int i = 0; i < routingCaches.size(); ) {
 				RoutingCacheContext check = routingCaches.get(i);
 				if ((System.currentTimeMillis() - check.created) / 1000l >= MAX_TIME_ROUTING_FILE) {
 					removed.add(routingCaches.remove(i));
@@ -381,8 +386,8 @@ public class OsmAndMapsService {
 
 	public int getCurrentOpenJavaFiles() {
 		int cnt = 0;
-		for(BinaryMapIndexReaderReference r: obfFiles.values()) {
-			cnt+= r.getOpenFiles();
+		for (BinaryMapIndexReaderReference r : obfFiles.values()) {
+			cnt += r.getOpenFiles();
 		}
 		return cnt;
 	}
@@ -405,10 +410,11 @@ public class OsmAndMapsService {
 				s2 = reorder(s2, "-car", "-bike", "-foot");
 				return s1.compareTo(s2);
 			}
+
 			private String reorder(String s, String... search) {
 				String result = s;
 				for (int i = 0; i < search.length; i++) {
-					if(s.contains(search[i])) {
+					if (s.contains(search[i])) {
 						result = Integer.toString(i) + s;
 					}
 				}
@@ -530,6 +536,7 @@ public class OsmAndMapsService {
 		}
 		return tileConfig.initErrorMessage == null;
 	}
+
 	public String validateNativeLib() {
 		if (nativelib == null) {
 			return "Tile rendering engine is not initialized";
@@ -537,9 +544,9 @@ public class OsmAndMapsService {
 		return null;
 	}
 
-    public ResponseEntity<String> renderMetaTile(VectorMetatile tile, TileMemoryCache<VectorMetatile> tileMemoryCache) throws XmlPullParserException, IOException, SAXException {
-        return tile.renderMetaTile(nativelib, tileMemoryCache);
-    }
+	public ResponseEntity<String> renderMetaTile(VectorMetatile tile, TileMemoryCache<VectorMetatile> tileMemoryCache) throws XmlPullParserException, IOException, SAXException {
+		return tile.renderMetaTile(nativelib, tileMemoryCache);
+	}
 
 	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
@@ -647,6 +654,7 @@ public class OsmAndMapsService {
 	private static class RouteParameters {
 		String routeProfile;
 		Map<String, String> routeParams = new LinkedHashMap<String, String>();
+
 		public RouteParameters(String p) {
 			this.routeProfile = p;
 			updateRoutingType(defaultRoutingType);
@@ -724,8 +732,7 @@ public class OsmAndMapsService {
 
 	private RoutingContext prepareRouterContext(RouteParameters rp, RoutePlannerFrontEnd router,
 	                                            List<BinaryMapIndexReader> usedMapList,
-	                                            boolean approximation) throws IOException, InterruptedException
-	{
+	                                            boolean approximation) throws IOException, InterruptedException {
 		boolean useNativeLib = approximation ? rp.useNativeApproximation : rp.useNativeRouting;
 
 		if (rp.onlineRouting != null && rp.useNativeApproximation) {
@@ -810,7 +817,7 @@ public class OsmAndMapsService {
 					waypoints.add(new WptPt(lat, lon));
 				}
 			}
-		} catch(RestClientException | JSONException error) {
+		} catch (RestClientException | JSONException error) {
 			LOGGER.error(String.format("OSRM get/parse error (%s)", url));
 			return null;
 		}
@@ -823,8 +830,8 @@ public class OsmAndMapsService {
 	}
 
 	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
-	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end, boolean useExternalTimestamps)
+	                                                          RoutePlannerFrontEnd router, Map<String, Object> props,
+	                                                          LatLon start, LatLon end, boolean useExternalTimestamps)
 			throws IOException, InterruptedException {
 
 		List<RouteSegmentResult> routeRes;
@@ -850,8 +857,8 @@ public class OsmAndMapsService {
 
 	@Nullable
 	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
-			LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
-			RouteCalculationProgress progress) throws IOException, InterruptedException {
+	                                        LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
+	                                        RouteCalculationProgress progress) throws IOException, InterruptedException {
 		String profile = routeMode.split("\\,")[0];
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -1023,7 +1030,7 @@ public class OsmAndMapsService {
 	}
 
 	private synchronized RouteCalcResult runRoutingSync(LatLon start, LatLon end, List<LatLon> intermediates,
-			RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
+	                                                    RoutePlannerFrontEnd router, RoutingContext ctx) throws IOException, InterruptedException {
 		return router.searchRoute(ctx, start, end, intermediates, null);
 	}
 
@@ -1099,7 +1106,7 @@ public class OsmAndMapsService {
 		initObfReaders();
 		long val = System.currentTimeMillis();
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
-		if(ref == null) {
+		if (ref == null) {
 			ref = new BinaryMapIndexReaderReference();
 			ref.file = target;
 			obfFiles.put(target.getAbsolutePath(), ref);
@@ -1379,7 +1386,7 @@ public class OsmAndMapsService {
 	}
 
 	public BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
-		int type, int size, int zoom, int x, int y) throws IOException {
+	                                    int type, int size, int zoom, int x, int y) throws IOException {
 		if (nativelib == null) {
 			return null;
 		}
