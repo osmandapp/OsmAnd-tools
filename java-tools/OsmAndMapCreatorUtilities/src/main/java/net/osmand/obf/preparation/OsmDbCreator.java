@@ -27,7 +27,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map.Entry;
+import java.util.Set;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -58,7 +60,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
 	private HashMap<Long, Integer> propagatedNodesCache = new HashMap<>();//key way_id, value - count
-	
+	private Set<Long> allIds = new HashSet<>();
 	
 
 	
@@ -410,7 +412,11 @@ public class OsmDbCreator implements IOsmStorageFilter {
 								break;
 							}
 							propagatedNodesCache.put(e.getId(), cnt);
-							pn.id = (1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1)) + (e.getId() << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + cnt;
+							long negative = 0;
+							if (e.getId() < 0) {
+								negative = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 2);
+							}
+							pn.id = (1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1)) + (e.getId() << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + cnt + negative;
 							currentCountNode++;
 							prepNode.setLong(1, pn.id);
 							prepNode.setDouble(2, latLon.getLatitude());
