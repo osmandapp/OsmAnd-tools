@@ -27,9 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
-import java.util.Set;
 
 public class OsmDbCreator implements IOsmStorageFilter {
 
@@ -60,8 +58,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
 	private HashMap<Long, Integer> propagatedNodesCache = new HashMap<>();//key way_id, value - count
-	private Set<Long> allIds = new HashSet<>();
-	
+
 
 	
 	// not used for now
