@@ -408,7 +408,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 								wayId = Math.abs(wayId) % (1l << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - ObfConstants.SHIFT_PROPAGATED_NODES_BITS - 1));
 							}
 							pn.id = ObfConstants.PROPAGATE_NODE_BIT + (wayId << ObfConstants.SHIFT_PROPAGATED_NODES_BITS) + newInd++; //+ i; - also should work but duplicates should be fixed first
-							if (i > ObfConstants.MAX_ID_PROPAGATED_NODES) {
+							if (newInd > ObfConstants.MAX_ID_PROPAGATED_NODES) {
 								log.error("Maximum number " + ObfConstants.MAX_ID_PROPAGATED_NODES + " of propagated nodes reached for way:" + e.getId());
 								nodeIds.clear();
 								nodeIds.addAll(oldNodeIds);
