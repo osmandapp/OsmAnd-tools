@@ -63,7 +63,8 @@ public class GeotiffTileController {
 
 		TileType tileType = TileType.from(type);
 		String tileId = config.createTileId(tileType.getType(), x, y, z, -1, -1);
-		GeotiffTile tile = tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
+		//GeotiffTile tile = tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
+		GeotiffTile tile = new GeotiffTile(config, tileType, x, y, z);
 		tileMemoryCache.cleanupCache();
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
@@ -84,7 +85,7 @@ public class GeotiffTileController {
 				tile.getTileType().getResType(), 256, tile.z, tile.x, tile.y);
 		File cacheFile = tile.getCacheFile(".png");
 		tile.runtimeImage = img;
-		tile.saveImageToCache(tile, cacheFile);
+		//tile.saveImageToCache(tile, cacheFile);
 
 		return img;
 	}
