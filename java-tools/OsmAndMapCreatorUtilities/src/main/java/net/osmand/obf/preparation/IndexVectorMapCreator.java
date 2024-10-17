@@ -909,10 +909,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                         mainTypes.add(mapRulType);
                     }
                 	// only nodes
+                    boolean ignore = false;
 					if (cid % 2 == 0 && propagateToNodes.getPropagateByNodeId(cid >> 1) != null) {
 						propagateToNodes.calculateBorderPointMainTypes(cid >> 1, mainTypes);
 						if(mainTypes.size() == 0) {
-							continue;
+							ignore = true;
 						}
 					}
                     
@@ -943,7 +944,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                             rs.getBoolean(1), rs.getBytes(2), rs.getBytes(3),
                             typeUse, addtypeUse, tempNames, rs.getBytes(7), null, tempStringTable, dataBlock,
                             allowWaySimplification);
-                    if (mapData != null) {
+                    if (mapData != null && !ignore) {
                         dataBlock.addDataObjects(mapData);
                     }
                 } else {

@@ -207,12 +207,12 @@ public class PropagateToNodes {
 				break;
 			case BORDERIN:
 				// possible fix for all interconnected roads assign on each point (not needed & more computational power)
-//				for (int i = 0; i < allIds.size() - 1; i++) {
-//					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
-//					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
-//				}
-				getNode(resultWay, w, 0, 1).applyRule(rule);
-				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
+				for (int i = 0; i < allIds.size() - 1; i++) {
+					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
+					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
+				}
+//				getNode(resultWay, w, 0, 1).applyRule(rule);
+//				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
 				break;
 			case BORDEROUT:
 				// fix for all interconnected roads assign on each point (not needed & more computational power)
@@ -343,7 +343,16 @@ public class PropagateToNodes {
 
 		private boolean applicable(Way w, Map<String, String> propMap) {
 			for (Map.Entry<String, String> entry : propMap.entrySet()) {
-				String tagValue = w.getTag(entry.getKey());
+				String propTag = entry.getKey();
+				if (propTag.startsWith("~")) {
+					String tagValue = w.getTag(propTag.substring(1));
+					boolean noValue = Algorithms.isEmpty(tagValue) || "no".equals(tagValue);
+					if (!noValue) {
+						return false;
+					}
+					continue;
+				}
+				String tagValue = w.getTag(propTag);
 				if (tagValue == null) {
 					return false;
 				} else {
@@ -394,20 +403,10 @@ public class PropagateToNodes {
 					if (!rule.type.isBorder()) {
 						continue;
 					}
-					boolean thisWayPartOfBorder = false;
 					List<PropagateRuleFromWayToNode> propagatedBorders = rules.get(rule);
 					for (PropagateRuleFromWayToNode p : propagatedBorders) {
-						if (p.way.wayId == w.getId() >> OsmDbCreator.SHIFT_ID) {
-							thisWayPartOfBorder = true;
-						}
-					}
-					if (!thisWayPartOfBorder) {
-						for (PropagateRuleFromWayToNode p : propagatedBorders) {
-							if (p.rule.applicableNetwork(w) && 
-									
-									!p.rule.getWayValue().equals(w.getTag(p.rule.getWayTag()))) {
-								p.ignoreBorderPoint = false;
-							}
+						if (p.rule.applicableNetwork(w) && !p.rule.applicableBorder(w)) {
+							p.ignoreBorderPoint = false;
 						}
 					}
 				}
