@@ -153,8 +153,7 @@ public class OsmGpxWriteContext {
 				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 				addAnalysisTags(gpxTrackTags, analysis);
 
-				String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track");
-				tagValue(serializer, "route_type", routeType);
+				tagValue(serializer, "route_type", "track"); // osm_route is not supported here
 
 				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
@@ -205,11 +204,13 @@ public class OsmGpxWriteContext {
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
 
-					String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track");
-					tagValue(serializer, "route_type", routeType);
+					tagValue(serializer, "route_type", "track"); // TODO use routeType or hide it at all from ways
 
 					serializeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
+
+					// TODO add 5km points
+//					String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track"); // TODO for points
 				}
 			}
 
