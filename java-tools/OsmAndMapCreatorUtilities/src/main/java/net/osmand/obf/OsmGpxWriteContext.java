@@ -59,7 +59,7 @@ public class OsmGpxWriteContext {
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
-	long ordinalId = -10;
+	private long baseOsmId = -10; // TODO generate base id (negative, 30 bits) based on gpx size/date/name
 
 	XmlSerializer serializer = null;
 	OutputStream outputStream = null;
@@ -138,7 +138,7 @@ public class OsmGpxWriteContext {
 			}
 			if (validTrack) {
 				serializer.startTag(null, "node");
-				serializer.attribute(null, "id", ordinalId-- + "");
+				serializer.attribute(null, "id", "" + baseOsmId--);
 				serializer.attribute(null, "action", "modify");
 				serializer.attribute(null, "version", "1");
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().getLat()));
@@ -172,24 +172,17 @@ public class OsmGpxWriteContext {
 						continue;
 					}
 					segments++;
-					long idStart = ordinalId;
+					long idStart = baseOsmId;
 					double dlon = s.getPoints().get(0).getLon();
 					double dlat = s.getPoints().get(0).getLat();
 					KQuadRect qr = new KQuadRect(dlon, dlat, dlon, dlat);
 					for (WptPt p : s.getPoints()) {
-						long nid = ordinalId--;
 						GpxUtilities.INSTANCE.updateQR(qr, p, dlat, dlon);
-						writePoint(nid, p, null, null, null);
+						writePoint(baseOsmId--, p, null, null, null);
 					}
-					long endid = ordinalId;
+					long endid = baseOsmId;
 					serializer.startTag(null, "way");
-					String osmId = s.getExtensionsToRead().get(OSM_TAG_PREFIX + "id");
-					if (osmId != null) {
-						long negWayId = -Long.parseLong(osmId);
-						serializer.attribute(null, "id", negWayId + "");
-					} else {
-						serializer.attribute(null, "id", ordinalId-- + "");
-					}
+					serializer.attribute(null, "id", "" + baseOsmId--);
 					serializer.attribute(null, "action", "modify");
 					serializer.attribute(null, "version", "1");
 
@@ -199,6 +192,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
+
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					tagValue(serializer, "route_radius", MapUtils.convertDistToChar(radius, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
@@ -220,10 +214,8 @@ public class OsmGpxWriteContext {
 			}
 
 			for (WptPt p : gpxFile.getPointsList()) {
-				String osmId = p.getExtensionsToRead().get(OSM_TAG_PREFIX + "id");
-				long nid = osmId != null ? -Long.parseLong(osmId) : ordinalId--;
 				if (gpxInfo != null) {
-					writePoint(nid, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
+					writePoint(baseOsmId--, p, "point", routeIdPrefix + gpxInfo.id, gpxInfo.name);
 				}
 			}
 		}
