@@ -134,12 +134,20 @@ public class RouteRelationExtractor {
 
 		String sourceFilePath = args[0];
 
+		final String RELATIONS_OSM_EXT = ".relations.osm";
 		String resultFilePath = args.length > 1 ? args[1]
-				: sourceFilePath.replace(".osm", ".relations.osm").replace(".pbf", "");
+				: sourceFilePath.replace(".osm", RELATIONS_OSM_EXT).replace(".pbf", "");
+		if (!resultFilePath.endsWith(RELATIONS_OSM_EXT)) {
+			resultFilePath += RELATIONS_OSM_EXT;
+		}
 
+		final String TRAVEL_OBF_EXT = ".travel.obf";
 		String obfFilePath = args.length > 2 ? args[2]
-				: sourceFilePath.replace(".osm", ".travel.obf")
+				: sourceFilePath.replace(".osm", TRAVEL_OBF_EXT)
 				.replace(".pbf", "").replace(".gz", "").replace(".bz2", "");
+		if (!obfFilePath.endsWith(TRAVEL_OBF_EXT)) {
+			obfFilePath += TRAVEL_OBF_EXT;
+		}
 
 		try {
 			RouteRelationExtractor rdg = new RouteRelationExtractor();
