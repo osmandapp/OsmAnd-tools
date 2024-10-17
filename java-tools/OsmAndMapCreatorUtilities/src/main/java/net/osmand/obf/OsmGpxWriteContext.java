@@ -144,14 +144,18 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().getLat()));
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 				tagValue(serializer, "route", "segment");
-				tagValue(serializer, "route_type", "track");
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
+
 				addGenericTags(gpxTrackTags, null);
 				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 				addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
 				addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 				addAnalysisTags(gpxTrackTags, analysis);
+
+				String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track");
+				tagValue(serializer, "route_type", routeType);
+
 				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
 			}
@@ -195,10 +199,10 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_type", "track");
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					tagValue(serializer, "route_radius", MapUtils.convertDistToChar(radius, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
+
 					addGenericTags(gpxTrackTags, t);
 					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
 					addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
@@ -206,6 +210,10 @@ public class OsmGpxWriteContext {
 					addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 					addAnalysisTags(gpxTrackTags, analysis);
 					addElevationTags(gpxTrackTags, s);
+
+					String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track");
+					tagValue(serializer, "route_type", routeType);
+
 					serializeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
 				}
@@ -264,11 +272,6 @@ public class OsmGpxWriteContext {
 				gpxInfo.updateRef(extensions.get("shield_text")); // update from osmc_text
 				gpxTrackTags.put("ref", gpxInfo.getPrettyRef()); // "osm_ref" will be kept as is
 			}
-//			for (String prefix : asIsTagsByPrefix) {
-//				if (extensions.containsKey(prefix)) {
-//					gpxTrackTags.put(prefix, extensions.get(prefix));
-//				}
-//			}
 			for (String key : extensions.keySet()) {
 				String outputKey = OBF_GPX_EXTENSION_TAG_PREFIX + key; // gpx_ by default
 				for (String asIsPrefix : asIsTagsByPrefix) {
