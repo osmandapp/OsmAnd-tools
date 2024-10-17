@@ -30,6 +30,8 @@ osmand:
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
+  heightmap.location: ${HEIGHTMAP_LOCATION:}
+  color.palette.location: ${osmand.files.location}resources/color-palette/
 
 server:
   port: 8080

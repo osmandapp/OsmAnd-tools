@@ -13,6 +13,7 @@ import net.osmand.server.tileManager.GeotiffTile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
@@ -31,14 +32,17 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
-	private static final String geotiffTilesFilepath = "../../../../heightmap/tiles/";
-	private static final String resultsColorFilepath = "../../resources/color-palette/";
-
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
 	@Autowired
 	TileServerConfig config;
+
+	@Value("${osmand.heightmap.location}")
+	String geotiffTiles;
+
+	@Value("${osmand.color.palette.location}")
+	String colorPalette;
 
 	private final TileMemoryCache<GeotiffTile> tileMemoryCache = new TileMemoryCache<>();
 
@@ -73,10 +77,10 @@ public class GeotiffTileController {
 	}
 
 	private BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
-		String resultColorsFilename = tile.getTileType().getResultColorFilePath(resultsColorFilepath);
-		String intermediateColorsFilename = tile.getTileType().getIntermediateColorFilePath(resultsColorFilepath);
+		String resultColorsFilename = tile.getTileType().getResultColorFilePath(colorPalette);
+		String intermediateColorsFilename = tile.getTileType().getIntermediateColorFilePath(colorPalette);
 		BufferedImage img = osmAndMapsService.getGeotiffTile(
-				geotiffTilesFilepath, resultColorsFilename, intermediateColorsFilename,
+				geotiffTiles, resultColorsFilename, intermediateColorsFilename,
 				tile.getTileType().getResType(), 256, tile.z, tile.x, tile.y);
 		File cacheFile = tile.getCacheFile(".png");
 		tile.runtimeImage = img;
