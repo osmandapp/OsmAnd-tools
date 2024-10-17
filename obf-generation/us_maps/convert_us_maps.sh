@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+#set -x
 unset SESSION_MANAGER
 # This script it used to prepare some NFS, BLM and parcel data for use in OsmAnd
 # Data download link: https://data.fs.usda.gov/geodata/edw/datasets.php
@@ -14,17 +14,17 @@ tmp_dir=tmp
 out_osm_dir=osm
 out_obf_dir=obf
 ogr2osm_dir=ogr2osm
-aggregate_nfs_rec_area_activities_template_name=aggregate_nfs_rec_area_activities_template
+aggregate_nfs_rec_area_activities_template_name=aggregate_rec_area_activities_template
 mapcreator_dir=/home/xmd5a/utilites/OsmAndMapCreator-main
 poi_types_path=/home/xmd5a/git/OsmAnd-resources/poi/poi_types_us-maps.xml
 rendering_types_path=/home/xmd5a/git/OsmAnd-resources/obf_creation/rendering_types_us-maps.xml
 
 process_nfs_trails=false
 process_nfs_roads=false
-process_nfs_rec_area_activities=false
+process_nfs_rec_area_activities=true
 process_nfs_trails=false
 process_blm_roads_trails=false
-process_blm_recreation_site_points=false
+process_blm_recreation_site_points=true
 
 process_private_lands_test=false
 process_private_lands_wisconsin=false
@@ -44,7 +44,7 @@ process_private_lands_rhode_island=false
 process_private_lands_wyoming=false
 process_private_lands_west_virginia=false
 process_private_lands_washington=false
-process_private_lands_virginia=true
+process_private_lands_virginia=false
 
 trails_shp_filename="S_USA.TrailNFS_Publish"
 roads_shp_filename="S_USA.RoadCore_FS"
@@ -121,12 +121,12 @@ export rendering_types_path
 function generate_osm_from_shp {
 	ogr2ogr $work_dir/$tmp_dir/$1.shp $work_dir/$source_dir/$1.shp -explodecollections
 	cd $dir/$ogr2osm_dir
-	time python3 -m ogr2osm --suppress-empty-tags $work_dir/$tmp_dir/$1.shp -o $work_dir/$out_osm_dir/us_$2.osm -t $2.py
+	time python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$tmp_dir/$1.shp -o $work_dir/$out_osm_dir/us_$2.osm -t $2.py
 }
 
 function generate_osm_private_lands {
 	echo -e "\033[95mGenerating osm from $1\033[0m"
-	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags "$1" -o $work_dir/$out_osm_dir/us_${2}_pl_northamerica.osm -t private_lands.py
+	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags "$1" -o $work_dir/$out_osm_dir/us_${2}_pl_northamerica.osm -t private_lands.py
 	osmconvert $work_dir/$out_osm_dir/us_${2}_pl_northamerica.osm --out-pbf > $work_dir/$out_osm_dir/us_${2}_pl_northamerica.pbf
 }
 
@@ -220,7 +220,8 @@ if [[ $process_nfs_rec_area_activities == true ]] ; then
 		sed -i "s,INPUT_FILE,$work_dir/$tmp_dir/$nfs_rec_area_activities_source_filename.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
 		sed -i "s,OUTPUT_FILE,$work_dir/$source_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg,g" $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
 		time python3 $work_dir/$tmp_dir/$aggregate_nfs_rec_area_activities_template_name.py
-		cd $dir/$ogr2osm_dir && python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg -o $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm -t nfs_rec_area_activities.py
+		cd $dir/$ogr2osm_dir && python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/${nfs_rec_area_activities_source_filename}_agg.gpkg -o $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm -t nfs_rec_area_activities.py
+		generate_obf us_nfs_rec_area_activities.osm
 	fi
 fi
 
@@ -243,13 +244,14 @@ fi
 if [[ $process_blm_recreation_site_points == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_blm_rec_area_activities.osm" ]; then
 	wget $url_blm_recreation_site_points -nc -O $work_dir/$source_dir/$blm_recreation_site_source_filename.gdb.zip
 	echo ==============Generating $blm_recreation_site_source_filename
-	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir/$blm_recreation_site_source_filename.gdb.zip -o $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm -t blm_recreation_site.py
+	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/$blm_recreation_site_source_filename.gdb.zip -o $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm -t blm_recreation_site.py
+	generate_obf us_blm_rec_area_activities.osm
 fi
 
 # Private lands test (Dallas)
 if [[ $process_private_lands_test == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm" ]; then
 	echo ==============Generating $private_lands_test_source_filename
-	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --suppress-empty-tags $work_dir/$source_dir/$private_lands_test_source_filename.gpkg -o $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm -t private_lands.py
+	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/$private_lands_test_source_filename.gpkg -o $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm -t private_lands.py
 	osmconvert $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm --out-pbf > $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.pbf
 # 	rm -f $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm
 fi
@@ -592,11 +594,3 @@ cd $work_dir/$tmp_dir
 if [[ $? == 0 ]] ; then
 	rm -rf $work_dir/$tmp_dir/*.*
 fi
-
-cd $work_dir/$out_obf_dir
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_blm_roads_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_trails.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_rec_area_activities.osm --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_nfs_roads.pbf --poi-types=$poi_types_path --rendering-types=$rendering_types_path
-# bash $mapcreator_dir/utilities.sh generate-obf $work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.pbf --poi-types=$poi_types_path --rendering-types=$rendering_types_path
