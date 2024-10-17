@@ -347,6 +347,7 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("name", gpxInfo.name);
 			gpxTrackTags.put("route_name", gpxInfo.name);
 			gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
+//			gpxTrackTags.put("name:en", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("description", gpxInfo.description);
 			gpxTrackTags.put("route_id", routeIdPrefix + gpxInfo.id);
 

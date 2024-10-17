@@ -122,9 +122,10 @@ public class RouteRelationExtractor {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
 //			s.add("germany-latest.osm.gz");
-			s.add("slovakia-latest.osm.gz");
+//			s.add("slovakia-latest.osm.gz");
 //			s.add("malta-latest.osm.gz");
 //			s.add("andorra-latest.osm.gz");
+			s.add("italy_sicilia.osm.pbf");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
 			// TODO specify source file, tmp folder, result file // finally clean up the folder
