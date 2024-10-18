@@ -58,7 +58,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private QuadTree<Multipolygon> cityQuadTree;
 	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
 	private Map<Long, List<Integer>> poiTagGroups = new HashMap<>();
-	private Map<Integer, Map<Integer, Integer>> mergedTagGroupsIds = new HashMap<>();// regionHash => <oldId, newId>
+	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
@@ -1083,12 +1083,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return "";
 		}
 		String result = "";
-		int regionHash = amenity.getRegionHash();
-		Map<Integer, Integer> combinedMap = mergedTagGroupsIds.computeIfAbsent(regionHash, s -> new HashMap<>());
+		String region = amenity.getRegionName();
+		Map<Integer, Integer> replaceIDMap = tagGroupIdsByRegion.computeIfAbsent(region, s -> new HashMap<>());
 		for (Map.Entry<Integer, List<BinaryMapIndexReader.TagValuePair>> entry : tg.entrySet()) {
 			int id = entry.getKey();
 			int mergedId;
-			if (!combinedMap.containsKey(id)) {
+			if (!replaceIDMap.containsKey(id)) {
 				mergedId = maxTagGroupId + 1;
 				String allPairs = "";
 				for (BinaryMapIndexReader.TagValuePair p : entry.getValue()) {
@@ -1100,10 +1100,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				tagGroupsPreparedStatement.setInt(1, mergedId);
 				tagGroupsPreparedStatement.setString(2, allPairs);
 				addBatch(tagGroupsPreparedStatement);
-				combinedMap.put(id, mergedId);
+				replaceIDMap.put(id, mergedId);
 				maxTagGroupId = mergedId;
 			} else {
-				mergedId = combinedMap.get(id);
+				mergedId = replaceIDMap.get(id);
 			}
 			if (!result.isEmpty()) {
 				result += ",";
