@@ -61,7 +61,8 @@ public class OsmGpxWriteContext {
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
-	private long baseOsmId = -10; // TODO generate base id (negative, 30 bits) based on gpx size/date/name
+	private final long baseIdMask = ((1 << 30) - 1); // 30 bits
+	private long baseOsmId = -(new Random(System.currentTimeMillis()).nextLong() & baseIdMask); // 30 bits negative
 
 	XmlSerializer serializer = null;
 	OutputStream outputStream = null;
@@ -480,9 +481,9 @@ public class OsmGpxWriteContext {
 		serializer.endTag(null, "tag");
 	}
 	
-	public File writeObf(Map<String, GpxFile> gpxFiles, List<KFile> files, File tmpFolder, String fileName, File targetObf) throws IOException,
-			SQLException, InterruptedException, XmlPullParserException {
-		
+	public File writeObf(Map<String, GpxFile> gpxFiles, List<KFile> files, File tmpFolder, String fileName,
+	                     File targetObf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+		generateUniqueBaseOsmId(gpxFiles, files);
 		startDocument();
 		if (gpxFiles != null) {
 			for (Entry<String, GpxFile> entry : gpxFiles.entrySet()) {
@@ -533,7 +534,30 @@ public class OsmGpxWriteContext {
 		}
 		return targetObf;
 	}
-	
+
+	private void generateUniqueBaseOsmId(Map<String, GpxFile> gpxFiles, List<KFile> kFiles) {
+		int seed = 0;
+		if (gpxFiles != null) {
+			seed += gpxFiles.size();
+			for (String name : gpxFiles.keySet()) {
+				for (int i = 0; i < name.length(); i++) {
+					seed += name.charAt(i);
+				}
+			}
+		}
+		if (kFiles != null) {
+			for(KFile f : kFiles) {
+				String name = f.name();
+				for (int i = 0; i < name.length(); i++) {
+					seed += name.charAt(i);
+				}
+			}
+		}
+		if (seed != 0) {
+			baseOsmId = -(new Random(seed).nextLong() & baseIdMask);
+		}
+	}
+
 	private void writeFile(GpxFile gpxFile, String fileName) throws SQLException, IOException {
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxFile.getModifiedTime());
 		OsmGpxFile file = new OsmGpxFile();
