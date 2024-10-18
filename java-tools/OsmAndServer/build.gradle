@@ -39,6 +39,12 @@ tasks.register('copyAndroidResources', Copy) {
 }
 processResources.dependsOn(copyAndroidResources)
 
+tasks.register('copyColorPalette', Copy) {
+    from("../../../resources/color-palette/")
+    into("src/main/resources/colorPalette")
+}
+processResources.dependsOn(copyColorPalette)
+
 bootJar {
     dependsOn generateGitProperties
     launchScript()

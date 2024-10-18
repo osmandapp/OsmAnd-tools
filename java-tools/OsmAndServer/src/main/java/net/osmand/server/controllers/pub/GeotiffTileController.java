@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 import javax.imageio.ImageIO;
 
@@ -32,6 +33,8 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
+	private final String colorPalette = Objects.requireNonNull(this.getClass().getResource("/colorPalette/")).getPath();
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
@@ -40,9 +43,6 @@ public class GeotiffTileController {
 
 	@Value("${osmand.heightmap.location}")
 	String geotiffTiles;
-
-	@Value("${osmand.color.palette.location}")
-	String colorPalette;
 
 	private final TileMemoryCache<GeotiffTile> tileMemoryCache = new TileMemoryCache<>();
 
