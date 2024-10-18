@@ -18,6 +18,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -544,15 +545,19 @@ public class WikiService {
 			lang = s[0];
 		}
 
-		List<String> ids;
-		if (lang.isEmpty()) {
-			ids = jdbcTemplate.query("SELECT id FROM wiki.wiki_mapping WHERE title = ?",
-					(rs, rowNum) -> rs.getString("id"), title);
-		} else {
-			ids = jdbcTemplate.query("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?",
-					(rs, rowNum) -> rs.getString("id"), lang, title);
+		String id;
+		try {
+			if (lang.isEmpty()) {
+				id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ? LIMIT 1",
+						String.class, title);
+			} else {
+				id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ? LIMIT 1",
+						String.class, lang, title);
+			}
+		} catch (EmptyResultDataAccessException e) {
+			return null;
 		}
-		return ids.isEmpty() ? null : ids.get(0);
+		return id;
 	}
 	
 	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
