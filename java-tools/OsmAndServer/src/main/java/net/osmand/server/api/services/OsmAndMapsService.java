@@ -133,6 +133,8 @@ public class OsmAndMapsService {
 
 	File tempDir;
 
+	Integer geotiffTileLock = 0;
+
 	@Autowired
 	VectorTileServerConfig config;
 
@@ -1747,9 +1749,12 @@ public class OsmAndMapsService {
 
 	public BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
 		int type, int size, int zoom, int x, int y) throws IOException {
-		if (nativelib == null) {
-			return null;
+		BufferedImage image = null;
+		synchronized (geotiffTileLock) {
+			if (nativelib != null) {
+				image = nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+			}	
 		}
-		return nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+		return image;
 	}
 }
