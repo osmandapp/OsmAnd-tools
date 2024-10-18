@@ -21,6 +21,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.data.LatLon;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.GzipSource;
 import okio.Okio;
@@ -54,6 +55,7 @@ import rtree.RTree;
 import javax.annotation.Nonnull;
 
 public class OsmGpxWriteContext {
+	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 	public static final String OSM_TAG_PREFIX = "osm_";
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
@@ -164,9 +166,15 @@ public class OsmGpxWriteContext {
 					double dlon = s.getPoints().get(0).getLon();
 					double dlat = s.getPoints().get(0).getLat();
 					KQuadRect qr = new KQuadRect(dlon, dlat, dlon, dlat);
+					List<LatLon> pointsForPoiSearch = new ArrayList<>();
 					for (WptPt p : s.getPoints()) {
 						GpxUtilities.INSTANCE.updateQR(qr, p, dlat, dlon);
 						writePoint(baseOsmId--, p, null, null, null);
+						if (pointsForPoiSearch.isEmpty() ||
+								MapUtils.getDistance(pointsForPoiSearch.get(pointsForPoiSearch.size() - 1),
+										new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_DISTANCE_M) {
+							pointsForPoiSearch.add(new LatLon(p.getLatitude(), p.getLongitude()));
+						}
 					}
 					long endid = baseOsmId;
 					serializer.startTag(null, "way");
@@ -179,16 +187,34 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_type", "track");
+					tagValue(serializer, "route_type", "track"); // use route_type=track for ways
+
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
-					tagValue(serializer, "route_radius", MapUtils.convertDistToChar(radius, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
-							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
+					String routeRadius = MapUtils.convertDistToChar(radius,
+							GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
+							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2);
+					tagValue(serializer, "route_radius", routeRadius);
+
 					Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, t, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
+
 					serializer.endTag(null, "way");
 
-					// TODO add 5km points
-//					String routeType = Objects.requireNonNullElse(gpxTrackTags.get(OSM_TAG_PREFIX + "route"), "track"); // TODO for points
+					String routeType = gpxTrackTags.get(OSM_TAG_PREFIX + "route");
+					if (routeType != null) {
+						for (LatLon ll : pointsForPoiSearch) {
+							serializer.startTag(null, "node");
+							serializer.attribute(null, "id", "" + baseOsmId--);
+							serializer.attribute(null, "action", "modify");
+							serializer.attribute(null, "version", "1");
+							serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
+							serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
+							tagValue(serializer, "route_radius", routeRadius);
+							tagValue(serializer, "route_type", routeType);
+							serializeTags(extraTrackTags, gpxTrackTags);
+							serializer.endTag(null, "node");
+						}
+					}
 				}
 			}
 
