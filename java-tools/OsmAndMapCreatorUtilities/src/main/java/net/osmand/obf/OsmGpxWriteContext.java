@@ -104,11 +104,8 @@ public class OsmGpxWriteContext {
 	}
 	
 
-	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile, GpxTrackAnalysis analysis,
-			String routeIdPrefix)
-			throws IOException, SQLException {
-		Map<String, String> gpxTrackTags = new LinkedHashMap<String, String>();
-
+	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
+	                       GpxTrackAnalysis analysis, String routeIdPrefix) throws IOException {
 		if (gpxFile.getMetadata() != null) {
 			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
 			gpxInfo.updateRef(metaExtensions.get(OSM_TAG_PREFIX + "ref"));
@@ -145,16 +142,8 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 				tagValue(serializer, "route", "segment");
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
-
-				addGenericTags(gpxTrackTags, null);
-				addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-				addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
-				addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
-				addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
-				addAnalysisTags(gpxTrackTags, analysis);
-
-				tagValue(serializer, "route_type", "track"); // osm_route is not supported here
-
+				tagValue(serializer, "route_type", "track"); // osm_route is not supported for non-detailed queries
+				Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, null, null);
 				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
 			}
@@ -184,28 +173,17 @@ public class OsmGpxWriteContext {
 					serializer.attribute(null, "id", "" + baseOsmId--);
 					serializer.attribute(null, "action", "modify");
 					serializer.attribute(null, "version", "1");
-
 					for (long nid = idStart; nid > endid; nid--) {
 						serializer.startTag(null, "nd");
 						serializer.attribute(null, "ref", nid + "");
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-
+					tagValue(serializer, "route_type", "track");
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					tagValue(serializer, "route_radius", MapUtils.convertDistToChar(radius, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2));
-
-					addGenericTags(gpxTrackTags, t);
-					addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-					addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
-					addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
-					addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
-					addAnalysisTags(gpxTrackTags, analysis);
-					addElevationTags(gpxTrackTags, s);
-
-					tagValue(serializer, "route_type", "track"); // TODO use routeType or hide it at all from ways
-
+					Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, t, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
 					serializer.endTag(null, "way");
 
@@ -221,6 +199,23 @@ public class OsmGpxWriteContext {
 			}
 		}
 		tracks++;
+	}
+
+	private Map<String, String> collectGpxTrackTags(OsmGpxFile gpxInfo, GpxFile gpxFile, String routeIdPrefix,
+	                                                GpxTrackAnalysis analysis, Track track, TrkSegment segment) throws IOException {
+		Map<String, String> gpxTrackTags = new LinkedHashMap<>();
+		if (track != null) {
+			addGenericTags(gpxTrackTags, track);
+		}
+		if (segment != null) {
+			addElevationTags(gpxTrackTags, segment);
+		}
+		addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
+		addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
+		addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
+		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
+		addAnalysisTags(gpxTrackTags, analysis);
+		return gpxTrackTags;
 	}
 
 	private void addPointGroupsTags(Map<String, String> gpxTrackTags, Map<String, PointsGroup> pointsGroups) {
@@ -595,7 +590,6 @@ public class OsmGpxWriteContext {
 				this.description = description;
 			}
 		}
-
 
 		@Nonnull
 		public String getPrettyRef() {
