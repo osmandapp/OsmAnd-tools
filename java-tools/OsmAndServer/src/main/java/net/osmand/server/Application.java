@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.ServiceLoader;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.imageio.spi.IIORegistry;
 import javax.imageio.spi.ImageReaderSpi;
@@ -71,7 +73,7 @@ public class Application  {
 			}
 			System.out.println("Application has started");
 			configureImageIO();
-			createColorPaletteDirectory("/colorPalette/");
+			createColorPaletteDirectory("/colorPalette.zip");
 			
 //			githubProject.syncGithubProject(); // to test
 		};
@@ -107,13 +109,35 @@ public class Application  {
 		}
 	}
 
-	public static void createColorPaletteDirectory(String resourceFolderPath) throws IOException, URISyntaxException {
+	public static void createColorPaletteDirectory(String resourceFolderPath) throws IOException {
 		Path tempDirectory = Files.createTempDirectory("colorPalette");
 		File tempDir = tempDirectory.toFile();
 		tempDir.deleteOnExit(); // remove the directory when the JVM exits
 
-		File resourceFolder = new File(Objects.requireNonNull(Application.class.getResource(resourceFolderPath)).toURI());
-		copyDirectory(resourceFolder, tempDir);
+		try (InputStream zipStream = Application.class.getResourceAsStream(resourceFolderPath)) {
+			if (zipStream == null) {
+				throw new FileNotFoundException("Resource not found: " + resourceFolderPath);
+			}
+
+			try (ZipInputStream zis = new ZipInputStream(zipStream)) {
+				ZipEntry entry;
+				while ((entry = zis.getNextEntry()) != null) {
+					File newFile = new File(tempDir, entry.getName());
+					if (entry.isDirectory()) {
+						newFile.mkdirs();
+					} else {
+						try (FileOutputStream fos = new FileOutputStream(newFile)) {
+							byte[] buffer = new byte[1024];
+							int len;
+							while ((len = zis.read(buffer)) > 0) {
+								fos.write(buffer, 0, len);
+							}
+						}
+					}
+					zis.closeEntry();
+				}
+			}
+		}
 		colorPalettePath = tempDirectory;
 	}
 

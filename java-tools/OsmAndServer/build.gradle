@@ -39,11 +39,12 @@ tasks.register('copyAndroidResources', Copy) {
 }
 processResources.dependsOn(copyAndroidResources)
 
-tasks.register('copyColorPalette', Copy) {
+tasks.register('zipColorPalette', Zip) {
     from("../../../resources/color-palette/")
-    into("src/main/resources/colorPalette")
+    archiveFileName = "colorPalette.zip"
+    destinationDirectory = file("src/main/resources")
 }
-processResources.dependsOn(copyColorPalette)
+processResources.dependsOn(zipColorPalette)
 
 bootJar {
     dependsOn generateGitProperties
