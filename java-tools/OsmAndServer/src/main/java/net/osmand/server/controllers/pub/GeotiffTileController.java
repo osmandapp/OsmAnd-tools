@@ -16,6 +16,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,13 +35,14 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
-	private final String colorPalette = Objects.requireNonNull(this.getClass().getResource("/colorPalette/")).getPath();
-
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
 	@Autowired
 	TileServerConfig config;
+
+	@Autowired
+	private ResourceLoader resourceLoader;
 
 	@Value("${osmand.heightmap.location}")
 	String geotiffTiles;
@@ -78,11 +81,19 @@ public class GeotiffTileController {
 	}
 
 	private synchronized BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
-		String resultColorsFilename = tile.getTileType().getResultColorFilePath(colorPalette);
-		String intermediateColorsFilename = tile.getTileType().getIntermediateColorFilePath(colorPalette);
+		Resource resultColorsResource = resourceLoader.getResource("classpath:colorPalette/" + tile.getTileType().getResultColorFilePath(""));
+		Resource intermediateColorsResource = resourceLoader.getResource("classpath:colorPalette/" + tile.getTileType().getIntermediateColorFilePath(""));
+
+		String resultColorsResourcePath = resultColorsResource.exists() ? resultColorsResource.getFile().getAbsolutePath() : "";
+		String intermediateColorsResourcePath = intermediateColorsResource.exists() ? intermediateColorsResource.getFile().getAbsolutePath() : "";
+
 		BufferedImage img = osmAndMapsService.getGeotiffTile(
-				geotiffTiles, resultColorsFilename, intermediateColorsFilename,
-				tile.getTileType().getResType(), 256, tile.z, tile.x, tile.y);
+				geotiffTiles,
+				resultColorsResourcePath,
+				intermediateColorsResourcePath,
+				tile.getTileType().getResType(),
+				256, tile.z, tile.x, tile.y
+		);
 		File cacheFile = tile.getCacheFile(".png");
 		tile.runtimeImage = img;
 		//tile.saveImageToCache(tile, cacheFile);
