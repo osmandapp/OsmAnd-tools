@@ -18,6 +18,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -529,7 +530,7 @@ public class WikiService {
 		
 		return found.get();
 	}
-	
+
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
 		String title = wiki;
 		String lang = "";
@@ -543,12 +544,18 @@ public class WikiService {
 			title = s[1];
 			lang = s[0];
 		}
-		
+
 		String id;
-		if (lang.isEmpty()) {
-			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ?", String.class, title);
-		} else {
-			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?", String.class, lang, title);
+		try {
+			if (lang.isEmpty()) {
+				id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ? LIMIT 1",
+						String.class, title);
+			} else {
+				id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ? LIMIT 1",
+						String.class, lang, title);
+			}
+		} catch (EmptyResultDataAccessException e) {
+			return null;
 		}
 		return id;
 	}
