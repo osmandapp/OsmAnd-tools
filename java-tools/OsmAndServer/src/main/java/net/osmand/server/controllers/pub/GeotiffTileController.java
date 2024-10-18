@@ -1,13 +1,13 @@
 package net.osmand.server.controllers.pub;
 
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Path;
 import java.util.Objects;
 
 import javax.imageio.ImageIO;
 
+import net.osmand.server.Application;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.GeotiffTile;
@@ -81,11 +81,16 @@ public class GeotiffTileController {
 	}
 
 	private synchronized BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
-		Resource resultColorsResource = resourceLoader.getResource("classpath:colorPalette/" + tile.getTileType().getResultColorFilePath(""));
-		Resource intermediateColorsResource = resourceLoader.getResource("classpath:colorPalette/" + tile.getTileType().getIntermediateColorFilePath(""));
+		Path tempDirectory = Application.getColorPaletteDirectory();
+		if (tempDirectory == null) {
+			throw new IOException("Temporary directory with color palettes is not initialized");
+		}
 
-		String resultColorsResourcePath = resultColorsResource.exists() ? resultColorsResource.getFile().getAbsolutePath() : "";
-		String intermediateColorsResourcePath = intermediateColorsResource.exists() ? intermediateColorsResource.getFile().getAbsolutePath() : "";
+		File resultColorsFile = new File(tempDirectory.toFile(), tile.getTileType().getResultColorFilePath(""));
+		File intermediateColorsFile = new File(tempDirectory.toFile(), tile.getTileType().getIntermediateColorFilePath(""));
+
+		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
+		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 
 		BufferedImage img = osmAndMapsService.getGeotiffTile(
 				geotiffTiles,

@@ -1,5 +1,10 @@
 package net.osmand.server;
 
+import java.io.*;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
 import java.util.ServiceLoader;
 
 import javax.imageio.spi.IIORegistry;
@@ -26,6 +31,8 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.monitor.OsmAndGithubProjectMonitorTasks;
 import net.osmand.util.Algorithms;
 
+import static org.apache.commons.io.FileUtils.copyDirectory;
+
 @SpringBootApplication
 @EnableScheduling
 @EnableJpaAuditing
@@ -40,6 +47,8 @@ public class Application  {
 	
 	@Autowired
 	OsmAndGithubProjectMonitorTasks githubProject;
+
+	private static Path colorPalettePath;
 	
 	public static void main(String[] args) {
 		System.out.println("Test parsing with kotlin: " + Json.Default.parseToJsonElement("{}"));
@@ -62,6 +71,7 @@ public class Application  {
 			}
 			System.out.println("Application has started");
 			configureImageIO();
+			createColorPaletteDirectory("/colorPalette/");
 			
 //			githubProject.syncGithubProject(); // to test
 		};
@@ -95,5 +105,19 @@ public class Application  {
 		} catch (ClassNotFoundException e) {
 			System.err.println("One of the service provider classes was not found: " + e.getMessage());
 		}
+	}
+
+	public static void createColorPaletteDirectory(String resourceFolderPath) throws IOException, URISyntaxException {
+		Path tempDirectory = Files.createTempDirectory("colorPalette");
+		File tempDir = tempDirectory.toFile();
+		tempDir.deleteOnExit(); // remove the directory when the JVM exits
+
+		File resourceFolder = new File(Objects.requireNonNull(Application.class.getResource(resourceFolderPath)).toURI());
+		copyDirectory(resourceFolder, tempDir);
+		colorPalettePath = tempDirectory;
+	}
+
+	public static Path getColorPaletteDirectory() {
+		return colorPalettePath;
 	}
 }
