@@ -529,7 +529,7 @@ public class WikiService {
 		
 		return found.get();
 	}
-	
+
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
 		String title = wiki;
 		String lang = "";
@@ -543,14 +543,16 @@ public class WikiService {
 			title = s[1];
 			lang = s[0];
 		}
-		
-		String id;
+
+		List<String> ids;
 		if (lang.isEmpty()) {
-			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE title = ?", String.class, title);
+			ids = jdbcTemplate.query("SELECT id FROM wiki.wiki_mapping WHERE title = ?",
+					(rs, rowNum) -> rs.getString("id"), title);
 		} else {
-			id = jdbcTemplate.queryForObject("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?", String.class, lang, title);
+			ids = jdbcTemplate.query("SELECT id FROM wiki.wiki_mapping WHERE lang = ? AND title = ?",
+					(rs, rowNum) -> rs.getString("id"), lang, title);
 		}
-		return id;
+		return ids.isEmpty() ? null : ids.get(0);
 	}
 	
 	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
