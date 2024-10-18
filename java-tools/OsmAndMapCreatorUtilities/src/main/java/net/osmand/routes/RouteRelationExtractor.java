@@ -138,7 +138,7 @@ public class RouteRelationExtractor {
 		final String RELATIONS_OSM_EXT = ".relations.osm";
 		String resultFilePath = args.length > 1 ? args[1]
 				: sourceFilePath.replace(".osm", RELATIONS_OSM_EXT).replace(".pbf", "");
-		if (!resultFilePath.endsWith(RELATIONS_OSM_EXT)) {
+		if (!resultFilePath.contains(RELATIONS_OSM_EXT)) {
 			resultFilePath += RELATIONS_OSM_EXT;
 		}
 
@@ -146,7 +146,7 @@ public class RouteRelationExtractor {
 		String obfFilePath = args.length > 2 ? args[2]
 				: sourceFilePath.replace(".osm", TRAVEL_OBF_EXT)
 				.replace(".pbf", "").replace(".gz", "").replace(".bz2", "");
-		if (!obfFilePath.endsWith(TRAVEL_OBF_EXT)) {
+		if (!obfFilePath.contains(TRAVEL_OBF_EXT)) {
 			obfFilePath += TRAVEL_OBF_EXT;
 		}
 
