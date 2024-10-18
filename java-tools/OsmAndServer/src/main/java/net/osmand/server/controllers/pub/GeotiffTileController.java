@@ -77,7 +77,7 @@ public class GeotiffTileController {
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
 	}
 
-	private BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
+	private synchronized BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
 		String resultColorsFilename = tile.getTileType().getResultColorFilePath(colorPalette);
 		String intermediateColorsFilename = tile.getTileType().getIntermediateColorFilePath(colorPalette);
 		BufferedImage img = osmAndMapsService.getGeotiffTile(
