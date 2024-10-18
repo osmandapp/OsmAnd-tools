@@ -56,8 +56,10 @@ public class BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					System.getProperty("maps.dir") + "Ukraine_europe_2.owiki.obf",
-					System.getProperty("maps.dir") + "Ukraine_europe_2.wiki.obf"
+					"/Users/macmini/OsmAnd/maps/Merged.obf",
+					"/Users/macmini/OsmAnd/maps/Ukraine_khmelnytskyy_europe_2.obf",
+					"/Users/macmini/OsmAnd/maps/Ukraine_vinnytsya_europe_2.obf",
+					"/Users/macmini/OsmAnd/maps/Ukraine_zhytomyr_europe_2.obf"
 			});
 		} else {
 			in.merger(args);
