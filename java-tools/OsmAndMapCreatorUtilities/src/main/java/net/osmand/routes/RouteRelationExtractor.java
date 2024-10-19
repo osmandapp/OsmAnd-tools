@@ -1,6 +1,7 @@
 package net.osmand.routes;
 
 import net.osmand.IProgress;
+import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -364,13 +365,7 @@ public class RouteRelationExtractor {
 			}
 		}
 
-		GPXUtilities.TrkSegment[] currentSegment = {null};
-		double[] lastLatLon = {Double.NaN, Double.NaN};
-		for (int i = 0; i < waysToJoin.size(); i++) {
-			addAndJoinWay(track, currentSegment, lastLatLon, waysToJoin.get(i),
-					i > 0 ? waysToJoin.get(i - 1) : null,
-					i < waysToJoin.size() - 1 ? waysToJoin.get(i + 1) : null);
-		}
+		joinWaysIntoTrackSegments(track, waysToJoin);
 
 		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
@@ -387,60 +382,80 @@ public class RouteRelationExtractor {
 		}
 	}
 
-	// TODO need another approach for join in case of A D C B E -> A B C D E
-	private boolean shouldReversePoints(Way current, Way prev, Way next) {
-		if (prev != null && !prev.getNodes().isEmpty()) {
-			Node currentLast = current.getLastNode();
-			if (eqNodes(currentLast, prev.getFirstNode()) || eqNodes(currentLast, prev.getLastNode())) {
-				return true;
+	private void joinWaysIntoTrackSegments(GPXUtilities.Track track, List<Way> ways) {
+		boolean[] done = new boolean[ways.size()];
+		while (true) {
+			long osmId = 0;
+			List<GPXUtilities.WptPt> wpts = new ArrayList<>();
+			for (int i = 0; i < ways.size(); i++) {
+				if (!done[i]) {
+					done[i] = true;
+					osmId = ways.get(i).getId(); // osm_id tag (optional)
+					addWayToPoints(wpts, false, ways.get(i), false); // "head" way
+					while (true) {
+						boolean stop = true;
+						for (int j = 0; j < ways.size(); j++) {
+							if (!done[j] && considerCandidateToJoin(wpts, ways.get(j))) {
+								done[j] = true;
+								stop = false;
+							}
+						}
+						if (stop) {
+							break; // nothing joined
+						}
+					}
+					break; // segment is done
+				}
 			}
-		}
-		if (next != null && !next.getNodes().isEmpty()) {
-			Node currentFirst = current.getFirstNode();
-			if (eqNodes(currentFirst, next.getFirstNode()) || eqNodes(currentFirst, next.getLastNode())) {
-				return true;
+			if (wpts.isEmpty()) {
+				break; // all done
 			}
+			GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
+			segment.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(osmId));
+			// segment.getExtensionsToWrite().put("relation_track", "yes");
+			segment.points.addAll(wpts);
+			track.segments.add(segment);
 		}
-		return false;
 	}
 
-	private boolean eqNodes(Node n1, Node n2) {
-		return MapUtils.areLatLonEqual(n1.getLatLon(), n2.getLatLon(), precisionLatLonEquals);
-	}
-
-	private void addAndJoinWay(GPXUtilities.Track track, GPXUtilities.TrkSegment[] currentSegment, double[] lastLatLon,
-	                              Way current, Way prev, Way next) {
-		if (current.getNodes().isEmpty()) {
-			log.info("==== Empty Nodes in the Way " + current.getId());
-			return;
+	private boolean considerCandidateToJoin(List<GPXUtilities.WptPt> wpts, Way candidate) {
+		if (wpts.isEmpty() || candidate.getNodes().isEmpty()) {
+			return true;
 		}
 
-		boolean reverse = shouldReversePoints(current, prev, next);
+		GPXUtilities.WptPt firstWpt = wpts.get(0);
+		GPXUtilities.WptPt lastWpt = wpts.get(wpts.size() - 1);
+		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
+		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
 
+		if (eqWptToLatLon(lastWpt, firstCandidateLL)) {
+			addWayToPoints(wpts, false, candidate, false); // wpts + Candidate
+		} else if (eqWptToLatLon(lastWpt, lastCandidateLL)) {
+			addWayToPoints(wpts, false, candidate, true); // wpts + etadidnaC
+		} else if (eqWptToLatLon(firstWpt, firstCandidateLL)) {
+			addWayToPoints(wpts, true, candidate, true); // etadidnaC + wpts
+		} else if (eqWptToLatLon(firstWpt, lastCandidateLL)) {
+			addWayToPoints(wpts, true, candidate, false); // Candidate + wpts
+		} else {
+			return false;
+		}
+
+		return true;
+	}
+
+	private void addWayToPoints(List<GPXUtilities.WptPt> wpts, boolean insert, Way way, boolean reverse) {
 		List<GPXUtilities.WptPt> points = new ArrayList<>();
-
-		for (Node n : current.getNodes()) {
+		for (Node n : way.getNodes()) {
 			points.add(new GPXUtilities.WptPt(n.getLatitude(), n.getLongitude()));
 		}
-
 		if (reverse) {
 			Collections.reverse(points);
 		}
+		wpts.addAll(insert ? 0 : wpts.size(), points);
+	}
 
-		if (!MapUtils.areLatLonEqual(lastLatLon[0], lastLatLon[1],
-				points.get(0).getLatitude(), points.get(0).getLongitude(), precisionLatLonEquals)) {
-			GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
-//			trkSegment.getExtensionsToWrite().put("relation_track", "yes");
-			trkSegment.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(current.getId()));
-			track.segments.add(trkSegment);
-			currentSegment[0] = trkSegment;
-		}
-
-		lastLatLon[0] = points.get(points.size() - 1).getLatitude();
-		lastLatLon[1] = points.get(points.size() - 1).getLongitude();
-
-		currentSegment[0].points.addAll(points);
-		countWays++;
+	private boolean eqWptToLatLon(GPXUtilities.WptPt wpt, LatLon ll) {
+		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
 	}
 
 	private void addNode(GPXFile gpxFile, Node node) {
