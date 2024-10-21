@@ -434,13 +434,16 @@ public class IndexHeightData {
 
 	public static boolean isHeightDataNeeded(Way e) {
 		if (e.getTag("highway") == null && e.getTag("cycleway") == null && e.getTag("footway") == null
-				&& e.getTag("waterway") == null && e.getTag("piste:type") == null) {
+				&& e.getTag("waterway") == null && e.getTag("piste:type") == null && e.getTag("route") == null) {
 			return false;
 		}
 		if (e.getTag("osmand_change") != null) {
 			return false;
 		}
 		if (e.getTag("tunnel") != null || e.getTag("bridge") != null) {
+			return false;
+		}
+		if (e.getTag("route") != null && !e.getTag("route").equals("segment")) {
 			return false;
 		}
 		return true;
