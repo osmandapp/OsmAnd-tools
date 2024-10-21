@@ -82,7 +82,7 @@ public class GeotiffTileController {
 	}
 
 	@Scheduled(fixedRate = CLEANUP_INTERVAL_MILLIS)
-	public void cleanUpCache() {
+	public synchronized void cleanUpCache() {
 		File cacheDir = new File(config.heightmapLocation);
 		if (!cacheDir.exists() || !cacheDir.isDirectory()) {
 			return; // Nothing to clean up
@@ -122,7 +122,7 @@ public class GeotiffTileController {
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 
-		BufferedImage img = osmAndMapsService.getGeotiffTile(
+		BufferedImage img = osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
 				resultColorsResourcePath,
 				intermediateColorsResourcePath,

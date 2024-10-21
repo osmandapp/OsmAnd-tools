@@ -547,6 +547,15 @@ public class OsmAndMapsService {
 		return tile.renderMetaTile(nativelib, tileMemoryCache);
 	}
 
+	public BufferedImage renderGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
+	                                       int type, int size, int zoom, int x, int y) throws IOException {
+		BufferedImage image = null;
+		if (nativelib != null) {
+			image = nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+		}
+		return image;
+	}
+
 	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
 		List<GeocodingResult> complete;
@@ -1382,14 +1391,5 @@ public class OsmAndMapsService {
 			return style;
 		}
 		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
-	}
-
-	public synchronized BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
-		int type, int size, int zoom, int x, int y) throws IOException {
-		BufferedImage image = null;
-		if (nativelib != null) {
-			image = nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
-		}
-		return image;
 	}
 }

@@ -85,8 +85,8 @@ public class VectorTileController {
 
 		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		// for local debug :
-		BufferedImage img = null;
-		//BufferedImage img = tile.getCacheRuntimeImage();
+		//BufferedImage img = null;
+		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
 		if (img == null) {
 			ResponseEntity<String> err = osmAndMapsService.renderMetaTile(tile, tileMemoryCache);
