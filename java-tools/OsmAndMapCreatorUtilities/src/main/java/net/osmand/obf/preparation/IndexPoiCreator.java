@@ -63,14 +63,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
 	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
-	private PropagateToNodes propagateToNodes;
-	private HashMap<String, PoiType> propagatedPoiTypeCache = new HashMap<>();
 
-	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes, PropagateToNodes propagateToNodes) {
+	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
-		this.propagateToNodes = propagateToNodes;
 	}
 
 	public void storeCities(CityDataStorage cityDataStorage) {
@@ -595,10 +592,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
 					if (poi.id > PROPAGATED_NODE_BIT) {
-						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
-						if (propagateToNodes != null && propagateToNodes.ignoreBorderPoint(poi.id, propagatedPoiType)) {
-							continue;
-						}
+						continue;
 					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
 							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
@@ -625,10 +619,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						tagGroupIds = parseTaggroups(rset.getString(6));
 					}
 					if (id > PROPAGATED_NODE_BIT) {
-						PoiType propagatedPoiType = getPropagatedPoiType(subtype);
-						if (propagateToNodes.ignoreBorderPoint(id, propagatedPoiType)) {
-							continue;
-						}
+						continue;
 					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
@@ -1065,16 +1056,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return sql;
 		}
 		return "";
-	}
-
-	private PoiType getPropagatedPoiType(String subtype) {
-		PoiType poiType = null;
-		if (propagatedPoiTypeCache.containsKey(subtype)) {
-			return propagatedPoiTypeCache.get(subtype);
-		}
-		poiType = poiTypes.getPoiTypeByKey(subtype);
-		propagatedPoiTypeCache.put(subtype, poiType);
-		return poiType;
 	}
 
 	private String insertMergedTaggroups(Amenity amenity) throws SQLException {
