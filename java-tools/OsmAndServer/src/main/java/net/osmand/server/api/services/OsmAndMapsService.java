@@ -116,8 +116,6 @@ public class OsmAndMapsService {
 
 	File tempDir;
 
-	Integer geotiffTileLock = 0;
-
 	@Autowired
 	TileServerConfig tileConfig;
 
@@ -1387,13 +1385,11 @@ public class OsmAndMapsService {
 		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
 	}
 
-	public BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
+	public synchronized BufferedImage getGeotiffTile(String tilePath, String outColorFilename, String midColorFilename,
 		int type, int size, int zoom, int x, int y) throws IOException {
 		BufferedImage image = null;
-		synchronized (geotiffTileLock) {
-			if (nativelib != null) {
-				image = nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
-			}
+		if (nativelib != null) {
+			image = nativelib.getGeotiffImage(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
 		}
 		return image;
 	}

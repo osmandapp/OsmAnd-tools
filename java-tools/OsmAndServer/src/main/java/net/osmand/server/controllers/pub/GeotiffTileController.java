@@ -80,7 +80,7 @@ public class GeotiffTileController {
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
 	}
 
-	private synchronized BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
+	private BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
 		Path tempDirectory = Application.getColorPaletteDirectory();
 		if (tempDirectory == null) {
 			throw new IOException("Temporary directory with color palettes is not initialized");
