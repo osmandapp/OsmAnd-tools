@@ -182,7 +182,7 @@ public class ObfFileInMemory {
 			MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexPOI = true;
-			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, null);
+			final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 			File poiFile = new File(targetFile.getParentFile(), IndexCreator.getPoiFileName(name));
 			indexPoiCreator.createDatabaseStructure(poiFile);
 			for (Map<String, Amenity> mp : poiObjects.valueCollection()) {
