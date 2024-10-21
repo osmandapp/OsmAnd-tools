@@ -2,8 +2,9 @@ package net.osmand.server.controllers.pub;
 
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
@@ -16,9 +17,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,14 +35,14 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
+	private static final long SEVEN_DAYS_IN_MILLIS = TimeUnit.SECONDS.toMillis(7);
+	private static final long CLEANUP_INTERVAL_MILLIS = 12 * 60 * 60 * 1000L; // 12 hours
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
 	@Autowired
 	TileServerConfig config;
-
-	@Autowired
-	private ResourceLoader resourceLoader;
 
 	@Value("${osmand.heightmap.location}")
 	String geotiffTiles;
@@ -66,8 +66,9 @@ public class GeotiffTileController {
 
 		TileType tileType = TileType.from(type);
 		String tileId = config.createTileId(tileType.getType(), x, y, z, -1, -1);
-		//GeotiffTile tile = tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
-		GeotiffTile tile = new GeotiffTile(config, tileType, x, y, z);
+		GeotiffTile tile = tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
+		// for testing
+		// GeotiffTile tile = new GeotiffTile(config, tileType, x, y, z);
 		tileMemoryCache.cleanupCache();
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
@@ -78,6 +79,35 @@ public class GeotiffTileController {
 		ImageIO.write(img, "png", baos);
 
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
+	}
+
+	@Scheduled(fixedRate = CLEANUP_INTERVAL_MILLIS)
+	public void cleanUpCache() {
+		File cacheDir = new File(config.heightmapLocation);
+		if (!cacheDir.exists() || !cacheDir.isDirectory()) {
+			return; // Nothing to clean up
+		}
+		cleanUpDirectory(cacheDir);
+	}
+
+	private void cleanUpDirectory(File dir) {
+		long now = System.currentTimeMillis();
+		File[] files = dir.listFiles();
+
+		if (files != null) {
+			for (File file : files) {
+				if (file.isDirectory()) {
+					cleanUpDirectory(file);
+				} else if (file.isFile() && now - file.lastModified() >= SEVEN_DAYS_IN_MILLIS) {
+					try {
+						Path filePath = file.toPath();
+						Files.delete(filePath);
+					} catch (IOException e) {
+						LOGGER.warn("Failed to delete file: " + file.getAbsolutePath(), e);
+					}
+				}
+			}
+		}
 	}
 
 	private BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
@@ -100,8 +130,8 @@ public class GeotiffTileController {
 				256, tile.z, tile.x, tile.y
 		);
 		File cacheFile = tile.getCacheFile(".png");
-		tile.runtimeImage = img;
-		//tile.saveImageToCache(tile, cacheFile);
+		tile.setRuntimeImage(img);
+		tile.saveImageToCache(tile, cacheFile);
 
 		return img;
 	}

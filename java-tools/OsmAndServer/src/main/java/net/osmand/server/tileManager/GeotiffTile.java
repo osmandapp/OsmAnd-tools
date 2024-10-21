@@ -1,21 +1,23 @@
 package net.osmand.server.tileManager;
 
 import net.osmand.server.controllers.pub.GeotiffTileController;
+import org.jetbrains.annotations.NotNull;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
-public class GeotiffTile implements TileCacheProvider {
-	public BufferedImage runtimeImage;
-	public long lastAccess;
+public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
+	private BufferedImage runtimeImage;
+	private long lastAccess;
 	private String tileId;
 	private final TileServerConfig cfg;
 	private final GeotiffTileController.TileType tileType;
 	public final int x;
 	public final int y;
 	public final int z;
+	private static final long THREE_HOURS_IN_MILLIS = 3 * 60 * 60 * 1000L;
 
 	public GeotiffTile(TileServerConfig cfg, GeotiffTileController.TileType tileType, int x, int y, int z) {
 		this.cfg = cfg;
@@ -27,8 +29,22 @@ public class GeotiffTile implements TileCacheProvider {
 		touch();
 	}
 
+	public void setRuntimeImage(BufferedImage runtimeImage) {
+		this.runtimeImage = runtimeImage;
+	}
+
 	public void touch() {
 		lastAccess = System.currentTimeMillis();
+		File cacheFile = getCacheFile(".png");
+		if (cacheFile != null && cacheFile.exists()) {
+			long lastModifiedTime = cacheFile.lastModified();
+			if (lastAccess > lastModifiedTime + THREE_HOURS_IN_MILLIS) {
+				boolean success = cacheFile.setLastModified(lastAccess);
+				if (!success) {
+					lastAccess = lastModifiedTime;
+				}
+			}
+		}
 	}
 
 	public GeotiffTileController.TileType getTileType() {
@@ -85,5 +101,10 @@ public class GeotiffTile implements TileCacheProvider {
 	@Override
 	public void setImg(BufferedImage img) {
 		runtimeImage = img;
+	}
+
+	@Override
+	public int compareTo(@NotNull GeotiffTile o) {
+		return Long.compare(lastAccess, o.lastAccess);
 	}
 }
