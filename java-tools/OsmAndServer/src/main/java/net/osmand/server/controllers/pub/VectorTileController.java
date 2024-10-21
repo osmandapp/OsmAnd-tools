@@ -7,6 +7,9 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import com.google.gson.JsonObject;
+import net.osmand.server.tileManager.TileMemoryCache;
+import net.osmand.server.tileManager.TileServerConfig;
+import net.osmand.server.tileManager.VectorMetatile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,29 +26,32 @@ import com.google.gson.Gson;
 
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.OsmAndMapsService.VectorMetatile;
-import net.osmand.server.api.services.OsmAndMapsService.VectorStyle;
-import net.osmand.server.api.services.OsmAndMapsService.VectorTileServerConfig;
+import net.osmand.server.tileManager.TileServerConfig.VectorStyle;
 import net.osmand.util.Algorithms;
 
 @Controller
 @RequestMapping("/tile")
 public class VectorTileController {
-	
-    protected static final Log LOGGER = LogFactory.getLog(VectorTileController.class);
+
+	protected static final Log LOGGER = LogFactory.getLog(VectorTileController.class);
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
-	
+
+	@Autowired
+	TileServerConfig config;
+
+	private final TileMemoryCache<VectorMetatile> tileMemoryCache = new TileMemoryCache<>();
+
 	Gson gson = new Gson();
 
 	private ResponseEntity<?> errorConfig(String msg) {
 		return ResponseEntity.badRequest()
 				.body(msg);
 	}
+
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
-		VectorTileServerConfig config = osmAndMapsService.getConfig();
 		for (VectorStyle vectorStyle : config.style.values()) {
 			vectorStyle.properties.clear();
 			for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
@@ -58,33 +64,32 @@ public class VectorTileController {
 		}
 		return ResponseEntity.ok(gson.toJson(config.style));
 	}
-	
+
 	@RequestMapping(path = "/{style}/{z}/{x}/{y}.png", produces = MediaType.IMAGE_PNG_VALUE)
 	public ResponseEntity<?> getTile(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y)
 			throws IOException, XmlPullParserException, SAXException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			VectorTileServerConfig config = osmAndMapsService.getConfig();
 			return errorConfig("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
 		}
 		if (osmAndMapsService.validateNativeLib() != null) {
 			return errorConfig("Tile service is not initialized: " + osmAndMapsService.validateNativeLib());
 		}
-		
+
 		String interactiveKey = osmAndMapsService.getInteractiveKeyMap(style);
 		String currentStyle = osmAndMapsService.getMapStyle(style, interactiveKey);
-		VectorStyle vectorStyle = osmAndMapsService.getStyle(currentStyle);
-		
+		VectorStyle vectorStyle = config.getStyle(currentStyle);
+
 		if (vectorStyle == null) {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
-		
-		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y, interactiveKey);
+
+		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		// for local debug :
-		// BufferedImage img = null;
+		//BufferedImage img = null;
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
 		if (img == null) {
-			ResponseEntity<String> err = osmAndMapsService.renderMetaTile(tile);
+			ResponseEntity<String> err = osmAndMapsService.renderMetaTile(tile, tileMemoryCache);
 			img = tile.runtimeImage;
 			if (err != null) {
 				return err;
@@ -92,31 +97,43 @@ public class VectorTileController {
 				return ResponseEntity.badRequest().body("Unexpected error during rendering");
 			}
 		}
-		osmAndMapsService.cleanupCache();
+		tileMemoryCache.cleanupCache();
 		BufferedImage subimage = tile.readSubImage(img, x, y);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
 	}
-	
+
 	@GetMapping(path = "/info/{style}/{z}/{x}/{y}.json", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> getTileInfo(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y) throws IOException {
-		
+
 		String interactiveKey = osmAndMapsService.getInteractiveKeyMap(style);
 		String currentStyle = osmAndMapsService.getMapStyle(style, interactiveKey);
-		VectorStyle vectorStyle = osmAndMapsService.getStyle(currentStyle);
-		
+		VectorStyle vectorStyle = config.getStyle(currentStyle);
+
 		if (vectorStyle == null) {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
-		VectorMetatile tile = osmAndMapsService.getMetaTile(vectorStyle, z, x, y, interactiveKey);
+		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		JsonObject tileInfo = osmAndMapsService.getTileInfo(tile.getCacheRuntimeInfo(), x, y, z);
 		tile.touch();
 		if (tileInfo == null) {
 			return ResponseEntity.badRequest().body("Unexpected error during rendering");
 		}
-		osmAndMapsService.cleanupCache();
-		
+		tileMemoryCache.cleanupCache();
+
 		return ResponseEntity.ok(String.valueOf(tileInfo));
+	}
+
+	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
+		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
+		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
+		String tileId = config.createTileId(key, x, y, z, metaSizeLog, vectorStyle.tileSizeLog);
+		VectorMetatile tile = tileMemoryCache.get(tileId);
+		if (tile == null) {
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, x, y, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
+			tileMemoryCache.put(tile.key, tile);
+		}
+		return tile;
 	}
 }

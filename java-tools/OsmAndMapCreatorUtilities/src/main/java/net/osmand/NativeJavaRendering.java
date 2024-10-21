@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -54,6 +55,8 @@ import resources._R;
 public class NativeJavaRendering extends NativeLibrary {
 
 	private static final String INDEXES_CACHE = "indexes.cache";
+
+	private final Map<String, Object> tilePathLocks = new ConcurrentHashMap<>();
 	
 	public static Boolean loaded = null;
 	
@@ -577,29 +580,44 @@ public class NativeJavaRendering extends NativeLibrary {
 	}
 
 	public BufferedImage getGeotiffImage(String tilePath, String outColorFilename, String midColorFilename,
-		int type, int size, int zoom, int x, int y) throws IOException {
-		ByteBuffer geotiffBuffer =
-			NativeLibrary.getGeotiffTile(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
-		InputStream inputStream = new InputStream() {
-			int nextInd = 0;
-			@Override
-			public int read() {
-				if(nextInd >= geotiffBuffer.capacity()) {
-					return -1;
-				}
-				byte b = geotiffBuffer.get(nextInd++) ;
-				if(b < 0) {
-					return b + 256;
-				} else {
-					return b;
-				}
+	                                     int type, int size, int zoom, int x, int y) throws IOException {
+		Object lock = tilePathLocks.computeIfAbsent(tilePath, k -> new Object());
+		try {
+			ByteBuffer geotiffBuffer;
+			synchronized (lock) {
+				geotiffBuffer = NativeLibrary.getGeotiffTile(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
 			}
-		};
-		Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("png");
-		ImageReader reader = readers.next();
-		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
-		BufferedImage img = reader.read(0);
-		AllocationUtil.freeDirectBuffer(geotiffBuffer);
-		return img;
+			try (InputStream inputStream = new InputStream() {
+				int nextInd = 0;
+
+				@Override
+				public int read() {
+					if (nextInd >= geotiffBuffer.capacity()) {
+						return -1;
+					}
+					byte b = geotiffBuffer.get(nextInd++);
+					return b & 0xFF;
+				}
+			};
+			     MemoryCacheImageInputStream memoryCacheStream = new MemoryCacheImageInputStream(inputStream)) {
+
+				Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("png");
+				if (!readers.hasNext()) {
+					throw new IOException("No PNG ImageReader found");
+				}
+				ImageReader reader = readers.next();
+				reader.setInput(memoryCacheStream, true);
+
+				BufferedImage img = reader.read(0);
+
+				synchronized (lock) {
+					AllocationUtil.freeDirectBuffer(geotiffBuffer);
+				}
+
+				return img;
+			}
+		} finally {
+			tilePathLocks.remove(tilePath);
+		}
 	}
 }
