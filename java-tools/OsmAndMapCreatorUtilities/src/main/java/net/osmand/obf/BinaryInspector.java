@@ -62,7 +62,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Map.obf"
+					"/Users/macmini/OsmAnd/maps/Pforzheim.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1099,6 +1099,11 @@ public class BinaryInspector {
 
 		b.append(" id ").append(obj.getId());
 		b.append(" osmid ").append((obj.getId() >> (SHIFT_ID + 1)));
+		if (obj.getId() > ObfConstants.PROPAGATE_NODE_BIT) {
+			long wayId = (obj.getId() & ((1L << ObfConstants.SHIFT_PROPAGATED_NODE_IDS) - 1)) >> ObfConstants.SHIFT_PROPAGATED_NODES_BITS;
+			wayId = wayId >> 1;
+			b.append(" (propagate from way: " + wayId + ") ");
+		}
 		if (vmapCoordinates) {
 			b.append(" lat/lon : ");
 			for (int i = 0; i < obj.getPointsLength(); i++) {
