@@ -1103,7 +1103,7 @@ public class OsmAndMapsService {
 		router.setUseNativeApproximation(rp.useNativeApproximation);
 		router.setUseGeometryBasedApproximation(rp.useGeometryBasedApproximation);
 
-		router.CALCULATE_MISSING_MAPS = false;
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
 		if (rp.disableHHRouting) {
 			router.disableHHRoutingConfig();
 		} else {
@@ -1121,7 +1121,7 @@ public class OsmAndMapsService {
 			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
 		}
 
-		config.routeCalculationTime = System.currentTimeMillis();
+//		config.routeCalculationTime = System.currentTimeMillis(); // parameter needed
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
 		ctx.leftSideNavigation = false;
