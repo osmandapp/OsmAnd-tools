@@ -314,7 +314,6 @@ public class OsmAndMapsService {
 				incompleteFlag[0] = true;
 			}
 		}
-		;
 		return res;
 	}
 
