@@ -81,24 +81,25 @@ public class TileServerConfig {
 	public String createTileId(String style, int x, int y, int z, int metaSizeLog, int tileSizeLog) {
 		int left;
 		int top;
+		final int shiftZoom = 31 - z;
 		if (metaSizeLog != -1) {
-			left = ((x >> metaSizeLog) << metaSizeLog) << (31 - z);
+			left = ((x >> metaSizeLog) << metaSizeLog) << shiftZoom;
 			if (left < 0) {
 				left = 0;
 			}
-			top = ((y >> metaSizeLog) << metaSizeLog) << (31 - z);
+			top = ((y >> metaSizeLog) << metaSizeLog) << shiftZoom;
 			if (top < 0) {
 				top = 0;
 			}
 		} else {
-			left = x << (31 - z);
-			top = y << (31 - z);
+			left = x << shiftZoom;
+			top = y << shiftZoom;
 		}
 
 		if (tileSizeLog != -1 && metaSizeLog != -1) {
-			return style + '-' + metaSizeLog + '-' + tileSizeLog + '/' + z + '/' + (left >> (31 - z)) + '/' + (top >> (31 - z));
+			return style + '-' + metaSizeLog + '-' + tileSizeLog + '/' + z + '/' + (left >> (31 - z)) + '/' + (top >> shiftZoom);
 		}
-		return style + '-' + z + '-' + (left >> (31 - z)) + '-' + (top >> (31 - z));
+		return style + '-' + z + '-' + (left >> shiftZoom) + '-' + (top >> shiftZoom);
 	}
 
 	public TileServerConfig getConfig() {
