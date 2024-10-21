@@ -1,30 +1,5 @@
 package net.osmand.obf.preparation;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-
-import org.apache.commons.logging.Log;
-
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.iterator.TIntObjectIterator;
@@ -37,6 +12,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
+import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb.IdTable;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.RestrictionData;
@@ -44,11 +20,7 @@ import net.osmand.binary.OsmandOdb.RestrictionData.Builder;
 import net.osmand.binary.OsmandOdb.RouteData;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.RouteDataObject.RestrictionInfo;
-import net.osmand.data.LatLon;
-import net.osmand.data.Multipolygon;
-import net.osmand.data.MultipolygonBuilder;
-import net.osmand.data.QuadRect;
-import net.osmand.data.QuadTree;
+import net.osmand.data.*;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -58,25 +30,25 @@ import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
-import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.OsmMapUtils;
-import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import rtree.Element;
-import rtree.IllegalValueException;
-import rtree.LeafElement;
-import rtree.RTree;
-import rtree.RTreeException;
-import rtree.RTreeInsertException;
-import rtree.Rect;
+import org.apache.commons.logging.Log;
+import rtree.*;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.sql.*;
+import java.util.*;
+import java.util.Map.Entry;
 
 public class IndexRouteCreator extends AbstractIndexPartCreator {
 
@@ -381,6 +353,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 			for (Node n : nodes) {
 				if (n != null) {
+					if (n.getId() > ObfConstants.PROPAGATE_NODE_BIT) {
+						continue;
+					}
 					// write id
 					Algorithms.writeLongInt(bpointIds, n.getId());
 					// write point type
