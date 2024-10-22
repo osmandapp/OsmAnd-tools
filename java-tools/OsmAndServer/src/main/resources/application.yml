@@ -66,7 +66,7 @@ tile-server:
     touring: style=Touring-view_(more-contrast-and-details),tilesize=256
   cache:
     location: ${TILE_SERVER_CACHE_LOCATION:tiles}
-    heightmap-location: ${TILE_SERVER_CACHE_LOCATION:heightmaps}
+    heightmap-location: ${TILE_SERVER_HEIGHTMAPS_CACHE_LOCATION:heightmaps}
     max-zoom: 16
 
 management:
