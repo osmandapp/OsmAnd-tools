@@ -179,7 +179,7 @@ class OsmAndHeightMapSlicer(object):
 
                 # Create target dataset
                 targetDataset = self.outDriver.Create(outputTileFile, dataSizeX, dataSizeY,
-                    1, gdalconst.GDT_Float32, options = self.options.driverOptions)
+                    1, self.inputBand.DataType, options = self.options.driverOptions)
                 targetDataset.SetGeoTransform( (tileLeft, self.inputGeoTransform[1], 0.0,
                     tileTop, 0.0, self.inputGeoTransform[5]) )
                 targetDataset.SetGCPs(self.gcps, self.wkt)
