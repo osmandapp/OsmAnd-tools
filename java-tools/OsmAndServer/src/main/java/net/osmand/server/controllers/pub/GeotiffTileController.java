@@ -156,7 +156,7 @@ public class GeotiffTileController {
 				resultColorsResourcePath,
 				intermediateColorsResourcePath,
 				tile.getTileType().getResType(),
-				512, tile.z, tile.x, tile.y
+				256, tile.z, tile.x, tile.y
 		);
 		File cacheFile = tile.getCacheFile(".png");
 		if (cacheFile == null) {
