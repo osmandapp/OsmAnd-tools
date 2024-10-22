@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -26,7 +27,6 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.util.MapsCollection;
 import org.apache.commons.logging.Log;
@@ -581,7 +581,8 @@ public class NativeJavaRendering extends NativeLibrary {
 
 	public BufferedImage getGeotiffImage(String tilePath, String outColorFilename, String midColorFilename,
 	                                     int type, int size, int zoom, int x, int y) throws IOException {
-		Object lock = tilePathLocks.computeIfAbsent(tilePath, k -> new Object());
+		String lockTilePath = String.format("%s/%s", tilePath, type);
+		Object lock = tilePathLocks.computeIfAbsent(lockTilePath, k -> new Object());
 		try {
 			ByteBuffer geotiffBuffer;
 			synchronized (lock) {
