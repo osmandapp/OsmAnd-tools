@@ -47,7 +47,7 @@ import static net.osmand.obf.OsmGpxWriteContext.OSM_TAG_PREFIX;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
-	private boolean DEBUG = false;
+//	private boolean DEBUG = false;
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
 	int countFiles;
 	int countWays;
@@ -122,11 +122,13 @@ public class RouteRelationExtractor {
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
+			s.add("slovakia-latest.osm.pbf");
+//			s.add("czech-republic-latest.osm.pbf");
+//			s.add("netherlands-latest.osm.pbf");
 //			s.add("germany-latest.osm.gz");
-//			s.add("slovakia-latest.osm.gz");
 //			s.add("malta-latest.osm.gz");
 //			s.add("andorra-latest.osm.gz");
-			s.add("italy_sicilia.osm.pbf");
+//			s.add("italy_sicilia.osm.pbf");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
 			// TODO specify source file, tmp folder, result file // finally clean up the folder
@@ -188,7 +190,6 @@ public class RouteRelationExtractor {
 			OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
 			File tmpFolder = new File(gpxDirectory, "tmp");
 			ctx.writeObf(null, kFiles, tmpFolder, osmFileName, obfFile);
-			// TODO remove osmFileName finally?
 		} else {
 			throw new RuntimeException("Wrong GPX directory: " + gpxDirectory.getAbsolutePath());
 		}
@@ -294,7 +295,7 @@ public class RouteRelationExtractor {
 	}
 
 	private void saveGpx(Entity relation, Map<EntityId, Entity> children, File resultFile) {
-//		DEBUG = relation.getId() == 13168625; // TODO remove debug
+//		DEBUG = relation.getId() == 13168625;
 
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
 

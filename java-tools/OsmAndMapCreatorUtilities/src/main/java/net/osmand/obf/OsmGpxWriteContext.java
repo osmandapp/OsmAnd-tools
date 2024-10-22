@@ -188,7 +188,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_type", "track"); // use route_type=track for ways
+					tagValue(serializer, "route_type", "track"); // TODO remove after click-on-shield
 
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					String routeRadius = MapUtils.convertDistToChar(radius,
