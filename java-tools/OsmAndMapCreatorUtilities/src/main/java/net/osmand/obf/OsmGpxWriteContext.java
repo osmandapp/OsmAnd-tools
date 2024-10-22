@@ -346,15 +346,15 @@ public class OsmGpxWriteContext {
 	}
 	
 
-	private void addGenericTags(Map<String, String> gpxTrackTags, Track p) throws IOException {
-		if (p != null) {
-			if (!Algorithms.isEmpty(p.getName())) {
-				gpxTrackTags.put("name", p.getName());
+	private void addGenericTags(Map<String, String> gpxTrackTags, Track t) throws IOException {
+		if (t != null) {
+			if (!Algorithms.isEmpty(t.getName())) {
+				gpxTrackTags.put("name", t.getName());
 			}
-			if (!Algorithms.isEmpty(p.getDesc())) {
-				gpxTrackTags.put("description", p.getDesc());
+			if (!Algorithms.isEmpty(t.getDesc())) {
+				gpxTrackTags.put("description", t.getDesc());
 			}
-			int color = p.getColor(0);
+			int color = t.getColor(0);
 			if (color != 0) {
 				gpxTrackTags.put("colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));

@@ -297,7 +297,26 @@ public class RouteRelationExtractor {
 //		DEBUG = relation.getId() == 13168625; // TODO remove debug
 
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
-		gpxFile.metadata.name = Objects.requireNonNullElse(relation.getTag("name"), String.valueOf(relation.getId()));
+
+		String id = String.valueOf(relation.getId());
+		String ref = relation.getTag("ref");
+		String mainName = relation.getTag("name");
+		String enName = relation.getTag("name:en");
+		String description = relation.getTag("description");
+		final int MAX_DESC_NAME_LENGTH = 80;
+
+		if (mainName != null) {
+			gpxFile.metadata.name = mainName;
+		} else if (enName != null) {
+			gpxFile.metadata.name = enName;
+		} else if (description != null && description.length() < MAX_DESC_NAME_LENGTH && !description.contains("\n")) {
+			gpxFile.metadata.name = description; // use short description when no name defined
+		} else if (ref != null) {
+			gpxFile.metadata.name = ref;
+		} else {
+			gpxFile.metadata.name = id;
+		}
+
 		gpxFile.metadata.desc = relation.getTag("description"); // nullable
 
 		Map <String, String> metadataExtensions = gpxFile.metadata.getExtensionsToWrite();
