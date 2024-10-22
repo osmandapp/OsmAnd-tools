@@ -35,7 +35,8 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
-	private static final long SEVEN_DAYS_IN_MILLIS = TimeUnit.SECONDS.toMillis(7);
+	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(7);
+	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(100);
 	private static final long CLEANUP_INTERVAL_MILLIS = 12 * 60 * 60 * 1000L; // 12 hours
 
 	@Autowired
@@ -75,9 +76,11 @@ public class GeotiffTileController {
 		if (img == null) {
 			img = getTileFromService(tile);
 		}
+		if (img == null) {
+			return ResponseEntity.badRequest().body("Failed to get tile");
+		}
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", baos);
-
 		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
 	}
 
@@ -98,16 +101,42 @@ public class GeotiffTileController {
 			for (File file : files) {
 				if (file.isDirectory()) {
 					cleanUpDirectory(file);
-				} else if (file.isFile() && now - file.lastModified() >= SEVEN_DAYS_IN_MILLIS) {
-					try {
-						Path filePath = file.toPath();
-						Files.delete(filePath);
-					} catch (IOException e) {
-						LOGGER.warn("Failed to delete file: " + file.getAbsolutePath(), e);
+				} else if (file.isFile() && isValidHeightmapFile(file)) {
+					int zoom = parseZoomFromFileName(file.getName());
+					if (zoom == -1) {
+						continue;
+					}
+					if ((zoom <= 7 && now - file.lastModified() >= CLEANUP_CACHE_BEFORE_ZOOM_7) ||
+							(zoom > 7 && now - file.lastModified() >= CLEANUP_CACHE_AFTER_ZOOM_7)) {
+						try {
+							Path filePath = file.toPath();
+							Files.delete(filePath);
+						} catch (IOException e) {
+							LOGGER.warn("Failed to delete file: " + file.getAbsolutePath(), e);
+						}
+
 					}
 				}
 			}
 		}
+	}
+
+	private int parseZoomFromFileName(String fileName) {
+		String[] parts = fileName.split(File.separator);
+		if (parts.length < 2) {
+			return -1;
+		}
+		for (int i = 0; i < parts.length; i++) {
+			if (parts[i].equals("heightmaps") && i + 2 < parts.length) {
+				return Integer.parseInt(parts[i + 2]);
+			}
+		}
+		return -1;
+	}
+
+	private boolean isValidHeightmapFile(File file) {
+		String name = file.getName();
+		return name.endsWith(".png") && name.contains("heightmaps");
 	}
 
 	private BufferedImage getTileFromService(GeotiffTile tile) throws IOException {
@@ -130,9 +159,11 @@ public class GeotiffTileController {
 				256, tile.z, tile.x, tile.y
 		);
 		File cacheFile = tile.getCacheFile(".png");
+		if (cacheFile == null) {
+			return null;
+		}
 		tile.setRuntimeImage(img);
 		tile.saveImageToCache(tile, cacheFile);
-
 		return img;
 	}
 
