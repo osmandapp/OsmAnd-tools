@@ -17,7 +17,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -57,6 +56,8 @@ public class NativeJavaRendering extends NativeLibrary {
 	private static final String INDEXES_CACHE = "indexes.cache";
 	
 	public static Boolean loaded = null;
+
+	private final Map<String, Object> tilePathLocks = new ConcurrentHashMap<>();
 	
 	private static NativeJavaRendering defaultLoadedLibrary;
 	
@@ -577,10 +578,13 @@ public class NativeJavaRendering extends NativeLibrary {
 		return defaultLoadedLibrary;
 	}
 
-	public synchronized BufferedImage getGeotiffImage(String tilePath, String outColorFilename, String midColorFilename,
+	public BufferedImage getGeotiffImage(String tilePath, String outColorFilename, String midColorFilename,
 	                                                  int type, int size, int zoom, int x, int y) throws IOException {
+		Object lock = tilePathLocks.computeIfAbsent(tilePath, k -> new Object());
 		ByteBuffer geotiffBuffer;
-		geotiffBuffer = NativeLibrary.getGeotiffTile(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+		synchronized (lock) {
+			geotiffBuffer = NativeLibrary.getGeotiffTile(tilePath, outColorFilename, midColorFilename, type, size, zoom, x, y);
+		}
 		try (InputStream inputStream = new InputStream() {
 			int nextInd = 0;
 
@@ -604,7 +608,9 @@ public class NativeJavaRendering extends NativeLibrary {
 
 			BufferedImage img = reader.read(0);
 
-			AllocationUtil.freeDirectBuffer(geotiffBuffer);
+			synchronized (lock) {
+				AllocationUtil.freeDirectBuffer(geotiffBuffer);
+			}
 
 			return img;
 		}
