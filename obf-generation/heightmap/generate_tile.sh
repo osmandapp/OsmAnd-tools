@@ -201,7 +201,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
       # Alternative Steps 4-5. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
       echo "Generating tile GeoTIFFs..."
       "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 --driver=GTiff \
-        --driver-options="COMPRESS=LZW;PREDICTOR=2;BIGTIFF=YES;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
+        --driver-options="COMPRESS=LZW;PREDICTOR=2;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
         --extension=tif $VERBOSE_PARAM \
         "$WORK_PATH/${TYPE}_ready.tif" "$OUTPUT_PATH"
     fi
