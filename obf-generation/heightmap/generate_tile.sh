@@ -178,12 +178,19 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
         -tr $PIXEL_SIZE $PIXEL_SIZE -tap \
         "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
     fi
+    if [ ! -f "$WORK_PATH/${TYPE}_ready.tif" ]; then
+      echo "Translating..."
+      gdal_translate -of GTiff -strict \
+        -mo "AREA_OR_POINT=POINT" -ot Float32 \
+        -co "COMPRESS=LZW" -co "PREDICTOR=2" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
+        "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/${TYPE}_ready.tif"
+    fi
     if [[ "$TYPE" == "heightmap" ]]; then
       # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
       echo "Slicing..."
       mkdir -p "$WORK_PATH/rawtiles"
       "$SRC_PATH/slicer.py" --size=$TILE_SIZE --driver=GTiff --extension=tif $VERBOSE_PARAM \
-          "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/rawtiles"
+          "$WORK_PATH/${TYPE}_ready.tif" "$WORK_PATH/rawtiles"
 
       # Step 5. Generate tiles that overlap each other by 1 heixel
       echo "Overlapping..."
@@ -193,9 +200,10 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
     else
       # Alternative Steps 4-5. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
       echo "Generating tile GeoTIFFs..."
-      "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 \
-          --driver=GTiff --driver-options="COMPRESS=LZW;PREDICTOR=2" --extension=tif $VERBOSE_PARAM \
-          "$WORK_PATH/${TYPE}_mercator.tif" "$OUTPUT_PATH"
+      "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 --driver=GTiff \
+        --driver-options="COMPRESS=LZW;PREDICTOR=2;BIGTIFF=YES;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
+        --extension=tif $VERBOSE_PARAM \
+        "$WORK_PATH/${TYPE}_ready.tif" "$OUTPUT_PATH"
     fi
 else
     echo "Calculating base slope..."

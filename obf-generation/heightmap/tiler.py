@@ -92,8 +92,8 @@ class OsmAndHeightMapSlicer(object):
         if self.inputBand.GetRasterColorTable():
             self.error("Input file must not have color table")
 
-        if self.inputBand.DataType != gdalconst.GDT_Int16:
-            self.error("Input file must have single raster band with Int16 type")
+        if self.inputBand.DataType != gdalconst.GDT_Float32:
+            self.error("Input file must have single raster band with Float32 type")
 
         self.inputGeoTransform = self.inputDataset.GetGeoTransform()
         if (self.inputGeoTransform[2], self.inputGeoTransform[4]) != (0,0):
