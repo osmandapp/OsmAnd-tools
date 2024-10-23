@@ -134,16 +134,39 @@ else
 fi
 
 
-# Step 1. Create GDAL VRT to reference all DEM files
-GAP=3
+# Step 1. Create GDAL VRT to reference needed DEM files
+GAP=1
 echo "Creating VRT..."
+LATMIN = $(($LAT - $GAP))
+LATMAX = $(($LAT + 1 + $GAP))
+LONMIN = $(($LON - $GAP))
+LONMAX = $(($LON + 1 + $GAP))
+TLATL='N'; if (( LATMAX < 0 )); then TLATL='S'; fi
+LLONL='E'; if (( LONMIN < 0 )); then LLONL='W'; fi
+TLATP=$LATMAX; if (( LATMAX < 0 )); then TLATP=$(( - $LATMAX)); fi
+LLONP=$LONMIN; if (( LONMIN < 0 )); then LLONP=$(( - $LONMIN)); fi
+TLTILE=${TLATL}$(printf "%02d" $TLATP)${LLONL}$(printf "%03d" $LLONP)
+BLATL='N'; if (( LATMIN < 0 )); then BLATL='S'; fi
+RLONL='E'; if (( LONMAX < 0 )); then RLONL='W'; fi
+BLATP=$LATMIN; if (( LATMIN < 0 )); then BLATP=$(( - $LATMIN)); fi
+RLONP=$LONMAX; if (( LONMAX < 0 )); then RLONP=$(( - $LONMAX)); fi
+BRTILE=${BLATL}$(printf "%02d" $BLATP)${RLONL}$(printf "%03d" $RLONP)
+TRTILE=${TLATL}$(printf "%02d" $TLATP)${RLONL}$(printf "%03d" $RLONP)
+BLTILE=${BLATL}$(printf "%02d" $BLATP)${LLONL}$(printf "%03d" $LLONP)
+TCTILE=${TLATL}$(printf "%02d" $TLATP)${LONL}$(printf "%03d" $LONP)
+BCTILE=${BLATL}$(printf "%02d" $BLATP)${LONL}$(printf "%03d" $LONP)
+CLTILE=${LATL}$(printf "%02d" $LATP)${LLONL}$(printf "%03d" $LLONP)
+CRTILE=${LATL}$(printf "%02d" $LATP)${RLONL}$(printf "%03d" $RLONP)
 NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
 gdalbuildvrt \
-    -te $(($LON - $GAP)) $(($LAT - $GAP)) $(($LON + $GAP)) $(($LAT + $GAP)) \
+    -te $(($LON - $GAP)) $(($LAT - $GAP)) $(($LON + 1 + $GAP)) $(($LAT + 1 + $GAP)) \
     -resolution highest \
     -hidenodata \
     -vrtnodata "$NODATA" \
-    "$WORK_PATH/heighttiles_$TYPE.vrt" "$DEMS_PATH"/*
+    "$WORK_PATH/heighttiles_$TYPE.vrt" \
+    "$DEMS_PATH/$TLTILE" "$DEMS_PATH/$TCTILE" "$DEMS_PATH/$TRTILE" /
+    "$DEMS_PATH/$CLTILE" "$DEMS_PATH/$TILE" "$DEMS_PATH/$CRTILE" /
+    "$DEMS_PATH/$BLTILE" "$DEMS_PATH/$BCTILE" "$DEMS_PATH/$BRTILE"
 
 # Step 2. Convert VRT to single GeoTIFF file
 DELTA=0.4
