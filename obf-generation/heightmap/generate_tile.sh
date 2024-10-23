@@ -139,7 +139,7 @@ if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
     echo "Creating VRT..."
     NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
     gdalbuildvrt \
-        -te -181 -90 181 90 \
+        -te -181 -85 181 85 \
         -resolution highest \
         -hidenodata \
         -vrtnodata "$NODATA" \
