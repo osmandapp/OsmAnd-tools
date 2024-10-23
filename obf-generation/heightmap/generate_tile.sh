@@ -139,7 +139,7 @@ GAP=3
 echo "Creating VRT..."
 NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
 gdalbuildvrt \
-    -te $(($LON - $DELTA)) $(($LAT - $DELTA)) $(($LON + $DELTA)) $(($LAT + $DELTA)) \
+    -te $(($LON - $GAP)) $(($LAT - $GAP)) $(($LON + $GAP)) $(($LAT + $GAP)) \
     -resolution highest \
     -hidenodata \
     -vrtnodata "$NODATA" \
