@@ -137,19 +137,19 @@ fi
 # Step 1. Create GDAL VRT to reference needed DEM files
 GAP=1
 echo "Creating VRT..."
-LATMIN = $(($LAT - $GAP))
-LATMAX = $(($LAT + 1 + $GAP))
-LONMIN = $(($LON - $GAP))
-LONMAX = $(($LON + 1 + $GAP))
+LATMIN=$(($LAT - $GAP))
+LATMAX=$(($LAT + 1 + $GAP))
+LONMIN=$(($LON - $GAP))
+LONMAX=$(($LON + 1 + $GAP))
 TLATL='N'; if (( LATMAX < 0 )); then TLATL='S'; fi
 LLONL='E'; if (( LONMIN < 0 )); then LLONL='W'; fi
-TLATP=$LATMAX; if (( LATMAX < 0 )); then TLATP=$(( - $LATMAX)); fi
-LLONP=$LONMIN; if (( LONMIN < 0 )); then LLONP=$(( - $LONMIN)); fi
+TLATP=$LATMAX; if (( LATMAX < 0 )); then TLATP=$(( - $TLATP)); fi
+LLONP=$LONMIN; if (( LONMIN < 0 )); then LLONP=$(( - $LLONP)); fi
 TLTILE=${TLATL}$(printf "%02d" $TLATP)${LLONL}$(printf "%03d" $LLONP)
 BLATL='N'; if (( LATMIN < 0 )); then BLATL='S'; fi
 RLONL='E'; if (( LONMAX < 0 )); then RLONL='W'; fi
-BLATP=$LATMIN; if (( LATMIN < 0 )); then BLATP=$(( - $LATMIN)); fi
-RLONP=$LONMAX; if (( LONMAX < 0 )); then RLONP=$(( - $LONMAX)); fi
+BLATP=$LATMIN; if (( LATMIN < 0 )); then BLATP=$(( - $BLATP)); fi
+RLONP=$LONMAX; if (( LONMAX < 0 )); then RLONP=$(( - $RLONP)); fi
 BRTILE=${BLATL}$(printf "%02d" $BLATP)${RLONL}$(printf "%03d" $RLONP)
 TRTILE=${TLATL}$(printf "%02d" $TLATP)${RLONL}$(printf "%03d" $RLONP)
 BLTILE=${BLATL}$(printf "%02d" $BLATP)${LLONL}$(printf "%03d" $LLONP)
