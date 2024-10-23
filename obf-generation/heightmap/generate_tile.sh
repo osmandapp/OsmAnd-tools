@@ -135,25 +135,24 @@ fi
 
 
 # Step 1. Create GDAL VRT to reference all DEM files
-if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
-    echo "Creating VRT..."
-    NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
-    gdalbuildvrt \
-        -te -181 -85 181 85 \
-        -resolution highest \
-        -hidenodata \
-        -vrtnodata "$NODATA" \
-        "allheighttiles_$TYPE.vrt" "$DEMS_PATH"/*
-fi
+GAP=3
+echo "Creating VRT..."
+NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
+gdalbuildvrt \
+    -te $(($LON - $DELTA)) $(($LAT - $DELTA)) $(($LON + $DELTA)) $(($LAT + $DELTA)) \
+    -resolution highest \
+    -hidenodata \
+    -vrtnodata "$NODATA" \
+    "$WORK_PATH/heighttiles_$TYPE.vrt" "$DEMS_PATH"/*
 
-# Step 2. Convert VRT to single giant GeoTIFF file
+# Step 2. Convert VRT to single GeoTIFF file
 DELTA=0.4
 if [ ! -f "$WORK_PATH/${TYPE}_grid.tif" ]; then
     echo "Baking Tile GeoTIFF..."
     gdal_translate -of GTiff -strict -epo \
         -projwin $(($LON - $DELTA)) $(($LAT + 1 + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - $DELTA)) \
         -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "PREDICTOR=2" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
-        "allheighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
+        "$WORK_PATH/heighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
 fi
 
 
