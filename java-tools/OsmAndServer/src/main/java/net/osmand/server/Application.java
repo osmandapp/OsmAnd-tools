@@ -33,6 +33,7 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.monitor.OsmAndGithubProjectMonitorTasks;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.server.utilities.WikidataUtilities.parseWikidataLicenses;
 import static org.apache.commons.io.FileUtils.copyDirectory;
 
 @SpringBootApplication
@@ -51,6 +52,7 @@ public class Application  {
 	OsmAndGithubProjectMonitorTasks githubProject;
 
 	private static Path colorPalettePath;
+	public static final String WIKI_DATA_LICENSES_FILE = "src/main/resources/wiki_data_licenses.json";
 	
 	public static void main(String[] args) {
 		System.out.println("Test parsing with kotlin: " + Json.Default.parseToJsonElement("{}"));
@@ -74,6 +76,7 @@ public class Application  {
 			System.out.println("Application has started");
 			configureImageIO();
 			createColorPaletteDirectory("/colorPalette.zip");
+			createWikidataLicensesFile();
 			
 //			githubProject.syncGithubProject(); // to test
 		};
@@ -143,5 +146,9 @@ public class Application  {
 
 	public static Path getColorPaletteDirectory() {
 		return colorPalettePath;
+	}
+
+	private void createWikidataLicensesFile() {
+		parseWikidataLicenses(WIKI_DATA_LICENSES_FILE);
 	}
 }
