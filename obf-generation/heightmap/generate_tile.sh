@@ -138,7 +138,7 @@ fi
 if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
     echo "Creating VRT..."
     NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
-    gdalbuildvrt \
+    gdalbuildvrt -strict \
         -te -181 -91 181 91 \
         -resolution highest \
         -hidenodata \
@@ -182,7 +182,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
       echo "Translating..."
       gdal_translate -of GTiff -strict \
         -mo "AREA_OR_POINT=POINT" -ot Float32 \
-        -co "COMPRESS=LZW" -co "PREDICTOR=2" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
+        -co "COMPRESS=LZW" -co "PREDICTOR=3" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
         "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/${TYPE}_ready.tif"
     fi
     if [[ "$TYPE" == "heightmap" ]]; then
@@ -201,7 +201,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
       # Alternative Steps 4-5. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
       echo "Generating tile GeoTIFFs..."
       "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 --driver=GTiff \
-        --driver-options="COMPRESS=LZW;PREDICTOR=2;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
+        --driver-options="COMPRESS=LZW;PREDICTOR=3;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
         --extension=tif $VERBOSE_PARAM \
         "$WORK_PATH/${TYPE}_ready.tif" "$OUTPUT_PATH"
     fi
@@ -254,4 +254,4 @@ if [[ "$TYPE" != "tifheightmap" ]]; then
 fi
 
 # Step 8. Clean up work
-rm -rf "$WORK_PATH"
+#rm -rf "$WORK_PATH"
