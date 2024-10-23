@@ -9,10 +9,11 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.concurrent.TimeUnit;
 
 public class WikidataUtilities {
 
-	private static final long PARSE_LICENSE_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000; // 30 days
+	private static final long PARSE_LICENSE_INTERVAL = TimeUnit.DAYS.toMillis(30);
 
 	public static void main(String[] args) {
 		parseWikidataLicenses("../../../osmand/web/map/src/resources/wiki_data_licenses.json");
@@ -20,7 +21,7 @@ public class WikidataUtilities {
 
 	public static void parseWikidataLicenses(String filePath) {
 		File file = new File(filePath);
-		if (!file.exists() || file.lastModified() + PARSE_LICENSE_INTERVAL_MILLIS > System.currentTimeMillis()) {
+		if (!file.exists() || file.lastModified() + PARSE_LICENSE_INTERVAL > System.currentTimeMillis()) {
 			String data = fetchWikidataLicenses();
 			if (data != null) {
 				saveToFile(data, filePath);
