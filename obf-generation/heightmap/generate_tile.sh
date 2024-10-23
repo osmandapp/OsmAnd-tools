@@ -135,12 +135,11 @@ fi
 
 
 # Step 1. Create GDAL VRT to reference needed DEM files
-GAP=1
 echo "Creating VRT..."
-LATMIN=$(($LAT - $GAP))
-LATMAX=$(($LAT + 1 + $GAP))
-LONMIN=$(($LON - $GAP))
-LONMAX=$(($LON + 1 + $GAP))
+LATMIN=$(($LAT - 1))
+LATMAX=$(($LAT + 1))
+LONMIN=$(($LON - 1))
+LONMAX=$(($LON + 1))
 TLATL='N'; if (( LATMAX < 0 )); then TLATL='S'; fi
 LLONL='E'; if (( LONMIN < 0 )); then LLONL='W'; fi
 TLATP=$LATMAX; if (( LATMAX < 0 )); then TLATP=$(( - $TLATP)); fi
@@ -159,13 +158,13 @@ CLTILE=${LATL}$(printf "%02d" $LATP)${LLONL}$(printf "%03d" $LLONP)
 CRTILE=${LATL}$(printf "%02d" $LATP)${RLONL}$(printf "%03d" $RLONP)
 NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
 gdalbuildvrt \
-    -te $(($LON - $GAP)) $(($LAT - $GAP)) $(($LON + 1 + $GAP)) $(($LAT + 1 + $GAP)) \
+    -te $(($LON - 1)) $(($LAT - 1)) $(($LON + 2)) $(($LAT + 2)) \
     -resolution highest \
     -hidenodata \
     -vrtnodata "$NODATA" \
     "$WORK_PATH/heighttiles_$TYPE.vrt" \
-    "$DEMS_PATH/$TLTILE.tif" "$DEMS_PATH/$TCTILE.tif" "$DEMS_PATH/$TRTILE.tif" /
-    "$DEMS_PATH/$CLTILE.tif" "$DEMS_PATH/$TILE.tif" "$DEMS_PATH/$CRTILE.tif" /
+    "$DEMS_PATH/$TLTILE.tif" "$DEMS_PATH/$TCTILE.tif" "$DEMS_PATH/$TRTILE.tif" \
+    "$DEMS_PATH/$CLTILE.tif" "$DEMS_PATH/$TILE.tif" "$DEMS_PATH/$CRTILE.tif" \
     "$DEMS_PATH/$BLTILE.tif" "$DEMS_PATH/$BCTILE.tif" "$DEMS_PATH/$BRTILE.tif"
 
 # Step 2. Convert VRT to single GeoTIFF file
