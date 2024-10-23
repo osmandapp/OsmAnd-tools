@@ -33,7 +33,6 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.monitor.OsmAndGithubProjectMonitorTasks;
 import net.osmand.util.Algorithms;
 
-import static net.osmand.server.utilities.WikidataUtilities.parseWikidataLicenses;
 import static org.apache.commons.io.FileUtils.copyDirectory;
 
 @SpringBootApplication
