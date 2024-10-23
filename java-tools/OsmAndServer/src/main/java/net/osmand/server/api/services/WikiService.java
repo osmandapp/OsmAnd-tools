@@ -38,7 +38,6 @@ import net.osmand.util.Algorithms;
 
 import javax.annotation.PostConstruct;
 
-import static net.osmand.server.Application.WIKI_DATA_LICENSES_FILE;
 import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 @Service
@@ -587,7 +586,7 @@ public class WikiService {
 	}
 
 	private void parseLicenseFile() {
-		File fileWithLicenses = new File(WIKI_DATA_LICENSES_FILE);
+		File fileWithLicenses = new File("src/main/resources/wiki_data_licenses.json");
 		if (!fileWithLicenses.exists()) {
 			log.error("License file not found: " + fileWithLicenses.getAbsolutePath());
 			return;
