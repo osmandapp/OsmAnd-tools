@@ -164,9 +164,9 @@ gdalbuildvrt \
     -hidenodata \
     -vrtnodata "$NODATA" \
     "$WORK_PATH/heighttiles_$TYPE.vrt" \
-    "$DEMS_PATH/$TLTILE" "$DEMS_PATH/$TCTILE" "$DEMS_PATH/$TRTILE" /
-    "$DEMS_PATH/$CLTILE" "$DEMS_PATH/$TILE" "$DEMS_PATH/$CRTILE" /
-    "$DEMS_PATH/$BLTILE" "$DEMS_PATH/$BCTILE" "$DEMS_PATH/$BRTILE"
+    "$DEMS_PATH/$TLTILE.tif" "$DEMS_PATH/$TCTILE.tif" "$DEMS_PATH/$TRTILE.tif" /
+    "$DEMS_PATH/$CLTILE.tif" "$DEMS_PATH/$TILE.tif" "$DEMS_PATH/$CRTILE.tif" /
+    "$DEMS_PATH/$BLTILE.tif" "$DEMS_PATH/$BCTILE.tif" "$DEMS_PATH/$BRTILE.tif"
 
 # Step 2. Convert VRT to single GeoTIFF file
 DELTA=0.4
