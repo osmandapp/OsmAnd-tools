@@ -40,7 +40,7 @@ public class ServerUtilities {
 			StyleDataExtractor.parseStylesXml(subArgsArray[0], subArgsArray[1]);
 		} else if (utl.equals("parse-wikidata-licenses")) {
 			WikidataUtilities.parseWikidataLicenses(subArgsArray[0]);
-		}else if (utl.equals("generate-reports")) {
+		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
 		} else {
 			System.err.println("Unknown command");
