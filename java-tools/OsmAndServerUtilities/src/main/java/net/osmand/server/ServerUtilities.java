@@ -12,6 +12,7 @@ import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
 import net.osmand.server.utilities.GenerateWebTranslations;
 import net.osmand.server.utilities.StyleDataExtractor;
+import net.osmand.server.utilities.WikidataUtilities;
 
 public class ServerUtilities {
 
@@ -37,6 +38,8 @@ public class ServerUtilities {
 			GenerateWebTranslations.generateTranslations(subArgsArray[0], subArgsArray[1]);
 		} else if (utl.equals("parse-styles")) {
 			StyleDataExtractor.parseStylesXml(subArgsArray[0], subArgsArray[1]);
+		} else if (utl.equals("parse-wikidata-licenses")) {
+			WikidataUtilities.parseWikidataLicenses(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
 		} else {

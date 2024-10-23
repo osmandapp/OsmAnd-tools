@@ -10,6 +10,10 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import com.clickhouse.data.value.UnsignedLong;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -32,6 +36,8 @@ import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
 
+import javax.annotation.PostConstruct;
+
 import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 @Service
@@ -50,7 +56,8 @@ public class WikiService {
 	private static final int FILTER_ZOOM_LEVEL = 15;
 	
 	private static final Map<Integer, Set<String>> EXCLUDED_POI_SUBTYPES_BY_ZOOM = Map.of(FILTER_ZOOM_LEVEL, Set.of("commercial", "battlefield"));
-	
+
+	private final Map<String, String> licenseMap = new HashMap<>();
 	
 	@Value("${osmand.wiki.location}")
 	private String pathToWikiSqlite;
@@ -61,6 +68,11 @@ public class WikiService {
 	
 	@Autowired
 	DatasourceConfiguration config;
+
+	@PostConstruct
+	public void init() {
+		parseLicenseFile();
+	}
 	
     
 	public FeatureCollection getImages(String northWest, String southEast) {
@@ -81,7 +93,7 @@ public class WikiService {
 			f.properties.put("imageTitle", rs.getString("imageTitle"));
 			f.properties.put("date", rs.getString("date"));
 			f.properties.put("author", rs.getString("author"));
-			f.properties.put("license", rs.getString("license"));
+			f.properties.put("license", getLicense(rs.getString("license")));
 			return f;
 		});
 		
@@ -463,7 +475,7 @@ public class WikiService {
 				imageDetails.put("image", createImageUrl(imageTitle));
 				imageDetails.put("date", rs.getString("date"));
 				imageDetails.put("author", rs.getString("author"));
-				imageDetails.put("license", rs.getString("license"));
+				imageDetails.put("license", getLicense(rs.getString("license")));
 				
 				imagesWithDetails.add(imageDetails);
 			};
@@ -571,6 +583,33 @@ public class WikiService {
 		}).toList();
 		
 		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+
+	private void parseLicenseFile() {
+		File fileWithLicenses = new File("src/main/resources/wiki_data_licenses.json");
+		if (!fileWithLicenses.exists()) {
+			log.error("License file not found: " + fileWithLicenses.getAbsolutePath());
+			return;
+		}
+		final String VALUE = "value";
+
+		try (BufferedReader reader = new BufferedReader(new FileReader(fileWithLicenses))) {
+			Gson gson = new Gson();
+			JsonObject jsonObject = gson.fromJson(reader, JsonObject.class);
+			JsonArray bindings = jsonObject.getAsJsonObject("results").getAsJsonArray("bindings");
+			for (JsonElement element : bindings) {
+				JsonObject binding = element.getAsJsonObject();
+				String itemValue = binding.getAsJsonObject("item").get(VALUE).getAsString();
+				String licenseValue = binding.getAsJsonObject(VALUE).get(VALUE).getAsString();
+				licenseMap.put(itemValue, licenseValue);
+			}
+		} catch (IOException e) {
+			log.error("Failed to parse license file", e);
+		}
+	}
+
+	public String getLicense(String data) {
+		return licenseMap.getOrDefault("http://www.wikidata.org/entity/" + data, null);
 	}
 	
 }
