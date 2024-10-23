@@ -34,7 +34,11 @@ Template files structure:
 Special variables:
 
 	@TO@, @TO_BASE64@ - automatically set with To-address before sending each email
+
 	@HTML_NEWLINE_TO_BR@ - user-defined option to convert \n to <br>\n (text-like templates)
+		This option is disabled by default and never applied to "already-html" templates.
+		If it is enabled in defaults.html, particular template might disable it with:
+			<!--Set HTML_NEWLINE_TO_BR=false--> OR <!--Unset HTML_NEWLINE_TO_BR-->
 
 Template variables:
 
@@ -364,6 +368,7 @@ public class EmailSenderTemplate {
 
 	private void parse(List<String> lines) {
 		List<String> bodyLines = new ArrayList<>();
+		boolean htmlTagFound = false;
 
 		for (String line : lines) {
 			parseCommandArgumentsFromComment(line);
@@ -373,6 +378,7 @@ public class EmailSenderTemplate {
 			// allow to specify Subject-line at the beginning of the template
 			if (bodyLines.isEmpty() && cleaned.trim().startsWith("Subject:")) {
 				subject = cleaned.replaceFirst(".*?:", "").trim();
+				continue;
 			}
 
 			// blank lines are allowed after non-blank
@@ -381,7 +387,11 @@ public class EmailSenderTemplate {
 			}
 
 			// add <br> at end of line if options is enabled and <br> is not already added
-			if (vars.containsKey(HTML_NEWLINE_TO_BR) && !cleaned.toLowerCase().endsWith("<br>")) {
+			String lowercase = cleaned.toLowerCase();
+			if (lowercase.contains("<html") || lowercase.contains("html>")) {
+				htmlTagFound = true;
+			}
+			if (!htmlTagFound && "true".equals(vars.get(HTML_NEWLINE_TO_BR)) && !lowercase.endsWith("<br>")) {
 				bodyLines.add(cleaned + "<br>" + "\n");
 			} else {
 				bodyLines.add(cleaned + "\n");
@@ -493,7 +503,12 @@ public class EmailSenderTemplate {
 					smtp.addHeader(key, val);
 				}
 
-				smtp.setHtmlMsg("<html>\n" + body + "</html>\n");
+				if (body.toLowerCase().contains("<html")) {
+					smtp.setHtmlMsg(body); // already html body
+				} else {
+					smtp.setHtmlMsg("<html>\n" + body + "</html>\n");
+				}
+
 				smtp.setFrom(from, name);
 				smtp.setSubject(subject);
 				smtp.addTo(to);
