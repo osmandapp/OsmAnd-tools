@@ -53,6 +53,8 @@ class OsmAndHeightMapSlicer(object):
         p = OptionParser(usage)
         p.add_option("--verbose", action="store_true", dest="verbose",
             help="Print status messages to stdout")
+        p.add_option("--skip", action="store_true", dest="skip",
+            help="Don't overwrite existing files, just skip them")
         p.add_option("--size", dest="size", type="int",
             help="Size of tile.")
         p.add_option("--overlap", dest="overlap", type="int",
@@ -141,10 +143,10 @@ class OsmAndHeightMapSlicer(object):
                 outputTileFile = os.path.join(self.outputDir, str(self.options.zoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
 
                 # Skip if this tile already exists
-                #if os.path.exists(outputTileFile):
-                #    if self.options.verbose:
-                #        print("Skipping tile TMS Y%sX%s" % (tileY, tileX))
-                #    continue
+                if self.options.skip and os.path.exists(outputTileFile):
+                    if self.options.verbose:
+                        print("Skipping tile TMS Y%sX%s" % (tileY, tileX))
+                    continue
 
                 if self.options.verbose:
                     print("Baking tile TMS Y%sX%s" % (tileY, tileX))

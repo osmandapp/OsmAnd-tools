@@ -67,6 +67,10 @@ while [[ $# -gt 0 ]]; do
       VERBOSE_PARAM="--verbose"
       shift # past argument with no value
       ;;
+    --skip)
+      SKIP_EXISTING="--skip"
+      shift # past argument with no value
+      ;;
     -*|--*)
       echo "Unknown option $1"
       exit 1
@@ -223,7 +227,7 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
       echo "Generating tile GeoTIFFs..."
       "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 --driver=GTiff \
         --driver-options="COMPRESS=LZW;PREDICTOR=3;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
-        --extension=tif $VERBOSE_PARAM \
+        --extension=tif $VERBOSE_PARAM $SKIP_EXISTING \
         "$WORK_PATH/${TYPE}_ready.tif" "$OUTPUT_PATH"
     fi
 else
