@@ -2,30 +2,37 @@ package net.osmand.server.api.services;
 
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import java.nio.file.Files;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.server.controllers.user.MapApiController;
-import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -42,9 +49,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
@@ -54,7 +65,9 @@ import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.util.Algorithms;
 
 @Service
