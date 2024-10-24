@@ -53,6 +53,8 @@ class OsmAndHeightMapSlicer(object):
         p = OptionParser(usage)
         p.add_option("--verbose", action="store_true", dest="verbose",
             help="Print status messages to stdout")
+        p.add_option("--skip", action="store_true", dest="skip",
+            help="Don't overwrite existing files, just skip them")
         p.add_option("--size", dest="size", type="int",
             help="Size of tile.")
         p.add_option("--overlap", dest="overlap", type="int",
@@ -92,8 +94,8 @@ class OsmAndHeightMapSlicer(object):
         if self.inputBand.GetRasterColorTable():
             self.error("Input file must not have color table")
 
-        if self.inputBand.DataType != gdalconst.GDT_Int16:
-            self.error("Input file must have single raster band with Int16 type")
+        if self.inputBand.DataType != gdalconst.GDT_Float32:
+            self.error("Input file must have single raster band with Float32 type")
 
         self.inputGeoTransform = self.inputDataset.GetGeoTransform()
         if (self.inputGeoTransform[2], self.inputGeoTransform[4]) != (0,0):
@@ -141,7 +143,7 @@ class OsmAndHeightMapSlicer(object):
                 outputTileFile = os.path.join(self.outputDir, str(self.options.zoom), str(tileX), "%s.%s" % (tileY, self.options.extension))
 
                 # Skip if this tile already exists
-                if os.path.exists(outputTileFile):
+                if self.options.skip and os.path.exists(outputTileFile):
                     if self.options.verbose:
                         print("Skipping tile TMS Y%sX%s" % (tileY, tileX))
                     continue
@@ -179,7 +181,7 @@ class OsmAndHeightMapSlicer(object):
 
                 # Create target dataset
                 targetDataset = self.outDriver.Create(outputTileFile, dataSizeX, dataSizeY,
-                    1, gdalconst.GDT_Float32, options = self.options.driverOptions)
+                    1, self.inputBand.DataType, options = self.options.driverOptions)
                 targetDataset.SetGeoTransform( (tileLeft, self.inputGeoTransform[1], 0.0,
                     tileTop, 0.0, self.inputGeoTransform[5]) )
                 targetDataset.SetGCPs(self.gcps, self.wkt)

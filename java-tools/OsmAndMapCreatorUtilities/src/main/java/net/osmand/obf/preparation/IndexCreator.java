@@ -391,7 +391,7 @@ public class IndexCreator {
 
 			final BasemapProcessor processor = new BasemapProcessor(logMapDataWarn, mapZooms, renderingTypes,
 					settings.zoomWaySmoothness);
-			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes, null)
+			final IndexPoiCreator poiCreator = settings.indexPOI ? new IndexPoiCreator(settings, renderingTypes)
 					: null;
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
@@ -505,7 +505,7 @@ public class IndexCreator {
 
 		this.propagateToNodes = new PropagateToNodes(renderingTypes);
 		this.indexTransportCreator = new IndexTransportCreator(settings);
-		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes, propagateToNodes);
+		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);

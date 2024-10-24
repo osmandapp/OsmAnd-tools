@@ -1,6 +1,13 @@
 package net.osmand.server;
 
+import java.io.*;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
 import java.util.ServiceLoader;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.imageio.spi.IIORegistry;
 import javax.imageio.spi.ImageReaderSpi;
@@ -26,6 +33,8 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.monitor.OsmAndGithubProjectMonitorTasks;
 import net.osmand.util.Algorithms;
 
+import static org.apache.commons.io.FileUtils.copyDirectory;
+
 @SpringBootApplication
 @EnableScheduling
 @EnableJpaAuditing
@@ -40,6 +49,8 @@ public class Application  {
 	
 	@Autowired
 	OsmAndGithubProjectMonitorTasks githubProject;
+
+	private static Path colorPalettePath;
 	
 	public static void main(String[] args) {
 		System.out.println("Test parsing with kotlin: " + Json.Default.parseToJsonElement("{}"));
@@ -62,6 +73,7 @@ public class Application  {
 			}
 			System.out.println("Application has started");
 			configureImageIO();
+			createColorPaletteDirectory("/colorPalette.zip");
 			
 //			githubProject.syncGithubProject(); // to test
 		};
@@ -95,5 +107,41 @@ public class Application  {
 		} catch (ClassNotFoundException e) {
 			System.err.println("One of the service provider classes was not found: " + e.getMessage());
 		}
+	}
+
+	public static void createColorPaletteDirectory(String resourceFolderPath) throws IOException {
+		Path tempDirectory = Files.createTempDirectory("colorPalette");
+		File tempDir = tempDirectory.toFile();
+		tempDir.deleteOnExit(); // remove the directory when the JVM exits
+
+		try (InputStream zipStream = Application.class.getResourceAsStream(resourceFolderPath)) {
+			if (zipStream == null) {
+				throw new FileNotFoundException("Resource not found: " + resourceFolderPath);
+			}
+
+			try (ZipInputStream zis = new ZipInputStream(zipStream)) {
+				ZipEntry entry;
+				while ((entry = zis.getNextEntry()) != null) {
+					File newFile = new File(tempDir, entry.getName());
+					if (entry.isDirectory()) {
+						newFile.mkdirs();
+					} else {
+						try (FileOutputStream fos = new FileOutputStream(newFile)) {
+							byte[] buffer = new byte[1024];
+							int len;
+							while ((len = zis.read(buffer)) > 0) {
+								fos.write(buffer, 0, len);
+							}
+						}
+					}
+					zis.closeEntry();
+				}
+			}
+		}
+		colorPalettePath = tempDirectory;
+	}
+
+	public static Path getColorPaletteDirectory() {
+		return colorPalettePath;
 	}
 }

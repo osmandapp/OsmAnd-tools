@@ -11,6 +11,7 @@ set -e
 #set -xe
 
 VERBOSE_PARAM=""
+SKIP_EXISTING=""
 SRC_PATH=$(dirname "$0")
 #SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 POSITIONAL_ARGS=()
@@ -65,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --verbose)
       VERBOSE_PARAM="--verbose"
+      shift # past argument with no value
+      ;;
+    --skip)
+      SKIP_EXISTING="--skip"
       shift # past argument with no value
       ;;
     -*|--*)
@@ -134,26 +139,47 @@ else
 fi
 
 
-# Step 1. Create GDAL VRT to reference all DEM files
-if [ ! -f "allheighttiles_$TYPE.vrt" ]; then
-    echo "Creating VRT..."
-    NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
-    gdalbuildvrt \
-        -te -181 -91 181 91 \
-        -resolution highest \
-        -hidenodata \
-        -vrtnodata "$NODATA" \
-        "allheighttiles_$TYPE.vrt" "$DEMS_PATH"/*
-fi
+# Step 1. Create GDAL VRT to reference needed DEM files
+echo "Creating VRT..."
+LATMIN=$(($LAT - 1))
+LATMAX=$(($LAT + 1))
+LONMIN=$(($LON - 1))
+LONMAX=$(($LON + 1))
+TLATL='N'; if (( LATMAX < 0 )); then TLATL='S'; fi
+LLONL='E'; if (( LONMIN < 0 )); then LLONL='W'; fi
+TLATP=$LATMAX; if (( LATMAX < 0 )); then TLATP=$(( - $TLATP)); fi
+LLONP=$LONMIN; if (( LONMIN < 0 )); then LLONP=$(( - $LLONP)); fi
+TLTILE=${TLATL}$(printf "%02d" $TLATP)${LLONL}$(printf "%03d" $LLONP)
+BLATL='N'; if (( LATMIN < 0 )); then BLATL='S'; fi
+RLONL='E'; if (( LONMAX < 0 )); then RLONL='W'; fi
+BLATP=$LATMIN; if (( LATMIN < 0 )); then BLATP=$(( - $BLATP)); fi
+RLONP=$LONMAX; if (( LONMAX < 0 )); then RLONP=$(( - $RLONP)); fi
+BRTILE=${BLATL}$(printf "%02d" $BLATP)${RLONL}$(printf "%03d" $RLONP)
+TRTILE=${TLATL}$(printf "%02d" $TLATP)${RLONL}$(printf "%03d" $RLONP)
+BLTILE=${BLATL}$(printf "%02d" $BLATP)${LLONL}$(printf "%03d" $LLONP)
+TCTILE=${TLATL}$(printf "%02d" $TLATP)${LONL}$(printf "%03d" $LONP)
+BCTILE=${BLATL}$(printf "%02d" $BLATP)${LONL}$(printf "%03d" $LONP)
+CLTILE=${LATL}$(printf "%02d" $LATP)${LLONL}$(printf "%03d" $LLONP)
+CRTILE=${LATL}$(printf "%02d" $LATP)${RLONL}$(printf "%03d" $RLONP)
+NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
+gdalbuildvrt \
+    -te $(($LON - 1)) $(($LAT - 1)) $(($LON + 2)) $(($LAT + 2)) \
+    -resolution highest \
+    -hidenodata \
+    -vrtnodata "$NODATA" \
+    "$WORK_PATH/heighttiles_$TYPE.vrt" \
+    "$DEMS_PATH/$TLTILE.tif" "$DEMS_PATH/$TCTILE.tif" "$DEMS_PATH/$TRTILE.tif" \
+    "$DEMS_PATH/$CLTILE.tif" "$DEMS_PATH/$TILE.tif" "$DEMS_PATH/$CRTILE.tif" \
+    "$DEMS_PATH/$BLTILE.tif" "$DEMS_PATH/$BCTILE.tif" "$DEMS_PATH/$BRTILE.tif"
 
-# Step 2. Convert VRT to single giant GeoTIFF file
+# Step 2. Convert VRT to single GeoTIFF file
 DELTA=0.4
 if [ ! -f "$WORK_PATH/${TYPE}_grid.tif" ]; then
     echo "Baking Tile GeoTIFF..."
     gdal_translate -of GTiff -strict -epo \
         -projwin $(($LON - $DELTA)) $(($LAT + 1 + $DELTA)) $(($LON + 1 + $DELTA)) $(($LAT - $DELTA)) \
         -mo "AREA_OR_POINT=POINT" -ot Int16 -co "COMPRESS=LZW" -co "PREDICTOR=2" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
-        "allheighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
+        "$WORK_PATH/heighttiles_$TYPE.vrt" "$WORK_PATH/${TYPE}_grid.tif"
 fi
 
 
@@ -178,12 +204,19 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
         -tr $PIXEL_SIZE $PIXEL_SIZE -tap \
         "$WORK_PATH/${TYPE}_grid.tif" "$WORK_PATH/${TYPE}_mercator.tif"
     fi
+    if [ ! -f "$WORK_PATH/${TYPE}_ready.tif" ]; then
+      echo "Translating..."
+      gdal_translate -of GTiff -strict \
+        -mo "AREA_OR_POINT=POINT" -ot Float32 \
+        -co "COMPRESS=LZW" -co "PREDICTOR=3" -co "BIGTIFF=YES" -co "SPARSE_OK=TRUE" -co "TILED=NO" \
+        "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/${TYPE}_ready.tif"
+    fi
     if [[ "$TYPE" == "heightmap" ]]; then
       # Step 4. Slice giant projected GeoTIFF to tiles of specified size and downscale them
       echo "Slicing..."
       mkdir -p "$WORK_PATH/rawtiles"
       "$SRC_PATH/slicer.py" --size=$TILE_SIZE --driver=GTiff --extension=tif $VERBOSE_PARAM \
-          "$WORK_PATH/${TYPE}_mercator.tif" "$WORK_PATH/rawtiles"
+          "$WORK_PATH/${TYPE}_ready.tif" "$WORK_PATH/rawtiles"
 
       # Step 5. Generate tiles that overlap each other by 1 heixel
       echo "Overlapping..."
@@ -193,9 +226,10 @@ if [[ "$TYPE" == "heightmap" ]] || [[ "$TYPE" == "tifheightmap" ]]; then
     else
       # Alternative Steps 4-5. Slice projected GeoTIFF to overlapped tiles of specified size and zoom level
       echo "Generating tile GeoTIFFs..."
-      "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 \
-          --driver=GTiff --driver-options="COMPRESS=LZW;PREDICTOR=2" --extension=tif $VERBOSE_PARAM \
-          "$WORK_PATH/${TYPE}_mercator.tif" "$OUTPUT_PATH"
+      "$SRC_PATH/tiler.py" --size=$TILE_FULL_SIZE --overlap=3 --zoom=9 --driver=GTiff \
+        --driver-options="COMPRESS=LZW;PREDICTOR=3;SPARSE_OK=TRUE;TILED=YES;BLOCKXSIZE=80;BLOCKYSIZE=80" \
+        --extension=tif $VERBOSE_PARAM $SKIP_EXISTING \
+        "$WORK_PATH/${TYPE}_ready.tif" "$OUTPUT_PATH"
     fi
 else
     echo "Calculating base slope..."

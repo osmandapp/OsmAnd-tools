@@ -343,7 +343,16 @@ public class PropagateToNodes {
 
 		private boolean applicable(Way w, Map<String, String> propMap) {
 			for (Map.Entry<String, String> entry : propMap.entrySet()) {
-				String tagValue = w.getTag(entry.getKey());
+				String propTag = entry.getKey();
+				if (propTag.startsWith("~")) {
+					String tagValue = w.getTag(propTag.substring(1));
+					boolean noValue = Algorithms.isEmpty(tagValue) || "no".equals(tagValue);
+					if (!noValue) {
+						return false;
+					}
+					continue;
+				}
+				String tagValue = w.getTag(propTag);
 				if (tagValue == null) {
 					return false;
 				} else {

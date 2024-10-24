@@ -159,6 +159,7 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = false) String deviceId,
 			@RequestParam(name = "orderid", required = false) String orderid,
 			HttpServletRequest request) throws IOException {
+		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
@@ -245,6 +246,7 @@ public class UserdataController {
 												 @RequestParam(name = "model", required = false) String model,
 												 @RequestParam(name = "lang", required = false) String lang
 	) throws IOException {
+		email = email.toLowerCase().trim();
 		String accessToken = UUID.randomUUID().toString();
 		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, brand, model);
 	}
