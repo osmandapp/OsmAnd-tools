@@ -11,6 +11,7 @@ set -e
 #set -xe
 
 VERBOSE_PARAM=""
+SKIP_EXISTING=""
 SRC_PATH=$(dirname "$0")
 #SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 POSITIONAL_ARGS=()
