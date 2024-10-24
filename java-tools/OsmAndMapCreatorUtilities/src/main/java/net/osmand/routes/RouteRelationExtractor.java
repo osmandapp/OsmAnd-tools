@@ -30,6 +30,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xmlpull.v1.XmlPullParserException;
 
+import javax.annotation.Nonnull;
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
 import java.nio.file.Files;
@@ -74,49 +75,27 @@ public class RouteRelationExtractor {
 	);
 	private FindByRenderingTypesRules finder = new FindByRenderingTypesRules(customStyles, customProperties);
 	private final String[] filteredTags = {
-			"-bus",
-			"-road",
-			"hiking",
-			"bicycle",
-			"foot",
-			"-ferry",
-			"mtb",
-			"-power",
-			"-railway",
-			"piste",
-			"-train",
-			"ski",
-			"-tram",
-			"-detour",
-			"-tracks",
-			"-trolleybus",
-			"horse",
-			"-share_taxi",
-			"-subway",
-			"-emergency_access",
-			"snowmobile",
-			"historic",
-			"running",
-			"fitness_trail",
-			"-light_rail",
-			"canoe",
-			"-pipeline",
-			"canyoning",
-			"junction",
-			"motorboat",
-			"-yes",
-			"waterway",
-			"boat",
-			"worship",
-			"aerialway",
-			"inline_skates",
-			"transhumance",
-			"historic_railway",
-			"via_ferrata",
-			"-monorail",
-			"hiking;mtb",
-			"-funicular" // count 200
-			// "walking" count 164
+			"hiking", // 244k
+			"bicycle", // 119k
+			"foot", // 63k
+			"mtb", // 29k
+			"piste", // 14k
+			"ski", // 8k
+			"horse", // 4k
+			"running", // 1k
+			"snowmobile", // 1k
+			"fitness_trail", // 1k
+			"canoe", // 0.8k
+			"canyoning", // 0.6k
+			"motorboat", // 0.4k
+			"boat", // 0.3k
+			"waterway", // 0.3k
+			"inline_skates", // 0.2k
+			"via_ferrata", // 0.2k
+			"walking", // 0.2k
+			"ferrata", // proposed
+			// bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
+			// power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
 	public static void main(String[] args) {
@@ -256,10 +235,12 @@ public class RouteRelationExtractor {
 				}
 			}
 
-			private boolean accessedRoute(String route) {
-				for (String value : filteredTags) {
-					if (route.endsWith(value)) {
-						return true;
+			private boolean accessedRoute(@Nonnull String route) {
+				for (String tag : route.split("[;, ]")) {
+					for (String value : filteredTags) {
+						if (tag.startsWith(value) || tag.endsWith(value)) {
+							return true;
+						}
 					}
 				}
 				return false;
