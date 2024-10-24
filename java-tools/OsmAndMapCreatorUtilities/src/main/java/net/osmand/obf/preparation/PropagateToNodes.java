@@ -14,8 +14,10 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypes.PropagateToNode;
 import net.osmand.osm.MapRenderingTypes.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
@@ -227,13 +229,14 @@ public class PropagateToNodes {
 
 	private List<PropagateRule> getRulesToApply(Way w) {
 		List<PropagateRule> rulesToApply = null;
-		for (String tag : w.getTagKeySet()) {
+		Map<String, String> trTags = renderingTypes.transformTags(w.getTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+		for (String tag : trTags.keySet()) {
 			List<PropagateRule> list = propagateRulesByTag.get(tag);
 			if (list == null) {
 				continue;
 			}
 			for (PropagateRule rule : list) {
-				String entityTag = w.getTag(tag);
+				String entityTag = trTags.get(tag);
 				if (entityTag != null && entityTag.equals(rule.value)) {
 					boolean propIf = rule.applicableBorder(w);
 					if (propIf) {
