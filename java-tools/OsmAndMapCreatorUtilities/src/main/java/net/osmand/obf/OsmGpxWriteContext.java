@@ -200,19 +200,31 @@ public class OsmGpxWriteContext {
 
 					serializer.endTag(null, "way");
 
-					String routeType = gpxTrackTags.get(OSM_TAG_PREFIX + "route");
-					if (routeType != null) {
-						for (LatLon ll : pointsForPoiSearch) {
-							serializer.startTag(null, "node");
-							serializer.attribute(null, "id", "" + baseOsmId--);
-							serializer.attribute(null, "action", "modify");
-							serializer.attribute(null, "version", "1");
-							serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
-							serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
-							tagValue(serializer, "route_radius", routeRadius);
-							tagValue(serializer, "route_type", routeType);
-							serializeTags(extraTrackTags, gpxTrackTags);
-							serializer.endTag(null, "node");
+					String routeTag = gpxTrackTags.get(OSM_TAG_PREFIX + "route");
+					if (routeTag != null) {
+						OsmRouteType routeType = null;
+						for(String tag : routeTag.split("[;, ]")) {
+							routeType = OsmRouteType.convertFromOsmGPXTag(tag);
+							if (routeType != null) {
+								break; // consider 1st found as main type
+							}
+						}
+						if (routeType != null) {
+							for (LatLon ll : pointsForPoiSearch) {
+								serializer.startTag(null, "node");
+								serializer.attribute(null, "id", "" + baseOsmId--);
+								serializer.attribute(null, "action", "modify");
+								serializer.attribute(null, "version", "1");
+								serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
+								serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
+								tagValue(serializer, "route_radius", routeRadius);
+								tagValue(serializer, "route_type", routeType.getName());
+								serializeTags(extraTrackTags, gpxTrackTags);
+								serializer.endTag(null, "node");
+							}
+						} else {
+							System.err.printf("WARN: unknown routeType (%s) for id (%s)\n", routeTag, gpxInfo.id);
+
 						}
 					}
 				}
