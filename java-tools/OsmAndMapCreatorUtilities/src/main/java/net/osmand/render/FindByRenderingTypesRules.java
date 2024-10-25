@@ -19,15 +19,6 @@ public class FindByRenderingTypesRules {
 	public final MapRenderingTypesEncoder renderingTypes;
 	private final RenderingRuleSearchRequest searchRequest;
 
-	private static final Map<String, String> suffixOsmcTagsToResult = Map.of(
-			"icon", "shield_fg",
-			"icon_2", "shield_fg_2",
-			"textShield", "shield_bg",
-			"_osmc_waycolor", "color",
-			"_osmc_text", "shield_text",
-			"_osmc_textcolor", "shield_textcolor"
-	);
-
 	public FindByRenderingTypesRules() {
 		this(new String[]{"default.render.xml"}, null);
 	}
@@ -109,82 +100,6 @@ public class FindByRenderingTypesRules {
 			}
 		}
 		return renderingConstants;
-	}
-
-	@Nullable
-	public Map<String, String> searchOsmcPropertiesByFinalTags(@Nonnull Map<String, String> tags) {
-		final String FIRST = "_1", ROUTE_PREFIX = "route_", OSMC_TEXT_SUFFIX = "_1_osmc_text";
-
-		String routeTypeTag = null;
-		for (String key : tags.keySet()) {
-			if (key.startsWith(ROUTE_PREFIX) && key.endsWith(FIRST)) {
-				routeTypeTag = key.replace(FIRST, "");
-			}
-		}
-
-		String routeNameTag = routeTypeTag != null ? routeTypeTag + OSMC_TEXT_SUFFIX : null;
-
-		Map<String, String> searchTags = new LinkedHashMap<>();
-		if (routeTypeTag != null) {
-			searchTags.put(routeTypeTag, tags.get(routeTypeTag + FIRST));
-		}
-		searchTags.putAll(tags);
-
-		for (Map.Entry<String, String> entry : searchTags.entrySet()) {
-			final String tag = entry.getKey();
-			final String value = entry.getValue();
-
-			searchRequest.clearState();
-			searchRequest.setStringFilter(renderingRules.PROPS.R_TAG, tag);
-			searchRequest.setStringFilter(renderingRules.PROPS.R_VALUE, value);
-			if (routeNameTag != null) {
-				searchRequest.setStringFilter(renderingRules.PROPS.R_NAME_TAG, routeNameTag);
-			}
-			searchRequest.search(RenderingRulesStorage.TEXT_RULES);
-
-			RenderingRuleProperty[] props = {
-					renderingRules.PROPS.R_ICON,
-					renderingRules.PROPS.R_ICON_2,
-					renderingRules.PROPS.R_TEXT_SHIELD
-			};
-
-			Map<String, String> result = new HashMap<>();
-			for (RenderingRuleProperty p : props) {
-				String key = p.getAttrName();
-				String val = searchRequest.getStringPropertyValue(p);
-				String validated = substituteAndValidate(val, searchTags);
-				if (validated != null) {
-					String convertedKey = suffixOsmcTagsToResult.get(key);
-					result.put(convertedKey == null ? key : convertedKey, validated);
-				}
-			}
-
-			if (!result.isEmpty()) {
-				for (String key : searchTags.keySet()) {
-					for (String suffix : suffixOsmcTagsToResult.keySet()) {
-						if (key.endsWith(suffix)) {
-							result.put(suffixOsmcTagsToResult.get(suffix), searchTags.get(key));
-						}
-					}
-				}
-				return result;
-			}
-		}
-
-		return null;
-	}
-
-	@Nullable
-	private String substituteAndValidate(@Nullable String in, @Nonnull Map<String, String> tags) {
-		if (in != null && in.contains("?")) {
-			for (String key : tags.keySet()) {
-				if (in.contains("?" + key + "?")) {
-					return in.replace("?" + key + "?", tags.get(key));
-				}
-			}
-			return null; // invalid
-		}
-		return in;
 	}
 
 	@Nullable

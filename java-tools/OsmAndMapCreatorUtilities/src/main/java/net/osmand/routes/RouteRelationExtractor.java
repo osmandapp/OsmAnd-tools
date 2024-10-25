@@ -347,8 +347,8 @@ public class RouteRelationExtractor {
 				waysToJoin.add(way);
 				transformer.addPropogatedTags(finder.renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-				Map<String, String> props = finder.searchOsmcPropertiesByFinalTags(way.getTags());
-				if (props != null) {
+				Map<String, String> props = getShieldTagsFromOsmcTags(way.getTags());
+				if (!Algorithms.isEmpty(props)) {
 					if (props.containsKey("color")) {
 						// color is forced by osmc_waycolor
 						metadataExtensions.remove("colour");
@@ -581,5 +581,37 @@ public class RouteRelationExtractor {
 				additionalEntities.putAll(map);
 			}
 		}
+	}
+
+	private static final Map<String, String> osmcTagsToShieldProps = Map.of(
+			"osmc_text", "shield_text",
+			"osmc_background", "shield_bg",
+			"osmc_foreground", "shield_fg",
+			"osmc_foreground2", "shield_fg_2",
+			"osmc_textcolor", "shield_textcolor",
+			"osmc_waycolor", "color" // waycolor is a part of osmc:symbol and must be applied to whole way
+	);
+
+	private static final String OSMC_ICON_PREFIX = "osmc_";
+	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
+	private static final Set<String> shieldBgIcons = Set.of("shield_bg");
+	private static final Set<String> shieldFgIcons = Set.of("shield_fg", "sheld_fg_2");
+
+	@Nonnull
+	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags) {
+		Map<String, String> result = new HashMap<>();
+		for (String tag : tags.keySet()) {
+			for (String match : osmcTagsToShieldProps.keySet()) {
+				if (tag.endsWith(match)) {
+					final String key = osmcTagsToShieldProps.get(match);
+					final String prefix =
+							(shieldBgIcons.contains(key) || shieldFgIcons.contains(key)) ? OSMC_ICON_PREFIX : "";
+					final String suffix = shieldBgIcons.contains(key) ? OSMC_ICON_BG_SUFFIX : "";
+					final String val = prefix + tags.get(tag) + suffix;
+					result.putIfAbsent(key, val); // prefer 1st
+				}
+			}
+		}
+		return result;
 	}
 }
