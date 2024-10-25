@@ -412,7 +412,7 @@ public class RouteRelationExtractor {
 				break; // all done
 			}
 			GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
-			segment.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(osmId));
+			// segment.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(osmId));
 			// segment.getExtensionsToWrite().put("relation_track", "yes");
 			segment.points.addAll(wpts);
 			track.segments.add(segment);
