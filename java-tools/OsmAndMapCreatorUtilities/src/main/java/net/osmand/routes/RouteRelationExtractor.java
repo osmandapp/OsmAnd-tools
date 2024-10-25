@@ -44,7 +44,7 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
-import static net.osmand.obf.OsmGpxWriteContext.OSM_TAG_PREFIX;
+import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
@@ -304,10 +304,10 @@ public class RouteRelationExtractor {
 		Map <String, String> metadataExtensions = gpxFile.metadata.getExtensionsToWrite();
 
 		for (String key : relation.getTagKeySet()) {
-			metadataExtensions.put(OSM_TAG_PREFIX + key, relation.getTag(key));
+			metadataExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
 
-		metadataExtensions.put(OSM_TAG_PREFIX + "id", String.valueOf(relation.getId()));
+		metadataExtensions.put(OSM_IN_GPX_PREFIX + "id", String.valueOf(relation.getId()));
 		metadataExtensions.put("relation_gpx", "yes"); // render route:segment distinctly
 
 		if (relation.getTags().containsKey("colour")) {
@@ -354,7 +354,7 @@ public class RouteRelationExtractor {
 						metadataExtensions.remove("colour");
 					}
 					if ((props.containsKey("shield_text") || props.containsKey("shield_textcolor"))
-							&& !metadataExtensions.containsKey(OSM_TAG_PREFIX + "osmc:symbol")) {
+							&& !metadataExtensions.containsKey(OSM_IN_GPX_PREFIX + "osmc:symbol")) {
 						// avoid synthetic osmc
 						props.remove("shield_text");
 						props.remove("shield_textcolor");
@@ -479,12 +479,12 @@ public class RouteRelationExtractor {
 			wptPt.lon = node.getLongitude();
 //			wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
-			wptPt.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(node.getId()));
+			wptPt.getExtensionsToWrite().put(OSM_IN_GPX_PREFIX + "id", String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 					String key = entry1.getKey().replace(":", "_-_");
 					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
-						key = OSMAND_EXTENSIONS_PREFIX + OSM_TAG_PREFIX + key;
+						key = OSMAND_EXTENSIONS_PREFIX + OSM_IN_GPX_PREFIX + key;
 					}
 					try {
 						writeNotNullText(serializer, key, entry1.getValue());

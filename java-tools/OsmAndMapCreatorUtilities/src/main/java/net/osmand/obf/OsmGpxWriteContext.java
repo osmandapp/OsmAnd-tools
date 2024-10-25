@@ -22,7 +22,6 @@ import java.util.Map.Entry;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.data.LatLon;
-import net.osmand.shared.gpx.primitives.Metadata;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -56,7 +55,8 @@ import javax.annotation.Nonnull;
 
 public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
-	public static final String OSM_TAG_PREFIX = "osm_";
+	public static final String OSM_IN_GPX_PREFIX = "osm_";
+	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
 	public int tracks = 0;
@@ -110,10 +110,10 @@ public class OsmGpxWriteContext {
 	                       GpxTrackAnalysis analysis, String routeIdPrefix) throws IOException {
 		if (gpxFile.getMetadata() != null) {
 			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
-			gpxInfo.updateRef(metaExtensions.get(OSM_TAG_PREFIX + "ref"));
-			gpxInfo.updateName(metaExtensions.get(OSM_TAG_PREFIX + "name"));
-			gpxInfo.updateDescription(metaExtensions.get(OSM_TAG_PREFIX + "description"));
-			String osmId = metaExtensions.get(OSM_TAG_PREFIX + "id");
+			gpxInfo.updateRef(metaExtensions.get(OSM_IN_GPX_PREFIX + "ref"));
+			gpxInfo.updateName(metaExtensions.get(OSM_IN_GPX_PREFIX + "name"));
+			gpxInfo.updateDescription(metaExtensions.get(OSM_IN_GPX_PREFIX + "description"));
+			String osmId = metaExtensions.get(OSM_IN_GPX_PREFIX + "id");
 			if (osmId != null) {
 				gpxInfo.id = Long.parseLong(osmId);
 			}
@@ -144,9 +144,9 @@ public class OsmGpxWriteContext {
 				serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 				tagValue(serializer, "route", "segment");
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
-				tagValue(serializer, "route_type", "track"); // osm_route is not supported for non-detailed queries
+				tagValue(serializer, "route_type", "track");
 				Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, null, null);
-				serializeTags(extraTrackTags, gpxTrackTags);
+				serializeTags(extraTrackTags, gpxTrackTags); // full osm-tags is not supported for non-detailed queries
 				serializer.endTag(null, "node");
 			}
 		} else {
@@ -187,7 +187,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_type", "track"); // TODO remove after click-on-shield
+					// tagValue(serializer, "route_type", "track"); // TODO uncomment to debug old click-on-shield
 
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					String routeRadius = MapUtils.convertDistToChar(radius,
@@ -200,7 +200,11 @@ public class OsmGpxWriteContext {
 
 					serializer.endTag(null, "way");
 
-					String routeTag = gpxTrackTags.get(OSM_TAG_PREFIX + "route");
+					if (gpxFile.getMetadata() != null) {
+						addExtensionsOsmTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
+					}
+
+					String routeTag = gpxTrackTags.get("route"); // came from metadata "osm_route"
 					if (routeTag != null) {
 						OsmRouteType routeType = null;
 						for(String tag : routeTag.split("[;, ]")) {
@@ -224,7 +228,6 @@ public class OsmGpxWriteContext {
 							}
 						} else {
 							System.err.printf("WARN: unknown routeType (%s) for id (%s)\n", routeTag, gpxInfo.id);
-
 						}
 					}
 				}
@@ -249,7 +252,9 @@ public class OsmGpxWriteContext {
 			addElevationTags(gpxTrackTags, segment);
 		}
 		addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
-		addMetadataTags(gpxTrackTags, gpxFile.getMetadata(), gpxInfo);
+		if (gpxFile.getMetadata() != null) {
+			addExtensionsTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead(), gpxInfo);
+		}
 		addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
@@ -279,41 +284,43 @@ public class OsmGpxWriteContext {
 		}
 	}
 
+	private static final Set<String> keepOriginalTags = Set.of(
+			"color", // transformed to color_$color by OBF-generation
+			"osm_id", // keep untouched original OSM id (relations and nodes)
+			"relation_gpx" // special marker to render OSMC route_track distinctly
+	);
+
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
-		final String[] asIsTagsByPrefix = {
-				"gpx_",
-				"osm_",
-				"shield_",
-				"relation_gpx",
-				"color", // will be transformed to color_$color during the OBF-generation process
-				// "ref", "name", "description", and some other generic tags might be already added w/o prefix
-		};
-		if (extensions != null && !extensions.isEmpty()) {
+		final String SHIELD_TEXT_TO_REF = SHIELD_IN_GPX_PREFIX + "text";
+		if (!Algorithms.isEmpty(extensions)) {
 			if (extensions.containsKey("color")) {
 				// prioritize osmand:color over GPX color
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
 			}
-			if (extensions.containsKey("shield_text")) {
-				gpxInfo.updateRef(extensions.get("shield_text")); // update from osmc_text
-				gpxTrackTags.put("ref", gpxInfo.getPrettyRef()); // "osm_ref" will be kept as is
+			if (extensions.containsKey(SHIELD_TEXT_TO_REF)) {
+				gpxInfo.updateRef(extensions.get(SHIELD_TEXT_TO_REF));
+				gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
 			}
-			for (String key : extensions.keySet()) {
-				String outputKey = OBF_GPX_EXTENSION_TAG_PREFIX + key; // gpx_ by default
-				for (String asIsPrefix : asIsTagsByPrefix) {
-					if (key.startsWith(asIsPrefix)) {
-						outputKey = key;
-						break;
-					}
+			for (final String key : extensions.keySet()) {
+				if (keepOriginalTags.contains(key) ||
+						key.startsWith(OBF_GPX_EXTENSION_TAG_PREFIX) || key.startsWith(SHIELD_IN_GPX_PREFIX)) {
+					gpxTrackTags.putIfAbsent(key, extensions.get(key));
+				} else if (key.startsWith(OSM_IN_GPX_PREFIX)) {
+					// Ignore OSM-tags now because they are useless for Map-section.
+				} else {
+					gpxTrackTags.putIfAbsent(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key));
 				}
-				// tags will be filtered by rendering/poi types
-				gpxTrackTags.put(outputKey, extensions.get(key));
 			}
 		}
 	}
-	private void addMetadataTags(Map<String, String> gpxTrackTags, Metadata metadata, OsmGpxFile gpxInfo) {
-		if (metadata != null) {
-			addExtensionsTags(gpxTrackTags, metadata.getExtensionsToRead(), gpxInfo);
+	private void addExtensionsOsmTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
+		if (!Algorithms.isEmpty(extensions)) {
+			for (final String key : extensions.keySet()) {
+				if (key.startsWith(OSM_IN_GPX_PREFIX)) {
+					gpxTrackTags.putIfAbsent(key.replaceFirst(OSM_IN_GPX_PREFIX, ""), extensions.get(key));
+				}
+			}
 		}
 	}
 
