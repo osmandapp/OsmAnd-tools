@@ -530,11 +530,11 @@ public class OsmGpxWriteContext {
 		settings.indexAddress = false;
 		settings.indexRouting = false;
 		settings.indexTransport = false;
-		String srtmDirectory = System.getenv("SRTM_DIRECTORY");
-		if (srtmDirectory != null) {
-			settings.indexRouting = true;
-			settings.srtmDataFolderUrl = srtmDirectory;
-		}
+//		String srtmDirectory = System.getenv("SRTM_DIRECTORY"); // TODO 994081a880fc47479e0d17e4d7f1ee8defa96fc5
+//		if (srtmDirectory != null) {
+//			settings.indexRouting = true;
+//			settings.srtmDataFolderUrl = srtmDirectory;
+//		}
 		RTree.clearCache();
 		try {
 			tmpFolder.mkdirs();
