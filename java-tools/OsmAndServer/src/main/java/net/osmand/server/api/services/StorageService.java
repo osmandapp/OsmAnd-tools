@@ -257,7 +257,8 @@ public class StorageService {
 	}
 
 	private void handleException(StorageType st, String req, String fld, String fileName, SdkClientException e) {
-		LOGGER.warn(String.format("Request %s to file %s - %s has failed: %s ", req, fld, fileName));
+		LOGGER.warn(String.format(
+				"StorageError: request %s to file %s - %s has failed (%s)", req, fld, fileName, e.getMessage()));
 		if (e.getCause() instanceof org.apache.http.conn.ConnectionPoolTimeoutException) {
 			if (System.currentTimeMillis() - reconnectTime > 60 * 1000) {
 				st.s3Conn = st.s3ConnBuilder.build();
