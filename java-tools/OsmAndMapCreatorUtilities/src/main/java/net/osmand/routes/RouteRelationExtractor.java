@@ -49,7 +49,6 @@ import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
-//	private boolean DEBUG = false;
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
 	int countFiles;
 	int countWays;
@@ -60,18 +59,19 @@ public class RouteRelationExtractor {
 	private String[] customStyles = {
 			"default.render.xml",
 			"routes.addon.render.xml"
-			// "skimap.render.xml" // could work instead of default.render.xml but not together
+			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
 	};
 	private static final Map<String, String> customProperties = Map.of(
-			// routes.addon.render.xml
+			// default.render.xml:
+			"whiteWaterSports", "true",
+			// routes.addon.render.xml:
 			"showCycleRoutes", "true",
 			"showMtbRoutes", "true",
 			"hikingRoutesOSMC", "walkingRoutesOSMC",
 			"showDirtbikeTrails", "true",
 			"horseRoutes", "true",
 			"showFitnessTrails", "true",
-			"showRunningRoutes", "true",
-			"whiteWaterSports", "true" // default.render.xml
+			"showRunningRoutes", "true"
 			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
 	private final String[] filteredTags = {
@@ -94,8 +94,8 @@ public class RouteRelationExtractor {
 			"via_ferrata", // 0.2k
 			"walking", // 0.2k
 			"ferrata", // proposed
-			// bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
-			// power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
+			// Ignored: bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
+			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
 	private final int ICON_SEARCH_ZOOM = 19;
@@ -112,16 +112,16 @@ public class RouteRelationExtractor {
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("test")) {
 			List<String> s = new ArrayList<>();
-			s.add("slovakia-latest.osm.pbf");
-//			s.add("czech-republic-latest.osm.pbf");
-//			s.add("netherlands-latest.osm.pbf");
-//			s.add("germany-latest.osm.gz");
-//			s.add("malta-latest.osm.gz");
 //			s.add("andorra-latest.osm.gz");
+//			s.add("czech-republic-latest.osm.pbf");
+//			s.add("germany-latest.osm.gz");
 //			s.add("italy_sicilia.osm.pbf");
+			s.add("malta-latest.osm.gz");
+//			s.add("netherlands-latest.osm.pbf");
+//			s.add("slovakia-latest.osm.pbf");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
-			// TODO specify source file, tmp folder, result file // finally clean up the folder
+			// TODO specify source file, tmp folder, result file, and finally clean up the folder
 			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
 			System.exit(1);
 		}
@@ -287,8 +287,6 @@ public class RouteRelationExtractor {
 	}
 
 	private void saveGpx(Entity relation, Map<EntityId, Entity> children, File resultFile) {
-//		DEBUG = relation.getId() == 13168625;
-
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
 
 		String id = String.valueOf(relation.getId());
@@ -302,7 +300,7 @@ public class RouteRelationExtractor {
 		} else if (enName != null) {
 			gpxFile.metadata.name = enName;
 		} else if (description != null && !description.contains("\n")) {
-			gpxFile.metadata.name = description; // length might be limited
+			gpxFile.metadata.name = description; // max length might be limited
 		} else if (ref != null) {
 			gpxFile.metadata.name = ref;
 		} else {
@@ -318,7 +316,7 @@ public class RouteRelationExtractor {
 		}
 
 		metadataExtensions.put(OSM_IN_GPX_PREFIX + "id", String.valueOf(relation.getId()));
-		metadataExtensions.put("relation_gpx", "yes"); // render route:segment distinctly
+		metadataExtensions.put("relation_gpx", "yes"); // need to render route:segment distinctly
 
 		if (relation.getTags().containsKey("colour")) {
 			metadataExtensions.remove("colour");

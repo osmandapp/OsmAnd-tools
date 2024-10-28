@@ -61,7 +61,7 @@ public class OsmGpxWriteContext {
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
-	private long baseOsmId = -10; // Could be pseudo-random (commit 479f502)
+	private long baseOsmId = -10; // could be pseudo-random (commit 479f502)
 
 	XmlSerializer serializer = null;
 	OutputStream outputStream = null;
@@ -146,7 +146,7 @@ public class OsmGpxWriteContext {
 				tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 				tagValue(serializer, "route_type", "track");
 				Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, null, null);
-				serializeTags(extraTrackTags, gpxTrackTags); // full osm-tags is not supported for non-detailed queries
+				serializeTags(extraTrackTags, gpxTrackTags);
 				serializer.endTag(null, "node");
 			}
 		} else {
@@ -187,7 +187,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					// tagValue(serializer, "route_type", "track"); // TODO uncomment to debug old click-on-shield
+					// tagValue(serializer, "route_type", "track"); // XXX uncomment to debug old click-on-shield
 
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					String routeRadius = MapUtils.convertDistToChar(radius,
@@ -204,7 +204,7 @@ public class OsmGpxWriteContext {
 						addExtensionsOsmTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
 					}
 
-					String routeTag = gpxTrackTags.get("route"); // came from metadata "osm_route"
+					String routeTag = gpxTrackTags.get("route"); // came from GPX metadata "osm_route"
 					if (routeTag != null) {
 						OsmRouteType routeType = null;
 						for(String tag : routeTag.split("[;, ]")) {
@@ -399,8 +399,6 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.put("tag_" + tg, tg);
 			}
 			if (activityType != null) {
-				// red, blue, green, orange, yellow
-				// gpxTrackTags.put("gpx_icon", "");
 				gpxTrackTags.put("gpx_bg", activityType.getColor() + "_hexagon_3_road_shield");
 				gpxTrackTags.put("color", activityType.getColor());
 				gpxTrackTags.put("route_activity_type", activityType.getName().toLowerCase());
@@ -530,7 +528,7 @@ public class OsmGpxWriteContext {
 		settings.indexAddress = false;
 		settings.indexRouting = false;
 		settings.indexTransport = false;
-//		String srtmDirectory = System.getenv("SRTM_DIRECTORY"); // TODO 994081a880fc47479e0d17e4d7f1ee8defa96fc5
+//		String srtmDirectory = System.getenv("SRTM_DIRECTORY"); // HeightData 994081a880fc47479e0d17e4d7f1ee8defa96fc5
 //		if (srtmDirectory != null) {
 //			settings.indexRouting = true;
 //			settings.srtmDataFolderUrl = srtmDirectory;
@@ -541,9 +539,7 @@ public class OsmGpxWriteContext {
 			IndexCreator ic = new IndexCreator(tmpFolder, settings);
 			MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(null, fileName);
 			ic.setMapFileName(fileName);
-			// IProgress.EMPTY_PROGRESS
 			IProgress prog = IProgress.EMPTY_PROGRESS;
-			// prog = new ConsoleProgressImplementation();
 			ic.generateIndexes(qp.osmFile, prog, null, MapZooms.getDefault(), types, null);
 			new File(tmpFolder, ic.getMapFileName()).renameTo(targetObf);
 		} finally {
@@ -659,7 +655,7 @@ public class OsmGpxWriteContext {
 					return prettyRef;
 				}
 			}
-			return "" + id % 1000; // default ref is always required
+			return "" + id % 1000; // non-empty ref is strongly required to render Travel Obf files
 		}
 	}
 
