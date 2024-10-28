@@ -296,14 +296,13 @@ public class RouteRelationExtractor {
 		String mainName = relation.getTag("name");
 		String enName = relation.getTag("name:en");
 		String description = relation.getTag("description");
-		final int DESC_AS_NAME_MAX_LENGTH = 80;
 
 		if (mainName != null) {
 			gpxFile.metadata.name = mainName;
 		} else if (enName != null) {
 			gpxFile.metadata.name = enName;
-		} else if (description != null && description.length() < DESC_AS_NAME_MAX_LENGTH && !description.contains("\n")) {
-			gpxFile.metadata.name = description; // use short description when no name defined
+		} else if (description != null && !description.contains("\n")) {
+			gpxFile.metadata.name = description; // length might be limited
 		} else if (ref != null) {
 			gpxFile.metadata.name = ref;
 		} else {
