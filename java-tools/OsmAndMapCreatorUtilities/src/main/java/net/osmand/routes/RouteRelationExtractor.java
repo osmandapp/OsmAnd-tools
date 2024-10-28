@@ -20,7 +20,8 @@ import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
-import net.osmand.render.FindByRenderingTypesRules;
+import net.osmand.render.RenderingRuleSearchRequest;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -73,7 +74,6 @@ public class RouteRelationExtractor {
 			"whiteWaterSports", "true" // default.render.xml
 			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
-	private FindByRenderingTypesRules finder = new FindByRenderingTypesRules(customStyles, customProperties);
 	private final String[] filteredTags = {
 			"hiking", // 244k
 			"bicycle", // 119k
@@ -97,6 +97,17 @@ public class RouteRelationExtractor {
 			// bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
 			// power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
+
+	private final int ICON_SEARCH_ZOOM = 19;
+	private final RenderingRulesStorage renderingRules;
+	private final MapRenderingTypesEncoder renderingTypes;
+	private final RenderingRuleSearchRequest searchRequest;
+
+	public RouteRelationExtractor() {
+		renderingTypes = new MapRenderingTypesEncoder("basemap");
+		renderingRules = RenderingRulesStorage.initWithStylesFromResources(customStyles);
+		searchRequest = RenderingRuleSearchRequest.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, customProperties);
+	}
 
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("test")) {
@@ -331,7 +342,7 @@ public class RouteRelationExtractor {
 
 		RelationTagsPropagation transformer = new RelationTagsPropagation();
 		try {
-			transformer.handleRelationPropogatedTags((Relation)relation, finder.renderingTypes, null,
+			transformer.handleRelationPropogatedTags((Relation)relation, renderingTypes, null,
 					MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
 		} catch (SQLException ex) {
 			throw new RuntimeException(ex);
@@ -345,7 +356,7 @@ public class RouteRelationExtractor {
 					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
 				waysToJoin.add(way);
-				transformer.addPropogatedTags(finder.renderingTypes,
+				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				Map<String, String> props = getShieldTagsFromOsmcTags(way.getTags());
 				if (!Algorithms.isEmpty(props)) {
@@ -470,7 +481,9 @@ public class RouteRelationExtractor {
 					return;
 				}
 			}
-			String gpxIcon = finder.searchGpxIconByNode(node);
+			final Map<String, String> transformedTags = renderingTypes.transformTags(node.getTags(),
+					Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+			String gpxIcon = searchRequest.searchIconByTags(transformedTags);
 			if (gpxIcon == null) {
 				return;
 			}
