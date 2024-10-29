@@ -23,6 +23,7 @@ public class DatasourceConfiguration {
 	private boolean wikiInitialzed;
 	private boolean monitorInitialzed;
 	private boolean changesetInitialzed;
+	private boolean osmgpxInitialzed;
 	
 	
     @Bean
@@ -37,6 +38,12 @@ public class DatasourceConfiguration {
     public DataSourceProperties wikiDataSourceProperties() {
         return new DataSourceProperties();
     }
+
+	@Bean
+	@ConfigurationProperties(prefix="spring.osmgpxdatasource")
+	public DataSourceProperties osmgpxDataSourceProperties() {
+		return new DataSourceProperties();
+	}
     
     @Bean
 	@ConfigurationProperties(prefix="spring.changesetdatasource")
@@ -54,6 +61,10 @@ public class DatasourceConfiguration {
 	@Primary
 	public DataSource primaryDataSource() {
 		return primaryDataSourceProperties().initializeDataSourceBuilder().build();
+	}
+
+	public boolean osmgpxInitialized() {
+		return osmgpxInitialzed;
 	}
 
 	public boolean wikiInitialized() {
@@ -76,6 +87,18 @@ public class DatasourceConfiguration {
 			return ds;
 		} catch (Exception e) {
 			LOG.warn("Warning - Wiki database not configured: " + e.getMessage());
+		}
+		return emptyDataSource();
+	}
+
+	@Bean
+	public DataSource osmgpxDataSource() {
+		try {
+			DataSource ds = osmgpxDataSourceProperties().initializeDataSourceBuilder().build();
+			osmgpxInitialzed = true;
+			return ds;
+		} catch (Exception e) {
+			LOG.warn("Warning - Osmgpx database not configured: " + e.getMessage());
 		}
 		return emptyDataSource();
 	}
@@ -133,6 +156,14 @@ public class DatasourceConfiguration {
 	
 	@Bean
 	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
+		if (dataSource == null) {
+			return null;
+		}
+		return new JdbcTemplate(dataSource);
+	}
+
+	@Bean
+	public JdbcTemplate osmgpxJdbcTemplate(@Qualifier("osmgpxDataSource") DataSource dataSource) {
 		if (dataSource == null) {
 			return null;
 		}

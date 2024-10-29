@@ -97,6 +97,10 @@ spring:
     username: ${WIKI_DB_USER:}
     password: ${WIKI_DB_PWD:}
     driverClassname: ${WIKI_DBCLASS_NAME:}
+  osmgpxdatasource:
+    url: ${OSM_GPX_DB_CONN}
+    username: ${OSM_GPX_DB_USER}
+    password: ${OSM_GPX_DB_PWD}
   monitordatasource:
     url:
     username:
