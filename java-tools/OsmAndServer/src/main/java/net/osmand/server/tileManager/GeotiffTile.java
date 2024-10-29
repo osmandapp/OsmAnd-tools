@@ -72,7 +72,7 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 		return TileCacheProvider.super.getCacheFile(
 				cfg.heightmapLocation, ext, z, x, y,
 				-1, -1,
-				tileType.getType(), null
+				tileType.getType(), null, 15
 		);
 	}
 
