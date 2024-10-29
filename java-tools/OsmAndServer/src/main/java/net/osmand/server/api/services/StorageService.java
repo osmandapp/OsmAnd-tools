@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
@@ -47,6 +48,8 @@ public class StorageService {
 
 	@Value("${storage.default}")
 	private String defaultStorage;
+	
+	private long reconnectTime = 0;
 
 	@Autowired
 	private Environment env;
@@ -110,6 +113,7 @@ public class StorageService {
 					region, bucket, accessKey, secretKey == null ? 0 : secretKey.length()));
 			AmazonS3 s3 = builder.build();
 			st = new StorageType();
+			st.s3ConnBuilder = builder;
 			st.bucket = bucket;
 			st.s3Conn = s3;
 		}
@@ -141,11 +145,17 @@ public class StorageService {
 			String newKey = userFolder + FILE_SEPARATOR + newStorageFileName;
 			for (String id : storage.split(",")) {
 				StorageType toStore = getStorageProviderById(id);
-				if (toStore != null && !toStore.local && toStore.s3Conn.doesObjectExist(toStore.bucket, oldKey)) {
-					CopyObjectResult res = toStore.s3Conn.copyObject(toStore.bucket, oldKey, toStore.bucket, newKey);
-					if (res.getLastModifiedDate() != null) {
-						toStore.s3Conn.deleteObject(toStore.bucket, oldKey);
+				try {
+					if (toStore != null && !toStore.local && toStore.s3Conn.doesObjectExist(toStore.bucket, oldKey)) {
+						CopyObjectResult res = toStore.s3Conn.copyObject(toStore.bucket, oldKey, toStore.bucket,
+								newKey);
+						if (res.getLastModifiedDate() != null) {
+							toStore.s3Conn.deleteObject(toStore.bucket, oldKey);
+						}
 					}
+				} catch (com.amazonaws.SdkClientException e) {
+					handleException(toStore, "remap", userFolder, oldStorageFileName, e);
+					throw e;
 				}
 			}
 		}
@@ -200,7 +210,12 @@ public class StorageService {
 		if (!s.local) {
 			ObjectMetadata om = new ObjectMetadata();
 			om.setContentLength(fileSize);
-			s.s3Conn.putObject(s.bucket, fld + FILE_SEPARATOR + fileName, is, om);
+			try {
+				s.s3Conn.putObject(s.bucket, fld + FILE_SEPARATOR + fileName, is, om);
+			} catch (com.amazonaws.SdkClientException e) {
+				handleException(s, "save", fld, fileName, e);
+				throw e;
+			}
 		}
 	}
 	
@@ -212,6 +227,9 @@ public class StorageService {
 					try {
 						S3Object obj = st.s3Conn.getObject(new GetObjectRequest(st.bucket, fld + FILE_SEPARATOR + filename));
 						return obj.getObjectContent();
+					} catch (com.amazonaws.SdkClientException e) {
+						handleException(st, "getFileInputStream", st.bucket, filename, e);
+						throw e;
 					} catch (RuntimeException e) {
 						LOGGER.warn(String.format("Request %s: %s ", st.bucket, fld + FILE_SEPARATOR + filename)); 
 						throw e;
@@ -227,13 +245,30 @@ public class StorageService {
 			for (String id : storage.split(",")) {
 				StorageType st = getStorageProviderById(id);
 				if (st != null && !st.local) {
-					st.s3Conn.deleteObject(st.bucket, fld + FILE_SEPARATOR + filename);
+					try {
+						st.s3Conn.deleteObject(st.bucket, fld + FILE_SEPARATOR + filename);
+					} catch (com.amazonaws.SdkClientException e) {
+						handleException(st, "delete", fld, filename, e);
+						throw e;
+					}
 				}
 			}
 		}
 	}
 
+	private void handleException(StorageType st, String req, String fld, String fileName, SdkClientException e) {
+		LOGGER.warn(String.format(
+				"StorageError: request %s to file %s - %s has failed (%s)", req, fld, fileName, e.getMessage()));
+		if (e.getCause() instanceof org.apache.http.conn.ConnectionPoolTimeoutException) {
+			if (System.currentTimeMillis() - reconnectTime > 60 * 1000) {
+				st.s3Conn = st.s3ConnBuilder.build();
+				reconnectTime = System.currentTimeMillis();
+			}
+		}
+	}
+
 	static class StorageType {
+		AmazonS3ClientBuilder s3ConnBuilder;
 		AmazonS3 s3Conn;
 		String bucket;
 		boolean local;

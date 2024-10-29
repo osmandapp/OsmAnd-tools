@@ -14,8 +14,10 @@ import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypes.PropagateToNode;
 import net.osmand.osm.MapRenderingTypes.PropagateToNodesType;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
@@ -227,15 +229,17 @@ public class PropagateToNodes {
 
 	private List<PropagateRule> getRulesToApply(Way w) {
 		List<PropagateRule> rulesToApply = null;
-		for (String tag : w.getTagKeySet()) {
+		Map<String, String> trTags = renderingTypes.transformTags(w.getTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+//		System.out.println("WA " + (w.getId()));
+		for (String tag : trTags.keySet()) {
 			List<PropagateRule> list = propagateRulesByTag.get(tag);
 			if (list == null) {
 				continue;
 			}
 			for (PropagateRule rule : list) {
-				String entityTag = w.getTag(tag);
+				String entityTag = trTags.get(tag);
 				if (entityTag != null && entityTag.equals(rule.value)) {
-					boolean propIf = rule.applicableBorder(w);
+					boolean propIf = rule.applicableBorder(trTags);
 					if (propIf) {
 						if (rulesToApply == null) {
 							rulesToApply = new ArrayList<>();
@@ -321,38 +325,38 @@ public class PropagateToNodes {
 			return propagateTag;
 		}
 		
-		public boolean applicableBorder(Way w) {
-			if (!value.equals(w.getTag(tag))) {
+		public boolean applicableBorder(Map<String, String> tags) {
+			if (!value.equals(tags.get(tag))) {
 				return false;
 			}
-			if (propNetworkIf != null && !applicable(w, propNetworkIf)) {
+			if (propNetworkIf != null && !applicable(tags, propNetworkIf)) {
 				return false;
 			}
-			if (propMapIf != null && !applicable(w, propMapIf)) {
+			if (propMapIf != null && !applicable(tags, propMapIf)) {
 				return false;
 			}
 			return true;
 		}
 		
-		public boolean applicableNetwork(Way w) {
+		public boolean applicableNetwork(Map<String, String> tags) {
 			if (propNetworkIf != null) {
-				return applicable(w, propNetworkIf);
+				return applicable(tags, propNetworkIf);
 			}
 			return true;
 		}
 
-		private boolean applicable(Way w, Map<String, String> propMap) {
+		private boolean applicable(Map<String, String> tags, Map<String, String> propMap) {
 			for (Map.Entry<String, String> entry : propMap.entrySet()) {
 				String propTag = entry.getKey();
 				if (propTag.startsWith("~")) {
-					String tagValue = w.getTag(propTag.substring(1));
+					String tagValue = tags.get(propTag.substring(1));
 					boolean noValue = Algorithms.isEmpty(tagValue) || "no".equals(tagValue);
 					if (!noValue) {
 						return false;
 					}
 					continue;
 				}
-				String tagValue = w.getTag(propTag);
+				String tagValue = tags.get(propTag);
 				if (tagValue == null) {
 					return false;
 				} else {
@@ -388,9 +392,13 @@ public class PropagateToNodes {
 		if (propagateTagsByOsmNodeId.isEmpty()) {
 			return;
 		}
+		Map<String, String> convertTags = null;
 		for (long nodeId : w.getNodeIds().toArray()) {
 			List<PropagateRuleFromWayToNode> linkedPropagate = propagateTagsByOsmNodeId.get(nodeId);
 			if (linkedPropagate != null) {
+				if (convertTags == null) {
+					convertTags = renderingTypes.transformTags(w.getTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+				}
 				Map<PropagateRule, List<PropagateRuleFromWayToNode>> rules = new HashMap<>();
 				for (PropagateRuleFromWayToNode n : linkedPropagate) {
 					if (!rules.containsKey(n.rule)) {
@@ -405,7 +413,7 @@ public class PropagateToNodes {
 					}
 					List<PropagateRuleFromWayToNode> propagatedBorders = rules.get(rule);
 					for (PropagateRuleFromWayToNode p : propagatedBorders) {
-						if (p.rule.applicableNetwork(w) && !p.rule.applicableBorder(w)) {
+						if (p.rule.applicableNetwork(convertTags) && !p.rule.applicableBorder(convertTags)) {
 							p.ignoreBorderPoint = false;
 						}
 					}

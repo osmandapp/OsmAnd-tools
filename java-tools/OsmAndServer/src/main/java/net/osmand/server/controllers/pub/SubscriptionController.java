@@ -177,6 +177,9 @@ public class SubscriptionController {
 	@PostMapping(path = {"/register", "/register.php"}, consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces =  MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> register(HttpServletRequest request) {
         String email = request.getParameter("email");
+        if (email != null) {
+            email = email.toLowerCase().trim();
+        }
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");
         // no email validation cause client doesn't provide it 99%
