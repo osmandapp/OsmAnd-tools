@@ -53,7 +53,7 @@ public class OsmGpxController {
 
 	@GetMapping(path = {"/get-routes-list"}, produces = "application/json")
 	public ResponseEntity<String> getRoutes(@RequestParam String activity,
-	                                        @RequestParam String year,
+	                                        @RequestParam(required = false) String year,
 	                                        @RequestParam String minlat,
 	                                        @RequestParam String maxlat,
 	                                        @RequestParam String minlon,
