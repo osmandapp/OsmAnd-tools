@@ -348,6 +348,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformAddMultipleNetwoksTag(tags);
 		tags = transformRouteLimitationTags(tags);
 		tags = transformTurnLanesTags(tags);
+		addEleFeetTags(tags);
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
 		if (listToTransform == null && listToCombine == null) {
@@ -1131,6 +1132,20 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return value.toLowerCase().endsWith(fromTag.value.toLowerCase());
 	}
 
+	private void addEleFeetTags(Map<String, String> tags) {
+		if (tags.containsKey("ele") && ! tags.containsKey("ele_feet")) {
+			String meters = tags.get("ele");
+			double m;
+			try {
+				m = Double.parseDouble(meters);
+			} catch (NumberFormatException e) {
+				return;
+			}
+			double feet = m * 3.2808399;
+			tags.put("ele_feet", String.valueOf(feet));
+		}
+		return;
+	}
 
 
 	protected String simplifyValueTo45(String val) {
