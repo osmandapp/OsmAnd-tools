@@ -244,22 +244,13 @@ public class UpdateSubscription {
 			boolean valid = rs.getBoolean("valid");
 			long currentTime = System.currentTimeMillis();
 			SubscriptionType fromSku = SubscriptionType.fromSku(sku);
-			if (checkTime == null) {
-				System.out.println("0. " + orderId + " " + fromSku + " " + this.subType);
-			}
 			if (this.subType != fromSku) {
 				continue;
 			}
 			long delayBetweenChecks = checkTime == null ? MINIMUM_WAIT_TO_REVALIDATE : (currentTime - checkTime.getTime());
-			if (checkTime == null) {
-				System.out.println("1. " + orderId);
-			}
 			if (delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll) {
 				// in case validate all (ignore minimum waiting time)
 				continue;
-			}
-			if (checkTime == null) {
-				System.out.println("2. " + orderId);
 			}
 			boolean activeNow = false;
 			if (checkTime != null && startTime != null && expireTime != null && expireTime.getTime() >= currentTime) {
@@ -268,9 +259,6 @@ public class UpdateSubscription {
 			// if it is not valid then it was requested to validate all
 			if (activeNow && valid && delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE_VALID) {
 				continue;
-			}
-			if (checkTime == null) {
-				System.out.println("3. " + orderId);
 			}
 			String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...")
 					: orderId;
