@@ -247,7 +247,7 @@ public class UpdateSubscription {
 			if (this.subType != fromSku) {
 				continue;
 			}
-			long delayBetweenChecks = checkTime == null ? currentTime : (currentTime - checkTime.getTime());
+			long delayBetweenChecks = checkTime == null ? 0 : (currentTime - checkTime.getTime());
 			if (delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll) {
 				// in case validate all (ignore minimum waiting time)
 				continue;
