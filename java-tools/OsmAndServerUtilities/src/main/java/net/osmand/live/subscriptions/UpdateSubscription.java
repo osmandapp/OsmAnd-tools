@@ -244,6 +244,9 @@ public class UpdateSubscription {
 			boolean valid = rs.getBoolean("valid");
 			long currentTime = System.currentTimeMillis();
 			SubscriptionType fromSku = SubscriptionType.fromSku(sku);
+			if (checkTime == null) {
+				System.out.println("0. " + orderId + " " + fromSku + " " + this.subType);
+			}
 			if (this.subType != fromSku) {
 				continue;
 			}
