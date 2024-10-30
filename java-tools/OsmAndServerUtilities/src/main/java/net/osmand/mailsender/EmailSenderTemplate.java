@@ -280,7 +280,8 @@ public class EmailSenderTemplate {
 		}
 	}
 
-	private final String HTML_COMMENTS = "(?s).*<!--.*?-->.*"; // (?s) for Pattern.DOTALL multiline mode
+	private final String HTML_COMMENT_MATCH = "(?s).*<!--.*?-->*.";
+	private final String HTML_COMMENT_REPLACE = "(?s)<!--.*?-->"; // (?s) Pattern.DOTALL (multiline)
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 
 	private void parseCommandArgumentsFromComment(String line) {
@@ -288,7 +289,7 @@ public class EmailSenderTemplate {
 		// <!--From: @NOREPLY_MAIL_FROM@-->
 		// <!--Set: HTML_NEWLINE_TO_BR=true-->
 		// <!-- Set DEFAULT_MAIL_FROM = noreply@domain -->
-		if (!line.matches(HTML_COMMENTS)) {
+		if (!line.matches(HTML_COMMENT_MATCH)) {
 			return;
 		}
 		Matcher matcher = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->").matcher(line);
@@ -312,8 +313,9 @@ public class EmailSenderTemplate {
 				// optional headers, eg:
 				// <!--List-Unsubscribe: <URL>-->
 				// <!--List-Unsubscribe-Post: List-Unsubscribe=One-Click-->
-				// throw new IllegalStateException(command + ": unknown template command");
-				headers.put(command, argument);
+				if (!argument.isEmpty()) {
+					headers.put(command, argument);
+				}
 			}
 		}
 	}
@@ -373,7 +375,7 @@ public class EmailSenderTemplate {
 		for (String line : lines) {
 			parseCommandArgumentsFromComment(line);
 
-			String cleaned = line.replaceAll(HTML_COMMENTS, "");
+			String cleaned = line.replaceAll(HTML_COMMENT_REPLACE, "");
 
 			// allow to specify Subject-line at the beginning of the template
 			if (bodyLines.isEmpty() && cleaned.trim().startsWith("Subject:")) {
@@ -398,7 +400,7 @@ public class EmailSenderTemplate {
 			}
 		}
 
-		String joined = String.join("", bodyLines).replaceAll(HTML_COMMENTS, ""); // drop comments
+		String joined = String.join("", bodyLines).replaceAll(HTML_COMMENT_REPLACE, "");
 		body = body == null ? joined : body + joined; // concat bodies from all included templates
 	}
 

@@ -417,7 +417,7 @@ public class WikivoyageGenOSM {
 			serializer.attribute(null, "action", "modify");
 			serializer.attribute(null, "version", "1");
 			serializer.attribute(null, "lat", formatLat(p.lat));
-			serializer.attribute(null, "lon", formatLat(p.lon));
+			serializer.attribute(null, "lon", formatLon(p.lon));
 			
 			tagValue(serializer, "route", "point");
 			tagValue(serializer, "route_type", "article_point");
