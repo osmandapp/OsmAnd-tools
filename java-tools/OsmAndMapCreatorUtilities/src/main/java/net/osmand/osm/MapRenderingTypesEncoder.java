@@ -1,5 +1,15 @@
 package net.osmand.osm;
 
+import gnu.trove.list.array.TIntArrayList;
+import net.osmand.PlatformUtil;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.util.Algorithms;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -13,18 +23,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
-
-import gnu.trove.list.array.TIntArrayList;
-import net.osmand.PlatformUtil;
-import net.osmand.osm.MapRenderingTypes.PropagateToNode;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.util.Algorithms;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
@@ -1134,6 +1132,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	private Map<String, String> addEleFeetTags(Map<String, String> tags) {
 		if (tags.containsKey("ele") && ! tags.containsKey("ele_feet")) {
+			tags = new LinkedHashMap<String, String>(tags);
 			String meters = tags.get("ele");
 			double m;
 			try {
