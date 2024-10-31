@@ -586,14 +586,15 @@ public class WikiService {
 	}
 
 	private void parseLicenseFile() {
-		File fileWithLicenses = new File("src/main/resources/wikidata/wiki_data_licenses.json");
-		if (!fileWithLicenses.exists()) {
-			log.error("License file not found: " + fileWithLicenses.getAbsolutePath());
+		ClassLoader classLoader = getClass().getClassLoader();
+		InputStream inputStream = classLoader.getResourceAsStream("wikidata/wiki_data_licenses.json");
+		if (inputStream == null) {
+			log.error("License file not found: wikidata/wiki_data_licenses.json");
 			return;
 		}
 		final String VALUE = "value";
 
-		try (BufferedReader reader = new BufferedReader(new FileReader(fileWithLicenses))) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
 			Gson gson = new Gson();
 			JsonObject jsonObject = gson.fromJson(reader, JsonObject.class);
 			JsonArray bindings = jsonObject.getAsJsonObject("results").getAsJsonArray("bindings");
