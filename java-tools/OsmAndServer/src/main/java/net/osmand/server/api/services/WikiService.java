@@ -586,7 +586,7 @@ public class WikiService {
 	}
 
 	private void parseLicenseFile() {
-		File fileWithLicenses = new File("src/main/resources/wiki_data_licenses.json");
+		File fileWithLicenses = new File("src/main/resources/wikidata/wiki_data_licenses.json");
 		if (!fileWithLicenses.exists()) {
 			log.error("License file not found: " + fileWithLicenses.getAbsolutePath());
 			return;
