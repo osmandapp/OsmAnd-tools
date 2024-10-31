@@ -134,7 +134,8 @@ public class RoutingController {
 		final String routingSection = "Routing (devel)";
 		final String approximationSection = "Approximation (devel)";
 
-		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", routingSection, "Use separate maps", false);
+		RoutingParameter noConditionals = new RoutingParameter("noconditionals", routingSection, "Ignore *:conditional tags", false);
+		RoutingParameter sepMaps = new RoutingParameter("noglobalfile", routingSection, "Use separate OBF maps", false);
 
 		RoutingParameter selectRoutingTypeCar = new RoutingParameter("routing", "Routing type",
 				"Algorithm and library for routing", null, RoutingParameterType.SYMBOLIC.name().toLowerCase());
@@ -172,8 +173,8 @@ public class RoutingController {
 				String derivedProfiles = e.getValue().getAttribute("derivedProfiles");
 				RoutingParameter routingTypes = derivedProfiles != null && "car".equals(e.getKey())
 						? selectRoutingTypeCar : selectRoutingTypeAll;
-				List<RoutingController.RoutingParameter> passParams = new ArrayList<>(Arrays.asList(
-						routingTypes, sepMaps, selectApproximationType, minPointApproximation, gpxTimestampsDisabled));
+				List<RoutingController.RoutingParameter> passParams = new ArrayList<>(Arrays.asList(routingTypes,
+						noConditionals, sepMaps, selectApproximationType, minPointApproximation, gpxTimestampsDisabled));
 				if (derivedProfiles != null) {
 					String[] derivedProfilesList = derivedProfiles.split(",");
 					for (String profile : derivedProfilesList) {
