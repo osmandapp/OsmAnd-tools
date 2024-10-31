@@ -768,7 +768,10 @@ public class OsmAndMapsService {
 			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
 		}
 
-//		config.routeCalculationTime = System.currentTimeMillis(); // parameter needed
+		if (rp.routeParams.get("noconditionals") == null) {
+			config.routeCalculationTime = System.currentTimeMillis();
+		}
+
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
 				usedMapList.toArray(new BinaryMapIndexReader[0]), rp.calcMode);
 		ctx.leftSideNavigation = false;

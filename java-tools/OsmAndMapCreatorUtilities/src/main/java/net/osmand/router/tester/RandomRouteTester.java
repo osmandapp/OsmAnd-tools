@@ -72,6 +72,7 @@ public class RandomRouteTester {
 
 		// enable Android mode for BRP
 		boolean CAR_2PHASE_MODE = false;
+		boolean ENABLE_TIME_CONDITIONAL_ROUTING = true;
 	}
 
 	class CommandLineOpts {
@@ -221,6 +222,10 @@ public class RandomRouteTester {
 			config.CAR_2PHASE_MODE = true;
 		}
 
+		if (opts.getOpt("--no-conditionals") != null) {
+			config.ENABLE_TIME_CONDITIONAL_ROUTING = false;
+		}
+
 		if (opts.getOpt("--help") != null) {
 			System.err.printf("%s\n", String.join("\n",
 					"",
@@ -248,6 +253,7 @@ public class RandomRouteTester {
 					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
 					"",
 					"--car-2phase use COMPLEX mode for car (Android default)",
+					"--no-conditionals disable *:conditional restrictions",
 					"",
 					"--red=N % red-color limit",
 					"--yellow=N % yellow-color limit",
@@ -421,7 +427,9 @@ public class RandomRouteTester {
 						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
 						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
 
-		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
+		if (this.config.ENABLE_TIME_CONDITIONAL_ROUTING) {
+			config.routeCalculationTime = System.currentTimeMillis();
+		}
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
@@ -471,7 +479,9 @@ public class RandomRouteTester {
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
-		config.routeCalculationTime = System.currentTimeMillis(); // ENABLE_TIME_CONDITIONAL_ROUTING
+		if (this.config.ENABLE_TIME_CONDITIONAL_ROUTING) {
+			config.routeCalculationTime = System.currentTimeMillis();
+		}
 
 		RoutingContext ctx = fe.buildRoutingContext(
 				config,
