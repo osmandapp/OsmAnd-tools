@@ -498,9 +498,11 @@ public class OsmAndMapsService {
 
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
 			synchronized (this) {
+				if (osmandRegions == null) {
+					osmandRegions = new OsmandRegions();
+					osmandRegions.prepareFile();
+				}
 				if (!(nativelib == null && tileConfig.initErrorMessage == null)) {
 					return tileConfig.initErrorMessage == null;
 				}
