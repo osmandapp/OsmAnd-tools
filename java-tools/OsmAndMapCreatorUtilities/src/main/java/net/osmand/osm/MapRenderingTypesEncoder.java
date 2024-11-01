@@ -1140,7 +1140,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			} catch (NumberFormatException e) {
 				return tags;
 			}
-			double feet = m * 3.2808399;
+			int feet = (int) (Math.round(m * 3.2808399));
 			tags.put("ele_feet", String.valueOf(feet));
 		}
 		return tags;
