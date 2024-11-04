@@ -83,7 +83,7 @@ public class GeotiffTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=2592000")
+				.header("Cache-Control", "public, max-age=1")
 				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
@@ -155,7 +155,11 @@ public class GeotiffTileController {
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 		long startTime = System.currentTimeMillis();
 		Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
-		LOGGER.info("Total active threads: " + allThreads.size());
+		for (Thread thread : allThreads.keySet()) {
+			if (thread.getName().contains("exec")) {
+				LOGGER.info("HTTP thread name: " + thread.getName() + ", state: " + thread.getState());
+			}
+		}
 		LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
