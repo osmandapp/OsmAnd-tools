@@ -4,7 +4,8 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.concurrent.*;
 
 import javax.imageio.ImageIO;
 
@@ -152,14 +153,36 @@ public class GeotiffTileController {
 
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
-
-		BufferedImage img = osmAndMapsService.renderGeotiffTile(
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
 				resultColorsResourcePath,
 				intermediateColorsResourcePath,
 				tile.getTileType().getResType(),
 				256, tile.z, tile.x, tile.y
-		);
+		));
+		BufferedImage img;
+		try {
+			img = future.get(30, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			LOGGER.warn("Rendering tile [" + tile.getTileId() + "] timed out on thread: " + Thread.currentThread().getId());
+			future.cancel(true);
+			img = null;
+		} catch (InterruptedException e) {
+			LOGGER.error("Rendering tile [" + tile.getTileId() + "] was interrupted on thread: " + Thread.currentThread().getId(), e);
+			Thread.currentThread().interrupt();
+			img = null;
+		} catch (ExecutionException e) {
+			LOGGER.error("Error during rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId(), e);
+			img = null;
+		} finally {
+			executor.shutdown();
+		}
+
+		if (img == null) {
+			return null;
+		}
+
 		File cacheFile = tile.getCacheFile(".png");
 		if (cacheFile == null) {
 			return null;
