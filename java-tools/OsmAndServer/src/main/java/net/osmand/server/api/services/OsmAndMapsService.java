@@ -496,42 +496,39 @@ public class OsmAndMapsService {
 		return routingConfig;
 	}
 
-	public boolean validateAndInitConfig() throws IOException {
+	public synchronized boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
-			synchronized (this) {
-				if (!(nativelib == null && tileConfig.initErrorMessage == null)) {
-					return tileConfig.initErrorMessage == null;
-				}
-				if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
-					tileConfig.initErrorMessage = "Files location is not specified";
-				} else {
-					File obfLocationF = new File(tileConfig.obfLocation);
-					if (!obfLocationF.exists()) {
-						tileConfig.initErrorMessage = "Files location is not specified";
-					}
-				}
-				tempDir = Files.createTempDirectory("osmandserver").toFile();
-				LOGGER.info("Init temp rendering directory for libs / fonts: " + tempDir.getAbsolutePath());
-				tempDir.deleteOnExit();
-				ClassLoader cl = NativeJavaRendering.class.getClassLoader();
-				ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(cl);
-				Resource[] resources = resolver.getResources("classpath:/map/fonts/*.ttf");
-				File fontsFolder = new File(tempDir, "fonts");
-				fontsFolder.mkdirs();
-				fontsFolder.deleteOnExit();
-				for (Resource resource : resources) {
-					InputStream ios = resource.getInputStream();
-					File file = new File(fontsFolder, resource.getFilename());
-					file.deleteOnExit();
-					FileOutputStream fous = new FileOutputStream(file);
-					Algorithms.streamCopy(ios, fous);
-					fous.close();
-					ios.close();
-				}
-				nativelib = NativeJavaRendering.getDefault(null, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
+			if (osmandRegions == null) {
+				osmandRegions = new OsmandRegions();
+				osmandRegions.prepareFile();
 			}
+			if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
+				tileConfig.initErrorMessage = "Files location is not specified";
+			} else {
+				File obfLocationF = new File(tileConfig.obfLocation);
+				if (!obfLocationF.exists()) {
+					tileConfig.initErrorMessage = "Files location is not specified";
+				}
+			}
+			tempDir = Files.createTempDirectory("osmandserver").toFile();
+			LOGGER.info("Init temp rendering directory for libs / fonts: " + tempDir.getAbsolutePath());
+			tempDir.deleteOnExit();
+			ClassLoader cl = NativeJavaRendering.class.getClassLoader();
+			ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver(cl);
+			Resource[] resources = resolver.getResources("classpath:/map/fonts/*.ttf");
+			File fontsFolder = new File(tempDir, "fonts");
+			fontsFolder.mkdirs();
+			fontsFolder.deleteOnExit();
+			for (Resource resource : resources) {
+				InputStream ios = resource.getInputStream();
+				File file = new File(fontsFolder, resource.getFilename());
+				file.deleteOnExit();
+				FileOutputStream fous = new FileOutputStream(file);
+				Algorithms.streamCopy(ios, fous);
+				fous.close();
+				ios.close();
+			}
+			nativelib = NativeJavaRendering.getDefault(null, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
 		}
 		return tileConfig.initErrorMessage == null;
 	}
