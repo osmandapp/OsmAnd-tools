@@ -152,7 +152,7 @@ public class GeotiffTileController {
 
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
-
+		LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		BufferedImage img = osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
 				resultColorsResourcePath,
@@ -160,6 +160,7 @@ public class GeotiffTileController {
 				tile.getTileType().getResType(),
 				256, tile.z, tile.x, tile.y
 		);
+		LOGGER.info("Finish rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		File cacheFile = tile.getCacheFile(".png");
 		if (cacheFile == null) {
 			return null;
