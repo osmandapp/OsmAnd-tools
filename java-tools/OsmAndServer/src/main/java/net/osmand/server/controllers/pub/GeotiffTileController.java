@@ -164,7 +164,7 @@ public class GeotiffTileController {
 		));
 		BufferedImage img;
 		try {
-			img = future.get(1, TimeUnit.MINUTES);
+			img = future.get(2, TimeUnit.MINUTES);
 		} catch (TimeoutException e) {
 			LOGGER.warn("Rendering tile [" + tile.getTileId() + "] timed out on thread: " + Thread.currentThread().getId());
 			future.cancel(true);
