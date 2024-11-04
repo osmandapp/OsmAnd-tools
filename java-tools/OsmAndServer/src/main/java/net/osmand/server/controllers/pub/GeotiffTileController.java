@@ -83,7 +83,7 @@ public class GeotiffTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=1")
+				.header("Cache-Control", "public, max-age=2592000")
 				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
@@ -153,16 +153,6 @@ public class GeotiffTileController {
 
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
-		long startTime = System.currentTimeMillis();
-		Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
-		int execThreadCount = 0;
-		for (Thread thread : allThreads.keySet()) {
-			if (thread.getName().contains("exec")) {
-				execThreadCount++;
-			}
-		}
-		LOGGER.info("Total number of 'exec' threads: " + execThreadCount);
-		LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
@@ -173,7 +163,7 @@ public class GeotiffTileController {
 		));
 		BufferedImage img;
 		try {
-			img = future.get(2, TimeUnit.MINUTES);
+			img = future.get(30, TimeUnit.SECONDS);
 		} catch (TimeoutException e) {
 			LOGGER.warn("Rendering tile [" + tile.getTileId() + "] timed out on thread: " + Thread.currentThread().getId());
 			future.cancel(true);
@@ -188,11 +178,6 @@ public class GeotiffTileController {
 		} finally {
 			executor.shutdown();
 		}
-		long endTime = System.currentTimeMillis();
-		long duration = endTime - startTime;
-
-		LOGGER.info("Finish rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId() +
-				" (duration: " + duration + " ms)");
 
 		if (img == null) {
 			return null;
