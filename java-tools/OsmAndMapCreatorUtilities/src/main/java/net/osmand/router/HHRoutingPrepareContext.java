@@ -122,6 +122,7 @@ public class HHRoutingPrepareContext {
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
+		config.routeCalculationTime = -1; // boostMaxspeedByMaxConditional
 		return config;
 	}
 
