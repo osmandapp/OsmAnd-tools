@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+
+import static net.osmand.binary.RouteDataObject.RULE_INT_MAX;
 import static net.osmand.router.HHRoutingUtilities.logf;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
@@ -122,7 +124,11 @@ public class HHRoutingPrepareContext {
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
-		config.routeCalculationTime = -1; // boostMaxspeedByMaxConditional
+		config.boostConditionalTags = Map.of(
+				"oneway", "no",
+				"access", "yes",
+				"maxspeed", RULE_INT_MAX
+		);
 		return config;
 	}
 
