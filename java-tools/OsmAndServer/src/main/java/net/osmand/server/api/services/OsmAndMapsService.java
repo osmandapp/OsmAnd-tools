@@ -498,11 +498,11 @@ public class OsmAndMapsService {
 
 	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
+			if (osmandRegions == null) {
+				osmandRegions = new OsmandRegions();
+				osmandRegions.prepareFile();
+			}
 			synchronized (this) {
-				if (osmandRegions == null) {
-					osmandRegions = new OsmandRegions();
-					osmandRegions.prepareFile();
-				}
 				if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
 					tileConfig.initErrorMessage = "Files location is not specified";
 				} else {
