@@ -155,11 +155,13 @@ public class GeotiffTileController {
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 		long startTime = System.currentTimeMillis();
 		Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
+		int execThreadCount = 0;
 		for (Thread thread : allThreads.keySet()) {
 			if (thread.getName().contains("exec")) {
-				LOGGER.info("HTTP thread name: " + thread.getName() + ", state: " + thread.getState());
+				execThreadCount++;
 			}
 		}
+		LOGGER.info("Total number of 'exec' threads: " + execThreadCount);
 		LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
