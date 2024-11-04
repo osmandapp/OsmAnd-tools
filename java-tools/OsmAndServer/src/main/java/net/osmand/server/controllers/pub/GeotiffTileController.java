@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import javax.imageio.ImageIO;
@@ -153,6 +154,8 @@ public class GeotiffTileController {
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 		long startTime = System.currentTimeMillis();
+		Map<Thread, StackTraceElement[]> allThreads = Thread.getAllStackTraces();
+		LOGGER.info("Total active threads: " + allThreads.size());
 		LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
