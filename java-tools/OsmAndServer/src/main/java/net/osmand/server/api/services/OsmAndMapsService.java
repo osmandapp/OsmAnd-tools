@@ -496,7 +496,7 @@ public class OsmAndMapsService {
 		return routingConfig;
 	}
 
-	public synchronized boolean validateAndInitConfig() throws IOException {
+	public boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
 			if (osmandRegions == null) {
 				osmandRegions = new OsmandRegions();
