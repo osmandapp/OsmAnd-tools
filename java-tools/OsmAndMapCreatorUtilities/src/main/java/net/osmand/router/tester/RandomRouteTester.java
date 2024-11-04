@@ -18,8 +18,6 @@ import org.apache.commons.logging.Log;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.PlatformUtil;
 
-import static net.osmand.binary.RouteDataObject.RULE_INT_MAX;
-
 public class RandomRouteTester {
 	class GeneratorConfig {
 		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
@@ -78,12 +76,7 @@ public class RandomRouteTester {
 //		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
 //		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
 
-		final static Map <String, String> boostConditionalTags = null;
-//		final static Map <String, String> boostConditionalTags = Map.of(
-//				"oneway", "no",
-//				"access", "yes",
-//				"maxspeed", RULE_INT_MAX
-//		);
+		final static Map <String, String> boostConditionalTags = null; // HHRoutingPrepareContext.boostConditionalTags
 	}
 
 	class CommandLineOpts {
