@@ -32,6 +32,8 @@ public class GeotiffTileController {
 
 	protected static final Log LOGGER = LogFactory.getLog(GeotiffTileController.class);
 
+	private static final boolean DEBUG = true;
+
 	private static final String HILLSHADE_TYPE = "hillshade";
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
@@ -153,7 +155,11 @@ public class GeotiffTileController {
 
 		String resultColorsResourcePath = resultColorsFile.exists() ? resultColorsFile.getAbsolutePath() : "";
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
+		long startTime = DEBUG ? System.currentTimeMillis() : 0;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
+		if (DEBUG) {
+			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
+		}
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
 				resultColorsResourcePath,
@@ -177,6 +183,12 @@ public class GeotiffTileController {
 			img = null;
 		} finally {
 			executor.shutdown();
+		}
+		if (DEBUG) {
+			long endTime = System.currentTimeMillis();
+			long duration = endTime - startTime;
+			LOGGER.info("Finish rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId() +
+					" (duration: " + duration + " ms)");
 		}
 
 		if (img == null) {
