@@ -157,6 +157,9 @@ public class GeotiffTileController {
 		String intermediateColorsResourcePath = intermediateColorsFile.exists() ? intermediateColorsFile.getAbsolutePath() : "";
 		long startTime = DEBUG ? System.currentTimeMillis() : 0;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
+		if (DEBUG) {
+			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
+		}
 		Future<BufferedImage> future = executor.submit(() -> osmAndMapsService.renderGeotiffTile(
 				geotiffTiles,
 				resultColorsResourcePath,
