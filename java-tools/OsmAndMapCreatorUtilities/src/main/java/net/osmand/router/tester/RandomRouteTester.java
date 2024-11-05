@@ -76,7 +76,8 @@ public class RandomRouteTester {
 //		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
 //		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
 
-		final static Map <String, String> boostConditionalTags = null; // HHRoutingPrepareContext.boostConditionalTags
+		final static Map <String, String> ambiguousConditionalTags = null;
+//		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
 	}
 
 	class CommandLineOpts {
@@ -437,8 +438,8 @@ public class RandomRouteTester {
 			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
 		}
 
-		if (this.config.boostConditionalTags != null) {
-			config.boostConditionalTags = this.config.boostConditionalTags;
+		if (this.config.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(
@@ -495,8 +496,8 @@ public class RandomRouteTester {
 			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
 		}
 
-		if (this.config.boostConditionalTags != null) {
-			config.boostConditionalTags = this.config.boostConditionalTags;
+		if (this.config.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(

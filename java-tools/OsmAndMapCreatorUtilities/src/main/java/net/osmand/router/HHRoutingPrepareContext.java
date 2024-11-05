@@ -34,10 +34,10 @@ public class HHRoutingPrepareContext {
 	private Map<String, String> PROFILE_SETTINGS = new TreeMap<>();
 	private List<File> FILE_SOURCES = new ArrayList<File>();
 
-	public static final Map<String, String> boostConditionalTags = Map.of(
-			"oneway", "no",
-			"access", "yes",
-			"maxspeed", RULE_INT_MAX
+	public static final Map<String, String> ambiguousConditionalTags = Map.of(
+			"oneway:conditional", "no",
+			"access:conditional", "yes",
+			"maxspeed:conditional", RULE_INT_MAX
 	);
 
 	public HHRoutingPrepareContext(File obfFile, String routingProfile, String... profileSettings) {
@@ -130,7 +130,7 @@ public class HHRoutingPrepareContext {
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
-		config.boostConditionalTags = boostConditionalTags; // applyBoostedConditionalTags
+		config.ambiguousConditionalTags = ambiguousConditionalTags; // resolveAmbiguousConditionalTags
 		return config;
 	}
 
