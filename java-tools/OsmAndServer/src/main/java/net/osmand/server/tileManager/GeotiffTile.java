@@ -61,9 +61,11 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 			return img;
 		}
 		File cf = getCacheFile(".png");
-		if (cf != null && cf.exists()) {
+		if (cf != null && cf.exists() && cf.length() > 0) {
 			runtimeImage = ImageIO.read(cf);
-			return runtimeImage;
+			if (runtimeImage != null) {
+				return runtimeImage;
+			}
 		}
 		return null;
 	}
