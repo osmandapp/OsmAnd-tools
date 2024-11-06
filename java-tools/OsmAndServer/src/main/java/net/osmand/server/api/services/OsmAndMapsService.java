@@ -12,6 +12,9 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +26,7 @@ import javax.annotation.Nullable;
 import net.osmand.router.*;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.VectorMetatile;
+import net.osmand.server.utils.TimezoneMapper;
 import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -687,6 +691,7 @@ public class OsmAndMapsService {
 		boolean useNativeRouting = false;
 		boolean noGlobalFile = false;
 		boolean noConditionals = false;
+		long routeCalculationTime = -1;
 		float minPointApproximation = -1;
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
@@ -731,6 +736,8 @@ public class OsmAndMapsService {
 				r.headingForRescuetrack = Integer.parseInt(value);
 			} else if ("minPointApproximation".equals(key)) {
 				r.minPointApproximation = Float.parseFloat(value);
+			} else if ("routeCalculationTime".equals(key)) {
+				r.routeCalculationTime = Long.parseLong(value);
 			} else if ("hhonly".equals(key)) {
 				r.useOnlyHHRouting = Boolean.parseBoolean(value);
 			} else if ("gpxtimestamps".equals(key)) {
@@ -778,7 +785,9 @@ public class OsmAndMapsService {
 		}
 
 		if (!rp.noConditionals) {
-			config.routeCalculationTime = System.currentTimeMillis();
+			config.routeCalculationTime = rp.routeCalculationTime >= 0
+					? rp.routeCalculationTime
+					: System.currentTimeMillis();
 		}
 
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
@@ -909,6 +918,10 @@ public class OsmAndMapsService {
 				}
 				ctx = prepareRouterContext(rp, router, usedMapList, false);
 			}
+			if (!rp.noConditionals && rp.routeCalculationTime < 0) {
+				// update TIME_CONDITIONAL_ROUTING if the conditional time is not disabled and is not enforced
+				ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(), start.getLongitude());
+			}
 			HashSet<Long> impassableRoads = new HashSet<>();
 			for (String s : avoidRoadsIds) {
 				impassableRoads.add(Long.parseLong(s));
@@ -935,6 +948,12 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
+	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
+		String tz = TimezoneMapper.latLngToTimezoneString(lat, lon);
+		ZonedDateTime zonedDateTime = ZonedDateTime.now(ZoneId.of(tz));
+		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
+		return zonedDateTime.toInstant().toEpochMilli();
+	}
 
 	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {
