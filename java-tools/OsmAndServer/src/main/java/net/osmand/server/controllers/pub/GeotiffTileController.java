@@ -112,15 +112,10 @@ public class GeotiffTileController {
 				if (cachedImage != null) {
 					return cachedImage;
 				}
-
-				if (z < UNDERSCALED_BASE_ZOOM) {
-					return fetchUpperTiles(tileType, x, y, z, currentTile);
-				} else {
-					BufferedImage serviceImage = getTileFromService(currentTile);
-					if (serviceImage != null) {
-						saveToCache(currentTile, serviceImage);
-						return serviceImage;
-					}
+				BufferedImage img = z < UNDERSCALED_BASE_ZOOM ? fetchUpperTiles(tileType, x, y, z) : getTileFromService(currentTile);
+				if (img != null) {
+					saveToCache(currentTile, img);
+					return img;
 				}
 				return null;
 			} finally {
@@ -129,7 +124,7 @@ public class GeotiffTileController {
 		}
 	}
 
-	private BufferedImage fetchUpperTiles(TileType tileType, int x, int y, int z, GeotiffTile currentTile) throws IOException {
+	private BufferedImage fetchUpperTiles(TileType tileType, int x, int y, int z) throws IOException {
 		BufferedImage[] upperTileImages = new BufferedImage[4];
 		boolean allTilesFound = true;
 
@@ -146,9 +141,7 @@ public class GeotiffTileController {
 			}
 		}
 		if (allTilesFound) {
-			BufferedImage res = createCombinedImage(upperTileImages);
-			saveToCache(currentTile, res);
-			return res;
+			return createCombinedImage(upperTileImages);
 		}
 		return null;
 	}
