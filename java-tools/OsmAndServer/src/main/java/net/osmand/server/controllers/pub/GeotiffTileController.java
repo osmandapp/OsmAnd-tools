@@ -91,7 +91,7 @@ public class GeotiffTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=1")
+				.header("Cache-Control", "public, max-age=2592000")
 				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
