@@ -14,8 +14,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import static net.osmand.binary.RouteDataObject.RULE_INT_MAX;
 import static net.osmand.router.HHRoutingUtilities.logf;
+import static net.osmand.router.RouteConditionalHelper.RULE_INT_MAX;
+
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
