@@ -29,11 +29,11 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 		touch();
 	}
 
-	public void setRuntimeImage(BufferedImage runtimeImage) {
+	public synchronized void setRuntimeImage(BufferedImage runtimeImage) {
 		this.runtimeImage = runtimeImage;
 	}
 
-	public void touch() {
+	public synchronized void touch() {
 		lastAccess = System.currentTimeMillis();
 		File cacheFile = getCacheFile(".png");
 		if (cacheFile != null && cacheFile.exists()) {
@@ -55,7 +55,7 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 		this.tileId = this.cfg.createTileId(tileType.getType(), x, y, z, -1, -1);
 	}
 
-	public BufferedImage getCacheRuntimeImage() throws IOException {
+	public synchronized BufferedImage getCacheRuntimeImage() throws IOException {
 		BufferedImage img = runtimeImage;
 		if (img != null) {
 			return img;
