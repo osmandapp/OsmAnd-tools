@@ -38,8 +38,8 @@ public class GeotiffTileController {
 	private static final String SLOPE_TYPE = "slope";
 	private static final String HEIGHT_TYPE = "height";
 
-	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(7);
-	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(100);
+	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(10);
+	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(400);
 	private static final long CLEANUP_INTERVAL_MILLIS = 12 * 60 * 60 * 1000L; // 12 hours
 	private static final int UNDERSCALED_BASE_ZOOM = 9;
 
@@ -104,10 +104,7 @@ public class GeotiffTileController {
 		Object lock = tileMemoryCache.getLock(tileId);
 		synchronized (lock) {
 			try {
-				GeotiffTile currentTile = tile != null ? tile : tileMemoryCache.getTile(
-						config.createTileId(tileType.getType(), x, y, z, -1, -1),
-						k -> new GeotiffTile(config, tileType, x, y, z)
-				);
+				GeotiffTile currentTile = tile != null ? tile : tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
 				tileMemoryCache.cleanupCache();
 				BufferedImage cachedImage = currentTile.getCacheRuntimeImage();
 				currentTile.touch();
