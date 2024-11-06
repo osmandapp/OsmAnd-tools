@@ -685,10 +685,14 @@ public class OsmAndMapsService {
 		boolean useGeometryBasedApproximation = false;
 		boolean useExternalTimestamps = false;
 		boolean useNativeRouting = false;
-		boolean noGlobalFile = false; // "noglobalfile"
+		boolean noGlobalFile = false;
+		boolean noConditionals = false;
+		float minPointApproximation = -1;
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
+		private static final int RESCUETRACK_DEFAULT_HEADING = 0;
+		int headingForRescuetrack = RESCUETRACK_DEFAULT_HEADING;
 
 		private final ServerRoutingTypes defaultRoutingType = ServerRoutingTypes.HH_JAVA;
 		private final ServerApproximationTypes defaultApproximationType = ServerApproximationTypes.GEO_JAVA;
@@ -721,12 +725,18 @@ public class OsmAndMapsService {
 				r.updateApproximationType(type);
 			} else if ("noglobalfile".equals(key)) {
 				r.noGlobalFile = Boolean.parseBoolean(value);
+			} else if ("noconditionals".equals(key)) {
+				r.noConditionals = Boolean.parseBoolean(value);
+			} else if ("heading".equals(key)) {
+				r.headingForRescuetrack = Integer.parseInt(value);
+			} else if ("minPointApproximation".equals(key)) {
+				r.minPointApproximation = Float.parseFloat(value);
 			} else if ("hhonly".equals(key)) {
 				r.useOnlyHHRouting = Boolean.parseBoolean(value);
 			} else if ("gpxtimestamps".equals(key)) {
 				r.useExternalTimestamps = Boolean.parseBoolean(value);
 			} else {
-				r.routeParams.put(key, value);
+				r.routeParams.put(key, value); // pass directly to the router
 			}
 		}
 		if (routingConfig.config.containsKey(r.routeProfile)) {
@@ -763,12 +773,11 @@ public class OsmAndMapsService {
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 
-		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
-		if (minPointApproximationString != null) {
-			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+		if (rp.minPointApproximation >= 0) {
+			config.minPointApproximation = rp.minPointApproximation;
 		}
 
-		if (rp.routeParams.get("noconditionals") == null) {
+		if (!rp.noConditionals) {
 			config.routeCalculationTime = System.currentTimeMillis();
 		}
 
@@ -779,17 +788,19 @@ public class OsmAndMapsService {
 	}
 
 	@Nullable
-	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
+	private List<RouteSegmentResult> onlineRouting(RouteParameters rp, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end, List<LatLon> intermediates,
-	                                               boolean useExternalTimestamps)
+	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
+		RoutingServerConfigEntry rsc = rp.onlineRouting;
 
 		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
 			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
 		} else {
-			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps);
+			int heading = rp.headingForRescuetrack;
+			boolean useExternalTimestamps = rp.useExternalTimestamps;
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps, heading);
 		}
 	}
 
@@ -842,13 +853,17 @@ public class OsmAndMapsService {
 
 	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
 	                                                          RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                                          LatLon start, LatLon end, boolean useExternalTimestamps)
+	                                                          LatLon start, LatLon end, boolean useExternalTimestamps,
+	                                                          int heading)
 			throws IOException, InterruptedException {
 
 		List<RouteSegmentResult> routeRes;
 		StringBuilder url = new StringBuilder(baseurl);
 		url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
 		url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+		if (heading != RouteParameters.RESCUETRACK_DEFAULT_HEADING) {
+			url.append(String.format("&heading=%d", heading));
+		}
 
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
@@ -906,8 +921,7 @@ public class OsmAndMapsService {
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
 			if (rp.onlineRouting != null) {
-				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates,
-						rp.useExternalTimestamps);
+				routeRes = onlineRouting(rp, ctx, router, props, start, end, intermediates);
 			} else {
 				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
 						: router.searchRoute(ctx, start, end, intermediates, null);
