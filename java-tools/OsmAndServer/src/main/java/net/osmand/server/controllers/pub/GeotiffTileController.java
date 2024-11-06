@@ -1,10 +1,10 @@
 package net.osmand.server.controllers.pub;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.concurrent.*;
 
 import javax.imageio.ImageIO;
@@ -41,6 +41,7 @@ public class GeotiffTileController {
 	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(7);
 	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(100);
 	private static final long CLEANUP_INTERVAL_MILLIS = 12 * 60 * 60 * 1000L; // 12 hours
+	private static final int UNDERSCALED_BASE_ZOOM = 9;
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -76,8 +77,13 @@ public class GeotiffTileController {
 		tileMemoryCache.cleanupCache();
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
+
 		if (img == null) {
-			img = getTileFromService(tile);
+			if (z < UNDERSCALED_BASE_ZOOM) {
+				img = generateUnderscaledTile(tile, tileType, x, y, z);
+			} else {
+				img = getTileFromService(tile);
+			}
 		}
 		if (img == null) {
 			return ResponseEntity.badRequest().body("Failed to get tile");
@@ -85,8 +91,87 @@ public class GeotiffTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(img, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=2592000")
+				.header("Cache-Control", "public, max-age=1")
 				.body(new ByteArrayResource(baos.toByteArray()));
+	}
+
+	private BufferedImage generateUnderscaledTile(GeotiffTile tile, TileType tileType, int x, int y, int z) throws IOException {
+		return fetchTile(tile, tileType, x, y, z);
+	}
+
+	private BufferedImage fetchTile(GeotiffTile tile, TileType tileType, int x, int y, int z) throws IOException {
+		String tileId = config.createTileId(tileType.getType(), x, y, z, -1, -1);
+		Object lock = tileMemoryCache.getLock(tileId);
+		synchronized (lock) {
+			try {
+				GeotiffTile currentTile = tile != null ? tile : tileMemoryCache.getTile(
+						config.createTileId(tileType.getType(), x, y, z, -1, -1),
+						k -> new GeotiffTile(config, tileType, x, y, z)
+				);
+				tileMemoryCache.cleanupCache();
+				BufferedImage cachedImage = currentTile.getCacheRuntimeImage();
+				currentTile.touch();
+
+				if (cachedImage != null) {
+					return cachedImage;
+				}
+
+				if (z < UNDERSCALED_BASE_ZOOM) {
+					return fetchUpperTiles(tileType, x, y, z, currentTile);
+				} else {
+					BufferedImage serviceImage = getTileFromService(currentTile);
+					if (serviceImage != null) {
+						saveToCache(currentTile, serviceImage);
+						return serviceImage;
+					}
+				}
+				return null;
+			} finally {
+				tileMemoryCache.removeLock(tileId);
+			}
+		}
+	}
+
+	private BufferedImage fetchUpperTiles(TileType tileType, int x, int y, int z, GeotiffTile currentTile) throws IOException {
+		BufferedImage[] upperTileImages = new BufferedImage[4];
+		boolean allTilesFound = true;
+
+		for (int dx = 0; dx < 2; dx++) {
+			for (int dy = 0; dy < 2; dy++) {
+				int subX = x * 2 + dx;
+				int subY = y * 2 + dy;
+				BufferedImage upperTileImage = fetchTile(tileType, subX, subY, z + 1);
+				if (upperTileImage != null) {
+					upperTileImages[dx * 2 + dy] = upperTileImage;
+				} else {
+					allTilesFound = false;
+				}
+			}
+		}
+		if (allTilesFound) {
+			BufferedImage res = createCombinedImage(upperTileImages);
+			saveToCache(currentTile, res);
+			return res;
+		}
+		return null;
+	}
+
+	private BufferedImage fetchTile(TileType tileType, int x, int y, int z) throws IOException {
+		return fetchTile(null, tileType, x, y, z);
+	}
+
+	private BufferedImage createCombinedImage(BufferedImage[] images) {
+		int tileSize = 256;
+		BufferedImage combinedImage = new BufferedImage(tileSize, tileSize, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g2d = combinedImage.createGraphics();
+
+		g2d.drawImage(images[0], 0, 0, tileSize / 2, tileSize / 2, null); // Top left (0, 0)
+		g2d.drawImage(images[2], tileSize / 2, 0, tileSize / 2, tileSize / 2, null); // Top right (1, 0)
+		g2d.drawImage(images[1], 0, tileSize / 2, tileSize / 2, tileSize / 2, null); // Bottom right (1, 1)
+		g2d.drawImage(images[3], tileSize / 2, tileSize / 2, tileSize / 2, tileSize / 2, null); // Bottom left (0, 1)
+
+		g2d.dispose();
+		return combinedImage;
 	}
 
 	@Scheduled(fixedRate = CLEANUP_INTERVAL_MILLIS)
@@ -195,6 +280,10 @@ public class GeotiffTileController {
 			return null;
 		}
 
+		return saveToCache(tile, img);
+	}
+
+	private BufferedImage saveToCache(GeotiffTile tile, BufferedImage img) throws IOException {
 		File cacheFile = tile.getCacheFile(".png");
 		if (cacheFile == null) {
 			return null;
