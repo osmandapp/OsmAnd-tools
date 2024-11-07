@@ -389,20 +389,22 @@ public class DownloadOsmGPX {
 			if (points.isEmpty() || points.size() < 100 || analysis.getTotalDistance() < 1000 || analysis.getMaxDistanceBetweenPoints() >= 1000) {
 				return "garbage";
 			}
-			float avgSpeed = analysis.getAvgSpeed();
-			if (avgSpeed == 0) {
-				return "other";
-			} else if (avgSpeed <= 12) {
-				return "foot";
-			} else if (avgSpeed <= 25) {
-				return "cycling";
-			} else if (avgSpeed <= 150) {
-				return "driving";
-			} else {
-				return "aviation";
+			if (analysis.getHasSpeedInTrack()) {
+				float avgSpeed = analysis.getAvgSpeed();
+				if (avgSpeed > 0 && avgSpeed <= 12) {
+					return "foot";
+				} else if (avgSpeed <= 25) {
+					return "cycling";
+				} else if (avgSpeed <= 150) {
+					return "driving";
+				} else if (avgSpeed > 150) {
+					return "aviation";
+				} else {
+					return "other";
+				}
 			}
 		}
-		return null;
+		return "other";
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
