@@ -73,7 +73,7 @@ public class OsmGpxController {
 		}
 
 		StringBuilder conditions = new StringBuilder();
-		conditions.append(" and m.maxlat >= ? and m.minlat <= ? and m.maxlon >= ? and m.minlon <= ?");
+		conditions.append(" AND ST_MakeEnvelope(?, ?, ?, ?, 4326) && ST_MakeEnvelope(m.minlon, m.minlat, m.maxlon, m.maxlat, 4326)");
 
 		List<Object> params = new ArrayList<>();
 		params.add(validatedMinLat);

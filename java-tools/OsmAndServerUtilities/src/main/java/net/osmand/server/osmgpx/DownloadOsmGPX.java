@@ -230,10 +230,12 @@ public class DownloadOsmGPX {
 			// add index for activity column
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
 			// add indexes for coordinates
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_minlat ON " + GPX_METADATA_TABLE_NAME + " (minlat)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_maxlat ON " + GPX_METADATA_TABLE_NAME + " (maxlat)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_minlon ON " + GPX_METADATA_TABLE_NAME + " (minlon)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_maxlon ON " + GPX_METADATA_TABLE_NAME + " (maxlon)");
+			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
+			statement.executeUpdate(
+					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
+							"ON " + GPX_METADATA_TABLE_NAME +
+							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
+			);
 			// add indexes for date
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
 		}
