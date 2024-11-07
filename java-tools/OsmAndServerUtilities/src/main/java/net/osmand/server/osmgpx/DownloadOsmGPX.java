@@ -411,7 +411,7 @@ public class DownloadOsmGPX {
 				}
 			}
 		}
-		return "other";
+		return "error";
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
