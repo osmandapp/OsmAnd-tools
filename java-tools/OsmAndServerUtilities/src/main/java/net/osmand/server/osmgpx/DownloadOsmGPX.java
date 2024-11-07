@@ -238,10 +238,16 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
 		}
 		LOG.info("All indexes created successfully.");
-		fillActivityColumn(rootPath);
+		LOG.info("Creating activities map...");
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
+		} else {
+			fillActivityColumn(activitiesMap);
+		}
 	}
 
-	private void fillActivityColumn(String rootPath) throws SQLException {
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
 		PreparedStatement updateStmt = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
@@ -271,7 +277,7 @@ public class DownloadOsmGPX {
 					}
 				}
 
-				String activity = analyzeActivity(name, description, tags, rootPath);
+				String activity = analyzeActivity(name, description, tags, activitiesMap);
 				if (activity == null) {
 					try (Statement dataStmt = dbConn.createStatement();
 					     ResultSet rf = dataStmt.executeQuery(
@@ -308,8 +314,7 @@ public class DownloadOsmGPX {
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
 
-	private String analyzeActivity(String name, String desc, List<String> tags, String rootPath) {
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+	private String analyzeActivity(String name, String desc, List<String> tags, Map<String, List<String>> activitiesMap) {
 		if (activitiesMap.isEmpty()) {
 			return null;
 		}
