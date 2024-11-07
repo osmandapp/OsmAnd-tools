@@ -62,43 +62,54 @@ public class OsmGpxController {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
 		cleanupCache();
-		String conditions = "";
-		conditions += " and m.maxlat >= " + minlat;
-		conditions += " and m.minlat <= " + maxlat;
-		conditions += " and m.maxlon >= " + minlon;
-		conditions += " and m.minlon <= " + maxlon;
 
-		// filter by tags
-		if (!Algorithms.isEmpty(activity)) {
-			String[] tagsAnd = activity.split(",");
-			for (String tagAnd : tagsAnd) {
-				conditions += " and (";
-				String[] tagsOr = tagAnd.split(";");
-				boolean t = false;
-				for (String tagOr : tagsOr) {
-					if (t) {
-						conditions += " or ";
-					}
-					conditions += " lower(m.tags::text) like '%" + tagOr.trim().toLowerCase() + "%'";
-					t = true;
-				}
-				conditions += ")";
-			}
+		Float validatedMinLat = validateCoordinate(minlat, "minlat");
+		Float validatedMaxLat = validateCoordinate(maxlat, "maxlat");
+		Float validatedMinLon = validateCoordinate(minlon, "minlon");
+		Float validatedMaxLon = validateCoordinate(maxlon, "maxlon");
+
+		if (validatedMinLat == null || validatedMaxLat == null || validatedMinLon == null || validatedMaxLon == null) {
+			return ResponseEntity.badRequest().body("Invalid latitude or longitude values.");
 		}
+
+		StringBuilder conditions = new StringBuilder();
+		conditions.append(" and m.maxlat >= ? and m.minlat <= ? and m.maxlon >= ? and m.minlon <= ?");
+
+		List<Object> params = new ArrayList<>();
+		params.add(validatedMinLat);
+		params.add(validatedMaxLat);
+		params.add(validatedMinLon);
+		params.add(validatedMaxLon);
 
 		// filter by year
 		if (!Algorithms.isEmpty(year)) {
-			conditions += " and extract(year from m.date) = " + year;
+			try {
+				Integer parsedYear = Integer.parseInt(year);
+				conditions.append(" and extract(year from m.date) = ?");
+				params.add(parsedYear);
+			} catch (NumberFormatException e) {
+				return ResponseEntity.badRequest().body("Invalid year format.");
+			}
 		}
 
-		String query = "SELECT m.id, f.data AS bytes, m.name, m.description, m.\"user\", m.date, m.tags " +
+		// filter by activity
+		if (!Algorithms.isEmpty(activity)) {
+			conditions.append(" and m.activity = ?");
+			params.add(activity);
+		}
+
+		String query = "SELECT m.id, f.data AS bytes, m.name, m.description, m.\"user\", m.date, m.tags, m.activity " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id " +
 				"WHERE 1 = 1 " + conditions +
 				" ORDER BY m.date ASC LIMIT 500";
 
 
-		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
+		List<Feature> features = jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, (rs, rowNum) -> {
 			Feature feature = new Feature();
 			Long id = rs.getLong("id");
 			feature.getProperties().put("id", id);
@@ -110,11 +121,12 @@ public class OsmGpxController {
 			Array tagsArray = rs.getArray("tags");
 			List<String> tags = new ArrayList<>();
 			if (tagsArray != null) {
-				ResultSet tagRs = tagsArray.getResultSet();
-				while (tagRs.next()) {
-					String tag = tagRs.getString(2);
-					if (tag != null) {
-						tags.add(tag.toLowerCase());
+				try (ResultSet tagRs = tagsArray.getResultSet()) {
+					while (tagRs.next()) {
+						String tag = tagRs.getString(2);
+						if (tag != null) {
+							tags.add(tag.toLowerCase());
+						}
 					}
 				}
 			}
@@ -161,6 +173,15 @@ public class OsmGpxController {
 		featureCollection.setFeatures(features);
 
 		return ResponseEntity.ok(gson.toJson(featureCollection));
+	}
+
+	private Float validateCoordinate(String coordinate, String name) {
+		try {
+			return Float.parseFloat(coordinate);
+		} catch (NumberFormatException e) {
+			LOGGER.warn("Invalid " + name + " coordinate: " + coordinate);
+			return null;
+		}
 	}
 
 	private record RouteFile(GpxFile gpxFile, GpxTrackAnalysis analysis) {
