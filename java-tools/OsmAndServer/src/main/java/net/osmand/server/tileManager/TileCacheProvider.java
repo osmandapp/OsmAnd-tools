@@ -9,8 +9,8 @@ public interface TileCacheProvider {
 	int MAX_FILES_PER_FOLDER = 4096;
 
 	default File getCacheFile(String cacheLocation, String ext, int z, int x, int y,
-	                          int metaSizeLog, int tileSizeLog, String styleKey, String interactiveKey) {
-		if (z > 16 || cacheLocation == null || cacheLocation.isEmpty()) {
+	                          int metaSizeLog, int tileSizeLog, String styleKey, String interactiveKey, int maxZoom) {
+		if (z > maxZoom || cacheLocation == null || cacheLocation.isEmpty()) {
 			return null;
 		}
 

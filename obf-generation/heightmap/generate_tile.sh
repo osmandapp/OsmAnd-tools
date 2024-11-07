@@ -162,15 +162,61 @@ BCTILE=${BLATL}$(printf "%02d" $BLATP)${LONL}$(printf "%03d" $LONP)
 CLTILE=${LATL}$(printf "%02d" $LATP)${LLONL}$(printf "%03d" $LLONP)
 CRTILE=${LATL}$(printf "%02d" $LATP)${RLONL}$(printf "%03d" $RLONP)
 NODATA="0"; if [[  "$TYPE" == "heightmap" ]]; then NODATA="0"; fi
+if [ -f "$DEMS_PATH/$TLTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMIN)) $(($LATMAX)) $(($LON)) $(($LATMAX + 1)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$TLTILE.vrt" "$DEMS_PATH/$TLTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$TCTILE.tif" ]; then
+    gdalbuildvrt -te $(($LON)) $(($LATMAX)) $(($LONMAX)) $(($LATMAX + 1)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$TCTILE.vrt" "$DEMS_PATH/$TCTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$TRTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMAX)) $(($LATMAX)) $(($LONMAX + 1)) $(($LATMAX + 1)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$TRTILE.vrt" "$DEMS_PATH/$TRTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$CLTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMIN)) $(($LAT)) $(($LON)) $(($LATMAX)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$CLTILE.vrt" "$DEMS_PATH/$CLTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$TILE.tif" ]; then
+    gdalbuildvrt -te $(($LON)) $(($LAT)) $(($LONMAX)) $(($LATMAX)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$TILE.vrt" "$DEMS_PATH/$TILE.tif"
+fi
+if [ -f "$DEMS_PATH/$CRTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMAX)) $(($LAT)) $(($LONMAX + 1)) $(($LATMAX)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$CRTILE.vrt" "$DEMS_PATH/$CRTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$BLTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMIN)) $(($LATMIN)) $(($LON)) $(($LAT)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$BLTILE.vrt" "$DEMS_PATH/$BLTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$BCTILE.tif" ]; then
+    gdalbuildvrt -te $(($LON)) $(($LATMIN)) $(($LONMAX)) $(($LAT)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$BCTILE.vrt" "$DEMS_PATH/$BCTILE.tif"
+fi
+if [ -f "$DEMS_PATH/$BRTILE.tif" ]; then
+    gdalbuildvrt -te $(($LONMAX)) $(($LATMIN)) $(($LONMAX + 1)) $(($LAT)) \
+        -resolution highest -hidenodata -vrtnodata "$NODATA" \
+        "$WORK_PATH/$BRTILE.vrt" "$DEMS_PATH/$BRTILE.tif"
+fi
+
 gdalbuildvrt \
     -te $(($LON - 1)) $(($LAT - 1)) $(($LON + 2)) $(($LAT + 2)) \
     -resolution highest \
     -hidenodata \
     -vrtnodata "$NODATA" \
     "$WORK_PATH/heighttiles_$TYPE.vrt" \
-    "$DEMS_PATH/$TLTILE.tif" "$DEMS_PATH/$TCTILE.tif" "$DEMS_PATH/$TRTILE.tif" \
-    "$DEMS_PATH/$CLTILE.tif" "$DEMS_PATH/$TILE.tif" "$DEMS_PATH/$CRTILE.tif" \
-    "$DEMS_PATH/$BLTILE.tif" "$DEMS_PATH/$BCTILE.tif" "$DEMS_PATH/$BRTILE.tif"
+    "$WORK_PATH/$TLTILE.vrt" "$WORK_PATH/$TCTILE.vrt" "$WORK_PATH/$TRTILE.vrt" \
+    "$WORK_PATH/$CLTILE.vrt" "$WORK_PATH/$TILE.vrt" "$WORK_PATH/$CRTILE.vrt" \
+    "$WORK_PATH/$BLTILE.vrt" "$WORK_PATH/$BCTILE.vrt" "$WORK_PATH/$BRTILE.vrt"
 
 # Step 2. Convert VRT to single GeoTIFF file
 DELTA=0.4

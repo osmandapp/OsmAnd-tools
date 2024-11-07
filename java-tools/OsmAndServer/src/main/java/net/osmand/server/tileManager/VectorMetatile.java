@@ -123,7 +123,7 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 				cfg.cacheLocation, ext, z,
 				left >> (31 - z), top >> (31 - z),
 				metaSizeLog, tileSizeLog,
-				style.key, interactiveKey
+				style.key, interactiveKey, 16
 		);
 	}
 

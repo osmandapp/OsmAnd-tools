@@ -1,5 +1,15 @@
 package net.osmand.osm;
 
+import gnu.trove.list.array.TIntArrayList;
+import net.osmand.PlatformUtil;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.util.Algorithms;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -13,18 +23,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
-
-import gnu.trove.list.array.TIntArrayList;
-import net.osmand.PlatformUtil;
-import net.osmand.osm.MapRenderingTypes.PropagateToNode;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.util.Algorithms;
 
 public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
@@ -348,6 +346,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformAddMultipleNetwoksTag(tags);
 		tags = transformRouteLimitationTags(tags);
 		tags = transformTurnLanesTags(tags);
+		tags = addEleFeetTags(tags);
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
 		if (listToTransform == null && listToCombine == null) {
@@ -1131,6 +1130,21 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return value.toLowerCase().endsWith(fromTag.value.toLowerCase());
 	}
 
+	private Map<String, String> addEleFeetTags(Map<String, String> tags) {
+		if (tags.containsKey("ele") && ! tags.containsKey("ele_feet")) {
+			tags = new LinkedHashMap<String, String>(tags);
+			String meters = tags.get("ele");
+			double m;
+			try {
+				m = Double.parseDouble(meters);
+			} catch (NumberFormatException e) {
+				return tags;
+			}
+			int feet = (int) (Math.round(m * 3.2808399));
+			tags.put("ele_feet", String.valueOf(feet));
+		}
+		return tags;
+	}
 
 
 	protected String simplifyValueTo45(String val) {
