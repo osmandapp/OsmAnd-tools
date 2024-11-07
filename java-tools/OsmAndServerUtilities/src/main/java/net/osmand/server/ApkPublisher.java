@@ -102,22 +102,19 @@ public class ApkPublisher {
 						} else if (tok == XmlPullParser.END_TAG && parser.getName().equals("string") && found) {
 							int ind = 0;
 							while ((ind = sb.indexOf("\\n")) != -1) {
-								sb.replace(ind, ind + 2, "");
+								sb.replace(ind, ind + 2, "\n");
 							}
 							ind = 0;
 							while ((ind = sb.indexOf("\\\"")) != -1) {
 								sb.replace(ind, ind + 2, "\"");
 							}
-							// remove empty lines
-							for(int k = 1; k < sb.length(); k++) {
-								if (sb.charAt(k - 1) == '\n' && sb.charAt(k) == '\n') {
-									sb.deleteCharAt(k);
-								}
-							}
 							String[] lines = sb.toString().split("\n");
 							StringBuilder res = new StringBuilder();
 							for (String line : lines) {
 								line = line.trim();
+								if (line.length() == 0) {
+									continue;
+								}
 								if (line.startsWith("-")) {
 									line = "•" + line.substring(1);
 								}
