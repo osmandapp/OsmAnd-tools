@@ -179,8 +179,11 @@ public class WikiService {
 		log.error("Error while reading url: " + url + " code: " + code + " content: " + shortenedContent);
 	}
 	
-	public Map<String, String> parseImageInfo(String data) {
-		return WikiImagesUtil.INSTANCE.parseWikiText(data);
+	public Map<String, String> parseImageInfo(String rawData) throws SQLException, IOException {
+		Map<String, String> result = new HashMap<>();
+		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, "en", "Old_parsing_without_title", null);
+		prepareMetaData(result);
+		return result;
 	}
 	
 	public Map<String, String> parseImageInfo(String rawData, String title, String lang) throws SQLException, IOException {
