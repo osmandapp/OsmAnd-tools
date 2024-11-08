@@ -283,7 +283,10 @@ public class DownloadOsmGPX {
 						if (tagsArray != null) {
 							try (ResultSet tagRs = tagsArray.getResultSet()) {
 								while (tagRs.next()) {
-									tags.add(tagRs.getString(2).toLowerCase());
+									String tag = tagRs.getString(2);
+									if (tag != null) {
+										tags.add(tag.toLowerCase());
+									}
 								}
 							}
 						}
