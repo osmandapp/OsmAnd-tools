@@ -125,7 +125,7 @@ public class DownloadOsmGPX {
 	
 	public static void main(String[] args) throws Exception {
 		String main = args.length > 0 ? args[0] : "";
-		DownloadOsmGPX utility = null;
+		DownloadOsmGPX utility = new DownloadOsmGPX();
 		//createActivitiesMap("../../");
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
