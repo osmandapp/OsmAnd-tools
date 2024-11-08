@@ -259,53 +259,64 @@ public class DownloadOsmGPX {
 		int batchSize = 0;
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
+		int offset = 0;
+		boolean hasMoreRecords = true;
 
-		try (Statement selectStmt = dbConn.createStatement();
-		     ResultSet rs = selectStmt.executeQuery(
-				     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE activity IS NULL LIMIT " + BATCH_LIMIT
-		     )) {
+		try {
+			while (hasMoreRecords) {
+				hasMoreRecords = false;
 
-			while (rs.next()) {
-				long id = rs.getLong("id");
-				String name = rs.getString("name");
-				String description = rs.getString("description");
-				Array tagsArray = rs.getArray("tags");
-				List<String> tags = new ArrayList<>();
+				try (Statement selectStmt = dbConn.createStatement();
+				     ResultSet rs = selectStmt.executeQuery(
+						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset
+				     )) {
 
-				if (tagsArray != null) {
-					try (ResultSet tagRs = tagsArray.getResultSet()) {
-						while (tagRs.next()) {
-							tags.add(tagRs.getString(2).toLowerCase());
+					while (rs.next()) {
+						hasMoreRecords = true;
+						long id = rs.getLong("id");
+						String name = rs.getString("name");
+						String description = rs.getString("description");
+						Array tagsArray = rs.getArray("tags");
+						List<String> tags = new ArrayList<>();
+
+						if (tagsArray != null) {
+							try (ResultSet tagRs = tagsArray.getResultSet()) {
+								while (tagRs.next()) {
+									tags.add(tagRs.getString(2).toLowerCase());
+								}
+							}
+						}
+
+						String activity = analyzeActivity(name, description, tags, activitiesMap);
+						if (activity == null) {
+							try (Statement dataStmt = dbConn.createStatement();
+							     ResultSet rf = dataStmt.executeQuery(
+									     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
+							     )) {
+								if (rf.next()) {
+									byte[] bytes = rf.getBytes("data");
+									activity = analyzeActivityFromGpx(bytes);
+								}
+							}
+						}
+
+						updateStmt.setString(1, activity);
+						updateStmt.setLong(2, id);
+						updateStmt.addBatch();
+
+						batchSize++;
+						processedCount++;
+
+						if (batchSize >= BATCH_LIMIT) {
+							updateStmt.executeBatch();
+							dbConn.commit();
+							batchSize = 0;
+							LOG.info("Processed " + processedCount + " records so far...");
 						}
 					}
 				}
-
-				String activity = analyzeActivity(name, description, tags, activitiesMap);
-				if (activity == null) {
-					try (Statement dataStmt = dbConn.createStatement();
-					     ResultSet rf = dataStmt.executeQuery(
-							     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
-					     )) {
-						if (rf.next()) {
-							byte[] bytes = rf.getBytes("data");
-							activity = analyzeActivityFromGpx(bytes);
-						}
-					}
-				}
-
-				updateStmt.setString(1, activity);
-				updateStmt.setLong(2, id);
-				updateStmt.addBatch();
-
-				batchSize++;
-				processedCount++;
-
-				if (batchSize >= BATCH_LIMIT) {
-					updateStmt.executeBatch();
-					dbConn.commit();
-					batchSize = 0;
-					LOG.info("Processed " + processedCount + " records so far...");
-				}
+				offset += BATCH_LIMIT;
 			}
 
 			if (batchSize > 0) {
