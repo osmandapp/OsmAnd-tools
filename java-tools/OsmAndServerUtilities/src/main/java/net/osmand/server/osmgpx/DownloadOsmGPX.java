@@ -251,6 +251,7 @@ public class DownloadOsmGPX {
 
 	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
+		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmt = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
 		);
@@ -311,8 +312,13 @@ public class DownloadOsmGPX {
 				updateStmt.executeBatch();
 				dbConn.commit();
 			}
+		} catch (SQLException e) {
+			dbConn.rollback();
+			throw e;
+		} finally {
+			dbConn.setAutoCommit(true);
+			updateStmt.close();
 		}
-		updateStmt.close();
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
 
