@@ -332,7 +332,13 @@ public class DownloadOsmGPX {
 		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
-			if (tags.contains(tag) || name.toLowerCase().contains(tag) || desc.toLowerCase().contains(tag)) {
+			if (tags.contains(tag)) {
+				return activityId;
+			}
+			if (name != null && name.toLowerCase().contains(tag)) {
+				return activityId;
+			}
+			if (desc != null && desc.toLowerCase().contains(tag)) {
 				return activityId;
 			}
 		}
