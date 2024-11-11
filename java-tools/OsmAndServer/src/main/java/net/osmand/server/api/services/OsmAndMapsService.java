@@ -858,9 +858,13 @@ public class OsmAndMapsService {
 		LOGGER.info("Online request: " + url.toString());
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
 		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		routeRes = approximate(ctx, router, props, trkSegment.points, useExternalTimestamps);
-		return routeRes;
+		if (file.error == null) {
+			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
+			routeRes = approximate(ctx, router, props, trkSegment.points, useExternalTimestamps);
+			return routeRes;
+		}
+		LOGGER.error("Empty GPX from Rescuetrack: " + url);
+		return new ArrayList<>();
 	}
 
 	@Nullable
