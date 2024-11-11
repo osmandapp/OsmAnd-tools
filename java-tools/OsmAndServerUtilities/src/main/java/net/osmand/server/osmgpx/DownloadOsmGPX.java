@@ -306,7 +306,7 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
-							if (gpxFile != null) {
+							if (gpxFile != null && gpxFile.getError() == null) {
 								GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 								List<WptPt> points = gpxFile.getAllPoints();
 								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
