@@ -110,6 +110,10 @@ public class DownloadOsmGPX {
 
 	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
 	private static final String ERROR_ACTIVITY_TYPE = "error";
+
+	private static final int MIN_POINTS_SIZE = 100;
+	private static final int MIN_DISTANCE = 1000;
+	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -218,14 +222,14 @@ public class DownloadOsmGPX {
 		} else if ("recalculateminmax_and_download".equals(main)) {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
-			utility.addActivityColumnAndPopulate(args[1]);
+			utility.addActivityColumnAndPopulate(args[1], args[2]);
 		} else {
 			utility.downloadGPXMain();
 		}
 		utility.commitAllStatements();
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
+	protected void addActivityColumnAndPopulate(String rootPath, String activityType) throws SQLException {
 		LOG.info("Starting the process to add activity column and indexes...");
 		try (Statement statement = dbConn.createStatement()) {
 			// add activity column if not exists
@@ -248,11 +252,11 @@ public class DownloadOsmGPX {
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
 		} else {
-			fillActivityColumn(activitiesMap);
+			fillActivityColumn(activitiesMap, activityType);
 		}
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap, String activityType) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmt = dbConn.prepareStatement(
@@ -265,49 +269,60 @@ public class DownloadOsmGPX {
 		int identifiedActivityCount = 0;
 		int offset = 0;
 		boolean hasMoreRecords = true;
-
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
+				String query = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME;
+				if (activityType == null) {
+					query += " WHERE activity IS NULL";
+				} else {
+					query += " WHERE activity = '" + activityType + "'";
+				}
+				query += " LIMIT " + BATCH_LIMIT + " OFFSET " + offset;
 
-				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery(
-						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset
-				     )) {
-
+				try (Statement selectStmt = dbConn.createStatement(); ResultSet rs = selectStmt.executeQuery(query)) {
 					while (rs.next()) {
+						String activity = null;
 						hasMoreRecords = true;
 						long id = rs.getLong("id");
-						String name = rs.getString("name");
-						String description = rs.getString("description");
-						Array tagsArray = rs.getArray("tags");
-						List<String> tags = new ArrayList<>();
-
-						if (tagsArray != null) {
-							try (ResultSet tagRs = tagsArray.getResultSet()) {
-								while (tagRs.next()) {
-									String tag = tagRs.getString(2);
-									if (tag != null) {
-										tags.add(tag.toLowerCase());
+						GpxFile gpxFile = null;
+						try (Statement dataStmt = dbConn.createStatement();
+						     ResultSet rf = dataStmt.executeQuery(
+								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
+						     )) {
+							if (rf.next()) {
+								byte[] bytes = rf.getBytes("data");
+								if (bytes != null) {
+									try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+										gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+									} catch (IOException e) {
+										LOG.error("Error loading GPX file", e);
+										activity = ERROR_ACTIVITY_TYPE;
 									}
 								}
 							}
 						}
 
-						String activity = analyzeActivity(name, description, tags, activitiesMap);
 						if (activity == null) {
-							try (Statement dataStmt = dbConn.createStatement();
-							     ResultSet rf = dataStmt.executeQuery(
-									     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
-							     )) {
-								if (rf.next()) {
-									byte[] bytes = rf.getBytes("data");
-									if (bytes != null) {
-										activity = analyzeActivityFromGpx(bytes);
-									}
+							if (gpxFile != null) {
+								GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+								List<WptPt> points = gpxFile.getAllPoints();
+								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
+										|| analysis.getTotalDistance() < MIN_DISTANCE
+										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+									activity = GARBAGE_ACTIVITY_TYPE;
 								}
+							} else {
+								activity = ERROR_ACTIVITY_TYPE;
 							}
+						}
+
+						if (activity == null) {
+							activity = analyzeActivity(rs, activitiesMap);
+						}
+
+						if (activity == null) {
+							activity = analyzeActivityFromGpx(gpxFile);
 						}
 
 						if (activity == null) {
@@ -350,9 +365,24 @@ public class DownloadOsmGPX {
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
 
-	private String analyzeActivity(String name, String desc, List<String> tags, Map<String, List<String>> activitiesMap) {
+	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
 		if (activitiesMap.isEmpty()) {
 			return null;
+		}
+		String name = rs.getString("name");
+		String desc = rs.getString("description");
+		Array tagsArray = rs.getArray("tags");
+		List<String> tags = new ArrayList<>();
+
+		if (tagsArray != null) {
+			try (ResultSet tagRs = tagsArray.getResultSet()) {
+				while (tagRs.next()) {
+					String tag = tagRs.getString(2);
+					if (tag != null) {
+						tags.add(tag.toLowerCase());
+					}
+				}
+			}
 		}
 
 		Map<String, String> tagMap = new LinkedHashMap<>();
@@ -422,14 +452,7 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(byte[] bytes) {
-		GpxFile gpxFile;
-		try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
-			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-		} catch (IOException e) {
-			LOG.error("Error loading GPX file", e);
-			return ERROR_ACTIVITY_TYPE;
-		}
+	private String analyzeActivityFromGpx(GpxFile gpxFile) {
 		if (gpxFile != null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			List<WptPt> points = gpxFile.getAllPoints();
