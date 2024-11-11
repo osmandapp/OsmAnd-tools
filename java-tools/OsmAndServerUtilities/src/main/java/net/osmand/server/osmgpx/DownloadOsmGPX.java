@@ -276,6 +276,8 @@ public class DownloadOsmGPX {
 				if (activityType == null) {
 					query += " WHERE activity IS NULL";
 				} else {
+					activityType = activityType.toLowerCase().trim();
+					LOG.info("Filtering by activity type: " + activityType);
 					query += " WHERE activity = '" + activityType + "'";
 				}
 				query += " LIMIT " + BATCH_LIMIT + " OFFSET " + offset;
