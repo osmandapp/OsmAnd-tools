@@ -367,10 +367,13 @@ public class OsmAndMapsService {
 					e.printStackTrace();
 				}
 			}
+			System.out.printf("Clean up %d global routing contexts, state - %s\n", removed.size(), routingCaches);
+			long MEMORY_BEFORE_GC = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			removed.clear();
 			System.gc();
-			System.out.printf("Clean up %d global routing contexts, state - %s \n", removed.size(), routingCaches);
-			long MEMORY_LAST_USED_MB = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			System.out.printf("***** Memory used %d MB *****\n", MEMORY_LAST_USED_MB);
+			long MEMORY_AFTER_GC = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
+			System.out.printf("***** GC: Memory used %d MB, released %d MB, cache size %d (contexts) *****\n",
+					MEMORY_AFTER_GC, MEMORY_BEFORE_GC - MEMORY_AFTER_GC, routingCaches.size());
 		}
 	}
 
