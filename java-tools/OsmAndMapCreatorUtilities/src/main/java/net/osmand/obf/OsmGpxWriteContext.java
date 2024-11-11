@@ -105,7 +105,6 @@ public class OsmGpxWriteContext {
 		}
 	}
 	
-
 	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
 	                       GpxTrackAnalysis analysis, String routeIdPrefix) throws IOException {
 		if (gpxFile.getMetadata() != null) {
@@ -187,7 +186,6 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					// tagValue(serializer, "route_type", "track"); // XXX uncomment to debug old click-on-shield
 
 					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
 					String routeRadius = MapUtils.convertDistToChar(radius,
@@ -197,6 +195,10 @@ public class OsmGpxWriteContext {
 
 					Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, t, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
+
+					if (!gpxTrackTags.containsKey("route")) {
+						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files
+					}
 
 					serializer.endTag(null, "way");
 
@@ -560,11 +562,15 @@ public class OsmGpxWriteContext {
 		if (name.lastIndexOf('.') != -1) {
 			name = name.substring(0, name.lastIndexOf('.'));
 		}
+		if (name.lastIndexOf('/') != -1) {
+			name = name.substring(name.lastIndexOf('/') + 1);
+		}
 		file.name = name;
-		file.id = gpxFile.getModifiedTime() / 1000;
-		file.timestamp = new Date(gpxFile.getModifiedTime());
 		file.description = "";
 		file.tags = new String[0];
+		long ts = gpxFile.getModifiedTime() > 0 ? gpxFile.getModifiedTime() : System.currentTimeMillis();
+		file.timestamp = new Date(ts);
+		file.id = ts / 1000;
 		writeTrack(file, null, gpxFile, analysis, "GPX");
 	}
 	
