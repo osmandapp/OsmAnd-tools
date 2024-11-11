@@ -222,14 +222,14 @@ public class DownloadOsmGPX {
 		} else if ("recalculateminmax_and_download".equals(main)) {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
-			utility.addActivityColumnAndPopulate(args[1], args[2]);
+			utility.addActivityColumnAndPopulate(args[1]);
 		} else {
 			utility.downloadGPXMain();
 		}
 		utility.commitAllStatements();
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath, String activityType) throws SQLException {
+	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
 		LOG.info("Starting the process to add activity column and indexes...");
 		try (Statement statement = dbConn.createStatement()) {
 			// add activity column if not exists
@@ -252,11 +252,11 @@ public class DownloadOsmGPX {
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
 		} else {
-			fillActivityColumn(activitiesMap, activityType);
+			fillActivityColumn(activitiesMap);
 		}
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap, String activityType) throws SQLException {
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmt = dbConn.prepareStatement(
@@ -272,19 +272,10 @@ public class DownloadOsmGPX {
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
-				String query = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME;
-				if (activityType == null) {
-					query += " WHERE activity IS NULL";
-				} else {
-					activityType = activityType.toLowerCase().trim();
-					LOG.info("Filtering by activity type: " + activityType);
-					if (!activityType.equals("all")) {
-						query += " WHERE activity = '" + activityType + "'";
-					}
-				}
-				query += " LIMIT " + BATCH_LIMIT + " OFFSET " + offset;
 
-				try (Statement selectStmt = dbConn.createStatement(); ResultSet rs = selectStmt.executeQuery(query)) {
+				try (Statement selectStmt = dbConn.createStatement();
+				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+						" WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
 					while (rs.next()) {
 						String activity = null;
 						hasMoreRecords = true;
