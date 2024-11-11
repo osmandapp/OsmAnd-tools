@@ -107,6 +107,9 @@ public class DownloadOsmGPX {
 	private static final int HTTP_TIMEOUT = 5000;
 	private static final int MAX_RETRY_TIMEOUT = 5;
 	private static final int RETRY_TIMEOUT = 15000;
+
+	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
+	private static final String ERROR_ACTIVITY_TYPE = "error";
 	
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -299,9 +302,15 @@ public class DownloadOsmGPX {
 							     )) {
 								if (rf.next()) {
 									byte[] bytes = rf.getBytes("data");
-									activity = analyzeActivityFromGpx(bytes);
+									if (bytes != null) {
+										activity = analyzeActivityFromGpx(bytes);
+									}
 								}
 							}
+						}
+
+						if (activity == null) {
+							activity = GARBAGE_ACTIVITY_TYPE;
 						}
 
 						updateStmt.setString(1, activity);
@@ -414,13 +423,13 @@ public class DownloadOsmGPX {
 			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 		} catch (IOException e) {
 			LOG.error("Error loading GPX file", e);
-			return "error";
+			return ERROR_ACTIVITY_TYPE;
 		}
 		if (gpxFile != null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			List<WptPt> points = gpxFile.getAllPoints();
 			if (points.isEmpty() || points.size() < 100 || analysis.getTotalDistance() < 1000 || analysis.getMaxDistanceBetweenPoints() >= 1000) {
-				return "garbage";
+				return GARBAGE_ACTIVITY_TYPE;
 			}
 			if (analysis.getHasSpeedInTrack()) {
 				float avgSpeed = analysis.getAvgSpeed();
@@ -437,7 +446,7 @@ public class DownloadOsmGPX {
 				}
 			}
 		}
-		return "error";
+		return ERROR_ACTIVITY_TYPE;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
