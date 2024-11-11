@@ -278,7 +278,9 @@ public class DownloadOsmGPX {
 				} else {
 					activityType = activityType.toLowerCase().trim();
 					LOG.info("Filtering by activity type: " + activityType);
-					query += " WHERE activity = '" + activityType + "'";
+					if (!activityType.equals("all")) {
+						query += " WHERE activity = '" + activityType + "'";
+					}
 				}
 				query += " LIMIT " + BATCH_LIMIT + " OFFSET " + offset;
 
