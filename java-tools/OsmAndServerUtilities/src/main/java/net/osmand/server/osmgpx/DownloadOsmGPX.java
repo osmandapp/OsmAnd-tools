@@ -262,6 +262,7 @@ public class DownloadOsmGPX {
 		int batchSize = 0;
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
+		int identifiedActivityCount = 0;
 		int offset = 0;
 		boolean hasMoreRecords = true;
 
@@ -313,6 +314,10 @@ public class DownloadOsmGPX {
 							activity = GARBAGE_ACTIVITY_TYPE;
 						}
 
+						if (!GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity)) {
+							identifiedActivityCount++;
+						}
+
 						updateStmt.setString(1, activity);
 						updateStmt.setLong(2, id);
 						updateStmt.addBatch();
@@ -324,7 +329,7 @@ public class DownloadOsmGPX {
 							updateStmt.executeBatch();
 							dbConn.commit();
 							batchSize = 0;
-							LOG.info("Processed " + processedCount + " records so far...");
+							LOG.info("Processed " + processedCount + " records so far. Identified " + identifiedActivityCount + " activities.");
 						}
 					}
 				}
