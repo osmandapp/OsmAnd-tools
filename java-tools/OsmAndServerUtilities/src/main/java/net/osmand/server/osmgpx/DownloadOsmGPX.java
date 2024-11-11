@@ -218,14 +218,14 @@ public class DownloadOsmGPX {
 		} else if ("recalculateminmax_and_download".equals(main)) {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
-			utility.addActivityColumnAndPopulate(args[1]);
+			utility.addActivityColumnAndPopulate(args[1], args[2]);
 		} else {
 			utility.downloadGPXMain();
 		}
 		utility.commitAllStatements();
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
+	protected void addActivityColumnAndPopulate(String rootPath, String activityType) throws SQLException {
 		LOG.info("Starting the process to add activity column and indexes...");
 		try (Statement statement = dbConn.createStatement()) {
 			// add activity column if not exists
@@ -248,11 +248,11 @@ public class DownloadOsmGPX {
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
 		} else {
-			fillActivityColumn(activitiesMap);
+			fillActivityColumn(activitiesMap, activityType);
 		}
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap, String activityType) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmt = dbConn.prepareStatement(
@@ -271,11 +271,8 @@ public class DownloadOsmGPX {
 				hasMoreRecords = false;
 
 				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery(
-						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset
-				     )) {
-
+				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+						     " WHERE activity IS " + activityType + " LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
 					while (rs.next()) {
 						hasMoreRecords = true;
 						long id = rs.getLong("id");
