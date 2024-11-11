@@ -265,14 +265,18 @@ public class DownloadOsmGPX {
 		int identifiedActivityCount = 0;
 		int offset = 0;
 		boolean hasMoreRecords = true;
-
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
+				String query = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME;
+				if (activityType == null) {
+					query += " WHERE activity IS NULL";
+				} else {
+					query += " WHERE activity = '" + activityType + "'";
+				}
+				query += " LIMIT " + BATCH_LIMIT + " OFFSET " + offset;
 
-				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-						     " WHERE activity IS " + activityType + " LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
+				try (Statement selectStmt = dbConn.createStatement(); ResultSet rs = selectStmt.executeQuery(query)) {
 					while (rs.next()) {
 						hasMoreRecords = true;
 						long id = rs.getLong("id");
