@@ -127,10 +127,13 @@ public class GpxController {
 	
 	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
 	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
+		final StringBuilder err = new StringBuilder();
 		GPXFile gpxFile = GPXUtilities.loadGPXFile(file.getInputStream());
-		final StringBuilder err = new StringBuilder(); 
+		if (gpxFile.error != null) {
+			err.append("loadGPXFile error (process-srtm)");
+		}
 		if (srtmLocation == null) {
-			err.append(String.format("Server is not configured for srtm processing. "));
+			err.append(String.format("Server is not configured for srtm processing."));
 		}
 		GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
 		if (srtmGpx == null) {

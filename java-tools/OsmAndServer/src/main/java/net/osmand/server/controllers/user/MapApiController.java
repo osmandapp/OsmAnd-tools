@@ -560,7 +560,7 @@ public class MapApiController {
 			bin = userdataService.getInputStream(dev, userFile);
 
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
-			if (gpxFile == null) {
+			if (gpxFile.error != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GPXTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
@@ -611,7 +611,7 @@ public class MapApiController {
 			}
 			bin = userdataService.getInputStream(dev, userFile);
 			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
-			if (gpxFile == null) {
+			if (gpxFile.error != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
@@ -677,11 +677,16 @@ public class MapApiController {
 		try (OutputStream os = response.getOutputStream()) {
 			Map<String, GpxFile> files = new HashMap<>();
 			for (String name : names) {
-				UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
-				if (userFile != null) {
-					is = userdataService.getInputStream(dev, userFile);
-					GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
-					files.put(name, file);
+				if (!name.endsWith(EMPTY_FILE_NAME)) {
+					UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
+					if (userFile != null) {
+						is = userdataService.getInputStream(dev, userFile);
+						GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
+						if (file.getError() == null) {
+							file.setModifiedTime(userFile.updatetime.getTime());
+							files.put(name, file);
+						}
+					}
 				}
 			}
 			targetObf = osmAndMapsService.getObf(files);

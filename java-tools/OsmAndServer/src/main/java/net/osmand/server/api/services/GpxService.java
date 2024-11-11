@@ -100,7 +100,7 @@ public class GpxService {
             analysis = gpxFile.getAnalysis(System.currentTimeMillis());
         } else {
             GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-            if (srtmGpx != null) {
+            if (srtmGpx != null && srtmGpx.error == null) {
                 analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
             }
         }

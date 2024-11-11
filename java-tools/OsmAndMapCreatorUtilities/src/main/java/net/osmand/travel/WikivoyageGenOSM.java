@@ -312,7 +312,7 @@ public class WikivoyageGenOSM {
 			combinedArticle.addArticle(lang, title, gpxFile, lat, lon, content, imageTitle,
 					Algorithms.isEmpty(srcBannerTitle) ? bannerTitle : srcBannerTitle, isPartOf,
 					isParentOf, isAggrPartOf, isAggrPartOfWid, contentJson);
-			if (gpxFile == null || gpxFile.isPointsEmpty()) {
+			if (gpxFile.error != null || gpxFile.isPointsEmpty()) {
 				if (lat == 0 && lon == 0) {
 					emptyLocation++;
 				} else {

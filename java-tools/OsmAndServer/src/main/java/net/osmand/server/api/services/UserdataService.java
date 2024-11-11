@@ -794,6 +794,9 @@ public class UserdataService {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
                 GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
+				if (gpxFile.error != null) {
+					return null;
+				}
                 Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
                 if (exception != null) {
                     return null;

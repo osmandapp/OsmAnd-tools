@@ -549,6 +549,11 @@ public class OsmGpxWriteContext {
 	}
 
 	private void writeFile(GpxFile gpxFile, String fileName) throws SQLException, IOException {
+		if (gpxFile == null || gpxFile.getError() != null) {
+			System.err.printf("WARN: writeFile %s gpxFile error (%s)\n",
+					fileName, gpxFile != null ? gpxFile.getError().getMessage() : "unknown");
+			return;
+		}
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxFile.getModifiedTime());
 		OsmGpxFile file = new OsmGpxFile();
 		String name = fileName;
