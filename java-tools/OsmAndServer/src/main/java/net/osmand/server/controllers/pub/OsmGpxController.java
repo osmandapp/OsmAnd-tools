@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
+import net.osmand.server.api.services.GpxService;
+import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -16,10 +18,13 @@ import org.apache.commons.logging.LogFactory;
 import org.geojson.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpSession;
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,12 +39,16 @@ public class OsmGpxController {
 	JdbcTemplate jdbcTemplate;
 
 	@Autowired
+	protected GpxService gpxService;
+
+	@Autowired
 	DatasourceConfiguration config;
 
 	@Autowired
 	Gson gson = new GsonBuilder().create();
 
 	protected static final Log LOGGER = LogFactory.getLog(OsmGpxController.class);
+	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	Map<String, RouteFile> routesCache = new ConcurrentHashMap<>();
 
@@ -118,6 +127,48 @@ public class OsmGpxController {
 		return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
 
+	@GetMapping(path = {"/get-osm-route"}, produces = "application/json")
+	public ResponseEntity<String> getRoute(@RequestParam Long id, HttpSession httpSession) throws IOException {
+		RouteFile routeFile = routesCache.get(id.toString());
+		// get from cache
+		if (routeFile != null) {
+			File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(routeFile.gpxFile, tmpGpx);
+			if (gpxData != null) {
+				return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+			} else {
+				return ResponseEntity.badRequest().body("Error loading GPX file");
+			}
+		}
+		// get from DB
+		String query = "SELECT id, data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = ? LIMIT 1";
+		try {
+			GpxData resultData = jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
+				Long rId = rs.getLong("id");
+				byte[] byteArray = rs.getBytes("data");
+				return new GpxData(rId, byteArray);
+			}, id);
+
+			if (resultData != null && resultData.byteArray != null) {
+				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(resultData.byteArray)).getBytes())) {
+					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+					if (gpxFile.getError() != null) {
+						File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+						WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
+						if (gpxData != null) {
+							return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+						}
+					}
+				} catch (IOException e) {
+					return ResponseEntity.badRequest().body("Error loading GPX file");
+				}
+			}
+		} catch (DataAccessException e) {
+			return ResponseEntity.badRequest().body("No records found");
+		}
+		return ResponseEntity.badRequest().body("No records found");
+	}
+
 	private ResponseEntity<String> filterByActivity(String activity, List<Object> params, StringBuilder conditions) {
 		if (!Algorithms.isEmpty(activity)) {
 			conditions.append(" AND m.activity = ?");
@@ -159,7 +210,7 @@ public class OsmGpxController {
 
 	private void addGeoDataToFeature(RouteFile file, Feature feature) {
 		GpxFile gpxFile = file.gpxFile;
-		List<WptPt> points = gpxFile.getAllPoints();
+		List<WptPt> points = gpxFile.getAllSegmentsPoints();
 		GpxTrackAnalysis analysis = file.analysis;
 		if (!points.isEmpty() && points.size() > 100 && analysis.getMaxDistanceBetweenPoints() < 1000) {
 			List<LatLon> latLonList = new ArrayList<>();
@@ -220,6 +271,9 @@ public class OsmGpxController {
 				}
 			}
 		}
+	}
+
+	private record GpxData(Long id, byte[] byteArray) {
 	}
 
 	// for testing purposes
