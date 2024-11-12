@@ -267,15 +267,18 @@ public class DownloadOsmGPX {
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
 		int identifiedActivityCount = 0;
-		int offset = 0;
 		boolean hasMoreRecords = true;
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
 				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-						" WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
+				     ResultSet rs = selectStmt.executeQuery(
+						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT)) {
+					if (!rs.isBeforeFirst()) {
+						break; // no more records to process
+					}
 					while (rs.next()) {
 						String activity = null;
 						hasMoreRecords = true;
@@ -343,7 +346,6 @@ public class DownloadOsmGPX {
 						}
 					}
 				}
-				offset += BATCH_LIMIT;
 			}
 
 			if (batchSize > 0) {
