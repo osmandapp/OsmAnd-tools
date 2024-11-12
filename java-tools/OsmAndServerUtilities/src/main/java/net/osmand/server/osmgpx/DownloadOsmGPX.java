@@ -306,7 +306,7 @@ public class DownloadOsmGPX {
 						if (activity == null) {
 							if (gpxFile != null) {
 								GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-								List<WptPt> points = gpxFile.getAllPoints();
+								List<WptPt> points = gpxFile.getAllSegmentsPoints();
 								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
 										|| analysis.getTotalDistance() < MIN_DISTANCE
 										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
@@ -455,7 +455,7 @@ public class DownloadOsmGPX {
 	private String analyzeActivityFromGpx(GpxFile gpxFile) {
 		if (gpxFile != null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			List<WptPt> points = gpxFile.getAllPoints();
+			List<WptPt> points = gpxFile.getAllSegmentsPoints();
 			if (points.isEmpty() || points.size() < 100 || analysis.getTotalDistance() < 1000 || analysis.getMaxDistanceBetweenPoints() >= 1000) {
 				return GARBAGE_ACTIVITY_TYPE;
 			}
