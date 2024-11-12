@@ -1,13 +1,13 @@
 package net.osmand.server.utils;
 
-import static net.osmand.gpx.GPXUtilities.ADDRESS_EXTENSION;
-import static net.osmand.gpx.GPXUtilities.BACKGROUND_TYPE_EXTENSION;
-import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
-import static net.osmand.gpx.GPXUtilities.ICON_NAME_EXTENSION;
-import static net.osmand.gpx.GPXUtilities.PROFILE_TYPE_EXTENSION;
-import static net.osmand.gpx.GPXUtilities.TRKPT_INDEX_EXTENSION;
-import static net.osmand.gpx.GPXUtilities.HIDDEN_EXTENSION;
 import static net.osmand.gpx.GPXUtilities.parseColor;
+import static net.osmand.shared.gpx.GpxUtilities.ADDRESS_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.BACKGROUND_TYPE_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.GAP_PROFILE_TYPE;
+import static net.osmand.shared.gpx.GpxUtilities.ICON_NAME_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.PROFILE_TYPE_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.TRKPT_INDEX_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.util.Algorithms.colorToString;
 
@@ -15,12 +15,12 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.*;
 import org.springframework.stereotype.Component;
 
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.util.MapUtils;
 
 @Component
@@ -28,39 +28,39 @@ public class WebGpxParser {
     
     private static final String COLOR_EXTENSION = "color";
     private static final String DESC_EXTENSION = "desc";
-    private static final String ARTICLE_TITLE = "article_title";
     
     public static final String LINE_PROFILE_TYPE = "line";
     public static final int NAN_MARKER = 99999;
     
     public static class TrackData {
-        public MetaData metaData;
+        public WebMetaData metaData;
         public List<Wpt> wpts;
-        public List<Track> tracks;
-        public Map<String, PointsGroup> pointsGroups;
+        public List<WebTrack> tracks;
+        public Map<String, WebPointsGroup> pointsGroups;
         public Map<String, Object> analysis;
         public Map<String, String> ext;
     }
     
-    public static class MetaData {
+    public static class WebMetaData {
         public String name;
         public String desc;
         public String link;
-        public GPXUtilities.Metadata ext;
+        public Metadata ext;
     
-        public MetaData(GPXUtilities.Metadata data) {
+        public WebMetaData(Metadata data) {
             if (data != null) {
-                if (data.name != null) {
-                    name = data.name;
-                    data.name = null;
+
+                if (data.getName() != null) {
+                    name = data.getName();
+                    data.setName(null);
                 }
-                if (data.desc != null) {
-                    desc = data.desc;
-                    data.desc = null;
+                if (data.getDescription() != null) {
+                    desc = data.getDesc();
+                    data.setDesc(null);
                 }
-                if (data.link != null) {
-                    link = data.link;
-                    data.link = null;
+                if (data.getLink() != null) {
+                    link = data.getLink();
+                    data.setLink(null);
                 }
             
                 Iterator<Map.Entry<String, String>> it = data.getExtensionsToWrite().entrySet().iterator();
@@ -89,29 +89,29 @@ public class WebGpxParser {
         public double lat;
         public double lon;
         public String category;
-        public GPXUtilities.WptPt ext;
+        public WptPt ext;
         
-        public Wpt(GPXUtilities.WptPt point) {
+        public Wpt(WptPt point) {
             if (point != null) {
-                if (point.name != null) {
-                    name = point.name;
-                    point.name = null;
+                if (point.getName() != null) {
+                    name = point.getName();
+                    point.setName(null);
                 }
-                if (point.desc != null) {
-                    desc = point.desc;
-                    point.desc = null;
+                if (point.getDesc() != null) {
+                    desc = point.getDesc();
+                    point.setDesc(null);
                 }
-                if (point.lat != 0) {
-                    lat = point.lat;
-                    point.lat = 0;
+                if (point.getLat() != 0) {
+                    lat = point.getLat();
+                    point.setLat(0);
                 }
-                if (point.lon != 0) {
-                    lon = point.lon;
-                    point.lon = 0;
+                if (point.getLon() != 0) {
+                    lon = point.getLon();
+                    point.setLon(0);
                 }
-                if (point.category != null) {
-                    category = point.category;
-                    point.category = null;
+                if (point.getCategory() != null) {
+                    category = point.getCategory();
+                    point.setCategory(null);
                 }
                 
                 Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -144,55 +144,55 @@ public class WebGpxParser {
         }
     }
     
-    public class PointsGroup {
+    public class WebPointsGroup {
         public String color;
         public String name;
         public String iconName;
         public String backgroundType;
         public final List<Wpt> points = new ArrayList<>();
-        public GPXUtilities.PointsGroup ext;
-        public PointsGroup(GPXUtilities.PointsGroup group) {
+        public GpxUtilities.PointsGroup ext;
+        public WebPointsGroup(GpxUtilities.PointsGroup group) {
             if (group != null) {
-                if (group.color != 0) {
-                    color = colorToString(group.color);
-                    group.color = 0;
+                if (group.getColor() != 0) {
+                    color = colorToString(group.getColor());
+                    group.setColor(0);
                 }
-                if (group.name != null) {
-                    name = group.name;
+                if (group.getName() != null) {
+                    name = group.getName();
                 }
-                if (group.iconName != null) {
-                    iconName = group.iconName;
-                    group.iconName = null;
+                if (group.getIconName() != null) {
+                    iconName = group.getIconName();
+                    group.setIconName(null);
                 }
-                if (group.backgroundType != null) {
-                    backgroundType = group.backgroundType;
-                    group.backgroundType = null;
+                if (group.getBackgroundType() != null) {
+                    backgroundType = group.getBackgroundType();
+                    group.setBackgroundType(null);
                 }
-                if (!group.points.isEmpty()) {
+                if (!group.getPoints().isEmpty()) {
                     List<Wpt> res = new ArrayList<>();
-                    group.points.forEach(wpt -> res.add(new Wpt(wpt)));
+                    group.getPoints().forEach(wpt -> res.add(new Wpt(wpt)));
                     points.addAll(res);
-                    group.points = Collections.emptyList();
+                    group.setPoints(Collections.emptyList());
                 }
             }
             ext = group;
         }
     }
     
-    public class Track {
+    public class WebTrack {
         public List<Point> points;
     
         public List<List<Point>> segments = new ArrayList<>();
-        public GPXUtilities.Track ext;
+        public Track ext;
         
-        public Track(GPXUtilities.Track track) {
+        public WebTrack(Track track) {
             points = new ArrayList<>();
-            track.segments.forEach(seg -> {
+            track.getSegments().forEach(seg -> {
                 List<Point> pointsSeg = new ArrayList<>();
-                seg.points.forEach(point -> {
-                    int index = seg.points.indexOf(point);
+                seg.getPoints().forEach(point -> {
+                    int index = seg.getPoints().indexOf(point);
                     Point p = new Point(point);
-                    if (track.segments.size() > 1 && index == seg.points.size() - 1 && track.segments.indexOf(seg) != track.segments.size() - 1) {
+                    if (track.getSegments().size() > 1 && index == seg.getPoints().size() - 1 && track.getSegments().indexOf(seg) != track.getSegments().size() - 1) {
                         p.profile = GAP_PROFILE_TYPE;
                     }
                     pointsSeg.add(p);
@@ -203,7 +203,7 @@ public class WebGpxParser {
             });
             
             if (!points.isEmpty()) {
-                track.segments = null;
+                track.setSegments(Collections.emptyList());
             }
             ext = track;
         }
@@ -221,29 +221,29 @@ public class WebGpxParser {
         public List<Point> geometry;
         public transient int geometrySize;
         public RouteSegment segment; // on each turn point
-        public GPXUtilities.WptPt ext;
+        public WptPt ext;
     
         public Point(){}
         
-        public Point(GPXUtilities.WptPt point) {
-            if (!Double.isNaN(point.lat)) {
-                lat = point.lat;
-                point.lat = Double.NaN;
+        public Point(WptPt point) {
+            if (!Double.isNaN(point.getLat())) {
+                lat = point.getLat();
+                point.setLat(Double.NaN);
             }
             
-            if (!Double.isNaN(point.lon)) {
-                lng = point.lon;
-                point.lon = Double.NaN;
+            if (!Double.isNaN(point.getLon())) {
+                lng = point.getLon();
+                point.setLon(Double.NaN);
             }
             
-            if (!Double.isNaN(point.ele) || point.ele != NAN_MARKER) {
-                ele = point.ele;
-                point.ele = Double.NaN;
+            if (!Double.isNaN(point.getEle()) || point.getEle() != NAN_MARKER) {
+                ele = point.getEle();
+                point.setEle(Double.NaN);
             }
     
-            if (!Double.isNaN(point.speed)) {
-                speed = point.speed;
-                point.speed = Double.NaN;
+            if (!Double.isNaN(point.getSpeed())) {
+                speed = point.getSpeed();
+                point.setSpeed(Double.NaN);
             }
             
             Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -270,27 +270,27 @@ public class WebGpxParser {
     }
     
     public static class RouteSegment {
-        public GPXUtilities.RouteSegment ext;
-        public List<GPXUtilities.RouteType> routeTypes;
+        public GpxUtilities.RouteSegment ext;
+        public List<GpxUtilities.RouteType> routeTypes;
     }
     
-    public void addRoutePoints(GPXFile gpxFile, TrackData gpxData) {
+    public void addRoutePoints(GpxFile gpxFile, TrackData gpxData) {
         Map<Integer, List<Point>> trackPointsMap = new HashMap<>();
         AtomicBoolean skip = new AtomicBoolean(false);
-        gpxFile.routes.forEach(route -> {
+        gpxFile.getRoutes().forEach(route -> {
             List<Point> routePoints = new ArrayList<>();
-            int index = gpxFile.routes.indexOf(route);
+            int index = gpxFile.getRoutes().indexOf(route);
             List<Point> trackPoints = getPointsFromSegmentIndex(gpxData, index);
             if (trackPoints.isEmpty()) {
                 //case with only one route points
-                if (route.points.size() == 1) {
-                    routePoints.add(new Point(route.points.get(0)));
+                if (route.getPoints().size() == 1) {
+                    routePoints.add(new Point(route.getPoints().get(0)));
                     trackPointsMap.put(0, routePoints);
                 }
             } else {
                 int prevTrkPointInd = -1;
-                for (GPXUtilities.WptPt p : route.points) {
-                    boolean isLastPoint = route.points.indexOf(p) == route.points.size() - 1;
+                for (WptPt p : route.getPoints()) {
+                    boolean isLastPoint = route.getPoints().indexOf(p) == route.getPoints().size() - 1;
                     Point routePoint = new Point(p);
                     int currTrkPointInd;
                     if (routePoint.geometry == null && routePoint.geometrySize == 0) {
@@ -335,7 +335,7 @@ public class WebGpxParser {
     
     public int getTrackBySegmentIndex(TrackData gpxData, int index) {
         int size = 0;
-        for(Track track : gpxData.tracks) {
+        for(WebTrack track : gpxData.tracks) {
             size += track.segments.size() - 1;
             if (size >= index) {
                 return gpxData.tracks.indexOf(track);
@@ -380,44 +380,44 @@ public class WebGpxParser {
         return currTrkPointInd;
     }
     
-    public void addSrtmEle(List<Track> tracks, GPXTrackAnalysis srtmAnalysis) {
+    public void addSrtmEle(List<WebTrack> tracks, GpxTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null && tracks != null) {
-            for (Track track : tracks) {
+            for (WebTrack track : tracks) {
                 int pointsSize = 0;
                 for (Point point : track.points) {
                     if (point.geometry != null) {
                         for (Point p : point.geometry) {
-                            p.srtmEle = srtmAnalysis.pointAttributes.get(point.geometry.indexOf(p) + pointsSize).elevation;
+                            p.srtmEle = srtmAnalysis.getPointAttributes().get(point.geometry.indexOf(p) + pointsSize).getElevation();
                         }
                         pointsSize += point.geometry.size();
                     } else {
-                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.pointAttributes.get(track.points.indexOf(p)).elevation);
+                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.getPointAttributes().get(track.points.indexOf(p)).getElevation());
                     }
                 }
             }
         }
     }
     
-    public void addAdditionalInfo(List<Track> tracks, GPXTrackAnalysis analysis, boolean addSpeed) {
+    public void addAdditionalInfo(List<WebTrack> tracks, GpxTrackAnalysis analysis, boolean addSpeed) {
         tracks.forEach(track -> {
             int pointsSize = 0;
             for (Point point : track.points) {
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {
                         int ind = point.geometry.indexOf(p);
-                        if (ind + pointsSize < analysis.pointAttributes.size()) {
-                            p.distance = analysis.pointAttributes.get(ind + pointsSize).distance;
+                        if (ind + pointsSize < analysis.getPointAttributes().size()) {
+                            p.distance = analysis.getPointAttributes().get(ind + pointsSize).getDistance();
                             if (addSpeed) {
-                                p.speed = analysis.pointAttributes.get(ind + pointsSize).speed;
+                                p.speed = analysis.getPointAttributes().get(ind + pointsSize).getSpeed();
                             }
                         }
                     }
                 } else {
                     int ind = track.points.indexOf(point);
-                    if (ind < analysis.pointAttributes.size()) {
-                        point.distance = analysis.pointAttributes.get(ind).distance;
+                    if (ind < analysis.getPointAttributes().size()) {
+                        point.distance = analysis.getPointAttributes().get(ind).getDistance();
                         if (addSpeed) {
-                            point.speed = analysis.pointAttributes.get(ind).speed;
+                            point.speed = analysis.getPointAttributes().get(ind).getSpeed();
                         }
                     }
                 }
@@ -428,7 +428,7 @@ public class WebGpxParser {
         });
     }
     
-    public Map<String, Object> getTrackAnalysis(GPXTrackAnalysis analysis, GPXTrackAnalysis srtmAnalysis) {
+    public Map<String, Object> getTrackAnalysis(GpxTrackAnalysis analysis, GpxTrackAnalysis srtmAnalysis) {
         if (analysis != null) {
             Map<String, Object> res = new HashMap<>();
             res.put("totalDistance", analysis.getTotalDistance());
@@ -458,9 +458,9 @@ public class WebGpxParser {
         return Collections.emptyMap();
     }
     
-    public List<Wpt> getWpts(GPXFile gpxFile) {
-        List<GPXUtilities.WptPt> points = gpxFile.getPoints();
-        if (points != null) {
+    public List<Wpt> getWpts(GpxFile gpxFile) {
+        List<WptPt> points = gpxFile.getPointsList();
+        if (!points.isEmpty()) {
             List<Wpt> res = new ArrayList<>();
             points.forEach(wpt -> res.add(new Wpt(wpt)));
             return res;
@@ -468,12 +468,12 @@ public class WebGpxParser {
         return Collections.emptyList();
     }
     
-    public Map<String, PointsGroup> getPointsGroups(GPXFile gpxFile) {
-        Map<String, GPXUtilities.PointsGroup> pointsGroups = gpxFile.getPointsGroups();
-        Map<String, PointsGroup> res = new LinkedHashMap<>();
+    public Map<String, WebPointsGroup> getPointsGroups(GpxFile gpxFile) {
+        Map<String, GpxUtilities.PointsGroup> pointsGroups = gpxFile.getPointsGroups();
+        Map<String, WebPointsGroup> res = new LinkedHashMap<>();
         if (!pointsGroups.isEmpty()) {
             for (String key : pointsGroups.keySet()) {
-                res.put(key, new PointsGroup(pointsGroups.get(key)));
+                res.put(key, new WebPointsGroup(pointsGroups.get(key)));
             }
             return res;
         }
@@ -481,15 +481,12 @@ public class WebGpxParser {
         return Collections.emptyMap();
     }
     
-    public List<Track> getTracks(GPXFile gpxFile) {
-        if (!gpxFile.tracks.isEmpty()) {
-            List<Track> res = new ArrayList<>();
-            List<GPXUtilities.Track> tracks = gpxFile.tracks.stream().filter(t -> !t.generalTrack).collect(Collectors.toList());
-//            if (!gpxFile.routes.isEmpty() && tracks.get(0).segments.size() != gpxFile.routes.size()) {
-//                return Collections.emptyList();
-//            }
+    public List<WebTrack> getTracks(GpxFile gpxFile) {
+        if (!gpxFile.getTracks().isEmpty()) {
+            List<WebTrack> res = new ArrayList<>();
+            List<Track> tracks = gpxFile.getTracks().stream().filter(t -> !t.getGeneralTrack()).toList();
             tracks.forEach(track -> {
-                Track t = new Track(track);
+                WebTrack t = new WebTrack(track);
                 res.add(t);
             });
             return res;
@@ -497,17 +494,18 @@ public class WebGpxParser {
         return Collections.emptyList();
     }
     
-    public GPXFile createGpxFileFromTrackData(WebGpxParser.TrackData trackData) {
-        GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
+    public GpxFile createGpxFileFromTrackData(WebGpxParser.TrackData trackData) {
+        GpxFile gpxFile = new GpxFile(OSMAND_ROUTER_V2);
         if (trackData.metaData != null) {
             if (trackData.metaData.ext != null) {
-                gpxFile.metadata = trackData.metaData.ext;
+                gpxFile.setMetadata(trackData.metaData.ext);
             }
-            gpxFile.metadata.name = trackData.metaData.name;
-            gpxFile.metadata.desc = trackData.metaData.desc;
-            gpxFile.metadata.link = trackData.metaData.link;
-            if (gpxFile.metadata.extensions == null) {
-                gpxFile.metadata.extensions = new LinkedHashMap<>();
+            Metadata metadata = gpxFile.getMetadata();
+            metadata.setName(trackData.metaData.name);
+            metadata.setDesc(trackData.metaData.desc);
+            metadata.setLink(trackData.metaData.link);
+            if (metadata.getExtensions() == null) {
+                metadata.setExtensions(new LinkedHashMap<>());
             }
         }
         if (trackData.wpts != null) {
@@ -517,19 +515,19 @@ public class WebGpxParser {
         }
     
         if (trackData.pointsGroups != null) {
-            Map<String, GPXUtilities.PointsGroup> res = new LinkedHashMap<>();
+            Map<String, GpxUtilities.PointsGroup> res = new LinkedHashMap<>();
             for (String key : trackData.pointsGroups.keySet()) {
-                PointsGroup dataGroup = trackData.pointsGroups.get(key);
-                GPXUtilities.PointsGroup group;
+                WebPointsGroup dataGroup = trackData.pointsGroups.get(key);
+                GpxUtilities.PointsGroup group;
                 if (dataGroup.ext != null) {
                     group = dataGroup.ext;
-                    group.color = parseColor(dataGroup.color, 0);
+                    group.setColor(parseColor(dataGroup.color, 0));
                     List<Wpt> wptsData = dataGroup.points;
                     for (Wpt wpt : wptsData) {
-                        group.points.add(convertToWptPt(wpt));
+                        group.getPoints().add(convertToWptPt(wpt));
                     }
                 } else {
-                    group = new GPXUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, parseColor(dataGroup.color, 0));
+                    group = new GpxUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, parseColor(dataGroup.color, 0));
                 }
                 res.put(key, group);
             }
@@ -538,64 +536,64 @@ public class WebGpxParser {
         
         if (trackData.tracks != null) {
             trackData.tracks.forEach(t -> {
-                GPXUtilities.Track track = t.ext;
+                Track track = t.ext;
                 if (track == null) {
-                    track = new GPXUtilities.Track();
+                    track = new Track();
                 }
                 if (!t.points.isEmpty()) {
-                    List<GPXUtilities.TrkSegment> segments = new ArrayList<>();
+                    List<TrkSegment> segments = new ArrayList<>();
                     if (t.points.get(0).geometry != null) {
-                        GPXUtilities.Route route = new GPXUtilities.Route();
+                        Route route = new Route();
                         List<Point> trkPoints = new ArrayList<>();
                         int allPoints = 0;
                         for (int i = 0; i < t.points.size(); i++) {
                             Point point = t.points.get(i);
                             List<WebGpxParser.Point> geo = point.geometry;
                             if (geo.isEmpty()) {
-                                if (!route.points.isEmpty()) {
-                                    gpxFile.routes.add(route);
+                                if (!route.getPoints().isEmpty()) {
+                                    gpxFile.getRoutes().add(route);
                                 }
-                                route = new GPXUtilities.Route();
+                                route = new Route();
                                 allPoints = 0;
                             }
-                            GPXUtilities.WptPt routePoint = point.ext;
+                            WptPt routePoint = point.ext;
                             if (routePoint == null) {
                                 routePoint = new WptPt();
                             }
-                            routePoint.lat = point.lat;
-                            routePoint.lon = point.lng;
+                            routePoint.setLat(point.lat);
+                            routePoint.setLon(point.lng);
                             if (point.ele == NAN_MARKER) {
-                                routePoint.ele = Double.NaN;
+                                routePoint.setEle(Double.NaN);
                             }
-                            if (routePoint.extensions == null) {
-                                routePoint.extensions = new LinkedHashMap<>();
+                            if (routePoint.getExtensions() == null) {
+                                routePoint.setExtensions(new LinkedHashMap<>());
                             }
                             if (!point.profile.equals(LINE_PROFILE_TYPE)) {
-                                routePoint.extensions.put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                                routePoint.getExtensions().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
                             boolean isLast = i == t.points.size() - 1;
                             //for last rtept trkpt_idx = last index of trkpt points
                             int ind = isLast ? allPoints - 1 : allPoints;
-                            routePoint.extensions.put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
-                            route.points.add(routePoint);
+                            routePoint.getExtensions().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
+                            route.getPoints().add(routePoint);
                             trkPoints.addAll(geo);
                         }
-                        gpxFile.routes.add(route);
+                        gpxFile.getRoutes().add(route);
                         if (!trkPoints.isEmpty()) {
                             addSegmentsToTrack(trkPoints, segments);
                         }
                     } else {
                         addSegmentsToTrack(t.points, segments);
                     }
-                    track.segments = segments;
-                    gpxFile.tracks.add(track);
+                    track.setSegments(segments);
+                    gpxFile.getTracks().add(track);
                 }
             });
         }
         
         if (trackData.ext != null) {
-            gpxFile.extensions = trackData.ext;
+            gpxFile.setExtensions(trackData.ext);
         }
         
         return gpxFile;
@@ -603,87 +601,87 @@ public class WebGpxParser {
     
     public WptPt convertToWptPt(Wpt wpt) {
         WptPt point = wpt.ext != null ? wpt.ext : new WptPt();
-        point.name = wpt.name;
+        point.setName(wpt.name);
         if (wpt.desc != null) {
-            point.desc = wpt.desc;
+            point.setDesc(wpt.desc);
         }
-        point.lat = wpt.lat;
-        point.lon = wpt.lon;
-        point.category = wpt.category;
-        if (point.extensions == null) {
-            point.extensions = new LinkedHashMap<>();
+        point.setLat(wpt.lat);
+        point.setLon(wpt.lon);
+        point.setCategory(wpt.category);
+        if (point.getExtensions() == null) {
+            point.setExtensions(new LinkedHashMap<>());
         }
         if (wpt.color != null) {
-            point.extensions.put(COLOR_EXTENSION, wpt.color);
+            point.getExtensions().put(COLOR_EXTENSION, wpt.color);
         }
         if (wpt.address != null) {
-            point.extensions.put(ADDRESS_EXTENSION, wpt.address);
+            point.getExtensions().put(ADDRESS_EXTENSION, wpt.address);
         }
         if (wpt.background != null) {
-            point.extensions.put(BACKGROUND_TYPE_EXTENSION, wpt.background);
+            point.getExtensions().put(BACKGROUND_TYPE_EXTENSION, wpt.background);
         }
         if (wpt.icon != null) {
-            point.extensions.put(ICON_NAME_EXTENSION, wpt.icon);
+            point.getExtensions().put(ICON_NAME_EXTENSION, wpt.icon);
         }
         if (wpt.hidden != null) {
-            point.extensions.put(HIDDEN_EXTENSION, wpt.hidden);
+            point.getExtensions().put(HIDDEN_EXTENSION, wpt.hidden);
         }
         return point;
     }
     
-    private void addSegmentsToTrack(List<Point> points, List<GPXUtilities.TrkSegment> segments) {
-        GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
+    private void addSegmentsToTrack(List<Point> points, List<TrkSegment> segments) {
+        TrkSegment segment = new TrkSegment();
         boolean isNanEle = isNanEle(points);
         int lastStartTrkptIdx = 0;
         int prevTypesSize = 0;
         Point lastPointWithSeg = null;
         for (Point point : points) {
-            GPXUtilities.WptPt filePoint = point.ext;
+            WptPt filePoint = point.ext;
             if (filePoint == null) {
-                filePoint = new GPXUtilities.WptPt();
+                filePoint = new WptPt();
             }
-            if (filePoint.hdop == -1) {
-                filePoint.hdop = Double.NaN;
+            if (filePoint.getHdop() == -1) {
+                filePoint.setHdop(Double.NaN);
             }
-            if (filePoint.heading == 0) {
-                filePoint.heading = Float.NaN;
+            if (filePoint.getHeading() == 0) {
+                filePoint.setHeading(Float.NaN);
             }
-            filePoint.lat = point.lat;
-            filePoint.lon = point.lng;
-            filePoint.speed = point.speed;
-            filePoint.ele = (!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN;
+            filePoint.setLat(point.lat);
+            filePoint.setLon(point.lng);
+            filePoint.setSpeed(point.speed);
+            filePoint.setEle((!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN);
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
-                filePoint.extensions.put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
-                segment.points.add(filePoint);
+                filePoint.getExtensions().put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
+                segment.getPoints().add(filePoint);
                 segments.add(segment);
-                segment = new GPXUtilities.TrkSegment();
+                segment = new TrkSegment();
             } else {
-                segment.points.add(filePoint);
+                segment.getPoints().add(filePoint);
             }
             
             if (point.segment != null) {
-                GPXUtilities.RouteSegment seg = point.segment.ext;
-                int segStartInd = seg.startTrackPointIndex != null ? Integer.parseInt(seg.startTrackPointIndex) : points.indexOf(point);
+                GpxUtilities.RouteSegment seg = point.segment.ext;
+                int segStartInd = seg.getStartTrackPointIndex() != null ? Integer.parseInt(seg.getStartTrackPointIndex()) : points.indexOf(point);
                 if (segStartInd == 0 && points.indexOf(point) > 0 && lastPointWithSeg != null) {
-                    int currentLength = Integer.parseInt(lastPointWithSeg.segment.ext.length);
+                    int currentLength = Integer.parseInt(lastPointWithSeg.segment.ext.getLength());
                     //fix approximate results
                     int segmentLength = currentLength == 1 ? 1 : currentLength - 1;
-                    int lastPointWithSegStartInd = lastPointWithSeg.segment.ext.startTrackPointIndex != null ? Integer.parseInt(lastPointWithSeg.segment.ext.startTrackPointIndex) : points.indexOf(lastPointWithSeg);
+                    int lastPointWithSegStartInd = lastPointWithSeg.segment.ext.getStartTrackPointIndex() != null ? Integer.parseInt(lastPointWithSeg.segment.ext.getStartTrackPointIndex()) : points.indexOf(lastPointWithSeg);
                     lastStartTrkptIdx = segmentLength + lastPointWithSegStartInd;
                     prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
-                    segment.routeTypes.addAll(point.segment.routeTypes);
+                    segment.getRouteTypes().addAll(point.segment.routeTypes);
                 }
-                seg.startTrackPointIndex = Integer.toString(segStartInd + lastStartTrkptIdx);
+                seg.setStartTrackPointIndex(Integer.toString(segStartInd + lastStartTrkptIdx));
                 
-                seg.types = prepareTypes(seg.types, prevTypesSize);
-                seg.pointTypes = prepareTypes(seg.pointTypes, prevTypesSize);
-                seg.names = prepareTypes(seg.names, prevTypesSize);
+                seg.setTypes(prepareTypes(seg.getTypes(), prevTypesSize));
+                seg.setPointTypes(prepareTypes(seg.getPointTypes(), prevTypesSize));
+                seg.setNames(prepareTypes(seg.getNames(), prevTypesSize));
                 
-                segment.routeSegments.add(seg);
+                segment.getRouteSegments().add(seg);
                 
-                if (segment.routeTypes.isEmpty()) {
-                    segment.routeTypes.addAll(point.segment.routeTypes);
+                if (segment.getRouteTypes().isEmpty()) {
+                    segment.getRouteTypes().addAll(point.segment.routeTypes);
                 }
                 lastPointWithSeg = point;
             }
@@ -726,14 +724,14 @@ public class WebGpxParser {
         return points.get(0).ele == NAN_MARKER;
     }
     
-    public void addRouteSegmentsToPoints(GPXUtilities.TrkSegment seg, List<WebGpxParser.Point> points) {
+    public void addRouteSegmentsToPoints(TrkSegment seg, List<WebGpxParser.Point> points) {
         int startInd = 0;
-        if (!seg.routeSegments.isEmpty()) {
-            for (GPXUtilities.RouteSegment rs : seg.routeSegments) {
+        if (!seg.getRouteSegments().isEmpty()) {
+            for (GpxUtilities.RouteSegment rs : seg.getRouteSegments()) {
                 WebGpxParser.RouteSegment segment = new WebGpxParser.RouteSegment();
                 segment.ext = rs;
-                segment.routeTypes = seg.routeTypes;
-                int length = Integer.parseInt(rs.length);
+                segment.routeTypes = seg.getRouteTypes();
+                int length = Integer.parseInt(rs.getLength());
                 points.get(startInd).segment = segment;
                 startInd = startInd + (length - 1);
             }

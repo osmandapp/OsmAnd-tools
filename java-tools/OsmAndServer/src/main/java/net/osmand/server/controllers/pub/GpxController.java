@@ -17,6 +17,14 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.io.KFile;
+import net.osmand.shared.util.IProgress;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import okio.Buffer;
+import okio.Okio;
+import okio.Source;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,10 +50,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import net.osmand.IProgress;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -72,9 +76,6 @@ public class GpxController {
 	WebGpxParser webGpxParser;
 	
 	@Autowired
-	OsmAndMapsService osmAndMapsService;
-	
-	@Autowired
 	UserSessionResources session;
 	
 	@Autowired
@@ -97,22 +98,19 @@ public class GpxController {
 	
 	@GetMapping(path = { "/get-gpx-info" }, produces = "application/json")
 	@ResponseBody
-	public String getGpx(HttpServletRequest request, HttpSession httpSession) throws IOException {
+	public String getGpx(HttpSession httpSession) {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		return gson.toJson(Map.of("all", ctx.files));
 	}
 	
-	
-	
 	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<Resource> getGpx(@RequestParam(required = true) String name,
-			HttpSession httpSession) throws IOException {
+	public ResponseEntity<Resource> getGpx(@RequestParam String name, HttpSession httpSession) {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = null;
 		for (int i = 0; i < ctx.files.size(); i++) {
 			GPXSessionFile file = ctx.files.get(i);
-			if (file.analysis != null && file.analysis.name.equals(name)) {
+			if (file.analysis != null && file.analysis.getName().equals(name)) {
 				tmpGpx = file.file;
 			}
 		}
@@ -127,26 +125,32 @@ public class GpxController {
 	
 	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
 	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(file.getInputStream());
+		GpxFile gpxFile;
+		try (Source source = new Buffer().readFrom(file.getInputStream())) {
+			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+		}
 		final StringBuilder err = new StringBuilder(); 
 		if (srtmLocation == null) {
-			err.append(String.format("Server is not configured for srtm processing. "));
+			err.append("Server is not configured for srtm processing. ");
 		}
-		GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
+		GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
 		if (srtmGpx == null) {
 			err.append(String.format(String.format("Couldn't calculate altitude for %s (%d KB)",
-					file.getName(), file.getSize() / 1024l)));
+					file.getName(), file.getSize() / 1024L)));
 		}
-	    StreamingResponseBody responseBody = outputStream -> {
-	    	OutputStreamWriter ouw = new OutputStreamWriter(outputStream);
-			if (err.length() > 0) {
+		StreamingResponseBody responseBody = outputStream -> {
+			OutputStreamWriter ouw = new OutputStreamWriter(outputStream);
+			if (!err.isEmpty()) {
 				ouw.write(err.toString());
 			} else {
-				GPXUtilities.writeGpx(ouw, srtmGpx, IProgress.EMPTY_PROGRESS);
+				Exception exception = GpxUtilities.INSTANCE.writeGpx(null, Okio.buffer(Okio.sink(outputStream)), srtmGpx, IProgress.Companion.getEMPTY_PROGRESS());
+				if (exception != null) {
+					ouw.write("Error writing gpx file: " + exception.getMessage());
+				}
 			}
-	    	ouw.close();
-	    };
-	    if (err.length() > 0) {
+			ouw.close();
+		};
+	    if (!err.isEmpty()) {
 	    	return ResponseEntity.badRequest().body(responseBody);
 	    }
 		return ResponseEntity.ok()
@@ -182,21 +186,20 @@ public class GpxController {
 		fous.close();
 
 		ctx.tempFiles.add(tmpGpx);
-
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
-		if (gpxFile.error != null) {
+		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
 			GPXSessionFile sessionFile = new GPXSessionFile();
 			ctx.files.add(sessionFile);
-			gpxFile.path = file.getOriginalFilename();
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			gpxFile.setPath(file.getOriginalFilename());
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
 			sessionFile.size = fileSizeMb;
 			gpxService.cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
-			GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis srtmAnalysis = null;
+			GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
+			GpxTrackAnalysis srtmAnalysis = null;
 			if (srtmGpx != null) {
 				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
 			}
@@ -219,20 +222,19 @@ public class GpxController {
 		Algorithms.streamCopy(is, fous);
 		is.close();
 		fous.close();
-		
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
-		if (gpxFile.error != null) {
+		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
 			GPXSessionFile sessionFile = new GPXSessionFile();
-			gpxFile.path = file.getOriginalFilename();
-			GPXTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			gpxFile.setPath(file.getOriginalFilename());
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			sessionFile.file = tmpGpx;
 			sessionFile.size = file.getSize() / (double) (1 << 20);
 			gpxService.cleanupFromNan(analysis);
 			sessionFile.analysis = analysis;
-			GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis srtmAnalysis = null;
+			GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
+			GpxTrackAnalysis srtmAnalysis = null;
 			if (srtmGpx != null) {
 				srtmAnalysis = srtmGpx.getAnalysis(System.currentTimeMillis());
 			}
@@ -257,10 +259,8 @@ public class GpxController {
 		is.close();
 		fous.close();
 		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
-		
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(tmpGpx);
-		
-		if (gpxFile.error != null) {
+		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
@@ -274,10 +274,10 @@ public class GpxController {
 	                                                         HttpSession httpSession) throws IOException {
 		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
 		
-		GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
 		InputStreamResource resource = new InputStreamResource(new FileInputStream(tmpGpx));
-		Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {
 			return ResponseEntity.badRequest().body(resource);
 		}
@@ -288,7 +288,7 @@ public class GpxController {
 	}
 	
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
-	public ResponseEntity<String> getSrtmData(@RequestBody String data) {
+	public ResponseEntity<String> getSrtmData(@RequestBody String data) throws IOException {
 		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
@@ -296,7 +296,7 @@ public class GpxController {
 	}
 	
 	@RequestMapping(path = {"/get-analysis"}, produces = "application/json")
-	public ResponseEntity<String> getAnalysis(@RequestBody String data) {
+	public ResponseEntity<String> getAnalysis(@RequestBody String data) throws IOException {
 		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
 		

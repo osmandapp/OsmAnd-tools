@@ -3,13 +3,16 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.io.KFile;
+import okio.Buffer;
+import okio.Source;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
-import java.util.zip.GZIPInputStream;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
@@ -73,7 +75,7 @@ public class FavoriteService {
     }
     
     public ResponseEntity<String> updateFavoriteFile(String fileName, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                     Long updatetime, GPXFile file) throws IOException {
+                                                     Long updatetime, GpxFile file) throws IOException {
         File tmpGpx = createTmpGpxFile(file, fileName);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, file, tmpGpx);
@@ -82,7 +84,7 @@ public class FavoriteService {
     }
     
     public UserdataService.ResponseFileStatus createResponse(PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                                             String groupName, GPXFile file, File tmpFile) {
+                                                             String groupName, GpxFile file, File tmpFile) throws IOException {
         UserdataService.ResponseFileStatus resp = null;
         if (file != null && tmpFile != null) {
             PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
@@ -96,16 +98,16 @@ public class FavoriteService {
         return resp;
     }
     
-    public File createTmpGpxFile(GPXFile file, String fileName) throws IOException {
+    public File createTmpGpxFile(GpxFile file, String fileName) throws IOException {
         File tmpGpx = File.createTempFile(fileName, FILE_EXT_GPX);
-        Exception exception = GPXUtilities.writeGpxFile(tmpGpx, file);
+        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), file);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);
         }
         return tmpGpx;
     }
     
-    public GPXFile createGpxFile(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
+    public GpxFile createGpxFile(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
         PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
         if (userGroupFile == null || userGroupFile.filesize == -1) {
             if (groupName.equals(DEFAULT_GROUP_FILE_NAME)) {
@@ -119,8 +121,11 @@ public class FavoriteService {
         }
         InputStream in = userGroupFile.data != null ? new ByteArrayInputStream(userGroupFile.data) : userdataService.getInputStream(userGroupFile);
         if (in != null) {
-            GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-            if (gpxFile.error != null) {
+            GpxFile gpxFile;
+            try (Source source = new Buffer().readFrom(in)) {
+                gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+            }
+            if (gpxFile.getError() != null) {
                 throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_READING_GPX_MSG);
             } else {
                 return gpxFile;
@@ -130,16 +135,16 @@ public class FavoriteService {
     }
     
     private PremiumUserFilesRepository.UserFile createDefaultGroup(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
-        GPXFile file = new GPXFile(OSMAND_ROUTER_V2);
-        file.metadata.name = DEFAULT_GROUP_NAME;
+        GpxFile file = new GpxFile(OSMAND_ROUTER_V2);
+        file.getMetadata().setName(DEFAULT_GROUP_NAME);
         File tmpGpx = createTmpGpxFile(file, groupName);
         uploadFavoriteFile(tmpGpx, dev, groupName, updatetime);
         return userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
     }
     
     public ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
-        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
-        gpxFile.metadata.name = groupName;
+        GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        gpxFile.getMetadata().setName(groupName);
         String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
         File tmpGpx = createTmpGpxFile(gpxFile, name);
         uploadFavoriteFile(tmpGpx, dev, name, null);

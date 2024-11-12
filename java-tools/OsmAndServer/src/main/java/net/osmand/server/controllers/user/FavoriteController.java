@@ -3,8 +3,6 @@ package net.osmand.server.controllers.user;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
@@ -14,6 +12,9 @@ import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.WptPt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,7 +51,7 @@ public class FavoriteController {
                                             @RequestParam String fileName,
                                             @RequestParam Long updatetime) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
-        GPXFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.deleteWptPt(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
         } else
@@ -67,12 +68,12 @@ public class FavoriteController {
                                                      @RequestParam Long updatetime,
                                                      @RequestParam boolean updateTimestamp) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
-        GPXFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
             data.forEach(d -> {
-                GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
-                file.updateWptPt(wptPt.name, data.indexOf(d), wptPt, updateTimestamp);
+                WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
+                file.updateWptPt(wptPt.getName(), data.indexOf(d), wptPt, updateTimestamp);
             });
             File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
             Date clienttime = null;
@@ -100,7 +101,7 @@ public class FavoriteController {
                                          @RequestParam String fileName,
                                          @RequestParam(required = false) Long updatetime) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
-        GPXFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.addPoint(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
         } else
@@ -123,8 +124,8 @@ public class FavoriteController {
                                             @RequestParam Long newGroupUpdatetime,
                                             @RequestParam int ind) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
-        GPXUtilities.WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
-        GPXFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime);
+        WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
+        GpxFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime);
         if (newGpxFile != null) {
             newGpxFile.updateWptPt(wptName, ind, wptPt, true);
         } else
@@ -132,7 +133,7 @@ public class FavoriteController {
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         
         boolean changeGroup = !oldGroupName.equals(newGroupName);
-        GPXFile oldGpxFile = null;
+        GpxFile oldGpxFile = null;
         if (changeGroup) {
             oldGpxFile = favoriteService.createGpxFile(oldGroupName, dev, oldGroupUpdatetime);
             if (oldGpxFile != null) {
@@ -175,11 +176,11 @@ public class FavoriteController {
                                               @RequestParam String fullNewName,
                                               @RequestParam Long oldUpdatetime) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
-        GPXFile gpxFile = favoriteService.createGpxFile(fullOldName, dev, oldUpdatetime);
+        GpxFile gpxFile = favoriteService.createGpxFile(fullOldName, dev, oldUpdatetime);
         if (gpxFile != null) {
-            GPXUtilities.PointsGroup pointsGroup = gpxFile.getPointsGroups().get(oldName);
+            GpxUtilities.PointsGroup pointsGroup = gpxFile.getPointsGroups().get(oldName);
             pointsGroup.setName(newName);
-            pointsGroup.points.forEach(p -> p.category = newName);
+            pointsGroup.getPoints().forEach(p -> p.setCategory(newName));
             gpxFile.updatePointsGroup(oldName, pointsGroup);
             
             File tmpGpx = favoriteService.createTmpGpxFile(gpxFile, fullNewName);

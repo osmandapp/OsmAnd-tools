@@ -11,15 +11,17 @@ import net.osmand.data.LatLonEle;
 import net.osmand.shared.gpx.ElevationApproximator;
 import net.osmand.router.*;
 import net.osmand.shared.gpx.ElevationDiffsCalculator;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.Location;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataBundle;
-import net.osmand.binary.StringBundle;
+import net.osmand.shared.util.StringBundle;
 import net.osmand.data.LatLon;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.controllers.pub.RoutingController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
@@ -44,7 +46,7 @@ public class RoutingService {
         Map<String, Object> props = new TreeMap<>();
         List<Location> locations = new ArrayList<>();
         List<WebGpxParser.Point> pointsRes;
-        List<RouteSegmentResult> routeSegmentResults = new ArrayList<>();
+        List<RouteSegmentResult> routeSegmentResults;
         List<WebGpxParser.Point> lineRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(),
                 endLatLon.getLatitude(), endLatLon.getLongitude());
         if (routeMode.equals(LINE_PROFILE_TYPE)) {
@@ -59,7 +61,7 @@ public class RoutingService {
             return lineRes;
         }
 
-        GPXUtilities.TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
+        TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
         if (hasRouting) {
             webGpxParser.addRouteSegmentsToPoints(seg, pointsRes);
         }
@@ -72,7 +74,7 @@ public class RoutingService {
         List<RouteSegmentResult> approximateResult = osmAndMapsService.approximateRoute(points, routeMode);
         List<WebGpxParser.Point> gpxPoints = getPoints(approximateResult, locations);
         if (!gpxPoints.isEmpty()) {
-            GPXUtilities.TrkSegment seg = generateRouteSegments(approximateResult, locations);
+            TrkSegment seg = generateRouteSegments(approximateResult, locations);
             webGpxParser.addRouteSegmentsToPoints(seg, gpxPoints);
             addDistance(gpxPoints);
         }
@@ -185,15 +187,15 @@ public class RoutingService {
     }
 
     public void interpolateEmptyElevationSegments(List<LatLonEle> points) {
-        List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+        List <WptPt> waypoints = new ArrayList<>();
         for (LatLonEle point : points) {
-            GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(point.getLatitude(), point.getLongitude());
-            waypoint.ele = point.getElevation();
+            WptPt waypoint = new WptPt(point.getLatitude(), point.getLongitude());
+            waypoint.setEle(point.getElevation());
             waypoints.add(waypoint);
         }
-        GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+        GpxUtilities.INSTANCE.interpolateEmptyElevationWpts(waypoints);
         for (int i = 0; i < waypoints.size(); i++) {
-            points.get(i).setElevation((float)waypoints.get(i).ele);
+            points.get(i).setElevation((float)waypoints.get(i).getEle());
         }
     }
 
@@ -334,8 +336,8 @@ public class RoutingService {
         }
     }
 
-    private GPXUtilities.TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
-        GPXUtilities.TrkSegment trkSegment = new GPXUtilities.TrkSegment();
+    private TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
+        TrkSegment trkSegment = new TrkSegment();
         RouteDataResources resources = new RouteDataResources(locations, Collections.emptyList());
         List<StringBundle> routeItems = new ArrayList<>();
         if (!Algorithms.isEmpty(route)) {
@@ -349,7 +351,7 @@ public class RoutingService {
             for (RouteSegmentResult sr : route) {
                 RouteDataBundle itemBundle = new RouteDataBundle(resources);
                 sr.writeToBundle(itemBundle);
-                routeItems.add(itemBundle);
+                routeItems.add(toKotlinStringBundle(itemBundle));
             }
         }
         List<StringBundle> typeList = new ArrayList<>();
@@ -357,26 +359,36 @@ public class RoutingService {
         for (BinaryMapRouteReaderAdapter.RouteTypeRule rule : rules.keySet()) {
             RouteDataBundle typeBundle = new RouteDataBundle(resources);
             rule.writeToBundle(typeBundle);
-            typeList.add(typeBundle);
+            typeList.add(toKotlinStringBundle(typeBundle));
         }
 
         if (locations.isEmpty()) {
             return trkSegment;
         }
 
-        List<GPXUtilities.RouteSegment> routeSegments = new ArrayList<>();
+        List<GpxUtilities.RouteSegment> routeSegments = new ArrayList<>();
         for (StringBundle item : routeItems) {
-            routeSegments.add(GPXUtilities.RouteSegment.fromStringBundle(item));
+            routeSegments.add(GpxUtilities.RouteSegment.Companion.fromStringBundle(item));
         }
-        trkSegment.routeSegments = routeSegments;
+        trkSegment.setRouteSegments(routeSegments);
 
-        List<GPXUtilities.RouteType> routeTypes = new ArrayList<>();
+        List<GpxUtilities.RouteType> routeTypes = new ArrayList<>();
         for (StringBundle item : typeList) {
-            routeTypes.add(GPXUtilities.RouteType.fromStringBundle(item));
+            routeTypes.add(GpxUtilities.RouteType.Companion.fromStringBundle(item));
         }
-        trkSegment.routeTypes = routeTypes;
+        trkSegment.setRouteTypes(routeTypes);
 
         return trkSegment;
+    }
+
+    public StringBundle toKotlinStringBundle(RouteDataBundle routeDataBundle) {
+        StringBundle kotlinBundle = new StringBundle();
+        for (Map.Entry<String, net.osmand.binary.StringBundle.Item<?>> entry : routeDataBundle.getMap().entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue().getValue() != null ? entry.getValue().getValue().toString() : null;
+            kotlinBundle.putString(key, value);
+        }
+        return kotlinBundle;
     }
 
     private void addDistance(List<WebGpxParser.Point> pointsRes) {
@@ -403,15 +415,15 @@ public class RoutingService {
                 }
             }
 
-            List <GPXUtilities.WptPt> waypoints = new ArrayList<>();
+            List <WptPt> waypoints = new ArrayList<>();
             pointsRes.forEach(p -> {
-                    GPXUtilities.WptPt waypoint = new GPXUtilities.WptPt(p.lat, p.lng);
-                    waypoint.ele = p.ele;
+                    WptPt waypoint = new WptPt(p.lat, p.lng);
+                    waypoint.setEle(p.ele);
                     waypoints.add(waypoint);
             });
-            GPXUtilities.interpolateEmptyElevationWpts(waypoints);
+            GpxUtilities.INSTANCE.interpolateEmptyElevationWpts(waypoints);
             for (int i = 0; i < waypoints.size(); i++) {
-                pointsRes.get(i).ele = waypoints.get(i).ele;
+                pointsRes.get(i).ele = waypoints.get(i).getEle();
             }
             return pointsRes;
         }
@@ -421,12 +433,12 @@ public class RoutingService {
     private void getPoint(int ind, RouteSegmentResult r, List<Location> locations, float[] heightArray, List<WebGpxParser.Point> pointsRes) {
         LatLon point = r.getPoint(ind);
         locations.add(new Location("", point.getLatitude(), point.getLongitude()));
-        GPXUtilities.WptPt pt = new GPXUtilities.WptPt();
+        WptPt pt = new WptPt();
         if (heightArray != null && heightArray.length > ind * 2 + 1) {
-            pt.ele = heightArray[ind * 2 + 1];
+            pt.setEle(heightArray[ind * 2 + 1]);
         }
-        pt.lat = point.getLatitude();
-        pt.lon = point.getLongitude();
+        pt.setLat(point.getLatitude());
+        pt.setLon(point.getLongitude());
         pointsRes.add(new WebGpxParser.Point(pt));
     }
 }
