@@ -110,8 +110,11 @@ public class GpxController {
 		File tmpGpx = null;
 		for (int i = 0; i < ctx.files.size(); i++) {
 			GPXSessionFile file = ctx.files.get(i);
-			if (file.analysis != null && file.analysis.getName().equals(name)) {
-				tmpGpx = file.file;
+			if (file.analysis != null) {
+				String fileName = file.analysis.getName();
+				if (fileName != null && fileName.equals(name)) {
+					tmpGpx = file.file;
+				}
 			}
 		}
 		if (tmpGpx == null) {
@@ -126,12 +129,14 @@ public class GpxController {
 	@PostMapping(path = {"/process-srtm"}, produces = "application/json")
 	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		final StringBuilder err = new StringBuilder();
-		GpxFile gpxFile;
+		GpxFile gpxFile = null;
 		try (Source source = new Buffer().readFrom(file.getInputStream())) {
 			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+		} catch (IOException e) {
+			err.append("error reading gpx file ");
 		}
-		if (gpxFile.getError() != null) {
-			err.append("loadGPXFile error (process-srtm)");
+		if (gpxFile == null || gpxFile.getError() != null) {
+			err.append("loadGPXFile error (process-srtm) ");
 		}
 		if (srtmLocation == null) {
 			err.append("Server is not configured for srtm processing. ");

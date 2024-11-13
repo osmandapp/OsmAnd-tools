@@ -379,6 +379,10 @@ public class MapApiController {
 						GpxFile gpxFile;
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+						} catch (IOException e) {
+							LOG.error("Error reading gpx file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							filesToIgnore.add(nd);
+							continue;
 						}
 						if (gpxFile.getError() != null) {
 							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
@@ -548,6 +552,8 @@ public class MapApiController {
 			GpxFile gpxFile;
 			try (Source source = new Buffer().readFrom(bin)) {
 				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			} catch (IOException e) {
+				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
 			}
 			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
@@ -601,6 +607,8 @@ public class MapApiController {
 			GpxFile gpxFile;
 			try (Source source = new Buffer().readFrom(bin)) {
 				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			} catch (IOException e) {
+				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
 			}
 			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));

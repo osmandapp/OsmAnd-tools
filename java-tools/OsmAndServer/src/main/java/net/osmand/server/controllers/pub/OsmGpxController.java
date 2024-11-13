@@ -54,6 +54,8 @@ public class OsmGpxController {
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES = 500;
+	private static final int MIN_POINTS_SIZE = 100;
+	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
@@ -212,7 +214,7 @@ public class OsmGpxController {
 		GpxFile gpxFile = file.gpxFile;
 		List<WptPt> points = gpxFile.getAllSegmentsPoints();
 		GpxTrackAnalysis analysis = file.analysis;
-		if (!points.isEmpty() && points.size() > 100 && analysis.getMaxDistanceBetweenPoints() < 1000) {
+		if (!points.isEmpty() && points.size() > MIN_POINTS_SIZE && analysis.getMaxDistanceBetweenPoints() < MAX_DISTANCE_BETWEEN_POINTS) {
 			List<LatLon> latLonList = new ArrayList<>();
 			for (WptPt point : points) {
 				if (point.hasLocation()) {

@@ -386,7 +386,9 @@ public class RoutingService {
         for (Map.Entry<String, net.osmand.binary.StringBundle.Item<?>> entry : routeDataBundle.getMap().entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue().getValue() != null ? entry.getValue().getValue().toString() : null;
-            kotlinBundle.putString(key, value);
+            if (value != null) {
+                kotlinBundle.putString(key, value);
+            }
         }
         return kotlinBundle;
     }

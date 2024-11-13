@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Nullable;
 import javax.transaction.Transactional;
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -106,7 +107,8 @@ public class FavoriteService {
         }
         return tmpGpx;
     }
-    
+
+    @Nullable
     public GpxFile createGpxFile(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
         PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
         if (userGroupFile == null || userGroupFile.filesize == -1) {
@@ -124,6 +126,8 @@ public class FavoriteService {
             GpxFile gpxFile;
             try (Source source = new Buffer().readFrom(in)) {
                 gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+            } catch (IOException e) {
+                throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_READING_GPX_MSG);
             }
             if (gpxFile.getError() != null) {
                 throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_READING_GPX_MSG);

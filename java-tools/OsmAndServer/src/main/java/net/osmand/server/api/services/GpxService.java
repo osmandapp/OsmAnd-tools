@@ -50,13 +50,15 @@ public class GpxService {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
         GpxFile gpxFileForAnalyse = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(originalSourceGpx));
-        GpxTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
-        gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
-        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-        if (analysis != null) {
-            boolean addSpeed = analysis.getAvgSpeed() != 0.0 && !analysis.hasSpeedInTrack();
-            if (!gpxData.tracks.isEmpty() && (!analysis.getPointAttributes().isEmpty() || addSpeed)) {
-                webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
+        if (gpxFileForAnalyse.getError() == null) {
+            GpxTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
+            gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
+            gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
+            if (analysis != null) {
+                boolean addSpeed = analysis.getAvgSpeed() != 0.0 && !analysis.hasSpeedInTrack();
+                if (!gpxData.tracks.isEmpty() && (!analysis.getPointAttributes().isEmpty() || addSpeed)) {
+                    webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
+                }
             }
         }
         return gpxData;
