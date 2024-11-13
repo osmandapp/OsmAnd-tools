@@ -380,7 +380,7 @@ public class MapApiController {
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 						} catch (IOException e) {
-							LOG.error("Error reading gpx file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							LOG.error("web-list-files: loadGpxFile error: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
 							filesToIgnore.add(nd);
 							continue;
 						}
