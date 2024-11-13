@@ -24,11 +24,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -45,6 +41,7 @@ import javax.xml.stream.XMLStreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Source;
 import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -110,6 +107,13 @@ public class DownloadOsmGPX {
 	private static final int HTTP_TIMEOUT = 5000;
 	private static final int MAX_RETRY_TIMEOUT = 5;
 	private static final int RETRY_TIMEOUT = 15000;
+
+	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
+	private static final String ERROR_ACTIVITY_TYPE = "error";
+
+	private static final int MIN_POINTS_SIZE = 100;
+	private static final int MIN_DISTANCE = 1000;
+	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -129,6 +133,7 @@ public class DownloadOsmGPX {
 	public static void main(String[] args) throws Exception {
 		String main = args.length > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
+		//createActivitiesMap("../../");
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
 			Source src = new Buffer().write(gpx.getBytes());
@@ -216,10 +221,255 @@ public class DownloadOsmGPX {
 			utility.recalculateMinMaxLatLon(false);
 		} else if ("recalculateminmax_and_download".equals(main)) {
 			utility.recalculateMinMaxLatLon(true);
+		} else if ("add_activity".equals(main)) {
+			utility.addActivityColumnAndPopulate(args[1]);
 		} else {
 			utility.downloadGPXMain();
 		}
 		utility.commitAllStatements();
+	}
+
+	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
+		LOG.info("Starting the process to add activity column and indexes...");
+		try (Statement statement = dbConn.createStatement()) {
+			// add activity column if not exists
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
+			// add index for activity column
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
+			// add indexes for coordinates
+			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
+			statement.executeUpdate(
+					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
+							"ON " + GPX_METADATA_TABLE_NAME +
+							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
+			);
+			// add indexes for date
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
+		}
+		LOG.info("All indexes created successfully.");
+		LOG.info("Creating activities map...");
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
+		} else {
+			fillActivityColumn(activitiesMap);
+		}
+	}
+
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
+		LOG.info("Starting to populate the 'activity' column...");
+		dbConn.setAutoCommit(false);
+		PreparedStatement updateStmt = dbConn.prepareStatement(
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
+		);
+
+		int batchSize = 0;
+		final int BATCH_LIMIT = 1000;
+		int processedCount = 0;
+		int identifiedActivityCount = 0;
+		int offset = 0;
+		boolean hasMoreRecords = true;
+		try {
+			while (hasMoreRecords) {
+				hasMoreRecords = false;
+
+				try (Statement selectStmt = dbConn.createStatement();
+				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+						" WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
+					while (rs.next()) {
+						String activity = null;
+						hasMoreRecords = true;
+						long id = rs.getLong("id");
+						GpxFile gpxFile = null;
+						try (Statement dataStmt = dbConn.createStatement();
+						     ResultSet rf = dataStmt.executeQuery(
+								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
+						     )) {
+							if (rf.next()) {
+								byte[] bytes = rf.getBytes("data");
+								if (bytes != null) {
+									try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+										gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+									} catch (IOException e) {
+										LOG.error("Error loading GPX file", e);
+										activity = ERROR_ACTIVITY_TYPE;
+									}
+								}
+							}
+						}
+
+						if (activity == null) {
+							if (gpxFile != null && gpxFile.getError() == null) {
+								GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+								List<WptPt> points = gpxFile.getAllPoints();
+								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
+										|| analysis.getTotalDistance() < MIN_DISTANCE
+										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+									activity = GARBAGE_ACTIVITY_TYPE;
+								}
+							} else {
+								activity = ERROR_ACTIVITY_TYPE;
+							}
+						}
+
+						if (activity == null) {
+							activity = analyzeActivity(rs, activitiesMap);
+						}
+
+						if (activity == null) {
+							activity = analyzeActivityFromGpx(gpxFile);
+						}
+
+						if (activity == null) {
+							activity = GARBAGE_ACTIVITY_TYPE;
+						}
+
+						if (!GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity)) {
+							identifiedActivityCount++;
+						}
+
+						updateStmt.setString(1, activity);
+						updateStmt.setLong(2, id);
+						updateStmt.addBatch();
+
+						batchSize++;
+						processedCount++;
+
+						if (batchSize >= BATCH_LIMIT) {
+							updateStmt.executeBatch();
+							dbConn.commit();
+							batchSize = 0;
+							LOG.info("Processed " + processedCount + " records so far. Identified " + identifiedActivityCount + " activities.");
+						}
+					}
+				}
+				offset += BATCH_LIMIT;
+			}
+
+			if (batchSize > 0) {
+				updateStmt.executeBatch();
+				dbConn.commit();
+			}
+		} catch (SQLException e) {
+			dbConn.rollback();
+			throw e;
+		} finally {
+			dbConn.setAutoCommit(true);
+			updateStmt.close();
+		}
+		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
+	}
+
+	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
+		if (activitiesMap.isEmpty()) {
+			return null;
+		}
+		String name = rs.getString("name");
+		String desc = rs.getString("description");
+		Array tagsArray = rs.getArray("tags");
+		List<String> tags = new ArrayList<>();
+
+		if (tagsArray != null) {
+			try (ResultSet tagRs = tagsArray.getResultSet()) {
+				while (tagRs.next()) {
+					String tag = tagRs.getString(2);
+					if (tag != null) {
+						tags.add(tag.toLowerCase());
+					}
+				}
+			}
+		}
+
+		Map<String, String> tagMap = new LinkedHashMap<>();
+
+		activitiesMap.forEach((activityId, tagList) ->
+				tagList.stream()
+						.sorted((tag1, tag2) -> Integer.compare(tag2.length(), tag1.length()))
+						.forEach(tag -> tagMap.put(tag, activityId))
+		);
+
+		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
+			String tag = entry.getKey();
+			String activityId = entry.getValue();
+			if (tags.contains(tag)) {
+				return activityId;
+			}
+			if (name != null && name.toLowerCase().contains(tag)) {
+				return activityId;
+			}
+			if (desc != null && desc.toLowerCase().contains(tag)) {
+				return activityId;
+			}
+		}
+		return null;
+	}
+
+	private static Map<String, List<String>> createActivitiesMap(String rootPath) {
+		File activityFile = new File(rootPath, "resources/poi/activities.json");
+		if (!activityFile.exists()) {
+			return Collections.emptyMap();
+		}
+
+		ObjectMapper mapper = new ObjectMapper();
+		Map<String, List<String>> activitiesMap = new LinkedHashMap<>();
+
+		try {
+			JsonNode rootNode = mapper.readTree(activityFile);
+
+			JsonNode groups = rootNode.path("groups");
+			for (JsonNode group : groups) {
+				String groupId = group.path("id").asText();
+				List<String> groupTags = new ArrayList<>();
+				JsonNode groupTagsNode = group.path("tags");
+				if (groupTagsNode.isArray()) {
+					for (JsonNode tag : groupTagsNode) {
+						groupTags.add(tag.asText());
+					}
+				}
+				activitiesMap.put(groupId, groupTags);
+				JsonNode activities = group.path("activities");
+				for (JsonNode activity : activities) {
+					String activityId = activity.path("id").asText();
+					List<String> activityTags = new ArrayList<>();
+					JsonNode tagsNode = activity.path("tags");
+					if (tagsNode.isArray()) {
+						for (JsonNode tag : tagsNode) {
+							activityTags.add(tag.asText());
+						}
+					}
+					activitiesMap.put(activityId, activityTags);
+				}
+			}
+		} catch (IOException e) {
+			return Collections.emptyMap();
+		}
+
+		return activitiesMap;
+	}
+
+	private String analyzeActivityFromGpx(GpxFile gpxFile) {
+		if (gpxFile != null) {
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			List<WptPt> points = gpxFile.getAllPoints();
+			if (points.isEmpty() || points.size() < 100 || analysis.getTotalDistance() < 1000 || analysis.getMaxDistanceBetweenPoints() >= 1000) {
+				return GARBAGE_ACTIVITY_TYPE;
+			}
+			if (analysis.getHasSpeedInTrack()) {
+				float avgSpeed = analysis.getAvgSpeed();
+				if (avgSpeed > 0 && avgSpeed <= 12) {
+					return "foot";
+				} else if (avgSpeed <= 25) {
+					return "cycling";
+				} else if (avgSpeed <= 150) {
+					return "driving";
+				} else if (avgSpeed > 150) {
+					return "aviation";
+				} else {
+					return "other";
+				}
+			}
+		}
+		return ERROR_ACTIVITY_TYPE;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
