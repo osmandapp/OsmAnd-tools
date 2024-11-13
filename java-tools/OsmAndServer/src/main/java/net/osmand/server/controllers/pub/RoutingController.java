@@ -55,7 +55,7 @@ import net.osmand.util.MapUtils;
 @Controller
 @RequestMapping("/routing")
 public class RoutingController {
-	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
+	public static final String MSG_LONG_DIST = "Unable to process your route. Please limit the distance to ";
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
