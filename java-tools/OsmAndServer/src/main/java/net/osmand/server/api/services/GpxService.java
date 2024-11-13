@@ -188,10 +188,10 @@ public class GpxService {
         in.mark(2); // mark the stream to be able to reset it
         byte[] signature = new byte[2];
         int res = in.read(signature); // read the first two bytes
+        in.reset(); // reset the stream to its original state
         if (res == -1) {
             return false;
         }
-        in.reset(); // reset the stream to its original state
         int sig = (signature[0] & 0xFF) | ((signature[1] & 0xFF) << 8);
         return sig == GZIPInputStream.GZIP_MAGIC;
     }
