@@ -132,7 +132,9 @@ public class GpxController {
 		final StringBuilder err = new StringBuilder();
 		GpxFile gpxFile = null;
 		InputStream in = file.getInputStream();
-		in = new GZIPInputStream(in);
+		if (gpxService.isGzipStream(in)) {
+			in = new GZIPInputStream(in);
+		}
 		try (Source source = new Buffer().readFrom(in)) {
 			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 		} catch (IOException e) {

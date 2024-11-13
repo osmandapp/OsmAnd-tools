@@ -184,7 +184,7 @@ public class GpxService {
         return gpxFile;
     }
 
-    public static boolean isGzipStream(InputStream in) throws IOException {
+    public boolean isGzipStream(InputStream in) throws IOException {
         in.mark(2); // mark the stream to be able to reset it
         byte[] signature = new byte[2];
         int res = in.read(signature); // read the first two bytes
