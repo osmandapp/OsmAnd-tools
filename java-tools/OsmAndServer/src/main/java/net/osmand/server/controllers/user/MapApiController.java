@@ -2,6 +2,9 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.primitives.Metadata;
+import okio.Buffer;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -35,6 +38,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
+import okio.Source;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -58,9 +62,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
@@ -82,16 +83,10 @@ public class MapApiController {
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1692026215870l; // 14-08-2023
+	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
 
 	private static final String INFO_KEY = "info";
 
-
-	@Autowired
-	UserdataController userdataController;
-
-	@Autowired
-	GpxController gpxController;
 
 	@Autowired
 	PremiumUserFilesRepository userFilesRepository;
@@ -109,19 +104,11 @@ public class MapApiController {
 	UserdataService userdataService;
 
 	@Autowired
-	protected StorageService storageService;
-
-	@Autowired
-	protected PremiumUserFilesRepository filesRepository;
-
-	@Autowired
 	protected GpxService gpxService;
 
 	@Autowired
 	WebGpxParser webGpxParser;
 
-	@Autowired
-	UserSessionResources session;
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -137,8 +124,6 @@ public class MapApiController {
 	Gson gson = new Gson();
 
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-
-	JsonParser jsonParser = new JsonParser();
 
 	public static class UserPasswordPost {
 		// security alert: don’t add fields to this class
@@ -387,28 +372,37 @@ public class MapApiController {
 			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
-					GPXTrackAnalysis analysis = null;
+					GpxTrackAnalysis analysis = null;
 					UserFile uf = of.get();
 					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
 							: userdataService.getInputStream(uf);
 					if (in != null) {
-						GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-						if (gpxFile.error != null) {
+						in = new GZIPInputStream(in);
+						GpxFile gpxFile;
+						try (Source source = new Buffer().readFrom(in)) {
+							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+						} catch (IOException e) {
+							LOG.error("web-list-files: loadGpxFile error: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							filesToIgnore.add(nd);
+							continue;
+						}
+						if (gpxFile.getError() != null) {
 							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
 							filesToIgnore.add(nd);
 							continue;
 						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
-							if (gpxFile.metadata != null) {
-								uf.details.add(METADATA, gson.toJsonTree(gpxFile.metadata));
+							Metadata metadata = gpxFile.getMetadata();
+							if (!metadata.isEmpty()) {
+								uf.details.add(METADATA, gson.toJsonTree(metadata));
 							}
 						} else {
-							Map<String, WebGpxParser.PointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
+							Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
 							Map<String, Map<String,String>> pointGroupsAnalysis = new HashMap<>();
 							groups.keySet().forEach(k -> {
 								Map<String, String> groupInfo = new HashMap<>();
-								WebGpxParser.PointsGroup group = groups.get(k);
+								WebGpxParser.WebPointsGroup group = groups.get(k);
 								groupInfo.put("color", group.color);
 								groupInfo.put("groupSize", String.valueOf(group.points.size()));
 								groupInfo.put("hidden", String.valueOf(isHidden(group)));
@@ -454,7 +448,7 @@ public class MapApiController {
 		file.setDeviceInfo(deviceInfo);
 	}
 
-	private boolean isHidden(WebGpxParser.PointsGroup group) {
+	private boolean isHidden(WebGpxParser.WebPointsGroup group) {
 		for (WebGpxParser.Wpt wpt:  group.points) {
 			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
@@ -546,83 +540,98 @@ public class MapApiController {
 	}
 
 	@GetMapping(value = "/get-gpx-info")
-	public ResponseEntity<String> getGpxInfo(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException, SQLException {
+	public ResponseEntity<String> getGpxInfo(@RequestParam(name = "name") String name,
+	                                         @RequestParam(name = "type") String type,
+	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
-		InputStream bin = null;
+		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, userFile);
-
-			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
-			if (gpxFile.error != null) {
+			in = userdataService.getInputStream(dev, userFile);
+			GpxFile gpxFile;
+			in = new GZIPInputStream(in);
+			try (Source source = new Buffer().readFrom(in)) {
+				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			} catch (IOException e) {
+				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
+			}
+			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GPXTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
+			GpxTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
 			if (!analysisPresent(ANALYSIS, userFile)) {
 				saveAnalysis(ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
-			if (bin != null) {
-				bin.close();
+			if (in != null) {
+				in.close();
 			}
 		}
 	}
 
-	private GPXTrackAnalysis getAnalysis(UserFile file, GPXFile gpxFile) {
-		gpxFile.path = file.name;
-		// file.clienttime == null ? 0 : file.clienttime.getTime()
-		GPXTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
+	private GpxTrackAnalysis getAnalysis(UserFile file, GpxFile gpxFile) {
+		gpxFile.setPath(file.name);
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxService.cleanupFromNan(analysis);
+
 		return analysis;
 	}
 
-	private void saveAnalysis(String tag, UserFile file, GPXTrackAnalysis analysis) {
-		if (file.details == null) {
-			file.details = new JsonObject();
-		}
+	private void saveAnalysis(String tag, UserFile file, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			analysis.pointAttributes.clear();
-			analysis.availableAttributes.clear();
+			if (file.details == null) {
+				file.details = new JsonObject();
+			}
+			analysis.getPointAttributes().clear();
+
+			Map<String, Object> res = new HashMap<>();
+			res.put("totalDistance", analysis.getTotalDistance());
+			res.put("timeMoving", analysis.getTimeMoving());
+			res.put("points", analysis.getPoints());
+			res.put("wptPoints", analysis.getWptPoints());
+
+			file.details.add(tag, gsonWithNans.toJsonTree(res));
 		}
-		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
 	}
 
 
 	@GetMapping(path = {"/get-srtm-gpx-info"}, produces = "application/json")
-	public ResponseEntity<String> getSrtmGpx(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam(name = "name", required = true) String name,
-			@RequestParam(name = "type", required = true) String type,
-			@RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
+	public ResponseEntity<String> getSrtmGpx(@RequestParam(name = "name") String name,
+	                                         @RequestParam(name = "type") String type,
+	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
-		InputStream bin = null;
+		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, userFile);
-			GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(bin));
-			if (gpxFile.error != null) {
+			in = userdataService.getInputStream(dev, userFile);
+			GpxFile gpxFile;
+			in = new GZIPInputStream(in);
+			try (Source source = new Buffer().readFrom(in)) {
+				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			} catch (IOException e) {
+				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
+			}
+			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GPXFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
-			GPXTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
+			GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
+			GpxTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
 			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
 				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
-			if (bin != null) {
-				bin.close();
+			if (in != null) {
+				in.close();
 			}
 		}
 	}

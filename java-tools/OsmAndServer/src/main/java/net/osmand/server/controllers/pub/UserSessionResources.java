@@ -9,6 +9,8 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.primitives.Metadata;
 import org.springframework.stereotype.Component;
 
 import net.osmand.gpx.GPXTrackAnalysis;
@@ -25,9 +27,9 @@ public class UserSessionResources implements HttpSessionListener {
 	static class GPXSessionFile {
 		transient File file;
 		double size;
-		GPXTrackAnalysis analysis;
-		GPXUtilities.Metadata metadata;
-		GPXTrackAnalysis srtmAnalysis;
+		GpxTrackAnalysis analysis;
+		Metadata metadata;
+		GpxTrackAnalysis srtmAnalysis;
 	}
 	
 	public static class GPXSessionContext {

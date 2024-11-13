@@ -110,6 +110,7 @@ public class DownloadOsmGPX {
 
 	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
 	private static final String ERROR_ACTIVITY_TYPE = "error";
+	private static final String NOSPEED_ACTIVITY_TYPE = "nospeed";
 
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MIN_DISTANCE = 1000;
@@ -267,20 +268,24 @@ public class DownloadOsmGPX {
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
 		int identifiedActivityCount = 0;
-		int offset = 0;
 		boolean hasMoreRecords = true;
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
 				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery("SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-						" WHERE activity IS NULL LIMIT " + BATCH_LIMIT + " OFFSET " + offset)) {
+				     ResultSet rs = selectStmt.executeQuery(
+						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
+								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT)) {
+					if (!rs.isBeforeFirst()) {
+						break; // no more records to process
+					}
 					while (rs.next()) {
 						String activity = null;
 						hasMoreRecords = true;
 						long id = rs.getLong("id");
 						GpxFile gpxFile = null;
+						GpxTrackAnalysis analysis = null;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
@@ -300,8 +305,8 @@ public class DownloadOsmGPX {
 
 						if (activity == null) {
 							if (gpxFile != null && gpxFile.getError() == null) {
-								GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-								List<WptPt> points = gpxFile.getAllPoints();
+								analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+								List<WptPt> points = gpxFile.getAllSegmentsPoints();
 								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
 										|| analysis.getTotalDistance() < MIN_DISTANCE
 										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
@@ -317,7 +322,7 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
-							activity = analyzeActivityFromGpx(gpxFile);
+							activity = analyzeActivityFromGpx(analysis);
 						}
 
 						if (activity == null) {
@@ -343,7 +348,6 @@ public class DownloadOsmGPX {
 						}
 					}
 				}
-				offset += BATCH_LIMIT;
 			}
 
 			if (batchSize > 0) {
@@ -447,13 +451,8 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(GpxFile gpxFile) {
-		if (gpxFile != null) {
-			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			List<WptPt> points = gpxFile.getAllPoints();
-			if (points.isEmpty() || points.size() < 100 || analysis.getTotalDistance() < 1000 || analysis.getMaxDistanceBetweenPoints() >= 1000) {
-				return GARBAGE_ACTIVITY_TYPE;
-			}
+	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
+		if (analysis != null) {
 			if (analysis.getHasSpeedInTrack()) {
 				float avgSpeed = analysis.getAvgSpeed();
 				if (avgSpeed > 0 && avgSpeed <= 12) {
@@ -468,6 +467,7 @@ public class DownloadOsmGPX {
 					return "other";
 				}
 			}
+			return NOSPEED_ACTIVITY_TYPE;
 		}
 		return ERROR_ACTIVITY_TYPE;
 	}
