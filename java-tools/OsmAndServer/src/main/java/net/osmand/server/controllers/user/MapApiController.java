@@ -586,11 +586,14 @@ public class MapApiController {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
+			analysis.getPointAttributes().clear();
+
 			Map<String, Object> res = new HashMap<>();
 			res.put("totalDistance", analysis.getTotalDistance());
 			res.put("timeMoving", analysis.getTimeMoving());
 			res.put("points", analysis.getPoints());
 			res.put("wptPoints", analysis.getWptPoints());
+
 			file.details.add(tag, gsonWithNans.toJsonTree(res));
 		}
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
