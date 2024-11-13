@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -376,6 +377,7 @@ public class MapApiController {
 					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
 							: userdataService.getInputStream(uf);
 					if (in != null) {
+						in = new GZIPInputStream(in);
 						GpxFile gpxFile;
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
@@ -542,15 +544,16 @@ public class MapApiController {
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
-		InputStream bin = null;
+		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, userFile);
+			in = userdataService.getInputStream(dev, userFile);
 			GpxFile gpxFile;
-			try (Source source = new Buffer().readFrom(bin)) {
+			in = new GZIPInputStream(in);
+			try (Source source = new Buffer().readFrom(in)) {
 				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 			} catch (IOException e) {
 				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
@@ -564,8 +567,8 @@ public class MapApiController {
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
-			if (bin != null) {
-				bin.close();
+			if (in != null) {
+				in.close();
 			}
 		}
 	}
@@ -579,14 +582,17 @@ public class MapApiController {
 	}
 
 	private void saveAnalysis(String tag, UserFile file, GpxTrackAnalysis analysis) {
-		if (file.details == null) {
-			file.details = new JsonObject();
-		}
 		if (analysis != null) {
-			analysis.getPointAttributes().clear();
-			analysis.getAvailableAttributes().clear();
+			if (file.details == null) {
+				file.details = new JsonObject();
+			}
+			Map<String, Object> res = new HashMap<>();
+			res.put("totalDistance", analysis.getTotalDistance());
+			res.put("timeMoving", analysis.getTimeMoving());
+			res.put("points", analysis.getPoints());
+			res.put("wptPoints", analysis.getWptPoints());
+			file.details.add(tag, gsonWithNans.toJsonTree(res));
 		}
-		file.details.add(tag, gsonWithNans.toJsonTree(analysis));
 		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		userFilesRepository.save(file);
 	}
@@ -597,15 +603,16 @@ public class MapApiController {
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
 		PremiumUserDevice dev = checkUser();
-		InputStream bin = null;
+		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
-			bin = userdataService.getInputStream(dev, userFile);
+			in = userdataService.getInputStream(dev, userFile);
 			GpxFile gpxFile;
-			try (Source source = new Buffer().readFrom(bin)) {
+			in = new GZIPInputStream(in);
+			try (Source source = new Buffer().readFrom(in)) {
 				gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 			} catch (IOException e) {
 				return ResponseEntity.badRequest().body(String.format("Error reading file %s", userFile.name));
@@ -620,8 +627,8 @@ public class MapApiController {
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
-			if (bin != null) {
-				bin.close();
+			if (in != null) {
+				in.close();
 			}
 		}
 	}

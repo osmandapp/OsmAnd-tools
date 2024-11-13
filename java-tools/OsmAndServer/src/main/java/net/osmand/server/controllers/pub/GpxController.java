@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -130,7 +131,9 @@ public class GpxController {
 	public ResponseEntity<StreamingResponseBody> attachSrtm(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file) throws IOException {
 		final StringBuilder err = new StringBuilder();
 		GpxFile gpxFile = null;
-		try (Source source = new Buffer().readFrom(file.getInputStream())) {
+		InputStream in = file.getInputStream();
+		in = new GZIPInputStream(in);
+		try (Source source = new Buffer().readFrom(in)) {
 			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 		} catch (IOException e) {
 			err.append("error reading gpx file ");

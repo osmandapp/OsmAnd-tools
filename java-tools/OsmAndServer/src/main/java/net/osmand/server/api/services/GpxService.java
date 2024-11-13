@@ -26,6 +26,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.*;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.zip.GZIPInputStream;
 
 @Service
 public class GpxService {
@@ -147,7 +148,10 @@ public class GpxService {
                     if (response.getBody() == null) {
                         return null;
                     }
-                    ByteArrayInputStream inputStream = new ByteArrayInputStream(response.getBody());
+                    InputStream inputStream = new ByteArrayInputStream(response.getBody());
+                    if (isGzipStream(inputStream)) {
+                        inputStream = new GZIPInputStream(inputStream);
+                    }
                     try (Source source = new Buffer().readFrom(inputStream)) {
                         return GpxUtilities.INSTANCE.loadGpxFile(source);
                     }
@@ -179,6 +183,19 @@ public class GpxService {
         }
         return gpxFile;
     }
+
+    public static boolean isGzipStream(InputStream in) throws IOException {
+        in.mark(2); // mark the stream to be able to reset it
+        byte[] signature = new byte[2];
+        int res = in.read(signature); // read the first two bytes
+        if (res == -1) {
+            return false;
+        }
+        in.reset(); // reset the stream to its original state
+        int sig = (signature[0] & 0xFF) | ((signature[1] & 0xFF) << 8);
+        return sig == GZIPInputStream.GZIP_MAGIC;
+    }
+
     
     public void cleanupFromNan(GpxTrackAnalysis analysis) {
         // process analysis

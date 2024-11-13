@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.zip.GZIPInputStream;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
@@ -123,6 +124,7 @@ public class FavoriteService {
         }
         InputStream in = userGroupFile.data != null ? new ByteArrayInputStream(userGroupFile.data) : userdataService.getInputStream(userGroupFile);
         if (in != null) {
+            in = new GZIPInputStream(in);
             GpxFile gpxFile;
             try (Source source = new Buffer().readFrom(in)) {
                 gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
