@@ -205,7 +205,7 @@ public class OsmGpxController {
 		String acceptEncoding = request.getHeader("Accept-Encoding");
 		boolean gzipSupported = acceptEncoding != null && acceptEncoding.contains("gzip");
 
-		response.setHeader("Content-Disposition", "attachment; filename=\"file.gpx\"");
+		response.setHeader("Content-Disposition", "attachment; filename=\"file-" + id + ".gpx\"");
 		response.setContentType("application/octet-stream");
 
 		try (OutputStream outputStream = response.getOutputStream()) {
