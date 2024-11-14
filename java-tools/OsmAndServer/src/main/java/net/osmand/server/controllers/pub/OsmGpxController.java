@@ -31,6 +31,7 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.BUFFER_SIZE;
@@ -56,6 +57,8 @@ public class OsmGpxController {
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	Map<String, RouteFile> routesCache = new ConcurrentHashMap<>();
+
+	private final ReentrantLock lock = new ReentrantLock();
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES = 100;
@@ -116,10 +119,20 @@ public class OsmGpxController {
 			feature.getProperties().put("user", rs.getString("user"));
 			feature.getProperties().put("date", rs.getString("date"));
 			String idKey = feature.getProperty("id").toString();
-			RouteFile file = routesCache.get(idKey);
-			if (file == null) {
-				file = getGpxFile(rs.getBytes("bytes"), idKey);
-			}
+			byte[] bytes = rs.getBytes("bytes");
+			RouteFile file = routesCache.computeIfAbsent(idKey, key -> {
+				GpxFile gpxFile = null;
+				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+				} catch (IOException e) {
+					LOGGER.error("Error loading GPX file", e);
+				}
+				if (gpxFile != null && gpxFile.getError() == null) {
+					GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+					return new RouteFile(bytes, gpxFile, analysis);
+				}
+				return null;
+			});
 			if (file != null) {
 				addGeoDataToFeature(file, feature);
 				if (feature.getProperty("geo") != null) {
@@ -250,22 +263,6 @@ public class OsmGpxController {
 		return null;
 	}
 
-	private RouteFile getGpxFile(byte[] bytes, String idKey) {
-		GpxFile gpxFile = null;
-		RouteFile file = null;
-		try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
-			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-		} catch (IOException e) {
-			LOGGER.error("Error loading GPX file", e);
-		}
-		if (gpxFile != null && gpxFile.getError() == null) {
-			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			file = new RouteFile(bytes, gpxFile, analysis);
-			routesCache.put(idKey, file);
-		}
-		return file;
-	}
-
 	private void addGeoDataToFeature(RouteFile file, Feature feature) {
 		GpxFile gpxFile = file.gpxFile;
 		List<WptPt> points = gpxFile.getAllSegmentsPoints();
@@ -314,19 +311,25 @@ public class OsmGpxController {
 	}
 
 	private void cleanupCache() {
-		int version = cacheTouch.incrementAndGet();
+		if (lock.tryLock()) {
+			try {
+				int version = cacheTouch.incrementAndGet();
 
-		if (version % MAX_RUNTIME_CACHE_SIZE == 0 && version > 0) {
-			cacheTouch.set(0);
+				if (version % MAX_RUNTIME_CACHE_SIZE == 0 && version > 0) {
+					cacheTouch.set(0);
 
-			List<String> keysToRemove = new ArrayList<>(routesCache.keySet());
+					List<String> keysToRemove = new ArrayList<>(routesCache.keySet());
 
-			// remove half of the cache
-			if (routesCache.size() >= MAX_RUNTIME_CACHE_SIZE) {
-				for (int i = 0; i < MAX_RUNTIME_CACHE_SIZE / 2; i++) {
-					String key = keysToRemove.get(i);
-					routesCache.remove(key);
+					// remove half of the cache
+					if (routesCache.size() >= MAX_RUNTIME_CACHE_SIZE) {
+						for (int i = 0; i < MAX_RUNTIME_CACHE_SIZE / 2; i++) {
+							String key = keysToRemove.get(i);
+							routesCache.remove(key);
+						}
+					}
 				}
+			} finally {
+				lock.unlock();
 			}
 		}
 	}
