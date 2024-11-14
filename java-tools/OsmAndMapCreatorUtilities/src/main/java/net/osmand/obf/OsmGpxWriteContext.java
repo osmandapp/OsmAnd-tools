@@ -196,15 +196,15 @@ public class OsmGpxWriteContext {
 					Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, t, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
 
-					if (!gpxTrackTags.containsKey("route")) {
-						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files
-					}
-
-					serializer.endTag(null, "way");
-
 					if (gpxFile.getMetadata() != null) {
 						addExtensionsOsmTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
 					}
+
+					if (!gpxTrackTags.containsKey("route")) {
+						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files (metadata)
+					}
+
+					serializer.endTag(null, "way");
 
 					String routeTag = gpxTrackTags.get("route"); // came from GPX metadata "osm_route"
 					if (routeTag != null) {
@@ -289,7 +289,7 @@ public class OsmGpxWriteContext {
 	private static final Set<String> keepOriginalTags = Set.of(
 			"color", // transformed to color_$color by OBF-generation
 			"osm_id", // keep untouched original OSM id (relations and nodes)
-			"relation_gpx" // special marker to render OSMC route_track distinctly
+			"relation_gpx" // special marker to render OSMC route_track distinctively
 	);
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {

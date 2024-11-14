@@ -316,7 +316,7 @@ public class RouteRelationExtractor {
 		}
 
 		metadataExtensions.put(OSM_IN_GPX_PREFIX + "id", String.valueOf(relation.getId()));
-		metadataExtensions.put("relation_gpx", "yes"); // need to render route:segment distinctly
+		metadataExtensions.put("relation_gpx", "yes"); // need to render route:segment distinctively
 
 		if (relation.getTags().containsKey("colour")) {
 			metadataExtensions.remove("colour");
