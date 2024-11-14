@@ -174,7 +174,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
      * broken multipolygons are also indexed, inner ways are sometimes left out,
      * broken rings are split and closed
      * broken multipolygons will normally be logged
-     * 
+     *
      * @param e    the entity to index
      * @param tags
      * @param ctx  the database context
@@ -255,6 +255,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         // The Rings are only composed by type, so if one way gets in a different Ring,
         // the rings will be incomplete
         List<Multipolygon> multipolygons = original.splitPerOuterRing(logMapDataWarn);
+
+        if (multipolygons.size() > 1 && "boundary".equals(tags.get(OSMTagKey.TYPE.getValue()))) {
+            LatLon center = OsmMapUtils.getCenter(e);
+            Formatter f = new Formatter(Locale.US).format("%.4f %.4f", center.getLatitude(), center.getLongitude());
+            tags.put("osmand_poi_lat_lon", f.toString());
+        }
 
         for (Multipolygon m : multipolygons) {
             assert m.getOuterRings().size() == 1;
@@ -916,7 +922,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 							ignore = true;
 						}
 					}
-                    
+
                     if (dataBlock == null) {
                         baseId = cid;
                         dataBlock = writer.createWriteMapDataBlock(baseId);
@@ -925,7 +931,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                     }
                     tempNames.clear();
                     decodeNames(rs.getString(6), tempNames);
-                    int[] typeUse = new int[mainTypes.size()];                    
+                    int[] typeUse = new int[mainTypes.size()];
 					for (int k = 0; k < typeUse.length; k++) {
 						typeUse[k] = mainTypes.get(k).getTargetId();
 					}
