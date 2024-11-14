@@ -276,7 +276,7 @@ public class GpxController {
 		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
-			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
+			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}
