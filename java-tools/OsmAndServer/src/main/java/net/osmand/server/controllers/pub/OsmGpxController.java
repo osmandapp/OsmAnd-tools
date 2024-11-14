@@ -268,13 +268,23 @@ public class OsmGpxController {
 		List<WptPt> points = gpxFile.getAllSegmentsPoints();
 		GpxTrackAnalysis analysis = file.analysis;
 		if (!points.isEmpty() && points.size() > MIN_POINTS_SIZE && analysis.getMaxDistanceBetweenPoints() < MAX_DISTANCE_BETWEEN_POINTS) {
-			List<LatLon> latLonList = new ArrayList<>();
-			for (WptPt point : points) {
-				if (point.hasLocation()) {
-					latLonList.add(new LatLon(point.getLatitude(), point.getLongitude()));
+			List<List<LatLon>> result = new ArrayList<>();
+			gpxFile.getTracks().forEach(track -> {
+				if (!track.getGeneralTrack()) {
+					track.getSegments().forEach(segment -> {
+						List<LatLon> segmentPoints = new ArrayList<>();
+						segment.getPoints().forEach(point -> {
+							if (point.hasLocation()) {
+								segmentPoints.add(new LatLon(point.getLatitude(), point.getLongitude()));
+							}
+						});
+						if (!segmentPoints.isEmpty()) {
+							result.add(segmentPoints);
+						}
+					});
 				}
-			}
-			feature.getProperties().put("geo", latLonList);
+			});
+			feature.getProperties().put("geo", result);
 			feature.getProperties().put("distance", analysis.getTotalDistance());
 		}
 	}
