@@ -23,12 +23,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
-import java.io.File;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
+
+import static net.osmand.server.api.services.UserdataService.BUFFER_SIZE;
 
 @RestController
 @RequestMapping("/osmgpx")
@@ -53,7 +58,7 @@ public class OsmGpxController {
 	Map<String, RouteFile> routesCache = new ConcurrentHashMap<>();
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
-	private static final int MAX_ROUTES = 500;
+	private static final int MAX_ROUTES = 100;
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
@@ -95,7 +100,7 @@ public class OsmGpxController {
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id " +
 				"WHERE 1 = 1 " + conditions +
-				" ORDER BY m.date DESC";
+				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES;
 
 		List<Feature> features = new ArrayList<>();
 		jdbcTemplate.query(query, ps -> {
@@ -103,9 +108,6 @@ public class OsmGpxController {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
-			if (features.size() >= MAX_ROUTES) {
-				return;
-			}
 			Feature feature = new Feature();
 			Long id = rs.getLong("id");
 			feature.getProperties().put("id", id);
@@ -120,7 +122,9 @@ public class OsmGpxController {
 			}
 			if (file != null) {
 				addGeoDataToFeature(file, feature);
-				features.add(feature);
+				if (feature.getProperty("geo") != null) {
+					features.add(feature);
+				}
 			}
 		});
 		FeatureCollection featureCollection = new FeatureCollection();
@@ -130,12 +134,11 @@ public class OsmGpxController {
 	}
 
 	@GetMapping(path = {"/get-osm-route"}, produces = "application/json")
-	public ResponseEntity<String> getRoute(@RequestParam Long id, HttpSession httpSession) throws IOException {
+	public ResponseEntity<String> getRoute(@RequestParam Long id) throws IOException {
 		RouteFile routeFile = routesCache.get(id.toString());
 		// get from cache
 		if (routeFile != null) {
-			File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(routeFile.gpxFile, tmpGpx);
+			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(routeFile.gpxFile.clone(), null, routeFile.analysis);
 			if (gpxData != null) {
 				return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 			} else {
@@ -155,8 +158,8 @@ public class OsmGpxController {
 				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(resultData.byteArray)).getBytes())) {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 					if (gpxFile.getError() != null) {
-						File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-						WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx);
+						GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+						WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
 						if (gpxData != null) {
 							return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 						}
@@ -169,6 +172,59 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("No records found");
 		}
 		return ResponseEntity.badRequest().body("No records found");
+	}
+
+	@GetMapping(path = {"/get-original-file"}, produces = "application/json")
+	public void getFile(@RequestParam Long id, HttpServletRequest request, HttpServletResponse response) throws IOException {
+		RouteFile routeFile = routesCache.get(id.toString());
+		byte[] fileData;
+		if (routeFile != null) {
+			fileData = routeFile.bytes;
+		} else {
+			String query = "SELECT id, data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = ? LIMIT 1";
+			try {
+				GpxData resultData = jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
+					Long rId = rs.getLong("id");
+					byte[] byteArray = rs.getBytes("data");
+					return new GpxData(rId, byteArray);
+				}, id);
+
+				if (resultData != null && resultData.byteArray != null) {
+					fileData = resultData.byteArray;
+				} else {
+					response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+					response.getWriter().write("No records found");
+					return;
+				}
+			} catch (DataAccessException e) {
+				response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				response.getWriter().write("Error loading GPX file");
+				return;
+			}
+		}
+		String acceptEncoding = request.getHeader("Accept-Encoding");
+		boolean gzipSupported = acceptEncoding != null && acceptEncoding.contains("gzip");
+
+		response.setHeader("Content-Disposition", "attachment; filename=\"file-" + id + ".gpx\"");
+		response.setContentType("application/octet-stream");
+
+		try (OutputStream outputStream = response.getOutputStream()) {
+			if (gzipSupported) {
+				response.setHeader("Content-Encoding", "gzip");
+				outputStream.write(fileData);
+			} else {
+				try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(fileData))) {
+					byte[] buffer = new byte[BUFFER_SIZE];
+					int bytesRead;
+					while ((bytesRead = gzipInputStream.read(buffer)) != -1) {
+						outputStream.write(buffer, 0, bytesRead);
+					}
+				}
+			}
+			outputStream.flush();
+		} catch (IOException e) {
+			response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+		}
 	}
 
 	private ResponseEntity<String> filterByActivity(String activity, List<Object> params, StringBuilder conditions) {
@@ -202,9 +258,9 @@ public class OsmGpxController {
 		} catch (IOException e) {
 			LOGGER.error("Error loading GPX file", e);
 		}
-		if (gpxFile != null) {
+		if (gpxFile != null && gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-			file = new RouteFile(gpxFile, analysis);
+			file = new RouteFile(bytes, gpxFile, analysis);
 			routesCache.put(idKey, file);
 		}
 		return file;
@@ -254,7 +310,7 @@ public class OsmGpxController {
 		}
 	}
 
-	private record RouteFile(GpxFile gpxFile, GpxTrackAnalysis analysis) {
+	private record RouteFile(byte[] bytes, GpxFile gpxFile, GpxTrackAnalysis analysis) {
 	}
 
 	private void cleanupCache() {

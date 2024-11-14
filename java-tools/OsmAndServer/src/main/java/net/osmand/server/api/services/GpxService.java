@@ -39,7 +39,7 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
     
-    public WebGpxParser.TrackData getTrackDataByGpxFile(GpxFile gpxFile, File originalSourceGpx) throws IOException {
+    public WebGpxParser.TrackData getTrackDataByGpxFile(GpxFile gpxFile, File originalSourceGpx, GpxTrackAnalysis analysis) throws IOException {
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
@@ -50,16 +50,19 @@ public class GpxService {
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        GpxFile gpxFileForAnalyse = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(originalSourceGpx));
-        if (gpxFileForAnalyse.getError() == null) {
-            GpxTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
-            gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
-            gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-            if (analysis != null) {
-                boolean addSpeed = analysis.getAvgSpeed() != 0.0 && !analysis.hasSpeedInTrack();
-                if (!gpxData.tracks.isEmpty() && (!analysis.getPointAttributes().isEmpty() || addSpeed)) {
-                    webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
-                }
+        GpxTrackAnalysis gpxAnalysis = analysis;
+        if (gpxAnalysis == null && originalSourceGpx != null) {
+            GpxFile gpxFileForAnalyse = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(originalSourceGpx));
+            if (gpxFileForAnalyse.getError() == null) {
+                gpxAnalysis = getAnalysis(gpxFileForAnalyse, false);
+            }
+        }
+        if (gpxAnalysis != null) {
+            gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
+            gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFile);
+            if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
+                boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+                webGpxParser.addAdditionalInfo(gpxData.tracks, gpxAnalysis, addSpeed);
             }
         }
         return gpxData;
