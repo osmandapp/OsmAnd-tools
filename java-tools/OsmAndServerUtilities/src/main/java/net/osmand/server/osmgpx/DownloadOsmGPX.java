@@ -454,7 +454,7 @@ public class DownloadOsmGPX {
 	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			if (analysis.getHasSpeedInTrack()) {
-				float avgSpeed = analysis.getAvgSpeed();
+				float avgSpeed = analysis.getAvgSpeed() * 3.6f;
 				if (avgSpeed > 0 && avgSpeed <= 12) {
 					return "foot";
 				} else if (avgSpeed <= 25) {
