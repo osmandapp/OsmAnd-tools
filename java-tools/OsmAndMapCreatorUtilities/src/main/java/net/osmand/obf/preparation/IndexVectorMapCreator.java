@@ -258,8 +258,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
         if (multipolygons.size() > 1 && "boundary".equals(tags.get(OSMTagKey.TYPE.getValue()))) {
             LatLon center = OsmMapUtils.getCenter(e);
-            Formatter f = new Formatter(Locale.US).format("%.4f %.4f", center.getLatitude(), center.getLongitude());
-            tags.put("osmand_poi_lat_lon", f.toString());
+            if (center != null) {
+                String url = MapUtils.createShortLinkString(center.getLatitude(), center.getLongitude(), 13);
+                tags.put("osmand_poi_lat_lon", url);
+            }
         }
 
         for (Multipolygon m : multipolygons) {
