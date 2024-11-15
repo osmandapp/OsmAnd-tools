@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
-@RequestMapping("/routing/search")
+@RequestMapping({"/search", "/routing/search"})
 public class SearchController {
     
     protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
