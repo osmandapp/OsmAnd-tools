@@ -133,18 +133,22 @@ public class SearchController {
         FeatureCollection collection = wikiService.getImages(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(collection));
     }
-    
+
     @MultiPlatform
     @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
                                                  @RequestParam(required = false) String imageTitle,
                                                  @RequestParam(required = false) Long pageId,
-                                                 @RequestParam(required = false) String lang) throws IOException, SQLException {
+                                                 @RequestParam(required = false) String lang,
+                                                 @RequestParam(name = "deviceid", required = false) Integer deviceId,
+                                                 @RequestParam(name = "accessToken", required = false) String accessToken) throws IOException, SQLException {
         if (imageTitle == null && data == null) {
             return ResponseEntity.badRequest().body("Required imageTitle or data!");
         }
-        
+
+        boolean saveToCache = validateUser(deviceId, accessToken);
+
         if (imageTitle == null) {
             // old parsing
             Map<String, String> info = wikiService.parseImageInfo(data);
@@ -152,10 +156,10 @@ public class SearchController {
         }
         // ignore data for new parsing
         data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
-        
+
         if (data == null) {
             data = wikiService.parseRawImageInfo(imageTitle);
-            if (data != null) {
+            if (data != null && saveToCache) {
                 wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
             }
         }
@@ -174,19 +178,14 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> parseImagesListInfo(@RequestBody List<WikiImageInfo> data,
                                                       @RequestParam String lang,
-                                                      @RequestParam(name = "deviceid", required = false) int deviceId,
+                                                      @RequestParam(name = "deviceid", required = false) Integer deviceId,
                                                       @RequestParam(name = "accessToken", required = false) String accessToken) {
         if (data == null) {
             return ResponseEntity.badRequest().body("Required data!");
         }
-        // validate user
-        boolean saveToCache = false;
-        if (deviceId != 0 && accessToken != null) {
-            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
-            if (dev != null) {
-                saveToCache = true;
-            }
-        }
+
+        boolean saveToCache = validateUser(deviceId, accessToken);
+
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
             String rawData = wikiImageInfo.data();
@@ -202,7 +201,7 @@ public class SearchController {
                 if (rawData == null) {
                     rawData = wikiService.parseRawImageInfo(title);
                 }
-                if (rawData != null) {
+                if (rawData != null && saveToCache) {
                     wikiService.saveWikiRawDataToCache(title, pageId, rawData);
                 }
             }
@@ -217,6 +216,14 @@ public class SearchController {
             }
         }
         return ResponseEntity.ok(gson.toJson(result));
+    }
+
+    private boolean validateUser(int deviceId, String accessToken) {
+        if (deviceId != 0 && accessToken != null) {
+            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
+	        return dev != null;
+        }
+        return false;
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
