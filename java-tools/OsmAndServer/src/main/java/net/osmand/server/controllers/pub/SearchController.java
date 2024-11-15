@@ -147,7 +147,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Required imageTitle or data!");
         }
 
-        boolean saveToCache = validateUser(deviceId, accessToken);
+        boolean saveToCache = deviceId != null && accessToken != null && validateUser(deviceId, accessToken);
 
         if (imageTitle == null) {
             // old parsing
@@ -184,7 +184,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Required data!");
         }
 
-        boolean saveToCache = validateUser(deviceId, accessToken);
+        boolean saveToCache = deviceId != null && accessToken != null && validateUser(deviceId, accessToken);
 
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
