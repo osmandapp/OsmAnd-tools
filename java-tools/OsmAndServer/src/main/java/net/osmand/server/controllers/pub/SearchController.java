@@ -140,14 +140,10 @@ public class SearchController {
     public ResponseEntity<String> parseImageInfo(@RequestBody(required = false) String data,
                                                  @RequestParam(required = false) String imageTitle,
                                                  @RequestParam(required = false) Long pageId,
-                                                 @RequestParam(required = false) String lang,
-                                                 @RequestParam(name = "deviceid", required = false) Integer deviceId,
-                                                 @RequestParam(name = "accessToken", required = false) String accessToken) throws IOException, SQLException {
+                                                 @RequestParam(required = false) String lang) throws IOException, SQLException {
         if (imageTitle == null && data == null) {
             return ResponseEntity.badRequest().body("Required imageTitle or data!");
         }
-
-        boolean saveToCache = deviceId != null && accessToken != null && validateUser(deviceId, accessToken);
 
         if (imageTitle == null) {
             // old parsing
@@ -159,7 +155,7 @@ public class SearchController {
 
         if (data == null) {
             data = wikiService.parseRawImageInfo(imageTitle);
-            if (data != null && saveToCache) {
+            if (data != null) {
                 wikiService.saveWikiRawDataToCache(imageTitle, pageId, data);
             }
         }
@@ -184,7 +180,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Required data!");
         }
 
-        boolean saveToCache = deviceId != null && accessToken != null && validateUser(deviceId, accessToken);
+        boolean saveToCache = validateUser(deviceId, accessToken);
 
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
@@ -218,8 +214,8 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(result));
     }
 
-    private boolean validateUser(int deviceId, String accessToken) {
-        if (deviceId != 0 && accessToken != null) {
+    private boolean validateUser(Integer deviceId, String accessToken) {
+        if (deviceId != null && accessToken != null) {
             PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
 	        return dev != null;
         }
