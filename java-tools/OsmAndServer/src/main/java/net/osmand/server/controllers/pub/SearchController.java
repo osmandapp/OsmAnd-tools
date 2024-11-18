@@ -61,11 +61,12 @@ public class SearchController {
     public ResponseEntity<String> search(@RequestParam double lat,
                                          @RequestParam double lon,
                                          @RequestParam String text,
-                                         @RequestParam String locale) throws IOException, XmlPullParserException {
+                                         @RequestParam String locale,
+                                         @RequestParam(required = false) Boolean baseSearch) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        List<Feature> features = searchService.search(lat, lon, text, locale);
+        List<Feature> features = searchService.search(lat, lon, text, locale, baseSearch != null && baseSearch);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     

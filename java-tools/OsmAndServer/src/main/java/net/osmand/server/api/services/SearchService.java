@@ -123,7 +123,7 @@ public class SearchService {
         return bbox;
     }
     
-    public List<Feature> search(double lat, double lon, String text, String locale) throws IOException, XmlPullParserException {
+    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
@@ -136,9 +136,14 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         List<Feature> features = new ArrayList<>();
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
+            if (list.isEmpty()) {
+                return Collections.emptyList();
+            }
             usedMapList = osmAndMapsService.getReaders(list,null);
-            
+            if (usedMapList.isEmpty()) {
+                return Collections.emptyList();
+            }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
             settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
@@ -159,11 +164,18 @@ public class SearchService {
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
-        
         if (!features.isEmpty()) {
             return features;
         } else {
             return Collections.emptyList();
+        }
+    }
+
+    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
+        if (baseSearch) {
+            return List.of(osmAndMapsService.getBaseMap());
+        } else {
+            return osmAndMapsService.getObfReaders(points, null, 0, "search");
         }
     }
     
