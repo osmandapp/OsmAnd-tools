@@ -1196,13 +1196,11 @@ public class UserdataService {
 
 	@Transactional
 	public String generateSharedUrl(PremiumUserFilesRepository.UserFile userFile) {
-		String fileName = userFile.name.replaceAll("\\s+", "_").toLowerCase();
 		String uniqueToken = UUID.randomUUID().toString();
-		String url = fileName + "_" + uniqueToken;
-		userFile.sharedUrl = url;
+		userFile.sharedUrl = uniqueToken;
 		filesRepository.saveAndFlush(userFile);
 
-		return url;
+		return uniqueToken;
 	}
 
 	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String token) {
