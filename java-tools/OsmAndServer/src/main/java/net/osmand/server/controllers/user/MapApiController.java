@@ -22,18 +22,17 @@ import java.util.zip.GZIPInputStream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.transaction.Transactional;
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
-import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -43,10 +42,7 @@ import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.AbstractResource;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
+import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,8 +63,6 @@ import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.controllers.pub.GpxController;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -82,6 +76,7 @@ public class MapApiController {
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
+	private static final String FILE_NOT_FOUND = "File not found";
 
 	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
 
@@ -832,5 +827,113 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
+	}
+
+	@GetMapping(path = {"/generate-shared-url"}, produces = "application/json")
+	public ResponseEntity<String> generateGpxSharedUrl(@RequestParam String name,
+	                                                    @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		String sharedUrl = userdataService.generateSharedUrl(userFile);
+		return ResponseEntity.ok(gson.toJson(Map.of("sharedUrl", sharedUrl)));
+	}
+
+	@GetMapping(path = {"/gpx/share/{token}"}, produces = "application/json")
+	@Transactional
+	public ResponseEntity<?> getTrackByUrl(@PathVariable String token,
+	                                       @RequestParam(required = false) Boolean downloadFile) throws IOException {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFileBySharedUrl(token);
+		if (userFile != null) {
+			boolean saved = userdataService.saveAccessedUser(dev, userFile);
+			if (!saved) {
+				return ResponseEntity.badRequest().body("User is in the blacklist");
+			}
+			if (downloadFile != null && downloadFile) {
+				FileDownloadResult fileResult = userdataService.getFile(userFile, dev);
+				if (fileResult == null) {
+					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+				}
+				return ResponseEntity.ok()
+						.header("Content-Disposition", "attachment; filename=" + fileResult.fileName)
+						.contentType(org.springframework.http.MediaType.valueOf(fileResult.contentType))
+						.body(new InputStreamResource(fileResult.inputStream));
+			}
+
+			GpxFile gpxFile = userdataService.getFile(userFile);
+
+			if (gpxFile.getError() == null) {
+				GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+				WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
+				if (gpxData != null) {
+					return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+				}
+			}
+		}
+		return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+	}
+
+	public record FileDownloadResult(InputStream inputStream, String fileName, String contentType) {
+	}
+
+	@GetMapping(path = {"/accessed-users"}, produces = "application/json")
+	public ResponseEntity<String> getAccessedUsers(@RequestParam String name,
+	                                               @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		List<String> users = userdataService.getAccessedUsers(userFile);
+		return ResponseEntity.ok(gson.toJson(Map.of("accessedUsers", users)));
+	}
+
+	@PostMapping(path = {"/create-file-blacklist"}, produces = "application/json")
+	public ResponseEntity<String> createFileBlacklist(@RequestBody List<String> list,
+	                                                  @RequestParam String name,
+	                                                  @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		boolean created = userdataService.createFileBlacklist(userFile, list);
+		if (!created) {
+			return ResponseEntity.badRequest().body("Error creating blacklist");
+		}
+		return ResponseEntity.ok("Blacklist created");
+	}
+
+	@GetMapping(path = {"/get-blacklist"}, produces = "application/json")
+	public ResponseEntity<String> getBlacklist(@RequestParam String name,
+	                                           @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		List<String> users = userdataService.getBlackList(userFile);
+		if (users == null) {
+			return ResponseEntity.badRequest().body("No blacklisted users");
+		}
+		return ResponseEntity.ok(gson.toJson(Map.of("blacklist", users)));
 	}
 }

@@ -35,9 +35,11 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
 	
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
-	
+
 	Iterable<UserFile> findAllByUserid(int userid);
-	
+
+	UserFile findUserFileBySharedUrl(String sharedUrl);
+
 	@Query("SELECT uf FROM UserFile uf " +
 			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
 			"AND uf.updatetime = (SELECT MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid AND uft.name = uf.name)")
@@ -89,13 +91,17 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Column(name = "gendetails", columnDefinition = "jsonb")
         @Type(type = "net.osmand.server.assist.data.JsonbType")
         public JsonObject details;
-        
-//      @Fetch(FetchMode.JOIN)
+
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;
-        
-//        @Lob
-//        public Blob data;
+
+	    @Column(name = "shared_url")
+	    public String sharedUrl;
+
+	    @Column(name = "shared_info", columnDefinition = "jsonb")
+	    @Type(type = "net.osmand.server.assist.data.JsonbType")
+	    public JsonObject sharedInfo;
+
 
     }
 

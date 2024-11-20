@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VALUE;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -10,17 +11,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -33,6 +27,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import okio.Buffer;
+import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -1195,4 +1193,125 @@ public class UserdataService {
             devicesRepository.saveAndFlush(dev);
         }
     }
+
+	@Transactional
+	public String generateSharedUrl(PremiumUserFilesRepository.UserFile userFile) {
+		String fileName = userFile.name.replaceAll("\\s+", "_").toLowerCase();
+		String uniqueToken = UUID.randomUUID().toString();
+		String url = fileName + "_" + uniqueToken;
+		userFile.sharedUrl = url;
+		filesRepository.saveAndFlush(userFile);
+
+		return url;
+	}
+
+	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String token) {
+		return filesRepository.findUserFileBySharedUrl(token);
+	}
+
+	public MapApiController.FileDownloadResult getFile(PremiumUserFilesRepository.UserFile userFile, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		if (userFile == null || dev == null) {
+			return null;
+		}
+		try (InputStream bin = getInputStream(dev, userFile)) {
+			if (bin != null) {
+				InputStream inputStream = new GZIPInputStream(bin);
+				String fileName = URLEncoder.encode(sanitizeEncode(userFile.name), StandardCharsets.UTF_8);
+				return new MapApiController.FileDownloadResult(inputStream, fileName, APPLICATION_OCTET_STREAM_VALUE);
+			}
+		}
+		return null;
+	}
+
+	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
+		if (file == null || file.data == null) {
+			return null;
+		}
+		try (InputStream inputStream = new GZIPInputStream(new ByteArrayInputStream(file.data));
+		     Source source = new Buffer().readFrom(inputStream)) {
+			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			if (gpxFile.getError() == null) {
+				return gpxFile;
+			}
+			return null;
+		}
+	}
+
+	public static class FileSharedInfo {
+		public Set<Integer> accessedUsers;
+		public Set<Integer> blackList;
+
+		public FileSharedInfo(Set<Integer> accessedUsers, Set<Integer> blackList) {
+			this.accessedUsers = accessedUsers;
+			this.blackList = blackList;
+		}
+
+		public FileSharedInfo() {
+			this.accessedUsers = new HashSet<>();
+			this.blackList = new HashSet<>();
+		}
+	}
+
+	public boolean saveAccessedUser(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
+		final String ACCESSED_USERS = "accessedUsers";
+		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+		if (fileSharedInfo == null) {
+			fileSharedInfo = new FileSharedInfo();
+		}
+		if (!fileSharedInfo.blackList.contains(dev.userid)) {
+			if (fileSharedInfo.accessedUsers.add(dev.userid)) {
+				userFile.sharedInfo.add(ACCESSED_USERS, gson.toJsonTree(fileSharedInfo.accessedUsers));
+				filesRepository.saveAndFlush(userFile);
+			}
+			return true;
+		}
+		return false;
+	}
+
+	public List<String> getAccessedUsers(PremiumUserFilesRepository.UserFile userFile) {
+		List<String> accessedUsers = new ArrayList<>();
+		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+		if (fileSharedInfo != null && fileSharedInfo.accessedUsers != null) {
+			for (Integer userId : fileSharedInfo.accessedUsers) {
+				PremiumUsersRepository.PremiumUser pu = usersRepository.findById(userId);
+				if (pu != null) {
+					accessedUsers.add(pu.email);
+				}
+			}
+		}
+		return accessedUsers;
+	}
+
+	@Transactional
+	public boolean createFileBlacklist(PremiumUserFilesRepository.UserFile userFile, List<String> list) {
+		final String BLACK_LIST = "blackList";
+		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+		if (fileSharedInfo == null) {
+			fileSharedInfo = new FileSharedInfo();
+		}
+		fileSharedInfo.blackList.addAll(list.stream().map(email -> {
+			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+			return pu != null ? pu.id : null;
+		}).filter(Objects::nonNull).toList());
+		if (fileSharedInfo.blackList.isEmpty()) {
+			return false;
+		}
+		userFile.sharedInfo.add(BLACK_LIST, gson.toJsonTree(fileSharedInfo.blackList));
+		filesRepository.saveAndFlush(userFile);
+		return true;
+	}
+
+	public List<String> getBlackList(PremiumUserFilesRepository.UserFile userFile) {
+		List<String> blackList = new ArrayList<>();
+		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+		if (fileSharedInfo != null && fileSharedInfo.blackList != null) {
+			for (Integer userId : fileSharedInfo.blackList) {
+				PremiumUsersRepository.PremiumUser pu = usersRepository.findById(userId);
+				if (pu != null) {
+					blackList.add(pu.email);
+				}
+			}
+		}
+		return blackList;
+	}
 }
