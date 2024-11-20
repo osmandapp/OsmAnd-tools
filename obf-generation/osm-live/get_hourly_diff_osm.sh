@@ -1,5 +1,5 @@
 #!/bin/bash -xe
-# GIT History could be found athttps://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
+# GIT History could be found at https://github.com/osmandapp/OsmAnd-misc/blob/master/osm-live/generate_hourly_osmand_diff.sh
 
 # For local test
 # How to generate files locally:
@@ -66,7 +66,7 @@ while true; do
     echo "END date $END_DATE is in the future of database!!!"
     exit 0;
   fi;
-  
+
   DATE_NAME="$(echo ${NSTART_DAY:2} | tr '-' _ | tr ':' _ )"
   TIME_NAME="$(echo ${NSTART_TIME} | tr '-' _ | tr ':' _ )"
   if [ "$TIME_NAME" = "00_00" ]; then
@@ -142,15 +142,32 @@ while true; do
   echo # 1. Query rich diffs - 2 in parallel
   START_T=$(date -u "+%H:%M")
 
-  echo -e "$QUERY_START" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START.osm &
-  echo -e "$QUERY_END" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END.osm &
-  echo "$QUERY_DIFF" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_CHANGE.osm  &
+  OVERPASS_STDERR=stderr.$$.tmp # stderr must be analyzed because osm3s_query might not drop error code
+  ERROR_IN_BACKGROUND=failed.$$.tmp # "bash -e" does not drop error on "false & false & false & wait; echo oops"
+
+  rm -f $ERROR_IN_BACKGROUND $OVERPASS_STDERR
+
+  echo -e "$QUERY_START" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query >$FILENAME_START.osm 2>>$OVERPASS_STDERR || touch $ERROR_IN_BACKGROUND &
+  echo -e "$QUERY_END" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query >$FILENAME_END.osm 2>>$OVERPASS_STDERR || touch $ERROR_IN_BACKGROUND &
+  echo "$QUERY_DIFF" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query >$FILENAME_CHANGE.osm 2>>$OVERPASS_STDERR || touch $ERROR_IN_BACKGROUND &
   wait
-  echo -e "$QUERY_START_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query > $FILENAME_START_REL.osm &
-  echo -e "$QUERY_END_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query  > $FILENAME_END_REL.osm &
+  echo -e "$QUERY_START_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query >$FILENAME_START_REL.osm 2>>$OVERPASS_STDERR || touch $ERROR_IN_BACKGROUND &
+  echo -e "$QUERY_END_REL" | $REMOTE_SSH_STRING /home/overpass/osm3s/bin/osm3s_query >$FILENAME_END_REL.osm 2>>$OVERPASS_STDERR || touch $ERROR_IN_BACKGROUND &
   wait
+
+  cat $OVERPASS_STDERR # verbose
+
   END_T=$(date -u "+%H:%M")
   echo "$START_DATE -> $END_DATE - $END_T ($START_T)" >> $DATE_LOG_FILE
+
+  if grep "error:" $OVERPASS_STDERR || test -f $ERROR_IN_BACKGROUND; then
+    echo "Fatal: osm3s_query failed in background job(s)"
+    rm -f $ERROR_IN_BACKGROUND $OVERPASS_STDERR
+    ls -la *.osm && rm -vf *.osm
+    exit 1
+  fi
+
+  rm -f $OVERPASS_STDERR
 
   #######################
 
@@ -176,12 +193,22 @@ while true; do
     exit 1;
   fi
 
-  gzip -c $FILENAME_START.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz &
-  gzip -c $FILENAME_END.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz &
-  gzip -c $FILENAME_CHANGE.osm > $FINAL_FOLDER/src/${FILENAME_DIFF}_diff.osm.gz &
-  gzip -c $FILENAME_START_REL.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before_rel.osm.gz &
-  gzip -c $FILENAME_END_REL.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after_rel.osm.gz &
+  rm -f $ERROR_IN_BACKGROUND
+
+  gzip -c $FILENAME_START.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz || touch $ERROR_IN_BACKGROUND &
+  gzip -c $FILENAME_END.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz || touch $ERROR_IN_BACKGROUND &
+  gzip -c $FILENAME_CHANGE.osm > $FINAL_FOLDER/src/${FILENAME_DIFF}_diff.osm.gz || touch $ERROR_IN_BACKGROUND &
+  gzip -c $FILENAME_START_REL.osm  > $FINAL_FOLDER/src/${FILENAME_DIFF}_before_rel.osm.gz || touch $ERROR_IN_BACKGROUND &
+  gzip -c $FILENAME_END_REL.osm    > $FINAL_FOLDER/src/${FILENAME_DIFF}_after_rel.osm.gz || touch $ERROR_IN_BACKGROUND &
   wait;
+
+  if [ -f $ERROR_IN_BACKGROUND ]; then
+    echo "Fatal: gzip failed in background job(s)"
+    ls -la $FINAL_FOLDER/src/${FILENAME_DIFF}/*.osm.gz && rm -vf $FINAL_FOLDER/src/${FILENAME_DIFF}/*.osm.gz
+    ls -la *.osm && rm -vf *.osm
+    rm -f $ERROR_IN_BACKGROUND
+    exit 1
+  fi
 
   TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_before.osm.gz
   TZ=UTC touch -c -d "$END_DATE" $FINAL_FOLDER/src/${FILENAME_DIFF}_after.osm.gz
@@ -193,7 +220,6 @@ while true; do
   # NEXT ITERATION
   START_DAY=$NSTART_DAY
   START_TIME=$NSTART_TIME
-  
 
   echo "$NSTART_DAY $NSTART_TIME" > "${RESULT_DIR}.proc_timestamp"
 done
