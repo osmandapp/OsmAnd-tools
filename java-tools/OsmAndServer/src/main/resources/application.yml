@@ -75,6 +75,13 @@ management:
       exposure:
         include: "*"
 spring:
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    session:
+      store-type: redis
+      redis:
+        namespace: osmand
   servlet:
     multipart:
       max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:50MB}

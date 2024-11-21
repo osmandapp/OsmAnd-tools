@@ -1,6 +1,8 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.File;
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +34,9 @@ public class UserSessionResources implements HttpSessionListener {
 		GpxTrackAnalysis srtmAnalysis;
 	}
 	
-	public static class GPXSessionContext {
+	public static class GPXSessionContext implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
 		List<GPXSessionFile> files = new ArrayList<>();
 		public List<File> tempFiles = new ArrayList<>();
 	}

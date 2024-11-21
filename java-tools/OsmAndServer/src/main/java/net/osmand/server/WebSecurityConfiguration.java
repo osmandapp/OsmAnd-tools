@@ -36,6 +36,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -57,6 +58,7 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
@@ -73,6 +75,7 @@ import net.osmand.util.Algorithms;
 
 @Configuration
 @EnableOAuth2Client
+@EnableRedisHttpSession(redisNamespace = "osmand", maxInactiveIntervalInSeconds = 3600 * 24 * 30)
 public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
@@ -133,8 +136,13 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
     
     @Override
 	protected void configure(HttpSecurity http) throws Exception {
-    	// http.csrf().disable().antMatcher("/**");
-    	// 1. CSRF
+	    http.sessionManagement()
+			    .maximumSessions(1)
+			    .and()
+			    .sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
+
+
+	    // 1. CSRF
     	Set<String> enabledMethods = new TreeSet<>(
     			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE"));
     	http.csrf().requireCsrfProtectionMatcher(new RequestMatcher() {
@@ -172,7 +180,6 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			mapLogin.setForceHttps(true);
 		}
 		http.exceptionHandling().defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/mapapi/**"));
-//		http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS));
 		http.rememberMe().tokenValiditySeconds(3600*24*14);
 		http.logout().deleteCookies("JSESSIONID").
 			logoutSuccessUrl("/").logoutRequestMatcher(new AntPathRequestMatcher("/logout")).permitAll();
