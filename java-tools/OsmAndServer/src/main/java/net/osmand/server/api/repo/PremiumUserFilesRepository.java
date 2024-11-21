@@ -38,7 +38,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
 	Iterable<UserFile> findAllByUserid(int userid);
 
-	UserFile findUserFileBySharedUrl(String sharedUrl);
+	UserFile findUserFileBySharedCode(String code);
 
 	@Query("SELECT uf FROM UserFile uf " +
 			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
@@ -95,8 +95,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Column(name = "data", columnDefinition="bytea")
         public byte[] data;
 
-	    @Column(name = "shared_url")
-	    public String sharedUrl;
+	    @Column(name = "shared_code")
+	    public String sharedCode;
 
 	    @Column(name = "shared_info", columnDefinition = "jsonb")
 	    @Type(type = "net.osmand.server.assist.data.JsonbType")

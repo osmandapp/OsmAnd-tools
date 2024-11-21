@@ -27,7 +27,7 @@ ALTER TABLE supporters_device_sub add primary key (sku, orderid);
 ------ PREMIUM accounts ----
 CREATE TABLE user_accounts(id serial primary key, email text not null, tokendevice text, orderid text, token text, tokentime timestamp, regtime timestamp); 
 CREATE TABLE user_account_devices(id serial primary key, userid integer, deviceid text, accesstoken text, lang text, brand text, model text, udpatetime timestamp); 
-CREATE TABLE user_files(id bigserial primary key, type text, name text, userid integer, deviceid integer, updatetime timestamp, clienttime timestamp, filesize bigint, zipfilesize bigint, storage text, gendetails jsonb, data bytea, shared_url text, shared_info jsonb);
+CREATE TABLE user_files(id bigserial primary key, type text, name text, userid integer, deviceid integer, updatetime timestamp, clienttime timestamp, filesize bigint, zipfilesize bigint, storage text, gendetails jsonb, data bytea, shared_code text, shared_info jsonb);
 CREATE TABLE promo_campaigns(name text, starttime timestamp, endtime timestamp, subactivemonths integer, numberlimit integer, used integer, lastusers text);
 ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
 --- 

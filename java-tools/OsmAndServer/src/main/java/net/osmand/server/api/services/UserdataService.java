@@ -1194,19 +1194,6 @@ public class UserdataService {
         }
     }
 
-	@Transactional
-	public String generateSharedUrl(PremiumUserFilesRepository.UserFile userFile) {
-		String uniqueToken = UUID.randomUUID().toString();
-		userFile.sharedUrl = uniqueToken;
-		filesRepository.saveAndFlush(userFile);
-
-		return uniqueToken;
-	}
-
-	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String token) {
-		return filesRepository.findUserFileBySharedUrl(token);
-	}
-
 	public MapApiController.FileDownloadResult getFile(PremiumUserFilesRepository.UserFile userFile, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
 		if (userFile == null || dev == null) {
 			return null;
@@ -1219,97 +1206,5 @@ public class UserdataService {
 			}
 		}
 		return null;
-	}
-
-	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
-		if (file == null || file.data == null) {
-			return null;
-		}
-		try (InputStream inputStream = new GZIPInputStream(new ByteArrayInputStream(file.data));
-		     Source source = new Buffer().readFrom(inputStream)) {
-			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
-			if (gpxFile.getError() == null) {
-				return gpxFile;
-			}
-			return null;
-		}
-	}
-
-	public static class FileSharedInfo {
-		public Set<Integer> accessedUsers;
-		public Set<Integer> blackList;
-
-		public FileSharedInfo(Set<Integer> accessedUsers, Set<Integer> blackList) {
-			this.accessedUsers = accessedUsers;
-			this.blackList = blackList;
-		}
-
-		public FileSharedInfo() {
-			this.accessedUsers = new HashSet<>();
-			this.blackList = new HashSet<>();
-		}
-	}
-
-	public boolean saveAccessedUser(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
-		final String ACCESSED_USERS = "accessedUsers";
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
-		if (fileSharedInfo == null) {
-			fileSharedInfo = new FileSharedInfo();
-		}
-		if (!fileSharedInfo.blackList.contains(dev.userid)) {
-			if (fileSharedInfo.accessedUsers.add(dev.userid)) {
-				userFile.sharedInfo.add(ACCESSED_USERS, gson.toJsonTree(fileSharedInfo.accessedUsers));
-				filesRepository.saveAndFlush(userFile);
-			}
-			return true;
-		}
-		return false;
-	}
-
-	public List<String> getAccessedUsers(PremiumUserFilesRepository.UserFile userFile) {
-		List<String> accessedUsers = new ArrayList<>();
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
-		if (fileSharedInfo != null && fileSharedInfo.accessedUsers != null) {
-			for (Integer userId : fileSharedInfo.accessedUsers) {
-				PremiumUsersRepository.PremiumUser pu = usersRepository.findById(userId);
-				if (pu != null) {
-					accessedUsers.add(pu.email);
-				}
-			}
-		}
-		return accessedUsers;
-	}
-
-	@Transactional
-	public boolean createFileBlacklist(PremiumUserFilesRepository.UserFile userFile, List<String> list) {
-		final String BLACK_LIST = "blackList";
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
-		if (fileSharedInfo == null) {
-			fileSharedInfo = new FileSharedInfo();
-		}
-		fileSharedInfo.blackList.addAll(list.stream().map(email -> {
-			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
-			return pu != null ? pu.id : null;
-		}).filter(Objects::nonNull).toList());
-		if (fileSharedInfo.blackList.isEmpty()) {
-			return false;
-		}
-		userFile.sharedInfo.add(BLACK_LIST, gson.toJsonTree(fileSharedInfo.blackList));
-		filesRepository.saveAndFlush(userFile);
-		return true;
-	}
-
-	public List<String> getBlackList(PremiumUserFilesRepository.UserFile userFile) {
-		List<String> blackList = new ArrayList<>();
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
-		if (fileSharedInfo != null && fileSharedInfo.blackList != null) {
-			for (Integer userId : fileSharedInfo.blackList) {
-				PremiumUsersRepository.PremiumUser pu = usersRepository.findById(userId);
-				if (pu != null) {
-					blackList.add(pu.email);
-				}
-			}
-		}
-		return blackList;
 	}
 }

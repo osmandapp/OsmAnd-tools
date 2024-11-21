@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.server.api.services.shareGpx.ShareGpxService;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.Buffer;
@@ -97,6 +98,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	ShareGpxService shareGpxService;
 
 	@Autowired
 	protected GpxService gpxService;
@@ -829,9 +833,12 @@ public class MapApiController {
 		return gson.toJson(Map.of("regions", regions));
 	}
 
-	@GetMapping(path = {"/generate-shared-url"}, produces = "application/json")
+	// Share GPX
+
+	@PostMapping(path = {"/file-share"}, produces = "application/json")
 	public ResponseEntity<String> generateGpxSharedUrl(@RequestParam String name,
-	                                                    @RequestParam String type) {
+	                                                   @RequestParam String type,
+	                                                   HttpServletRequest request) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
@@ -840,36 +847,29 @@ public class MapApiController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		String sharedUrl = userdataService.generateSharedUrl(userFile);
+		String code = shareGpxService.generateSharedCode(userFile);
+		String domain = request.getScheme() + "://" + request.getServerName() +
+				(request.getServerPort() != 80 && request.getServerPort() != 443 ? ":" + request.getServerPort() : "");
+		String sharedUrl = domain + "/share/gpx/" + code;
+
 		return ResponseEntity.ok(gson.toJson(Map.of("sharedUrl", sharedUrl)));
 	}
 
-	@GetMapping(path = {"/gpx/share/{token}"}, produces = "application/json")
+	@GetMapping(path = {"/share/gpx/{code}"}, produces = "application/json")
 	@Transactional
-	public ResponseEntity<?> getTrackByUrl(@PathVariable String token,
-	                                       @RequestParam(required = false) Boolean downloadFile) throws IOException {
+	public ResponseEntity<?> getTrackByUrl(@PathVariable String code) throws IOException {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
 		}
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFileBySharedUrl(token);
+		PremiumUserFilesRepository.UserFile userFile = shareGpxService.getUserFileBySharedUrl(code);
 		if (userFile != null) {
-			boolean saved = userdataService.saveAccessedUser(dev, userFile);
+			boolean saved = shareGpxService.saveAccessedUser(dev, userFile);
 			if (!saved) {
 				return ResponseEntity.badRequest().body("User is in the blacklist");
 			}
-			if (downloadFile != null && downloadFile) {
-				FileDownloadResult fileResult = userdataService.getFile(userFile, dev);
-				if (fileResult == null) {
-					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
-				}
-				return ResponseEntity.ok()
-						.header("Content-Disposition", "attachment; filename=" + fileResult.fileName)
-						.contentType(org.springframework.http.MediaType.valueOf(fileResult.contentType))
-						.body(new InputStreamResource(fileResult.inputStream));
-			}
 
-			GpxFile gpxFile = userdataService.getFile(userFile);
+			GpxFile gpxFile = shareGpxService.getFile(userFile);
 
 			if (gpxFile.getError() == null) {
 				GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
@@ -885,7 +885,7 @@ public class MapApiController {
 	public record FileDownloadResult(InputStream inputStream, String fileName, String contentType) {
 	}
 
-	@GetMapping(path = {"/accessed-users"}, produces = "application/json")
+	@GetMapping(path = {"/share/accessed-users"}, produces = "application/json")
 	public ResponseEntity<String> getAccessedUsers(@RequestParam String name,
 	                                               @RequestParam String type) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
@@ -896,14 +896,15 @@ public class MapApiController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		List<String> users = userdataService.getAccessedUsers(userFile);
+		List<String> users = shareGpxService.getAccessedUsers(userFile);
+
 		return ResponseEntity.ok(gson.toJson(Map.of("accessedUsers", users)));
 	}
 
-	@PostMapping(path = {"/create-file-blacklist"}, produces = "application/json")
-	public ResponseEntity<String> createFileBlacklist(@RequestBody List<String> list,
-	                                                  @RequestParam String name,
-	                                                  @RequestParam String type) {
+	@PostMapping(path = {"/share/edit-blacklist"}, produces = "application/json")
+	public ResponseEntity<String> editBlacklist(@RequestBody List<String> list,
+	                                            @RequestParam String name,
+	                                            @RequestParam String type) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
@@ -912,14 +913,33 @@ public class MapApiController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		boolean created = userdataService.createFileBlacklist(userFile, list);
+		boolean created = shareGpxService.editBlacklist(userFile, list);
 		if (!created) {
-			return ResponseEntity.badRequest().body("Error creating blacklist");
+			return ResponseEntity.badRequest().body("Error editing blacklist");
 		}
-		return ResponseEntity.ok("Blacklist created");
+		return ResponseEntity.ok("Blacklist edited");
 	}
 
-	@GetMapping(path = {"/get-blacklist"}, produces = "application/json")
+	@GetMapping(path = {"/share/edit-whitelist"}, produces = "application/json")
+	public ResponseEntity<String> editWhitelist(@RequestBody List<String> list,
+	                                            @RequestParam String name,
+	                                            @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		boolean created = shareGpxService.editWhitelist(userFile, list);
+		if (!created) {
+			return ResponseEntity.badRequest().body("Error editing whitelist");
+		}
+		return ResponseEntity.ok("Whitelist edited");
+	}
+
+	@GetMapping(path = {"/share/get-blacklist"}, produces = "application/json")
 	public ResponseEntity<String> getBlacklist(@RequestParam String name,
 	                                           @RequestParam String type) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = checkUser();
@@ -930,7 +950,7 @@ public class MapApiController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		List<String> users = userdataService.getBlackList(userFile);
+		List<String> users = shareGpxService.getBlackList(userFile);
 		if (users == null) {
 			return ResponseEntity.badRequest().body("No blacklisted users");
 		}
