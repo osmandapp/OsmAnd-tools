@@ -4,6 +4,7 @@ import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
+import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_DELIMITER;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_NAMES;
@@ -55,8 +56,9 @@ import javax.annotation.Nonnull;
 
 public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
-	public static final String OSM_IN_GPX_PREFIX = "osm_";
+	public static final String OSM_IN_GPX_PREFIX = OSM_PREFIX;
 	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
+	public static final String OSM_ID_TAG = "osm_id"; // special
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
 	public int tracks = 0;
@@ -112,7 +114,7 @@ public class OsmGpxWriteContext {
 			gpxInfo.updateRef(metaExtensions.get(OSM_IN_GPX_PREFIX + "ref"));
 			gpxInfo.updateName(metaExtensions.get(OSM_IN_GPX_PREFIX + "name"));
 			gpxInfo.updateDescription(metaExtensions.get(OSM_IN_GPX_PREFIX + "description"));
-			String osmId = metaExtensions.get(OSM_IN_GPX_PREFIX + "id");
+			String osmId = metaExtensions.get(OSM_ID_TAG);
 			if (osmId != null) {
 				gpxInfo.id = Long.parseLong(osmId);
 			}

@@ -45,6 +45,7 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
+import static net.osmand.obf.OsmGpxWriteContext.OSM_ID_TAG;
 import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
@@ -315,7 +316,7 @@ public class RouteRelationExtractor {
 			metadataExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
 
-		metadataExtensions.put(OSM_IN_GPX_PREFIX + "id", String.valueOf(relation.getId()));
+		metadataExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
 		metadataExtensions.put("relation_gpx", "yes"); // need to render route:segment distinctively
 
 		if (relation.getTags().containsKey("colour")) {
@@ -420,7 +421,7 @@ public class RouteRelationExtractor {
 				break; // all done
 			}
 			GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
-			// segment.getExtensionsToWrite().put(OSM_TAG_PREFIX + "id", String.valueOf(osmId));
+			// segment.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(osmId));
 			// segment.getExtensionsToWrite().put("relation_track", "yes");
 			segment.points.addAll(wpts);
 			track.segments.add(segment);
@@ -489,7 +490,7 @@ public class RouteRelationExtractor {
 			wptPt.lon = node.getLongitude();
 //			wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
-			wptPt.getExtensionsToWrite().put(OSM_IN_GPX_PREFIX + "id", String.valueOf(node.getId()));
+			wptPt.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 					String key = entry1.getKey().replace(":", "_-_");
