@@ -53,12 +53,18 @@ import net.osmand.util.MapUtils;
 import rtree.RTree;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
+
 	public static final String OSM_IN_GPX_PREFIX = OSM_PREFIX;
 	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
-	public static final String OSM_ID_TAG = "osm_id"; // special
+
+	public static final String OSM_ID_TAG = "osm_id";
+	public static final String ROUTE_ID_TAG = "route_id";
+	public static final String RELATION_GPX_TAG = "relation_gpx";
+
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
 	public final QueryParams qp;
 	public int tracks = 0;
@@ -109,15 +115,19 @@ public class OsmGpxWriteContext {
 	
 	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
 	                       GpxTrackAnalysis analysis, String routeIdPrefix) throws IOException {
+
+		Map <String, String> extensions = new HashMap<>();
 		if (gpxFile.getMetadata() != null) {
-			Map <String, String> metaExtensions = gpxFile.getMetadata().getExtensionsToRead();
-			gpxInfo.updateRef(metaExtensions.get(OSM_IN_GPX_PREFIX + "ref"));
-			gpxInfo.updateName(metaExtensions.get(OSM_IN_GPX_PREFIX + "name"));
-			gpxInfo.updateDescription(metaExtensions.get(OSM_IN_GPX_PREFIX + "description"));
-			String osmId = metaExtensions.get(OSM_ID_TAG);
-			if (osmId != null) {
-				gpxInfo.id = Long.parseLong(osmId);
-			}
+			extensions.putAll(gpxFile.getMetadata().getExtensionsToRead());
+		}
+		extensions.putAll(gpxFile.getExtensionsToRead());
+
+		gpxInfo.updateRef(extensions.get(OSM_IN_GPX_PREFIX + "ref"));
+		gpxInfo.updateName(extensions.get(OSM_IN_GPX_PREFIX + "name"));
+		gpxInfo.updateDescription(extensions.get(OSM_IN_GPX_PREFIX + "description"));
+		String osmId = extensions.get(OSM_ID_TAG);
+		if (osmId != null) {
+			gpxInfo.id = Long.parseLong(osmId);
 		}
 
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
@@ -198,17 +208,18 @@ public class OsmGpxWriteContext {
 					Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, routeIdPrefix, analysis, t, s);
 					serializeTags(extraTrackTags, gpxTrackTags);
 
+					addExtensionsOsmTags(gpxTrackTags, gpxFile.getExtensionsToRead());
 					if (gpxFile.getMetadata() != null) {
 						addExtensionsOsmTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
 					}
 
 					if (!gpxTrackTags.containsKey("route")) {
-						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files (metadata)
+						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files (ext)
 					}
 
 					serializer.endTag(null, "way");
 
-					String routeTag = gpxTrackTags.get("route"); // came from GPX metadata "osm_route"
+					String routeTag = gpxTrackTags.get("route"); // came from GPX ext "osm_route"
 					if (routeTag != null) {
 						OsmRouteType routeType = null;
 						for(String tag : routeTag.split("[;, ]")) {
@@ -256,6 +267,7 @@ public class OsmGpxWriteContext {
 			addElevationTags(gpxTrackTags, segment);
 		}
 		addGpxInfoTags(gpxTrackTags, gpxInfo, routeIdPrefix);
+		addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 		if (gpxFile.getMetadata() != null) {
 			addExtensionsTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead(), gpxInfo);
 		}
@@ -290,8 +302,8 @@ public class OsmGpxWriteContext {
 
 	private static final Set<String> keepOriginalTags = Set.of(
 			"color", // transformed to color_$color by OBF-generation
-			"osm_id", // keep untouched original OSM id (relations and nodes)
-			"relation_gpx" // special marker to render OSMC route_track distinctively
+			OSM_ID_TAG, // keep untouched original OSM id (relations and nodes)
+			RELATION_GPX_TAG // special marker to render OSMC route_track distinctively
 	);
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
@@ -338,10 +350,10 @@ public class OsmGpxWriteContext {
 		if (wgs.eleCount > 0 && !Double.isNaN(wgs.startEle) && !Double.isNaN(wgs.endEle)) {
 			int st = (int) wgs.startEle;
 			gpxTrackTags.put("start_ele", String.valueOf((int) wgs.startEle));
-			gpxTrackTags.put("end_ele__start", String.valueOf((int) wgs.endEle - st));
-			gpxTrackTags.put("avg_ele__start", String.valueOf((int) (wgs.sumEle / wgs.eleCount) - st));
-			gpxTrackTags.put("min_ele__start", String.valueOf((int) wgs.minEle - st));
-			gpxTrackTags.put("max_ele__start", String.valueOf((int) wgs.maxEle - st));
+//			gpxTrackTags.put("end_ele__start", String.valueOf((int) wgs.endEle - st));
+//			gpxTrackTags.put("avg_ele__start", String.valueOf((int) (wgs.sumEle / wgs.eleCount) - st));
+//			gpxTrackTags.put("min_ele__start", String.valueOf((int) wgs.minEle - st));
+//			gpxTrackTags.put("max_ele__start", String.valueOf((int) wgs.maxEle - st));
 			gpxTrackTags.putIfAbsent("diff_ele_up", String.valueOf((int) wgs.up)); // prefer GpxTrackAnalysis
 			gpxTrackTags.putIfAbsent("diff_ele_down", String.valueOf((int) wgs.down)); // prefer GpxTrackAnalysis
 			gpxTrackTags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wgs.step, wgs.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
@@ -393,7 +405,7 @@ public class OsmGpxWriteContext {
 			gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("name:ref", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("description", gpxInfo.description);
-			gpxTrackTags.put("route_id", routeIdPrefix + gpxInfo.id);
+			gpxTrackTags.put(ROUTE_ID_TAG, routeIdPrefix + gpxInfo.id);
 
 			if (gpxInfo.timestamp.getTime() > 0) {
 				gpxTrackTags.put("date", gpxInfo.timestamp.toString());
@@ -446,7 +458,7 @@ public class OsmGpxWriteContext {
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
 			tagValue(serializer, "route_type", "track_point");
-			tagValue(serializer, "route_id", routeId);
+			tagValue(serializer, ROUTE_ID_TAG, routeId);
 			tagValue(serializer, "route_name", routeName);
 		}
 		if (!Algorithms.isEmpty(p.getName())) {
@@ -626,19 +638,19 @@ public class OsmGpxWriteContext {
 		public String gpx;
 		public byte[] gpxGzip;
 
-		public void updateName(String name) {
+		public void updateName(@Nullable String name) {
 			if (name != null) {
 				this.name = name;
 			}
 		}
 
-		public void updateRef(String ref) {
+		public void updateRef(@Nullable String ref) {
 			if (ref != null) {
 				this.ref = ref;
 			}
 		}
 
-		public void updateDescription(String description) {
+		public void updateDescription(@Nullable String description) {
 			if (description != null) {
 				this.description = description;
 			}

@@ -45,8 +45,7 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
-import static net.osmand.obf.OsmGpxWriteContext.OSM_ID_TAG;
-import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
+import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
@@ -310,18 +309,18 @@ public class RouteRelationExtractor {
 
 		gpxFile.metadata.desc = relation.getTag("description"); // nullable
 
-		Map <String, String> metadataExtensions = gpxFile.metadata.getExtensionsToWrite();
+		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
 		for (String key : relation.getTagKeySet()) {
-			metadataExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
+			gpxExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
 
-		metadataExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
-		metadataExtensions.put("relation_gpx", "yes"); // need to render route:segment distinctively
+		gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
+		gpxExtensions.put(RELATION_GPX_TAG, "yes"); // need to render route:segment distinctively
 
 		if (relation.getTags().containsKey("colour")) {
-			metadataExtensions.remove("colour");
-			metadataExtensions.put("color", relation.getTags().get("colour"));
+			gpxExtensions.remove("colour");
+			gpxExtensions.put("color", relation.getTags().get("colour"));
 		}
 
 		File gpxDir = getGpxDirectory(resultFile);
@@ -360,15 +359,15 @@ public class RouteRelationExtractor {
 				if (!Algorithms.isEmpty(props)) {
 					if (props.containsKey("color")) {
 						// color is forced by osmc_waycolor
-						metadataExtensions.remove("colour");
+						gpxExtensions.remove("colour");
 					}
 					if ((props.containsKey("shield_text") || props.containsKey("shield_textcolor"))
-							&& !metadataExtensions.containsKey(OSM_IN_GPX_PREFIX + "osmc:symbol")) {
+							&& !gpxExtensions.containsKey(OSM_IN_GPX_PREFIX + "osmc:symbol")) {
 						// avoid synthetic osmc
 						props.remove("shield_text");
 						props.remove("shield_textcolor");
 					}
-					metadataExtensions.putAll(props);
+					gpxExtensions.putAll(props);
 				}
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
@@ -395,12 +394,12 @@ public class RouteRelationExtractor {
 	private void joinWaysIntoTrackSegments(GPXUtilities.Track track, List<Way> ways) {
 		boolean[] done = new boolean[ways.size()];
 		while (true) {
-			long osmId = 0;
+			// long osmId = 0;
 			List<GPXUtilities.WptPt> wpts = new ArrayList<>();
 			for (int i = 0; i < ways.size(); i++) {
 				if (!done[i]) {
 					done[i] = true;
-					osmId = ways.get(i).getId(); // osm_id tag (optional)
+					// osmId = ways.get(i).getId(); // osm_id tag (optional)
 					addWayToPoints(wpts, false, ways.get(i), false); // "head" way
 					while (true) {
 						boolean stop = true;
