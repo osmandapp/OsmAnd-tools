@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.sql.DataSource;
@@ -18,20 +19,19 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.jdbc.DataSourceBuilder;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.*;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Profiles;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -58,6 +58,7 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.session.MapSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
@@ -75,18 +76,25 @@ import net.osmand.util.Algorithms;
 
 @Configuration
 @EnableOAuth2Client
-@EnableRedisHttpSession(redisNamespace = "osmand", maxInactiveIntervalInSeconds = 3600 * 24 * 30)
 public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_USER = "ROLE_USER";
+	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
     
     @Value("${admin.api-oauth2-url}")
     private String adminOauth2Url;
-    
-    @Autowired
+
+	@Value("${spring.session.redisHost}")
+	private String redisHost;
+
+	@Value("${spring.session.redisPort}")
+	private String redisPort;
+
+
+	@Autowired
 	protected PremiumUsersRepository usersRepository;
     
     @Autowired
@@ -111,7 +119,37 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			return userDevice;
 		}
 	}
-    
+
+	private boolean isRedisAvailable() {
+		return redisHost != null && !redisHost.isEmpty() && redisPort != null && !redisPort.isEmpty();
+	}
+
+	@Bean
+	@ConditionalOnExpression("T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && T(org.springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
+	public MapSessionRepository mapSessionRepository() {
+		if (!isRedisAvailable()) {
+			LOG.warn("Redis is not configured, falling back to MapSessionRepository.");
+			MapSessionRepository repository = new MapSessionRepository(new ConcurrentHashMap<>());
+			repository.setDefaultMaxInactiveInterval(SESSION_TTL_SECONDS);
+			return repository;
+		}
+		LOG.info("Redis configuration is detected, skipping MapSessionRepository.");
+		return null;
+	}
+
+	@Configuration
+	@ConditionalOnExpression("!T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && !T(org.springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
+	@EnableRedisHttpSession(maxInactiveIntervalInSeconds = SESSION_TTL_SECONDS)
+	public class ConditionalRedisConfig {
+
+		@Bean
+		public RedisConnectionFactory redisConnectionFactory() {
+			LettuceConnectionFactory factory = new LettuceConnectionFactory(redisHost, Integer.parseInt(redisPort));
+			factory.afterPropertiesSet();
+			LOG.info("Redis connection established: " + factory.getConnection().ping());
+			return factory;
+		}
+	}
 
     @Override
     protected void configure(final AuthenticationManagerBuilder auth) throws Exception {
