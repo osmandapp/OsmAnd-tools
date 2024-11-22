@@ -64,12 +64,14 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-security"
     implementation "org.springframework.boot:spring-boot-starter-thymeleaf"
     implementation "org.springframework.boot:spring-boot-starter-data-jpa"
-    implementation "org.springframework.boot:spring-boot-starter-data-redis"
     implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
     implementation "org.javassist:javassist:3.25.0-GA"
     implementation "javax.xml.bind:jaxb-api:2.3.1"
     implementation "javax.activation:activation:1.1"
     implementation "org.glassfish.jaxb:jaxb-runtime:2.3.5"
+
+    implementation 'org.springframework.session:spring-session-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     
     implementation 'com.sendgrid:sendgrid-java:4.2.1'
     implementation group: 'net.sf.trove4j', name: 'trove4j', version: '3.0.3'
