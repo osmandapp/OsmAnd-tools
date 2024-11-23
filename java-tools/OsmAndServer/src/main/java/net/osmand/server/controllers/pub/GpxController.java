@@ -274,7 +274,9 @@ public class GpxController {
 		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
 		if (gpxFile.getError() != null) {
-			return ResponseEntity.badRequest().body("Error reading gpx!");
+			LOGGER.error(String.format(
+					"process-track-data loadGpxFile (%s) error (%s)", file.getName(), gpxFile.getError().getMessage()));
+			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, tmpGpx, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
