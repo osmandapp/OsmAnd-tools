@@ -467,6 +467,8 @@ public class RouteRelationExtractor {
 		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
 	}
 
+	final String[] nodeNameTags = { "name", "name:en", "ref" };
+
 	private void addNode(GPXFile gpxFile, Node node) {
 		final Map<String, String> skipNodeByTags = Map.of(
 				"information", "guidepost"
@@ -503,7 +505,14 @@ public class RouteRelationExtractor {
 					}
 				}
 			});
-			wptPt.name = node.getTags().get("name");
+			Map<String, String> tags = node.getTags();
+			for (String tag : nodeNameTags) {
+				String val = tags.get(tag);
+				if (val != null) {
+					wptPt.name = val;
+					break;
+				}
+			}
 			gpxFile.addPoint(wptPt);
 			countNodes++;
 		}
