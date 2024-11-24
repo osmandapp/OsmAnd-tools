@@ -37,10 +37,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 	
 	Iterable<UserFile> findAllByUserid(int userid);
-	
-	@Query("SELECT uf FROM UserFile uf " +
-			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
-			"AND uf.updatetime = (SELECT MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid AND uft.name = uf.name)")
+
+    @Query("SELECT uf FROM UserFile uf "
+			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
+			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
 	
 	
