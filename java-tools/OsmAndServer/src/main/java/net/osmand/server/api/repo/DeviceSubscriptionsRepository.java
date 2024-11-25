@@ -1,5 +1,6 @@
 package net.osmand.server.api.repo;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
@@ -28,7 +29,9 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 	@Entity
     @Table(name = "supporters_device_sub")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
-	public class SupporterDeviceSubscription {
+	public class SupporterDeviceSubscription implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
 
 		@Id
 		@Column(name = "sku")
