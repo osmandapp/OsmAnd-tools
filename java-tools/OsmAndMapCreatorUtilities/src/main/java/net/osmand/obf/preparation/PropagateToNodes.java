@@ -29,31 +29,31 @@ public class PropagateToNodes {
     private TLongObjectHashMap<List<PropagateRuleFromWayToNode>> propagateTagsByOsmNodeId = new TLongObjectHashMap<>();
     private Map<String, List<PropagateRule>> propagateRulesByTag = new HashMap<>();
     private Map<PropagateRule, Map<String, String>> convertedPropagatedTags = new HashMap<>();
-    
+
     public static class PropagateWayWithNodes {
-    	
+
     	PropagateFromWayToNode[] points;
     	boolean empty = true;
-    	
+
 		public PropagateWayWithNodes(int oldNodes) {
 			points = new PropagateFromWayToNode[2 *oldNodes - 1];
 		}
     }
-    
+
     public static class PropagateRuleFromWayToNode {
     	public final PropagateFromWayToNode way;
     	public final PropagateRule rule;
 		public final Map<String, String> tags = new HashMap<>();
 		public boolean ignoreBorderPoint;
 		public long osmId; // connected point
-		
+
 		public PropagateRuleFromWayToNode(PropagateFromWayToNode propagateFromWayToNode, PropagateRule rule) {
 			this.way = propagateFromWayToNode;
 			this.rule = rule;
 		}
-		
+
     }
-    
+
 	public static class PropagateFromWayToNode {
 		public long id; // negative ids - artificial node
 		public long wayId;
@@ -75,7 +75,7 @@ public class PropagateToNodes {
 				this.id = -1;
 			}
 		}
-		
+
 		public LatLon getLatLon(Node st, Node en) {
 			if (st == null || en == null) {
 				return null;
@@ -87,7 +87,7 @@ public class PropagateToNodes {
 		public void applyRule(PropagateRule rule) {
 			applyRule(rule, false);
 		}
-		
+
 		public void applyRule(PropagateRule rule, boolean end) {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
 			rl.osmId = end ? endId : startId;
@@ -122,7 +122,7 @@ public class PropagateToNodes {
 			}
 		}
 	}
-	
+
 	public boolean isNoRegisteredNodes() {
 		return propagateTagsByNodeId.isEmpty();
 	}
@@ -144,7 +144,7 @@ public class PropagateToNodes {
 			l.add(pn);
 		}
 	}
-	
+
 
 	public List<PropagateFromWayToNode> getPropagateByNodeId(long nodeId) {
 		return propagateTagsByNodeId.get(nodeId);
@@ -155,7 +155,7 @@ public class PropagateToNodes {
 		for (Map.Entry<String, MapRenderingTypes.MapRulType> entry : ruleTypes.entrySet()) {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
-				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix, 
+				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix,
 						d.propagateNetworkIf, d.propagateIf);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
@@ -190,7 +190,7 @@ public class PropagateToNodes {
 		for (PropagateRule rule : rulesToApply) {
 			switch (rule.type) {
 			case ALL:
-				for (int i = 0; i < w.getNodes().size(); i++) {
+				for (int i = 0; i < allIds.size(); i++) {
 					getNode(resultWay, w, i, i).applyRule(rule);
 				}
 				break;
@@ -254,7 +254,7 @@ public class PropagateToNodes {
 		return rulesToApply;
 	}
 
-	
+
 
 	public void propagateTagsToWayNodesNoBorderRule(Way w) {
 		if (propagateTagsByNodeId.isEmpty()) {
@@ -308,15 +308,15 @@ public class PropagateToNodes {
 		public String getPropagateValue() {
 			return value;
 		}
-		
+
 		public String getWayTag() {
 			return tag;
 		}
-		
+
 		public String getWayValue() {
 			return value;
 		}
-		
+
 		public String getPropagateTag() {
 			String propagateTag = tag;
 			if (tagPrefix != null) {
@@ -324,7 +324,7 @@ public class PropagateToNodes {
 			}
 			return propagateTag;
 		}
-		
+
 		public boolean applicableBorder(Map<String, String> tags) {
 			if (!value.equals(tags.get(tag))) {
 				return false;
@@ -337,7 +337,7 @@ public class PropagateToNodes {
 			}
 			return true;
 		}
-		
+
 		public boolean applicableNetwork(Map<String, String> tags) {
 			if (propNetworkIf != null) {
 				return applicable(tags, propNetworkIf);
