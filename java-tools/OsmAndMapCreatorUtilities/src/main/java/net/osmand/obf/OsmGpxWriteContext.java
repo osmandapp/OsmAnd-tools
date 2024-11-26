@@ -60,6 +60,8 @@ public class OsmGpxWriteContext {
 
 	public static final String OSM_IN_GPX_PREFIX = OSM_PREFIX;
 	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
+	public static final String SHIELD_TEXT_TO_REF = "shield_text";
+	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
 
 	public static final String OSM_ID_TAG = "osm_id";
 	public static final String ROUTE_ID_TAG = "route_id";
@@ -306,8 +308,10 @@ public class OsmGpxWriteContext {
 	);
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
-		final String SHIELD_TEXT_TO_REF = SHIELD_IN_GPX_PREFIX + "text";
 		if (!Algorithms.isEmpty(extensions)) {
+			if (extensions.containsKey(SHIELD_WAYCOLOR)) {
+				extensions.put("color", extensions.get(SHIELD_WAYCOLOR)); // reuse it
+			}
 			if (extensions.containsKey("color")) {
 				// prioritize osmand:color over GPX color
 				gpxTrackTags.remove("colour_int");

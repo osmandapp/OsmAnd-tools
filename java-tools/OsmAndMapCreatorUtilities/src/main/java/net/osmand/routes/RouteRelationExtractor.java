@@ -47,6 +47,7 @@ import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
 import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 
 public class RouteRelationExtractor {
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
@@ -311,6 +312,13 @@ public class RouteRelationExtractor {
 
 		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
+		final String[] cleanupByPresenceTags = { "ref", "name", "description" }; // osm_ref_present, etc
+		for (String tag : cleanupByPresenceTags) {
+			if (!Algorithms.isEmpty(relation.getTag(tag))) {
+				gpxExtensions.put("osm_" + tag + "_present", "yes");
+			}
+		}
+
 		for (String key : relation.getTagKeySet()) {
 			gpxExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
@@ -358,7 +366,8 @@ public class RouteRelationExtractor {
 				Map<String, String> props = getShieldTagsFromOsmcTags(way.getTags());
 				if (!Algorithms.isEmpty(props)) {
 					if (props.containsKey("color")) {
-						// color is forced by osmc_waycolor
+						// osmc_waycolor overwrites other colors and duplicates in POI-section as shield_waycolor
+						props.put("shield_waycolor", props.get("color"));
 						gpxExtensions.remove("colour");
 					}
 					if ((props.containsKey("shield_text") || props.containsKey("shield_textcolor"))
