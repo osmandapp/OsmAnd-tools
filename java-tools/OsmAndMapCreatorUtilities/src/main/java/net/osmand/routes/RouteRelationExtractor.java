@@ -627,7 +627,7 @@ public class RouteRelationExtractor {
 
 	@Nonnull
 	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags) {
-		Map<String, String> result = new HashMap<>();
+		Map<String, String> result = new LinkedHashMap<>();
 		for (String tag : tags.keySet()) {
 			for (String match : osmcTagsToShieldProps.keySet()) {
 				if (tag.endsWith(match)) {

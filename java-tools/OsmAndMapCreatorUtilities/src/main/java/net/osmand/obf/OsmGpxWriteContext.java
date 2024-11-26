@@ -118,7 +118,7 @@ public class OsmGpxWriteContext {
 	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
 	                       GpxTrackAnalysis analysis, String routeIdPrefix) throws IOException {
 
-		Map <String, String> extensions = new HashMap<>();
+		Map <String, String> extensions = new LinkedHashMap<>();
 		if (gpxFile.getMetadata() != null) {
 			extensions.putAll(gpxFile.getMetadata().getExtensionsToRead());
 		}
