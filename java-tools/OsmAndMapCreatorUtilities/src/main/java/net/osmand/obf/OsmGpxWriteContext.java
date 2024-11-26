@@ -271,7 +271,6 @@ public class OsmGpxWriteContext {
 		if (gpxFile.getMetadata() != null) {
 			addExtensionsTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead(), gpxInfo);
 		}
-		addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead(), gpxInfo);
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
 		return gpxTrackTags;
@@ -302,8 +301,8 @@ public class OsmGpxWriteContext {
 
 	private static final Set<String> keepOriginalTags = Set.of(
 			"color", // transformed to color_$color by OBF-generation
-			OSM_ID_TAG, // keep untouched original OSM id (relations and nodes)
-			RELATION_GPX_TAG // special marker to render OSMC route_track distinctively
+			OSM_ID_TAG, // [osm_id] keep untouched original OSM id (relations and nodes)
+			RELATION_GPX_TAG // [relation_gpx] special marker to render OSMC route_track distinctively
 	);
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {
@@ -319,13 +318,15 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
 			}
 			for (final String key : extensions.keySet()) {
-				if (keepOriginalTags.contains(key) ||
-						key.startsWith(OBF_GPX_EXTENSION_TAG_PREFIX) || key.startsWith(SHIELD_IN_GPX_PREFIX)) {
-					gpxTrackTags.putIfAbsent(key, extensions.get(key));
+				if (keepOriginalTags.contains(key)
+						|| key.startsWith(SHIELD_IN_GPX_PREFIX)
+						|| key.startsWith(OBF_GPX_EXTENSION_TAG_PREFIX)
+				) {
+					gpxTrackTags.putIfAbsent(key, extensions.get(key)); // original | shield_ | gpx_
 				} else if (key.startsWith(OSM_IN_GPX_PREFIX)) {
-					// Ignore OSM-tags now because they are useless for Map-section.
+					// Ignore OSM-tags now because they are useless for Map-section (see addExtensionsOsmTags)
 				} else {
-					gpxTrackTags.putIfAbsent(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key));
+					gpxTrackTags.putIfAbsent(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key)); // add gpx_
 				}
 			}
 		}
