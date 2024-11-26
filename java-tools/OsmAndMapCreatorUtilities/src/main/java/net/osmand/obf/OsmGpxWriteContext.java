@@ -583,9 +583,16 @@ public class OsmGpxWriteContext {
 		file.name = name;
 		file.description = "";
 		file.tags = new String[0];
+
+		int xor = 0;
+		for (int i = 0; i < file.name.length(); i++) {
+			xor += file.name.charAt(i);
+		}
+
 		long ts = gpxFile.getModifiedTime() > 0 ? gpxFile.getModifiedTime() : System.currentTimeMillis();
 		file.timestamp = new Date(ts);
-		file.id = ts / 1000;
+		file.id = ts ^ xor;
+
 		writeTrack(file, null, gpxFile, analysis, "GPX");
 	}
 	
