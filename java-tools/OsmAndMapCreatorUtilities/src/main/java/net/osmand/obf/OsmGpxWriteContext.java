@@ -121,6 +121,8 @@ public class OsmGpxWriteContext {
 		Map <String, String> extensions = new LinkedHashMap<>();
 		if (gpxFile.getMetadata() != null) {
 			extensions.putAll(gpxFile.getMetadata().getExtensionsToRead());
+			gpxInfo.updateName(gpxFile.getMetadata().getName());
+			gpxInfo.updateDescription(gpxFile.getMetadata().getDescription());
 		}
 		extensions.putAll(gpxFile.getExtensionsToRead());
 
@@ -135,10 +137,9 @@ public class OsmGpxWriteContext {
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
 			boolean validTrack = false;
 			for (Track t : gpxFile.getTracks()) {
-				gpxInfo.updateName(t.getName());
-				gpxInfo.updateDescription(t.getDesc());
+				// gpxInfo.updateName(t.getName());
+				// gpxInfo.updateDescription(t.getDesc());
 				for (TrkSegment s : t.getSegments()) {
-					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
 						continue;
 					}
@@ -164,10 +165,9 @@ public class OsmGpxWriteContext {
 			}
 		} else {
 			for (Track t : gpxFile.getTracks()) {
-				gpxInfo.updateName(t.getName());
-				gpxInfo.updateDescription(t.getDesc());
+				// gpxInfo.updateName(t.getName());
+				// gpxInfo.updateDescription(t.getDesc());
 				for (TrkSegment s : t.getSegments()) {
-					gpxInfo.updateName(s.getName());
 					if (s.getPoints().isEmpty()) {
 						continue;
 					}
@@ -651,19 +651,19 @@ public class OsmGpxWriteContext {
 		public byte[] gpxGzip;
 
 		public void updateName(@Nullable String name) {
-			if (name != null) {
+			if (!Algorithms.isEmpty(name)) {
 				this.name = name;
 			}
 		}
 
 		public void updateRef(@Nullable String ref) {
-			if (ref != null) {
+			if (!Algorithms.isEmpty(ref)) {
 				this.ref = ref;
 			}
 		}
 
 		public void updateDescription(@Nullable String description) {
-			if (description != null) {
+			if (!Algorithms.isEmpty(description)) {
 				this.description = description;
 			}
 		}
