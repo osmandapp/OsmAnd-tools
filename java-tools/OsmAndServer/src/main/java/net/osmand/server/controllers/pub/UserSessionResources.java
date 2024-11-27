@@ -1,6 +1,8 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.File;
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,6 +11,8 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
 
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.primitives.Metadata;
 import org.springframework.stereotype.Component;
 
 import net.osmand.gpx.GPXTrackAnalysis;
@@ -25,12 +29,14 @@ public class UserSessionResources implements HttpSessionListener {
 	static class GPXSessionFile {
 		transient File file;
 		double size;
-		GPXTrackAnalysis analysis;
-		GPXUtilities.Metadata metadata;
-		GPXTrackAnalysis srtmAnalysis;
+		GpxTrackAnalysis analysis;
+		Metadata metadata;
+		GpxTrackAnalysis srtmAnalysis;
 	}
 	
-	public static class GPXSessionContext {
+	public static class GPXSessionContext implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
 		List<GPXSessionFile> files = new ArrayList<>();
 		public List<File> tempFiles = new ArrayList<>();
 	}

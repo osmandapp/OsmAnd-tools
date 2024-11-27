@@ -13,7 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+
 import static net.osmand.router.HHRoutingUtilities.logf;
+import static net.osmand.router.RouteConditionalHelper.RULE_INT_MAX;
+
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -31,7 +34,13 @@ public class HHRoutingPrepareContext {
 	private String ROUTING_PROFILE = "car";
 	private Map<String, String> PROFILE_SETTINGS = new TreeMap<>();
 	private List<File> FILE_SOURCES = new ArrayList<File>();
-	
+
+	public static final Map<String, String> ambiguousConditionalTags = Map.of(
+			"oneway:conditional", "no",
+			"access:conditional", "yes",
+			"maxspeed:conditional", RULE_INT_MAX
+	);
+
 	public HHRoutingPrepareContext(File obfFile, String routingProfile, String... profileSettings) {
 		if (routingProfile != null) {
 			ROUTING_PROFILE = routingProfile;
@@ -122,6 +131,7 @@ public class HHRoutingPrepareContext {
 		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
+		config.ambiguousConditionalTags = ambiguousConditionalTags; // resolveAmbiguousConditionalTags
 		return config;
 	}
 

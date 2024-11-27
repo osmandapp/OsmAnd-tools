@@ -411,7 +411,6 @@ public class EmailSenderTemplate {
 		private SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
-		private final String MSN_DOMAINS = ".*(@hotmail|@outlook|@live|@msn|@windowslive).*"; // USE_SENDGRID_FOR_MSN
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -430,7 +429,15 @@ public class EmailSenderTemplate {
 		}
 
 		private boolean enforceViaSendGrid(String to) {
-			return System.getenv("USE_SENDGRID_FOR_MSN") != null && MSN_DOMAINS != null && to.matches(MSN_DOMAINS);
+			String sendGridDomains = System.getenv("SENDGRID_DOMAINS");
+			if (sendGridDomains != null) {
+				for (String domain : sendGridDomains.split("[,|]")) {
+					if (to.toLowerCase().contains(domain.trim().toLowerCase())) {
+						return true;
+					}
+				}
+			}
+			return false;
 		}
 
 		private Mail mail;
@@ -474,7 +481,7 @@ public class EmailSenderTemplate {
 			String to = getTo();
 
 			if (enforceViaSendGrid(to)) {
-				LOG.warn(to.replaceFirst(".....", ".....") + ": domain goes via SendGrid");
+				LOG.warn(to.replaceFirst(".....", ".....") + ": send via SendGrid");
 				return error();
 			}
 

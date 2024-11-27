@@ -72,7 +72,12 @@ public class RandomRouteTester {
 
 		// enable Android mode for BRP
 		boolean CAR_2PHASE_MODE = false;
-		boolean ENABLE_TIME_CONDITIONAL_ROUTING = true;
+		long USE_TIME_CONDITIONAL_ROUTING = 1; // 0 disable, 1 auto, >1 exact time in milliseconds
+//		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
+//		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
+
+		final static Map <String, String> ambiguousConditionalTags = null;
+//		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
 	}
 
 	class CommandLineOpts {
@@ -223,7 +228,7 @@ public class RandomRouteTester {
 		}
 
 		if (opts.getOpt("--no-conditionals") != null) {
-			config.ENABLE_TIME_CONDITIONAL_ROUTING = false;
+			config.USE_TIME_CONDITIONAL_ROUTING = 0;
 		}
 
 		if (opts.getOpt("--help") != null) {
@@ -427,8 +432,14 @@ public class RandomRouteTester {
 						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
 						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
 
-		if (this.config.ENABLE_TIME_CONDITIONAL_ROUTING) {
+		if (this.config.USE_TIME_CONDITIONAL_ROUTING == 1) {
 			config.routeCalculationTime = System.currentTimeMillis();
+		} else if (this.config.USE_TIME_CONDITIONAL_ROUTING != 0) {
+			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
+		}
+
+		if (this.config.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(
@@ -479,8 +490,14 @@ public class RandomRouteTester {
 
 		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
 
-		if (this.config.ENABLE_TIME_CONDITIONAL_ROUTING) {
+		if (this.config.USE_TIME_CONDITIONAL_ROUTING == 1) {
 			config.routeCalculationTime = System.currentTimeMillis();
+		} else if (this.config.USE_TIME_CONDITIONAL_ROUTING != 0) {
+			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
+		}
+
+		if (this.config.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(

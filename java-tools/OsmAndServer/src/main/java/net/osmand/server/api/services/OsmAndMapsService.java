@@ -12,6 +12,9 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +26,7 @@ import javax.annotation.Nullable;
 import net.osmand.router.*;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.VectorMetatile;
+import net.osmand.server.utils.TimezoneMapper;
 import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -685,10 +689,15 @@ public class OsmAndMapsService {
 		boolean useGeometryBasedApproximation = false;
 		boolean useExternalTimestamps = false;
 		boolean useNativeRouting = false;
-		boolean noGlobalFile = false; // "noglobalfile"
+		boolean noGlobalFile = false;
+		boolean noConditionals = false;
+		long routeCalculationTime = -1;
+		float minPointApproximation = -1;
 		RouteCalculationMode calcMode = null;
 		public boolean disableHHRouting;
 		public RoutingServerConfigEntry onlineRouting;
+		private static final int RESCUETRACK_DEFAULT_HEADING = 0;
+		int headingForRescuetrack = RESCUETRACK_DEFAULT_HEADING;
 
 		private final ServerRoutingTypes defaultRoutingType = ServerRoutingTypes.HH_JAVA;
 		private final ServerApproximationTypes defaultApproximationType = ServerApproximationTypes.GEO_JAVA;
@@ -721,12 +730,20 @@ public class OsmAndMapsService {
 				r.updateApproximationType(type);
 			} else if ("noglobalfile".equals(key)) {
 				r.noGlobalFile = Boolean.parseBoolean(value);
+			} else if ("noconditionals".equals(key)) {
+				r.noConditionals = Boolean.parseBoolean(value);
+			} else if ("heading".equals(key)) {
+				r.headingForRescuetrack = Integer.parseInt(value);
+			} else if ("minPointApproximation".equals(key)) {
+				r.minPointApproximation = Float.parseFloat(value);
+			} else if ("routeCalculationTime".equals(key)) {
+				r.routeCalculationTime = Long.parseLong(value);
 			} else if ("hhonly".equals(key)) {
 				r.useOnlyHHRouting = Boolean.parseBoolean(value);
 			} else if ("gpxtimestamps".equals(key)) {
 				r.useExternalTimestamps = Boolean.parseBoolean(value);
 			} else {
-				r.routeParams.put(key, value);
+				r.routeParams.put(key, value); // pass directly to the router
 			}
 		}
 		if (routingConfig.config.containsKey(r.routeProfile)) {
@@ -763,13 +780,14 @@ public class OsmAndMapsService {
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
 
-		String minPointApproximationString = rp.routeParams.get("minPointApproximation");
-		if (minPointApproximationString != null) {
-			config.minPointApproximation = Float.parseFloat(minPointApproximationString);
+		if (rp.minPointApproximation >= 0) {
+			config.minPointApproximation = rp.minPointApproximation;
 		}
 
-		if (rp.routeParams.get("noconditionals") == null) {
-			config.routeCalculationTime = System.currentTimeMillis();
+		if (!rp.noConditionals) {
+			config.routeCalculationTime = rp.routeCalculationTime >= 0
+					? rp.routeCalculationTime
+					: System.currentTimeMillis();
 		}
 
 		final RoutingContext ctx = router.buildRoutingContext(config, useNativeLib ? nativelib : null,
@@ -779,17 +797,19 @@ public class OsmAndMapsService {
 	}
 
 	@Nullable
-	private List<RouteSegmentResult> onlineRouting(RoutingServerConfigEntry rsc, RoutingContext ctx,
+	private List<RouteSegmentResult> onlineRouting(RouteParameters rp, RoutingContext ctx,
 	                                               RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                               LatLon start, LatLon end, List<LatLon> intermediates,
-	                                               boolean useExternalTimestamps)
+	                                               LatLon start, LatLon end, List<LatLon> intermediates)
 			throws IOException, InterruptedException {
+		RoutingServerConfigEntry rsc = rp.onlineRouting;
 
 		// OSRM by type, all others treated as "rescuetrack"
 		if (rsc.type != null && "osrm".equalsIgnoreCase(rsc.type)) {
 			return onlineRoutingOSRM(rsc.url, ctx, router, props, start, end, intermediates);
 		} else {
-			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps);
+			int heading = rp.headingForRescuetrack;
+			boolean useExternalTimestamps = rp.useExternalTimestamps;
+			return onlineRoutingRescuetrack(rsc.url, ctx, router, props, start, end, useExternalTimestamps, heading);
 		}
 	}
 
@@ -842,13 +862,17 @@ public class OsmAndMapsService {
 
 	private List<RouteSegmentResult> onlineRoutingRescuetrack(String baseurl, RoutingContext ctx,
 	                                                          RoutePlannerFrontEnd router, Map<String, Object> props,
-	                                                          LatLon start, LatLon end, boolean useExternalTimestamps)
+	                                                          LatLon start, LatLon end, boolean useExternalTimestamps,
+	                                                          int heading)
 			throws IOException, InterruptedException {
 
 		List<RouteSegmentResult> routeRes;
 		StringBuilder url = new StringBuilder(baseurl);
 		url.append(String.format("?point=%.6f,%.6f", start.getLatitude(), start.getLongitude()));
 		url.append(String.format("&point=%.6f,%.6f", end.getLatitude(), end.getLongitude()));
+		if (heading != RouteParameters.RESCUETRACK_DEFAULT_HEADING) {
+			url.append(String.format("&heading=%d", heading));
+		}
 
 		RestTemplate restTemplate = new RestTemplate();
 		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
@@ -898,6 +922,10 @@ public class OsmAndMapsService {
 				}
 				ctx = prepareRouterContext(rp, router, usedMapList, false);
 			}
+			if (!rp.noConditionals && rp.routeCalculationTime < 0) {
+				// update TIME_CONDITIONAL_ROUTING if the conditional time is not disabled and is not enforced
+				ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(), start.getLongitude());
+			}
 			HashSet<Long> impassableRoads = new HashSet<>();
 			for (String s : avoidRoadsIds) {
 				impassableRoads.add(Long.parseLong(s));
@@ -910,8 +938,7 @@ public class OsmAndMapsService {
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
 			if (rp.onlineRouting != null) {
-				routeRes = onlineRouting(rp.onlineRouting, ctx, router, props, start, end, intermediates,
-						rp.useExternalTimestamps);
+				routeRes = onlineRouting(rp, ctx, router, props, start, end, intermediates);
 			} else {
 				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
 						: router.searchRoute(ctx, start, end, intermediates, null);
@@ -925,6 +952,12 @@ public class OsmAndMapsService {
 		return routeRes;
 	}
 
+	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
+		String tz = TimezoneMapper.latLngToTimezoneString(lat, lon);
+		ZonedDateTime zonedDateTime = ZonedDateTime.now(ZoneId.of(tz));
+		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
+		return zonedDateTime.toInstant().toEpochMilli();
+	}
 
 	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {

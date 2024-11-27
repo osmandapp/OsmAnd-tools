@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
-@RequestMapping("/routing/search")
+@RequestMapping({"/search", "/routing/search"})
 public class SearchController {
     
     protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
@@ -61,11 +61,12 @@ public class SearchController {
     public ResponseEntity<String> search(@RequestParam double lat,
                                          @RequestParam double lon,
                                          @RequestParam String text,
-                                         @RequestParam String locale) throws IOException, XmlPullParserException {
+                                         @RequestParam String locale,
+                                         @RequestParam(required = false) Boolean baseSearch) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        List<Feature> features = searchService.search(lat, lon, text, locale);
+        List<Feature> features = searchService.search(lat, lon, text, locale, baseSearch != null && baseSearch);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
@@ -133,7 +134,7 @@ public class SearchController {
         FeatureCollection collection = wikiService.getImages(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(collection));
     }
-    
+
     @MultiPlatform
     @RequestMapping(path = {"/parse-image-info"}, produces = "application/json")
     @ResponseBody
@@ -144,7 +145,7 @@ public class SearchController {
         if (imageTitle == null && data == null) {
             return ResponseEntity.badRequest().body("Required imageTitle or data!");
         }
-        
+
         if (imageTitle == null) {
             // old parsing
             Map<String, String> info = wikiService.parseImageInfo(data);
@@ -152,7 +153,7 @@ public class SearchController {
         }
         // ignore data for new parsing
         data = wikiService.getWikiRawDataFromCache(imageTitle, pageId);
-        
+
         if (data == null) {
             data = wikiService.parseRawImageInfo(imageTitle);
             if (data != null) {
@@ -174,19 +175,14 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> parseImagesListInfo(@RequestBody List<WikiImageInfo> data,
                                                       @RequestParam String lang,
-                                                      @RequestParam(name = "deviceid", required = false) int deviceId,
+                                                      @RequestParam(name = "deviceid", required = false) Integer deviceId,
                                                       @RequestParam(name = "accessToken", required = false) String accessToken) {
         if (data == null) {
             return ResponseEntity.badRequest().body("Required data!");
         }
-        // validate user
-        boolean saveToCache = false;
-        if (deviceId != 0 && accessToken != null) {
-            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
-            if (dev != null) {
-                saveToCache = true;
-            }
-        }
+
+        boolean saveToCache = validateUser(deviceId, accessToken);
+
         Map<String, Map<String, String>> result = new HashMap<>();
         for (WikiImageInfo wikiImageInfo : data) {
             String rawData = wikiImageInfo.data();
@@ -217,6 +213,14 @@ public class SearchController {
             }
         }
         return ResponseEntity.ok(gson.toJson(result));
+    }
+
+    private boolean validateUser(Integer deviceId, String accessToken) {
+        if (deviceId != null && accessToken != null) {
+            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
+	        return dev != null;
+        }
+        return false;
     }
     
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")

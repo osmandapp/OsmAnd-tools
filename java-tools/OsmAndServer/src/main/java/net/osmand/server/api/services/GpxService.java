@@ -1,11 +1,17 @@
 package net.osmand.server.api.services;
 
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.PointAttributes;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.PointAttributes;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
+import okio.Buffer;
+import okio.Okio;
+import okio.Source;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +23,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.zip.GZIPInputStream;
 
 @Service
 public class GpxService {
@@ -35,33 +39,38 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
     
-    public WebGpxParser.TrackData getTrackDataByGpxFile(GPXFile gpxFile, File originalSourceGpx) {
+    public WebGpxParser.TrackData getTrackDataByGpxFile(GpxFile gpxFile, File originalSourceGpx, GpxTrackAnalysis analysis) throws IOException {
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
-        gpxData.metaData = new WebGpxParser.MetaData(gpxFile.metadata);
+        gpxData.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
         gpxData.wpts = webGpxParser.getWpts(gpxFile);
         gpxData.tracks = webGpxParser.getTracks(gpxFile);
-        gpxData.ext = gpxFile.extensions;
+        gpxData.ext = gpxFile.getExtensions();
         
-        if (!gpxFile.routes.isEmpty()) {
+        if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        GPXFile gpxFileForAnalyse = GPXUtilities.loadGPXFile(originalSourceGpx);
-        GPXTrackAnalysis analysis = getAnalysis(gpxFileForAnalyse, false);
-        gpxData.analysis = webGpxParser.getTrackAnalysis(analysis, null);
-        gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFileForAnalyse);
-        if (analysis != null) {
-            boolean addSpeed = analysis.getAvgSpeed() != 0.0 && !analysis.hasSpeedInTrack();
-            if (!gpxData.tracks.isEmpty() && (!analysis.pointAttributes.isEmpty() || addSpeed)) {
-                webGpxParser.addAdditionalInfo(gpxData.tracks, analysis, addSpeed);
+        GpxTrackAnalysis gpxAnalysis = analysis;
+        if (gpxAnalysis == null && originalSourceGpx != null) {
+            GpxFile gpxFileForAnalyse = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(originalSourceGpx));
+            if (gpxFileForAnalyse.getError() == null) {
+                gpxAnalysis = getAnalysis(gpxFileForAnalyse, false);
+            }
+        }
+        if (gpxAnalysis != null) {
+            gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
+            gpxData.pointsGroups = webGpxParser.getPointsGroups(gpxFile);
+            if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
+                boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+                webGpxParser.addAdditionalInfo(gpxData.tracks, gpxAnalysis, addSpeed);
             }
         }
         return gpxData;
     }
     
-    public WebGpxParser.TrackData addSrtmData(WebGpxParser.TrackData trackData) {
-        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
-        GPXTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
+    public WebGpxParser.TrackData addSrtmData(WebGpxParser.TrackData trackData) throws IOException {
+        GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        GpxTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
         if (srtmAnalysis != null) {
             if (trackData.analysis == null) {
                 trackData.analysis = new LinkedHashMap<>();
@@ -78,9 +87,9 @@ public class GpxService {
         return trackData;
     }
     
-    public WebGpxParser.TrackData addAnalysisData(WebGpxParser.TrackData trackData) {
-        GPXFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
-        GPXTrackAnalysis analysis = getAnalysis(gpxFile, false);
+    public WebGpxParser.TrackData addAnalysisData(WebGpxParser.TrackData trackData) throws IOException {
+        GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+        GpxTrackAnalysis analysis = getAnalysis(gpxFile, false);
         if (analysis != null) {
             if (trackData.analysis == null) {
                 trackData.analysis = new LinkedHashMap<>();
@@ -94,13 +103,13 @@ public class GpxService {
         return trackData;
     }
     
-    private GPXTrackAnalysis getAnalysis(GPXFile gpxFile, boolean isSrtm) {
-       GPXTrackAnalysis analysis = null;
+    private GpxTrackAnalysis getAnalysis(GpxFile gpxFile, boolean isSrtm) throws IOException {
+       GpxTrackAnalysis analysis = null;
         if (!isSrtm) {
             analysis = gpxFile.getAnalysis(System.currentTimeMillis());
         } else {
-            GPXFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
-            if (srtmGpx != null && srtmGpx.error == null) {
+            GpxFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
+            if (srtmGpx != null && srtmGpx.getError() == null) {
                 analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
             }
         }
@@ -110,15 +119,18 @@ public class GpxService {
         return analysis;
     }
     
-    public GPXFile calculateSrtmAltitude(GPXFile gpxFile, File[] missingFile) {
+    public GpxFile calculateSrtmAltitude(GpxFile gpxFile, File[] missingFile) throws IOException {
         if (srtmLocation == null) {
             return null;
         }
         if (srtmLocation.startsWith("http://") || srtmLocation.startsWith("https://")) {
             String serverUrl = srtmLocation + "/gpx/process-srtm";
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            GPXUtilities.writeGpx(new OutputStreamWriter(baos), gpxFile, null);
-            
+            OutputStream outputStream = new ByteArrayOutputStream();
+            Exception exception = GpxUtilities.INSTANCE.writeGpx(null, Okio.buffer(Okio.sink(outputStream)), gpxFile, null);
+            if (exception != null) {
+                return null;
+            }
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             
@@ -136,7 +148,16 @@ public class GpxService {
             try {
                 ResponseEntity<byte[]> response = restTemplate.postForEntity(serverUrl, requestEntity, byte[].class);
                 if (response.getStatusCode().is2xxSuccessful()) {
-                    return GPXUtilities.loadGPXFile(new ByteArrayInputStream(response.getBody()));
+                    if (response.getBody() == null) {
+                        return null;
+                    }
+                    InputStream inputStream = new ByteArrayInputStream(response.getBody());
+                    if (isGzipStream(inputStream)) {
+                        inputStream = new GZIPInputStream(inputStream);
+                    }
+                    try (Source source = new Buffer().readFrom(inputStream)) {
+                        return GpxUtilities.INSTANCE.loadGpxFile(source);
+                    }
                 }
             } catch (RestClientException e) {
                 LOGGER.error(e.getMessage(), e);
@@ -149,13 +170,13 @@ public class GpxService {
             }
             IndexHeightData hd = new IndexHeightData();
             hd.setSrtmData(srtmFolder.getAbsolutePath(), srtmFolder);
-            for (GPXUtilities.Track tr : gpxFile.tracks) {
-                for (GPXUtilities.TrkSegment s : tr.segments) {
-                    for (int i = 0; i < s.points.size(); i++) {
-                        GPXUtilities.WptPt wpt = s.points.get(i);
-                        double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
+            for (Track tr : gpxFile.getTracks()) {
+                for (TrkSegment s : tr.getSegments()) {
+                    for (int i = 0; i < s.getPoints().size(); i++) {
+                        WptPt wpt = s.getPoints().get(i);
+                        double h = hd.getPointHeight(wpt.getLat(), wpt.getLon(), missingFile);
                         if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-                            wpt.ele = h;
+                            wpt.setEle(h);
                         } else if (i == 0) {
                             return null;
                         }
@@ -165,12 +186,25 @@ public class GpxService {
         }
         return gpxFile;
     }
+
+    public boolean isGzipStream(InputStream in) throws IOException {
+        in.mark(2); // mark the stream to be able to reset it
+        byte[] signature = new byte[2];
+        int res = in.read(signature); // read the first two bytes
+        in.reset(); // reset the stream to its original state
+        if (res == -1) {
+            return false;
+        }
+        int sig = (signature[0] & 0xFF) | ((signature[1] & 0xFF) << 8);
+        return sig == GZIPInputStream.GZIP_MAGIC;
+    }
+
     
-    public void cleanupFromNan(GPXTrackAnalysis analysis) {
+    public void cleanupFromNan(GpxTrackAnalysis analysis) {
         // process analysis
-        if (Double.isNaN(analysis.minHdop)) {
-            analysis.minHdop = -1;
-            analysis.maxHdop = -1;
+        if (Double.isNaN(analysis.getMinHdop())) {
+            analysis.setMinHdop(-1);
+            analysis.setMaxHdop(-1);
         }
         if (analysis.getMinSpeed() > analysis.getMaxSpeed()) {
             analysis.setMinSpeed(analysis.getMaxSpeed());
@@ -179,47 +213,47 @@ public class GpxService {
             analysis.setEndTime(0);
             analysis.setStartTime(0);
         }
-        cleanupFromNan(analysis.locationStart);
-        cleanupFromNan(analysis.locationEnd);
+        cleanupFromNan(analysis.getLocationStart());
+        cleanupFromNan(analysis.getLocationEnd());
 
-        Iterator<PointAttributes> iterator = analysis.pointAttributes.iterator();
+        Iterator<PointAttributes> iterator = analysis.getPointAttributes().iterator();
         float sumDist = 0;
         while (iterator.hasNext()) {
             PointAttributes attributes = iterator.next();
-            if (Float.isNaN(attributes.speed)) {
-                sumDist += attributes.distance;
+            if (Float.isNaN(attributes.getSpeed())) {
+                sumDist += attributes.getDistance();
                 iterator.remove();
             } else if (sumDist > 0) {
-                attributes.distance += sumDist;
+                attributes.setDistance(attributes.getDistance() + sumDist);
                 sumDist = 0;
             }
         }
-        iterator = analysis.pointAttributes.iterator();
+        iterator = analysis.getPointAttributes().iterator();
         sumDist = 0;
         while (iterator.hasNext()) {
             PointAttributes attributes = iterator.next();
-            if (Float.isNaN(attributes.elevation)) {
-                sumDist += attributes.distance;
+            if (Float.isNaN(attributes.getElevation())) {
+                sumDist += attributes.getDistance();
                 iterator.remove();
             } else if (sumDist > 0) {
-                attributes.distance += sumDist;
+                attributes.setDistance(attributes.getDistance() + sumDist);
                 sumDist = 0;
             }
         }
     }
     
-    private void cleanupFromNan(GPXUtilities.WptPt wpt) {
+    private void cleanupFromNan(WptPt wpt) {
         if (wpt == null) {
             return;
         }
-        if (Float.isNaN(wpt.heading)) {
-            wpt.heading = 0;
+        if (Float.isNaN(wpt.getHeading())) {
+            wpt.setHeading(0);
         }
-        if (Double.isNaN(wpt.ele)) {
-            wpt.ele = 99999;
+        if (Double.isNaN(wpt.getEle())) {
+            wpt.setEle(99999);
         }
-        if (Double.isNaN(wpt.hdop)) {
-            wpt.hdop = -1;
+        if (Double.isNaN(wpt.getHdop())) {
+            wpt.setHdop(-1);
         }
     }
 }
