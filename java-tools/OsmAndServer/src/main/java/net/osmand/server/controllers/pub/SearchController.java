@@ -198,7 +198,7 @@ public class SearchController {
                 if (rawData == null) {
                     rawData = wikiService.parseRawImageInfo(title);
                 }
-                if (rawData != null && saveToCache) {
+                if (rawData != null) {
                     wikiService.saveWikiRawDataToCache(title, pageId, rawData);
                 }
             }

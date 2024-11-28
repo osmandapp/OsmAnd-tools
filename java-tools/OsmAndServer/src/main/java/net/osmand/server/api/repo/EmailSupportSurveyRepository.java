@@ -1,5 +1,6 @@
 package net.osmand.server.api.repo;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -23,8 +24,10 @@ public interface EmailSupportSurveyRepository extends JpaRepository<EmailSupport
 	@Entity
 	@Table(name = "email_support_survey")
 	@IdClass(EmailSupportSurveyFeedbackKey.class)
-	public class EmailSupportSurveyFeedback {
-	
+	public class EmailSupportSurveyFeedback implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
+
 		@Id
 		@Column(nullable = false, length = 100)
 		public String ip;

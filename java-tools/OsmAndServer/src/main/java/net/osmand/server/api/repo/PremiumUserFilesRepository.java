@@ -1,6 +1,8 @@
 package net.osmand.server.api.repo;
 
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -40,9 +42,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
 	UserFile findUserFileBySharedCode(String code);
 
-	@Query("SELECT uf FROM UserFile uf " +
-			"WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type " +
-			"AND uf.updatetime = (SELECT MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid AND uft.name = uf.name)")
+    @Query("SELECT uf FROM UserFile uf "
+			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
+			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
 	
 	
@@ -53,7 +55,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
-    class UserFile {
+    class UserFile implements Serializable {
+	    @Serial
+	    private static final long serialVersionUID = 1L;
 
     	@Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
