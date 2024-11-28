@@ -38,6 +38,7 @@ ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
 CREATE INDEX user_account_devices_userid_idx on user_account_devices(userid);
 CREATE INDEX user_files_userid_idx on user_files(userid);
 CREATE INDEX user_files_deviceid_idx on user_files(deviceid);
+CREATE INDEX user_files_shared_code_idx on user_files(shared_code);
 
 -- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
