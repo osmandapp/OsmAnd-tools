@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import javax.persistence.*;
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -12,8 +14,10 @@ public interface PromoCampaignRepository extends JpaRepository<PromoCampaignRepo
     
     @Entity
     @Table(name = "promo_campaigns")
-    class Promo {
-        
+    class Promo implements Serializable {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
         @Id
         @Column(name = "name")
         public String name;
