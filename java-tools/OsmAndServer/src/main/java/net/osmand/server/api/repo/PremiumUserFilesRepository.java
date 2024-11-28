@@ -15,6 +15,7 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import net.osmand.server.api.services.ShareGpxService.FileSharedInfo;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,6 +42,12 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	Iterable<UserFile> findAllByUserid(int userid);
 
 	UserFile findUserFileBySharedCode(String code);
+
+	@Query("SELECT uf.sharedInfo FROM UserFile uf WHERE uf.sharedCode = :code")
+	JsonObject findSharedInfoBySharedCode(String code);
+
+	@Query("SELECT uf.sharedInfo FROM UserFile uf WHERE uf.id = :id")
+	JsonObject findSharedInfoById(long id);
 
     @Query("SELECT uf FROM UserFile uf "
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
