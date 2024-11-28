@@ -146,9 +146,13 @@ public class ShareGpxService {
 		if (info == null) {
 			info = new FileSharedInfo();
 		}
-		info.getAccessedUsers().getUsers().put(dev.userid, System.currentTimeMillis());
-		userFile.sharedInfo = gson.toJsonTree(info).getAsJsonObject();
-		filesRepository.saveAndFlush(userFile);
+		Map<Integer, Long> users = info.getAccessedUsers().getUsers();
+		if (!users.containsKey(dev.userid)) {
+			users.put(dev.userid, System.currentTimeMillis());
+			info.getAccessedUsers().setUsers(users);
+			userFile.sharedInfo = gson.toJsonTree(info).getAsJsonObject();
+			filesRepository.saveAndFlush(userFile);
+		}
 	}
 
 	@Transactional
