@@ -47,7 +47,6 @@ import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
 import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
-import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 
 public class RouteRelationExtractor {
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
@@ -324,7 +323,7 @@ public class RouteRelationExtractor {
 		}
 
 		gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
-		gpxExtensions.put(RELATION_GPX_TAG, "yes"); // need to render route:segment distinctively
+		gpxExtensions.put(OSMC_COLORS_TAG, "yes"); // need to render route:segment distinctively
 
 		if (relation.getTags().containsKey("colour")) {
 			gpxExtensions.remove("colour");
