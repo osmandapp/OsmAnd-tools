@@ -1,5 +1,7 @@
 package net.osmand.server.api.repo;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -38,7 +40,9 @@ public interface LotterySeriesRepository extends JpaRepository<LotterySeries, St
 
     @Entity
     @Table(name = "lottery_series")
-    class LotterySeries {
+    class LotterySeries implements Serializable {
+	    @Serial
+	    private static final long serialVersionUID = 1L;
 
     	@Id
         @Column(name = "name")

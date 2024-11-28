@@ -1,5 +1,6 @@
 package net.osmand.server.api.repo;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
@@ -28,7 +29,9 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
 	@Entity
 	@Table(name = "email_free_users")
 	@IdClass(MapUserPrimaryKey.class)
-	class MapUser {
+	class MapUser implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
 
 		@Id
 		@Column(name = "aid")
