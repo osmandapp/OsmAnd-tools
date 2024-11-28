@@ -1,6 +1,8 @@
 package net.osmand.server.api.repo;
 
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -51,7 +53,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	
     @Entity(name = "UserFile")
     @Table(name = "user_files")
-    class UserFile {
+    class UserFile implements Serializable {
+	    @Serial
+	    private static final long serialVersionUID = 1L;
 
     	@Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
