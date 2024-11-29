@@ -12,6 +12,8 @@ import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
 import okio.Source;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +41,8 @@ public class ShareGpxService {
 
 	@Autowired
 	UserdataService userdataService;
+
+	protected static final Log LOGGER = LogFactory.getLog(ShareGpxService.class);
 
 	private static final String BLACK_LIST = "blacklist";
 	private static final String WHITE_LIST = "whitelist";
@@ -123,8 +127,8 @@ public class ShareGpxService {
 		return null;
 	}
 
-	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String token) {
-		return filesRepository.findUserFileBySharedCode(token);
+	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String code) {
+		return filesRepository.findUserFileBySharedCode(code);
 	}
 
 	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
@@ -137,19 +141,20 @@ public class ShareGpxService {
 			if (gpxFile.getError() == null) {
 				return gpxFile;
 			}
+			LOGGER.error("Error loading gpx file: " + gpxFile.getError());
 			return null;
 		}
 	}
 
 	@Transactional
-	public void saveAccessedUser(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile, FileSharedInfo info) {
+	public void storeUserAccess(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile, FileSharedInfo info) {
 		if (info == null) {
 			info = new FileSharedInfo();
 		}
-		Map<Integer, Long> users = info.getAccessedUsers().getUsers();
+		Map<Integer, Long> users = info.getUsersAccessInfo().getUsers();
 		if (!users.containsKey(dev.userid)) {
 			users.put(dev.userid, System.currentTimeMillis());
-			info.getAccessedUsers().setUsers(users);
+			info.getUsersAccessInfo().setUsers(users);
 			userFile.sharedInfo = gson.toJsonTree(info).getAsJsonObject();
 			filesRepository.saveAndFlush(userFile);
 		}
@@ -200,18 +205,18 @@ public class ShareGpxService {
 	public static class FileSharedInfo {
 		private Whitelist whitelist;
 		private Blacklist blacklist;
-		private AccessedUsers accessedUsers;
+		private UsersAccessInfo usersAccessInfo;
 		private SharingType sharingType;
 		private Set<GroupAction> groupActions;
 
 		public FileSharedInfo() {
-			this(new Whitelist(), new Blacklist(), new AccessedUsers(), SharingType.PUBLIC, new HashSet<>());
+			this(new Whitelist(), new Blacklist(), new UsersAccessInfo(), SharingType.PUBLIC, new HashSet<>());
 		}
 
-		public FileSharedInfo(Whitelist whitelist, Blacklist blacklist, AccessedUsers accessedUsers, SharingType sharingType, Set<GroupAction> groupActions) {
+		public FileSharedInfo(Whitelist whitelist, Blacklist blacklist, UsersAccessInfo usersAccessInfo, SharingType sharingType, Set<GroupAction> groupActions) {
 			this.whitelist = whitelist;
 			this.blacklist = blacklist;
-			this.accessedUsers = accessedUsers;
+			this.usersAccessInfo = usersAccessInfo;
 			this.sharingType = sharingType != null ? sharingType : SharingType.PUBLIC;
 			this.groupActions = groupActions != null ? groupActions : new HashSet<>();
 		}
@@ -242,7 +247,7 @@ public class ShareGpxService {
 		public enum GroupAction {
 			EDIT_WHITELIST("editWhitelist"),
 			EDIT_BLACKLIST("editBlacklist"),
-			SEE_ACCESSED_USERS("seeAccessedUsers");
+			VIEW_USERS_ACCESS("viewUsersAccess");
 
 			private final String action;
 
@@ -304,14 +309,14 @@ public class ShareGpxService {
 		}
 
 		@Data
-		public static class AccessedUsers {
+		public static class UsersAccessInfo {
 			private Map<Integer, Long> users;
 
-			public AccessedUsers() {
+			public UsersAccessInfo() {
 				this(new HashMap<>());
 			}
 
-			public AccessedUsers(Map<Integer, Long> users) {
+			public UsersAccessInfo(Map<Integer, Long> users) {
 				this.users = users != null ? users : new HashMap<>();
 			}
 

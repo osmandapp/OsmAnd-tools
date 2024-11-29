@@ -82,7 +82,7 @@ public class ShareFileController {
 		}
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev != null) {
-			shareGpxService.saveAccessedUser(dev, userFile, info);
+			shareGpxService.storeUserAccess(dev, userFile, info);
 		}
 		FileDownloadResult fileResult = shareGpxService.downloadFile(userFile);
 		if (fileResult == null) {
@@ -111,7 +111,7 @@ public class ShareFileController {
 		}
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev != null) {
-			shareGpxService.saveAccessedUser(dev, userFile, info);
+			shareGpxService.storeUserAccess(dev, userFile, info);
 		}
 		GpxFile gpxFile = shareGpxService.getFile(userFile);
 		if (gpxFile.getError() == null) {
