@@ -1,6 +1,7 @@
 package net.osmand.obf;
 
 
+import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
 import gnu.trove.iterator.TIntObjectIterator;
@@ -38,7 +39,10 @@ public class BinaryInspector {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static final int SHIFT_ID = 6;
+	private static final double DISTANCE_LAT_LON = 0.01;
+	private int CNT_LINES = -1;
 	private VerboseInfo vInfo;
+	
 	public static void main(String[] args) throws IOException {
 		BinaryInspector in = new BinaryInspector();
 		if (args == null || args.length == 0) {
@@ -50,7 +54,7 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -58,11 +62,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-//					"-latlon=50.868332,15.24471",
+					"-latlon=52.334697,4.871069",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "Netherlands_noord-holland_europe_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -82,7 +86,11 @@ public class BinaryInspector {
 		if (vInfo != null && vInfo.osm && vInfo.osmOut == null) {
 			// ignore
 		} else {
-			System.out.println(s);
+			if(CNT_LINES >= 0) {
+				CNT_LINES++;
+			} else {
+				System.out.println(s);
+			}
 		}
 
 	}
@@ -200,7 +208,7 @@ public class BinaryInspector {
 					String[] values = params[i].substring("-latlon=".length()).split(",");
 					double latmid = Double.parseDouble(values[0]);
 					double lonmid = Double.parseDouble(values[1]);
-					double dist = 0.005;
+					double dist = DISTANCE_LAT_LON;
 					lonleft = lonmid - dist;
 					lattop = latmid + dist;
 					lonright = lonmid + dist;
@@ -489,17 +497,29 @@ public class BinaryInspector {
 	}
 
 	public void printFileInformation(File file) throws IOException {
+		long tm = System.nanoTime();
 		RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
-		printFileInformation(r, file);
+		BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+		BinaryMapIndexReader.DEPTH_CACHE = 0;
+		// FIXME this part not ready to be merged to master (delete)
+		for (int i = 0; i < 4; i++) {
+			CNT_LINES = 0;
+			CodedInputStream.READ_BYTES = 0;
+			CodedInputStream.READ_BLOCKS = 0;
+			printFileInformation(index);
+			System.out.printf("%.3f sec, %d blocks total %d bytes - %d objects\n", (System.nanoTime() - tm) / 1e9,
+					CodedInputStream.READ_BLOCKS, CodedInputStream.READ_BYTES, CNT_LINES);
+			
+			tm = System.nanoTime();
+		}
 	}
 
-	public void printFileInformation(RandomAccessFile r, File file) throws IOException {
-		String filename = file.getName();
+	public void printFileInformation(BinaryMapIndexReader index) throws IOException {
 		try {
-			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			
 			String owner = index.getOwner() != null ? "\n" + index.getOwner().toString() : "";
 			int i = 1;
-			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
+			println("Binary index " + index.getFile().getName() + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
 			for (BinaryIndexPart p : index.getIndexes()) {
 				String partname = p.getPartName();
 				String name = p.getName() == null ? "" : p.getName();
@@ -565,7 +585,7 @@ public class BinaryInspector {
 
 
 		} catch (IOException e) {
-			System.err.println("File doesn't have valid structure : " + filename + " " + e.getMessage());
+			System.err.println("File doesn't have valid structure : " + index.getFile().getName() + " " + e.getMessage());
 			throw e;
 		}
 
