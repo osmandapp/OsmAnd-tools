@@ -87,6 +87,7 @@ public class MapApiController {
 
 	private static final String INFO_KEY = "info";
 
+	private static final int LOG_SLOW_WEB_LIST_FILES_MS = 1000;
 
 	@Autowired
 	PremiumUserFilesRepository userFilesRepository;
@@ -359,6 +360,7 @@ public class MapApiController {
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
+		long start = System.currentTimeMillis();
 		PremiumUserDevice dev = checkUser();
 		if (dev == null) {
 			return tokenNotValid();
@@ -443,9 +445,15 @@ public class MapApiController {
 				addDeviceInformation(nd, devices);
 			}
 		}
-		LOG.info(String.format(
-				"web-list-files-stats: userid=%d totalFiles=%d ignoredFiles=%d cloudReads=%d cacheWrites=%d",
-				dev.userid, res.uniqueFiles.size(), filesToIgnore.size(), cloudReads, cacheWrites));
+
+		long elapsed = System.currentTimeMillis() - start;
+
+		if (LOG_SLOW_WEB_LIST_FILES_MS > 0 && elapsed > LOG_SLOW_WEB_LIST_FILES_MS) {
+			LOG.info(String.format(
+					"web-list-files-slow: userid=%d totalFiles=%d ignoredFiles=%d cloudReads=%d cacheWrites=%d elapsed=%d ms",
+					dev.userid, res.uniqueFiles.size(), filesToIgnore.size(), cloudReads, cacheWrites, elapsed));
+		}
+
 		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
