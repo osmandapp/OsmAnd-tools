@@ -264,10 +264,11 @@ public class ShareFileService {
 	}
 
 	private String normalizeCode(String code) {
+		String normalizedCode = code;
 		if (code.contains(CODE_SEPARATOR)) {
-			code = code.substring(0, code.indexOf(CODE_SEPARATOR));
+			normalizedCode = code.substring(0, code.indexOf(CODE_SEPARATOR));
 		}
-		return code;
+		return normalizedCode;
 	}
 
 	@Data
