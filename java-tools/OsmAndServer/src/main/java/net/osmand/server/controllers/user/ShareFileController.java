@@ -4,12 +4,15 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.UserdataService;
-import net.osmand.server.api.services.ShareGpxService;
+import net.osmand.server.api.services.ShareFileService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ResponseEntity;
@@ -34,13 +37,15 @@ public class ShareFileController {
 	UserdataService userdataService;
 
 	@Autowired
-	ShareGpxService shareGpxService;
+	ShareFileService shareFileService;
 
 	@Autowired
 	protected GpxService gpxService;
 
 	Gson gson = new Gson();
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+
+	protected static final Log LOGGER = LogFactory.getLog(ShareFileController.class);
 
 	private static final String ERROR_GETTING_SHARED_INFO = "Error getting shared info";
 
@@ -60,31 +65,40 @@ public class ShareFileController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		String code = shareGpxService.generateSharedCode(userFile, type, groupActions);
+		String code = shareFileService.generateSharedCode(userFile, type, groupActions);
+		if (code == null) {
+			return ResponseEntity.badRequest().body("Error generating link");
+		}
+		String name = shareFileService.getNamePartForCode(fileName);
+		String url = "/share/get?code=" + code + "-" + name;
 
-		return ResponseEntity.ok(gson.toJson(Map.of("url", "/share/get?code=" + code)));
+		return ResponseEntity.ok(gson.toJson(Map.of("url", url)));
 	}
 
 	@PostMapping(path = {"/get"}, produces = "application/json")
 	@Transactional
 	public ResponseEntity<?> getFile(@RequestParam String code) throws IOException {
-		PremiumUserFilesRepository.UserFile userFile = shareGpxService.getUserFileBySharedUrl(code);
+		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByCode(code);
+		if (shareFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		ShareGpxService.FileSharedInfo info = shareGpxService.getSharedInfo(userFile.id);
+		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(shareFile.getInfo());
 		if (info == null) {
 			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
 		}
-		boolean hasAccess = shareGpxService.checkAccess(info);
+		boolean hasAccess = shareFileService.checkAccess(info);
 		if (!hasAccess) {
 			return ResponseEntity.badRequest().body("You don't have access to this file");
 		}
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev != null) {
-			shareGpxService.storeUserAccess(dev, userFile, info);
+			shareFileService.storeUserAccess(dev, shareFile, info);
 		}
-		FileDownloadResult fileResult = shareGpxService.downloadFile(userFile);
+		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
 		if (fileResult == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
@@ -97,23 +111,27 @@ public class ShareFileController {
 	@PostMapping(path = {"/get-gpx"}, produces = "application/json")
 	@Transactional
 	public ResponseEntity<?> getGpx(@RequestParam String code) throws IOException {
-		PremiumUserFilesRepository.UserFile userFile = shareGpxService.getUserFileBySharedUrl(code);
+		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByCode(code);
+		if (shareFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		ShareGpxService.FileSharedInfo info = shareGpxService.getSharedInfo(userFile.id);
+		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(shareFile.getInfo());
 		if (info == null) {
 			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
 		}
-		boolean hasAccess = shareGpxService.checkAccess(info);
+		boolean hasAccess = shareFileService.checkAccess(info);
 		if (!hasAccess) {
 			return ResponseEntity.badRequest().body("File is private");
 		}
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev != null) {
-			shareGpxService.storeUserAccess(dev, userFile, info);
+			shareFileService.storeUserAccess(dev, shareFile, info);
 		}
-		GpxFile gpxFile = shareGpxService.getFile(userFile);
+		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
@@ -121,6 +139,7 @@ public class ShareFileController {
 				return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 			}
 		}
+		LOGGER.error("Error getting gpx data: " + gpxFile.getError());
 		return ResponseEntity.badRequest().body("Error getting gpx data");
 	}
 
@@ -132,12 +151,7 @@ public class ShareFileController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
-		if (userFile == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
-		}
-		boolean created = shareGpxService.editBlacklist(userFile, list);
-		if (!created) {
+		if (!shareFileService.editBlacklist(dev, name, type, list)) {
 			return ResponseEntity.badRequest().body("Error editing blacklist");
 		}
 		return ResponseEntity.ok("Blacklist edited");
@@ -155,8 +169,7 @@ public class ShareFileController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		boolean created = shareGpxService.editWhitelist(userFile, list);
-		if (!created) {
+		if (!shareFileService.editWhitelist(dev, name, type, list)) {
 			return ResponseEntity.badRequest().body("Error editing whitelist");
 		}
 		return ResponseEntity.ok("Whitelist edited");
@@ -169,11 +182,7 @@ public class ShareFileController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
-		if (userFile == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
-		}
-		ShareGpxService.FileSharedInfo info = shareGpxService.getSharedInfo(userFile.id);
+		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(dev, name, type);
 		if (info == null) {
 			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
 		}
@@ -186,14 +195,14 @@ public class ShareFileController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		ShareGpxService.FileSharedInfo info = shareGpxService.getSharedInfo(code);
+		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(code);
 		if (info == null) {
 			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
 		}
-		ShareGpxService.FileSharedInfo.SharingType type = info.getSharingType();
-		Set<ShareGpxService.FileSharedInfo.GroupAction> groupActions = info.getGroupActions();
+		ShareFileService.FileSharedInfo.SharingType type = info.getSharingType();
+		Set<ShareFileService.FileSharedInfo.GroupAction> groupActions = info.getGroupActions();
 
-		return ResponseEntity.ok(gson.toJson(Map.of("hasAccess", shareGpxService.checkAccess(info), "type", type, "groupActions", groupActions)));
+		return ResponseEntity.ok(gson.toJson(Map.of("hasAccess", shareFileService.checkAccess(info), "type", type, "groupActions", groupActions)));
 	}
 
 }

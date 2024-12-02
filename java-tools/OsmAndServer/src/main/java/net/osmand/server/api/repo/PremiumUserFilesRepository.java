@@ -1,6 +1,7 @@
 package net.osmand.server.api.repo;
 
 
+import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
@@ -15,7 +16,7 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
-import net.osmand.server.api.services.ShareGpxService.FileSharedInfo;
+import com.google.gson.Gson;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,14 +42,6 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
 	Iterable<UserFile> findAllByUserid(int userid);
 
-	UserFile findUserFileBySharedCode(String code);
-
-	@Query("SELECT uf.sharedInfo FROM UserFile uf WHERE uf.sharedCode = :code")
-	JsonObject findSharedInfoBySharedCode(String code);
-
-	@Query("SELECT uf.sharedInfo FROM UserFile uf WHERE uf.id = :id")
-	JsonObject findSharedInfoById(long id);
-
     @Query("SELECT uf FROM UserFile uf "
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
 			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
@@ -63,6 +56,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
     @Entity(name = "UserFile")
     @Table(name = "user_files")
     class UserFile implements Serializable {
+	    private static final Gson gson = new Gson();
+
 	    @Serial
 	    private static final long serialVersionUID = 1L;
 
@@ -103,17 +98,23 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Type(type = "net.osmand.server.assist.data.JsonbType")
         public JsonObject details;
 
-        @Column(name = "data", columnDefinition="bytea")
-        public byte[] data;
+	    @Column(name = "data", columnDefinition = "bytea")
+	    public byte[] data;
 
-	    @Column(name = "shared_code")
-	    public String sharedCode;
+	    @Serial
+	    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+		    out.defaultWriteObject();
+		    out.writeObject(details != null ? gson.toJson(details) : null);
+	    }
 
-	    @Column(name = "shared_info", columnDefinition = "jsonb")
-	    @Type(type = "net.osmand.server.assist.data.JsonbType")
-	    public JsonObject sharedInfo;
-
-
+	    @Serial
+	    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+		    in.defaultReadObject();
+		    String json = (String) in.readObject();
+		    if (json != null) {
+			    this.details = gson.fromJson(json, JsonObject.class);
+		    }
+	    }
     }
 
     

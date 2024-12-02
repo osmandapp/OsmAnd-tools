@@ -4,9 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import lombok.Data;
 import lombok.Getter;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.user.ShareFileController;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -19,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Nullable;
 import javax.transaction.Transactional;
+import javax.validation.constraints.NotNull;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,10 +30,13 @@ import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VA
 
 
 @Service
-public class ShareGpxService {
+public class ShareFileService {
 
 	@Autowired
 	protected PremiumUserFilesRepository filesRepository;
+
+	@Autowired
+	protected ShareFileRepository shareFileRepository;
 
 	@Autowired
 	protected PremiumUsersRepository usersRepository;
@@ -42,53 +44,63 @@ public class ShareGpxService {
 	@Autowired
 	UserdataService userdataService;
 
-	protected static final Log LOGGER = LogFactory.getLog(ShareGpxService.class);
-
-	private static final String BLACK_LIST = "blacklist";
-	private static final String WHITE_LIST = "whitelist";
+	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
 
 	private static final String SEPARATOR = ",";
+	private static final String CODE_SEPARATOR = "-";
+	public static final int CODE_LENGTH = 8;
 
 	Gson gson = new Gson();
 
 	@Transactional
 	public String generateSharedCode(PremiumUserFilesRepository.UserFile userFile, String type, @Nullable String groupActions) {
-		String uniqueToken = UUID.randomUUID().toString();
-		userFile.sharedCode = uniqueToken;
-		userFile.sharedInfo = addSharedInfo(type, groupActions);
-		filesRepository.saveAndFlush(userFile);
-
-		return uniqueToken;
-	}
-
-	private JsonObject addSharedInfo(String type, @Nullable String groupActions) {
-		FileSharedInfo fileSharedInfo = new FileSharedInfo();
-		FileSharedInfo.SharingType sharingType = FileSharedInfo.SharingType.fromType(type);
-		fileSharedInfo.setSharingType(Objects.requireNonNullElse(sharingType, FileSharedInfo.SharingType.PUBLIC));
-
-		if (sharingType == FileSharedInfo.SharingType.GROUP_BY_LOGIN && groupActions != null) {
-			String[] actions = groupActions.split(SEPARATOR);
-			for (String action : actions) {
-				FileSharedInfo.GroupAction groupAction = FileSharedInfo.GroupAction.fromAction(action.trim());
-				if (groupAction != null) {
-					fileSharedInfo.getGroupActions().add(groupAction);
-				}
-			}
+		String uniqueCode = UUID.randomUUID().toString().substring(0, CODE_LENGTH);
+		ShareFileRepository.ShareFile file = shareFileRepository.findByCode(uniqueCode);
+		while (file != null) {
+			uniqueCode = UUID.randomUUID().toString().substring(0, CODE_LENGTH);
+			file = shareFileRepository.findByCode(uniqueCode);
 		}
+		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
+		shareFile.setCode(uniqueCode);
+		shareFile.setName(userFile.name);
+		shareFile.setType(userFile.type);
+		shareFile.setUserid(userFile.userid);
+		shareFile.setInfo(addSharedInfo(type, groupActions));
 
-		return gson.toJsonTree(fileSharedInfo).getAsJsonObject();
+		ShareFileRepository.ShareFile existingFile = shareFileRepository.findByUseridAndNameAndType(userFile.userid, userFile.name, userFile.type);
+		if (existingFile != null) {
+			shareFileRepository.delete(existingFile);
+		}
+		shareFileRepository.saveAndFlush(shareFile);
+
+		return uniqueCode;
 	}
 
-	public FileSharedInfo getSharedInfo(Long id) {
-		JsonObject sharedInfoJson = filesRepository.findSharedInfoById(id);
+	public String getNamePartForCode(String filename) {
+		final String DOT = ".";
+		String prefix = filename.substring(0, CODE_LENGTH);
+		String suffix = filename.contains(DOT) ? filename.substring(filename.lastIndexOf(DOT) - 1) : "";
+		return prefix + suffix;
+	}
+
+	public FileSharedInfo getSharedInfo(JsonObject sharedInfoJson) {
 		if (sharedInfoJson != null) {
 			return gson.fromJson(sharedInfoJson, FileSharedInfo.class);
 		}
 		return null;
 	}
 
+	public FileSharedInfo getSharedInfo(@NotNull PremiumUserDevicesRepository.PremiumUserDevice dev, @NotNull String name, @NotNull String type) {
+		ShareFileRepository.ShareFile file = shareFileRepository.findByUseridAndNameAndType(dev.userid, name, type);
+		if (file != null) {
+			return getSharedInfo(file.getInfo());
+		}
+		return null;
+	}
+
 	public FileSharedInfo getSharedInfo(String code) {
-		JsonObject sharedInfoJson = filesRepository.findSharedInfoBySharedCode(code);
+		code = normalizeCode(code);
+		JsonObject sharedInfoJson = shareFileRepository.findInfoByCode(code);
 		if (sharedInfoJson != null) {
 			return gson.fromJson(sharedInfoJson, FileSharedInfo.class);
 		}
@@ -127,8 +139,16 @@ public class ShareGpxService {
 		return null;
 	}
 
-	public PremiumUserFilesRepository.UserFile getUserFileBySharedUrl(String code) {
-		return filesRepository.findUserFileBySharedCode(code);
+	public ShareFileRepository.ShareFile getShareFileByCode(String code) {
+		if (code == null) {
+			return null;
+		}
+		code = normalizeCode(code);
+		return shareFileRepository.findByCode(code);
+	}
+
+	public PremiumUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {
+		return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.userid, file.name, file.type);
 	}
 
 	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
@@ -147,7 +167,9 @@ public class ShareGpxService {
 	}
 
 	@Transactional
-	public void storeUserAccess(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile, FileSharedInfo info) {
+	public void storeUserAccess(PremiumUserDevicesRepository.PremiumUserDevice dev,
+	                            ShareFileRepository.ShareFile shareFile,
+	                            FileSharedInfo info) {
 		if (info == null) {
 			info = new FileSharedInfo();
 		}
@@ -155,14 +177,24 @@ public class ShareGpxService {
 		if (!users.containsKey(dev.userid)) {
 			users.put(dev.userid, System.currentTimeMillis());
 			info.getUsersAccessInfo().setUsers(users);
-			userFile.sharedInfo = gson.toJsonTree(info).getAsJsonObject();
-			filesRepository.saveAndFlush(userFile);
+			shareFile.setInfo(gson.toJsonTree(info).getAsJsonObject());
+			shareFileRepository.saveAndFlush(shareFile);
 		}
 	}
 
 	@Transactional
-	public boolean editBlacklist(PremiumUserFilesRepository.UserFile userFile, List<String> list) {
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+	public boolean editBlacklist(@NotNull PremiumUserDevicesRepository.PremiumUserDevice dev,
+	                             @NotNull String name,
+	                             @NotNull String type,
+	                             List<String> list) {
+		if (dev == null || name == null || type == null) {
+			return false;
+		}
+		ShareFileRepository.ShareFile file = shareFileRepository.findByUseridAndNameAndType(dev.userid, name, type);
+		if (file == null) {
+			return false;
+		}
+		FileSharedInfo fileSharedInfo = gson.fromJson(file.getInfo(), FileSharedInfo.class);
 		if (fileSharedInfo == null) {
 			fileSharedInfo = new FileSharedInfo();
 		}
@@ -174,14 +206,25 @@ public class ShareGpxService {
 		if (blist.getUsers().isEmpty()) {
 			return false;
 		}
-		userFile.sharedInfo.add(BLACK_LIST, gson.toJsonTree(blist));
-		filesRepository.saveAndFlush(userFile);
+		fileSharedInfo.setBlacklist(blist);
+		file.setInfo(gson.toJsonTree(fileSharedInfo).getAsJsonObject());
+		shareFileRepository.saveAndFlush(file);
 		return true;
 	}
 
 	@Transactional
-	public boolean editWhitelist(PremiumUserFilesRepository.UserFile userFile, List<String> list) {
-		FileSharedInfo fileSharedInfo = gson.fromJson(userFile.sharedInfo, FileSharedInfo.class);
+	public boolean editWhitelist(@NotNull PremiumUserDevicesRepository.PremiumUserDevice dev,
+	                             @NotNull String name,
+	                             @NotNull String type,
+	                             List<String> list) {
+		if (dev == null || name == null || type == null) {
+			return false;
+		}
+		ShareFileRepository.ShareFile file = shareFileRepository.findByUseridAndNameAndType(dev.userid, name, type);
+		if (file == null) {
+			return false;
+		}
+		FileSharedInfo fileSharedInfo = gson.fromJson(file.getInfo(), FileSharedInfo.class);
 		if (fileSharedInfo == null) {
 			fileSharedInfo = new FileSharedInfo();
 		}
@@ -196,9 +239,35 @@ public class ShareGpxService {
 		if (wlist.getPermissions().isEmpty()) {
 			return false;
 		}
-		userFile.sharedInfo.add(WHITE_LIST, gson.toJsonTree(wlist));
-		filesRepository.saveAndFlush(userFile);
+		fileSharedInfo.setWhitelist(wlist);
+		file.setInfo(gson.toJsonTree(fileSharedInfo).getAsJsonObject());
+		shareFileRepository.saveAndFlush(file);
 		return true;
+	}
+
+	private JsonObject addSharedInfo(String type, @Nullable String groupActions) {
+		FileSharedInfo fileSharedInfo = new FileSharedInfo();
+		FileSharedInfo.SharingType sharingType = FileSharedInfo.SharingType.fromType(type);
+		fileSharedInfo.setSharingType(Objects.requireNonNullElse(sharingType, FileSharedInfo.SharingType.PUBLIC));
+
+		if (sharingType == FileSharedInfo.SharingType.GROUP_BY_LOGIN && groupActions != null) {
+			String[] actions = groupActions.split(SEPARATOR);
+			for (String action : actions) {
+				FileSharedInfo.GroupAction groupAction = FileSharedInfo.GroupAction.fromAction(action.trim());
+				if (groupAction != null) {
+					fileSharedInfo.getGroupActions().add(groupAction);
+				}
+			}
+		}
+
+		return gson.toJsonTree(fileSharedInfo).getAsJsonObject();
+	}
+
+	private String normalizeCode(String code) {
+		if (code.contains(CODE_SEPARATOR)) {
+			code = code.substring(0, code.indexOf(CODE_SEPARATOR));
+		}
+		return code;
 	}
 
 	@Data
