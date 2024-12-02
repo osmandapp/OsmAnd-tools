@@ -1424,7 +1424,7 @@ public class WikiDatabasePreparation {
 		String lang = "de";
 		String title = "page";
 		CustomWikiModel wikiModel = new CustomWikiModel("https://" + lang + ".wikipedia.org/wiki/${image}",
-				"https://" + lang + ".wikpedia.org/wiki/${title}", null, true);
+				"https://" + lang + ".wikipedia.org/wiki/${title}", null, true);
 		String rawWikiText = WikiDatabasePreparation.removeMacroBlocks(input, null, macros, pois, lang, title, null);
 
 //		System.out.println(text);
@@ -1862,7 +1862,7 @@ public class WikiDatabasePreparation {
 							try {
 								CustomWikiModel wikiModel = new CustomWikiModel(
 										"https://" + lang + ".wikipedia.org/wiki/${image}",
-										"https://" + lang + ".wikpedia.org/wiki/${title}", imageUrlStorage, true);
+										"https://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
 								String rawWikiText = removeMacroBlocks(ctext, null, new HashMap<>(), null, lang,
 										title.toString(), null);
 								plainStr = generateHtmlArticle(rawWikiText, wikiModel);

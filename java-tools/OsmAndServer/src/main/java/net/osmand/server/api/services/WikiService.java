@@ -474,7 +474,8 @@ public class WikiService {
 			RowCallbackHandler h = rs -> {
 				Map<String, Object> imageDetails = new HashMap<>();
 				String imageTitle = rs.getString("imageTitle");
-				
+
+				imageDetails.put("mediaId", rs.getLong("mediaId"));
 				imageDetails.put("image", createImageUrl(imageTitle));
 				imageDetails.put("date", rs.getString("date"));
 				imageDetails.put("author", rs.getString("author"));
@@ -511,7 +512,7 @@ public class WikiService {
 			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
 			String finalArticleId = articleId;
 			processImageQuery(
-					"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
+					"SELECT mediaId, imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
 							"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
 					ps -> ps.setString(1, finalArticleId),
 					rowCallbackHandler);
@@ -522,7 +523,7 @@ public class WikiService {
 			
 			if (!found) {
 				processImageQuery(
-						"SELECT imgName AS imageTitle, '' AS date, '' AS author, '' AS license " +
+						"SELECT imgName AS imageTitle, imgId AS mediaId, '' AS date, '' AS author, '' AS license " +
 								"FROM wiki.categoryimages WHERE catName = ? ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
 						ps -> ps.setString(1, categoryName.replace(' ', '_')),
 						rowCallbackHandler);
@@ -534,7 +535,7 @@ public class WikiService {
 		AtomicBoolean found = new AtomicBoolean(false);
 		
 		processImageQuery(
-				"SELECT imageTitle, date, author, license FROM wiki.wikiimages WHERE id = " +
+				"SELECT imageTitle, mediaId, date, author, license FROM wiki.wikiimages WHERE id = " +
 						"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
 						"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
 				ps -> ps.setString(1, categoryName.replace(' ', '_')),
@@ -582,6 +583,7 @@ public class WikiService {
 			feature.properties.put("date", imageDetails.get("date"));
 			feature.properties.put("author", imageDetails.get("author"));
 			feature.properties.put("license", imageDetails.get("license"));
+			feature.properties.put("mediaId", imageDetails.get("mediaId"));
 			return feature;
 		}).toList();
 		

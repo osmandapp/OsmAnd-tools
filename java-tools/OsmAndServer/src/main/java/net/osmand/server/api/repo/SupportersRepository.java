@@ -1,5 +1,7 @@
 package net.osmand.server.api.repo;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -23,7 +25,9 @@ public interface SupportersRepository extends JpaRepository<SupportersRepository
 
     @Entity
     @Table(name = "supporters")
-    class Supporter {
+    class Supporter implements Serializable {
+        @Serial
+        private static final long serialVersionUID = 1L;
 
         @Id
         @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "supporters_seq")
