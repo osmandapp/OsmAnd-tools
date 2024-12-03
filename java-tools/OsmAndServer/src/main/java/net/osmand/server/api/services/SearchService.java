@@ -8,21 +8,15 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
+import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -214,11 +208,26 @@ public class SearchService {
             settings.setRegions(osmandRegions);
             settings.setOfflineIndexes(usedMapList);
             searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-            
+            List<BinaryMapPoiReaderAdapter.PoiSubType> brands = new ArrayList<>();
+            for (BinaryMapIndexReader map : usedMapList) {
+                brands.addAll(map.getTopIndexSubTypes());
+            }
             for (String category : data.categories) {
                 if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
                     SearchResult prevResult = new SearchResult();
                     prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
+                    if (prevResult.object == null) {
+                        // try to find in brands
+                        for (BinaryMapPoiReaderAdapter.PoiSubType brand : brands) {
+                            if (brand.possibleValues.contains(data.prevSearchRes)) {
+                                prevResult.object = new TopIndexFilter(brand, mapPoiTypes, category);
+                                break;
+                            }
+                        }
+                    }
+                    if (prevResult.object == null) {
+                        searchUICore.resetPhrase();
+                    }
                     prevResult.localeName = category;
                     prevResult.objectType = ObjectType.POI_TYPE;
                     searchUICore.resetPhrase(prevResult);
@@ -574,6 +583,8 @@ public class SearchService {
                     tags.put(POI_ADD_CATEGORY_NAME, additionalCategory);
                 }
             });
+        } else if (obj instanceof TopIndexFilter type) {
+            tags.put(CATEGORY_ICON, type.getTag());
         } else if (obj instanceof AbstractPoiType type) {
             tags.put(KEY_NAME, type.getKeyName());
             tags.put(ICON_NAME, type.getIconKeyName());
