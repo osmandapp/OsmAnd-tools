@@ -172,10 +172,13 @@ public class SearchService {
     }
 
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
+        OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
         if (baseSearch) {
-            return List.of(osmAndMapsService.getBaseMap());
+            return List.of(basemap);
         } else {
-            return osmAndMapsService.getObfReaders(points, null, 0, "search");
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
+            list.add(basemap);
+            return list;
         }
     }
     
