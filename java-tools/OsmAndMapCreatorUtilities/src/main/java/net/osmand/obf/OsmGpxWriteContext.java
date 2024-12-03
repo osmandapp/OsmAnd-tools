@@ -67,7 +67,7 @@ public class OsmGpxWriteContext {
 	public static final String ROUTE_ID_TAG = "route_id";
 	public static final String OSMC_COLORS_TAG = "use_osmc_colors";
 
-	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
+	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
