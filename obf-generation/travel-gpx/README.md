@@ -57,7 +57,8 @@ GPX=<type> OBF=points_groups_category POI
 ```
 GPX=osmand:osm_tag_* OBF=[POI|MAP] POI,MAP,STYLE,FLEXIBLE (some OSM tags will be lost: osmc:symbol, route, type, etc)
 
-GPX=osmand:use_osmc_colors OBF=use_osmc_colors POI,MAP,STYLE
+GPX=osmand:flexible_line_width OBF=flexible_line_width POI,MAP,STYLE
+GPX=osmand:translucent_line_colors OBF=translucent_line_colors POI,MAP,STYLE
 
 GPX=osmand:osm_id OBF=osm_id POI,MAP (will be used to keep/display OSM id if applicable)
 GPX=osmand:osm_ref_present OBF=gpx_osm_ref_present POI ("yes" if "ref" comes from osm tags)
@@ -102,7 +103,8 @@ GPX=osmand:shield_fg_2 OBF=shield_fg_2 POI,MAP,STYLE
 GPX=osmand:shield_text OBF=shield_text POI,MAP,STYLE
 GPX=osmand:shield_textcolor OBF=shield_textcolor POI,MAP,STYLE
 
-GPX=osmand:use_osmc_colors OBF=use_osmc_colors POI,MAP,STYLE (transparent colors)
+GPX=osmand:flexible_line_width OBF=flexible_line_width POI,MAP,STYLE (zoom-based line width)
+GPX=osmand:translucent_line_colors OBF=translucent_line_colors POI,MAP,STYLE (semi-transparent line colors)
 ```
 
 ### 5.2. Waypoints

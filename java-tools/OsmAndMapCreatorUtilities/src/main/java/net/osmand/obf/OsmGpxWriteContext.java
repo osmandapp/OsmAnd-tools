@@ -65,7 +65,6 @@ public class OsmGpxWriteContext {
 
 	public static final String OSM_ID_TAG = "osm_id";
 	public static final String ROUTE_ID_TAG = "route_id";
-	public static final String OSMC_COLORS_TAG = "use_osmc_colors";
 
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 	public final QueryParams qp;
@@ -304,7 +303,8 @@ public class OsmGpxWriteContext {
 	private static final Set<String> keepOriginalTags = Set.of(
 			"color", // transformed to color_$color by OBF-generation
 			OSM_ID_TAG, // [osm_id] keep untouched original OSM id (relations and nodes)
-			OSMC_COLORS_TAG // [use_osmc_colors] special marker to render OSMC route_track distinctively
+			"flexible_line_width",
+			"translucent_line_colors"
 	);
 
 	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions, OsmGpxFile gpxInfo) {

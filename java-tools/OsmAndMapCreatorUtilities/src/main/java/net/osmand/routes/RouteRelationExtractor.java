@@ -323,7 +323,8 @@ public class RouteRelationExtractor {
 		}
 
 		gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
-		gpxExtensions.put(OSMC_COLORS_TAG, "yes"); // need to render route:segment distinctively
+		gpxExtensions.put("flexible_line_width", "yes");
+		gpxExtensions.put("translucent_line_colors", "yes");
 
 		if (relation.getTags().containsKey("colour")) {
 			gpxExtensions.remove("colour");
