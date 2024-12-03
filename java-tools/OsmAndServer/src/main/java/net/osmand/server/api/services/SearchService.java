@@ -208,11 +208,26 @@ public class SearchService {
             settings.setRegions(osmandRegions);
             settings.setOfflineIndexes(usedMapList);
             searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-            
+            List<BinaryMapPoiReaderAdapter.PoiSubType> brands = new ArrayList<>();
+            for (BinaryMapIndexReader map : usedMapList) {
+                brands.addAll(map.getTopIndexSubTypes());
+            }
             for (String category : data.categories) {
                 if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
                     SearchResult prevResult = new SearchResult();
                     prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
+                    if (prevResult.object == null) {
+                        // try to find in brands
+                        for (BinaryMapPoiReaderAdapter.PoiSubType brand : brands) {
+                            if (brand.possibleValues.contains(data.prevSearchRes)) {
+                                prevResult.object = new TopIndexFilter(brand, mapPoiTypes, category);
+                                break;
+                            }
+                        }
+                    }
+                    if (prevResult.object == null) {
+                        searchUICore.resetPhrase();
+                    }
                     prevResult.localeName = category;
                     prevResult.objectType = ObjectType.POI_TYPE;
                     searchUICore.resetPhrase(prevResult);
