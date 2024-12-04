@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import okio.GzipSource;
 import okio.Okio;
@@ -63,7 +64,7 @@ public class OsmGpxWriteContext {
 	public static final String SHIELD_TEXT_TO_REF = "shield_text";
 	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
 
-	public static final String ROUTE_ID_TAG = "route_id";
+	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 	public final QueryParams qp;

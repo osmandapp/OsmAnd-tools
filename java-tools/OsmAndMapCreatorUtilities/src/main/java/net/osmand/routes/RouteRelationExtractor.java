@@ -1,6 +1,7 @@
 package net.osmand.routes;
 
 import net.osmand.IProgress;
+import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
@@ -45,7 +46,8 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
-import static net.osmand.obf.OsmGpxWriteContext.*;
+import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
+import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
@@ -311,20 +313,13 @@ public class RouteRelationExtractor {
 
 		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
-		final String[] cleanupByPresenceTags = { "ref", "name", "description" }; // osm_ref_present, etc
-		for (String tag : cleanupByPresenceTags) {
-			if (!Algorithms.isEmpty(relation.getTag(tag))) {
-				gpxExtensions.put("osm_" + tag + "_present", "yes");
-			}
-		}
-
 		for (String key : relation.getTagKeySet()) {
 			gpxExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
 
 		gpxExtensions.put("flexible_line_width", "yes");
 		gpxExtensions.put("translucent_line_colors", "yes");
-		gpxExtensions.put(ROUTE_ID_TAG, "OSM" + relation.getId());
+		gpxExtensions.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 		// gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
 
 		if (relation.getTags().containsKey("colour")) {

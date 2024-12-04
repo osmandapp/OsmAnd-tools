@@ -60,10 +60,6 @@ GPX=osmand:osm_tag_* OBF=[POI|MAP] POI,MAP,STYLE,FLEXIBLE (some OSM tags will be
 GPX=osmand:flexible_line_width OBF=flexible_line_width POI,MAP,STYLE
 GPX=osmand:translucent_line_colors OBF=translucent_line_colors POI,MAP,STYLE
 
-GPX=osmand:osm_ref_present OBF=gpx_osm_ref_present POI ("yes" if "ref" comes from osm tags)
-GPX=osmand:osm_name_present OBF=gpx_osm_name_present POI ("yes" if "name" comes from osm tags)
-GPX=osmand:osm_description_present OBF=gpx_osm_description_present POI ("yes" if "description" comes from osm tags)
-
 GPX=osmand:shield_bg OBF=shield_bg POI,MAP,STYLE
 GPX=osmand:shield_fg OBF=shield_fg POI,MAP,STYLE
 GPX=osmand:shield_fg_2 OBF=shield_fg_2 POI,MAP,STYLE
