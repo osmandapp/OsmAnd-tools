@@ -60,7 +60,6 @@ GPX=osmand:osm_tag_* OBF=[POI|MAP] POI,MAP,STYLE,FLEXIBLE (some OSM tags will be
 GPX=osmand:flexible_line_width OBF=flexible_line_width POI,MAP,STYLE
 GPX=osmand:translucent_line_colors OBF=translucent_line_colors POI,MAP,STYLE
 
-GPX=osmand:osm_id OBF=osm_id POI,MAP (will be used to keep/display OSM id if applicable)
 GPX=osmand:osm_ref_present OBF=gpx_osm_ref_present POI ("yes" if "ref" comes from osm tags)
 GPX=osmand:osm_name_present OBF=gpx_osm_name_present POI ("yes" if "name" comes from osm tags)
 GPX=osmand:osm_description_present OBF=gpx_osm_description_present POI ("yes" if "description" comes from osm tags)
@@ -76,7 +75,7 @@ GPX=osmand:shield_waycolor OBF=shield_waycolor POI,SPECIAL (shadow copy of osmc_
 ## 4. Save/Restore (analytics, elevation and special tags)
 
 ```
-OBF=route_id POI,MAP,SPECIAL (used to identify unique GPX and to connect Map<->POI data)
+OBF=route_id POI,MAP,SPECIAL (used to identify unique GPX and to connect Map<->POI data) format:[A-Z]+[0-9]+ eg OSM12345
 
 OBF=route_radius POI (specify default radius to search in POI section)
 

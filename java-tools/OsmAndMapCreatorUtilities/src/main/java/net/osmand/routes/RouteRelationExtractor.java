@@ -322,9 +322,10 @@ public class RouteRelationExtractor {
 			gpxExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
 		}
 
-		gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
 		gpxExtensions.put("flexible_line_width", "yes");
 		gpxExtensions.put("translucent_line_colors", "yes");
+		gpxExtensions.put(ROUTE_ID_TAG, "OSM" + relation.getId());
+		// gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
 
 		if (relation.getTags().containsKey("colour")) {
 			gpxExtensions.remove("colour");
@@ -498,9 +499,9 @@ public class RouteRelationExtractor {
 			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
 			wptPt.lat = node.getLatitude();
 			wptPt.lon = node.getLongitude();
-//			wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
-			wptPt.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(node.getId()));
+			// wptPt.getExtensionsToWrite().put("relation_point", "yes");
+			// wptPt.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 					String key = entry1.getKey().replace(":", "_-_");
