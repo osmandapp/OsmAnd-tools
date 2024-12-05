@@ -66,6 +66,7 @@ GPX=osmand:shield_fg_2 OBF=shield_fg_2 POI,MAP,STYLE
 GPX=osmand:shield_text OBF=shield_text POI,MAP,STYLE
 GPX=osmand:shield_textcolor OBF=shield_textcolor POI,MAP,STYLE
 GPX=osmand:shield_waycolor OBF=shield_waycolor POI,SPECIAL (shadow copy of osmc_waycolor)
+GPX=<none> OBF=shield_stub_name MAP,STYLE,SPECIAL (allows display shields without any text inside)
 ```
 
 ## 4. Save/Restore (analytics, elevation and special tags)

@@ -59,10 +59,13 @@ import javax.annotation.Nullable;
 public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
-	public static final String OSM_IN_GPX_PREFIX = OSM_PREFIX;
+	public static final String OSM_TAG_PREFIX = OSM_PREFIX;
 	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
-	public static final String SHIELD_TEXT_TO_REF = "shield_text";
+	public static final String SHIELD_FG = "shield_fg";
+	public static final String SHIELD_BG = "shield_bg";
+	public static final String SHIELD_TEXT = "shield_text";
 	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
+	public static final String SHIELD_STUB_NAME = "shield_stub_name";
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 
@@ -125,9 +128,9 @@ public class OsmGpxWriteContext {
 		extensions.putAll(gpxFile.getExtensionsToRead());
 
 		gpxInfo.updateRouteId(extensions.get(ROUTE_ID_TAG));
-		gpxInfo.updateRef(extensions.get(OSM_IN_GPX_PREFIX + "ref"));
-		gpxInfo.updateName(extensions.get(OSM_IN_GPX_PREFIX + "name"));
-		gpxInfo.updateDescription(extensions.get(OSM_IN_GPX_PREFIX + "description"));
+		gpxInfo.updateRef(extensions.get(OSM_TAG_PREFIX + "ref"));
+		gpxInfo.updateName(extensions.get(OSM_TAG_PREFIX + "name"));
+		gpxInfo.updateDescription(extensions.get(OSM_TAG_PREFIX + "description"));
 
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
 			boolean validTrack = false;
@@ -271,7 +274,16 @@ public class OsmGpxWriteContext {
 		}
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
+		finalizeShieldStubName(gpxTrackTags);
 		return gpxTrackTags;
+	}
+
+	private void finalizeShieldStubName(Map<String, String> gpxTrackTags) {
+		if (gpxTrackTags.containsKey("ref") || gpxTrackTags.containsKey(SHIELD_TEXT)) {
+			gpxTrackTags.remove(SHIELD_STUB_NAME);
+		} else if (gpxTrackTags.containsKey(SHIELD_FG) || gpxTrackTags.containsKey(SHIELD_BG)) {
+			gpxTrackTags.put(SHIELD_STUB_NAME, ".");
+		}
 	}
 
 	private void addPointGroupsTags(Map<String, String> gpxTrackTags, Map<String, PointsGroup> pointsGroups) {
@@ -314,17 +326,13 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.remove("colour_int");
 				gpxTrackTags.remove("colour");
 			}
-			if (extensions.containsKey(SHIELD_TEXT_TO_REF)) {
-				gpxInfo.updateRef(extensions.get(SHIELD_TEXT_TO_REF));
-				gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
-			}
 			for (final String key : extensions.keySet()) {
 				if (keepOriginalTags.contains(key)
 						|| key.startsWith(SHIELD_IN_GPX_PREFIX)
 						|| key.startsWith(OBF_GPX_EXTENSION_TAG_PREFIX)
 				) {
 					gpxTrackTags.putIfAbsent(key, extensions.get(key)); // original | shield_ | gpx_
-				} else if (key.startsWith(OSM_IN_GPX_PREFIX)) {
+				} else if (key.startsWith(OSM_TAG_PREFIX)) {
 					// Ignore OSM-tags now because they are useless for Map-section (see addExtensionsOsmTags)
 				} else {
 					gpxTrackTags.putIfAbsent(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key)); // add gpx_
@@ -335,8 +343,8 @@ public class OsmGpxWriteContext {
 	private void addExtensionsOsmTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
 		if (!Algorithms.isEmpty(extensions)) {
 			for (final String key : extensions.keySet()) {
-				if (key.startsWith(OSM_IN_GPX_PREFIX)) {
-					gpxTrackTags.putIfAbsent(key.replaceFirst(OSM_IN_GPX_PREFIX, ""), extensions.get(key));
+				if (key.startsWith(OSM_TAG_PREFIX)) {
+					gpxTrackTags.putIfAbsent(key.replaceFirst(OSM_TAG_PREFIX, ""), extensions.get(key));
 				}
 			}
 		}
@@ -407,8 +415,10 @@ public class OsmGpxWriteContext {
 			if (!Algorithms.isEmpty(gpxInfo.name)) {
 				gpxTrackTags.put("name", gpxInfo.name);
 			}
-			gpxTrackTags.put("ref", gpxInfo.getPrettyRef()); // TODO
-			gpxTrackTags.put("name:ref", gpxInfo.getPrettyRef()); // TODO
+			if (!Algorithms.isEmpty(gpxInfo.ref)) {
+				gpxTrackTags.put("ref", gpxInfo.ref);
+				gpxTrackTags.put("name:ref", gpxInfo.ref); // TODO must require non-empty name before add?
+			}
 			if (!Algorithms.isEmpty(gpxInfo.description)) {
 				gpxTrackTags.put("description", gpxInfo.description);
 			}
@@ -689,33 +699,6 @@ public class OsmGpxWriteContext {
 			if (!Algorithms.isEmpty(description)) {
 				this.description = description;
 			}
-		}
-
-		@Nonnull
-		public String getPrettyRef() {
-			if (!Algorithms.isEmpty(ref)) {
-				final int MAX_REF_LENGTH = 7;
-				return ref.substring(0, Math.min(ref.length(), MAX_REF_LENGTH));
-			}
-			if (!Algorithms.isEmpty(name)) {
-				String prettyRef = "";
-				final String[] words = name.split("[\\s()]+");
-				for (int i = 0; i < words.length; i++) {
-					// Tour du Mont Blanc (France, Italy, Switzerland) => TMB
-					// Camino de Santiago (Spain) => CS
-					// Appalachian Trail (USA) => AT
-					if (words[i].length() >= 3 && Character.isLetter(words[i].charAt(0))) {
-						prettyRef += words[i].toUpperCase().charAt(0);
-					}
-					if (prettyRef.length() >= 3) {
-						break;
-					}
-				}
-				if (prettyRef.length() > 0) {
-					return prettyRef;
-				}
-			}
-			return "" + id % 1000; // non-empty ref is strongly required to render Travel Obf files
 		}
 	}
 

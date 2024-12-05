@@ -46,8 +46,7 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
 import static net.osmand.gpx.GPXUtilities.writeNotNullText;
-import static net.osmand.obf.OsmGpxWriteContext.OSM_IN_GPX_PREFIX;
-import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
+import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 public class RouteRelationExtractor {
@@ -314,7 +313,7 @@ public class RouteRelationExtractor {
 		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
 		for (String key : relation.getTagKeySet()) {
-			gpxExtensions.put(OSM_IN_GPX_PREFIX + key, relation.getTag(key));
+			gpxExtensions.put(OSM_TAG_PREFIX + key, relation.getTag(key));
 		}
 
 		gpxExtensions.put("flexible_line_width", "yes");
@@ -359,20 +358,14 @@ public class RouteRelationExtractor {
 				waysToJoin.add(way);
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-				Map<String, String> props = getShieldTagsFromOsmcTags(way.getTags());
-				if (!Algorithms.isEmpty(props)) {
-					if (props.containsKey("color")) {
-						// osmc_waycolor overwrites other colors and duplicates in POI-section as shield_waycolor
-						props.put("shield_waycolor", props.get("color"));
+				Map<String, String> shieldTags = getShieldTagsFromOsmcTags(way.getTags());
+				if (!Algorithms.isEmpty(shieldTags)) {
+					if (shieldTags.containsKey(SHIELD_WAYCOLOR)) {
+						// shield_waycolor [POI] overwrites the color [MAP] for the whole relation
+						shieldTags.put("color", shieldTags.get(SHIELD_WAYCOLOR));
 						gpxExtensions.remove("colour");
 					}
-					if ((props.containsKey("shield_text") || props.containsKey("shield_textcolor"))
-							&& !gpxExtensions.containsKey(OSM_IN_GPX_PREFIX + "osmc:symbol")) {
-						// avoid synthetic osmc
-						props.remove("shield_text");
-						props.remove("shield_textcolor");
-					}
-					gpxExtensions.putAll(props);
+					gpxExtensions.putAll(shieldTags);
 				}
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
@@ -472,12 +465,14 @@ public class RouteRelationExtractor {
 		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
 	}
 
-	final String[] nodeNameTags = { "name", "name:en", "ref" };
+	final String[] nodeNameTags = { "name", "name:en" }; // no more ref here
+
+	final Map<String, String> skipNodeByTags = Map.of(
+			"information", "guidepost"
+			// ...
+	);
 
 	private void addNode(GPXFile gpxFile, Node node) {
-		final Map<String, String> skipNodeByTags = Map.of(
-				"information", "guidepost"
-		);
 		if (node != null && !node.getTags().isEmpty()) {
 			for (String k : skipNodeByTags.keySet()) {
 				final String nodeTagValue = node.getTags().get(k);
@@ -501,7 +496,7 @@ public class RouteRelationExtractor {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 					String key = entry1.getKey().replace(":", "_-_");
 					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
-						key = OSMAND_EXTENSIONS_PREFIX + OSM_IN_GPX_PREFIX + key;
+						key = OSMAND_EXTENSIONS_PREFIX + OSM_TAG_PREFIX + key;
 					}
 					try {
 						writeNotNullText(serializer, key, entry1.getValue());
@@ -613,7 +608,7 @@ public class RouteRelationExtractor {
 			"osmc_foreground", "shield_fg",
 			"osmc_foreground2", "shield_fg_2",
 			"osmc_textcolor", "shield_textcolor",
-			"osmc_waycolor", "color" // waycolor is a part of osmc:symbol and must be applied to whole way
+			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
 	);
 
 	private static final String OSMC_ICON_PREFIX = "osmc_";
