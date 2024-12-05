@@ -401,7 +401,6 @@ public class OsmGpxWriteContext {
 		if (gpxInfo != null) {
 			gpxTrackTags.put("user", gpxInfo.user);
 			gpxTrackTags.put("name", gpxInfo.name);
-			gpxTrackTags.put("route_name", gpxInfo.name);
 			gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("name:ref", gpxInfo.getPrettyRef());
 			gpxTrackTags.put("description", gpxInfo.description);
@@ -459,7 +458,6 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "route", routeType);
 			tagValue(serializer, "route_type", "track_point");
 			tagValue(serializer, ROUTE_ID_TAG, routeId);
-			tagValue(serializer, "route_name", routeName);
 		}
 		if (!Algorithms.isEmpty(p.getName())) {
 			tagValue(serializer, "name", p.getName());
