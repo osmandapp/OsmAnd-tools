@@ -399,11 +399,17 @@ public class OsmGpxWriteContext {
 
 	private void addGpxInfoTags(Map<String, String> gpxTrackTags, OsmGpxFile gpxInfo) {
 		if (gpxInfo != null) {
-			gpxTrackTags.put("user", gpxInfo.user);
-			gpxTrackTags.put("name", gpxInfo.name);
-			gpxTrackTags.put("ref", gpxInfo.getPrettyRef());
-			gpxTrackTags.put("name:ref", gpxInfo.getPrettyRef());
-			gpxTrackTags.put("description", gpxInfo.description);
+			if (!Algorithms.isEmpty(gpxInfo.user)) {
+				gpxTrackTags.put("user", gpxInfo.user);
+			}
+			if (!Algorithms.isEmpty(gpxInfo.name)) {
+				gpxTrackTags.put("name", gpxInfo.name);
+			}
+			gpxTrackTags.put("ref", gpxInfo.getPrettyRef()); // TODO
+			gpxTrackTags.put("name:ref", gpxInfo.getPrettyRef()); // TODO
+			if (!Algorithms.isEmpty(gpxInfo.description)) {
+				gpxTrackTags.put("description", gpxInfo.description);
+			}
 			gpxTrackTags.put(ROUTE_ID_TAG, gpxInfo.getRouteId());
 
 			if (gpxInfo.timestamp.getTime() > 0) {

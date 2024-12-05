@@ -123,7 +123,7 @@ public class RouteRelationExtractor {
 //			s.add("slovakia-latest.osm.pbf");
 			args = s.toArray(new String[0]);
 		} else if (args.length < 1) {
-			// TODO specify source file, tmp folder, result file, and finally clean up the folder
+			// TODO --in=filename (osm/gz/bz2/pbf) --out=filename (travel.obf) --tmp=directory (.) --keep-tmp-files (false)
 			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
 			System.exit(1);
 		}
@@ -291,11 +291,11 @@ public class RouteRelationExtractor {
 	private void saveGpx(Entity relation, Map<EntityId, Entity> children, File resultFile) {
 		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
 
-		String id = String.valueOf(relation.getId());
-		String ref = relation.getTag("ref");
+		String id = String.valueOf(relation.getId()); // TODO
+		String ref = relation.getTag("ref"); // TODO
 		String mainName = relation.getTag("name");
 		String enName = relation.getTag("name:en");
-		String description = relation.getTag("description");
+		String description = relation.getTag("description"); // TODO
 
 		if (mainName != null) {
 			gpxFile.metadata.name = mainName;
