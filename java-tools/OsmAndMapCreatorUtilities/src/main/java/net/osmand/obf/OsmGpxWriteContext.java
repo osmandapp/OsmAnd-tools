@@ -216,7 +216,8 @@ public class OsmGpxWriteContext {
 
 					serializer.endTag(null, "way");
 
-					String routeTag = gpxTrackTags.get("route"); // came from GPX ext "osm_route"
+					String routeTag = gpxTrackTags.get("route"); // came from GPX ext "osm_tag_route"
+					gpxTrackTags.remove("route"); // avoid generation of standard route-types in Map section
 					if (routeTag != null) {
 						OsmRouteType routeType = null;
 						for(String tag : routeTag.split("[;, ]")) {
@@ -298,6 +299,7 @@ public class OsmGpxWriteContext {
 
 	private static final Set<String> keepOriginalTags = Set.of(
 			"color", // transformed to color_$color by OBF-generation
+			"route_id",
 			"flexible_line_width",
 			"translucent_line_colors"
 	);
