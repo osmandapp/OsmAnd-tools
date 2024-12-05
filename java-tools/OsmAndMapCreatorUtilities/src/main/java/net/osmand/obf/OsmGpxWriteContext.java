@@ -59,6 +59,7 @@ import javax.annotation.Nullable;
 public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
+	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String OSM_TAG_PREFIX = OSM_PREFIX;
 	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
 	public static final String SHIELD_FG = "shield_fg";
@@ -66,8 +67,7 @@ public class OsmGpxWriteContext {
 	public static final String SHIELD_TEXT = "shield_text";
 	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
 	public static final String SHIELD_STUB_NAME = "shield_stub_name";
-
-	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
+	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 	public final QueryParams qp;
@@ -284,6 +284,12 @@ public class OsmGpxWriteContext {
 		} else if (gpxTrackTags.containsKey(SHIELD_FG) || gpxTrackTags.containsKey(SHIELD_BG)) {
 			gpxTrackTags.put(SHIELD_STUB_NAME, ".");
 		}
+		if (gpxTrackTags.containsKey(SHIELD_TEXT)) {
+			String text = gpxTrackTags.get(SHIELD_TEXT);
+			if (text.length() >= MIN_REF_LENGTH_FOR_SEARCH && !text.equals(gpxTrackTags.get("ref"))) {
+				gpxTrackTags.put("name:sym", text); // TODO require plain name?
+			}
+		}
 	}
 
 	private void addPointGroupsTags(Map<String, String> gpxTrackTags, Map<String, PointsGroup> pointsGroups) {
@@ -417,7 +423,9 @@ public class OsmGpxWriteContext {
 			}
 			if (!Algorithms.isEmpty(gpxInfo.ref)) {
 				gpxTrackTags.put("ref", gpxInfo.ref);
-				gpxTrackTags.put("name:ref", gpxInfo.ref); // TODO must require non-empty name before add?
+				if (gpxInfo.ref.length() >= MIN_REF_LENGTH_FOR_SEARCH) {
+					gpxTrackTags.put("name:ref", gpxInfo.ref); // TODO require plain name?
+				}
 			}
 			if (!Algorithms.isEmpty(gpxInfo.description)) {
 				gpxTrackTags.put("description", gpxInfo.description);
