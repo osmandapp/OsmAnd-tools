@@ -26,14 +26,11 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
-import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
-import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -43,18 +40,13 @@ import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.AbstractResource;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
+import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -67,8 +59,6 @@ import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.controllers.pub.GpxController;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -190,7 +180,7 @@ public class MapApiController {
 		}
 		request.login(username, password);
 
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		userdataService.updateDeviceLangInfo(dev, credentials.lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
 
 		return okStatus();
@@ -199,9 +189,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/delete-account"})
 	public ResponseEntity<String> deleteAccount(@RequestParam String token, HttpServletRequest request)
 			throws ServletException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.deleteAccount(token, dev, request);
 	}
@@ -258,28 +248,15 @@ public class MapApiController {
 		return userdataService.validateToken(username, token);
 	}
 
-	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
-		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-			return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
-		}
-		return null;
-	}
-
-	private ResponseEntity<String> tokenNotValid() {
-	    return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
-
-	}
-
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                     @RequestParam String name, @RequestParam String type) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 
@@ -288,9 +265,9 @@ public class MapApiController {
 
 	@PostMapping(value = "/delete-file")
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		userdataService.deleteFile(name, type, null, null, dev);
 		return userdataService.ok();
@@ -300,9 +277,9 @@ public class MapApiController {
 	public ResponseEntity<String> deleteFile(@RequestParam String name,
 	                                         @RequestParam String type,
 	                                         @RequestParam Long updatetime) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
@@ -311,9 +288,9 @@ public class MapApiController {
 	@GetMapping(value = "/delete-file-all-versions")
 	public ResponseEntity<String> deleteFileAllVersions(@RequestParam String name,
 	                                         @RequestParam String type, @RequestParam Long updatetime, @RequestParam boolean isTrash) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		} else {
 			return userdataService.deleteFileAllVersions(dev.userid, name, type, updatetime, isTrash);
 		}
@@ -324,9 +301,9 @@ public class MapApiController {
 	                                         @RequestParam String newName,
 	                                         @RequestParam String type,
 	                                         @RequestParam boolean saveCopy) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		if (!oldName.equals(newName)) {
 			return userdataService.renameFile(oldName, newName, type, dev, saveCopy);
@@ -338,9 +315,9 @@ public class MapApiController {
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
 	                                           @RequestParam String newFolderName) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
@@ -348,9 +325,9 @@ public class MapApiController {
 	@GetMapping(value = "/delete-folder")
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
 	                                           @RequestParam String type) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.deleteFolder(folderName, type, dev);
 	}
@@ -361,9 +338,9 @@ public class MapApiController {
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		long start = System.currentTimeMillis();
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
 		List <UserFileNoData> filesToIgnore = new ArrayList<>();
@@ -506,9 +483,9 @@ public class MapApiController {
 			@RequestParam String name,
 			@RequestParam String type,
 			@RequestParam(required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
             response.setStatus(error.getStatusCodeValue());
             response.getWriter().write(Objects.requireNonNull(error.getBody()));
             return;
@@ -524,9 +501,9 @@ public class MapApiController {
 	                               @RequestParam String name,
 	                               @RequestParam String type,
 	                               @RequestParam Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			response.getWriter().write(Objects.requireNonNull(error.getBody()));
 			return;
@@ -539,9 +516,9 @@ public class MapApiController {
 	
 	@GetMapping(value = "/restore-file")
 	public ResponseEntity<String> restoreFile(@RequestParam String name, @RequestParam String type, @RequestParam Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.restoreFile(name, type, updatetime, dev);
 	}
@@ -554,9 +531,9 @@ public class MapApiController {
 	
 	@PostMapping(value = "/empty-trash")
 	public ResponseEntity<String> emptyTrash(@RequestBody List<FileData> files) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.emptyTrash(files, dev);
 	}
@@ -565,7 +542,7 @@ public class MapApiController {
 	public ResponseEntity<String> getGpxInfo(@RequestParam(name = "name") String name,
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
@@ -627,7 +604,7 @@ public class MapApiController {
 	public ResponseEntity<String> getSrtmGpx(@RequestParam(name = "name") String name,
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
@@ -663,9 +640,9 @@ public class MapApiController {
 	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
 	                         @RequestParam String format,
 	                         @RequestBody List<String> data) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			if (error.getBody() != null) {
 				response.getWriter().write(error.getBody());
@@ -680,9 +657,9 @@ public class MapApiController {
 	                               @RequestParam String folderName,
 	                               @RequestParam String type,
 	                               HttpServletResponse response) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			if (error.getBody() != null) {
 				response.getWriter().write(error.getBody());
@@ -701,7 +678,7 @@ public class MapApiController {
 	@RequestMapping(path = {"/download-obf"})
 	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream is = null;
 		FileInputStream fis = null;
 		File targetObf = null;
@@ -753,7 +730,7 @@ public class MapApiController {
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
 
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		Map<String, String> info = new HashMap<>();
 
@@ -782,9 +759,9 @@ public class MapApiController {
 
 	@PostMapping(path = {"/auth/send-code"})
 	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
@@ -796,9 +773,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
 		if (emailSender.isEmail(email)) {
-			PremiumUserDevice dev = checkUser();
+			PremiumUserDevice dev = userdataService.checkUser();
 			if (dev == null) {
-				return tokenNotValid();
+				return userdataService.tokenNotValidResponse();
 			}
 			// check token from old email
 			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
@@ -836,9 +813,9 @@ public class MapApiController {
 		}
 		username = username.toLowerCase().trim();
 		if (emailSender.isEmail(username)) {
-			PremiumUserDevice dev = checkUser();
+			PremiumUserDevice dev = userdataService.checkUser();
 			if (dev == null) {
-				return tokenNotValid();
+				return userdataService.tokenNotValidResponse();
 			}
 			return userdataService.changeEmail(username, token, dev, request);
 		}
@@ -855,4 +832,5 @@ public class MapApiController {
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
 	}
+
 }

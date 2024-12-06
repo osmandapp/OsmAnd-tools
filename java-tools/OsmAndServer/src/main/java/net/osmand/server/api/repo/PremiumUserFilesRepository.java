@@ -1,6 +1,7 @@
 package net.osmand.server.api.repo;
 
 
+import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
@@ -15,6 +16,7 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import com.google.gson.Gson;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -37,7 +39,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	UserFile findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(int userid, String name, String type, Date updatetime);
 	
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
-	
+
 	Iterable<UserFile> findAllByUserid(int userid);
 
     @Query("SELECT uf FROM UserFile uf "
@@ -54,6 +56,8 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
     @Entity(name = "UserFile")
     @Table(name = "user_files")
     class UserFile implements Serializable {
+	    private static final Gson gson = new Gson();
+
 	    @Serial
 	    private static final long serialVersionUID = 1L;
 
@@ -93,14 +97,24 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Column(name = "gendetails", columnDefinition = "jsonb")
         @Type(type = "net.osmand.server.assist.data.JsonbType")
         public JsonObject details;
-        
-//      @Fetch(FetchMode.JOIN)
-        @Column(name = "data", columnDefinition="bytea")
-        public byte[] data;
-        
-//        @Lob
-//        public Blob data;
 
+	    @Column(name = "data", columnDefinition = "bytea")
+	    public byte[] data;
+
+	    @Serial
+	    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+		    out.defaultWriteObject();
+		    out.writeObject(details != null ? gson.toJson(details) : null);
+	    }
+
+	    @Serial
+	    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+		    in.defaultReadObject();
+		    String json = (String) in.readObject();
+		    if (json != null) {
+			    this.details = gson.fromJson(json, JsonObject.class);
+		    }
+	    }
     }
 
     
