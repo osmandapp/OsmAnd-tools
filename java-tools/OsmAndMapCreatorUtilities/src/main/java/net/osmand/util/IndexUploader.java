@@ -460,7 +460,8 @@ public class IndexUploader {
 			ZipEntry zEntry = new ZipEntry(parentEntry + f.getName());
 			zEntry.setSize(f.length());
 			zEntry.setComment(description);
-			zEntry.setTime(lastModifiedTime);
+			System.err.printf("WARN: zip-time-fix %d %d\n", lastModifiedTime, lastModifiedTime / 1000 * 1000);
+			zEntry.setTime(lastModifiedTime / 1000 * 1000); // ZIP does not support milliseconds correctly
 			zout.putNextEntry(zEntry);
 			FileInputStream is = new FileInputStream(f);
 			Algorithms.streamCopy(is, zout);
