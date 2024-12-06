@@ -3,8 +3,6 @@ package net.osmand.routes;
 import net.osmand.IProgress;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.preparation.DBDialect;
@@ -23,9 +21,15 @@ import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import okio.Okio;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 import org.apache.commons.logging.Log;
@@ -44,10 +48,9 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
-import static net.osmand.gpx.GPXUtilities.OSMAND_EXTENSIONS_PREFIX;
-import static net.osmand.gpx.GPXUtilities.writeNotNullText;
 import static net.osmand.obf.OsmGpxWriteContext.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
 
 public class RouteRelationExtractor {
 	private static final Log log = LogFactory.getLog(RouteRelationExtractor.class);
@@ -288,27 +291,18 @@ public class RouteRelationExtractor {
 	}
 
 	private void saveGpx(Entity relation, Map<EntityId, Entity> children, File resultFile) {
-		GPXFile gpxFile = new GPXFile(OSMAND_ROUTER_V2);
+		GpxFile gpxFile = new GpxFile(OSMAND_ROUTER_V2);
 
-		String id = String.valueOf(relation.getId()); // TODO
-		String ref = relation.getTag("ref"); // TODO
 		String mainName = relation.getTag("name");
 		String enName = relation.getTag("name:en");
-		String description = relation.getTag("description"); // TODO
 
 		if (mainName != null) {
-			gpxFile.metadata.name = mainName;
+			gpxFile.getMetadata().setName(mainName);
 		} else if (enName != null) {
-			gpxFile.metadata.name = enName;
-		} else if (description != null && !description.contains("\n")) {
-			gpxFile.metadata.name = description; // max length might be limited
-		} else if (ref != null) {
-			gpxFile.metadata.name = ref;
-		} else {
-			gpxFile.metadata.name = id;
+			gpxFile.getMetadata().setName(enName);
 		}
 
-		gpxFile.metadata.desc = relation.getTag("description"); // nullable
+		gpxFile.getMetadata().setDesc(relation.getTag("description")); // nullable
 
 		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
@@ -336,9 +330,9 @@ public class RouteRelationExtractor {
 			throw new RuntimeException(ex);
 		}
 
-		GPXUtilities.Track track = new GPXUtilities.Track();
-		track.name = gpxFile.metadata.name;
-		gpxFile.tracks.add(track);
+		Track track = new Track();
+		track.setName(gpxFile.getMetadata().getName());
+		gpxFile.getTracks().add(track);
 
 		RelationTagsPropagation transformer = new RelationTagsPropagation();
 		try {
@@ -378,7 +372,13 @@ public class RouteRelationExtractor {
 		try {
 			OutputStream outputStream = new FileOutputStream(outFile);
 			outputStream = new GZIPOutputStream(outputStream);
-			GPXUtilities.writeGpx(new OutputStreamWriter(outputStream), gpxFile, null);
+//			if (Algorithms.isEmpty(gpxFile.getMetadata().getName())) {
+//				gpxFile.setPath(null); // @NonNull TODO fixme
+//			}
+			Exception ex = GpxUtilities.INSTANCE.writeGpx(null, Okio.buffer(Okio.sink(outputStream)), gpxFile, null);
+			if (ex != null) {
+				throw new RuntimeException(ex);
+			}
 			outputStream.close();
 		} catch (IOException ex) {
 			throw new RuntimeException(ex);
@@ -389,11 +389,11 @@ public class RouteRelationExtractor {
 		}
 	}
 
-	private void joinWaysIntoTrackSegments(GPXUtilities.Track track, List<Way> ways) {
+	private void joinWaysIntoTrackSegments(Track track, List<Way> ways) {
 		boolean[] done = new boolean[ways.size()];
 		while (true) {
 			// long osmId = 0;
-			List<GPXUtilities.WptPt> wpts = new ArrayList<>();
+			List<WptPt> wpts = new ArrayList<>();
 			for (int i = 0; i < ways.size(); i++) {
 				if (!done[i]) {
 					done[i] = true;
@@ -417,21 +417,21 @@ public class RouteRelationExtractor {
 			if (wpts.isEmpty()) {
 				break; // all done
 			}
-			GPXUtilities.TrkSegment segment = new GPXUtilities.TrkSegment();
+			TrkSegment segment = new TrkSegment();
 			// segment.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(osmId));
 			// segment.getExtensionsToWrite().put("relation_track", "yes");
-			segment.points.addAll(wpts);
-			track.segments.add(segment);
+			segment.getPoints().addAll(wpts);
+			track.getSegments().add(segment);
 		}
 	}
 
-	private boolean considerCandidateToJoin(List<GPXUtilities.WptPt> wpts, Way candidate) {
+	private boolean considerCandidateToJoin(List<WptPt> wpts, Way candidate) {
 		if (wpts.isEmpty() || candidate.getNodes().isEmpty()) {
 			return true;
 		}
 
-		GPXUtilities.WptPt firstWpt = wpts.get(0);
-		GPXUtilities.WptPt lastWpt = wpts.get(wpts.size() - 1);
+		WptPt firstWpt = wpts.get(0);
+		WptPt lastWpt = wpts.get(wpts.size() - 1);
 		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
 		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
 
@@ -450,10 +450,10 @@ public class RouteRelationExtractor {
 		return true;
 	}
 
-	private void addWayToPoints(List<GPXUtilities.WptPt> wpts, boolean insert, Way way, boolean reverse) {
-		List<GPXUtilities.WptPt> points = new ArrayList<>();
+	private void addWayToPoints(List<WptPt> wpts, boolean insert, Way way, boolean reverse) {
+		List<WptPt> points = new ArrayList<>();
 		for (Node n : way.getNodes()) {
-			points.add(new GPXUtilities.WptPt(n.getLatitude(), n.getLongitude()));
+			points.add(new WptPt(n.getLatitude(), n.getLongitude()));
 		}
 		if (reverse) {
 			Collections.reverse(points);
@@ -461,7 +461,7 @@ public class RouteRelationExtractor {
 		wpts.addAll(insert ? 0 : wpts.size(), points);
 	}
 
-	private boolean eqWptToLatLon(GPXUtilities.WptPt wpt, LatLon ll) {
+	private boolean eqWptToLatLon(WptPt wpt, LatLon ll) {
 		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
 	}
 
@@ -472,7 +472,7 @@ public class RouteRelationExtractor {
 			// ...
 	);
 
-	private void addNode(GPXFile gpxFile, Node node) {
+	private void addNode(GpxFile gpxFile, Node node) {
 		if (node != null && !node.getTags().isEmpty()) {
 			for (String k : skipNodeByTags.keySet()) {
 				final String nodeTagValue = node.getTags().get(k);
@@ -486,9 +486,9 @@ public class RouteRelationExtractor {
 			if (gpxIcon == null) {
 				return;
 			}
-			GPXUtilities.WptPt wptPt = new GPXUtilities.WptPt();
-			wptPt.lat = node.getLatitude();
-			wptPt.lon = node.getLongitude();
+			WptPt wptPt = new WptPt();
+			wptPt.setLat(node.getLatitude());
+			wptPt.setLon(node.getLongitude());
 			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
 			// wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			// wptPt.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(node.getId()));
@@ -498,18 +498,14 @@ public class RouteRelationExtractor {
 					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
 						key = OSMAND_EXTENSIONS_PREFIX + OSM_TAG_PREFIX + key;
 					}
-					try {
-						writeNotNullText(serializer, key, entry1.getValue());
-					} catch (IOException ex) {
-						throw new RuntimeException(ex);
-					}
+					GpxUtilities.INSTANCE.writeNotNullText(serializer, key, entry1.getValue());
 				}
 			});
 			Map<String, String> tags = node.getTags();
 			for (String tag : nodeNameTags) {
 				String val = tags.get(tag);
 				if (val != null) {
-					wptPt.name = val;
+					wptPt.setName(val);
 					break;
 				}
 			}
