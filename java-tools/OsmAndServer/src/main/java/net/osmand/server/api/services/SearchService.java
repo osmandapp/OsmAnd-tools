@@ -8,21 +8,15 @@ import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
+import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -172,10 +166,13 @@ public class SearchService {
     }
 
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
+        OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
         if (baseSearch) {
-            return List.of(osmAndMapsService.getBaseMap());
+            return List.of(basemap);
         } else {
-            return osmAndMapsService.getObfReaders(points, null, 0, "search");
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
+            list.add(basemap);
+            return list;
         }
     }
     
@@ -211,11 +208,26 @@ public class SearchService {
             settings.setRegions(osmandRegions);
             settings.setOfflineIndexes(usedMapList);
             searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-            
+            List<BinaryMapPoiReaderAdapter.PoiSubType> brands = new ArrayList<>();
+            for (BinaryMapIndexReader map : usedMapList) {
+                brands.addAll(map.getTopIndexSubTypes());
+            }
             for (String category : data.categories) {
                 if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
                     SearchResult prevResult = new SearchResult();
                     prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
+                    if (prevResult.object == null) {
+                        // try to find in brands
+                        for (BinaryMapPoiReaderAdapter.PoiSubType brand : brands) {
+                            if (brand.possibleValues.stream().anyMatch(value -> value.equalsIgnoreCase(data.prevSearchRes))) {
+                                prevResult.object = new TopIndexFilter(brand, mapPoiTypes, category);
+                                break;
+                            }
+                        }
+                    }
+                    if (prevResult.object == null) {
+                        searchUICore.resetPhrase();
+                    }
                     prevResult.localeName = category;
                     prevResult.objectType = ObjectType.POI_TYPE;
                     searchUICore.resetPhrase(prevResult);
@@ -529,53 +541,78 @@ public class SearchService {
         }
         return null;
     }
-    
+
     private Map<String, String> getPoiTypeFields(Object obj) {
-        final String KEY_NAME = "web_keyName";
-        final String OSM_TAG = "web_typeOsmTag";
-        final String OSM_VALUE = "web_typeOsmValue";
-        final String ICON_NAME = "web_iconKeyName";
-        final String CATEGORY_ICON = "web_categoryIcon";
-        final String CATEGORY_KEY_NAME = "web_categoryKeyName";
-        final String POI_ADD_CATEGORY_NAME = "web_poiAdditionalCategory";
-        final String POI_FILTER_NAME = "web_poiFilterName";
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
-            tags.put(KEY_NAME, type.getKeyName());
-            tags.put(OSM_TAG, type.getOsmTag());
-            tags.put(OSM_VALUE, type.getOsmValue());
-            tags.put(ICON_NAME, type.getIconKeyName());
+            tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
+            tags.put(PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
+            tags.put(PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
+            tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
             PoiCategory category = type.getCategory();
             if (category != null) {
-                tags.put(CATEGORY_ICON, category.getIconKeyName());
-                tags.put(CATEGORY_KEY_NAME, category.getKeyName());
+                tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), category.getIconKeyName());
+                tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), category.getKeyName());
             }
         } else if (obj instanceof PoiFilter type) {
-            tags.put(KEY_NAME, type.getKeyName());
+            tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
             PoiCategory category = type.getPoiCategory();
             if (category != null) {
-                tags.put(CATEGORY_ICON, category.getIconKeyName());
-                tags.put(CATEGORY_KEY_NAME, category.getKeyName());
+                tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), category.getIconKeyName());
+                tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), category.getKeyName());
             }
         } else if (obj instanceof SearchCoreFactory.PoiAdditionalCustomFilter type) {
-            tags.put(KEY_NAME, type.getKeyName());
-            tags.put(ICON_NAME, type.getIconKeyName());
+            tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
+            tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
             type.additionalPoiTypes.stream().findFirst().ifPresent(poiType -> {
-                tags.put(ICON_NAME, getIconName(poiType));
+                tags.put(PoiTypeField.ICON_NAME.getFieldName(), getIconName(poiType));
                 PoiFilter poiFilter = poiType.getFilter();
                 if (poiFilter != null) {
-                    tags.put(POI_FILTER_NAME, poiFilter.getKeyName());
+                    tags.put(PoiTypeField.POI_FILTER_NAME.getFieldName(), poiFilter.getKeyName());
                 }
                 String additionalCategory = poiType.getPoiAdditionalCategory();
                 if (additionalCategory != null) {
-                    tags.put(POI_ADD_CATEGORY_NAME, additionalCategory);
+                    tags.put(PoiTypeField.POI_ADD_CATEGORY_NAME.getFieldName(), additionalCategory);
                 }
             });
+        } else if (obj instanceof TopIndexFilter type) {
+            tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), type.getTag());
+            tags.put(PoiTypeField.NAME.getFieldName(), type.getValue());
         } else if (obj instanceof AbstractPoiType type) {
-            tags.put(KEY_NAME, type.getKeyName());
-            tags.put(ICON_NAME, type.getIconKeyName());
+            tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
+            tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
         }
         return tags;
+    }
+
+    public enum PoiTypeField {
+        NAME("web_name"),
+        TYPE("web_type"),
+        KEY_NAME("web_keyName"),
+        OSM_TAG("web_typeOsmTag"),
+        OSM_VALUE("web_typeOsmValue"),
+        ICON_NAME("web_iconKeyName"),
+        CATEGORY_ICON("web_categoryIcon"),
+        CATEGORY_KEY_NAME("web_categoryKeyName"),
+        POI_ADD_CATEGORY_NAME("web_poiAdditionalCategory"),
+        POI_FILTER_NAME("web_poiFilterName"),
+        POI_ID("web_poi_id"),
+        POI_NAME("web_poi_name"),
+        POI_COLOR("web_poi_color"),
+        POI_ICON_NAME("web_poi_iconName"),
+        POI_TYPE("web_poi_type"),
+        POI_SUBTYPE("web_poi_subType"),
+        POI_OSM_URL("web_poi_osmUrl");
+
+        private final String fieldName;
+
+        PoiTypeField(String fieldName) {
+            this.fieldName = fieldName;
+        }
+
+        public String getFieldName() {
+            return fieldName;
+        }
     }
     
     private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
@@ -586,8 +623,8 @@ public class SearchService {
             } else {
                 Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
                 feature = new Feature(geometry)
-                        .prop("web_type", result.objectType)
-                        .prop("web_name", result.localeName);
+                        .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+                        .prop(PoiTypeField.NAME.getFieldName(), result.localeName);
                 Map<String, String> tags = getPoiTypeFields(result.object);
                 for (Map.Entry<String, String> entry : tags.entrySet()) {
                     feature.prop(entry.getKey(), entry.getValue());
@@ -603,14 +640,14 @@ public class SearchService {
         Feature feature = null;
         if (poiType != null) {
             feature = new Feature(Geometry.point(amenity.getLocation()))
-                    .prop("web_type", result.objectType)
-                    .prop("web_poi_id", amenity.getId())
-                    .prop("web_poi_name", amenity.getName())
-                    .prop("web_poi_color", amenity.getColor())
-                    .prop("web_poi_iconName", getIconName(poiType))
-                    .prop("web_poi_type", amenity.getType().getKeyName())
-                    .prop("web_poi_subType", amenity.getSubType())
-                    .prop("web_poi_osmUrl", getOsmUrl(result));
+                    .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+                    .prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
+                    .prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
+                    .prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
+                    .prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType))
+                    .prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
+                    .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
+                    .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
             for (Map.Entry<String, String> entry : tags.entrySet()) {
                 String value = unzipContent(entry.getValue());

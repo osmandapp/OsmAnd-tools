@@ -77,6 +77,7 @@ public class MapApiController {
 
 	private static final String INFO_KEY = "info";
 
+	private static final int LOG_SLOW_WEB_LIST_FILES_MS = 1000;
 
 	@Autowired
 	PremiumUserFilesRepository userFilesRepository;
@@ -336,12 +337,14 @@ public class MapApiController {
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
+		long start = System.currentTimeMillis();
 		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
 		List <UserFileNoData> filesToIgnore = new ArrayList<>();
+		int cloudReads = 0, cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
@@ -353,18 +356,23 @@ public class MapApiController {
 					UserFile uf = of.get();
 					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
 							: userdataService.getInputStream(uf);
+					cloudReads++;
 					if (in != null) {
 						in = new GZIPInputStream(in);
 						GpxFile gpxFile;
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 						} catch (IOException e) {
-							LOG.error("web-list-files: loadGpxFile error: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							LOG.error(String.format(
+									"web-list-files-error: load-gpx-error %s id=%d userid=%d error (%s)",
+									uf.name, uf.id, uf.userid, e.getMessage()));
 							filesToIgnore.add(nd);
 							continue;
 						}
 						if (gpxFile.getError() != null) {
-							LOG.error("web-list-files: ignore corrupted-gpx-file: " + uf.name + " (id=" + uf.id + ") (userid=" + uf.userid + ")");
+							LOG.error(String.format(
+									"web-list-files-error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
+									uf.name, uf.id, uf.userid, gpxFile.getError().getMessage()));
 							filesToIgnore.add(nd);
 							continue;
 						}
@@ -387,9 +395,14 @@ public class MapApiController {
 							});
 							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
+					} else {
+						LOG.error(String.format(
+								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
+						filesToIgnore.add(nd);
 					}
 					saveAnalysis(ANALYSIS, uf, analysis);
 					nd.details = uf.details.deepCopy();
+					cacheWrites++;
 				}
 			}
 			if (analysisPresent(ANALYSIS, nd.details)) {
@@ -409,6 +422,15 @@ public class MapApiController {
 				addDeviceInformation(nd, devices);
 			}
 		}
+
+		long elapsed = System.currentTimeMillis() - start;
+
+		if (LOG_SLOW_WEB_LIST_FILES_MS > 0 && elapsed > LOG_SLOW_WEB_LIST_FILES_MS) {
+			LOG.info(String.format(
+					"web-list-files-slow: userid=%d totalFiles=%d ignoredFiles=%d cloudReads=%d cacheWrites=%d elapsed=%d ms",
+					dev.userid, res.uniqueFiles.size(), filesToIgnore.size(), cloudReads, cacheWrites, elapsed));
+		}
+
 		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
