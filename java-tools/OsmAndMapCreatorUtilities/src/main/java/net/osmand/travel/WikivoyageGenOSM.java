@@ -511,7 +511,7 @@ public class WikivoyageGenOSM {
 			if (color != 0) {
 				tagValue(serializer, "colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				tagValue(serializer, "colour_int", Algorithms.colorToString(color));
+				// tagValue(serializer, "colour_int", Algorithms.colorToString(color)); // unsupported
 			}
 		}
 

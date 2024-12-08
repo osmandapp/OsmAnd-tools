@@ -140,3 +140,10 @@ GPX=<wpt> OBF=route_track_point POI (Other routes points)
 GPX=<name>|osmand:osm_tag_name|osmand:osm_tag_ref|osmand:osm_tag_description OBF=name POI,SPECIAL
 GPX=osmand:osm_tag_ref|synthetic-ref OBF=name:ref POI,SPECIAL
 ```
+
+### 7. TODO
+
+```
+remove gpx_ and osm_tag_ prefixes
+describe name, ref, description, filename, color, colour
+```

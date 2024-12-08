@@ -306,19 +306,20 @@ public class RouteRelationExtractor {
 
 		Map <String, String> gpxExtensions = gpxFile.getExtensionsToWrite();
 
-		for (String key : relation.getTagKeySet()) {
-			gpxExtensions.put(OSM_TAG_PREFIX + key, relation.getTag(key));
-		}
+//		for (String key : relation.getTagKeySet()) {
+//			gpxExtensions.put(OSM_TAG_PREFIX + key, relation.getTag(key));
+//		}
+		gpxExtensions.putAll(relation.getTags());
 
 		gpxExtensions.put("flexible_line_width", "yes");
 		gpxExtensions.put("translucent_line_colors", "yes");
 		gpxExtensions.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 		// gpxExtensions.put(OSM_ID_TAG, String.valueOf(relation.getId()));
 
-		if (relation.getTags().containsKey("colour")) {
-			gpxExtensions.remove("colour");
-			gpxExtensions.put("color", relation.getTags().get("colour"));
-		}
+//		if (relation.getTags().containsKey("colour")) {
+//			// gpxExtensions.remove("colour");
+//			gpxExtensions.put("color", relation.getTags().get("colour")); // "color" for rendering
+//		}
 
 		File gpxDir = getGpxDirectory(resultFile);
 
@@ -354,11 +355,11 @@ public class RouteRelationExtractor {
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				Map<String, String> shieldTags = getShieldTagsFromOsmcTags(way.getTags());
 				if (!Algorithms.isEmpty(shieldTags)) {
-					if (shieldTags.containsKey(SHIELD_WAYCOLOR)) {
+//					if (shieldTags.containsKey(SHIELD_WAYCOLOR)) {
 						// shield_waycolor [POI] overwrites the color [MAP] for the whole relation
-						shieldTags.put("color", shieldTags.get(SHIELD_WAYCOLOR));
-						gpxExtensions.remove("colour");
-					}
+						// shieldTags.put("color", shieldTags.get(SHIELD_WAYCOLOR));
+						// gpxExtensions.remove("colour"); // no-need
+//					}
 					gpxExtensions.putAll(shieldTags);
 				}
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
@@ -490,14 +491,15 @@ public class RouteRelationExtractor {
 			WptPt wptPt = new WptPt();
 			wptPt.setLat(node.getLatitude());
 			wptPt.setLon(node.getLongitude());
-			wptPt.getExtensionsToWrite().put("gpx_icon", gpxIcon);
+			wptPt.getExtensionsToWrite().put("icon", gpxIcon);
 			// wptPt.getExtensionsToWrite().put("relation_point", "yes");
 			// wptPt.getExtensionsToWrite().put(OSM_ID_TAG, String.valueOf(node.getId()));
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
 					String key = entry1.getKey().replace(":", "_-_");
 					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
-						key = OSMAND_EXTENSIONS_PREFIX + OSM_TAG_PREFIX + key;
+//						key = OSMAND_EXTENSIONS_PREFIX + OSM_TAG_PREFIX + key;
+						key = OSMAND_EXTENSIONS_PREFIX + key;
 					}
 					GpxUtilities.INSTANCE.writeNotNullText(serializer, key, entry1.getValue());
 				}
