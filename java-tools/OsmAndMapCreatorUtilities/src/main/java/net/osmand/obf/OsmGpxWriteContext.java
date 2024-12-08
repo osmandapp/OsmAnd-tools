@@ -4,7 +4,6 @@ import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
-//import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_DELIMITER;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_NAMES;
@@ -59,8 +58,6 @@ public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
-//	public static final String OSM_TAG_PREFIX = OSM_PREFIX;
-//	public static final String SHIELD_IN_GPX_PREFIX = "shield_";
 	public static final String SHIELD_FG = "shield_fg";
 	public static final String SHIELD_BG = "shield_bg";
 	public static final String SHIELD_TEXT = "shield_text";
@@ -130,9 +127,6 @@ public class OsmGpxWriteContext {
 		gpxInfo.updateName(gpxFile.getMetadata().getName());
 		gpxInfo.updateDescription(gpxFile.getMetadata().getDescription());
 
-//		gpxInfo.updateRef(extensions.get(OSM_TAG_PREFIX + "ref"));
-//		gpxInfo.updateName(extensions.get(OSM_TAG_PREFIX + "name"));
-//		gpxInfo.updateDescription(extensions.get(OSM_TAG_PREFIX + "description"));
 		gpxInfo.updateRef(extensions.get("ref"));
 		gpxInfo.updateName(extensions.get("name"));
 		gpxInfo.updateDescription(extensions.get("description"));
@@ -232,17 +226,7 @@ public class OsmGpxWriteContext {
 					}
 					tagValue(serializer, "route", "segment");
 					tagValue(serializer, "route_radius", routeRadius);
-
 					serializeTags(mapSectionTrackTags);
-
-//					addExtensionsOsmTags(gpxTrackTags, gpxFile.getExtensionsToRead());
-//					if (gpxFile.getMetadata() != null) {
-//						addExtensionsOsmTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
-//					}
-//					if (!gpxTrackTags.containsKey("route")) {
-//						tagValue(serializer, "route_type", "track"); // route_type=track for user-GPX-files (ext)
-//					}
-
 					serializer.endTag(null, "way");
 
 					// 3. Write segment as <node> (with route_type tag) every 5 km [POI-section]
@@ -340,49 +324,11 @@ public class OsmGpxWriteContext {
 		}
 	}
 
-//	private static final Set<String> keepOriginalTags = Set.of(
-//			"color", // transformed to color_$color by OBF-generation
-//			"route_id",
-//			"flexible_line_width",
-//			"translucent_line_colors"
-//	);
-
-	private void addExtensionsTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
-		if (!Algorithms.isEmpty(extensions)) {
-//			if (extensions.containsKey(SHIELD_WAYCOLOR)) {
-//				extensions.put("color", extensions.get(SHIELD_WAYCOLOR));
-//			}
-//			if (extensions.containsKey("color")) {
-//				// prioritize osmand:color over GPX color
-//				gpxTrackTags.remove("colour_int");
-//				gpxTrackTags.remove("colour");
-//			}
-			for (final String key : extensions.keySet()) {
-				gpxTrackTags.putIfAbsent(key, extensions.get(key));
-			}
-//			for (final String key : extensions.keySet()) {
-//				if (keepOriginalTags.contains(key)
-//						|| key.startsWith(SHIELD_IN_GPX_PREFIX)
-//						|| key.startsWith(OBF_GPX_EXTENSION_TAG_PREFIX)
-//				) {
-//					gpxTrackTags.putIfAbsent(key, extensions.get(key)); // original | shield_ | gpx_
-//				} else if (key.startsWith(OSM_TAG_PREFIX)) {
-//					// Ignore OSM-tags now because they are useless for Map-section (see addExtensionsOsmTags)
-//				} else {
-//					gpxTrackTags.putIfAbsent(OBF_GPX_EXTENSION_TAG_PREFIX + key, extensions.get(key)); // add gpx_
-//				}
-//			}
+	private void addExtensionsTags(@Nonnull Map<String, String> gpxTrackTags, @Nonnull Map<String, String> extensions) {
+		for (final String key : extensions.keySet()) {
+			gpxTrackTags.putIfAbsent(key, extensions.get(key));
 		}
 	}
-//	private void addExtensionsOsmTags(Map<String, String> gpxTrackTags, Map<String, String> extensions) {
-//		if (!Algorithms.isEmpty(extensions)) {
-//			for (final String key : extensions.keySet()) {
-//				if (key.startsWith(OSM_TAG_PREFIX)) {
-//					gpxTrackTags.putIfAbsent(key.replaceFirst(OSM_TAG_PREFIX, ""), extensions.get(key));
-//				}
-//			}
-//		}
-//	}
 
 	private void addElevationTags(Map<String, String> gpxTrackTags, TrkSegment s) {
 		IndexHeightData.WayGeneralStats wgs = new IndexHeightData.WayGeneralStats();
