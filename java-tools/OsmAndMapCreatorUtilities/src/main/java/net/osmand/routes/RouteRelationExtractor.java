@@ -331,7 +331,7 @@ public class RouteRelationExtractor {
 		}
 
 		Track track = new Track();
-		track.setName(gpxFile.getMetadata().getName());
+		track.setName(gpxFile.getMetadata().getName()); // nullable
 		gpxFile.getTracks().add(track);
 
 		RelationTagsPropagation transformer = new RelationTagsPropagation();
@@ -373,7 +373,8 @@ public class RouteRelationExtractor {
 			OutputStream outputStream = new FileOutputStream(outFile);
 			outputStream = new GZIPOutputStream(outputStream);
 //			if (Algorithms.isEmpty(gpxFile.getMetadata().getName())) {
-//				gpxFile.setPath(null); // @NonNull TODO fixme
+//				// empty "path" as <name></name> will be used
+//				gpxFile.setPath(null); // not allowed (@NonNull)
 //			}
 			Exception ex = GpxUtilities.INSTANCE.writeGpx(null, Okio.buffer(Okio.sink(outputStream)), gpxFile, null);
 			if (ex != null) {

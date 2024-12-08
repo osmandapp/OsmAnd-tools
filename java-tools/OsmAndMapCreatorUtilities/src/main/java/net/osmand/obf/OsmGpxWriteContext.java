@@ -120,14 +120,22 @@ public class OsmGpxWriteContext {
 	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
 	                       GpxTrackAnalysis analysis) throws IOException {
 		Map <String, String> extensions = new LinkedHashMap<>();
+
 		if (gpxFile.getMetadata() != null) {
 			extensions.putAll(gpxFile.getMetadata().getExtensionsToRead());
-			gpxInfo.updateName(gpxFile.getMetadata().getName());
-			gpxInfo.updateDescription(gpxFile.getMetadata().getDescription());
 		}
 		extensions.putAll(gpxFile.getExtensionsToRead());
 
 		gpxInfo.updateRouteId(extensions.get(ROUTE_ID_TAG));
+		if (Amenity.ROUTE_ID_OSM_PREFIX.equals(gpxInfo.routeIdPrefix)) {
+			gpxInfo.name = null; // allow empty name for OSM-tracks
+		}
+
+		if (gpxFile.getMetadata() != null) {
+			gpxInfo.updateName(gpxFile.getMetadata().getName());
+			gpxInfo.updateDescription(gpxFile.getMetadata().getDescription());
+		}
+
 		gpxInfo.updateRef(extensions.get(OSM_TAG_PREFIX + "ref"));
 		gpxInfo.updateName(extensions.get(OSM_TAG_PREFIX + "name"));
 		gpxInfo.updateDescription(extensions.get(OSM_TAG_PREFIX + "description"));
@@ -274,11 +282,11 @@ public class OsmGpxWriteContext {
 		}
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
-		finalizeShieldStubName(gpxTrackTags);
+		finalizeGpxShieldTags(gpxTrackTags);
 		return gpxTrackTags;
 	}
 
-	private void finalizeShieldStubName(Map<String, String> gpxTrackTags) {
+	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
 		if (gpxTrackTags.containsKey("ref") || gpxTrackTags.containsKey(SHIELD_TEXT)) {
 			gpxTrackTags.remove(SHIELD_STUB_NAME);
 		} else if (gpxTrackTags.containsKey(SHIELD_FG) || gpxTrackTags.containsKey(SHIELD_BG)) {
@@ -287,7 +295,7 @@ public class OsmGpxWriteContext {
 		if (gpxTrackTags.containsKey(SHIELD_TEXT)) {
 			String text = gpxTrackTags.get(SHIELD_TEXT);
 			if (text.length() >= MIN_REF_LENGTH_FOR_SEARCH && !text.equals(gpxTrackTags.get("ref"))) {
-				gpxTrackTags.put("name:sym", text); // TODO require plain name?
+				gpxTrackTags.put("name:sym", text);
 			}
 		}
 	}
@@ -421,10 +429,13 @@ public class OsmGpxWriteContext {
 			if (!Algorithms.isEmpty(gpxInfo.name)) {
 				gpxTrackTags.put("name", gpxInfo.name);
 			}
+			if (!Algorithms.isEmpty(gpxInfo.filename)) {
+				gpxTrackTags.put("filename", gpxInfo.filename);
+			}
 			if (!Algorithms.isEmpty(gpxInfo.ref)) {
 				gpxTrackTags.put("ref", gpxInfo.ref);
 				if (gpxInfo.ref.length() >= MIN_REF_LENGTH_FOR_SEARCH) {
-					gpxTrackTags.put("name:ref", gpxInfo.ref); // TODO require plain name?
+					gpxTrackTags.put("name:ref", gpxInfo.ref);
 				}
 			}
 			if (!Algorithms.isEmpty(gpxInfo.description)) {
@@ -595,16 +606,14 @@ public class OsmGpxWriteContext {
 			return;
 		}
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxFile.getModifiedTime());
+
 		OsmGpxFile file = new OsmGpxFile("GPX");
-		String name = fileName;
-		if (name.lastIndexOf('.') != -1) {
-			name = name.substring(0, name.lastIndexOf('.'));
-		}
-		if (name.lastIndexOf('/') != -1) {
-			name = name.substring(name.lastIndexOf('/') + 1);
-		}
-		file.name = name;
-		file.description = "";
+
+		String baseFileName = fileName.substring(fileName.lastIndexOf('/') + 1); // ok with/without '/'
+		String noGpxFileName = baseFileName.replaceAll("(?i)\\.gz$", "").replaceAll("(?i)\\.gpx$", "");
+
+		file.filename = baseFileName;
+		file.name = noGpxFileName;
 		file.tags = new String[0];
 
 		int xor = 0;
@@ -660,6 +669,7 @@ public class OsmGpxWriteContext {
 		public double lat;
 		public double lon;
 		public String description;
+		public String filename;
 
 		public static final double ERROR_NUMBER = -1000;
 		public double minlat = ERROR_NUMBER;
