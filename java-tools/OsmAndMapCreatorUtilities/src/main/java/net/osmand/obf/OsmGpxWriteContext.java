@@ -203,10 +203,6 @@ public class OsmGpxWriteContext {
 					Map<String, String> poiSectionTrackTags =
 							collectGpxTrackTags(gpxInfo, gpxFile, analysis, extraTrackTags, t, s);
 
-					// TODO move routeTag to RouteRelationExtractor
-					String routeTag = poiSectionTrackTags.get("route"); // it might be OSM relation tag
-					poiSectionTrackTags.remove("route"); // avoid generation based on standard "route" tag
-
 					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
 					if (mapSectionTrackTags.containsKey(SHIELD_WAYCOLOR)) {
 						mapSectionTrackTags.put("color", mapSectionTrackTags.get(SHIELD_WAYCOLOR));
@@ -214,6 +210,7 @@ public class OsmGpxWriteContext {
 					if (mapSectionTrackTags.containsKey("color")) {
 						mapSectionTrackTags.remove("colour");
 					}
+					mapSectionTrackTags.remove("route_type");
 
 					// 2. Write segment as <way> (without route_type tag) [MAP-section]
 					serializer.startTag(null, "way");
@@ -231,17 +228,7 @@ public class OsmGpxWriteContext {
 					serializer.endTag(null, "way");
 
 					// 3. Write segment as <node> (with route_type tag) every 5 km [POI-section]
-					String routeTypeValue = "track"; // default route_type=track
-					if (routeTag != null) {
-						OsmRouteType routeType = null;
-						for (String tag : routeTag.split("[;, ]")) {
-							routeType = OsmRouteType.convertFromOsmGPXTag(tag);
-							if (routeType != null) {
-								break; // consider 1st found as main type
-							}
-						}
-						routeTypeValue = routeType.getName();
-					}
+					poiSectionTrackTags.putIfAbsent("route_type", "track"); // default
 					for (LatLon ll : pointsForPoiSearch) {
 						serializer.startTag(null, "node");
 						serializer.attribute(null, "id", "" + baseOsmId--);
@@ -250,7 +237,6 @@ public class OsmGpxWriteContext {
 						serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
 						serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
 						tagValue(serializer, "route_radius", routeRadius);
-						tagValue(serializer, "route_type", routeTypeValue);
 						serializeTags(poiSectionTrackTags);
 						serializer.endTag(null, "node");
 					}
