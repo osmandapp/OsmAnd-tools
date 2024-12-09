@@ -203,6 +203,7 @@ public class OsmGpxWriteContext {
 					Map<String, String> poiSectionTrackTags =
 							collectGpxTrackTags(gpxInfo, gpxFile, analysis, extraTrackTags, t, s);
 
+					// TODO move routeTag to RouteRelationExtractor
 					String routeTag = poiSectionTrackTags.get("route"); // it might be OSM relation tag
 					poiSectionTrackTags.remove("route"); // avoid generation based on standard "route" tag
 

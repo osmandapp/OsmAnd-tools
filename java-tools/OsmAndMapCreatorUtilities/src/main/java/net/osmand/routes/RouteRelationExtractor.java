@@ -102,6 +102,38 @@ public class RouteRelationExtractor {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
+	// TODO try to prefix instead of removing...
+	final Set<String> skipGenerationTags = Set.of(
+			// Way tags
+			"route", // prevent OSMC routes in the Map section
+			"icn_ref", "rcn_ref", "lcn_ref", "ncn_ref", "lwn_ref", "rwn_ref", // network refs
+			// Node tags
+			"amenity", // bench
+			"building", // building
+			"checkpoint", // checkpoint_hiking
+			"club", // club_sport
+			"craft", // craft_winery
+			"highway", // highway_crossing (hmm)
+			"historic", // wayside_cross, memorial
+			"information", // information_guidepost
+			"internet_access", // internet_access_yes
+			"junction", // junction
+			"landuse", // ski_resort
+			"leisure", // firepit
+			"man_made", // cross, tower
+			"military", // military_bunker
+			"mountain_pass", // mountain_pass
+			"natural", // peak, spring
+			"picnic_table", // picnic_table
+			"public_transport", // public_transport_platform
+			"railway", // railway_station
+			"shelter", // shelter
+			"shop", // ticket, alcohol
+			"sport", // running, fitness, fitness_station
+			"tourism", // information, viewpoint, artwork
+			"traffic_calming" // traffic_calming_table
+	);
+
 	private final int ICON_SEARCH_ZOOM = 19;
 	private final RenderingRulesStorage renderingRules;
 	private final MapRenderingTypesEncoder renderingTypes;
@@ -352,6 +384,12 @@ public class RouteRelationExtractor {
 
 		joinWaysIntoTrackSegments(track, waysToJoin);
 
+		// TODO move route_type from OsmGpxWriteContext to this block
+
+		for (String skip : skipGenerationTags) {
+			gpxExtensions.remove(skip);
+		}
+
 		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
 			OutputStream outputStream = new FileOutputStream(outFile);
@@ -468,12 +506,14 @@ public class RouteRelationExtractor {
 			wptPt.setLon(node.getLongitude());
 			wptPt.getExtensionsToWrite().put("icon", gpxIcon);
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
-				for (Map.Entry<String, String> entry1 : node.getTags().entrySet()) {
-					String key = entry1.getKey().replace(":", "_-_");
-					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
-						key = OSMAND_EXTENSIONS_PREFIX + key;
+				for (Map.Entry<String, String> entry : node.getTags().entrySet()) {
+					String key = entry.getKey().replace(":", "_-_");
+					if (!skipGenerationTags.contains(key)) {
+						if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
+							key = OSMAND_EXTENSIONS_PREFIX + key;
+						}
+						GpxUtilities.INSTANCE.writeNotNullText(serializer, key, entry.getValue());
 					}
-					GpxUtilities.INSTANCE.writeNotNullText(serializer, key, entry1.getValue());
 				}
 			});
 			Map<String, String> tags = node.getTags();
