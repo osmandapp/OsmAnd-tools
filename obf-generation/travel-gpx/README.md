@@ -145,5 +145,5 @@ GPX=osmand:osm_tag_ref|synthetic-ref OBF=name:ref POI,SPECIAL
 
 ```
 remove gpx_ and osm_tag_ prefixes
-describe name, ref, description, filename, color, colour
+describe name, ref, description, filename, color, colour, route_name, route_id (OSM/GPX)
 ```

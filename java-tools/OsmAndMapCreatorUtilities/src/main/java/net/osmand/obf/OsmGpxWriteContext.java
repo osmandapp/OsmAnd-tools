@@ -457,6 +457,7 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "route", routeType);
 			tagValue(serializer, "route_type", "track_point");
 			tagValue(serializer, ROUTE_ID_TAG, routeId);
+			tagValue(serializer, "route_name", routeId); // required by fetchSegmentsAndPoints / searchPoiByName
 		}
 		if (!Algorithms.isEmpty(p.getName())) {
 			tagValue(serializer, "name", p.getName());
