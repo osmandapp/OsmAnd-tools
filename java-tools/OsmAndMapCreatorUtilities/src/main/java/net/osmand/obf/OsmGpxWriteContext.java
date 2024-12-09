@@ -413,7 +413,7 @@ public class OsmGpxWriteContext {
 				gpxTrackTags.put("tag_" + tg, tg);
 			}
 			if (activityType != null) {
-				gpxTrackTags.put("bg", activityType.getColor() + "_hexagon_3_road_shield");
+				gpxTrackTags.put("bg", activityType.getColor() + "_hexagon_3_road_shield"); // TODO fixme
 				gpxTrackTags.put("color", activityType.getColor());
 				gpxTrackTags.put("route_activity_type", activityType.getName().toLowerCase());
 			}
@@ -479,7 +479,7 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "icon", p.getIconName());
 		}
 		if (!Algorithms.isEmpty(p.getBackgroundType())) {
-			tagValue(serializer, "bg", p.getBackgroundType());
+			tagValue(serializer, "background", p.getBackgroundType());
 		}
 		int color = p.getColor(0); // gpx-point color
 		if (color != 0) {
