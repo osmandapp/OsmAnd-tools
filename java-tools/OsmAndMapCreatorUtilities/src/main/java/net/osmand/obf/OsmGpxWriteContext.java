@@ -293,7 +293,7 @@ public class OsmGpxWriteContext {
 		for (String name : pointsGroups.keySet()) {
 			PointsGroup pg = pointsGroups.get(name);
 			if (pg.getIconName() != null || pg.getBackgroundType() != null || pg.getColor() != 0) {
-				pgNames.add(name.isEmpty() ? OBF_POINTS_GROUPS_EMPTY_NAME_VALUE : name);
+				pgNames.add(name.isEmpty() ? OBF_POINTS_GROUPS_EMPTY_NAME_STUB : name);
 				pgIcons.add(pg.getIconName());
 				pgBackgrounds.add(pg.getBackgroundType());
 				pgColors.add(KAlgorithms.INSTANCE.colorToString(pg.getColor()));
