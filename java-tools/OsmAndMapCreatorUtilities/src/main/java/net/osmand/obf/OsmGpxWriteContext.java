@@ -4,12 +4,7 @@ import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_DELIMITER;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_NAMES;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_ICONS;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
-import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
+import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.*;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -296,7 +291,7 @@ public class OsmGpxWriteContext {
 		for (String name : pointsGroups.keySet()) {
 			PointsGroup pg = pointsGroups.get(name);
 			if (pg.getIconName() != null || pg.getBackgroundType() != null || pg.getColor() != 0) {
-				pgNames.add(name);
+				pgNames.add(name.isEmpty() ? OBF_POINTS_GROUPS_EMPTY_NAME_VALUE : name);
 				pgIcons.add(pg.getIconName());
 				pgBackgrounds.add(pg.getBackgroundType());
 				pgColors.add(KAlgorithms.INSTANCE.colorToString(pg.getColor()));
