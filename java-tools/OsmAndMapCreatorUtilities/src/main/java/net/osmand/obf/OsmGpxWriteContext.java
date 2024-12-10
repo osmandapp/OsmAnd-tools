@@ -63,6 +63,7 @@ public class OsmGpxWriteContext {
 	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
+
 	public final QueryParams qp;
 	public int tracks = 0;
 	public int segments = 0;
@@ -512,7 +513,7 @@ public class OsmGpxWriteContext {
 					InputStream fis = new FileInputStream(gf.absolutePath());
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(fis)), null, false);
 					writeFile(gpxFile, gf.name());
-				} else {
+				} else if (gf.name().endsWith(".gpx")) {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(gf, null, false);
 					writeFile(gpxFile, gf.name());
 				}
@@ -574,6 +575,10 @@ public class OsmGpxWriteContext {
 		file.id = ts ^ xor;
 
 		writeTrack(file, null, gpxFile, analysis);
+	}
+	
+	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		generateObfFromGpx(Arrays.asList(args));
 	}
 	
 	public static void generateObfFromGpx(List<String> subArgs) throws IOException, SQLException,
