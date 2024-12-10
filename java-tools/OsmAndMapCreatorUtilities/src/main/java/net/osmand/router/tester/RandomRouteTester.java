@@ -80,9 +80,13 @@ public class RandomRouteTester {
 //		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
 	}
 
-	class CommandLineOpts {
+	public static class CommandLineOpts {
 		public String getOpt(String key) {
 			return opts.get(key);
+		}
+
+		public boolean getBoolean(String key) {
+			return "true".equals(getOpt(key));
 		}
 
 		public void setOpt(String key, String val) {
@@ -108,8 +112,8 @@ public class RandomRouteTester {
 			}
 		}
 
-		private HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
-		private List<String> strings = new ArrayList<>(); // other args not parsed as opts
+		private final HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
+		private final List<String> strings = new ArrayList<>(); // other args not parsed as opts
 	}
 
 	public static void main(String[] args) throws Exception {

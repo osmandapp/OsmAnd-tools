@@ -22,13 +22,13 @@ import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
+import net.osmand.router.tester.RandomRouteTester.CommandLineOpts;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import okio.Okio;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
@@ -40,7 +40,8 @@ import org.xmlpull.v1.XmlPullParserException;
 import javax.annotation.Nonnull;
 import javax.xml.stream.XMLStreamException;
 import java.io.*;
-import java.nio.file.Files;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -140,67 +141,108 @@ public class RouteRelationExtractor {
 	private final MapRenderingTypesEncoder renderingTypes;
 	private final RenderingRuleSearchRequest searchRequest;
 
-	public RouteRelationExtractor() {
+	private final boolean keepTmpFiles;
+	private final String inFilePath, outFilePath, tmpDirectoryPath;
+	private final String generationWorkingDirectory, gpxDirectoryPath;
+	private final String dbFilePath, travelOsmFilePath, relationsOsmFilePath;
+
+	public RouteRelationExtractor(String[] args) {
+		CommandLineOpts opts = new CommandLineOpts(args);
+
+		inFilePath = opts.getOpt("--in");
+		outFilePath = opts.getOpt("--out");
+		keepTmpFiles = opts.getBoolean("--keep-tmp-files");
+		tmpDirectoryPath = Objects.requireNonNullElse(opts.getOpt("--tmp"), "/tmp");
+
+		if (opts.getBoolean("--help") || inFilePath == null || outFilePath == null) {
+			System.err.printf("%s\n", String.join("\n",
+					"",
+					"Usage: route-relation-extractor [--options]",
+					"",
+					"--in=/path/to/input_osm_file.(gz|bz2|pbf)",
+					"--out=/path/to/output_obf_file.obf",
+					"--tmp=/path/to/tmp (/tmp)",
+					"--keep-tmp-files",
+					"--help",
+					""
+			));
+			System.exit(0);
+		}
+
+		String basename = Paths.get(inFilePath).getFileName().toString().replace('.', '-');
+
+		dbFilePath = tmpDirectoryPath + "/" + basename + ".db";
+		travelOsmFilePath = tmpDirectoryPath + "/" + basename + ".travel.osm";
+		relationsOsmFilePath = tmpDirectoryPath + "/" + basename + ".relations.osm";
+		generationWorkingDirectory = tmpDirectoryPath + "/" + basename + "-obf";
+		gpxDirectoryPath = tmpDirectoryPath + "/" + basename + "-gpx";
+
 		renderingTypes = new MapRenderingTypesEncoder("basemap");
 		renderingRules = RenderingRulesStorage.initWithStylesFromResources(customStyles);
 		searchRequest = RenderingRuleSearchRequest.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, customProperties);
 	}
 
+	private void cleanupTmpFiles() throws IOException {
+		class remover extends SimpleFileVisitor<Path> {
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				String name = file.getFileName().toString();
+				if (name.endsWith(".gpx.gz") || name.endsWith(".obf")) {
+					Files.delete(file);
+				}
+				return FileVisitResult.CONTINUE;
+			}
+		}
+		if (!keepTmpFiles) {
+			if (Files.exists(Paths.get(generationWorkingDirectory))) {
+				Files.walkFileTree(Paths.get(generationWorkingDirectory), new remover());
+				Files.deleteIfExists(Paths.get(generationWorkingDirectory));
+			}
+			if (Files.exists(Paths.get(gpxDirectoryPath))) {
+				Files.walkFileTree(Paths.get(gpxDirectoryPath), new remover());
+				Files.deleteIfExists(Paths.get(gpxDirectoryPath));
+			}
+			Files.deleteIfExists(Paths.get(dbFilePath));
+			Files.deleteIfExists(Paths.get(travelOsmFilePath));
+			Files.deleteIfExists(Paths.get(relationsOsmFilePath));
+			try {
+				Files.deleteIfExists(Paths.get(tmpDirectoryPath));
+			} catch (IOException e) {
+				log.info("Unable to remove " + tmpDirectoryPath); // could be common such as /tmp
+			}
+		}
+	}
+
+	private void initTmpFiles() throws IOException {
+		cleanupTmpFiles(); // always do cleanup before
+		Files.createDirectories(Paths.get(gpxDirectoryPath));
+		Files.createDirectories(Paths.get(generationWorkingDirectory));
+	}
+
 	public static void main(String[] args) {
-		if (args.length == 1 && args[0].equals("test")) {
-			List<String> s = new ArrayList<>();
-//			s.add("andorra-latest.osm.gz");
-//			s.add("czech-republic-latest.osm.pbf");
-//			s.add("germany-latest.osm.gz");
-//			s.add("italy_sicilia.osm.pbf");
-			s.add("malta-latest.osm.gz");
-//			s.add("netherlands-latest.osm.pbf");
-//			s.add("slovakia-latest.osm.pbf");
-			args = s.toArray(new String[0]);
-		} else if (args.length < 1) {
-			// TODO --in=filename (osm/gz/bz2/pbf) --out=filename (travel.obf) --tmp=directory (.) --keep-tmp-files (false)
-			System.err.println("Usage: country.osm(|.gz|.bz2|.pbf) [result.osm(|.gz|.bz2)] [result.travel.obf]");
-			System.exit(1);
-		}
-
-		String sourceFilePath = args[0];
-
-		final String RELATIONS_OSM_EXT = ".relations.osm";
-		String resultFilePath = args.length > 1 ? args[1]
-				: sourceFilePath.replace(".osm", RELATIONS_OSM_EXT).replace(".pbf", "");
-		if (!resultFilePath.contains(RELATIONS_OSM_EXT)) {
-			resultFilePath += RELATIONS_OSM_EXT;
-		}
-
-		final String TRAVEL_OBF_EXT = ".travel.obf";
-		String obfFilePath = args.length > 2 ? args[2]
-				: sourceFilePath.replace(".osm", TRAVEL_OBF_EXT)
-				.replace(".pbf", "").replace(".gz", "").replace(".bz2", "");
-		if (!obfFilePath.contains(TRAVEL_OBF_EXT)) {
-			obfFilePath += TRAVEL_OBF_EXT;
-		}
-
+		RouteRelationExtractor rre = new RouteRelationExtractor(args);
 		try {
-			RouteRelationExtractor rdg = new RouteRelationExtractor();
-			File sourceFile = new File(sourceFilePath);
-			File resultFile = new File(resultFilePath);
-			rdg.extractRoutes(sourceFile, resultFile);
-			rdg.gpxDirectoryToObfFile(getGpxDirectory(resultFile), new File(obfFilePath));
+			rre.initTmpFiles();
+			rre.extractRoutes();
+			rre.gpxDirectoryToObfFile();
 		} catch (SQLException | IOException | XmlPullParserException | XMLStreamException | InterruptedException e) {
 			log.error("Extract routes error: ", e);
+		} finally {
+			try {
+				rre.cleanupTmpFiles();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 
-	private static File getGpxDirectory(File sourceFile) {
-		return new File(sourceFile.getPath()
-				.replace(".relations", ".gpx.files")
-				.replace(".osm", "")
-				.replace(".pbf", "")
-				.replace(".bz2", "")
-				.replace(".gz", ""));
+	private File getGpxDirectory() {
+		return new File(gpxDirectoryPath);
 	}
 
-	private void gpxDirectoryToObfFile(File gpxDirectory, File obfFile) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+	private void gpxDirectoryToObfFile() throws IOException, SQLException, XmlPullParserException, InterruptedException {
+		File gpxDirectory = getGpxDirectory();
+		File obfFile = new File(outFilePath);
 		if (gpxDirectory.isDirectory()) {
 			List<KFile> kFiles = new ArrayList<>();
 			for (File file : gpxDirectory.listFiles()) {
@@ -211,20 +253,24 @@ public class RouteRelationExtractor {
 			if (kFiles.isEmpty()) {
 				throw new RuntimeException("No GPX-gz files in directory: " + gpxDirectory.getAbsolutePath());
 			}
-			String osmFileName = Algorithms.getFileNameWithoutExtension(obfFile) + ".osm";
 			OsmGpxWriteContext.QueryParams qp = new OsmGpxWriteContext.QueryParams();
-			qp.osmFile = new File(osmFileName);
+			qp.osmFile = new File(travelOsmFilePath);
 			OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
-			File tmpFolder = new File(gpxDirectory, "tmp");
-			ctx.writeObf(null, kFiles, tmpFolder, osmFileName, obfFile);
+			File tmpFolder = new File(generationWorkingDirectory);
+			String obfFileBaseName = Paths.get(outFilePath).getFileName().toString();
+			ctx.writeObf(null, kFiles, tmpFolder, obfFileBaseName, obfFile);
 		} else {
 			throw new RuntimeException("Wrong GPX directory: " + gpxDirectory.getAbsolutePath());
 		}
 	}
 
-	private void extractRoutes(File sourceFile, File resultFile) throws IOException, XmlPullParserException,
+	private void extractRoutes() throws IOException, XmlPullParserException,
 			XMLStreamException, SQLException, InterruptedException {
-		File dbFile = new File(sourceFile.getParentFile(), sourceFile.getName() + ".db");
+
+		File sourceFile = new File(inFilePath);
+		File resultFile = new File(relationsOsmFilePath);
+		File dbFile = new File(dbFilePath);
+
 		long startTime = System.currentTimeMillis();
 		long endTime, deltaTime;
 		InputStream sourceIs;
@@ -345,7 +391,7 @@ public class RouteRelationExtractor {
 		gpxExtensions.put("translucent_line_colors", "yes");
 		gpxExtensions.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 
-		File gpxDir = getGpxDirectory(resultFile);
+		File gpxDir = getGpxDirectory();
 
 		try {
 			if (!gpxDir.exists()) {

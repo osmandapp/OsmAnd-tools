@@ -7,6 +7,8 @@ import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKI
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.*;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -238,7 +240,7 @@ public class OsmGpxWriteContext {
 				}
 			}
 
-			// 4. Write all GPX waypoints (TODO: How to restore waypoints to a corresponding track/segment?)
+			// 4. Write all GPX waypoints
 			for (WptPt p : gpxFile.getPointsList()) {
 				if (gpxInfo != null) {
 					writePoint(baseOsmId--, p, "point", gpxInfo.getRouteId(), gpxInfo.name);
@@ -537,7 +539,8 @@ public class OsmGpxWriteContext {
 			ic.setMapFileName(fileName);
 			IProgress prog = IProgress.EMPTY_PROGRESS;
 			ic.generateIndexes(qp.osmFile, prog, null, MapZooms.getDefault(), types, null);
-			new File(tmpFolder, ic.getMapFileName()).renameTo(targetObf);
+			File obfInTmpFolder = new File(tmpFolder, ic.getMapFileName()); // might need to move between two fs
+			Files.move(obfInTmpFolder.toPath(), targetObf.toPath(), StandardCopyOption.REPLACE_EXISTING);
 		} finally {
 			Algorithms.removeAllFiles(tmpFolder);
 		}

@@ -17,6 +17,7 @@ import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
 import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
+import net.osmand.routes.RouteRelationExtractor;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -230,6 +231,8 @@ public class MainUtilities {
 				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
 			} else if (utl.equals("add-owner-to-obf")) {
 				BinaryMerger.signObfFile(subArgsArray);
+			} else if (utl.equals("route-relation-extractor")) {
+				RouteRelationExtractor.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
@@ -392,5 +395,6 @@ public class MainUtilities {
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
 		System.out.println("\t\t random-route-tester --help # generate random routes and run java/cpp/hh comparison");
+		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
 	}
 }
