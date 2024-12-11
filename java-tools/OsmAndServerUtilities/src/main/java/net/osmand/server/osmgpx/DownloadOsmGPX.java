@@ -558,7 +558,7 @@ public class DownloadOsmGPX {
 			Source src = new Buffer().write(Algorithms.gzipToString(cont).getBytes());
 			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
-			ctx.writeTrack(gpxInfo, null, gpxFile, analysis);
+			ctx.writeTrack(gpxInfo, gpxFile, analysis);
 		}
 		ctx.endDocument();
 		

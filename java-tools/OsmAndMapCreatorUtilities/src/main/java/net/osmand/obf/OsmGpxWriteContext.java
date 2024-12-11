@@ -153,7 +153,7 @@ public class OsmGpxWriteContext {
 	}
 
 	// slightly outdated (never used even by Planet__OSM_GPX_Query job)
-	private void writeTrackWithoutDetails(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile, GpxTrackAnalysis analysis) throws IOException {
+	private void writeTrackWithoutDetails(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis) throws IOException {
 		boolean validTrack = false;
 		for (Track t : gpxFile.getTracks()) {
 			for (TrkSegment s : t.getSegments()) {
@@ -176,17 +176,16 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "route", "segment");
 			tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 			tagValue(serializer, "route_type", "track");
-			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis, extraTrackTags, null, null);
+			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis, null, null);
 			serializeTags(gpxTrackTags);
 			serializer.endTag(null, "node");
 		}
 	}
 
-	public void writeTrack(OsmGpxFile gpxInfo, Map<String, String> extraTrackTags, GpxFile gpxFile,
-	                       GpxTrackAnalysis analysis) throws IOException {
+	public void writeTrack(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis) throws IOException {
 		updateGpxInfoByGpxExtensions(gpxInfo, gpxFile);
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
-			writeTrackWithoutDetails(gpxInfo, extraTrackTags, gpxFile, analysis);
+			writeTrackWithoutDetails(gpxInfo, gpxFile, analysis);
 		} else {
 			for (Track t : gpxFile.getTracks()) {
 				for (TrkSegment s : t.getSegments()) {
@@ -221,7 +220,7 @@ public class OsmGpxWriteContext {
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2);
 
 					Map<String, String> poiSectionTrackTags =
-							collectGpxTrackTags(gpxInfo, gpxFile, analysis, extraTrackTags, t, s);
+							collectGpxTrackTags(gpxInfo, gpxFile, analysis, t, s);
 
 					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
 					if (mapSectionTrackTags.containsKey(SHIELD_WAYCOLOR)) {
@@ -274,11 +273,8 @@ public class OsmGpxWriteContext {
 	}
 
 	private Map<String, String> collectGpxTrackTags(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis,
-													Map<String, String> extraTrackTags, Track track, TrkSegment segment) {
+													Track track, TrkSegment segment) {
 		Map<String, String> gpxTrackTags = new LinkedHashMap<>();
-		if (extraTrackTags != null) {
-			gpxTrackTags.putAll(extraTrackTags);
-		}
 		if (track != null) {
 			addGenericTags(gpxTrackTags, track);
 		}
@@ -596,7 +592,7 @@ public class OsmGpxWriteContext {
 		file.timestamp = new Date(ts);
 		file.id = ts ^ xor;
 
-		writeTrack(file, null, gpxFile, analysis);
+		writeTrack(file, gpxFile, analysis);
 	}
 	
 	public static void main(String[] args) throws IOException, SQLException, XmlPullParserException, InterruptedException {
