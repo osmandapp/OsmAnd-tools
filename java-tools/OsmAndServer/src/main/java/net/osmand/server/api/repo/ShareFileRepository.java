@@ -1,71 +1,147 @@
 package net.osmand.server.api.repo;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 
 import javax.persistence.*;
-import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Repository
 public interface ShareFileRepository extends JpaRepository<ShareFileRepository.ShareFile, Long> {
 
-	ShareFile findByCode(String code);
+	ShareFile findByUuid(String uuid);
 
-	@Query("SELECT sf.info FROM ShareFile sf WHERE sf.code = :code")
-	JsonObject findInfoByCode(String code);
+	ShareFile findByOwneridAndFilepath(int ownerid, String filepath);
 
-	ShareFile findByUseridAndNameAndType(int userid, String name, String type);
+	@Query("SELECT a FROM ShareFilesAccess a WHERE a.id = :id")
+	ShareFilesAccess findShareFilesAccessById(@Param("id") long id);
 
+	<S extends ShareFilesAccess> S saveAndFlush(S entity);
 
 	@Setter
 	@Getter
 	@Entity(name = "ShareFile")
-	@Table(name = "share_files")
+	@Table(name = "user_share_files")
 	class ShareFile implements Serializable {
-		private static final Gson gson = new Gson();
 
 		@Serial
 		private static final long serialVersionUID = 1L;
 
 		@Id
-		@Column(nullable = false, unique = true)
-		private String code;
+		@GeneratedValue(strategy = GenerationType.IDENTITY)
+		@Column(name = "file_id")
+		public long id;
 
-		@Column(name = "name", nullable = false)
+		@Column(nullable = false)
+		public int ownerid;
+
+		@Column(unique = true)
+		private String uuid;
+
+		@Column(nullable = false)
+		public String filepath;
+
+		@Column(nullable = false)
 		public String name;
 
-		@Column(name = "type", nullable = false)
+		@Column(nullable = false)
 		public String type;
 
-		@Column(name = "userid", nullable = false)
-		public int userid;
+		@Column(nullable = false)
+		public boolean publicAccess;
 
-		@Column(name = "info", columnDefinition = "jsonb")
-		@Type(type = "net.osmand.server.assist.data.JsonbType")
-		private JsonObject info;
+		@OneToMany(mappedBy = "file", cascade = CascadeType.ALL, orphanRemoval = true)
+		private List<ShareFilesAccess> accessRecords;
 
-		@Serial
-		private void writeObject(java.io.ObjectOutputStream out) throws IOException {
-			out.defaultWriteObject();
-			out.writeObject(info != null ? gson.toJson(info) : null);
+		public void addAccessRecord(ShareFilesAccess access) {
+			accessRecords.add(access);
+			access.setFile(this);
 		}
+	}
+
+	@Setter
+	@Getter
+	@Entity(name = "ShareFilesAccess")
+	@Table(name = "user_share_files_access")
+	class ShareFilesAccess implements Serializable {
 
 		@Serial
-		private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
-			in.defaultReadObject();
-			String json = (String) in.readObject();
-			if (json != null) {
-				this.info = gson.fromJson(json, JsonObject.class);
+		private static final long serialVersionUID = 1L;
+
+		@Id
+		@GeneratedValue(strategy = GenerationType.IDENTITY)
+		private long id;
+
+		@ManyToOne
+		@JoinColumn(name = "user_id", nullable = false)
+		private PremiumUsersRepository.PremiumUser user;
+
+		@Column(nullable = false)
+		private String access;
+
+		@Column(name = "date")
+		@Temporal(TemporalType.TIMESTAMP)
+		public Date requestDate;
+
+		@ManyToOne
+		@JoinColumn(name = "file_id", nullable = false)
+		private ShareFile file;
+	}
+
+	@Getter
+	@Setter
+	public class ShareFileDTO {
+
+		private long id;
+		private int ownerid;
+		private String uuid;
+		private String filepath;
+		private String name;
+		private String type;
+		private boolean publicAccess;
+		private List<ShareFilesAccessDTO> accessRecords;
+
+		public ShareFileDTO(ShareFile shareFile, boolean includeAccessRecords) {
+			this.id = shareFile.getId();
+			this.ownerid = shareFile.getOwnerid();
+			this.uuid = shareFile.getUuid();
+			this.filepath = shareFile.getFilepath();
+			this.name = shareFile.getName();
+			this.type = shareFile.getType();
+			this.publicAccess = shareFile.isPublicAccess();
+			if (includeAccessRecords && shareFile.getAccessRecords() != null) {
+				this.accessRecords = shareFile.getAccessRecords().stream()
+						.map((ShareFilesAccess access) -> new ShareFilesAccessDTO(access, false))
+						.collect(Collectors.toList());
 			}
 		}
+	}
 
+	@Getter
+	@Setter
+	class ShareFilesAccessDTO {
+
+		private long id;
+		private String name;
+		private String access;
+		private Date requestDate;
+
+		public ShareFilesAccessDTO(ShareFilesAccess access, boolean includeFile) {
+			this.id = access.getId();
+			this.name = access.getUser().email;
+			this.access = access.getAccess();
+			this.requestDate = access.getRequestDate();
+			if (includeFile) {
+				this.id = access.getFile().getId();
+			}
+		}
 	}
 }

@@ -40,10 +40,32 @@ CREATE INDEX user_files_userid_idx on user_files(userid);
 CREATE INDEX user_files_deviceid_idx on user_files(deviceid);
 
 -- share file
-CREATE TABLE share_files(code varchar NOT NULL primary key, name text NOT NULL, type text NOT NULL, userid integer NOT NULL, info jsonb);
-CREATE INDEX share_files_userid_idx ON share_files(userid);
-CREATE INDEX share_files_name_idx ON share_files(name);
-CREATE INDEX share_files_type_idx ON share_files(type);
+CREATE TABLE user_share_files (
+    file_id SERIAL PRIMARY KEY,
+    ownerid INTEGER NOT NULL,
+    uuid TEXT UNIQUE,
+    filepath TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    public_access BOOLEAN NOT NULL
+);
+
+CREATE TABLE user_share_files_access (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    access TEXT NOT NULL,
+    date TIMESTAMP NOT NULL,
+    file_id INTEGER NOT NULL,
+    CONSTRAINT fk_user_share_files_access_user FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_share_files_access_file FOREIGN KEY (file_id) REFERENCES user_share_files(file_id) ON DELETE CASCADE
+);
+
+CREATE INDEX user_share_files_ownerid_idx ON user_share_files(ownerid);
+CREATE INDEX user_share_files_uuid_idx ON user_share_files(uuid);
+CREATE INDEX user_share_files_filepath_idx ON user_share_files(filepath);
+
+CREATE INDEX user_share_files_access_userid_idx ON user_share_files_access(user_id);
+CREATE INDEX user_share_files_access_file_id_idx ON user_share_files_access(file_id);
 
 -- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.UserdataService;
@@ -22,9 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.transaction.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static net.osmand.server.api.services.UserdataService.FILE_NOT_FOUND;
 
@@ -47,16 +46,13 @@ public class ShareFileController {
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileController.class);
 
-	private static final String ERROR_GETTING_SHARED_INFO = "Error getting shared info";
-
 	public record FileDownloadResult(InputStream inputStream, String fileName, String contentType) {
 	}
 
 	@PostMapping(path = {"/generate-link"}, produces = "application/json")
 	public ResponseEntity<String> generateLink(@RequestParam String fileName,
 	                                           @RequestParam String fileType,
-	                                           @RequestParam String type,
-	                                           @RequestParam(required = false) String groupActions) {
+	                                           @RequestParam Boolean publicAccess) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
@@ -65,39 +61,25 @@ public class ShareFileController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		String code = shareFileService.generateSharedCode(userFile, type, groupActions);
-		if (code == null) {
+		String uuid = shareFileService.generateSharedCode(userFile, publicAccess);
+		if (uuid == null) {
 			return ResponseEntity.badRequest().body("Error generating link");
 		}
-		String name = shareFileService.getNamePartForCode(fileName);
-		String url = "/share/get?code=" + code + "-" + name;
-
-		return ResponseEntity.ok(gson.toJson(Map.of("url", url)));
+		return ResponseEntity.ok(gson.toJson(Map.of("uuid", uuid)));
 	}
 
-	@PostMapping(path = {"/get"}, produces = "application/json")
+	@GetMapping(path = {"/get/{uuid}"}, produces = "application/json")
 	@Transactional
-	public ResponseEntity<?> getFile(@RequestParam String code) throws IOException {
-		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByCode(code);
+	public ResponseEntity<?> getFile(@PathVariable String uuid) throws IOException {
+		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByUuid(uuid);
 		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
+		ResponseEntity<String> errorAccess = shareFileService.checkAccess(shareFile);
+		if (errorAccess != null) {
+			return errorAccess;
+		}
 		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
-		if (userFile == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
-		}
-		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(shareFile.getInfo());
-		if (info == null) {
-			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
-		}
-		boolean hasAccess = shareFileService.checkAccess(info);
-		if (!hasAccess) {
-			return ResponseEntity.badRequest().body("You don't have access to this file");
-		}
-		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
-		if (dev != null) {
-			shareFileService.storeUserAccess(dev, shareFile, info);
-		}
 		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
 		if (fileResult == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
@@ -108,29 +90,23 @@ public class ShareFileController {
 				.body(new InputStreamResource(fileResult.inputStream));
 	}
 
-	@PostMapping(path = {"/get-gpx"}, produces = "application/json")
+	@GetMapping(path = {"/join/{uuid}"}, produces = "application/json")
 	@Transactional
-	public ResponseEntity<?> getGpx(@RequestParam String code) throws IOException {
-		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByCode(code);
+	public ResponseEntity<?> getGpx(@PathVariable String uuid) throws IOException {
+		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByUuid(uuid);
 		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
+		ResponseEntity<String> errorAccess = shareFileService.checkAccess(shareFile);
+		if (errorAccess != null) {
+			return errorAccess;
+		}
 		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
-		if (userFile == null) {
+		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
+		if (fileResult == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(shareFile.getInfo());
-		if (info == null) {
-			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
-		}
-		boolean hasAccess = shareFileService.checkAccess(info);
-		if (!hasAccess) {
-			return ResponseEntity.badRequest().body("File is private");
-		}
-		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
-		if (dev != null) {
-			shareFileService.storeUserAccess(dev, shareFile, info);
-		}
+
 		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
@@ -143,66 +119,90 @@ public class ShareFileController {
 		return ResponseEntity.badRequest().body("Error getting gpx data");
 	}
 
-	@PostMapping(path = {"/edit-blacklist"}, produces = "application/json")
-	public ResponseEntity<String> editBlacklist(@RequestBody List<String> list,
-	                                            @RequestParam String name,
-	                                            @RequestParam String type) {
+	@GetMapping(path = {"/request-access"}, produces = "application/json")
+	@Transactional
+	public ResponseEntity<?> requestAccess(@RequestParam String uuid) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		if (!shareFileService.editBlacklist(dev, name, type, list)) {
-			return ResponseEntity.badRequest().body("Error editing blacklist");
-		}
-		return ResponseEntity.ok("Blacklist edited");
-	}
-
-	@GetMapping(path = {"/edit-whitelist"}, produces = "application/json")
-	public ResponseEntity<String> editWhitelist(@RequestBody List<String> list,
-	                                            @RequestParam String name,
-	                                            @RequestParam String type) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
-		if (dev == null) {
-			return userdataService.tokenNotValidResponse();
-		}
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, null, dev);
-		if (userFile == null) {
+		ShareFileRepository.ShareFile shareFile = shareFileService.getShareFileByUuid(uuid);
+		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		if (!shareFileService.editWhitelist(dev, name, type, list)) {
-			return ResponseEntity.badRequest().body("Error editing whitelist");
+		if (dev.userid == shareFile.ownerid) {
+			return ResponseEntity.badRequest().body("You are the owner of this file");
 		}
-		return ResponseEntity.ok("Whitelist edited");
+		shareFileService.requestAccess(shareFile, dev);
+		return ResponseEntity.ok("Access requested");
 	}
 
-	@GetMapping(path = {"/get-shared-info"}, produces = "application/json")
-	public ResponseEntity<String> getSharedInfo(@RequestParam String name,
-	                                            @RequestParam String type) {
+	@GetMapping(path = {"/get-share-file-info"}, produces = "application/json")
+	public ResponseEntity<String> getFileInfo(@RequestParam String fileName,
+	                                          @RequestParam String fileType,
+	                                          @RequestParam boolean createIfNotExists) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(dev, name, type);
-		if (info == null) {
-			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
+		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, fileName);
+		if (shareFile == null) {
+			if (createIfNotExists) {
+				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
+				shareFile = shareFileService.createShareFile(userFile, false, null);
+			} else {
+				return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+			}
 		}
-		return ResponseEntity.ok(gson.toJson(info));
+		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(shareFile.ownerid);
+		if (user == null) {
+			return ResponseEntity.badRequest().body("Error getting user info");
+		}
+		String ownerName = user.email;
+		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, true);
+		return ResponseEntity.ok(gson.toJson(Map.of("owner", ownerName, "file", shareFileDto)));
 	}
 
-	@GetMapping(path = {"/check-access"}, produces = "application/json")
-	public ResponseEntity<String> checkAccess(@RequestParam String code) {
+	@GetMapping(path = {"/edit-access-list"}, produces = "application/json")
+	public ResponseEntity<String> editWhitelist(@RequestBody Map<Integer, String> accessMap,
+	                                            @RequestParam String fileName) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		ShareFileService.FileSharedInfo info = shareFileService.getSharedInfo(code);
-		if (info == null) {
-			return ResponseEntity.badRequest().body(ERROR_GETTING_SHARED_INFO);
+		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, fileName);
+		if (shareFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		ShareFileService.FileSharedInfo.SharingType type = info.getSharingType();
-		Set<ShareFileService.FileSharedInfo.GroupAction> groupActions = info.getGroupActions();
+		boolean success = shareFileService.editAccessList(shareFile, accessMap);
+		if (!success) {
+			return ResponseEntity.badRequest().body("Error editing access list");
+		}
+		return ResponseEntity.ok("Access list edited");
+	}
 
-		return ResponseEntity.ok(gson.toJson(Map.of("hasAccess", shareFileService.checkAccess(info), "type", type, "groupActions", groupActions)));
+	@PostMapping(path = {"/update-requests"}, produces = "application/json")
+	public ResponseEntity<String> updateRequests(@RequestBody Map<Integer, String> requests,
+	                                             @RequestParam long fileId) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		ShareFileRepository.ShareFile shareFile = shareFileService.getFileById(fileId);
+		if (shareFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		if (shareFile.ownerid != dev.userid) {
+			return ResponseEntity.badRequest().body("You are not the owner of this file");
+		}
+		boolean success = shareFileService.updateRequests(requests);
+		if (!success) {
+			return ResponseEntity.badRequest().body("Error updating requests");
+		}
+		shareFile = shareFileService.getFileById(fileId);
+		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, true);
+
+		return ResponseEntity.ok(gson.toJson(shareFileDto));
 	}
 
 }
