@@ -4,6 +4,8 @@ import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
+import static net.osmand.osm.MapPoiTypes.OTHER_MAP_CATEGORY;
+import static net.osmand.osm.MapPoiTypes.ROUTES;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
@@ -39,8 +41,11 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
+import com.google.gson.Gson;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -93,6 +98,7 @@ public class OsmGpxWriteContext {
 
 	XmlSerializer serializer = null;
 	OutputStream outputStream = null;
+	private final Gson gson = new Gson();
 
 	public OsmGpxWriteContext(QueryParams qp) {
 		this.qp = qp;
@@ -176,7 +182,10 @@ public class OsmGpxWriteContext {
 			tagValue(serializer, "route", "segment");
 			tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
 			tagValue(serializer, "route_type", "track");
-			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis, null, null);
+			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
+			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
+			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
+					metadataExtraTags, extensionsExtraTags, null, null);
 			serializeTags(gpxTrackTags);
 			serializer.endTag(null, "node");
 		}
@@ -219,8 +228,11 @@ public class OsmGpxWriteContext {
 							GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
 							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2);
 
-					Map<String, String> poiSectionTrackTags =
-							collectGpxTrackTags(gpxInfo, gpxFile, analysis, t, s);
+					Map<String, String> metadataExtraTags = new LinkedHashMap<>();
+					Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
+
+					Map<String, String> poiSectionTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
+							metadataExtraTags, extensionsExtraTags, t, s);
 
 					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
 					if (mapSectionTrackTags.containsKey(SHIELD_WAYCOLOR)) {
@@ -256,6 +268,12 @@ public class OsmGpxWriteContext {
 						serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
 						serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
 						tagValue(serializer, "route_radius", routeRadius);
+						if (!metadataExtraTags.isEmpty()) {
+							tagValue(serializer, "metadata_extra_tags", gson.toJson(metadataExtraTags));
+						}
+						if (!extensionsExtraTags.isEmpty()) {
+							tagValue(serializer, "extensions_extra_tags", gson.toJson(extensionsExtraTags));
+						}
 						serializeTags(poiSectionTrackTags);
 						serializer.endTag(null, "node");
 					}
@@ -273,7 +291,9 @@ public class OsmGpxWriteContext {
 	}
 
 	private Map<String, String> collectGpxTrackTags(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis,
-													Track track, TrkSegment segment) {
+	                                                Map<String, String> metadataExtraTags,
+	                                                Map<String, String> extensionsExtraTags,
+	                                                Track track, TrkSegment segment) {
 		Map<String, String> gpxTrackTags = new LinkedHashMap<>();
 		if (track != null) {
 			addGenericTags(gpxTrackTags, track);
@@ -282,8 +302,8 @@ public class OsmGpxWriteContext {
 			addElevationTags(gpxTrackTags, segment);
 		}
 		addGpxInfoTags(gpxTrackTags, gpxInfo);
-		addExtensionsTags(gpxTrackTags, gpxFile.getExtensionsToRead());
-		addExtensionsTags(gpxTrackTags, gpxFile.getMetadata().getExtensionsToRead());
+		addExtensionsTags(gpxTrackTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
+		addExtensionsTags(gpxTrackTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
 		finalizeGpxShieldTags(gpxTrackTags);
@@ -327,9 +347,22 @@ public class OsmGpxWriteContext {
 		}
 	}
 
-	private void addExtensionsTags(@Nonnull Map<String, String> gpxTrackTags, @Nonnull Map<String, String> extensions) {
-		for (final String key : extensions.keySet()) {
-			gpxTrackTags.putIfAbsent(key, extensions.get(key));
+	final Set<String> alwaysExtraTags = Set.of("route", "note", "fixme"); // avoid garbage in Map section
+
+	private void addExtensionsTags(@Nonnull Map<String, String> gpxTrackTags,
+	                               @Nonnull Map<String, String> extraTags,
+	                               @Nonnull Map<String, String> extensions) {
+		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+		for (final String tag : extensions.keySet()) {
+			final String val = extensions.get(tag);
+			PoiType pt = poiTypes.getPoiTypeByTagValue(tag, val);
+			if (!alwaysExtraTags.contains(tag) && pt != null &&
+					(ROUTES.equals(pt.getCategory().getKeyName())
+							|| OTHER_MAP_CATEGORY.equals(pt.getCategory().getKeyName()))) {
+				gpxTrackTags.putIfAbsent(tag, val);
+			} else {
+				extraTags.putIfAbsent(tag, val);
+			}
 		}
 	}
 
@@ -452,10 +485,15 @@ public class OsmGpxWriteContext {
 		serializer.attribute(null, "id", id + "");
 		serializer.attribute(null, "action", "modify");
 		serializer.attribute(null, "version", "1");
-		Map<String, String> pointExtensions = p.getExtensionsToRead();
-		for (String key : pointExtensions.keySet()) {
-			tagValue(serializer, key, pointExtensions.get(key));
+
+		Map<String, String> pointPoiTags = new LinkedHashMap<>();
+		Map<String, String> pointExtraTags = new LinkedHashMap<>();
+		addExtensionsTags(pointPoiTags, pointExtraTags, p.getExtensionsToRead());
+		if (!pointExtraTags.isEmpty()) {
+			tagValue(serializer, "wpt_extra_tags", gson.toJson(pointExtraTags));
 		}
+		serializeTags(pointPoiTags);
+
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
 			tagValue(serializer, "route_type", "track_point");
