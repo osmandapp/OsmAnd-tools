@@ -331,7 +331,7 @@ public class OsmGpxWriteContext {
 		List<String> pgBackgrounds = new ArrayList<>();
 		for (String name : pointsGroups.keySet()) {
 			PointsGroup pg = pointsGroups.get(name);
-			if (pg.getIconName() != null || pg.getBackgroundType() != null || pg.getColor() != 0) {
+			if (pg.getIconName() != null && pg.getBackgroundType() != null && pg.getColor() != 0) {
 				pgNames.add(name.isEmpty() ? OBF_POINTS_GROUPS_EMPTY_NAME_STUB : name);
 				pgIcons.add(pg.getIconName());
 				pgBackgrounds.add(pg.getBackgroundType());
