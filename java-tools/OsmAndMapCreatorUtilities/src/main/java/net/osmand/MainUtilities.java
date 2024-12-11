@@ -40,6 +40,7 @@ import java.net.URL;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -237,6 +238,42 @@ public class MainUtilities {
 				printSynopsys();
 			}
 		}
+	}
+
+	public static class CommandLineOpts {
+		public String getOpt(String key) {
+			return opts.get(key);
+		}
+
+		public boolean getBoolean(String key) {
+			return "true".equals(getOpt(key));
+		}
+
+		public void setOpt(String key, String val) {
+			opts.put(key, val);
+		}
+
+		public List<String> getStrings() {
+			return strings;
+		}
+
+		public CommandLineOpts(String[] args) {
+			for (String a : args) {
+				if (a.startsWith("--")) {
+					if (a.contains("=")) {
+						String[] keyval = a.split("=");
+						setOpt(keyval[0], keyval[1]); // --opt=value
+					} else {
+						setOpt(a, "true"); // --opt
+					}
+				} else {
+					strings.add(a);
+				}
+			}
+		}
+
+		private final HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
+		private final List<String> strings = new ArrayList<>(); // other args not parsed as opts
 	}
 
 	private static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {

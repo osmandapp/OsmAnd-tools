@@ -1,6 +1,7 @@
 package net.osmand.routes;
 
 import net.osmand.IProgress;
+import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -22,7 +23,6 @@ import net.osmand.osm.io.OsmBaseStoragePbf;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
-import net.osmand.router.tester.RandomRouteTester.CommandLineOpts;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Track;
