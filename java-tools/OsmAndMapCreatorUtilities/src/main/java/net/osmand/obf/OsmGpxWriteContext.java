@@ -180,7 +180,7 @@ public class OsmGpxWriteContext {
 			serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().getLat()));
 			serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 			tagValue(serializer, "route", "segment");
-			tagValue(serializer, "route_radius", gpxFile.getOuterRadius());
+			tagValue(serializer, "route_bbox_radius", gpxFile.getOuterRadius());
 			tagValue(serializer, "route_type", "track");
 			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
@@ -254,7 +254,7 @@ public class OsmGpxWriteContext {
 						serializer.endTag(null, "nd");
 					}
 					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_radius", routeRadius);
+					tagValue(serializer, "route_bbox_radius", routeRadius);
 					serializeTags(mapSectionTrackTags);
 					serializer.endTag(null, "way");
 
@@ -267,7 +267,7 @@ public class OsmGpxWriteContext {
 						serializer.attribute(null, "version", "1");
 						serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
 						serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
-						tagValue(serializer, "route_radius", routeRadius);
+						tagValue(serializer, "route_bbox_radius", routeRadius);
 						if (!metadataExtraTags.isEmpty()) {
 							tagValue(serializer, "metadata_extra_tags", gson.toJson(metadataExtraTags));
 						}

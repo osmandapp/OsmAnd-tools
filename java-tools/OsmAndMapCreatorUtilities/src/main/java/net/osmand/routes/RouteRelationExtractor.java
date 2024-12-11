@@ -372,7 +372,7 @@ public class RouteRelationExtractor {
 
 		gpxExtensions.putAll(relation.getTags());
 
-		gpxExtensions.put("flexible_line_width", "yes");
+		gpxExtensions.put("width", "roadstyle");
 		gpxExtensions.put("translucent_line_colors", "yes");
 		gpxExtensions.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 
