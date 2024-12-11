@@ -117,6 +117,9 @@ public class ShareFileService {
 			if (dev == null) {
 				return userdataService.tokenNotValidResponse();
 			}
+			if (file.ownerid == dev.userid) {
+				return null;
+			}
 			List<ShareFileRepository.ShareFilesAccess> accessList = file.getAccessRecords();
 			for (ShareFileRepository.ShareFilesAccess access : accessList) {
 				if (access.getUser().id == dev.userid) {

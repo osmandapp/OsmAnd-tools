@@ -112,7 +112,11 @@ public class ShareFileController {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
 			if (gpxData != null) {
-				return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
+				return ResponseEntity.ok(gsonWithNans.toJson(Map.of(
+						"gpx_data", gpxData,
+						"name", userFile.name,
+						"type", userFile.type
+				)));
 			}
 		}
 		LOGGER.error("Error getting gpx data: " + gpxFile.getError());
