@@ -115,7 +115,8 @@ public class DownloadOsmGPX {
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MIN_DISTANCE = 1000;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
-	
+
+	private static final String GPX_FILE_PREIX = "OG";
 
 	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
@@ -524,7 +525,7 @@ public class DownloadOsmGPX {
 						String.format("Fetched %d tracks %d segments - last %s (now %s)", ctx.tracks + 1, ctx.segments, lastTimestamp,
 								new Date()));
 			}
-			OsmGpxFile gpxInfo = new OsmGpxFile();
+			OsmGpxFile gpxInfo = new OsmGpxFile(GPX_FILE_PREIX);
 			gpxInfo.id = rs.getLong(1);
 			byte[] cont = rs.getBytes(2);
 			if (cont == null) {
@@ -557,7 +558,7 @@ public class DownloadOsmGPX {
 			Source src = new Buffer().write(Algorithms.gzipToString(cont).getBytes());
 			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxInfo.timestamp.getTime());
-			ctx.writeTrack(gpxInfo, null, gpxFile, analysis, "OG");
+			ctx.writeTrack(gpxInfo, gpxFile, analysis);
 		}
 		ctx.endDocument();
 		
@@ -666,7 +667,7 @@ public class DownloadOsmGPX {
 		long maxId = 0;
 		int batchSize = 0;
 		while (rs.next()) {
-			OsmGpxFile r = new OsmGpxFile();
+			OsmGpxFile r = new OsmGpxFile(GPX_FILE_PREIX);
 			try {
 				r.id = rs.getLong(1);
 				r.name = rs.getString(2);
@@ -710,7 +711,7 @@ public class DownloadOsmGPX {
 		long maxId = 0;
 		int batchSize = 0;
 		while (rs.next()) {
-			OsmGpxFile r = new OsmGpxFile();
+			OsmGpxFile r = new OsmGpxFile(GPX_FILE_PREIX);
 			try {
 				r.id = rs.getLong(1);
 				r.name= rs.getString(2);
@@ -992,7 +993,7 @@ public class DownloadOsmGPX {
 		while((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 			if(tok == XmlPullParser.START_TAG) {
 				if(parser.getName().equals("gpx_file")) {
-					p = new OsmGpxFile();
+					p = new OsmGpxFile(GPX_FILE_PREIX);
 					p.id = Long.parseLong(parser.getAttributeValue("", "id"));
 					p.user = parser.getAttributeValue("", "user");
 					p.name = parser.getAttributeValue("", "name");
