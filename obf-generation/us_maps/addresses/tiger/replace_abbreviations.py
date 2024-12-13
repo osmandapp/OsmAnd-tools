@@ -49,7 +49,7 @@ def process_osm_file(input_file, output_file, pattern, replacements, buffer_size
         total_lines = sum(1 for _ in infile)
         infile.seek(0)  # Reset the pointer to the beginning of the file
 
-        pbar = tqdm(total=total_lines, desc="Обработка строк OSM", unit="строка")
+        pbar = tqdm(total=total_lines, desc="String processing OSM", unit="строка")
 
         current_size = 0
         buffer = []
@@ -90,7 +90,7 @@ def process_csv_file(input_file, output_file, pattern, replacements, buffer_size
         writer.writeheader()
 
         # Update tqdm by adding the total number of rows
-        pbar = tqdm(total=total_lines, desc="Обработка строк CSV", unit="строка", unit_scale=True)
+        pbar = tqdm(total=total_lines, desc="String processing CSV", unit="строка", unit_scale=True)
 
         buffer = []
         current_size = 0

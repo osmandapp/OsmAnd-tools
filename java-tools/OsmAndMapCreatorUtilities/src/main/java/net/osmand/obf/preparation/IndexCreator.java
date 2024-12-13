@@ -79,6 +79,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
+    private String TIGER_OSMAND_TAG = "tiger:osmand";
 
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
@@ -195,7 +196,7 @@ public class IndexCreator {
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		calculateRegionTagAndTransliterate(e, icc);
-        if (e.isTiger()) {
+        if (e.getTag(TIGER_OSMAND_TAG) != null) {
             indexAddressCreator.iterateMainEntity(e, ctx, icc);
             return;
         }
