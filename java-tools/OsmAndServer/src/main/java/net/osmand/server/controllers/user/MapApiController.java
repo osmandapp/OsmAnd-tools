@@ -71,7 +71,7 @@ public class MapApiController {
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1734082635553L; // 13-12-2024
+	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
 
 	private static final String INFO_KEY = "info";
 
@@ -344,6 +344,7 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
 		List <UserFileNoData> filesToIgnore = new ArrayList<>();
 		int cloudReads = 0, cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
@@ -396,7 +397,6 @@ public class MapApiController {
 							});
 							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
-						uf.details.add(SHARE, gson.toJsonTree(isShared(uf)));
 					} else {
 						LOG.error(String.format(
 								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
@@ -417,6 +417,7 @@ public class MapApiController {
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
 				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
 			}
+			nd.details.add(SHARE, gson.toJsonTree(isShared(nd, shareList)));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
@@ -437,11 +438,15 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private boolean isShared(UserFile file) {
-		ShareFileRepository.ShareFile sharedFile = shareFileService.getFileByOwnerAndFilepath(file.userid, file.name);
-		return sharedFile != null;
+	private boolean isShared(UserFileNoData file, List<ShareFileRepository.ShareFile> shareList) {
+		for (ShareFileRepository.ShareFile sf : shareList) {
+			if (sf.getFilepath().equals(file.name) && sf.getType().equals(file.type)) {
+				return true;
+			}
+		}
+		return false;
 	}
-	
+
 	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
 		String deviceInfo = devices.get(file.deviceid);
 		if (deviceInfo == null) {

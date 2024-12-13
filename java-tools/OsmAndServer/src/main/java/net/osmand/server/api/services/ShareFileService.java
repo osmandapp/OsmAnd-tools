@@ -88,6 +88,10 @@ public class ShareFileService {
 		return shareFileRepository.findByOwneridAndFilepath(ownerid, filepath);
 	}
 
+	public List<ShareFileRepository.ShareFile> getFilesByOwner(int ownerid) {
+		return shareFileRepository.findByOwnerid(ownerid);
+	}
+
 	public ShareFileRepository.ShareFile getFileById(long id) {
 		return shareFileRepository.findById(id).orElse(null);
 	}

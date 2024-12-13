@@ -21,6 +21,8 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 	ShareFile findByOwneridAndFilepath(int ownerid, String filepath);
 
+	List<ShareFile> findByOwnerid(int ownerid);
+
 	@Query("SELECT a FROM ShareFilesAccess a WHERE a.id = :id")
 	ShareFilesAccess findShareFilesAccessById(@Param("id") long id);
 
