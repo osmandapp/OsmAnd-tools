@@ -576,6 +576,7 @@ public class SearchService {
                 }
             });
         } else if (obj instanceof TopIndexFilter type) {
+            tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), type.getTag());
             tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), type.getTag());
             tags.put(PoiTypeField.NAME.getFieldName(), type.getValue());
         } else if (obj instanceof AbstractPoiType type) {
