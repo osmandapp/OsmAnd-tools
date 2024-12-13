@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.Buffer;
@@ -27,9 +28,6 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import net.osmand.map.OsmandRegions;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
@@ -56,7 +54,6 @@ import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
@@ -69,11 +66,12 @@ public class MapApiController {
 	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String METADATA = "metadata";
+	private static final String SHARE = "share";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
+	private static final long ANALYSIS_RERUN = 1734082635553L; // 13-12-2024
 
 	private static final String INFO_KEY = "info";
 
@@ -93,6 +91,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	ShareFileService shareFileService;
 
 	@Autowired
 	protected GpxService gpxService;
@@ -395,6 +396,7 @@ public class MapApiController {
 							});
 							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
+						uf.details.add(SHARE, gson.toJsonTree(isShared(uf)));
 					} else {
 						LOG.error(String.format(
 								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
@@ -433,6 +435,11 @@ public class MapApiController {
 
 		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	private boolean isShared(UserFile file) {
+		ShareFileRepository.ShareFile sharedFile = shareFileService.getFileByOwnerAndFilepath(file.userid, file.name);
+		return sharedFile != null;
 	}
 	
 	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
