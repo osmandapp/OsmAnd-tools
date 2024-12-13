@@ -308,7 +308,7 @@ public class OsmGpxWriteContext {
 		addGpxInfoTags(gpxTrackTags, gpxInfo);
 		addExtensionsTags(gpxTrackTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
 		addExtensionsTags(gpxTrackTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
-		finalizeActivityType(gpxTrackTags, metadataExtraTags, extensionsExtraTags);
+		finalizeActivityType(gpxTrackTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
 		finalizeGpxShieldTags(gpxTrackTags);
@@ -317,17 +317,25 @@ public class OsmGpxWriteContext {
 
 	private void finalizeActivityType(Map<String, String> gpxTrackTags,
 	                                  Map<String, String> metadataExtraTags,
-	                                  Map<String, String> extensionsExtraTags
-	) {
+	                                  Map<String, String> extensionsExtraTags,
+	                                  OsmGpxFile gpxInfo) {
+		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
+		String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
+
+		// OsmGpxFile.tags compatibility (might be used by DownloadOsmGPX)
+		OsmRouteType compatibleOsmRouteType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
+		for (String tg : gpxInfo.tags) {
+			extensionsExtraTags.put("tag_" + tg, "yes");
+		}
+		if (compatibleOsmRouteType != null) {
+			gpxTrackTags.putIfAbsent("color", compatibleOsmRouteType.getColor());
+			gpxTrackTags.putIfAbsent("route_activity_type", compatibleOsmRouteType.getName().toLowerCase());
+		}
+
 		Map<String, String> allTags = new LinkedHashMap<>();
 		allTags.putAll(gpxTrackTags);
 		allTags.putAll(metadataExtraTags);
 		allTags.putAll(extensionsExtraTags);
-
-		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
-		String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
-
-		// TODO support gpxInfo.tags String[] additionally (DownloadOsmGPX)
 
 		RouteActivityHelper helper = RouteActivityHelper.INSTANCE;
 		for (String tag : activityTags) {
@@ -342,7 +350,7 @@ public class OsmGpxWriteContext {
 					if (activity != null) {
 						gpxTrackTags.put("route_type", activity.getGroup().getId());
 						gpxTrackTags.put("route_activity_type", activity.getId());
-						return;
+						return; // success
 					}
 				}
 			}
@@ -484,17 +492,6 @@ public class OsmGpxWriteContext {
 
 			if (gpxInfo.timestamp.getTime() > 0) {
 				gpxTrackTags.put("date", gpxInfo.timestamp.toString());
-			}
-
-			// TODO move to finalizeActivityType
-			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
-			for (String tg : gpxInfo.tags) {
-				gpxTrackTags.put("tag_" + tg, tg);
-			}
-			if (activityType != null) {
-				gpxTrackTags.put("color", activityType.getColor());
-				gpxTrackTags.put("route_activity_type", activityType.getName().toLowerCase());
-				gpxTrackTags.put("background", activityType.getColor() + "_hexagon_3_road_shield");
 			}
 		}
 	}
