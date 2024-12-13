@@ -46,6 +46,8 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
+import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.RouteActivity;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -181,7 +183,7 @@ public class OsmGpxWriteContext {
 			serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 			tagValue(serializer, "route", "segment");
 			tagValue(serializer, "route_bbox_radius", gpxFile.getOuterRadius());
-			tagValue(serializer, "route_type", "track");
+			tagValue(serializer, "route_type", "other");
 			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
 			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
@@ -242,6 +244,7 @@ public class OsmGpxWriteContext {
 						mapSectionTrackTags.remove("colour");
 					}
 					mapSectionTrackTags.remove("route_type");
+					mapSectionTrackTags.remove("route_activity_type");
 
 					// 2. Write segment as <way> (without route_type tag) [MAP-section]
 					serializer.startTag(null, "way");
@@ -259,7 +262,6 @@ public class OsmGpxWriteContext {
 					serializer.endTag(null, "way");
 
 					// 3. Write segment as <node> (with route_type tag) every 5 km [POI-section]
-					poiSectionTrackTags.putIfAbsent("route_type", "track"); // default
 					for (LatLon ll : pointsForPoiSearch) {
 						serializer.startTag(null, "node");
 						serializer.attribute(null, "id", "" + baseOsmId--);
@@ -304,10 +306,47 @@ public class OsmGpxWriteContext {
 		addGpxInfoTags(gpxTrackTags, gpxInfo);
 		addExtensionsTags(gpxTrackTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
 		addExtensionsTags(gpxTrackTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
+		finalizeActivityType(gpxTrackTags, metadataExtraTags, extensionsExtraTags);
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
 		finalizeGpxShieldTags(gpxTrackTags);
 		return gpxTrackTags;
+	}
+
+	private void finalizeActivityType(Map<String, String> gpxTrackTags,
+	                                  Map<String, String> metadataExtraTags,
+	                                  Map<String, String> extensionsExtraTags
+	) {
+		Map<String, String> allTags = new LinkedHashMap<>();
+		allTags.putAll(gpxTrackTags);
+		allTags.putAll(metadataExtraTags);
+		allTags.putAll(extensionsExtraTags);
+
+		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
+		String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
+
+		// TODO support gpxInfo.tags String[] additionally (DownloadOsmGPX)
+
+		RouteActivityHelper helper = RouteActivityHelper.INSTANCE;
+		for (String tag : activityTags) {
+			String values = allTags.get(tag);
+			if (values != null) {
+				// "hiking;horse" "mountain_bike, bicycle"
+				for (String val : values.split("[;, ]")) {
+					RouteActivity activity = helper.findRouteActivity(val); // find by id
+					if (activity == null) {
+						activity = helper.findActivityByTag(val); // try to find by tags
+					}
+					if (activity != null) {
+						gpxTrackTags.put("route_type", activity.getGroup().getId());
+						gpxTrackTags.put("route_activity_type", activity.getId());
+						return;
+					}
+				}
+			}
+		}
+
+		gpxTrackTags.putIfAbsent("route_type", "other"); // unknown
 	}
 
 	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
@@ -444,14 +483,16 @@ public class OsmGpxWriteContext {
 			if (gpxInfo.timestamp.getTime() > 0) {
 				gpxTrackTags.put("date", gpxInfo.timestamp.toString());
 			}
+
+			// TODO move to finalizeActivityType
 			OsmRouteType activityType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 			for (String tg : gpxInfo.tags) {
 				gpxTrackTags.put("tag_" + tg, tg);
 			}
 			if (activityType != null) {
-				gpxTrackTags.put("bg", activityType.getColor() + "_hexagon_3_road_shield"); // TODO fixme bg ?
 				gpxTrackTags.put("color", activityType.getColor());
 				gpxTrackTags.put("route_activity_type", activityType.getName().toLowerCase());
+				gpxTrackTags.put("background", activityType.getColor() + "_hexagon_3_road_shield");
 			}
 		}
 	}

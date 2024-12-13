@@ -11,7 +11,6 @@ import net.osmand.obf.preparation.OsmDbAccessor;
 import net.osmand.obf.preparation.OsmDbAccessorContext;
 import net.osmand.obf.preparation.OsmDbCreator;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
@@ -415,19 +414,6 @@ public class RouteRelationExtractor {
 		}
 
 		joinWaysIntoTrackSegments(track, waysToJoin);
-
-		String routeTag = gpxExtensions.get("route"); // from OSM relation
-
-		if (routeTag != null) {
-			OsmRouteType routeType = null;
-			for (String tag : routeTag.split("[;, ]")) {
-				routeType = OsmRouteType.convertFromOsmGPXTag(tag);
-				if (routeType != null) {
-					break; // consider 1st found as main type
-				}
-			}
-			gpxExtensions.put("route_type", routeType.getName());
-		}
 
 		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
