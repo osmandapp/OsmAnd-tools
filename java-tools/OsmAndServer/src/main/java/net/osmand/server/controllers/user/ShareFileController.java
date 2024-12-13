@@ -209,4 +209,24 @@ public class ShareFileController {
 		return ResponseEntity.ok(gson.toJson(shareFileDto));
 	}
 
+	@GetMapping(path = {"/change-share-type"}, produces = "application/json")
+	public ResponseEntity<String> changeShareType(@RequestParam String filePath) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
+		if (shareFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		}
+		boolean success = shareFileService.changeFileShareType(shareFile);
+		if (!success) {
+			return ResponseEntity.badRequest().body("Error changing share type");
+		}
+		shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
+		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.isPublicAccess());
+
+		return ResponseEntity.ok(gson.toJson(shareFileDto));
+	}
+
 }

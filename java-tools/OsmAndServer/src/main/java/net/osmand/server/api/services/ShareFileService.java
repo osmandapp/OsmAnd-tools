@@ -46,13 +46,7 @@ public class ShareFileService {
 
 	@Transactional
 	public String generateSharedCode(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess) {
-		String uniqueCode = UUID.randomUUID().toString();
-		ShareFileRepository.ShareFile file = shareFileRepository.findByUuid(uniqueCode);
-		while (file != null) {
-			uniqueCode = UUID.randomUUID().toString();
-			file = shareFileRepository.findByUuid(uniqueCode);
-		}
-
+		String uniqueCode = generateUniqueCode();
 		// Update existing file with new code
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
 		if (existingFile != null) {
@@ -62,6 +56,16 @@ public class ShareFileService {
 		}
 		createShareFile(userFile, publicAccess, uniqueCode);
 
+		return uniqueCode;
+	}
+
+	private String generateUniqueCode() {
+		String uniqueCode = UUID.randomUUID().toString();
+		ShareFileRepository.ShareFile file = shareFileRepository.findByUuid(uniqueCode);
+		while (file != null) {
+			uniqueCode = UUID.randomUUID().toString();
+			file = shareFileRepository.findByUuid(uniqueCode);
+		}
 		return uniqueCode;
 	}
 
@@ -109,6 +113,17 @@ public class ShareFileService {
 			}
 		});
 		shareFile.setAccessRecords(accessList);
+		shareFileRepository.saveAndFlush(shareFile);
+		return true;
+	}
+
+	@Transactional
+	public boolean changeFileShareType(ShareFileRepository.ShareFile shareFile) {
+		shareFile.setPublicAccess(!shareFile.isPublicAccess());
+		if (shareFile.isPublicAccess() && shareFile.getUuid() == null) {
+			String uuid = generateUniqueCode();
+			shareFile.setUuid(uuid);
+		}
 		shareFileRepository.saveAndFlush(shareFile);
 		return true;
 	}
@@ -209,7 +224,6 @@ public class ShareFileService {
 				shareFileRepository.saveAndFlush(access);
 			}
 		}
-
 		return true;
 	}
 }
