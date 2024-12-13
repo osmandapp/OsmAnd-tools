@@ -46,6 +46,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
+import net.osmand.shared.ToolsOsmAndContextImpl;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import okio.GzipSource;
@@ -103,6 +104,7 @@ public class OsmGpxWriteContext {
 	private final Gson gson = new Gson();
 
 	public OsmGpxWriteContext(QueryParams qp) {
+		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 		this.qp = qp;
 	}
 

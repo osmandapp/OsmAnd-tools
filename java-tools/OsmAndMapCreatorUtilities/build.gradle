@@ -1,3 +1,6 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.0.0'
+}
 task collectTestResources(type: Copy) {
 	into "src/test/resources/"
 	from("../../../resources/test-resources") {
@@ -10,9 +13,8 @@ compileJava {
 }
 
 processTestResources {
-        dependsOn collectTestResources
+	dependsOn collectTestResources
 }
-
 
 task collectMdpiIcons(type: Sync) {
 	from("../../../resources/rendering_styles/style-icons/map-shaders-png/drawable-mdpi")
@@ -25,20 +27,24 @@ task collectFonts(type: Sync) {
 	into "src/main/resources/map/fonts"
 }
 
+task collectActivities(type: Copy) {
+	from("../../../resources/poi/") {
+		include "activities.json"
+	}
+	into "src/main/resources/resources/"
+}
+
 compileJava {
-	dependsOn collectMdpiIcons, collectFonts
+	dependsOn collectMdpiIcons, collectFonts, collectActivities
 }
 
 processResources {
-        dependsOn collectMdpiIcons, collectFonts
+	dependsOn collectMdpiIcons, collectFonts, collectActivities
 }
-
 
 configurations.all {
 	exclude group: 'xml-apis', module: 'xml-apis'
 }
-
-
 
 dependencies {
 	testImplementation group: 'junit', name: 'junit', version: '4.12'
@@ -116,5 +122,5 @@ dependencies {
 	implementation 'com.belerweb:pinyin4j:2.5.0'
 
 	implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-
+	implementation "org.jetbrains.kotlin:kotlin-stdlib"
 }
