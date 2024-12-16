@@ -144,6 +144,7 @@ public class UserdataService {
     public static final String INFO_EXT = ".info";
 
 	public static final String FILE_NOT_FOUND = "File not found";
+	public static final String FILE_WAS_DELETED = "File was deleted";
 
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     

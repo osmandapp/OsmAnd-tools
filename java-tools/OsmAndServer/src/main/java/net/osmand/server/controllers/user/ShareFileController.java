@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.util.Map;
 
 import static net.osmand.server.api.services.UserdataService.FILE_NOT_FOUND;
+import static net.osmand.server.api.services.UserdataService.FILE_WAS_DELETED;
 
 
 @Controller
@@ -82,7 +83,7 @@ public class ShareFileController {
 		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
 		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
 		if (fileResult == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+			return ResponseEntity.badRequest().body("Error downloading file");
 		}
 		return ResponseEntity.ok()
 				.header("Content-Disposition", "attachment; filename=" + fileResult.fileName)
@@ -97,16 +98,16 @@ public class ShareFileController {
 		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
+		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
+		if (userFile == null) {
+			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+		} else if (userFile.filesize == -1) {
+			return ResponseEntity.ok().body(FILE_WAS_DELETED);
+		}
 		ResponseEntity<String> errorAccess = shareFileService.checkAccess(shareFile);
 		if (errorAccess != null) {
 			return errorAccess;
 		}
-		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
-		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
-		if (fileResult == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
-		}
-
 		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
