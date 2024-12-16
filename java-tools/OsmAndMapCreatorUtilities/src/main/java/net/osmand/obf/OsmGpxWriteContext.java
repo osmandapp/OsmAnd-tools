@@ -352,6 +352,7 @@ public class OsmGpxWriteContext {
 					if (activity != null) {
 						gpxTrackTags.put("route_type", activity.getGroup().getId());
 						gpxTrackTags.put("route_activity_type", activity.getId());
+						gpxTrackTags.put("route_activity", activity.getId()); // to split into poi_additional_category
 						return; // success
 					}
 				}
