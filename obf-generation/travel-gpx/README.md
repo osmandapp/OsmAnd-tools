@@ -22,7 +22,7 @@ SPECIAL - tag is used/generated/transformed in a special way
 GPX=osmand:color OBF=color POI,MAP,STYLE,SPECIAL
 GPX=osmand:width OBF=width POI,MAP,STYLE
 
-GPX=osmand:activity OBF=osmand:activity POI,METADATA
+GPX=osmand:activity OBF=route_activity_type POI,METADATA
 
 GPX=osmand:points_groups OBF=points_groups_names POI
 GPX=osmand:points_groups OBF=points_groups_icons POI
@@ -89,7 +89,7 @@ OBF=min_ele,avg_ele,max_ele,diff_ele_up,diff_ele_down POI,MAP (analytics of GPX-
 GPX=<trkseg> OBF=route VAL=segment
 
 GPX=osmand:color OBF=color POI,MAP,STYLE,SPECIAL
-GPX=osmand:width OBF=width POI,MAP,STYLE (supported: thin/medium/bold or roadstyle)
+GPX=osmand:width OBF=width POI,MAP,STYLE (supported: thin/medium/bold, roadstyle or 1-24 custom)
 
 GPX=osmand:shield_bg OBF=shield_bg POI,MAP,STYLE
 GPX=osmand:shield_fg OBF=shield_fg POI,MAP,STYLE
@@ -114,19 +114,8 @@ GPX=osmand:background OBF=background POI,STYLE (mix color+background is badly su
 ### 6.1. POI-categories (search, filters, show-on-map)
 
 ```
-GPX=osmand:route_type OBF=route_type VALUE=cycling POI (Bicycle)
-GPX=osmand:route_type OBF=route_type VALUE=fitness POI (Fitness trails)
-GPX=osmand:route_type OBF=route_type VALUE=hiking POI (Hiking)
-GPX=osmand:route_type OBF=route_type VALUE=inline_skates POI (Inline skates)
-GPX=osmand:route_type OBF=route_type VALUE=mountainbike POI (Mountain biking)
-GPX=osmand:route_type OBF=route_type VALUE=riding POI (Horse riding)
-GPX=osmand:route_type OBF=route_type VALUE=running POI (Running)
-GPX=osmand:route_type OBF=route_type VALUE=snowmobile POI (Snowmobile)
-GPX=osmand:route_type OBF=route_type VALUE=walking POI (Walking)
-GPX=osmand:route_type OBF=route_type VALUE=water POI (Water sports)
-GPX=osmand:route_type OBF=route_type VALUE=winter POI (Winter sports)
-
-GPX=[default] OBF=route_type VALUE=track POI (Other routes)
+GPX=osmand:route_type OBF=route_type VALUE=[top level (group id) from activities.json] -- automatically resolved, "other" used as default
+GPX=osmand:(route_activity_type|osmand:activity|route) OBF=route_activity_type VALUE=[sub level (activity id) from activities.json] -- resolved by tags
 
 GPX=<wpt> OBF=route_track_point POI (Other routes points)
 ```
@@ -140,6 +129,8 @@ GPX=<name>|osmand:name|osmand:ref|osmand:shield_text OBF=GPX POI,SPECIAL
 ### 7. TODO
 
 ```
-describe name, ref, description, filename, color, colour, route_name, route_id (OSM/GPX)
-clarify route_type
+metadata_extra_tags, extensions_extra_tags, wpt_extra_tags (internal)
+name, ref, description, filename
+route_name, route_id (OSM/GPX)
+TODO color, colour
 ```
