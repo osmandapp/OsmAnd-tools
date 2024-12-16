@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.*;
 
+import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
 import net.osmand.util.Algorithms;
@@ -78,38 +79,6 @@ public class RandomRouteTester {
 
 		final static Map <String, String> ambiguousConditionalTags = null;
 //		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
-	}
-
-	class CommandLineOpts {
-		public String getOpt(String key) {
-			return opts.get(key);
-		}
-
-		public void setOpt(String key, String val) {
-			opts.put(key, val);
-		}
-
-		public List<String> getStrings() {
-			return strings;
-		}
-
-		public CommandLineOpts(String[] args) {
-			for (String a : args) {
-				if (a.startsWith("--")) {
-					if (a.contains("=")) {
-						String[] keyval = a.split("=");
-						setOpt(keyval[0], keyval[1]); // --opt=value
-					} else {
-						setOpt(a, "true"); // --opt
-					}
-				} else {
-					strings.add(a);
-				}
-			}
-		}
-
-		private HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
-		private List<String> strings = new ArrayList<>(); // other args not parsed as opts
 	}
 
 	public static void main(String[] args) throws Exception {
