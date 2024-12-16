@@ -79,6 +79,7 @@ public class IndexCreator {
 	private boolean recreateOnlyBinaryFile = false; // false;
 	private boolean deleteOsmDB = true;
 	private boolean deleteDatabaseIndexes = true;
+    private String TIGER_OSMAND_TAG = "tiger:osmand";
 
 	public IndexCreator(File workingDir, IndexCreatorSettings settings) {
 		this.workingDir = workingDir;
@@ -195,6 +196,10 @@ public class IndexCreator {
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		calculateRegionTagAndTransliterate(e, icc);
+        if (e.getTag(TIGER_OSMAND_TAG) != null) {
+            indexAddressCreator.iterateMainEntity(e, ctx, icc);
+            return;
+        }
 		if (heightData != null && e instanceof Way) {
 			if (!settings.keepOnlyRouteRelationObjects) {// small speedup
 				heightData.proccess((Way) e);
@@ -248,7 +253,7 @@ public class IndexCreator {
 	}
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, File readFile, IProgress progress,
-			IOsmStorageFilter addFilter, int idSourceMapInd, int idShift, 
+			IOsmStorageFilter addFilter, int idSourceMapInd, int idShift,
 			boolean generateNewIds, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
@@ -285,7 +290,7 @@ public class IndexCreator {
 		if (!this.settings.ignorePropagate) {
 			dbCreator.setPropagateToNodes(propagateToNodes);
 		}
-		
+
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.LOADING_FILE") + readFile.getAbsolutePath(), -1); //$NON-NLS-1$
@@ -321,7 +326,7 @@ public class IndexCreator {
 		if (osmDBdialect.databaseFileExists(dbFile)) {
 			osmDBdialect.removeDatabase(dbFile);
 		}
-		
+
 		Connection dbConn = (Connection) getDatabaseConnection(dbFile.getAbsolutePath(), osmDBdialect);
 		accessor.setDbConn(dbConn, osmDBdialect);
 		OsmDbCreator dbCreator = null;
@@ -748,7 +753,7 @@ public class IndexCreator {
 						} else {
 							indexRouteRelationCreator.iterateRelation(e, ctx, icc);
 						}
-						
+
 					}
 					if (settings.indexRouting) {
 						indexRouteCreator.indexRelations(e, ctx);
@@ -820,7 +825,7 @@ public class IndexCreator {
 	public static void main(String[] args)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		long time = System.currentTimeMillis();
-		
+
 		// if(true){ generateRegionsFile(); return;}
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
@@ -855,10 +860,10 @@ public class IndexCreator {
 		int st = file.lastIndexOf('/');
 		int e = file.indexOf('.', st);
 		String name = file.substring(st, e);
-		
-		
+
+
 //		creator.setMapFileName(name + ".travel.obf");
-		
+
 		creator.setNodesDBFile(new File(rootFolder + name + ".tmp.odb"));
 
 		MapPoiTypes.setDefault(new MapPoiTypes(rootFolder + "../repos/resources/poi/poi_types.xml"));
