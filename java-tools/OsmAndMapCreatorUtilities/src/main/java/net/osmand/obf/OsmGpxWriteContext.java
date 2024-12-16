@@ -92,6 +92,7 @@ public class OsmGpxWriteContext {
 	public static final String SHIELD_STUB_NAME = "shield_stub_name";
 	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
+	private final static NumberFormat distanceFormat = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.US));
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 
 	public final QueryParams qp;
@@ -497,7 +498,7 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addAnalysisTags(Map<String, String> gpxTrackTags, GpxTrackAnalysis analysis) {
-		gpxTrackTags.put("distance", latLonFormat.format(analysis.getTotalDistance()));
+		gpxTrackTags.put("distance", distanceFormat.format(analysis.getTotalDistance()));
 		if (analysis.isTimeSpecified()) {
 			gpxTrackTags.put("time_span", analysis.getTimeSpan() + "");
 			gpxTrackTags.put("time_span_no_gaps", analysis.getTimeSpanWithoutGaps() + "");
@@ -650,7 +651,7 @@ public class OsmGpxWriteContext {
 					fileName, gpxFile != null ? gpxFile.getError().getMessage() : "unknown");
 			return;
 		}
-		GpxTrackAnalysis analysis = gpxFile.getAnalysis(gpxFile.getModifiedTime());
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
 
 		OsmGpxFile file = new OsmGpxFile("GPX");
 
