@@ -68,6 +68,7 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
 
 public class RouteRelationExtractor {
@@ -532,7 +533,7 @@ public class RouteRelationExtractor {
 			wptPt.getExtensionsToWrite().put("icon", gpxIcon);
 			wptPt.setExtensionsWriter("route_relation_node", serializer -> {
 				for (Map.Entry<String, String> entry : node.getTags().entrySet()) {
-					String key = entry.getKey().replace(":", "_-_");
+					String key = entry.getKey().replace(":", XML_COLON);
 					if (!key.startsWith(OSMAND_EXTENSIONS_PREFIX)) {
 						key = OSMAND_EXTENSIONS_PREFIX + key;
 					}

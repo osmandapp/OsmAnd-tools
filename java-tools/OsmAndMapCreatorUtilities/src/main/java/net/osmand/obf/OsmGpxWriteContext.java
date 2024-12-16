@@ -6,6 +6,7 @@ import static net.osmand.obf.preparation.IndexRouteRelationCreator.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKIP_POINTS_BITS;
 import static net.osmand.osm.MapPoiTypes.OTHER_MAP_CATEGORY;
 import static net.osmand.osm.MapPoiTypes.ROUTES;
+import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
@@ -405,7 +406,7 @@ public class OsmGpxWriteContext {
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (final String tag : extensions.keySet()) {
 			final String val = extensions.get(tag);
-			PoiType pt = poiTypes.getPoiTypeByTagValue(tag, val);
+			PoiType pt = poiTypes.getPoiTypeByTagValue(tag.replaceAll(XML_COLON, ":"), val);
 			if (!alwaysExtraTags.contains(tag) && pt != null &&
 					(ROUTES.equals(pt.getCategory().getKeyName())
 							|| OTHER_MAP_CATEGORY.equals(pt.getCategory().getKeyName()))) {
@@ -440,7 +441,7 @@ public class OsmGpxWriteContext {
 		Iterator<Entry<String, String>> it = gpxTrackTags.entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, String> e = it.next();
-			tagValue(serializer, e.getKey(), e.getValue());
+			tagValue(serializer, e.getKey().replaceAll(XML_COLON, ":"), e.getValue());
 		}
 	}
 
