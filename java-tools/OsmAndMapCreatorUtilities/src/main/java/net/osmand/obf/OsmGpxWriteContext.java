@@ -356,7 +356,7 @@ public class OsmGpxWriteContext {
 			}
 		}
 
-		gpxTrackTags.putIfAbsent("route_type", "other"); // unknown
+		gpxTrackTags.putIfAbsent("route_type", "other"); // unknown / default
 	}
 
 	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
@@ -654,10 +654,11 @@ public class OsmGpxWriteContext {
 
 		OsmGpxFile file = new OsmGpxFile("GPX");
 
-		String baseFileName = fileName.substring(fileName.lastIndexOf('/') + 1); // ok with/without '/'
-		String noGpxFileName = baseFileName.replaceAll("(?i)\\.gz$", "").replaceAll("(?i)\\.gpx$", "");
+		final String baseFileName = fileName.substring(fileName.lastIndexOf('/') + 1); // ok with/without '/'
+		final String noGzFileName = baseFileName.replaceAll("(?i)\\.gz$", ""); // gpx filename
+		final String noGpxFileName = noGzFileName.replaceAll("(?i)\\.gpx$", ""); // <name>
 
-		file.filename = baseFileName;
+		file.filename = noGzFileName;
 		file.name = noGpxFileName;
 		file.tags = new String[0];
 
