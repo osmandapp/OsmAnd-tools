@@ -86,11 +86,17 @@ public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
-	public static final String TRACK_COLOR = "track_color";
+
+	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+	public static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
+	public static final String COLOR = "color"; // osmand:color
+	public static final String COLOUR = "colour"; // osmand:colour
+	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
+	public static final String[] colorTagsForMapSection = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
+
 	public static final String SHIELD_FG = "shield_fg";
 	public static final String SHIELD_BG = "shield_bg";
 	public static final String SHIELD_TEXT = "shield_text";
-	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
 	public static final String SHIELD_STUB_NAME = "shield_stub_name";
 	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
@@ -317,9 +323,6 @@ public class OsmGpxWriteContext {
 		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
 		final String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
 
-		// track_color (map section tag), shield-specific, color/colour, gpx_color (trk displaycolor)
-		final String[] mapColorTags = {TRACK_COLOR, SHIELD_WAYCOLOR, "color", "colour", "gpx_color"};
-
 		// OsmGpxFile.tags compatibility (might be used by DownloadOsmGPX)
 		OsmRouteType compatibleOsmRouteType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
 		for (String tg : gpxInfo.tags) {
@@ -335,7 +338,7 @@ public class OsmGpxWriteContext {
 		allTags.putAll(metadataExtraTags);
 		allTags.putAll(extensionsExtraTags);
 
-		for (String tag : mapColorTags) {
+		for (String tag : colorTagsForMapSection) {
 			if (allTags.containsKey(tag)) {
 				gpxTrackTags.put(TRACK_COLOR,
 						MapRenderingTypesEncoder.formatColorToPalette(allTags.get(tag), false));
@@ -468,7 +471,7 @@ public class OsmGpxWriteContext {
 			}
 			int color = t.getColor(0); // gpx-color of the distinct track (not supported completely)
 			if (color != 0) {
-				extensionsExtraTags.put("gpx_color",
+				extensionsExtraTags.put(DISPLAYCOLOR,
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
 			}
 		}
@@ -570,7 +573,7 @@ public class OsmGpxWriteContext {
 		}
 		int color = p.getColor(0); // gpx-point color
 		if (color != 0) {
-			tagValue(serializer, "gpx_color", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+			tagValue(serializer, DISPLAYCOLOR, MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
 		}
 		if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
 			if (!Double.isNaN(p.getEle())) {
