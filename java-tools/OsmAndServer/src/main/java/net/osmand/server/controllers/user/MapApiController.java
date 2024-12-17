@@ -741,10 +741,13 @@ public class MapApiController {
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
+		final String NICKNAME = "nickname";
 
 		PremiumUserDevice dev = userdataService.checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		Map<String, String> info = new HashMap<>();
+
+		info.put(NICKNAME, pu.nickname);
 
 		String orderId = pu.orderid;
 		if (orderId == null) {

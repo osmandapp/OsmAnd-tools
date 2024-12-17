@@ -138,7 +138,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		public ShareFilesAccessDTO(ShareFilesAccess access, boolean includeFile) {
 			this.id = access.getId();
-			this.name = access.getUser().email;
+			this.name = access.getUser().nickname;
 			this.access = access.getAccess();
 			this.requestDate = access.getRequestDate();
 			if (includeFile) {

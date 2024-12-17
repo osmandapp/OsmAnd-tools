@@ -34,6 +34,9 @@ public class ShareFileService {
 	protected ShareFileRepository shareFileRepository;
 
 	@Autowired
+	protected PremiumUsersRepository usersRepository;
+
+	@Autowired
 	UserdataService userdataService;
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
@@ -176,9 +179,13 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public void requestAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+	public void requestAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String nickname) {
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
 		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
+		if (user.nickname == null) {
+			user.nickname = nickname;
+			user = usersRepository.saveAndFlush(user);
+		}
 		access.setUser(user);
 		access.setAccess(ShareFileService.PermissionType.PENDING.name());
 		access.setRequestDate(new Date());

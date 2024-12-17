@@ -126,7 +126,7 @@ public class ShareFileController {
 
 	@GetMapping(path = {"/request-access"}, produces = "application/json")
 	@Transactional
-	public ResponseEntity<?> requestAccess(@RequestParam String uuid) {
+	public ResponseEntity<?> requestAccess(@RequestParam String uuid, @RequestParam String nickname) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
@@ -138,7 +138,7 @@ public class ShareFileController {
 		if (dev.userid == shareFile.ownerid) {
 			return ResponseEntity.badRequest().body("You are the owner of this file");
 		}
-		shareFileService.requestAccess(shareFile, dev);
+		shareFileService.requestAccess(shareFile, dev, nickname);
 		return ResponseEntity.ok("Access requested");
 	}
 
@@ -163,7 +163,7 @@ public class ShareFileController {
 		if (user == null) {
 			return ResponseEntity.badRequest().body("Error getting user info");
 		}
-		String ownerName = user.email;
+		String ownerName = user.nickname;
 		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, true);
 		return ResponseEntity.ok(gson.toJson(Map.of("owner", ownerName, "file", shareFileDto)));
 	}
