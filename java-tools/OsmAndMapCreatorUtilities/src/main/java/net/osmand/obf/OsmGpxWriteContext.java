@@ -573,7 +573,7 @@ public class OsmGpxWriteContext {
 		}
 		int color = p.getColor(0); // gpx-point color
 		if (color != 0) {
-			tagValue(serializer, DISPLAYCOLOR, MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
+			tagValue(serializer, COLOR, MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
 		}
 		if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
 			if (!Double.isNaN(p.getEle())) {
