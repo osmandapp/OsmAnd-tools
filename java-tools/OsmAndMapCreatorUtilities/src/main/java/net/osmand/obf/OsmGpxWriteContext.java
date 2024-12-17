@@ -7,6 +7,7 @@ import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKI
 import static net.osmand.osm.MapPoiTypes.OTHER_MAP_CATEGORY;
 import static net.osmand.osm.MapPoiTypes.ROUTES;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
+import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
@@ -86,6 +87,10 @@ public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
+
+	public static final String ROUTE_TYPE = "route_type";
+	public static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
+	public static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
 
 	public static final String TRACK_COLOR = "track_color"; // Map-section tag
 	public static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
@@ -194,7 +199,7 @@ public class OsmGpxWriteContext {
 			serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 			tagValue(serializer, "route", "segment");
 			tagValue(serializer, "route_bbox_radius", gpxFile.getOuterRadius());
-			tagValue(serializer, "route_type", "other");
+			tagValue(serializer, ROUTE_TYPE, "other");
 			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
 			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
@@ -247,7 +252,7 @@ public class OsmGpxWriteContext {
 							metadataExtraTags, extensionsExtraTags, t, s);
 					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
 					poiSectionTrackTags.remove(TRACK_COLOR); // track_color is required for Rendering only
-					mapSectionTrackTags.remove("route_type"); // avoid creation of POI-data when indexing Ways
+					mapSectionTrackTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 
 					// 2. Write segment as <way> (without route_type tag) [MAP-section]
 					serializer.startTag(null, "way");
@@ -321,7 +326,7 @@ public class OsmGpxWriteContext {
 	                                           Map<String, String> extensionsExtraTags,
 	                                           OsmGpxFile gpxInfo) {
 		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
-		final String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
+		final String[] activityTags = {ROUTE_ACTIVITY_TYPE, OSMAND_ACTIVITY, "route"};
 
 		// OsmGpxFile.tags compatibility (might be used by DownloadOsmGPX)
 		OsmRouteType compatibleOsmRouteType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
@@ -330,7 +335,7 @@ public class OsmGpxWriteContext {
 		}
 		if (compatibleOsmRouteType != null) {
 			gpxTrackTags.putIfAbsent(TRACK_COLOR, compatibleOsmRouteType.getColor());
-			gpxTrackTags.putIfAbsent("route_activity_type", compatibleOsmRouteType.getName().toLowerCase());
+			gpxTrackTags.putIfAbsent(ROUTE_ACTIVITY_TYPE, compatibleOsmRouteType.getName().toLowerCase());
 		}
 
 		Map<String, String> allTags = new LinkedHashMap<>();
@@ -357,16 +362,15 @@ public class OsmGpxWriteContext {
 						activity = helper.findActivityByTag(val); // try to find by tags
 					}
 					if (activity != null) {
-						gpxTrackTags.put("route_type", activity.getGroup().getId());
-						gpxTrackTags.put("route_activity_type", activity.getId());
-						gpxTrackTags.put("route_activity", activity.getId()); // to split into poi_additional_category
+						gpxTrackTags.put(ROUTE_TYPE, activity.getGroup().getId());
+						gpxTrackTags.put(ROUTE_ACTIVITY_TYPE, activity.getId()); // to split into poi_additional_category
 						return; // success
 					}
 				}
 			}
 		}
 
-		gpxTrackTags.putIfAbsent("route_type", "other"); // unknown / default
+		gpxTrackTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
 	}
 
 	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
@@ -545,7 +549,7 @@ public class OsmGpxWriteContext {
 
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
-			tagValue(serializer, "route_type", "track_point");
+			tagValue(serializer, ROUTE_TYPE, "track_point");
 			tagValue(serializer, ROUTE_ID_TAG, routeId);
 			tagValue(serializer, "route_name", routeName); // required by fetchSegmentsAndPoints / searchPoiByName
 		}
