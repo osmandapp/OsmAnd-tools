@@ -17,6 +17,7 @@ import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
 import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
+import net.osmand.routes.RouteRelationExtractor;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
@@ -39,6 +40,7 @@ import java.net.URL;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -230,10 +232,48 @@ public class MainUtilities {
 				ObfDiffMerger.mergeRelationOsmLive(subArgsArray);
 			} else if (utl.equals("add-owner-to-obf")) {
 				BinaryMerger.signObfFile(subArgsArray);
+			} else if (utl.equals("route-relation-extractor")) {
+				RouteRelationExtractor.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
 		}
+	}
+
+	public static class CommandLineOpts {
+		public String getOpt(String key) {
+			return opts.get(key);
+		}
+
+		public boolean getBoolean(String key) {
+			return "true".equals(getOpt(key));
+		}
+
+		public void setOpt(String key, String val) {
+			opts.put(key, val);
+		}
+
+		public List<String> getStrings() {
+			return strings;
+		}
+
+		public CommandLineOpts(String[] args) {
+			for (String a : args) {
+				if (a.startsWith("--")) {
+					if (a.contains("=")) {
+						String[] keyval = a.split("=");
+						setOpt(keyval[0], keyval[1]); // --opt=value
+					} else {
+						setOpt(a, "true"); // --opt
+					}
+				} else {
+					strings.add(a);
+				}
+			}
+		}
+
+		private final HashMap<String, String> opts = new HashMap<>(); // --opt=value --opt[=true]
+		private final List<String> strings = new ArrayList<>(); // other args not parsed as opts
 	}
 
 	private static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {
@@ -392,5 +432,6 @@ public class MainUtilities {
 		System.out.println("\t\t generate-from-overpass <path to overpass.xml (must have format 2017_06_18-10_30)> <path to working directory>: The utility converts overpass.xml to obf");
 		System.out.println("\t\t travel-guide-creator: creates custom travel guide from existing resources (.travel.sqlite), --help or -h for more details");
 		System.out.println("\t\t random-route-tester --help # generate random routes and run java/cpp/hh comparison");
+		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
 	}
 }

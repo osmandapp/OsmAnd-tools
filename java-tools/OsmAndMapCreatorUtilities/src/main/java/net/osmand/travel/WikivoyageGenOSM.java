@@ -13,14 +13,7 @@ import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -58,7 +51,7 @@ public class WikivoyageGenOSM {
 	private static final double ARTICLE_NO_COORDS_DELTA = 1;
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageGenOSM.class);
-	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols());
+	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 	private static final String LANG = "LANG";
 	private static final String TITLE = "TITLE";
 	private static final boolean WRITE_POINTS_COLLECTION = false;
@@ -518,7 +511,7 @@ public class WikivoyageGenOSM {
 			if (color != 0) {
 				tagValue(serializer, "colour",
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				tagValue(serializer, "colour_int", Algorithms.colorToString(color));
+				// tagValue(serializer, "colour_int", Algorithms.colorToString(color)); // unsupported
 			}
 		}
 
