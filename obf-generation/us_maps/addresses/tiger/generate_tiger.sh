@@ -1,9 +1,21 @@
 #!/bin/bash -xe
 
 WORKING_DIR=tiger
+ln -s /home/basemap/$WORKING_DIR . || true
+
 OUT_FILE=$WORKING_DIR/tiger.pbf
 OUT_FILE_O5M=$WORKING_DIR/tiger.o5m
 SCRIPTS=tools/obf-generation/us_maps/addresses/tiger
+
+if [ "$REGENERATE" == "true" ]; then
+	rm $OUT_FILE
+    rm $OUT_FILE_O5M
+fi
+
+if [[ -f "$OUT_FILE_O5M" ]]; then
+	echo $OUT_FILE_O5M already exists!
+    exit 0
+fi
 
 source_dir=$WORKING_DIR/source # Downloaded archive will be extracted there
 work_dir=$WORKING_DIR # Working directory
@@ -11,7 +23,6 @@ work_dir=$WORKING_DIR # Working directory
 tiger_url="https://downloads.opencagedata.com/public/tiger2023-nominatim-preprocessed.csv.tar.gz"
 tiger_gz_filename=tiger-nominatim-preprocessed-latest.csv.tar.gz
 
-mkdir -p "$work_dir"
 mkdir -p "$source_dir"
 
 find $work_dir/ -maxdepth 1 -type f -name "*.osm" ! -name 'merged*.osm' -delete
@@ -88,3 +99,4 @@ if [[ ! -f "$OUT_FILE_O5M" ]]; then
 fi
 
 osmium fileinfo --extended $OUT_FILE_O5M
+cp $OUT_FILE_O5M /home/osm-planet/
