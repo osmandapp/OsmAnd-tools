@@ -77,7 +77,7 @@ public class ShareFileService {
 	public ShareFileRepository.ShareFile createShareFile(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess, UUID uniqueCode) {
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
 		if (existingFile != null) {
-			return existingFile;
+			throw new IllegalStateException("File already shared");
 		}
 		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
 

@@ -64,7 +64,7 @@ CREATE TABLE user_share_files_access (
 CREATE INDEX user_share_files_ownerid_idx ON user_share_files(ownerid);
 CREATE INDEX user_share_files_uuid_idx ON user_share_files(uuid);
 CREATE INDEX user_share_files_filepath_idx ON user_share_files(filepath);
-CREATE INDEX user_share_files_ownerid_filepath_idx ON user_share_files(ownerid, filepath);
+CREATE UNIQUE INDEX user_share_files_ownerid_filepath_idx ON user_share_files(ownerid, filepath);
 
 CREATE INDEX user_share_files_access_userid_idx ON user_share_files_access(user_id);
 CREATE INDEX user_share_files_access_file_id_idx ON user_share_files_access(file_id);
