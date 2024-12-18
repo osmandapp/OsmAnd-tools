@@ -12,12 +12,13 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Repository
 public interface ShareFileRepository extends JpaRepository<ShareFileRepository.ShareFile, Long> {
 
-	ShareFile findByUuid(String uuid);
+	ShareFile findByUuid(UUID uuid);
 
 	ShareFile findByOwneridAndFilepath(int ownerid, String filepath);
 
@@ -46,7 +47,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 		public int ownerid;
 
 		@Column(unique = true)
-		private String uuid;
+		private UUID uuid;
 
 		@Column(nullable = false)
 		public String filepath;
@@ -114,7 +115,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 		public ShareFileDTO(ShareFile shareFile, boolean includeAccessRecords) {
 			this.id = shareFile.getId();
 			this.ownerid = shareFile.getOwnerid();
-			this.uuid = shareFile.getUuid();
+			this.uuid = shareFile.getUuid() != null ? shareFile.getUuid().toString() : null;
 			this.filepath = shareFile.getFilepath();
 			this.name = shareFile.getName();
 			this.type = shareFile.getType();

@@ -51,8 +51,8 @@ public class ShareFileService {
 	public static final String PUBLIC_SHARE_TYPE = "public";
 
 	@Transactional
-	public String generateSharedCode(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess) {
-		String uniqueCode = generateUniqueCode();
+	public UUID generateSharedCode(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess) {
+		UUID uniqueCode = generateUniqueCode();
 		// Update existing file with new code
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
 		if (existingFile != null) {
@@ -65,16 +65,20 @@ public class ShareFileService {
 		return uniqueCode;
 	}
 
-	private String generateUniqueCode() {
-		String uniqueCode;
+	private UUID generateUniqueCode() {
+		UUID uniqueCode;
 		do {
-			uniqueCode = UUID.randomUUID().toString();
+			uniqueCode = UUID.randomUUID();
 		} while (shareFileRepository.findByUuid(uniqueCode) != null);
 		return uniqueCode;
 	}
 
 	@Transactional
-	public ShareFileRepository.ShareFile createShareFile(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess, String uniqueCode) {
+	public ShareFileRepository.ShareFile createShareFile(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess, UUID uniqueCode) {
+		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
+		if (existingFile != null) {
+			return existingFile;
+		}
 		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
 
 		String name = userFile.name.substring(userFile.name.lastIndexOf("/") + 1);
@@ -126,7 +130,7 @@ public class ShareFileService {
 		} else {
 			shareFile.setPublicAccess(shareType.equals(PUBLIC_SHARE_TYPE));
 			if (shareFile.isPublicAccess() && shareFile.getUuid() == null) {
-				String uuid = generateUniqueCode();
+				UUID uuid = generateUniqueCode();
 				shareFile.setUuid(uuid);
 			}
 			shareFileRepository.saveAndFlush(shareFile);
@@ -178,7 +182,7 @@ public class ShareFileService {
 		if (uuid == null) {
 			return null;
 		}
-		return shareFileRepository.findByUuid(uuid);
+		return shareFileRepository.findByUuid(UUID.fromString(uuid));
 	}
 
 	@Transactional

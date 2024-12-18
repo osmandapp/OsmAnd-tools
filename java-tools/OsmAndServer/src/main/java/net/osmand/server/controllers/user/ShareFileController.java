@@ -24,6 +24,7 @@ import javax.transaction.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.UUID;
 
 import static net.osmand.server.api.services.ShareFileService.PRIVATE_SHARE_TYPE;
 import static net.osmand.server.api.services.UserdataService.FILE_NOT_FOUND;
@@ -63,11 +64,11 @@ public class ShareFileController {
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		String uuid = shareFileService.generateSharedCode(userFile, publicAccess);
+		UUID uuid = shareFileService.generateSharedCode(userFile, publicAccess);
 		if (uuid == null) {
 			return ResponseEntity.badRequest().body("Error generating link");
 		}
-		return ResponseEntity.ok(gson.toJson(Map.of("uuid", uuid)));
+		return ResponseEntity.ok(gson.toJson(Map.of("uuid", uuid.toString())));
 	}
 
 	@GetMapping(path = {"/get/{uuid}"}, produces = "application/json")
@@ -167,7 +168,7 @@ public class ShareFileController {
 		if (user == null) {
 			return ResponseEntity.badRequest().body("Error getting user info");
 		}
-		String ownerName = user.nickname;
+		String ownerName = user.nickname != null ? user.nickname : user.email;
 		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, true);
 		return ResponseEntity.ok(gson.toJson(Map.of("owner", ownerName, "file", shareFileDto)));
 	}
