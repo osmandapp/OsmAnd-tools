@@ -47,6 +47,9 @@ public class ShareFileService {
 		BLOCKED
 	}
 
+	public static final String PRIVATE_SHARE_TYPE = "private";
+	public static final String PUBLIC_SHARE_TYPE = "public";
+
 	@Transactional
 	public String generateSharedCode(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess) {
 		String uniqueCode = generateUniqueCode();
@@ -121,13 +124,17 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public boolean changeFileShareType(ShareFileRepository.ShareFile shareFile) {
-		shareFile.setPublicAccess(!shareFile.isPublicAccess());
-		if (shareFile.isPublicAccess() && shareFile.getUuid() == null) {
-			String uuid = generateUniqueCode();
-			shareFile.setUuid(uuid);
+	public boolean changeFileShareType(ShareFileRepository.ShareFile shareFile, String shareType) {
+		if (shareType.equals(PRIVATE_SHARE_TYPE)) {
+			shareFileRepository.delete(shareFile);
+		} else {
+			shareFile.setPublicAccess(shareType.equals(PUBLIC_SHARE_TYPE));
+			if (shareFile.isPublicAccess() && shareFile.getUuid() == null) {
+				String uuid = generateUniqueCode();
+				shareFile.setUuid(uuid);
+			}
+			shareFileRepository.saveAndFlush(shareFile);
 		}
-		shareFileRepository.saveAndFlush(shareFile);
 		return true;
 	}
 

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 
+import static net.osmand.server.api.services.ShareFileService.PRIVATE_SHARE_TYPE;
 import static net.osmand.server.api.services.UserdataService.FILE_NOT_FOUND;
 import static net.osmand.server.api.services.UserdataService.FILE_WAS_DELETED;
 
@@ -211,18 +212,29 @@ public class ShareFileController {
 	}
 
 	@GetMapping(path = {"/change-share-type"}, produces = "application/json")
-	public ResponseEntity<String> changeShareType(@RequestParam String filePath) {
+	public ResponseEntity<String> changeShareType(@RequestParam String filePath,
+	                                              @RequestParam String fileType,
+	                                              @RequestParam String shareType,
+	                                              @RequestParam boolean createIfNotExists) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
 		if (shareFile == null) {
-			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+			if (createIfNotExists) {
+				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(filePath, fileType, null, dev);
+				shareFile = shareFileService.createShareFile(userFile, false, null);
+			} else {
+				return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+			}
 		}
-		boolean success = shareFileService.changeFileShareType(shareFile);
+		boolean success = shareFileService.changeFileShareType(shareFile, shareType);
 		if (!success) {
 			return ResponseEntity.badRequest().body("Error changing share type");
+		}
+		if (shareType.equals(PRIVATE_SHARE_TYPE)) {
+			return ResponseEntity.ok(FILE_WAS_DELETED);
 		}
 		shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
 		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.isPublicAccess());
