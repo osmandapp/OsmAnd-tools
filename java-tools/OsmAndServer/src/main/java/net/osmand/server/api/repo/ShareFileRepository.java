@@ -39,7 +39,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		@Id
 		@GeneratedValue(strategy = GenerationType.IDENTITY)
-		@Column(name = "file_id")
+		@Column(nullable = false)
 		public long id;
 
 		@Column(nullable = false)
