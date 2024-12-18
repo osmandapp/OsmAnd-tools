@@ -66,12 +66,10 @@ public class ShareFileService {
 	}
 
 	private String generateUniqueCode() {
-		String uniqueCode = UUID.randomUUID().toString();
-		ShareFileRepository.ShareFile file = shareFileRepository.findByUuid(uniqueCode);
-		while (file != null) {
+		String uniqueCode;
+		do {
 			uniqueCode = UUID.randomUUID().toString();
-			file = shareFileRepository.findByUuid(uniqueCode);
-		}
+		} while (shareFileRepository.findByUuid(uniqueCode) != null);
 		return uniqueCode;
 	}
 
@@ -79,9 +77,7 @@ public class ShareFileService {
 	public ShareFileRepository.ShareFile createShareFile(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess, String uniqueCode) {
 		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
 
-		String name = (userFile.name.lastIndexOf("/") >= 0)
-				? userFile.name.substring(userFile.name.lastIndexOf("/") + 1)
-				: userFile.name;
+		String name = userFile.name.substring(userFile.name.lastIndexOf("/") + 1);
 
 		shareFile.setUuid(uniqueCode);
 		shareFile.setName(name);

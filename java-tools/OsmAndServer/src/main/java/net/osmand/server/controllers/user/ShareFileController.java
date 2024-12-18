@@ -111,7 +111,7 @@ public class ShareFileController {
 		}
 		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile.getError() == null) {
-			GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
 			if (gpxData != null) {
 				return ResponseEntity.ok(gsonWithNans.toJson(Map.of(
@@ -155,6 +155,9 @@ public class ShareFileController {
 		if (shareFile == null) {
 			if (createIfNotExists) {
 				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
+				if (userFile == null) {
+					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+				}
 				shareFile = shareFileService.createShareFile(userFile, false, null);
 			} else {
 				return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
@@ -224,6 +227,9 @@ public class ShareFileController {
 		if (shareFile == null) {
 			if (createIfNotExists) {
 				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(filePath, fileType, null, dev);
+				if (userFile == null) {
+					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
+				}
 				shareFile = shareFileService.createShareFile(userFile, false, null);
 			} else {
 				return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
