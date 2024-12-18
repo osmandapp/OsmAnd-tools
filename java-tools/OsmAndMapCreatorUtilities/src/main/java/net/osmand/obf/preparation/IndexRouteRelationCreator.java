@@ -142,7 +142,7 @@ public class IndexRouteRelationCreator {
 			}
 		}
 		tags.put("route", "segment");
-		tags.put("route_type", "track");
+		tags.put("route_type", "other");
 		tags.put("route_id", "O-" + e.getId() );
 	}
 	

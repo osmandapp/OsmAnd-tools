@@ -7,6 +7,7 @@ import static net.osmand.obf.preparation.IndexRouteRelationCreator.MAX_GRAPH_SKI
 import static net.osmand.osm.MapPoiTypes.OTHER_MAP_CATEGORY;
 import static net.osmand.osm.MapPoiTypes.ROUTES;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
+import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_BACKGROUNDS;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_CATEGORY;
 import static net.osmand.shared.gpx.GpxUtilities.PointsGroup.OBF_POINTS_GROUPS_COLORS;
@@ -86,10 +87,21 @@ public class OsmGpxWriteContext {
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
+
+	public static final String ROUTE_TYPE = "route_type";
+	public static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
+	public static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
+
+	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+	public static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
+	public static final String COLOR = "color"; // osmand:color
+	public static final String COLOUR = "colour"; // osmand:colour
+	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
+	public static final String[] colorTagsForMapSection = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
+
 	public static final String SHIELD_FG = "shield_fg";
 	public static final String SHIELD_BG = "shield_bg";
 	public static final String SHIELD_TEXT = "shield_text";
-	public static final String SHIELD_WAYCOLOR = "shield_waycolor";
 	public static final String SHIELD_STUB_NAME = "shield_stub_name";
 	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
@@ -187,7 +199,7 @@ public class OsmGpxWriteContext {
 			serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
 			tagValue(serializer, "route", "segment");
 			tagValue(serializer, "route_bbox_radius", gpxFile.getOuterRadius());
-			tagValue(serializer, "route_type", "other");
+			tagValue(serializer, ROUTE_TYPE, "other");
 			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
 			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
@@ -236,19 +248,11 @@ public class OsmGpxWriteContext {
 
 					Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 					Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
-
 					Map<String, String> poiSectionTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
 							metadataExtraTags, extensionsExtraTags, t, s);
-
 					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
-					if (mapSectionTrackTags.containsKey(SHIELD_WAYCOLOR)) {
-						mapSectionTrackTags.put("color", mapSectionTrackTags.get(SHIELD_WAYCOLOR));
-					}
-					if (mapSectionTrackTags.containsKey("color")) {
-						mapSectionTrackTags.remove("colour");
-					}
-					mapSectionTrackTags.remove("route_type");
-					mapSectionTrackTags.remove("route_activity_type");
+					poiSectionTrackTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+					mapSectionTrackTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 
 					// 2. Write segment as <way> (without route_type tag) [MAP-section]
 					serializer.startTag(null, "way");
@@ -302,7 +306,7 @@ public class OsmGpxWriteContext {
 	                                                Track track, TrkSegment segment) {
 		Map<String, String> gpxTrackTags = new LinkedHashMap<>();
 		if (track != null) {
-			addGenericTags(gpxTrackTags, track);
+			addGenericTags(gpxTrackTags, extensionsExtraTags, track);
 		}
 		if (segment != null) {
 			addElevationTags(gpxTrackTags, segment);
@@ -310,19 +314,19 @@ public class OsmGpxWriteContext {
 		addGpxInfoTags(gpxTrackTags, gpxInfo);
 		addExtensionsTags(gpxTrackTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
 		addExtensionsTags(gpxTrackTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
-		finalizeActivityType(gpxTrackTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
+		finalizeActivityTypeAndColors(gpxTrackTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
 		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
 		addAnalysisTags(gpxTrackTags, analysis);
 		finalizeGpxShieldTags(gpxTrackTags);
 		return gpxTrackTags;
 	}
 
-	private void finalizeActivityType(Map<String, String> gpxTrackTags,
-	                                  Map<String, String> metadataExtraTags,
-	                                  Map<String, String> extensionsExtraTags,
-	                                  OsmGpxFile gpxInfo) {
+	private void finalizeActivityTypeAndColors(Map<String, String> gpxTrackTags,
+	                                           Map<String, String> metadataExtraTags,
+	                                           Map<String, String> extensionsExtraTags,
+	                                           OsmGpxFile gpxInfo) {
 		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
-		String[] activityTags = {"route_activity_type", "osmand:activity", "route"};
+		final String[] activityTags = {ROUTE_ACTIVITY_TYPE, OSMAND_ACTIVITY, "route"};
 
 		// OsmGpxFile.tags compatibility (might be used by DownloadOsmGPX)
 		OsmRouteType compatibleOsmRouteType = OsmRouteType.getTypeFromTags(gpxInfo.tags);
@@ -330,14 +334,22 @@ public class OsmGpxWriteContext {
 			extensionsExtraTags.put("tag_" + tg, "yes");
 		}
 		if (compatibleOsmRouteType != null) {
-			gpxTrackTags.putIfAbsent("color", compatibleOsmRouteType.getColor());
-			gpxTrackTags.putIfAbsent("route_activity_type", compatibleOsmRouteType.getName().toLowerCase());
+			gpxTrackTags.putIfAbsent(TRACK_COLOR, compatibleOsmRouteType.getColor());
+			gpxTrackTags.putIfAbsent(ROUTE_ACTIVITY_TYPE, compatibleOsmRouteType.getName().toLowerCase());
 		}
 
 		Map<String, String> allTags = new LinkedHashMap<>();
 		allTags.putAll(gpxTrackTags);
 		allTags.putAll(metadataExtraTags);
 		allTags.putAll(extensionsExtraTags);
+
+		for (String tag : colorTagsForMapSection) {
+			if (allTags.containsKey(tag)) {
+				gpxTrackTags.put(TRACK_COLOR,
+						MapRenderingTypesEncoder.formatColorToPalette(allTags.get(tag), false));
+				break;
+			}
+		}
 
 		RouteActivityHelper helper = RouteActivityHelper.INSTANCE;
 		for (String tag : activityTags) {
@@ -350,15 +362,15 @@ public class OsmGpxWriteContext {
 						activity = helper.findActivityByTag(val); // try to find by tags
 					}
 					if (activity != null) {
-						gpxTrackTags.put("route_type", activity.getGroup().getId());
-						gpxTrackTags.put("route_activity_type", activity.getId());
+						gpxTrackTags.put(ROUTE_TYPE, activity.getGroup().getId());
+						gpxTrackTags.put(ROUTE_ACTIVITY_TYPE, activity.getId()); // to split into poi_additional_category
 						return; // success
 					}
 				}
 			}
 		}
 
-		gpxTrackTags.putIfAbsent("route_type", "other"); // unknown / default
+		gpxTrackTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
 	}
 
 	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
@@ -453,7 +465,7 @@ public class OsmGpxWriteContext {
 		}		
 	}
 
-	private void addGenericTags(Map<String, String> gpxTrackTags, Track t) {
+	private void addGenericTags(Map<String, String> gpxTrackTags, Map<String, String> extensionsExtraTags, Track t) {
 		if (t != null) {
 			if (!Algorithms.isEmpty(t.getName())) {
 				gpxTrackTags.put("name", t.getName());
@@ -461,11 +473,10 @@ public class OsmGpxWriteContext {
 			if (!Algorithms.isEmpty(t.getDesc())) {
 				gpxTrackTags.put("description", t.getDesc());
 			}
-			int color = t.getColor(0); // this is gpx-color not osmand:color
+			int color = t.getColor(0); // gpx-color of the distinct track (not supported completely)
 			if (color != 0) {
-				gpxTrackTags.put("colour",
+				extensionsExtraTags.put(DISPLAYCOLOR,
 						MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-				// gpxTrackTags.put("colour_int", Algorithms.colorToString(color)); // unsupported
 			}
 		}
 	}
@@ -538,7 +549,7 @@ public class OsmGpxWriteContext {
 
 		if (routeType != null) {
 			tagValue(serializer, "route", routeType);
-			tagValue(serializer, "route_type", "track_point");
+			tagValue(serializer, ROUTE_TYPE, "track_point");
 			tagValue(serializer, ROUTE_ID_TAG, routeId);
 			tagValue(serializer, "route_name", routeName); // required by fetchSegmentsAndPoints / searchPoiByName
 		}
@@ -566,8 +577,7 @@ public class OsmGpxWriteContext {
 		}
 		int color = p.getColor(0); // gpx-point color
 		if (color != 0) {
-			tagValue(serializer, "colour", MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
-			// tagValue(serializer, "colour_int", Algorithms.colorToString(color)); // unsupported
+			tagValue(serializer, COLOR, MapRenderingTypesEncoder.formatColorToPalette(Algorithms.colorToString(color), false));
 		}
 		if (qp.details >= QueryParams.DETAILS_ELE_SPEED) {
 			if (!Double.isNaN(p.getEle())) {
