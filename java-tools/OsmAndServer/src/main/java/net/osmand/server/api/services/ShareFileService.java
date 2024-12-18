@@ -138,7 +138,7 @@ public class ShareFileService {
 		return true;
 	}
 
-	public ResponseEntity<String> checkAccess(ShareFileRepository.ShareFile file) {
+	public ResponseEntity<String> checkAccessAndReturnError(ShareFileRepository.ShareFile file) {
 		if (file.isPublicAccess()) {
 			return null;
 		} else {

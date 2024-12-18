@@ -78,7 +78,7 @@ public class ShareFileController {
 		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		ResponseEntity<String> errorAccess = shareFileService.checkAccess(shareFile);
+		ResponseEntity<String> errorAccess = shareFileService.checkAccessAndReturnError(shareFile);
 		if (errorAccess != null) {
 			return errorAccess;
 		}
@@ -106,7 +106,7 @@ public class ShareFileController {
 		} else if (userFile.filesize == -1) {
 			return ResponseEntity.ok().body(FILE_WAS_DELETED);
 		}
-		ResponseEntity<String> errorAccess = shareFileService.checkAccess(shareFile);
+		ResponseEntity<String> errorAccess = shareFileService.checkAccessAndReturnError(shareFile);
 		if (errorAccess != null) {
 			return errorAccess;
 		}
