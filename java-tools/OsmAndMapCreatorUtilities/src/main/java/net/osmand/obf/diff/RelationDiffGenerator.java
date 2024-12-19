@@ -22,10 +22,10 @@ public class RelationDiffGenerator {
         if(args.length == 1 && args[0].equals("test")) {
             args = new String[4];
             List<String> s = new ArrayList<String>();
-            s.add("/Users/macmini/OsmAnd/overpass/issue_x/23_12_06_12_10_before_rel.osm");
-            s.add("/Users/macmini/OsmAnd/overpass/issue_x/23_12_06_12_10_after_rel.osm");
-            s.add("/Users/macmini/OsmAnd/overpass/issue_x/23_12_06_12_10_diff.osm");
-            s.add("/Users/macmini/OsmAnd/overpass/issue_x/_after_rel_m.osm");
+            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_before_rel.osm.gz");
+            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_after_rel.osm.gz");
+            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_diff.osm.gz");
+            s.add("/Users/ivan/OsmAnd/tmp/_after_rel_m.osm");
             args = s.toArray(new String[0]);
         } else if (args.length < 4) {
             System.out.println("Usage: <path before_rel.osm.gz file> " +
@@ -86,9 +86,10 @@ public class RelationDiffGenerator {
         int statisticAddedMembers = 0;
 
         Set<EntityId> deletedObjIds = new HashSet<>();
+        Set<EntityId> modifiedObjIds = new HashSet<>();
         if (diffFile != null) {
             try {
-                DiffParser.fetchModifiedIds(diffFile, null, deletedObjIds);
+                DiffParser.fetchModifiedIds(diffFile, null, deletedObjIds, modifiedObjIds);
             } catch (IOException | XmlPullParserException e) {
                 e.printStackTrace();
             }
@@ -101,7 +102,7 @@ public class RelationDiffGenerator {
             if (entityType != Entity.EntityType.NODE && entityType != Entity.EntityType.WAY) {
                 continue;
             }
-            if (!endEntities.containsKey(e.getKey()) && !deletedObjIds.contains(e.getKey())) {
+            if (!endEntities.containsKey(e.getKey()) && !deletedObjIds.contains(e.getKey()) && !modifiedObjIds.contains(e.getKey())) {
                 endStorage.registerEntity(e.getValue(), null);
                 statisticAddedMembers++;
             }
