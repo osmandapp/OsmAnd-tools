@@ -33,7 +33,6 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -176,6 +175,26 @@ public class OsmGpxWriteContext {
 		gpxInfo.updateDescription(extensions.get("description"));
 	}
 
+	private void flushXmlTag(String xmlTag, Map<String, String> osmTags, LatLon ll, long idStart, long idEnd) throws IOException {
+		serializer.startTag(null, xmlTag);
+		serializer.attribute(null, "id", "" + baseOsmId--);
+		serializer.attribute(null, "action", "modify");
+		serializer.attribute(null, "version", "1");
+		if (ll != null) {
+			serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
+			serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
+		}
+		if (idStart != 0 && idEnd != 0) {
+			for (long nid = idStart; nid > idEnd; nid--) {
+				serializer.startTag(null, "nd");
+				serializer.attribute(null, "ref", nid + "");
+				serializer.endTag(null, "nd");
+			}
+		}
+		serializeTags(osmTags);
+		serializer.endTag(null, xmlTag);
+	}
+
 	// slightly outdated (never used even by Planet__OSM_GPX_Query job)
 	private void writeTrackWithoutDetails(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis) throws IOException {
 		boolean validTrack = false;
@@ -191,21 +210,68 @@ public class OsmGpxWriteContext {
 			}
 		}
 		if (validTrack) {
-			serializer.startTag(null, "node");
-			serializer.attribute(null, "id", "" + baseOsmId--);
-			serializer.attribute(null, "action", "modify");
-			serializer.attribute(null, "version", "1");
-			serializer.attribute(null, "lat", latLonFormat.format(gpxFile.findPointToShow().getLat()));
-			serializer.attribute(null, "lon", latLonFormat.format(gpxFile.findPointToShow().getLon()));
-			tagValue(serializer, "route", "segment");
-			tagValue(serializer, "route_bbox_radius", gpxFile.getOuterRadius());
-			tagValue(serializer, ROUTE_TYPE, "other");
-			Map<String, String> metadataExtraTags = new LinkedHashMap<>();
-			Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
-			Map<String, String> gpxTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
-					metadataExtraTags, extensionsExtraTags, null, null);
-			serializeTags(gpxTrackTags);
-			serializer.endTag(null, "node");
+			WptPt pointToShow = gpxFile.findPointToShow();
+			LatLon ll = new LatLon(pointToShow.getLat(), pointToShow.getLon());
+			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+			collectGpxTrackTags(gpxInfo, gpxFile, analysis, poiSectionTags, null, null, null);
+			flushXmlTag("node", poiSectionTags, ll, 0, 0);
+		}
+	}
+
+	private void writeWaysAndPoints(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis) throws IOException {
+		boolean hasSegments = false, hasPoints = false;
+		for (Track t : gpxFile.getTracks()) {
+			for (TrkSegment s : t.getSegments()) {
+				if (s.getPoints().isEmpty()) {
+					continue;
+				}
+				if (!validatedTrackSegment(s)) {
+					continue;
+				}
+				hasSegments = true;
+				segments++;
+
+				// 1. Write points as <node> for the following <way> [MAP-section]
+				List<LatLon> pointsForPoiSearch = new ArrayList<>();
+				long idStart = baseOsmId;
+				for (WptPt p : s.getPoints()) {
+					writePoint(baseOsmId--, p, null, null, null);
+					if (pointsForPoiSearch.isEmpty() ||
+							MapUtils.getDistance(pointsForPoiSearch.get(pointsForPoiSearch.size() - 1),
+									new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_DISTANCE_M) {
+						pointsForPoiSearch.add(new LatLon(p.getLatitude(), p.getLongitude()));
+					}
+				}
+				long idEnd = baseOsmId;
+
+				// 2. Write segment as <way> (without route_type tag) [MAP-section]
+				Map<String, String> poiSectionTags = new LinkedHashMap<>();
+				Map<String, String> mapSectionTags = new LinkedHashMap<>();
+				collectGpxTrackTags(gpxInfo, gpxFile, analysis, poiSectionTags, mapSectionTags, t, s);
+				flushXmlTag("way", mapSectionTags, null, idStart, idEnd);
+
+				// 3. Write segment as <node> (with route_type tag) every 5 km [POI-section]
+				for (LatLon ll : pointsForPoiSearch) {
+					flushXmlTag("node", poiSectionTags, ll, 0, 0);
+				}
+			}
+		}
+
+		// 4. Write all GPX waypoints
+		for (WptPt p : gpxFile.getPointsList()) {
+			if (gpxInfo != null) {
+				writePoint(baseOsmId--, p, "point", gpxInfo.getRouteId(), gpxInfo.name);
+				hasPoints = true;
+			}
+		}
+
+		// 5. Write center-point to search tracks without any segments [POI-section]
+		if (hasSegments == false && hasPoints == true) {
+			KQuadRect bbox = gpxFile.getRect();
+			LatLon center = new LatLon(bbox.centerY(), bbox.centerX());
+			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+			collectGpxTrackTags(gpxInfo, gpxFile, analysis, poiSectionTags, null, null, null);
+			flushXmlTag("node", poiSectionTags, center, 0, 0);
 		}
 	}
 
@@ -214,111 +280,51 @@ public class OsmGpxWriteContext {
 		if (qp.details < QueryParams.DETAILS_TRACKS) {
 			writeTrackWithoutDetails(gpxInfo, gpxFile, analysis);
 		} else {
-			for (Track t : gpxFile.getTracks()) {
-				for (TrkSegment s : t.getSegments()) {
-					if (s.getPoints().isEmpty()) {
-						continue;
-					}
-					if (!validatedTrackSegment(s)) {
-						continue;
-					}
-					segments++;
-
-					// 1. Write points as <node> for the following <way> [MAP-section]
-					long idStart = baseOsmId;
-					double dlon = s.getPoints().get(0).getLon();
-					double dlat = s.getPoints().get(0).getLat();
-					KQuadRect qr = new KQuadRect(dlon, dlat, dlon, dlat);
-					List<LatLon> pointsForPoiSearch = new ArrayList<>();
-					for (WptPt p : s.getPoints()) {
-						GpxUtilities.INSTANCE.updateQR(qr, p, dlat, dlon);
-						writePoint(baseOsmId--, p, null, null, null);
-						if (pointsForPoiSearch.isEmpty() ||
-								MapUtils.getDistance(pointsForPoiSearch.get(pointsForPoiSearch.size() - 1),
-										new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_DISTANCE_M) {
-							pointsForPoiSearch.add(new LatLon(p.getLatitude(), p.getLongitude()));
-						}
-					}
-					long idEnd = baseOsmId;
-
-					int radius = (int) MapUtils.getDistance(qr.getBottom(), qr.getLeft(), qr.getTop(), qr.getRight());
-					String routeRadius = MapUtils.convertDistToChar(radius,
-							GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER, GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
-							GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1, GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2);
-
-					Map<String, String> metadataExtraTags = new LinkedHashMap<>();
-					Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
-					Map<String, String> poiSectionTrackTags = collectGpxTrackTags(gpxInfo, gpxFile, analysis,
-							metadataExtraTags, extensionsExtraTags, t, s);
-					Map<String, String> mapSectionTrackTags = new HashMap<>(poiSectionTrackTags);
-					poiSectionTrackTags.remove(TRACK_COLOR); // track_color is required for Rendering only
-					mapSectionTrackTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
-
-					// 2. Write segment as <way> (without route_type tag) [MAP-section]
-					serializer.startTag(null, "way");
-					serializer.attribute(null, "id", "" + baseOsmId--);
-					serializer.attribute(null, "action", "modify");
-					serializer.attribute(null, "version", "1");
-					for (long nid = idStart; nid > idEnd; nid--) {
-						serializer.startTag(null, "nd");
-						serializer.attribute(null, "ref", nid + "");
-						serializer.endTag(null, "nd");
-					}
-					tagValue(serializer, "route", "segment");
-					tagValue(serializer, "route_bbox_radius", routeRadius);
-					serializeTags(mapSectionTrackTags);
-					serializer.endTag(null, "way");
-
-					// 3. Write segment as <node> (with route_type tag) every 5 km [POI-section]
-					for (LatLon ll : pointsForPoiSearch) {
-						serializer.startTag(null, "node");
-						serializer.attribute(null, "id", "" + baseOsmId--);
-						serializer.attribute(null, "action", "modify");
-						serializer.attribute(null, "version", "1");
-						serializer.attribute(null, "lat", latLonFormat.format(ll.getLatitude()));
-						serializer.attribute(null, "lon", latLonFormat.format(ll.getLongitude()));
-						tagValue(serializer, "route_bbox_radius", routeRadius);
-						if (!metadataExtraTags.isEmpty()) {
-							tagValue(serializer, "metadata_extra_tags", gson.toJson(metadataExtraTags));
-						}
-						if (!extensionsExtraTags.isEmpty()) {
-							tagValue(serializer, "extensions_extra_tags", gson.toJson(extensionsExtraTags));
-						}
-						serializeTags(poiSectionTrackTags);
-						serializer.endTag(null, "node");
-					}
-				}
-			}
-
-			// 4. Write all GPX waypoints
-			for (WptPt p : gpxFile.getPointsList()) {
-				if (gpxInfo != null) {
-					writePoint(baseOsmId--, p, "point", gpxInfo.getRouteId(), gpxInfo.name);
-				}
-			}
+			writeWaysAndPoints(gpxInfo, gpxFile, analysis);
 		}
 		tracks++;
 	}
 
 	private Map<String, String> collectGpxTrackTags(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis,
-	                                                Map<String, String> metadataExtraTags,
-	                                                Map<String, String> extensionsExtraTags,
-	                                                Track track, TrkSegment segment) {
-		Map<String, String> gpxTrackTags = new LinkedHashMap<>();
-		if (track != null) {
-			addGenericTags(gpxTrackTags, extensionsExtraTags, track);
+	                                                @Nullable Map<String, String> poiSectionTags,
+	                                                @Nullable Map<String, String> mapSectionTags,
+	                                                @Nullable Track track, @Nullable TrkSegment segment) {
+		Map<String, String> allTags = new LinkedHashMap<>();
+		Map<String, String> metadataExtraTags = new LinkedHashMap<>();
+		Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
+
+		addGpxInfoTags(allTags, gpxInfo);
+		addAnalysisTags(allTags, analysis);
+		addElevationGraphTags(allTags, segment);
+		addPointGroupsTags(allTags, gpxFile.getPointsGroups());
+		addNameDescDisplaycolor(allTags, extensionsExtraTags, track);
+
+		addExtensionsTags(allTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
+		addExtensionsTags(allTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
+
+		finalizeActivityTypeAndColors(allTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
+		finalizeGpxShieldTags(allTags);
+
+		allTags.put("route_bbox_radius", gpxFile.getOuterRadius());
+
+		if (!metadataExtraTags.isEmpty()) {
+			allTags.put("metadata_extra_tags", gson.toJson(metadataExtraTags));
 		}
-		if (segment != null) {
-			addElevationTags(gpxTrackTags, segment);
+		if (!extensionsExtraTags.isEmpty()) {
+			allTags.put("extensions_extra_tags", gson.toJson(extensionsExtraTags));
 		}
-		addGpxInfoTags(gpxTrackTags, gpxInfo);
-		addExtensionsTags(gpxTrackTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
-		addExtensionsTags(gpxTrackTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
-		finalizeActivityTypeAndColors(gpxTrackTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
-		addPointGroupsTags(gpxTrackTags, gpxFile.getPointsGroups());
-		addAnalysisTags(gpxTrackTags, analysis);
-		finalizeGpxShieldTags(gpxTrackTags);
-		return gpxTrackTags;
+
+		if (poiSectionTags != null) {
+			poiSectionTags.putAll(allTags);
+			poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+		}
+		if (mapSectionTags != null) {
+			mapSectionTags.putAll(allTags);
+			mapSectionTags.put("route", "segment");
+			mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
+		}
+
+		return allTags; // compatibility for writeTrackWithoutDetails
 	}
 
 	private void finalizeActivityTypeAndColors(Map<String, String> gpxTrackTags,
@@ -429,23 +435,25 @@ public class OsmGpxWriteContext {
 		}
 	}
 
-	private void addElevationTags(Map<String, String> gpxTrackTags, TrkSegment s) {
-		IndexHeightData.WayGeneralStats wgs = new IndexHeightData.WayGeneralStats();
-		for (WptPt p : s.getPoints()) {
-			wgs.altitudes.add(p.getEle());
-			wgs.dists.add(p.getDistance());
-		}
-		IndexHeightData.calculateEleStats(wgs, (int) DIST_STEP);
-		if (wgs.eleCount > 0 && !Double.isNaN(wgs.startEle) && !Double.isNaN(wgs.endEle)) {
+	private void addElevationGraphTags(Map<String, String> gpxTrackTags, TrkSegment s) {
+		if (s != null) {
+			IndexHeightData.WayGeneralStats wgs = new IndexHeightData.WayGeneralStats();
+			for (WptPt p : s.getPoints()) {
+				wgs.altitudes.add(p.getEle());
+				wgs.dists.add(p.getDistance());
+			}
+			IndexHeightData.calculateEleStats(wgs, (int) DIST_STEP);
+			if (wgs.eleCount > 0 && !Double.isNaN(wgs.startEle) && !Double.isNaN(wgs.endEle)) {
 //			int st = (int) wgs.startEle;
-			gpxTrackTags.put("start_ele", String.valueOf((int) wgs.startEle));
+				gpxTrackTags.put("start_ele", String.valueOf((int) wgs.startEle));
 //			gpxTrackTags.put("end_ele__start", String.valueOf((int) wgs.endEle - st));
 //			gpxTrackTags.put("avg_ele__start", String.valueOf((int) (wgs.sumEle / wgs.eleCount) - st));
 //			gpxTrackTags.put("min_ele__start", String.valueOf((int) wgs.minEle - st));
 //			gpxTrackTags.put("max_ele__start", String.valueOf((int) wgs.maxEle - st));
-			gpxTrackTags.putIfAbsent("diff_ele_up", String.valueOf((int) wgs.up)); // prefer GpxTrackAnalysis
-			gpxTrackTags.putIfAbsent("diff_ele_down", String.valueOf((int) wgs.down)); // prefer GpxTrackAnalysis
-			gpxTrackTags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wgs.step, wgs.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+				gpxTrackTags.putIfAbsent("diff_ele_up", String.valueOf((int) wgs.up)); // prefer GpxTrackAnalysis
+				gpxTrackTags.putIfAbsent("diff_ele_down", String.valueOf((int) wgs.down)); // prefer GpxTrackAnalysis
+				gpxTrackTags.put("ele_graph", MapAlgorithms.encodeIntHeightArrayGraph(wgs.step, wgs.altIncs, MAX_GRAPH_SKIP_POINTS_BITS));
+			}
 		}
 	}
 
@@ -465,7 +473,7 @@ public class OsmGpxWriteContext {
 		}		
 	}
 
-	private void addGenericTags(Map<String, String> gpxTrackTags, Map<String, String> extensionsExtraTags, Track t) {
+	private void addNameDescDisplaycolor(Map<String, String> gpxTrackTags, Map<String, String> extensionsExtraTags, Track t) {
 		if (t != null) {
 			if (!Algorithms.isEmpty(t.getName())) {
 				gpxTrackTags.put("name", t.getName());
