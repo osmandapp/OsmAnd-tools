@@ -41,7 +41,7 @@ public class DiffParser {
         }
     }
 
-    public static void fetchModifiedIds(File diff, Set<Entity.EntityId> all, Set<Entity.EntityId> deleted) throws IOException, XmlPullParserException {
+    public static void fetchModifiedIds(File diff, Set<Entity.EntityId> all, Set<Entity.EntityId> deleted, Set<Entity.EntityId> modified) throws IOException, XmlPullParserException {
         InputStream fis;
         if (diff.getName().endsWith(".gz")) {
             fis = new GZIPInputStream(new FileInputStream(diff));
@@ -72,6 +72,9 @@ public class DiffParser {
                     }
                     if (deleted != null && actionType != null && actionType != ActionType.MODIFY) {
                         deleted.add(entityId);
+                    }
+                    if (modified != null && actionType != null && actionType == ActionType.MODIFY) {
+                        modified.add(entityId);
                     }
                 }
             } else if (tok == XmlPullParser.END_TAG) {

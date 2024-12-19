@@ -29,11 +29,11 @@ public class ObfDiffGenerator {
 	private static final long ID_MULTIPOLYGON_LIMIT = 1l << 41l;
 
 	private static final int COORDINATES_PRECISION_COMPARE = 0;
-	
+
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
 	public static boolean COMPARE_TRANSPORT = true;
-	
+
 	public static void main(String[] args) throws IOException, RTreeException {
 		if(args.length == 1 && args[0].equals("test")) {
 			args = new String[3];
@@ -56,7 +56,7 @@ public class ObfDiffGenerator {
 			System.exit(1);
 		}
 	}
-	
+
 	private void run(String[] args) throws IOException, RTreeException, SQLException {
 		File start = new File(args[0]);
 		File end = new File(args[1]);
@@ -80,11 +80,11 @@ public class ObfDiffGenerator {
 		fStart.readObfFiles(Collections.singletonList(start));
 		ObfFileInMemory fEnd = new ObfFileInMemory();
 		fEnd.readObfFiles(Collections.singletonList(end));
-		
+
 		Set<EntityId> allModifiedObjIds = new HashSet<>();
 		if (diff != null) {
 			try {
-				DiffParser.fetchModifiedIds(diff, allModifiedObjIds, null);
+				DiffParser.fetchModifiedIds(diff, allModifiedObjIds, null, null);
 			} catch (IOException | XmlPullParserException e) {
 				e.printStackTrace();
 			}
@@ -97,7 +97,7 @@ public class ObfDiffGenerator {
 		if (COMPARE_TRANSPORT) {
 			compareTransport(fStart, fEnd, result == null, allModifiedObjIds);
 		}
-		
+
 		System.out.println("Finished comparing.");
 		if (result != null) {
 			if (result.exists()) {
@@ -151,7 +151,7 @@ public class ObfDiffGenerator {
 				}
 			}
 		}
-		
+
 		TLongObjectIterator<TransportStop> stopIterator = endStopData.iterator();
 		while(stopIterator.hasNext()) {
 			stopIterator.advance();
@@ -233,16 +233,16 @@ public class ObfDiffGenerator {
 				System.err.println(e.getMessage());
 				e.printStackTrace();
 			}
-			
+
 		}
-		
+
 		for (TransportRoute route : endRouteData.valueCollection()) {
 			if (print) {
 				System.out.println("Transport route " + (route.getId() / 2) + " is missing in (1): " + route);
 			} else if(!existingRoutes.contains(route.getId())){
 				for(TransportStop s : route.getForwardStops()) {
 					long routeId = route.getId().longValue();
-					TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted, 
+					TransportStop originalStop = checkEndStopData(endStopData, endStopDataDeleted,
 							s, routeId, s.getId());
 					originalStop.addRouteId(routeId);
 				}
@@ -262,7 +262,7 @@ public class ObfDiffGenerator {
 		}
 		return endStopData.get(stopId);
 	}
-	
+
 	private TLongObjectHashMap<TransportStop> cleanStopsAndAdjustId(TLongObjectHashMap<TransportStop> transportStops) {
 		if (transportStops == null) {
 			return null;
@@ -359,12 +359,12 @@ public class ObfDiffGenerator {
 
 	private void compareMapData(ObfFileInMemory fStart, ObfFileInMemory fEnd, boolean print, Set<EntityId> modifiedObjIds) {
 		fStart.filterAllZoomsBelow(13);
-		fEnd.filterAllZoomsBelow(13);		
+		fEnd.filterAllZoomsBelow(13);
 		MapIndex mi = fEnd.getMapIndex();
 		int deleteId;
 		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		if(rl != null) {
-			deleteId = rl; 
+			deleteId = rl;
 		} else {
 			deleteId = mi.decodingRules.size() + 1;
 			mi.initMapEncodingRule(0, deleteId, OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
@@ -398,7 +398,7 @@ public class ObfDiffGenerator {
 							BinaryMapDataObject obj = new BinaryMapDataObject(idx, objS.getCoordinates(), null,
 									objS.getObjectType(), objS.isArea(), new int[] { deleteId }, null, 0, 0);
 							endData.put(idx, obj);
-						} 
+						}
 					} else if (objE.compareBinary(objS, COORDINATES_PRECISION_COMPARE)) {
 						endData.remove(idx);
 					}
@@ -424,10 +424,10 @@ public class ObfDiffGenerator {
 		}
 		return null;
 	}
-	
+
 	private EntityId getTransportEntityId(MapObject objS, EntityType tp) {
 		Long id = objS.getId();
-		// we didn't store way or node (so it should be checked twice probably) 
+		// we didn't store way or node (so it should be checked twice probably)
 		return new EntityId(tp, id >> (BinaryInspector.SHIFT_ID));
 	}
 
