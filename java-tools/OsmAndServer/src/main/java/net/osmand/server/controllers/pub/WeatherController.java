@@ -173,19 +173,13 @@ public class WeatherController {
 	}
 	
 	private String getCityByBbox(double lat, double lon, QuadRect searchBbox) throws IOException {
-		LOGGER.info("Getting city by bbox");
-		LOGGER.info("Bbox: " + searchBbox.toString());
-		LOGGER.info("Lat: " + lat + " Lon: " + lon);
 		Amenity nearestPlace;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
-			LOGGER.info("Map list: " + usedMapList.size());
-			usedMapList.forEach(map -> LOGGER.info("Map: " + map.getCountryName() + " " + map.getRegionName()));
 			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
-			LOGGER.info("Founded places: " + resultCollection.getCurrentSearchResults().size());
 			resultCollection.getCurrentSearchResults().forEach(sr -> LOGGER.info(sr.object.toString()));
 			nearestPlace = getNearestPlace(resultCollection, lat, lon);
 		} finally {
