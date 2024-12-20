@@ -45,6 +45,9 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
 
         @Column(name = "email")
         public String email;
+
+        @Column(name = "nickname")
+        public String nickname;
         
         @Column(name = "token")
         public String token;
