@@ -326,11 +326,11 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addMetadataTags(Map<String, String> allTags, Metadata metadata) {
-		if (!Algorithms.isEmpty(metadata.getLink())) {
-			allTags.put("url", metadata.getLink());
-		}
-		if (!Algorithms.isEmpty(metadata.getLinkText())) {
-			allTags.put("url_text", metadata.getLinkText());
+		if (metadata.getLink() != null && !Algorithms.isEmpty(metadata.getLink().getHref())) {
+			allTags.put("url", metadata.getLink().getHref());
+			if (!Algorithms.isEmpty(metadata.getLink().getText())) {
+				allTags.put("url_text", metadata.getLink().getText());
+			}
 		}
 	}
 
@@ -581,11 +581,11 @@ public class OsmGpxWriteContext {
 		if (!Algorithms.isEmpty(p.getComment())) {
 			tagValue(serializer, "note", p.getComment());
 		}
-		if (!Algorithms.isEmpty(p.getLink())) {
-			tagValue(serializer, "url", p.getLink());
-		}
-		if (!Algorithms.isEmpty(p.getLinkText())) {
-			tagValue(serializer, "url_text", p.getLinkText());
+		if (p.getLink() != null && !Algorithms.isEmpty(p.getLink().getHref())) {
+			tagValue(serializer, "url", p.getLink().getHref());
+			if (!Algorithms.isEmpty(p.getLink().getText())) {
+				tagValue(serializer, "url_text", p.getLink().getText());
+			}
 		}
 		if (!Algorithms.isEmpty(p.getIconName())) {
 			tagValue(serializer, "icon", p.getIconName());

@@ -44,7 +44,7 @@ public class WebGpxParser {
     public static class WebMetaData {
         public String name;
         public String desc;
-        public String link;
+        public Link link;
         public Metadata ext;
     
         public WebMetaData(Metadata data) {
