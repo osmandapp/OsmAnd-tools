@@ -146,8 +146,10 @@ public class WeatherController {
 	public String getAddressByLatlon(@RequestParam double lat, @RequestParam double lon, @RequestParam(required = false) String nw, @RequestParam(required = false) String se) throws IOException, InterruptedException {
 		QuadRect searchBbox;
 		if (nw == null && se == null) {
+			LOGGER.info("Getting city by location");
 			return getCityByLocation(lat, lon);
 		} else if (nw != null && se != null) {
+			LOGGER.info("Getting city by bbox");
 			searchBbox = getBbox(lat, lon, nw, se);
 		} else {
 			return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
@@ -178,6 +180,7 @@ public class WeatherController {
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
 			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
+			resultCollection.getCurrentSearchResults().forEach(sr -> LOGGER.info(sr.object.toString()));
 			nearestPlace = getNearestPlace(resultCollection, lat, lon);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
