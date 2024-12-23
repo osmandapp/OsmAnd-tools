@@ -49,7 +49,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.ToolsOsmAndContextImpl;
 import net.osmand.shared.gpx.RouteActivityHelper;
-import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.shared.gpx.primitives.*;
 import okio.GzipSource;
 import okio.Okio;
 
@@ -66,9 +66,6 @@ import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.GpxUtilities.PointsGroup;
-import net.osmand.shared.gpx.primitives.Track;
-import net.osmand.shared.gpx.primitives.TrkSegment;
-import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexHeightData;
@@ -296,6 +293,7 @@ public class OsmGpxWriteContext {
 		addGpxInfoTags(allTags, gpxInfo);
 		addAnalysisTags(allTags, analysis);
 		addElevationGraphTags(allTags, segment);
+		addMetadataTags(allTags, gpxFile.getMetadata());
 		addPointGroupsTags(allTags, gpxFile.getPointsGroups());
 		addNameDescDisplaycolor(allTags, extensionsExtraTags, track);
 
@@ -325,6 +323,15 @@ public class OsmGpxWriteContext {
 		}
 
 		return allTags; // compatibility for writeTrackWithoutDetails
+	}
+
+	private void addMetadataTags(Map<String, String> allTags, Metadata metadata) {
+		if (metadata.getLink() != null && !Algorithms.isEmpty(metadata.getLink().getHref())) {
+			allTags.put("url", metadata.getLink().getHref());
+			if (!Algorithms.isEmpty(metadata.getLink().getText())) {
+				allTags.put("url_text", metadata.getLink().getText());
+			}
+		}
 	}
 
 	private void finalizeActivityTypeAndColors(Map<String, String> gpxTrackTags,
@@ -574,8 +581,11 @@ public class OsmGpxWriteContext {
 		if (!Algorithms.isEmpty(p.getComment())) {
 			tagValue(serializer, "note", p.getComment());
 		}
-		if (!Algorithms.isEmpty(p.getLink())) {
-			tagValue(serializer, "url", p.getLink());
+		if (p.getLink() != null && !Algorithms.isEmpty(p.getLink().getHref())) {
+			tagValue(serializer, "url", p.getLink().getHref());
+			if (!Algorithms.isEmpty(p.getLink().getText())) {
+				tagValue(serializer, "url_text", p.getLink().getText());
+			}
 		}
 		if (!Algorithms.isEmpty(p.getIconName())) {
 			tagValue(serializer, "icon", p.getIconName());
