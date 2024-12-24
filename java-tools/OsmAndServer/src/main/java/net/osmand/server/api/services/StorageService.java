@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import com.amazonaws.services.s3.model.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +23,6 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.CopyObjectResult;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.S3Object;
 
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.util.Algorithms;
@@ -264,6 +261,19 @@ public class StorageService {
 				st.s3Conn = st.s3ConnBuilder.build();
 				reconnectTime = System.currentTimeMillis();
 			}
+		} else if (e instanceof AmazonS3Exception s3Exception) {
+			if ("NoSuchKey".equals(s3Exception.getErrorCode())) {
+				LOGGER.error(String.format(
+						"The specified key does not exist: %s/%s in bucket %s", fld, fileName, st.bucket));
+			} else {
+				LOGGER.error(String.format(
+						"Amazon S3 error occurred: %s. Request: %s/%s in bucket %s",
+						s3Exception.getErrorCode(), fld, fileName, st.bucket));
+			}
+		} else {
+			LOGGER.error(String.format(
+					"Unexpected error during request %s to file %s/%s in bucket %s: %s",
+					req, fld, fileName, st.bucket, e.getMessage()));
 		}
 	}
 
