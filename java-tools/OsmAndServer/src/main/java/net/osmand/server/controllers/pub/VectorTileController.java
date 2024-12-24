@@ -83,7 +83,7 @@ public class VectorTileController {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
 
-		tileMemoryCache.cleanupCache();
+		tileMemoryCache.conditionalCleanupCache();
 		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		// for local debug :
 		//BufferedImage img = null;
@@ -122,7 +122,7 @@ public class VectorTileController {
 		if (tileInfo == null) {
 			return ResponseEntity.badRequest().body("Unexpected error during rendering");
 		}
-		tileMemoryCache.cleanupCache();
+		tileMemoryCache.conditionalCleanupCache();
 
 		return ResponseEntity.ok()
 				.header("Cache-Control", "public, max-age=2592000")

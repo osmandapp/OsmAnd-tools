@@ -3,6 +3,7 @@ package net.osmand.server.tileManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class TileMemoryCache<T extends TileCacheProvider> {
 	private final Map<String, T> cacheMap = new ConcurrentHashMap<>();
@@ -11,6 +12,9 @@ public class TileMemoryCache<T extends TileCacheProvider> {
 
 	private static final int MAX_RUNTIME_IMAGE_CACHE_SIZE = 80;
 	private static final int MAX_RUNTIME_TILES_CACHE_SIZE = 10000;
+
+	private final AtomicLong lastCleanupTime = new AtomicLong(0);
+	private static final long CLEANUP_INTERVAL_MILLIS = 10000;
 
 	public T getTile(String key, TileProvider<T> provider) {
 		return cacheMap.computeIfAbsent(key, provider::createTile);
@@ -30,6 +34,14 @@ public class TileMemoryCache<T extends TileCacheProvider> {
 
 	public void removeLock(String tileId) {
 		lockMap.remove(tileId);
+	}
+
+	public void conditionalCleanupCache() {
+		long currentTime = System.currentTimeMillis();
+		long lastTime = lastCleanupTime.get();
+		if (currentTime - lastTime >= CLEANUP_INTERVAL_MILLIS && lastCleanupTime.compareAndSet(lastTime, currentTime)) {
+			cleanupCache();
+		}
 	}
 
 	public void cleanupCache() {
