@@ -83,6 +83,7 @@ public class VectorTileController {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
 
+		tileMemoryCache.cleanupCache();
 		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
 		// for local debug :
 		//BufferedImage img = null;
@@ -97,11 +98,12 @@ public class VectorTileController {
 				return ResponseEntity.badRequest().body("Unexpected error during rendering");
 			}
 		}
-		tileMemoryCache.cleanupCache();
 		BufferedImage subimage = tile.readSubImage(img, x, y);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
-		return ResponseEntity.ok(new ByteArrayResource(baos.toByteArray()));
+		return ResponseEntity.ok()
+				.header("Cache-Control", "public, max-age=2592000")
+				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
 	@GetMapping(path = "/info/{style}/{z}/{x}/{y}.json", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -122,7 +124,9 @@ public class VectorTileController {
 		}
 		tileMemoryCache.cleanupCache();
 
-		return ResponseEntity.ok(String.valueOf(tileInfo));
+		return ResponseEntity.ok()
+				.header("Cache-Control", "public, max-age=2592000")
+				.body(String.valueOf(tileInfo));
 	}
 
 	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
