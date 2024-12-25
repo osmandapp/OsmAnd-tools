@@ -387,19 +387,19 @@ public class SearchService {
             type = type.replace("_", " ");
             if (res == null) {
                 res = searchUICore.immediateSearch(type, null);
-                LOGGER.info(String.format(
-                        "1-st result (%s) = %d found total (%s)",
-                        type, res.getCurrentSearchResults().size(),
-                        res.getCurrentSearchResults().size() > 0 ? res.getCurrentSearchResults().get(0) : null
-                ));
+//                LOGGER.info(String.format(
+//                        "1-st result (%s) = %d found total (%s)",
+//                        type, res.getCurrentSearchResults().size(),
+//                        res.getCurrentSearchResults().size() > 0 ? res.getCurrentSearchResults().get(0) : null
+//                ));
             } else {
                 SearchUICore.SearchResultCollection searchResults = searchUICore.immediateSearch(type, null);
                 res.addSearchResults(searchResults.getCurrentSearchResults(), false, true);
-                LOGGER.info(String.format(
-                        "next result (%s) = %d current = %d total (%s)",
-                        type, searchResults.getCurrentSearchResults().size(), res.getCurrentSearchResults().size(),
-                        res.getCurrentSearchResults().size() > 0 ? res.getCurrentSearchResults().get(0) : null
-                ));
+//                LOGGER.info(String.format(
+//                        "next result (%s) = %d current = %d total (%s)",
+//                        type, searchResults.getCurrentSearchResults().size(), res.getCurrentSearchResults().size(),
+//                        res.getCurrentSearchResults().size() > 0 ? res.getCurrentSearchResults().get(0) : null
+//                ));
             }
         }
         return res;
