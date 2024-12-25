@@ -144,17 +144,19 @@ public class WeatherController {
 	@GetMapping(path = {"/get-address-by-latlon"})
 	@ResponseBody
 	public String getAddressByLatlon(@RequestParam double lat, @RequestParam double lon, @RequestParam(required = false) String nw, @RequestParam(required = false) String se) throws IOException, InterruptedException {
-		QuadRect searchBbox;
 		if (nw == null && se == null) {
 			LOGGER.info("Getting city by location");
 			return getCityByLocation(lat, lon);
 		} else if (nw != null && se != null) {
-			LOGGER.info("Getting city by bbox");
-			searchBbox = getBbox(lat, lon, nw, se);
-		} else {
-			return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
+			QuadRect searchBbox = getBbox(lat, lon, nw, se);
+			LOGGER.info(String.format(
+					"Getting city by bbox LatLon (%.5f,%.5f) NW (%s) SE (%s) BBOX (%d,%d,%d,%d)",
+					lat, lon, nw, se,
+					(int)searchBbox.left, (int)searchBbox.top, (int)searchBbox.right, (int)searchBbox.bottom
+			));
+			return getCityByBbox(lat, lon, searchBbox);
 		}
-		return getCityByBbox(lat, lon, searchBbox);
+		return gson.toJson(new AddressInfo(Collections.emptyMap(), new LatLon(lat, lon)));
 	}
 	
 	private String getCityByLocation(double lat, double lon) throws IOException, InterruptedException {

@@ -9,8 +9,11 @@ import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
+import net.osmand.server.controllers.pub.WeatherController;
 import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.MapUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
@@ -35,7 +38,9 @@ public class SearchService {
     OsmAndMapsService osmAndMapsService;
     
     OsmandRegions osmandRegions;
-    
+
+    protected static final Log LOGGER = LogFactory.getLog(SearchService.class);
+
     private ConcurrentHashMap<String, Map<String, String>> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
@@ -365,7 +370,13 @@ public class SearchService {
             res = searchWithBbox(searchUICore, settings, searchBbox, types);
             attempts++;
         }
-        
+
+        LOGGER.info(String.format(
+                "Search Debug bbox(%d,%d,%d,%d) attempts(%d) results(%d) maps(%s)",
+                (int)searchBbox.left, (int)searchBbox.top, (int)searchBbox.right, (int)searchBbox.bottom,
+                attempts, res.getCurrentSearchResults().size(), mapList
+        ));
+
         return res;
     }
     
