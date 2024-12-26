@@ -356,9 +356,17 @@ public class MapApiController {
 				if (of.isPresent()) {
 					GpxTrackAnalysis analysis = null;
 					UserFile uf = of.get();
-					InputStream in = uf.data != null ? new ByteArrayInputStream(uf.data)
-							: userdataService.getInputStream(uf);
-					cloudReads++;
+					InputStream in;
+					try {
+						in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
+						cloudReads++;
+					} catch (Exception e) {
+						LOG.error(String.format(
+								"web-list-files-error: input-stream-error %s id=%d userid=%d error (%s)",
+								uf.name, uf.id, uf.userid, e.getMessage()));
+						filesToIgnore.add(nd);
+						continue;
+					}
 					if (in != null) {
 						in = new GZIPInputStream(in);
 						GpxFile gpxFile;

@@ -205,7 +205,9 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 			if (this.runtimeImage != null) {
 				this.setInfo(result.getGenerationResult().getInfo());
 				File cacheFile = this.getCacheFile(".png");
-				this.saveImageToCache(this, cacheFile);
+				if (cacheFile != null) {
+					this.saveImageToCache(this, cacheFile);
+				}
 			}
 			String msg = String.format("Rendered %d %d at %d (%s %s): %dx%d - %d ms", this.left, this.top, this.z,
 					this.style.name, props, ctx.width, ctx.height, (int) (System.currentTimeMillis() - now));
