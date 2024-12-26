@@ -502,7 +502,6 @@ public class WebGpxParser {
             metadata.setName(trackData.metaData.name);
             metadata.setDesc(trackData.metaData.desc);
             metadata.setLink(trackData.metaData.link);
-            metadata.getExtensionsToWrite();
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
@@ -561,7 +560,6 @@ public class WebGpxParser {
                             if (point.ele == NAN_MARKER) {
                                 routePoint.setEle(Double.NaN);
                             }
-                            routePoint.getExtensionsToWrite();
                             if (!point.profile.equals(LINE_PROFILE_TYPE)) {
                                 routePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
