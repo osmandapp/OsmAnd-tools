@@ -600,7 +600,6 @@ public class WebGpxParser {
         point.setLat(wpt.lat);
         point.setLon(wpt.lon);
         point.setCategory(wpt.category);
-        point.getExtensionsToWrite();
         if (wpt.color != null) {
             point.getExtensionsToWrite().put(COLOR_EXTENSION, wpt.color);
         }
