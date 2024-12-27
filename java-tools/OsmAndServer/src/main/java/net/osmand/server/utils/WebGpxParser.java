@@ -502,9 +502,6 @@ public class WebGpxParser {
             metadata.setName(trackData.metaData.name);
             metadata.setDesc(trackData.metaData.desc);
             metadata.setLink(trackData.metaData.link);
-            if (metadata.getExtensions() == null) {
-                metadata.setExtensions(new LinkedHashMap<>());
-            }
         }
         if (trackData.wpts != null) {
             for (Wpt wpt : trackData.wpts) {
@@ -563,17 +560,14 @@ public class WebGpxParser {
                             if (point.ele == NAN_MARKER) {
                                 routePoint.setEle(Double.NaN);
                             }
-                            if (routePoint.getExtensions() == null) {
-                                routePoint.setExtensions(new LinkedHashMap<>());
-                            }
                             if (!point.profile.equals(LINE_PROFILE_TYPE)) {
-                                routePoint.getExtensions().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
+                                routePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
                             boolean isLast = i == t.points.size() - 1;
                             //for last rtept trkpt_idx = last index of trkpt points
                             int ind = isLast ? allPoints - 1 : allPoints;
-                            routePoint.getExtensions().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
+                            routePoint.getExtensionsToWrite().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
                             route.getPoints().add(routePoint);
                             trkPoints.addAll(geo);
                         }
@@ -606,23 +600,20 @@ public class WebGpxParser {
         point.setLat(wpt.lat);
         point.setLon(wpt.lon);
         point.setCategory(wpt.category);
-        if (point.getExtensions() == null) {
-            point.setExtensions(new LinkedHashMap<>());
-        }
         if (wpt.color != null) {
-            point.getExtensions().put(COLOR_EXTENSION, wpt.color);
+            point.getExtensionsToWrite().put(COLOR_EXTENSION, wpt.color);
         }
         if (wpt.address != null) {
-            point.getExtensions().put(ADDRESS_EXTENSION, wpt.address);
+            point.getExtensionsToWrite().put(ADDRESS_EXTENSION, wpt.address);
         }
         if (wpt.background != null) {
-            point.getExtensions().put(BACKGROUND_TYPE_EXTENSION, wpt.background);
+            point.getExtensionsToWrite().put(BACKGROUND_TYPE_EXTENSION, wpt.background);
         }
         if (wpt.icon != null) {
-            point.getExtensions().put(ICON_NAME_EXTENSION, wpt.icon);
+            point.getExtensionsToWrite().put(ICON_NAME_EXTENSION, wpt.icon);
         }
         if (wpt.hidden != null) {
-            point.getExtensions().put(HIDDEN_EXTENSION, wpt.hidden);
+            point.getExtensionsToWrite().put(HIDDEN_EXTENSION, wpt.hidden);
         }
         return point;
     }
@@ -650,7 +641,7 @@ public class WebGpxParser {
             filePoint.setEle((!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN);
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
-                filePoint.getExtensions().put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
+                filePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
                 segment.getPoints().add(filePoint);
                 segments.add(segment);
                 segment = new TrkSegment();
