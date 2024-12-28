@@ -198,7 +198,7 @@ public class DownloadIndexController {
 	}
 
 	private boolean isContainAndEqual(String param, MultiValueMap<String, String> params) {
-		return isContainAndEqual(param, "yes", params);
+		return isContainAndEqual(param, "yes", params) || isContainAndEqual(param, "true", params);
 	}
 
 	
