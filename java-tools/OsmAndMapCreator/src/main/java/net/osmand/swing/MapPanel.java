@@ -593,7 +593,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	protected void downloadDiffs(Graphics2D g, MapDiff md) {
 		try {
-			String url = "https://download.osmand.net/check_live?aosmc=yes&timestamp=" + md.timestamp +
+			String url = "https://download.osmand.net/check_live?aosmc=true&timestamp=" + md.timestamp +
 					"&file=" + URLEncoder.encode(md.baseName, StandardCharsets.UTF_8.toString());
 			System.out.println("Loading " + url);
 			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
