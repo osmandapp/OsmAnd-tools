@@ -72,6 +72,7 @@ public class SearchService {
     public static class PoiSearchData {
         
         public PoiSearchData(List<String> categories,
+                             Map<String, String> categoriesLang,
                              String northWest,
                              String southEast,
                              String savedNorthWest,
@@ -80,6 +81,7 @@ public class SearchService {
                              String prevSearchRes,
                              String prevSearchCategory) {
             this.categories = categories;
+            this.categoriesLang = categoriesLang;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             if (savedNorthWest != null && savedSouthEast != null) {
                 this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
@@ -92,6 +94,7 @@ public class SearchService {
         }
         
         public List<String> categories;
+        public Map<String, String> categoriesLang;
         public List<LatLon> bbox;
         public List<LatLon> savedBbox;
         public int prevCategoriesCount;
@@ -213,16 +216,23 @@ public class SearchService {
                 brands.addAll(map.getTopIndexSubTypes());
             }
             for (String category : data.categories) {
-                if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
+                String lang = data.categoriesLang != null ? data.categoriesLang.get(category) : null;
+	            if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
                     SearchResult prevResult = new SearchResult();
                     prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
                     if (prevResult.object == null) {
                         // try to find in brands
-                        for (BinaryMapPoiReaderAdapter.PoiSubType brand : brands) {
-                            if (brand.possibleValues.stream().anyMatch(value -> value.equalsIgnoreCase(data.prevSearchRes))) {
-                                prevResult.object = new TopIndexFilter(brand, mapPoiTypes, category);
-                                break;
-                            }
+                        BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = brands.stream()
+                                .filter(brand -> brand.name.contains(":") && brand.name.split(":")[1].equalsIgnoreCase(lang))
+                                .findFirst()
+                                .orElseGet(() -> brands.stream()
+                                        .filter(brand -> !brand.name.contains(":"))
+                                        .findFirst()
+                                        .orElse(null)
+                                );
+
+                        if (selectedBrand != null) {
+                            prevResult.object = new TopIndexFilter(selectedBrand, mapPoiTypes, category);
                         }
                     }
                     if (prevResult.object == null) {
