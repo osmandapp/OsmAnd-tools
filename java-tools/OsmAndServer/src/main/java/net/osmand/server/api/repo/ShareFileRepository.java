@@ -27,6 +27,9 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 	@Query("SELECT a FROM ShareFilesAccess a WHERE a.id = :id")
 	ShareFilesAccess findShareFilesAccessById(@Param("id") long id);
 
+	@Query("SELECT a FROM ShareFilesAccess a WHERE a.user.id = :userId")
+	List<ShareFilesAccess> findShareFilesAccessListByUserId(int userId);
+
 	<S extends ShareFilesAccess> S saveAndFlush(S entity);
 
 	@Setter

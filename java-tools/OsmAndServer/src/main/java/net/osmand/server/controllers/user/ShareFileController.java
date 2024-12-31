@@ -249,4 +249,15 @@ public class ShareFileController {
 		return ResponseEntity.ok(gson.toJson(shareFileDto));
 	}
 
+	@GetMapping(path = {"/get-shared-with-me"}, produces = "application/json")
+	public ResponseEntity<String> getSharedWithMe() {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		ShareFileRepository.ShareFileDTO[] shareFiles = shareFileService.getSharedWithMe(dev.userid);
+		return ResponseEntity.ok(gson.toJson(shareFiles));
+
+	}
+
 }
