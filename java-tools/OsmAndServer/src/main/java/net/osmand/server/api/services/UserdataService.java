@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -1207,7 +1208,6 @@ public class UserdataService {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			Optional<UserFile> of = filesRepository.findById(nd.id);
 			if (of.isPresent()) {
-				GpxTrackAnalysis analysis = null;
 				UserFile uf = of.get();
 				InputStream in;
 				try {
@@ -1243,9 +1243,19 @@ public class UserdataService {
 									bboxPoints.minLon() >= bbox.minLon() &&
 									bboxPoints.maxLon() <= bbox.maxLon();
 					if (isBBoxPointsInsideBBox) {
-						if (containsSegment(allPoints, wptPoints)) {
+						Map<String, Float> resMap = new HashMap<>();
+						List<List<Integer>> indexes = containsSegment(allPoints, wptPoints);
+						if (!indexes.isEmpty()) {
+							for(List<Integer> ind : indexes) {
+								GpxFile newFile = new GpxFile(OSMAND_ROUTER_V2);
+								List<WptPt> pList = allPoints.subList(ind.get(0), ind.get(1));
+								newFile.addPoints(pList);
+								GpxTrackAnalysis analysis = newFile.getAnalysis(0);
+								resMap.put(ind.get(0) + "-" + ind.get(1), analysis.getMaxSpeed());
+							}
 							result.add(nd);
 						}
+
 					}
 
 				} else {
@@ -1272,32 +1282,93 @@ public class UserdataService {
 	record BoundingBox(double minLat, double maxLat, double minLon, double maxLon) {
 	}
 
-	private boolean containsSegment(List<WptPt> allPoints, List<WptPt> segmentPoints) {
-		if (segmentPoints.isEmpty() || allPoints.isEmpty() || segmentPoints.size() > allPoints.size()) {
-			return false;
+	private List<List<Integer>> containsSegment(List<WptPt> allPoints, List<WptPt> segmentPoints) {
+		if (segmentPoints.isEmpty() || allPoints.isEmpty() || segmentPoints.size() != 2) {
+			return Collections.emptyList();
 		}
 
 		WptPt segmentStart = segmentPoints.get(0);
+		WptPt segmentEnd = segmentPoints.get(1);
 
-		for (int i = 0; i <= allPoints.size() - segmentPoints.size(); i++) {
-			if (pointsCloseEnough(allPoints.get(i), segmentStart)) {
-				boolean matches = true;
-				for (int j = 1; j < segmentPoints.size(); j++) {
-					if (!pointsCloseEnough(allPoints.get(i + j), segmentPoints.get(j))) {
-						matches = false;
-						break;
-					}
+		List<List<Integer>> matchingSegments = new ArrayList<>();
+
+		matchingSegments.addAll(findSegments(allPoints, segmentStart, segmentEnd));
+
+		matchingSegments.addAll(findSegments(allPoints, segmentEnd, segmentStart));
+
+		return matchingSegments;
+	}
+
+	private List<List<Integer>> findSegments(List<WptPt> allPoints, WptPt startPoint, WptPt endPoint) {
+		List<List<Integer>> segments = new ArrayList<>();
+		int currentIndex = 0;
+
+		while (currentIndex < allPoints.size() - 1) {
+			int startIndex = -1;
+
+			for (int i = currentIndex; i < allPoints.size() - 1; i++) {
+				WptPt trackStart = allPoints.get(i);
+				WptPt trackEnd = allPoints.get(i + 1);
+
+				if (isPointOnSegment(trackStart, trackEnd, startPoint)) {
+					startIndex = i;
+					currentIndex = i + 1;
+					break;
 				}
-				if (matches) {
-					return true;
+			}
+
+			if (startIndex == -1) {
+				break;
+			}
+
+			for (int i = currentIndex; i < allPoints.size() - 1; i++) {
+				WptPt trackStart = allPoints.get(i);
+				WptPt trackEnd = allPoints.get(i + 1);
+
+				if (isPointOnSegment(trackStart, trackEnd, endPoint)) {
+					if (segments.isEmpty() || startIndex > segments.get(segments.size() - 1).get(1)) {
+						segments.add(List.of(startIndex, i + 1));
+					}
+					currentIndex = i + 1;
+					break;
 				}
 			}
 		}
-		return false;
+
+		return segments;
 	}
 
-	private boolean pointsCloseEnough(WptPt p1, WptPt p2) {
-		return Math.round(p1.getLat() * 1e5) == Math.round(p2.getLat() * 1e5) &&
-				Math.round(p1.getLon() * 1e5) == Math.round(p2.getLon() * 1e5);
+
+	private boolean isPointOnSegment(WptPt start, WptPt end, WptPt point) {
+		double distanceToSegment = getProjectionDistance(start, end, point);
+		return distanceToSegment <= 15.0;
+	}
+
+	private double getProjectionDistance(WptPt start, WptPt end, WptPt point) {
+		double startX = start.getLongitude();
+		double startY = start.getLatitude();
+		double endX = end.getLongitude();
+		double endY = end.getLatitude();
+		double pointX = point.getLongitude();
+		double pointY = point.getLatitude();
+
+		double dx = endX - startX;
+		double dy = endY - startY;
+
+		if (dx == 0 && dy == 0) {
+			return Math.sqrt(Math.pow(pointX - startX, 2) + Math.pow(pointY - startY, 2)) * 111320;
+		}
+
+		double t = ((pointX - startX) * dx + (pointY - startY) * dy) / (dx * dx + dy * dy);
+
+		if (t < 0) {
+			return Math.sqrt(Math.pow(pointX - startX, 2) + Math.pow(pointY - startY, 2)) * 111320;
+		} else if (t > 1) {
+			return Math.sqrt(Math.pow(pointX - endX, 2) + Math.pow(pointY - endY, 2)) * 111320;
+		} else {
+			double projX = startX + t * dx;
+			double projY = startY + t * dy;
+			return Math.sqrt(Math.pow(pointX - projX, 2) + Math.pow(pointY - projY, 2)) * 111320;
+		}
 	}
 }
