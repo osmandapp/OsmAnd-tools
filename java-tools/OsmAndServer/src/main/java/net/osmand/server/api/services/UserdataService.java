@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -12,16 +13,9 @@ import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -33,6 +27,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.data.LatLon;
+import net.osmand.data.LatLonEle;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.WptPt;
+import okio.Buffer;
+import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -1195,4 +1197,178 @@ public class UserdataService {
             devicesRepository.saveAndFlush(dev);
         }
     }
+
+	public List<UserFileNoData> getTracksBySegment(List<LatLon> points, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		List<UserFileNoData> result = new ArrayList<>();
+		UserdataController.UserFilesResults res = generateFiles(dev.userid, null, false, true, "GPX");
+		List<WptPt> wptPoints = points.stream()
+				.map(latLon -> new WptPt(latLon.getLatitude(), latLon.getLongitude()))
+				.collect(Collectors.toList());
+		BoundingBox bboxPoints = calculateBoundingBox(wptPoints);
+		for (UserFileNoData nd : res.uniqueFiles) {
+			Optional<UserFile> of = filesRepository.findById(nd.id);
+			if (of.isPresent()) {
+				UserFile uf = of.get();
+				InputStream in;
+				try {
+					in = uf.data != null ? new ByteArrayInputStream(uf.data) : getInputStream(uf);
+				} catch (Exception e) {
+					LOG.error(String.format(
+							"web-list-files-error: input-stream-error %s id=%d userid=%d error (%s)",
+							uf.name, uf.id, uf.userid, e.getMessage()));
+					continue;
+				}
+				if (in != null) {
+					in = new GZIPInputStream(in);
+					GpxFile gpxFile;
+					try (Source source = new Buffer().readFrom(in)) {
+						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+					} catch (IOException e) {
+						LOG.error(String.format(
+								"web-list-files-error: load-gpx-error %s id=%d userid=%d error (%s)",
+								uf.name, uf.id, uf.userid, e.getMessage()));
+						continue;
+					}
+					if (gpxFile.getError() != null) {
+						LOG.error(String.format(
+								"web-list-files-error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
+								uf.name, uf.id, uf.userid, gpxFile.getError().getMessage()));
+						continue;
+					}
+					List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
+					BoundingBox bbox = calculateBoundingBox(allPoints);
+					boolean isBBoxPointsInsideBBox =
+							bboxPoints.minLat() >= bbox.minLat() &&
+									bboxPoints.maxLat() <= bbox.maxLat() &&
+									bboxPoints.minLon() >= bbox.minLon() &&
+									bboxPoints.maxLon() <= bbox.maxLon();
+					if (isBBoxPointsInsideBBox) {
+						Map<String, Float> resMap = new HashMap<>();
+						List<List<Integer>> indexes = containsSegment(allPoints, wptPoints);
+						if (!indexes.isEmpty()) {
+							for(List<Integer> ind : indexes) {
+								GpxFile newFile = new GpxFile(OSMAND_ROUTER_V2);
+								List<WptPt> pList = allPoints.subList(ind.get(0), ind.get(1));
+								newFile.addPoints(pList);
+								GpxTrackAnalysis analysis = newFile.getAnalysis(0);
+								resMap.put(ind.get(0) + "-" + ind.get(1), analysis.getMaxSpeed());
+							}
+							result.add(nd);
+						}
+
+					}
+
+				} else {
+					LOG.error(String.format(
+							"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
+				}
+			}
+		}
+		return result;
+	}
+
+	private static BoundingBox calculateBoundingBox(List<WptPt> points) {
+		if (points.isEmpty()) {
+			return new BoundingBox(0, 0, 0, 0);
+		}
+		double minLat = points.stream().mapToDouble(WptPt::getLat).min().orElseThrow();
+		double maxLat = points.stream().mapToDouble(WptPt::getLat).max().orElseThrow();
+		double minLon = points.stream().mapToDouble(WptPt::getLon).min().orElseThrow();
+		double maxLon = points.stream().mapToDouble(WptPt::getLon).max().orElseThrow();
+
+		return new BoundingBox(minLat, maxLat, minLon, maxLon);
+	}
+
+	record BoundingBox(double minLat, double maxLat, double minLon, double maxLon) {
+	}
+
+	private List<List<Integer>> containsSegment(List<WptPt> allPoints, List<WptPt> segmentPoints) {
+		if (segmentPoints.isEmpty() || allPoints.isEmpty() || segmentPoints.size() != 2) {
+			return Collections.emptyList();
+		}
+
+		WptPt segmentStart = segmentPoints.get(0);
+		WptPt segmentEnd = segmentPoints.get(1);
+
+		List<List<Integer>> matchingSegments = new ArrayList<>();
+
+		matchingSegments.addAll(findSegments(allPoints, segmentStart, segmentEnd));
+
+		matchingSegments.addAll(findSegments(allPoints, segmentEnd, segmentStart));
+
+		return matchingSegments;
+	}
+
+	private List<List<Integer>> findSegments(List<WptPt> allPoints, WptPt startPoint, WptPt endPoint) {
+		List<List<Integer>> segments = new ArrayList<>();
+		int currentIndex = 0;
+
+		while (currentIndex < allPoints.size() - 1) {
+			int startIndex = -1;
+
+			for (int i = currentIndex; i < allPoints.size() - 1; i++) {
+				WptPt trackStart = allPoints.get(i);
+				WptPt trackEnd = allPoints.get(i + 1);
+
+				if (isPointOnSegment(trackStart, trackEnd, startPoint)) {
+					startIndex = i;
+					currentIndex = i + 1;
+					break;
+				}
+			}
+
+			if (startIndex == -1) {
+				break;
+			}
+
+			for (int i = currentIndex; i < allPoints.size() - 1; i++) {
+				WptPt trackStart = allPoints.get(i);
+				WptPt trackEnd = allPoints.get(i + 1);
+
+				if (isPointOnSegment(trackStart, trackEnd, endPoint)) {
+					if (segments.isEmpty() || startIndex > segments.get(segments.size() - 1).get(1)) {
+						segments.add(List.of(startIndex, i + 1));
+					}
+					currentIndex = i + 1;
+					break;
+				}
+			}
+		}
+
+		return segments;
+	}
+
+
+	private boolean isPointOnSegment(WptPt start, WptPt end, WptPt point) {
+		double distanceToSegment = getProjectionDistance(start, end, point);
+		return distanceToSegment <= 15.0;
+	}
+
+	private double getProjectionDistance(WptPt start, WptPt end, WptPt point) {
+		double startX = start.getLongitude();
+		double startY = start.getLatitude();
+		double endX = end.getLongitude();
+		double endY = end.getLatitude();
+		double pointX = point.getLongitude();
+		double pointY = point.getLatitude();
+
+		double dx = endX - startX;
+		double dy = endY - startY;
+
+		if (dx == 0 && dy == 0) {
+			return Math.sqrt(Math.pow(pointX - startX, 2) + Math.pow(pointY - startY, 2)) * 111320;
+		}
+
+		double t = ((pointX - startX) * dx + (pointY - startY) * dy) / (dx * dx + dy * dy);
+
+		if (t < 0) {
+			return Math.sqrt(Math.pow(pointX - startX, 2) + Math.pow(pointY - startY, 2)) * 111320;
+		} else if (t > 1) {
+			return Math.sqrt(Math.pow(pointX - endX, 2) + Math.pow(pointY - endY, 2)) * 111320;
+		} else {
+			double projX = startX + t * dx;
+			double projY = startY + t * dy;
+			return Math.sqrt(Math.pow(pointX - projX, 2) + Math.pow(pointY - projY, 2)) * 111320;
+		}
+	}
 }

@@ -2,6 +2,8 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.data.LatLon;
+import net.osmand.data.LatLonEle;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.Buffer;
@@ -862,5 +864,17 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
+	}
+
+	@PostMapping(path = {"/get-tracks-by-seg"}, produces = "application/json")
+	public ResponseEntity<String> getTracksBySegment(@RequestBody List<List<Double>> points) throws IOException {
+		PremiumUserDevice dev = checkUser();
+		if (dev == null) {
+			return tokenNotValid();
+		}
+		List<LatLon> latLonPoints = points.stream()
+				.map(point -> new LatLon(point.get(1), point.get(0)))
+				.toList();
+		return ResponseEntity.ok(gson.toJson(userdataService.getTracksBySegment(latLonPoints, dev)));
 	}
 }
