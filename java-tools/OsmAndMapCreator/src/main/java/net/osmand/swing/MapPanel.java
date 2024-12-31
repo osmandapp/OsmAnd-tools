@@ -593,7 +593,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	protected void downloadDiffs(Graphics2D g, MapDiff md) {
 		try {
-			String url = "https://download.osmand.net/check_live?aosmc=true&self=true&timestamp=" + md.timestamp +
+			String url = "https://download.osmand.net/check_live?aosmc=true&timestamp=" + md.timestamp +
 					"&file=" + URLEncoder.encode(md.baseName, StandardCharsets.UTF_8.toString());
 			System.out.println("Loading " + url);
 			HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
@@ -616,7 +616,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 				long time = updateFiles.get(file);
 				File targetFile = new File(dir, file.substring(0, file.length() - 3));
 				if(!targetFile.exists() || targetFile.lastModified() != time) {
-					String nurl = "https://download.osmand.net/download?aosmc=true&self=true&" + md.timestamp + "&file=" + URLEncoder.encode(file, StandardCharsets.UTF_8.toString());
+					String nurl = "https://download.osmand.net/download?aosmc=yes&" + md.timestamp + "&file=" + URLEncoder.encode(file, StandardCharsets.UTF_8.toString());
 					System.out.println("Loading " + nurl);
 					HttpURLConnection c = NetworkUtils.getHttpURLConnection(nurl);
 					GZIPInputStream gzip = new GZIPInputStream(c.getInputStream());
