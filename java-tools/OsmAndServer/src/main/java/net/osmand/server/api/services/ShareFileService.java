@@ -240,4 +240,15 @@ public class ShareFileService {
 		}
 		return true;
 	}
+
+	public void getSharedWithMe(int id) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(id);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			if (originalFile != null) {
+
+			}
+		}
+	}
 }
