@@ -667,7 +667,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			HashSet<String> set = new HashSet<>();
 			while (rs.next()) {
                 String value = rs.getString(2);
-                if (maxPerMap <= 0) {
+                if (maxPerMap > 0) {
                     set.add(value);
                 } else if (isBrand && WORLD_BRANDS.contains(value)) {
                     set.add(rs.getString(2));
