@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VALUE;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -10,17 +11,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -33,6 +27,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
+import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import okio.Buffer;
+import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -143,6 +143,9 @@ public class UserdataService {
     public static final String EMPTY_FILE_NAME = "__folder__.info";
     public static final String INFO_EXT = ".info";
 
+	public static final String FILE_NOT_FOUND = "File not found";
+	public static final String FILE_WAS_DELETED = "File was deleted";
+
     protected static final Log LOG = LogFactory.getLog(UserdataService.class);
     
     private static final int MAX_ATTEMPTS_PER_DAY = 100;
@@ -159,6 +162,14 @@ public class UserdataService {
             this.lastCheckTime = lastCheckTime;
         }
     }
+
+	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
+		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
+			return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+		}
+		return null;
+	}
     
     private ResponseEntity<String> trackRequest(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
@@ -244,7 +255,7 @@ public class UserdataService {
 		}
 	}
 
-	private String sanitizeEncode(String name) {
+	public String sanitizeEncode(String name) {
 		return name.replace("\r", CR_SANITIZE).replace("\n", LF_SANITIZE);
 	}
 
@@ -658,7 +669,7 @@ public class UserdataService {
     public InputStream getInputStream(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
         InputStream bin = null;
         if (dev == null) {
-            tokenNotValid();
+	        tokenNotValidError();
         } else {
             if (userFile == null) {
                 throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -696,6 +707,9 @@ public class UserdataService {
     }
     
     public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
+		if (userFile.storage.equals("local")) {
+			return new ByteArrayInputStream(userFile.data);
+		}
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
 
@@ -703,9 +717,13 @@ public class UserdataService {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
 
-    public ResponseEntity<String> tokenNotValid() {
+    public ResponseEntity<String> tokenNotValidError() {
         throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
     }
+
+	public ResponseEntity<String> tokenNotValidResponse() {
+		return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
+	}
 
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();

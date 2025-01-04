@@ -53,7 +53,6 @@ import com.google.gson.GsonBuilder;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
-import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
@@ -86,7 +85,6 @@ public class GpxController {
 	String srtmLocation;
 	
 	@PostMapping(path = {"/clear"}, produces = "application/json")
-	@ResponseBody
 	public String clear(HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		for (File f : ctx.tempFiles) {
@@ -98,14 +96,12 @@ public class GpxController {
 	}
 	
 	@GetMapping(path = { "/get-gpx-info" }, produces = "application/json")
-	@ResponseBody
 	public String getGpx(HttpSession httpSession) {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		return gson.toJson(Map.of("all", ctx.files));
 	}
 	
 	@GetMapping(path = {"/get-gpx-file"}, produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<Resource> getGpx(@RequestParam String name, HttpSession httpSession) {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
 		File tmpGpx = null;
@@ -225,7 +221,6 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/get-gpx-analysis"}, produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<String> getGpxInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                         HttpServletRequest request, HttpSession httpSession) throws IOException {
 		
@@ -260,7 +255,6 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                               HttpSession httpSession) throws IOException {
 		
@@ -284,7 +278,6 @@ public class GpxController {
 	}
 	
 	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
-	@ResponseBody
 	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
 	                                                         HttpSession httpSession) throws IOException {
 		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
