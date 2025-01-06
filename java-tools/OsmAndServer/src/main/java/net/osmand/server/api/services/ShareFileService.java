@@ -138,6 +138,15 @@ public class ShareFileService {
 		return true;
 	}
 
+	public boolean deleteShareFile(String name, int userid) {
+		ShareFileRepository.ShareFile shareFile = shareFileRepository.findByOwneridAndFilepath(userid, name);
+		if (shareFile != null) {
+			shareFileRepository.delete(shareFile);
+			return true;
+		}
+		return false;
+	}
+
 	public ResponseEntity<String> checkAccessAndReturnError(ShareFileRepository.ShareFile file) {
 		if (file.isPublicAccess()) {
 			return null;
