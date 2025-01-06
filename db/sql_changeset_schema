@@ -41,7 +41,7 @@ CREATE INDEX user_files_deviceid_idx on user_files(deviceid);
 
 -- share file
 CREATE TABLE user_share_files (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     ownerid INTEGER NOT NULL,
     uuid UUID UNIQUE,
     filepath TEXT NOT NULL,
@@ -51,11 +51,11 @@ CREATE TABLE user_share_files (
 );
 
 CREATE TABLE user_share_files_access (
-    id SERIAL UNIQUE,
+    id BIGSERIAL UNIQUE,
     user_id INTEGER NOT NULL,
     access TEXT NOT NULL,
     date TIMESTAMP NOT NULL,
-    file_id INTEGER NOT NULL,
+    file_id BIGINT NOT NULL,
     CONSTRAINT user_share_files_access_pk PRIMARY KEY (file_id, user_id),
     CONSTRAINT fk_user_share_files_access_user FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE,
     CONSTRAINT fk_user_share_files_access_file FOREIGN KEY (file_id) REFERENCES user_share_files(id) ON DELETE CASCADE
