@@ -26,11 +26,11 @@ public class RelationTagsPropagation {
 	final static String SPLIT_VALUE= "SPLITVL";
 	private static final String RELATION_SORT_TAG = "relation_sort:";
 	private Map<EntityId, PropagateEntityTags> propogatedTags = new LinkedHashMap<Entity.EntityId, PropagateEntityTags>();
-	
+
 	private static class RelationRulePropagation {
 		String relationGroupKeyString;
 		String relationGroupValueString;
-		
+
 		Map<String, String> relationNameTags = new LinkedHashMap<String, String>();
 		Map<String, String> relationAdditionalTags = new LinkedHashMap<String, String>();
 		List<PropagateTagGroup> relationGroups = new ArrayList<>();
@@ -40,28 +40,28 @@ public class RelationTagsPropagation {
 					relationNameTags, relationAdditionalTags, relationGroups);
 		}
 	}
-	
+
 	public static class PropagateTagGroup {
 		public Map<String, String> tags = new LinkedHashMap<String, String>();
 		public String orderValue = "";
 		public String groupKey = "";
-		
+
 		@Override
 		public String toString() {
 			return groupKey + " " + orderValue + " - " + tags;
 		}
 	}
-	
+
 	public static class PropagateEntityTags {
 		public Map<String, String> putThroughTags = new LinkedHashMap<String, String>();
 		public Map<String, List<PropagateTagGroup>> relationGroupTags = new LinkedHashMap<String, List<PropagateTagGroup>>();
-		
+
 		@Override
 		public String toString() {
 			return putThroughTags + " " + relationGroupTags;
 		}
 	}
-	
+
 	private Map<String, String> processNameTags(Map<String, String> relationTags, MapRenderingTypesEncoder renderingTypes,
 			Map<String, String> relationNameTags, Map<String, String> relationNames, EntityConvertApplyType at) {
 		if (relationNames != null) {
@@ -80,7 +80,7 @@ public class RelationTagsPropagation {
 		}
 		return relationNameTags;
 	}
-	
+
 	private List<RelationRulePropagation> processRelationTags(MapRenderingTypesEncoder renderingTypes, Map<String, String> relationTags, EntityConvertApplyType at) {
 		List<RelationRulePropagation> res = null;
 		for (Entry<String, String> ev : relationTags.entrySet()) {
@@ -167,7 +167,7 @@ public class RelationTagsPropagation {
 			for (RelationMember ids : relation.getMembers()) {
 				PropagateEntityTags entityTags = getPropogateTagForEntity(ids.getEntityId());
 				for (RelationRulePropagation p : lst) {
-					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString;
+					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString + ":" + p.relationGroupValueString;
 					if (!entityTags.putThroughTags.containsKey(sortKey)
 							|| p.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) < 0) {
 						entityTags.putThroughTags.put(sortKey, p.relationGroupValueString);
@@ -190,7 +190,7 @@ public class RelationTagsPropagation {
 						entityTags.relationGroupTags.get(g.groupKey).add(g);
 					}
 				}
-				
+
 			}
 		}
 	}
@@ -209,9 +209,9 @@ public class RelationTagsPropagation {
 		}
 		return propogatedTags.get(entityId);
 	}
-	
-	
-	
+
+
+
 	public Map<String, String> addPropogatedTags(MapRenderingTypesEncoder renderingTypes, EntityConvertApplyType tp, Entity e, Map<String, String> tags) {
 		EntityId eid = EntityId.valueOf(e);
 		PropagateEntityTags proptags = propogatedTags.get(eid);
@@ -257,12 +257,12 @@ public class RelationTagsPropagation {
 					mod++;
 				}
 			}
-		}	
+		}
 		return tags;
 	}
-	
-	
-	
+
+
+
 	private static String sortAndAttachUniqueValue(String list, String value) {
 		if(list == null) {
 			list = "";
@@ -296,5 +296,5 @@ public class RelationTagsPropagation {
 		return r;
 	}
 
-	
+
 }
