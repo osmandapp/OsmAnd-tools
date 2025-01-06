@@ -111,7 +111,7 @@ public class ShareFileController {
 			return errorAccess;
 		}
 		GpxFile gpxFile = shareFileService.getFile(userFile);
-		if (gpxFile.getError() == null) {
+		if (gpxFile != null && gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
 			WebGpxParser.TrackData gpxData = gpxService.getTrackDataByGpxFile(gpxFile, null, analysis);
 			if (gpxData != null) {
@@ -122,7 +122,11 @@ public class ShareFileController {
 				)));
 			}
 		}
-		LOGGER.error("Error getting gpx data: " + gpxFile.getError());
+		if (gpxFile == null) {
+			LOGGER.error("Error getting gpx data: gpxFile is null");
+		} else {
+			LOGGER.error("Error getting gpx data: " + gpxFile.getError());
+		}
 		return ResponseEntity.badRequest().body("Error getting gpx data");
 	}
 
