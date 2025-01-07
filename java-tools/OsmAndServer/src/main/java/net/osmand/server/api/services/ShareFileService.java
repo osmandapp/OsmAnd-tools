@@ -129,10 +129,6 @@ public class ShareFileService {
 			shareFileRepository.delete(shareFile);
 		} else {
 			shareFile.setPublicAccess(shareType.equals(PUBLIC_SHARE_TYPE));
-			if (shareFile.isPublicAccess() && shareFile.getUuid() == null) {
-				UUID uuid = generateUniqueCode();
-				shareFile.setUuid(uuid);
-			}
 			shareFileRepository.saveAndFlush(shareFile);
 		}
 		return true;
