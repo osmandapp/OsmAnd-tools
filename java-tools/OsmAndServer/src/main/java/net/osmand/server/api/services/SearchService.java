@@ -664,6 +664,10 @@ public class SearchService {
                 String value = unzipContent(entry.getValue());
                 feature.prop(entry.getKey(), value);
             }
+            Map<String, String> names = amenity.getNamesMap(true);
+            for (Map.Entry<String, String> entry : names.entrySet()) {
+                feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
+            }
             Map<String, String> typeTags = getPoiTypeFields(poiType);
             for (Map.Entry<String, String> entry : typeTags.entrySet()) {
                 feature.prop(entry.getKey(), entry.getValue());
