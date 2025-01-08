@@ -138,6 +138,15 @@ public class ShareFileService {
 		return true;
 	}
 
+	public boolean deleteShareFile(String name, int userid) {
+		ShareFileRepository.ShareFile shareFile = shareFileRepository.findByOwneridAndFilepath(userid, name);
+		if (shareFile != null) {
+			shareFileRepository.delete(shareFile);
+			return true;
+		}
+		return false;
+	}
+
 	public ResponseEntity<String> checkAccessAndReturnError(ShareFileRepository.ShareFile file) {
 		if (file.isPublicAccess()) {
 			return null;
@@ -207,10 +216,15 @@ public class ShareFileService {
 	}
 
 	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
-		if (file == null || file.data == null) {
+		if (file == null) {
 			return null;
 		}
-		try (InputStream inputStream = new GZIPInputStream(new ByteArrayInputStream(file.data));
+		InputStream in = file.data != null ? new ByteArrayInputStream(file.data)
+				: userdataService.getInputStream(file);
+		if (in == null) {
+			return null;
+		}
+		try (InputStream inputStream = new GZIPInputStream(in);
 		     Source source = new Buffer().readFrom(inputStream)) {
 			GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 			if (gpxFile.getError() == null) {

@@ -82,6 +82,10 @@ public class UserdataService {
     @Autowired
     protected PremiumUserFilesRepository filesRepository;
 
+	@Lazy
+	@Autowired
+	ShareFileService shareFileService;
+
     @Autowired
     protected StorageService storageService;
 
@@ -170,7 +174,7 @@ public class UserdataService {
 		}
 		return null;
 	}
-    
+
     private ResponseEntity<String> trackRequest(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
         RequestData checkData = requestTracker.getIfPresent(ipAddress);
@@ -725,6 +729,7 @@ public class UserdataService {
 		return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
 	}
 
+	@Transactional
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
         PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
         usf.name = name;
@@ -739,6 +744,7 @@ public class UserdataService {
             usf.clienttime = new Date(clienttime);
         }
         filesRepository.saveAndFlush(usf);
+		shareFileService.deleteShareFile(name, dev.userid);
     }
 
     //delete entry from database!
