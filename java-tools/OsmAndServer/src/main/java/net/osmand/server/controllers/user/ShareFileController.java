@@ -9,6 +9,7 @@ import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -251,6 +252,16 @@ public class ShareFileController {
 		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.isPublicAccess());
 
 		return ResponseEntity.ok(gson.toJson(shareFileDto));
+	}
+
+	@GetMapping(path = {"/get-shared-with-me"}, produces = "application/json")
+	public ResponseEntity<String> getSharedWithMe(@RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		UserdataController.UserFilesResults files = shareFileService.getSharedWithMe(dev.userid, type);
+		return ResponseEntity.ok(gson.toJson(files));
 	}
 
 }

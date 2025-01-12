@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import net.osmand.server.api.repo.*;
+import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -249,5 +250,21 @@ public class ShareFileService {
 			}
 		}
 		return true;
+	}
+
+	public UserdataController.UserFilesResults getSharedWithMe(int id, String type) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(id);
+		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			if (originalFile == null || !originalFile.type.equals(type)) {
+				continue;
+			}
+			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
+			allFiles.add(userFile);
+		}
+		UserdataController.UserFilesResults results = userdataService.getUserFilesResults(allFiles, id, false);
+		return results;
 	}
 }
