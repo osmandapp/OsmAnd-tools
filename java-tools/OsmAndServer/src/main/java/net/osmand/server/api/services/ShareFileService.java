@@ -14,9 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -264,7 +262,20 @@ public class ShareFileService {
 			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
 			allFiles.add(userFile);
 		}
-		UserdataController.UserFilesResults results = userdataService.getUserFilesResults(allFiles, id, false);
-		return results;
+		return userdataService.getUserFilesResults(allFiles, id, false);
+	}
+
+	public List<PremiumUserFilesRepository.UserFile> getOriginalSharedWithMeFiles(PremiumUserDevicesRepository.PremiumUserDevice dev, String type) {
+		List<PremiumUserFilesRepository.UserFile> files = new ArrayList<>();
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			if (originalFile == null || !originalFile.type.equals(type)) {
+				continue;
+			}
+			files.add(originalFile);
+		}
+		return files;
 	}
 }

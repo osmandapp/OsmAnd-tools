@@ -674,8 +674,9 @@ public class MapApiController {
 
 	@PostMapping(value = "/download-backup-folder")
 	public void createBackupFolder(@RequestParam String format,
-	                               @RequestParam String folderName,
 	                               @RequestParam String type,
+	                               @RequestParam(required = false) String folderName,
+								   @RequestParam(required = false) Boolean shared,
 	                               HttpServletResponse response) throws IOException {
 		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
@@ -686,7 +687,12 @@ public class MapApiController {
 			}
 			return;
 		}
-		userdataService.getBackupFolder(response, dev, folderName, format, type);
+		if (folderName != null) {
+			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+		} else if (shared != null && shared) {
+			List<PremiumUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			userdataService.getBackupFolder(response, dev, null, format, type, files);
+		}
 	}
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")

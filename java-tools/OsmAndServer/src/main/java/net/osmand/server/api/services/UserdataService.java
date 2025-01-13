@@ -1033,8 +1033,10 @@ public class UserdataService {
 
     @Transactional
     public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                String folderName, String format, String type) throws IOException {
-        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+                                String folderName, String format, String type, List<PremiumUserFilesRepository.UserFile> selectedFiles) throws IOException {
+        List<UserFile> files = folderName != null
+		        ? filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type)
+		        : selectedFiles;
         SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
         String fileName = "Export_" + formatter.format(new Date());
         File tmpFile = File.createTempFile(fileName, ".zip");
