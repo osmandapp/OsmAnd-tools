@@ -702,27 +702,20 @@ public class MapApiController {
 	}
 
 	@RequestMapping(path = {"/download-obf"})
-	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
+	public ResponseEntity<Resource> downloadObf(HttpServletResponse response,
+	                                            @RequestBody List<String> names,
+	                                            @RequestParam(required = false) Boolean shared,
+	                                            @RequestParam(required = false) String sharedType)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = userdataService.checkUser();
-		InputStream is = null;
 		FileInputStream fis = null;
 		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			Map<String, GpxFile> files = new HashMap<>();
-			for (String name : names) {
-				if (!name.endsWith(EMPTY_FILE_NAME)) {
-					UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
-					if (userFile != null) {
-						is = userdataService.getInputStream(dev, userFile);
-						GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
-						if (file.getError() == null) {
-							file.setModifiedTime(userFile.updatetime.getTime());
-							files.put(name, file);
-						}
-					}
-				}
+			List<PremiumUserFilesRepository.UserFile> selectedFiles = null;
+			if (shared != null && shared && sharedType != null) {
+				selectedFiles = shareFileService.getOriginalSharedWithMeFiles(dev, sharedType);
 			}
+			Map<String, GpxFile> files = userdataService.getGpxFilesMap(dev, names, selectedFiles);
 			targetObf = osmAndMapsService.getObf(files);
 			fis = new FileInputStream(targetObf);
 			Algorithms.streamCopy(fis, os);
@@ -734,9 +727,6 @@ public class MapApiController {
 
 			return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 		} finally {
-			if (is != null) {
-				is.close();
-			}
 			if (fis != null) {
 				fis.close();
 			}

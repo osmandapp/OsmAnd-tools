@@ -31,6 +31,8 @@ import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
+import okio.GzipSource;
+import okio.Okio;
 import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -42,6 +44,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -1221,4 +1225,37 @@ public class UserdataService {
             devicesRepository.saveAndFlush(dev);
         }
     }
+
+	public Map<String, GpxFile> getGpxFilesMap(PremiumUserDevicesRepository.PremiumUserDevice dev,
+	                                           List<String> names, List<UserFile> selectedFiles) throws IOException {
+		Map<String, GpxFile> files = new HashMap<>();
+		if (names != null && !names.isEmpty()) {
+			for (String name : names) {
+				if (!name.endsWith(EMPTY_FILE_NAME)) {
+					UserFile userFile = getUserFile(name, "GPX", null, dev);
+					if (userFile != null) {
+						processGpxFile(dev, userFile, files);
+					}
+				}
+			}
+		} else if (selectedFiles != null) {
+			for (UserFile userFile : selectedFiles) {
+				if (!userFile.name.endsWith(EMPTY_FILE_NAME)) {
+					processGpxFile(dev, userFile, files);
+				}
+			}
+		}
+		return files;
+	}
+
+	private void processGpxFile(PremiumUserDevicesRepository.PremiumUserDevice dev, UserFile userFile,
+	                            Map<String, GpxFile> files) throws IOException {
+		try (InputStream is = getInputStream(dev, userFile)) {
+			GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
+			if (file.getError() == null) {
+				file.setModifiedTime(userFile.updatetime.getTime());
+				files.put(userFile.name, file);
+			}
+		}
+	}
 }
