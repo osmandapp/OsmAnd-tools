@@ -37,7 +37,6 @@ import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
-import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
@@ -46,7 +45,6 @@ import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -55,6 +53,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -696,7 +695,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
         if (settings.indexByProximity) {
             cityPart = findCityPart(location, city);
         } else {
-            cityPart = city.getName(); 
+            cityPart = city.getName();
         }
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
 		if (foundStreet == null) {
@@ -1266,12 +1265,21 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return retName;
 	}
 
-	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
+    private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
+                                              IndexCreatorSettings settings) {
+        name = Algorithms.normalizeSearchText(name);
+        name = stripBraces(name);
+        String withoutDiacritic = ArabicNormalizer.normalize(name);
+        if (!name.equals(withoutDiacritic)) {
+            parseNormalizedPrefix(withoutDiacritic, data, namesIndex, settings);
+        }
+        parseNormalizedPrefix(name, data, namesIndex, settings);
+    }
+
+	private static void parseNormalizedPrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
 			IndexCreatorSettings settings) {
 		int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
-		name = Algorithms.normalizeSearchText(name);
-		name = stripBraces(name);
 
 		for (int i = 0; i <= name.length(); i++) {
 			boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'

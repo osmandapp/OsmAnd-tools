@@ -16,6 +16,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
+import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
@@ -838,17 +839,25 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		name = Algorithms.normalizeSearchText(name);
-		List<String> splitName = Algorithms.splitByWordsLowercase(name);
-		for (String str : splitName) {
-			if (str.length() > settings.charsToBuildPoiNameIndex) {
-				str = str.substring(0, settings.charsToBuildPoiNameIndex);
-			}
-			if (!poiData.containsKey(str)) {
-				poiData.put(str, new LinkedHashSet<>());
-			}
-			poiData.get(str).add(data);
-		}
+		String withoutDiacritic = ArabicNormalizer.normalize(name);
+        if (!name.equals(withoutDiacritic)) {
+            parseNormalizedPrefix(withoutDiacritic, data, poiData);
+        }
+        parseNormalizedPrefix(name, data, poiData);
 	}
+
+    private void parseNormalizedPrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
+        List<String> splitName = Algorithms.splitByWordsLowercase(name);
+        for (String str : splitName) {
+            if (str.length() > settings.charsToBuildPoiNameIndex) {
+                str = str.substring(0, settings.charsToBuildPoiNameIndex);
+            }
+            if (!poiData.containsKey(str)) {
+                poiData.put(str, new LinkedHashSet<>());
+            }
+            poiData.get(str).add(data);
+        }
+    }
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
 			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,
