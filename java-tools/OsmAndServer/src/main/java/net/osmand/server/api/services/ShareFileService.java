@@ -278,4 +278,15 @@ public class ShareFileService {
 		}
 		return files;
 	}
+
+	public PremiumUserFilesRepository.UserFile getSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				return getUserFile(file);
+			}
+		}
+		return null;
+	}
 }

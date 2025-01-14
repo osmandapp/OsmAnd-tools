@@ -500,22 +500,28 @@ public class MapApiController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam String name,
-			@RequestParam String type,
-			@RequestParam(required = false) Long updatetime) throws IOException {
+	                    @RequestParam String name,
+	                    @RequestParam String type,
+	                    @RequestParam(required = false) Long updatetime,
+	                    @RequestParam(required = false) Boolean shared) throws IOException {
 		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
-            response.setStatus(error.getStatusCodeValue());
-            response.getWriter().write(Objects.requireNonNull(error.getBody()));
-            return;
-        }
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			response.setStatus(error.getStatusCodeValue());
+			response.getWriter().write(Objects.requireNonNull(error.getBody()));
+			return;
+		}
+		PremiumUserFilesRepository.UserFile userFile;
+		if (shared != null && shared) {
+			userFile = shareFileService.getSharedWithMeFile(name, type, dev);
+		} else {
+			userFile = userdataService.getUserFile(name, type, updatetime, dev);
+		}
 		if (userFile != null) {
 			userdataService.getFile(userFile, response, request, name, type, dev);
 		}
 	}
-	
+
 	@GetMapping(value = "/download-file-from-prev-version")
 	public void getFilePrevVersion(HttpServletResponse response, HttpServletRequest request,
 	                               @RequestParam String name,
