@@ -839,20 +839,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		name = Algorithms.normalizeSearchText(name);
-        if (ArabicNormalizer.isSpecialArabic(name)) {
-            name = ArabicNormalizer.normalize(name);
-        }
+		if (ArabicNormalizer.isSpecialArabic(name)) {
+			name = ArabicNormalizer.normalize(name);
+		}
 		List<String> splitName = Algorithms.splitByWordsLowercase(name);
-        for (String str : splitName) {
-            if (str.length() > settings.charsToBuildPoiNameIndex) {
-                str = str.substring(0, settings.charsToBuildPoiNameIndex);
-            }
-            if (!poiData.containsKey(str)) {
-                poiData.put(str, new LinkedHashSet<>());
-            }
-            poiData.get(str).add(data);
-        }
-    }
+		for (String str : splitName) {
+		if (str.length() > settings.charsToBuildPoiNameIndex) {
+			str = str.substring(0, settings.charsToBuildPoiNameIndex);
+		}
+		if (!poiData.containsKey(str)) {
+			poiData.put(str, new LinkedHashSet<>());
+		}
+		poiData.get(str).add(data);
+		}
+	}
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
 			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,
