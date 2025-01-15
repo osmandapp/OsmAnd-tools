@@ -289,4 +289,16 @@ public class ShareFileService {
 		}
 		return null;
 	}
+
+	public boolean removeSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				shareFileRepository.removeShareFilesAccessById(file.getId(), dev.userid);
+				return true;
+			}
+		}
+		return false;
+	}
 }

@@ -264,4 +264,18 @@ public class ShareFileController {
 		return ResponseEntity.ok(gson.toJson(files));
 	}
 
+	@GetMapping(path = {"/remove-shared-with-me-file"}, produces = "application/json")
+	public ResponseEntity<String> removeSharedWithMeFile(@RequestParam String name,
+	                                                     @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		boolean removed = shareFileService.removeSharedWithMeFile(name, type, dev);
+		if (!removed) {
+			return ResponseEntity.badRequest().body("Error removing file");
+		}
+		return ResponseEntity.ok("File removed");
+	}
+
 }
