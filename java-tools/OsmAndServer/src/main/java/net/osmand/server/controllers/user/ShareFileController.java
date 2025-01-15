@@ -278,4 +278,15 @@ public class ShareFileController {
 		return ResponseEntity.ok("File removed");
 	}
 
+	@GetMapping(path = {"/save-shared-file"}, produces = "application/json")
+	public ResponseEntity<String> saveSharedFile(@RequestParam String fileName,
+	                                             @RequestParam String fileType,
+	                                             @RequestParam String newName) throws IOException {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return shareFileService.saveSharedFile(fileName, fileType, newName, dev);
+	}
+
 }

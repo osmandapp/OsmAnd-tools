@@ -30,6 +30,7 @@ import javax.transaction.Transactional;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.io.KFile;
 import okio.Buffer;
 import okio.GzipSource;
 import okio.Okio;
@@ -813,7 +814,7 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
     }
 
-    private InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+    public InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(newName, ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
@@ -821,11 +822,11 @@ public class UserdataService {
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
-                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-				if (gpxFile.error != null) {
+	            GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
+				if (gpxFile.getError() != null) {
 					return null;
 				}
-                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
                 if (exception != null) {
                     return null;
                 }

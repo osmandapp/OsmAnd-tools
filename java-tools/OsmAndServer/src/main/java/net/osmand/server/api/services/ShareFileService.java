@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
@@ -300,5 +301,30 @@ public class ShareFileService {
 			}
 		}
 		return false;
+	}
+
+	public ResponseEntity<String> saveSharedFile(String name, String type, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				PremiumUserFilesRepository.UserFile userFile = getUserFile(file);
+				if (userFile != null) {
+					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
+					if (zipFile != null) {
+						try {
+							userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+						} catch (OsmAndPublicApiException e) {
+							return ResponseEntity.badRequest().body(e.getMessage());
+						}
+						return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+					} else {
+						return ResponseEntity.badRequest().body("Zip file not found");
+					}
+				}
+				return ResponseEntity.badRequest().body("Original file not found");
+			}
+		}
+		return ResponseEntity.badRequest().body("Shared file not found");
 	}
 }
