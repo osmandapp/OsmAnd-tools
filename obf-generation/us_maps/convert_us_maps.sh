@@ -26,7 +26,7 @@ process_nfs_trails=false
 process_blm_roads_trails=false
 process_blm_recreation_site_points=false
 process_nps_trails=true
-process_nps_roads=false
+process_nps_roads=true
 process_nps_pois=false
 process_nps_parking_lots=false
 process_nps_buildings=false
@@ -267,6 +267,7 @@ if [[ $process_nps_trails == true ]] ; then
 	fi
 	ogr2ogr $work_dir/$source_dir/nps_trails.gpkg $work_dir/$source_original_dir/nps_trails.geojson
 	cd $dir/$ogr2osm_dir && python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/nps_trails.gpkg -o $work_dir/$out_osm_dir/us_nps_trails.osm -t nps_trails.py
+	generate_obf us_nps_trails.osm
 fi
 
 if [[ $process_nps_roads == true ]] ; then
@@ -275,6 +276,8 @@ if [[ $process_nps_roads == true ]] ; then
 		python3 -m dump_esri "$url_nps_roads" $work_dir/$source_original_dir/nps_roads.geojson
 	fi
 	ogr2ogr $work_dir/$source_dir/nps_roads.gpkg $work_dir/$source_original_dir/nps_roads.geojson
+	cd $dir/$ogr2osm_dir && python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/nps_roads.gpkg -o $work_dir/$out_osm_dir/us_nps_roads.osm -t nps_roads.py
+	generate_obf us_nps_roads.osm
 fi
 
 if [[ $process_nps_pois == true ]] ; then

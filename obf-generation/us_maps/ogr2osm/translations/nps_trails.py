@@ -28,80 +28,79 @@ class USNPSTrailsTranslation(ogr2osm.TranslationBase):
 			if 'MAPLABEL' in attrs and MAPLABEL and MAPLABEL.lower() != 'way':
 				name = MAPLABEL.strip().strip()
 				if name:
-					tags['name'] = sanitize_xml_string(name)
+					tags['name'] = sanitize_xml_string(name).lower().title().replace("'S ","'s ")
 			elif 'TRLNAME' in attrs and TRLNAME and TRLNAME.lower() != 'trail' and TRLNAME.lower() != 'way':
 				name = TRLNAME.strip().strip()
 				if name:
-					tags['name'] = sanitize_xml_string(name)
+					tags['name'] = sanitize_xml_string(name).lower().title().replace("'S ","'s ")
 		if ('TRLSTATUS' in attrs and TRLSTATUS):
 			match TRLSTATUS:
 				case "Decommissioned":
-					tags.update({'us_maps_trail_accessibility_status':'decommissioned'})
-				case "Exisiting" | "Existing":
-					tags.update({'us_maps_trail_accessibility_status':'existing'})
+					tags.update({'us_maps_accessibility_status':'decommissioned'})
+				case "Exisiting":
+					tags.update({'us_maps_accessibility_status':'existing'})
+				case "Existing":
+					tags.update({'us_maps_accessibility_status':'existing'})
 				case "Maintained":
-					tags.update({'us_maps_trail_accessibility_status':'maintained'})
+					tags.update({'us_maps_accessibility_status':'maintained'})
 				case "Not Applicable":
-					tags.update({'us_maps_trail_accessibility_status':'not_applicable'})
+					tags.update({'us_maps_accessibility_status':'not_applicable'})
 				case "Proposed":
-					tags.update({'us_maps_trail_accessibility_status':'proposed'})
+					tags.update({'us_maps_accessibility_status':'proposed'})
 				case "Temporarily Closed":
-					tags.update({'us_maps_trail_accessibility_status':'temporarily_closed'})
+					tags.update({'us_maps_accessibility_status':'temporarily_closed'})
 				case "Unmaintained":
-					tags.update({'us_maps_trail_accessibility_status':'unmaintained'})
-		if ('TRLSURFACE' in attrs and TRLSURFACE):
+					tags.update({'us_maps_accessibility_status':'unmaintained'})
+		if attrs.get('TRLSURFACE'):
 			surface = TRLSURFACE.lower()
-			match surface:
-				case "aggregate":
-					tags.update({'surface':'aggregate'})
-				case "asphalt":
-					tags.update({'surface':'asphalt'})
-				case "bituminous":
-					tags.update({'surface':'bituminous'})
-				case "brick":
-					tags.update({'surface':'brick'})
-				case "clay":
-					tags.update({'surface':'clay'})
-				case "concrete":
-					tags.update({'surface':'concrete'})
-				case "dirt with gravel":
-					tags.update({'surface':'dirt_with_gravel'})
-				case "earth" | "soil":
-					tags.update({'surface':'earth'})
-				case "earth/grass":
-					tags.update({'surface':'earth_grass'})
-				case "gravel" | "gravel road":
-					tags.update({'surface':'gravel'})
-				case "imported compacted material":
-					tags.update({'surface':'imported_compacted_material'})
-				case "imported loose material":
-					tags.update({'surface':'imported_loose_material'})
-				case "lava":
-					tags.update({'surface':'lava'})
-				case "masonry/stone" | "stone":
-					tags.update({'surface':'stone'})
-				case "metal":
-					tags.update({'surface':'metal'})
-				case "native" | "native material":
-					tags.update({'surface':'native_material'})
-				case "other" | "other unpaved":
-					tags.update({'surface':'other'})
-				case "paver":
-					tags.update({'surface':'paver'})
-				case "plastic":
-					tags.update({'surface':'plastic'})
-				case "rubber":
-					tags.update({'surface':'rubber'})
-				case "sand":
-					tags.update({'surface':'sand'})
-				case "snow":
-					tags.update({'surface':'snow'})
-				case "water":
-					tags.update({'surface':'water'})
-				case "wood":
-					tags.update({'surface':'wood'})
-				case "wood chips":
-					tags.update({'surface':'wood_chips'})
+			if surface == "aggregate":
+				tags.update({'surface': 'aggregate'})
+			elif surface == "asphalt":
+				tags.update({'surface': 'asphalt'})
+			elif surface == "bituminous":
+				tags.update({'surface': 'bituminous'})
+			elif surface == "brick":
+				tags.update({'surface': 'brick'})
+			elif surface == "clay":
+				tags.update({'surface': 'clay'})
+			elif surface == "concrete":
+				tags.update({'surface': 'concrete'})
+			elif surface == "dirt with gravel":
+				tags.update({'surface': 'dirt_with_gravel'})
+			elif surface == "earth" or surface == "earth/grass" or surface == "soil":
+				tags.update({'surface': 'earth'})
+			elif surface == "gravel" or surface == "gravel_road":
+				tags.update({'surface': 'gravel'})
+			elif surface == "imported compacted material":
+				tags.update({'surface': 'imported_compacted_material'})
+			elif surface == "imported loose material":
+				tags.update({'surface': 'imported_loose_material'})
+			elif surface == "lava":
+				tags.update({'surface': 'lava'})
+			elif surface == "masonry/stone" or surface == "stone":
+				tags.update({'surface': 'stone'})
+			elif surface == "metal":
+				tags.update({'surface': 'metal'})
+			elif surface == "native" or surface == "native material":
+				tags.update({'surface': 'native_material'})
+			elif surface == "other" or surface == "other unpaved":
+				tags.update({'surface': 'other'})
+			elif surface == "paver":
+				tags.update({'surface': 'paver'})
+			elif surface == "plastic":
+				tags.update({'surface': 'plastic'})
+			elif surface == "rubber":
+				tags.update({'surface': 'rubber'})
+			elif surface == "sand":
+				tags.update({'surface': 'sand'})
+			elif surface == "snow":
+				tags.update({'surface': 'snow'})
+			elif surface == "water":
+				tags.update({'surface': 'water'})
+			elif surface == "wood":
+				tags.update({'surface': 'wood'})
+			elif surface == "wood chips":
+				tags.update({'surface': 'wood_chips'})
 		if ('TRLTYPE' in attrs and TRLTYPE):
 			match TRLTYPE:
 				case "Ferry Route":
@@ -114,7 +113,9 @@ class USNPSTrailsTranslation(ogr2osm.TranslationBase):
 					tags.update({'us_maps_trail_type':'sidewalk'})
 				case "Snow Trail":
 					tags.update({'us_maps_trail_type':'snow_trail'})
-				case "Standard Terra Trail" | "Standard/Terra Trail":
+				case "Standard Terra Trail":
+					tags.update({'us_maps_trail_type':'standard_terra_trail'})
+				case "Standard/Terra Trail":
 					tags.update({'us_maps_trail_type':'standard_terra_trail'})
 				case "Steps":
 					tags.update({'us_maps_trail_type':'steps'})
@@ -125,16 +126,15 @@ class USNPSTrailsTranslation(ogr2osm.TranslationBase):
 				case "Water Trail":
 					tags.update({'us_maps_trail_type':'water_trail'})
 
-		if ('TRLCLASS' in attrs and TRLCLASS):
-			match TRLCLASS:
-				case "Class1" | "Class 1: Minimally Developed" | "2" | "Class2" | "Class 2: Minor Development" | "Class 2: Moderately Developed":
-					tags.update({'us_maps_terra_base_symbology':'tc1-2'})
-				case "3" | "Class3" | "Class 3: Developed":
-					tags.update({'us_maps_terra_base_symbology':'tc3'})
-				case "4" | "Class4" | "Class 4: Highly Developed" | "5" | "Class5" | "Class 5: Fully Developed":
-					tags.update({'us_maps_terra_base_symbology':'tc4-5'})
-				case "6":
-					tags.update({'us_maps_terra_base_symbology':'tc6'})
+		if attrs.get('TRLCLASS'):
+			if TRLCLASS == "Class1" or TRLCLASS == "Class 1: Minimally Developed" or TRLCLASS == "2" or TRLCLASS == "Class2" or TRLCLASS == "Class 2: Minor Development" or TRLCLASS == "Class 2: Moderately Developed":
+				tags.update({'us_maps_terra_base_symbology':'tc1-2'})
+			if TRLCLASS == "3" or TRLCLASS == "Class3" or TRLCLASS == "Class 3: Developed":
+				tags.update({'us_maps_terra_base_symbology':'tc3'})
+			if TRLCLASS == "4" or TRLCLASS == "Class4" or TRLCLASS == "Class 4: Highly Developed" or TRLCLASS == "5" or TRLCLASS == "Class5" or TRLCLASS == "Class 5: Fully Developed":
+				tags.update({'us_maps_terra_base_symbology':'tc4-5'})
+			if TRLCLASS == "6":
+				tags.update({'us_maps_terra_base_symbology':'tc6'})
 
 		if 'TRLUSE' in attrs:
 			if 'hike' in TRLUSE.lower() or 'hiking' in TRLUSE.lower() or 'walking' in TRLUSE.lower() or 'pedestrian' in TRLUSE.lower() or 'foot' in TRLUSE.lower():
@@ -172,6 +172,9 @@ class USNPSTrailsTranslation(ogr2osm.TranslationBase):
 
 		if ('ACCESSNOTES' in attrs and ACCESSNOTES):
 			tags['access_notes'] = ACCESSNOTES
+
+		if ('SEASONAL' in attrs and SEASONAL.lower() == 'yes'):
+			tags.update({'seasonal':'yes'})
 
 		if ('SEASONAL' in attrs and SEASONAL.lower() == 'no'):
 			tags.update({'seasonal':'no'})
