@@ -1268,30 +1268,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
                                               IndexCreatorSettings settings) {
         name = Algorithms.normalizeSearchText(name);
-        if (ArabicNormalizer.isSpecialArabic(name)) {
-            name = ArabicNormalizer.normalize(name);
-        }
         name = stripBraces(name);
-        int prev = -1;
-		List<String> namesToAdd = new ArrayList<>();
+		List<String> namesToAdd = splitNames(name);
 
-		for (int i = 0; i <= name.length(); i++) {
-			boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
-					&& ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
-					|| (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
-			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
-					name.charAt(i) != '\'' && !isHyphenNearNumber)) {
-				if (prev != -1) {
-					String substr = name.substring(prev, i);
-					namesToAdd.add(substr.toLowerCase());
-					prev = -1;
-				}
-			} else {
-				if (prev == -1) {
-					prev = i;
-				}
-			}
-		}
+        if (ArabicNormalizer.isSpecialArabic(name)) {
+            String arabic = ArabicNormalizer.normalize(name);
+            if (arabic != null && !arabic.equals(name)) {
+                namesToAdd.addAll(Algorithms.splitByWordsLowercase(arabic));
+            }
+        }
 		// remove common words
 		int pos = 0;
 		while(namesToAdd.size() > 1 && pos != -1) {
@@ -1326,6 +1311,30 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 	}
+
+    private static List<String> splitNames(String name) {
+        int prev = -1;
+        List<String> namesToAdd = new ArrayList<>();
+
+        for (int i = 0; i <= name.length(); i++) {
+            boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
+                    && ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
+                    || (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
+            if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
+                    name.charAt(i) != '\'' && !isHyphenNearNumber)) {
+                if (prev != -1) {
+                    String substr = name.substring(prev, i);
+                    namesToAdd.add(substr.toLowerCase());
+                    prev = -1;
+                }
+            } else {
+                if (prev == -1) {
+                    prev = i;
+                }
+            }
+        }
+        return namesToAdd;
+    }
 
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
