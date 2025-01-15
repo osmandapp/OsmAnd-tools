@@ -839,15 +839,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
 		name = Algorithms.normalizeSearchText(name);
-		String withoutDiacritic = ArabicNormalizer.normalize(name);
-        if (!name.equals(withoutDiacritic)) {
-            parseNormalizedPrefix(withoutDiacritic, data, poiData);
+        if (ArabicNormalizer.isSpecialArabic(name)) {
+            name = ArabicNormalizer.normalize(name);
         }
-        parseNormalizedPrefix(name, data, poiData);
-	}
-
-    private void parseNormalizedPrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
-        List<String> splitName = Algorithms.splitByWordsLowercase(name);
+		List<String> splitName = Algorithms.splitByWordsLowercase(name);
         for (String str : splitName) {
             if (str.length() > settings.charsToBuildPoiNameIndex) {
                 str = str.substring(0, settings.charsToBuildPoiNameIndex);

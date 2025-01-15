@@ -1268,17 +1268,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
                                               IndexCreatorSettings settings) {
         name = Algorithms.normalizeSearchText(name);
-        name = stripBraces(name);
-        String withoutDiacritic = ArabicNormalizer.normalize(name);
-        if (!name.equals(withoutDiacritic)) {
-            parseNormalizedPrefix(withoutDiacritic, data, namesIndex, settings);
+        if (ArabicNormalizer.isSpecialArabic(name)) {
+            name = ArabicNormalizer.normalize(name);
         }
-        parseNormalizedPrefix(name, data, namesIndex, settings);
-    }
-
-	private static void parseNormalizedPrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
-			IndexCreatorSettings settings) {
-		int prev = -1;
+        name = stripBraces(name);
+        int prev = -1;
 		List<String> namesToAdd = new ArrayList<>();
 
 		for (int i = 0; i <= name.length(); i++) {
