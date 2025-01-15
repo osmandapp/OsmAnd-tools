@@ -98,17 +98,17 @@ class BLMRoadsTrailsTranslation(ogr2osm.TranslationBase):
 			tags.update({'us_maps_road_functional_class':'unknown'})
 
 		if OBSRVE_SRFCE_TYPE.lower() == 'natural':
-			tags.update({'us_maps_road_surface':'native_material'})
+			tags.update({'surface':'native_material'})
 		if OBSRVE_SRFCE_TYPE.lower() == 'natural improved':
-			tags.update({'us_maps_road_surface':'improved_native_material'})
+			tags.update({'surface':'improved_native_material'})
 		if OBSRVE_SRFCE_TYPE.lower() == 'unknown':
-			tags.update({'us_maps_road_surface':'other'})
+			tags.update({'surface':'other'})
 		if OBSRVE_SRFCE_TYPE.lower() == 'aggregate':
-			tags.update({'us_maps_road_surface':'aggregate'})
+			tags.update({'surface':'aggregate'})
 		if OBSRVE_SRFCE_TYPE.lower() == 'snow':
-			tags.update({'us_maps_road_surface':'snow'})
+			tags.update({'surface':'snow'})
 		if OBSRVE_SRFCE_TYPE.lower() == 'solid surface':
-			tags.update({'us_maps_road_surface':'solid_surface'})
+			tags.update({'surface':'solid_surface'})
 
 		if ROUTE_SPCL_DSGNTN_TYPE.lower() == 'blm back country byway':
 			tags.update({'us_maps_road_special_designation':'blm_back_country_byway'})

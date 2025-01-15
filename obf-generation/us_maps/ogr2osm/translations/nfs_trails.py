@@ -93,35 +93,35 @@ class USFSTrailsTranslation(ogr2osm.TranslationBase):
 		if 'TYPICAL_TR' in attrs and TYPICAL_TREAD_CROSS_SLOPE and TYPICAL_TREAD_CROSS_SLOPE != 'N/A':
 			tags['us_maps_typical_tread_cross_slope'] = TYPICAL_TREAD_CROSS_SLOPE.lower().replace("%","")
 		if TRAIL_SURFACE == 'AC- ASPHALT' or TRAIL_SURFACE == 'ASPHALT':
-			tags.update({'us_maps_trail_surface':'asphalt'})
+			tags.update({'surface':'asphalt'})
 		if TRAIL_SURFACE == 'AGG - CRUSHED AGGREGATE OR GRAVEL' or TRAIL_SURFACE == 'CRUSHED AGGREGATE OR GRAVEL':
-			tags.update({'us_maps_trail_surface':'crushed_aggregate_or_gravel'})
+			tags.update({'surface':'crushed_aggregate_or_gravel'})
 		if TRAIL_SURFACE == 'CHUNK WOOD':
-			tags.update({'us_maps_trail_surface':'chunk_wood'})
+			tags.update({'surface':'chunk_wood'})
 		if TRAIL_SURFACE == 'CON - CONCRETE' or TRAIL_SURFACE == 'CONCRETE':
-			tags.update({'us_maps_trail_surface':'concrete'})
+			tags.update({'surface':'concrete'})
 		if TRAIL_SURFACE == 'IMPORTED COMPACTED MATERIAL':
-			tags.update({'us_maps_trail_surface':'imported_compacted_material'})
+			tags.update({'surface':'imported_compacted_material'})
 		if TRAIL_SURFACE == 'IMPORTED LOOSE MATERIAL':
-			tags.update({'us_maps_trail_surface':'imported_loose_material'})
+			tags.update({'surface':'imported_loose_material'})
 		if TRAIL_SURFACE == 'NATIVE MATERIAL' or TRAIL_SURFACE == 'NAT - NATIVE MATERIAL':
-			tags.update({'us_maps_trail_surface':'native_material'})
+			tags.update({'surface':'native_material'})
 		if TRAIL_SURFACE == 'OTHER':
-			tags.update({'us_maps_trail_surface':'other'})
+			tags.update({'surface':'other'})
 		if TRAIL_SURFACE == 'SNOW':
-			tags.update({'us_maps_trail_surface':'snow'})
+			tags.update({'surface':'snow'})
 		if TRAIL_SURFACE == 'WATER':
-			tags.update({'us_maps_trail_surface':'water'})
+			tags.update({'surface':'water'})
 		if TRAIL_SURFACE == 'F - FIRM':
-			tags.update({'us_maps_trail_surface_firmness':'firm'})
+			tags.update({'surface_firmness':'firm'})
 		if TRAIL_SURFACE == 'H - HARD':
-			tags.update({'us_maps_trail_surface_firmness':'hard'})
+			tags.update({'surface_firmness':'hard'})
 		if TRAIL_SURFACE == 'P - PAVED':
-			tags.update({'us_maps_trail_surface_firmness':'paved'})
+			tags.update({'surface_firmness':'paved'})
 		if TRAIL_SURFACE == 'S - SOFT':
-			tags.update({'us_maps_trail_surface_firmness':'soft'})
+			tags.update({'surface_firmness':'soft'})
 		if TRAIL_SURFACE == 'VS - VERY SOFT':
-			tags.update({'us_maps_trail_surface_firmness':'very_soft'})
+			tags.update({'surface_firmness':'very_soft'})
 		if 'MINIMUM_TR' in attrs and MINIMUM_TRAIL_WIDTH and MINIMUM_TRAIL_WIDTH != 'N/A':
 			tags['us_maps_minimum_trail_width'] = MINIMUM_TRAIL_WIDTH.lower()
 		if 'NATIONAL_T' in attrs and NATIONAL_TRAIL_DESIGNATION:

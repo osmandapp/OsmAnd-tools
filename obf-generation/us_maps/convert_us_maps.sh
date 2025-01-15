@@ -21,10 +21,15 @@ rendering_types_path=/home/xmd5a/git/OsmAnd-resources/obf_creation/rendering_typ
 
 process_nfs_trails=false
 process_nfs_roads=false
-process_nfs_rec_area_activities=true
+process_nfs_rec_area_activities=false
 process_nfs_trails=false
 process_blm_roads_trails=false
-process_blm_recreation_site_points=true
+process_blm_recreation_site_points=false
+process_nps_trails=true
+process_nps_roads=false
+process_nps_pois=false
+process_nps_parking_lots=false
+process_nps_buildings=false
 
 process_private_lands_test=false
 process_private_lands_wisconsin=false
@@ -78,6 +83,11 @@ url_nfs_rec_area_activities="https://data.fs.usda.gov/geodata/edw/edw_resources/
 url_nfs_roads="https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.RoadCore_FS.zip"
 url_nfs_trails="https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.TrailNFS_Publish.zip"
 url_blm_recreation_site_points="https://opendata.arcgis.com/api/v3/datasets/7438e9e800914c94bad99f70a4f2092d_1/downloads/data?format=fgdb&spatialRefId=4269&where=1%3D1"
+url_nps_trails="https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_Trails_Geographic/MapServer/0"
+url_nps_roads="https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_Roads_Geographic/FeatureServer/1"
+url_nps_pois="https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_POIs_Geographic/MapServer/0"
+url_nps_parking_lots="https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_ParkingLots_Geographic/FeatureServer/2"
+url_nps_buildings="https://mapservices.nps.gov/arcgis/rest/services/NationalDatasets/NPS_Public_Buildings_Geographic/MapServer/2"
 
 url_wisconsin="https://uwmadison.box.com/shared/static/j0o2i5fmu5vthmab4mzuanws9lvsmpea.zip"
 url_utah="https://stg-arcgisazurecdataprod1.az.arcgis.com/exportfiles-5278-21569/UtahStatewideParcels_-1516116324658468324.zip?sv=2018-03-28&sr=b&sig=A1CWCUzGZpz0GohyK51vnx6shIpTtOSxPmljFNDdcxc%3D&se=2024-03-28T07%3A33%3A08Z&sp=r"
@@ -247,6 +257,50 @@ if [[ $process_blm_recreation_site_points == true ]] && [ ! -f "$work_dir/$out_o
 	cd $dir/$ogr2osm_dir && time python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/$blm_recreation_site_source_filename.gdb.zip -o $work_dir/$out_osm_dir/us_blm_rec_area_activities.osm -t blm_recreation_site.py
 	generate_obf us_blm_rec_area_activities.osm
 fi
+
+# National Park Service
+if [[ $process_nps_trails == true ]] ; then
+	cd $dir
+	if [ ! -f $work_dir/$source_original_dir/nps_trails.geojson ]; then
+		echo "Downloading "$url_nps_trails
+		python3 -m dump_esri "$url_nps_trails" $work_dir/$source_original_dir/nps_trails.geojson
+	fi
+	ogr2ogr $work_dir/$source_dir/nps_trails.gpkg $work_dir/$source_original_dir/nps_trails.geojson
+	cd $dir/$ogr2osm_dir && python3 -m ogr2osm --max-tag-length=10000 --suppress-empty-tags $work_dir/$source_dir/nps_trails.gpkg -o $work_dir/$out_osm_dir/us_nps_trails.osm -t nps_trails.py
+fi
+
+if [[ $process_nps_roads == true ]] ; then
+	if [ ! -f $work_dir/$source_original_dir/nps_roads.geojson ]; then
+		echo "Downloading "$url_nps_roads
+		python3 -m dump_esri "$url_nps_roads" $work_dir/$source_original_dir/nps_roads.geojson
+	fi
+	ogr2ogr $work_dir/$source_dir/nps_roads.gpkg $work_dir/$source_original_dir/nps_roads.geojson
+fi
+
+if [[ $process_nps_pois == true ]] ; then
+	if [ ! -f $work_dir/$source_original_dir/nps_pois.geojson ]; then
+		echo "Downloading "$url_nps_pois
+		python3 -m dump_esri "$url_nps_pois" $work_dir/$source_original_dir/nps_pois.geojson
+	fi
+	ogr2ogr $work_dir/$source_dir/nps_pois.gpkg $work_dir/$source_original_dir/nps_pois.geojson
+fi
+
+if [[ $process_nps_parking_lots == true ]] ; then
+	if [ ! -f $work_dir/$source_original_dir/nps_parking_lots.geojson ]; then
+		echo "Downloading "$url_nps_parking_lots
+		python3 -m dump_esri "$url_nps_parking_lots" $work_dir/$source_original_dir/nps_parking_lots.geojson
+	fi
+	ogr2ogr $work_dir/$source_dir/nps_parking_lots.gpkg $work_dir/$source_original_dir/nps_parking_lots.geojson
+fi
+
+if [[ $process_nps_buildings == true ]] ; then
+	if [ ! -f $work_dir/$source_original_dir/nps_buildings.geojson ]; then
+		echo "Downloading "$url_nps_buildings
+		python3 -m dump_esri "$url_nps_buildings" $work_dir/$source_original_dir/nps_buildings.geojson
+	fi
+	ogr2ogr $work_dir/$source_dir/nps_buildings.gpkg $work_dir/$source_original_dir/nps_buildings.geojson
+fi
+
 
 # Private lands test (Dallas)
 if [[ $process_private_lands_test == true ]] && [ ! -f "$work_dir/$out_osm_dir/us_${private_lands_test_source_filename}_pl_northamerica.osm" ]; then
