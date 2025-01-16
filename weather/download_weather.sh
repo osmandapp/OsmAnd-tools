@@ -30,6 +30,7 @@ NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
 
+SLEEP_BEFORE_CURL=0.5
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
@@ -62,7 +63,10 @@ should_download_file() {
     local FILENAME=$1
     local URL=$2
 
+    sleep $SLEEP_BEFORE_CURL
+
     if [[ -f $FILENAME ]]; then
+
         # File is already dowlnloaded
         local DISK_FILE_MODIFIED_TIME="$(TZ=GMT date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
         local SERVER_RESPONSE=$(curl -s -I -L --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
@@ -77,6 +81,9 @@ should_download_file() {
             # Server don't have update for this file. Don't need to download it.
             echo 0
             return
+        elif [[ $SERVER_RESPONSE =~ "429" ]]; then
+            # HTTP/1.1 429 Too Many Requests (ecmwf) - retry
+            sleep 60
         elif [[ $SERVER_RESPONSE =~ "403" ]]; then   
             # We're blocked by server. Wait a bit and continue download
             sleep 60
@@ -106,6 +113,8 @@ download() {
     local URL=$2
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
+
+    sleep $SLEEP_BEFORE_CURL
 
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
