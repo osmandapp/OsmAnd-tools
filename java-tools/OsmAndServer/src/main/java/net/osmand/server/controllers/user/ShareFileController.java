@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.transaction.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -264,8 +265,8 @@ public class ShareFileController {
 		return ResponseEntity.ok(gson.toJson(files));
 	}
 
-	@GetMapping(path = {"/remove-shared-with-me-file"}, produces = "application/json")
-	public ResponseEntity<String> removeSharedWithMeFile(@RequestParam String name,
+	@PostMapping(path = {"/remove-shared-with-me-file"}, produces = "application/json")
+	public ResponseEntity<String> removeSharedWithMeFile(@RequestBody String name,
 	                                                     @RequestParam String type) {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
@@ -278,15 +279,14 @@ public class ShareFileController {
 		return ResponseEntity.ok("File removed");
 	}
 
-	@GetMapping(path = {"/save-shared-file"}, produces = "application/json")
-	public ResponseEntity<String> saveSharedFile(@RequestParam String fileName,
-	                                             @RequestParam String fileType,
-	                                             @RequestParam String newName) throws IOException {
+	@PostMapping(path = {"/save-shared-file"}, produces = "application/json")
+	public ResponseEntity<String> saveSharedFile(@RequestBody List<String> names,
+	                                             @RequestParam String type) throws IOException {
 		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return shareFileService.saveSharedFile(fileName, fileType, newName, dev);
+		return shareFileService.saveSharedFile(names.get(0), type, names.get(1), dev);
 	}
 
 }

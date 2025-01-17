@@ -251,8 +251,8 @@ public class ShareFileService {
 		return true;
 	}
 
-	public UserdataController.UserFilesResults getSharedWithMe(int id, String type) {
-		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(id);
+	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
 		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
@@ -263,7 +263,7 @@ public class ShareFileService {
 			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
 			allFiles.add(userFile);
 		}
-		return userdataService.getUserFilesResults(allFiles, id, false);
+		return userdataService.getUserFilesResults(allFiles, userid, false);
 	}
 
 	public List<PremiumUserFilesRepository.UserFile> getOriginalSharedWithMeFiles(PremiumUserDevicesRepository.PremiumUserDevice dev, String type) {
