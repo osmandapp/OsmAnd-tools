@@ -350,6 +350,7 @@ public class MapApiController {
 		int cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
+			boolean isSharedFile = isShared(nd, shareList);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
@@ -396,12 +397,13 @@ public class MapApiController {
 						filesToIgnore.add(nd);
 					}
 					// save details
-					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isShared(nd, shareList));
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf);
 					nd.details = uf.details.deepCopy();
 					cacheWrites++;
 				}
 			}
+			nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
