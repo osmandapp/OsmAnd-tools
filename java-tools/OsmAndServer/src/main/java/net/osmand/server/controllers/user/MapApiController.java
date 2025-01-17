@@ -71,7 +71,7 @@ public class MapApiController {
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
+	private static final long ANALYSIS_RERUN = 1737108563348L; // 17-01-2025
 
 	private static final String INFO_KEY = "info";
 
@@ -346,7 +346,8 @@ public class MapApiController {
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
 		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
 		List <UserFileNoData> filesToIgnore = new ArrayList<>();
-		int cloudReads = 0, cacheWrites = 0;
+		int cloudReads = 0;
+		int cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
@@ -355,6 +356,7 @@ public class MapApiController {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
 					GpxTrackAnalysis analysis = null;
+					GpxFile gpxFile = null;
 					UserFile uf = of.get();
 					InputStream in;
 					try {
@@ -369,7 +371,6 @@ public class MapApiController {
 					}
 					if (in != null) {
 						in = new GZIPInputStream(in);
-						GpxFile gpxFile;
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 						} catch (IOException e) {
@@ -388,44 +389,19 @@ public class MapApiController {
 						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
-							Metadata metadata = gpxFile.getMetadata();
-							if (!metadata.isEmpty()) {
-								uf.details.add(METADATA, gson.toJsonTree(metadata));
-							}
-						} else {
-							Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
-							Map<String, Map<String,String>> pointGroupsAnalysis = new HashMap<>();
-							groups.keySet().forEach(k -> {
-								Map<String, String> groupInfo = new HashMap<>();
-								WebGpxParser.WebPointsGroup group = groups.get(k);
-								groupInfo.put("color", group.color);
-								groupInfo.put("groupSize", String.valueOf(group.points.size()));
-								groupInfo.put("hidden", String.valueOf(isHidden(group)));
-								pointGroupsAnalysis.put(k, groupInfo);
-							});
-							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					} else {
 						LOG.error(String.format(
 								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
 						filesToIgnore.add(nd);
 					}
-					saveAnalysis(ANALYSIS, uf, analysis);
+					// save details
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isShared(nd, shareList));
+					saveDetails(newDetails, ANALYSIS, uf);
 					nd.details = uf.details.deepCopy();
 					cacheWrites++;
 				}
 			}
-			if (analysisPresent(ANALYSIS, nd.details)) {
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
-			}
-			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
-			}
-			nd.details.add(SHARE, gson.toJsonTree(isShared(nd, shareList)));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
@@ -444,6 +420,45 @@ public class MapApiController {
 
 		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	private JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isFavorite, boolean isShared) {
+		JsonObject details = new JsonObject();
+		if (gpxFile != null) {
+			// add metadata without description
+			Metadata metadata = gpxFile.getMetadata();
+			if (!metadata.isEmpty()) {
+				metadata.setDesc(null);
+				details.add(METADATA, gson.toJsonTree(metadata));
+			}
+			// add point groups for favorites
+			if (isFavorite) {
+				Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
+				if (!groups.isEmpty()) {
+					Map<String, Map<String, String>> pointGroupsAnalysis = new HashMap<>();
+					groups.keySet().forEach(k -> {
+						Map<String, String> groupInfo = new HashMap<>();
+						WebGpxParser.WebPointsGroup group = groups.get(k);
+						groupInfo.put("color", group.color);
+						groupInfo.put("groupSize", String.valueOf(group.points.size()));
+						groupInfo.put("hidden", String.valueOf(isHidden(group)));
+						pointGroupsAnalysis.put(k, groupInfo);
+					});
+					details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
+				}
+			}
+			// add track analysis
+			if (isTrack && analysis != null) {
+				Map<String, Object> res = getDetails(analysis);
+				if (!res.isEmpty()) {
+					details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+				}
+			}
+		}
+		// add share information
+		details.add(SHARE, gson.toJsonTree(isShared));
+
+		return details;
 	}
 
 	private boolean isShared(UserFileNoData file, List<ShareFileRepository.ShareFile> shareList) {
@@ -477,7 +492,7 @@ public class MapApiController {
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
-		if(userFile == null) {
+		if (userFile == null) {
 			return false;
 		}
 		JsonObject details = userFile.details;
@@ -605,17 +620,33 @@ public class MapApiController {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			analysis.getPointAttributes().clear();
+			Map<String, Object> res = getDetails(analysis);
+			if (!res.isEmpty()) {
+				file.details.add(tag, gsonWithNans.toJsonTree(res));
+			}
+		}
+		saveDetails(file.details, tag, file);
+	}
 
+	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
+		if (analysis != null) {
 			Map<String, Object> res = new HashMap<>();
+			analysis.getPointAttributes().clear();
 			res.put("totalDistance", analysis.getTotalDistance());
+			res.put("startTime", analysis.getStartTime());
+			res.put("endTime", analysis.getEndTime());
 			res.put("timeMoving", analysis.getTimeMoving());
 			res.put("points", analysis.getPoints());
 			res.put("wptPoints", analysis.getWptPoints());
 
-			file.details.add(tag, gsonWithNans.toJsonTree(res));
+			return res;
 		}
-		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
+		return Collections.emptyMap();
+	}
+
+	private void saveDetails(JsonObject newDetails, String tag, UserFile file) {
+		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
+		file.details = newDetails;
 		userFilesRepository.save(file);
 	}
 
