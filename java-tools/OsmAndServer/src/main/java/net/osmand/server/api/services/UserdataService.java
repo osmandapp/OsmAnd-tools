@@ -1,7 +1,6 @@
 package net.osmand.server.api.services;
 
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
-import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VALUE;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -11,7 +10,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -28,10 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
 import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.shared.gpx.GpxFile;
-import net.osmand.shared.gpx.GpxUtilities;
-import okio.Buffer;
-import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -497,11 +491,15 @@ public class UserdataService {
             LOG.error("device-register: email is not found (" + email + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
-        if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
-            wearOutToken(pu);
-            LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
-            throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
+        boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
+                (System.currentTimeMillis() - pu.tokenTime.getTime()) <
+                        TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        if ( ! (tokenIsActive && pu.token.equals(token))) {
+            wearOutToken(pu); // cut down on tries (even for web password)
+            if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
+                LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
+                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
+            }
         }
         if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
         	pu.token = null;
@@ -529,6 +527,19 @@ public class UserdataService {
         devicesRepository.saveAndFlush(device);
         LOG.info("device-register: success (" + email + ")");
         return ResponseEntity.ok(gson.toJson(device));
+    }
+
+    private boolean validateWithWebPassword(int userId, String password) {
+        if (userId > 0 && !Algorithms.isEmpty(password)) {
+            List<PremiumUserDevicesRepository.PremiumUserDevice> webDevices =
+                    devicesRepository.findByUseridAndDeviceid(userId, TOKEN_DEVICE_WEB);
+            for (PremiumUserDevicesRepository.PremiumUserDevice device : webDevices) {
+                if (!Algorithms.isEmpty(device.accesstoken) && encoder.matches(password, device.accesstoken)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public String oldStorageFileName(PremiumUserFilesRepository.UserFile usf) {

@@ -21,11 +21,12 @@ import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice
 
 @Repository
 public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserDevice, Long> {
-	PremiumUserDevice findById(int id);
+    PremiumUserDevice findById(int id);
 
-	PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
+    PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
 
-	List<PremiumUserDevice> findByUserid(int userid);
+    List<PremiumUserDevice> findByUserid(int userid);
+    List<PremiumUserDevice> findByUseridAndDeviceid(int userid, String deviceid);
 
     int deleteByUserid(int userid);
 
