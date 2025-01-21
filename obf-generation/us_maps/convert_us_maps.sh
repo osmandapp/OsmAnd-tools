@@ -25,9 +25,9 @@ process_nfs_rec_area_activities=false
 process_nfs_trails=false
 process_blm_roads_trails=false
 process_blm_recreation_site_points=false
-process_nps_trails=true
-process_nps_roads=true
-process_nps_pois=false
+process_nps_trails=false
+process_nps_roads=false
+process_nps_pois=true
 process_nps_parking_lots=false
 process_nps_buildings=false
 
