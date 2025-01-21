@@ -1,7 +1,9 @@
 package net.osmand.server.api.services;
 
 import net.osmand.server.api.repo.*;
+import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
@@ -13,9 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -249,5 +249,82 @@ public class ShareFileService {
 			}
 		}
 		return true;
+	}
+
+	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
+		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			if (originalFile == null || !originalFile.type.equals(type)) {
+				continue;
+			}
+			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
+			allFiles.add(userFile);
+		}
+		return userdataService.getUserFilesResults(allFiles, userid, false);
+	}
+
+	public List<PremiumUserFilesRepository.UserFile> getOriginalSharedWithMeFiles(PremiumUserDevicesRepository.PremiumUserDevice dev, String type) {
+		List<PremiumUserFilesRepository.UserFile> files = new ArrayList<>();
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			if (originalFile == null || !originalFile.type.equals(type)) {
+				continue;
+			}
+			files.add(originalFile);
+		}
+		return files;
+	}
+
+	public PremiumUserFilesRepository.UserFile getSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				return getUserFile(file);
+			}
+		}
+		return null;
+	}
+
+	public boolean removeSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				shareFileRepository.removeShareFilesAccessById(file.getId(), dev.userid);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public ResponseEntity<String> saveSharedFile(String name, String type, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
+		for (ShareFileRepository.ShareFilesAccess access : list) {
+			ShareFileRepository.ShareFile file = access.getFile();
+			if (file.name.equals(name) && file.type.equals(type)) {
+				PremiumUserFilesRepository.UserFile userFile = getUserFile(file);
+				if (userFile != null) {
+					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
+					if (zipFile != null) {
+						try {
+							userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+						} catch (OsmAndPublicApiException e) {
+							return ResponseEntity.badRequest().body(e.getMessage());
+						}
+						return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+					} else {
+						return ResponseEntity.badRequest().body("Zip file not found");
+					}
+				}
+				return ResponseEntity.badRequest().body("Original file not found");
+			}
+		}
+		return ResponseEntity.badRequest().body("Shared file not found");
 	}
 }

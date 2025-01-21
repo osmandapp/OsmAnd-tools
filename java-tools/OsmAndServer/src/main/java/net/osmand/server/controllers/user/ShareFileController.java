@@ -9,6 +9,7 @@ import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.transaction.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -251,6 +253,43 @@ public class ShareFileController {
 		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.isPublicAccess());
 
 		return ResponseEntity.ok(gson.toJson(shareFileDto));
+	}
+
+	@GetMapping(path = {"/get-shared-with-me"}, produces = "application/json")
+	public ResponseEntity<String> getSharedWithMe(@RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		UserdataController.UserFilesResults files = shareFileService.getSharedWithMe(dev.userid, type);
+		return ResponseEntity.ok(gson.toJson(files));
+	}
+
+	@PostMapping(path = {"/remove-shared-with-me-file"}, produces = "application/json")
+	public ResponseEntity<String> removeSharedWithMeFile(@RequestBody String name,
+	                                                     @RequestParam String type) {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		boolean removed = shareFileService.removeSharedWithMeFile(name, type, dev);
+		if (!removed) {
+			return ResponseEntity.badRequest().body("Error removing file");
+		}
+		return ResponseEntity.ok("File removed");
+	}
+
+	@PostMapping(path = {"/save-shared-file"}, produces = "application/json")
+	public ResponseEntity<String> saveSharedFile(@RequestBody List<String> names,
+	                                             @RequestParam String type) throws IOException {
+		PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		if (names.size() != 2) {
+			return ResponseEntity.badRequest().body("Error saving file");
+		}
+		return shareFileService.saveSharedFile(names.get(0), type, names.get(1), dev);
 	}
 
 }

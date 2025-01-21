@@ -3,9 +3,11 @@ package net.osmand.server.api.repo;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.*;
 import java.io.Serial;
@@ -26,6 +28,14 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 	@Query("SELECT a FROM ShareFilesAccess a WHERE a.id = :id")
 	ShareFilesAccess findShareFilesAccessById(@Param("id") long id);
+
+	@Query("SELECT a FROM ShareFilesAccess a WHERE a.user.id = :userId")
+	List<ShareFilesAccess> findShareFilesAccessListByUserId(int userId);
+
+	@Transactional
+	@Modifying
+	@Query("DELETE FROM ShareFilesAccess a WHERE a.file.id = :id AND a.user.id = :userId")
+	void removeShareFilesAccessById(long id, int userId);
 
 	<S extends ShareFilesAccess> S saveAndFlush(S entity);
 

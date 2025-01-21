@@ -350,6 +350,7 @@ public class MapApiController {
 		int cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
+			boolean isSharedFile = isShared(nd, shareList);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
@@ -396,12 +397,13 @@ public class MapApiController {
 						filesToIgnore.add(nd);
 					}
 					// save details
-					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isShared(nd, shareList));
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf);
 					nd.details = uf.details.deepCopy();
 					cacheWrites++;
 				}
 			}
+			nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
@@ -515,22 +517,28 @@ public class MapApiController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam String name,
-			@RequestParam String type,
-			@RequestParam(required = false) Long updatetime) throws IOException {
+	                    @RequestParam String name,
+	                    @RequestParam String type,
+	                    @RequestParam(required = false) Long updatetime,
+	                    @RequestParam(required = false) Boolean shared) throws IOException {
 		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
 			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
-            response.setStatus(error.getStatusCodeValue());
-            response.getWriter().write(Objects.requireNonNull(error.getBody()));
-            return;
-        }
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			response.setStatus(error.getStatusCodeValue());
+			response.getWriter().write(Objects.requireNonNull(error.getBody()));
+			return;
+		}
+		PremiumUserFilesRepository.UserFile userFile;
+		if (shared != null && shared) {
+			userFile = shareFileService.getSharedWithMeFile(name, type, dev);
+		} else {
+			userFile = userdataService.getUserFile(name, type, updatetime, dev);
+		}
 		if (userFile != null) {
 			userdataService.getFile(userFile, response, request, name, type, dev);
 		}
 	}
-	
+
 	@GetMapping(value = "/download-file-from-prev-version")
 	public void getFilePrevVersion(HttpServletResponse response, HttpServletRequest request,
 	                               @RequestParam String name,
@@ -705,8 +713,9 @@ public class MapApiController {
 
 	@PostMapping(value = "/download-backup-folder")
 	public void createBackupFolder(@RequestParam String format,
-	                               @RequestParam String folderName,
 	                               @RequestParam String type,
+	                               @RequestParam(required = false) String folderName,
+								   @RequestParam(required = false) Boolean shared,
 	                               HttpServletResponse response) throws IOException {
 		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
@@ -717,7 +726,12 @@ public class MapApiController {
 			}
 			return;
 		}
-		userdataService.getBackupFolder(response, dev, folderName, format, type);
+		if (folderName != null) {
+			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+		} else if (shared != null && shared) {
+			List<PremiumUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			userdataService.getBackupFolder(response, dev, null, format, type, files);
+		}
 	}
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
@@ -727,27 +741,20 @@ public class MapApiController {
 	}
 
 	@RequestMapping(path = {"/download-obf"})
-	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
+	public ResponseEntity<Resource> downloadObf(HttpServletResponse response,
+	                                            @RequestBody List<String> names,
+	                                            @RequestParam(required = false) Boolean shared,
+	                                            @RequestParam(required = false) String sharedType)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
 		PremiumUserDevice dev = userdataService.checkUser();
-		InputStream is = null;
 		FileInputStream fis = null;
 		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			Map<String, GpxFile> files = new HashMap<>();
-			for (String name : names) {
-				if (!name.endsWith(EMPTY_FILE_NAME)) {
-					UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
-					if (userFile != null) {
-						is = userdataService.getInputStream(dev, userFile);
-						GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
-						if (file.getError() == null) {
-							file.setModifiedTime(userFile.updatetime.getTime());
-							files.put(name, file);
-						}
-					}
-				}
+			List<PremiumUserFilesRepository.UserFile> selectedFiles = null;
+			if (shared != null && shared && sharedType != null) {
+				selectedFiles = shareFileService.getOriginalSharedWithMeFiles(dev, sharedType);
 			}
+			Map<String, GpxFile> files = userdataService.getGpxFilesMap(dev, names, selectedFiles);
 			targetObf = osmAndMapsService.getObf(files);
 			fis = new FileInputStream(targetObf);
 			Algorithms.streamCopy(fis, os);
@@ -759,9 +766,6 @@ public class MapApiController {
 
 			return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 		} finally {
-			if (is != null) {
-				is.close();
-			}
 			if (fis != null) {
 				fis.close();
 			}

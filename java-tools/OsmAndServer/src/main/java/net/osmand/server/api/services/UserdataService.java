@@ -26,6 +26,13 @@ import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
 import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.io.KFile;
+import okio.Buffer;
+import okio.GzipSource;
+import okio.Okio;
+import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -36,6 +43,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -261,7 +270,7 @@ public class UserdataService {
 		return name.replace(CR_SANITIZE, "\r").replace(LF_SANITIZE, "\n");
 	}
 
-	private UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
+	public UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
         PremiumUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
@@ -820,7 +829,7 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
     }
 
-    private InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+    public InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(newName, ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
@@ -828,11 +837,11 @@ public class UserdataService {
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
-                GPXFile gpxFile = GPXUtilities.loadGPXFile(new GZIPInputStream(in));
-				if (gpxFile.error != null) {
+	            GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
+				if (gpxFile.getError() != null) {
 					return null;
 				}
-                Exception exception = GPXUtilities.writeGpxFile(tmpGpx, gpxFile);
+                Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
                 if (exception != null) {
                     return null;
                 }
@@ -1044,8 +1053,10 @@ public class UserdataService {
 
     @Transactional
     public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                String folderName, String format, String type) throws IOException {
-        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
+                                String folderName, String format, String type, List<PremiumUserFilesRepository.UserFile> selectedFiles) throws IOException {
+        List<UserFile> files = folderName != null
+		        ? filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type)
+		        : selectedFiles;
         SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yy");
         String fileName = "Export_" + formatter.format(new Date());
         File tmpFile = File.createTempFile(fileName, ".zip");
@@ -1230,4 +1241,37 @@ public class UserdataService {
             devicesRepository.saveAndFlush(dev);
         }
     }
+
+	public Map<String, GpxFile> getGpxFilesMap(PremiumUserDevicesRepository.PremiumUserDevice dev,
+	                                           List<String> names, List<UserFile> selectedFiles) throws IOException {
+		Map<String, GpxFile> files = new HashMap<>();
+		if (names != null && !names.isEmpty()) {
+			for (String name : names) {
+				if (!name.endsWith(EMPTY_FILE_NAME)) {
+					UserFile userFile = getUserFile(name, "GPX", null, dev);
+					if (userFile != null) {
+						processGpxFile(dev, userFile, files);
+					}
+				}
+			}
+		} else if (selectedFiles != null) {
+			for (UserFile userFile : selectedFiles) {
+				if (!userFile.name.endsWith(EMPTY_FILE_NAME)) {
+					processGpxFile(dev, userFile, files);
+				}
+			}
+		}
+		return files;
+	}
+
+	private void processGpxFile(PremiumUserDevicesRepository.PremiumUserDevice dev, UserFile userFile,
+	                            Map<String, GpxFile> files) throws IOException {
+		try (InputStream is = getInputStream(dev, userFile)) {
+			GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
+			if (file.getError() == null) {
+				file.setModifiedTime(userFile.updatetime.getTime());
+				files.put(userFile.name, file);
+			}
+		}
+	}
 }
