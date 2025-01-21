@@ -286,6 +286,9 @@ public class ShareFileController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
+		if (names.size() != 2) {
+			return ResponseEntity.badRequest().body("Error saving file");
+		}
 		return shareFileService.saveSharedFile(names.get(0), type, names.get(1), dev);
 	}
 
