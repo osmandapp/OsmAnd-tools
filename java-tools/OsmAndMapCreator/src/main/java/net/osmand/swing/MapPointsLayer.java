@@ -1,9 +1,5 @@
 package net.osmand.swing;
 
-import static net.osmand.ColorPalette.DARK_GREY;
-import static net.osmand.ColorPalette.LIGHT_GREY;
-import static net.osmand.ColorPalette.SLOPE_PALETTE;
-
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -19,18 +15,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.osmand.ColorPalette;
 import net.osmand.data.DataTileManager;
-import net.osmand.gpx.GPXFile;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.RouteColorize;
-import net.osmand.router.RouteColorize.ColorizationType;
-import net.osmand.router.RouteColorize.RouteColorizationPoint;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.ColorPalette;
+import net.osmand.shared.routing.RouteColorize;
+import net.osmand.shared.routing.RouteColorize.ColorizationType;
+import net.osmand.shared.routing.RouteColorize.RouteColorizationPoint;
 import net.osmand.util.MapUtils;
-
 
 public class MapPointsLayer implements MapPanelLayer {
 
@@ -48,7 +43,7 @@ public class MapPointsLayer implements MapPanelLayer {
 	private List<LineObject> linesToDraw = new ArrayList<>();
 
 	private Font whiteFont;
-	GPXFile gpxFile;
+	GpxFile gpxFile;
 	public ColorizationType colorizationType = ColorizationType.NONE;
 	private boolean isGrey = true;
 
@@ -285,7 +280,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		this.points = points;
 	}
 
-	public void setColorizationType(GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
+	public void setColorizationType(GpxFile gpxFile, ColorizationType colorizationType, boolean grey) {
 		this.gpxFile = gpxFile;
 		this.colorizationType = colorizationType;
 		this.isGrey = grey;
@@ -300,11 +295,12 @@ public class MapPointsLayer implements MapPanelLayer {
 		
 		ColorPalette palette;
 		if (isGrey) {
-			palette = ColorPalette.parsePalette(new double[][] { { 0, LIGHT_GREY }, { 1, DARK_GREY } });
+			palette = ColorPalette.Companion.parsePalette(new double[][]
+					{ { 0, ColorPalette.Companion.getLIGHT_GREY() }, { 1, ColorPalette.Companion.getDARK_GREY() } });
 		} else if (colorizationType == ColorizationType.SLOPE) {
-			palette = SLOPE_PALETTE;
+			palette = ColorPalette.Companion.getSLOPE_PALETTE();
 		} else {
-			palette = ColorPalette.MIN_MAX_PALETTE;
+			palette = ColorPalette.Companion.getMIN_MAX_PALETTE();
 		}
 		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType, palette);
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
@@ -313,12 +309,12 @@ public class MapPointsLayer implements MapPanelLayer {
 		List<RouteColorizationPoint> dataList = routeColorize.getSimplifiedResult(map.getZoom());
 
 		for (int i = 1; i < dataList.size(); i++) {
-			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
-			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
-			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).lon, map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
-			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).lat, map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
-			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).primaryColor), pixX2, pixY2,
-					new Color(dataList.get(i).primaryColor), false);
+			int pixX1 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i - 1).getLon(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+			int pixY1 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i - 1).getLat(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+			int pixX2 = (int) (MapUtils.getPixelShiftX(map.getZoom(), dataList.get(i).getLon(), map.getLongitude(), map.getTileSize()) + map.getCenterPointX());
+			int pixY2 = (int) (MapUtils.getPixelShiftY(map.getZoom(), dataList.get(i).getLat(), map.getLatitude(), map.getTileSize()) + map.getCenterPointY());
+			GradientPaint gp = new GradientPaint(pixX1, pixY1, new Color(dataList.get(i - 1).getPrimaryColor()), pixX2, pixY2,
+					new Color(dataList.get(i).getPrimaryColor()), false);
 			g.setPaint(gp);
 			g.setStroke(new BasicStroke(10));
 			g.draw(new Line2D.Float(pixX1, pixY1, pixX2, pixY2));

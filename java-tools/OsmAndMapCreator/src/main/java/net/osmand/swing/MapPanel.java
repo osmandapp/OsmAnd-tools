@@ -30,7 +30,6 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,7 +61,8 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
 
-import net.osmand.NativeLibrary;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.routing.RouteColorize.ColorizationType;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -75,7 +75,6 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
-import net.osmand.gpx.GPXFile;
 import net.osmand.map.IMapLocationListener;
 import net.osmand.map.ITileSource;
 import net.osmand.map.MapTileDownloader;
@@ -85,7 +84,6 @@ import net.osmand.map.TileSourceManager;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.io.NetworkUtils;
-import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.swing.MapPanelSelector.MapSelectionArea;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -1018,7 +1016,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		prepareImage();
 	}
 
-	public void setColorizationType(GPXFile gpxFile, ColorizationType colorizationType, boolean grey) {
+	public void setColorizationType(GpxFile gpxFile, ColorizationType colorizationType, boolean grey) {
 		getLayer(MapPointsLayer.class).setColorizationType(gpxFile, colorizationType, grey);
 		repaint();
 	}
