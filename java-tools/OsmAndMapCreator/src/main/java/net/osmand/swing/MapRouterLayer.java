@@ -48,6 +48,14 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import net.osmand.router.*;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.shared.io.KFile;
+import net.osmand.shared.routing.RouteColorize.ColorizationType;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -74,12 +82,6 @@ import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.QuadTree;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.gpx.GPXUtilities.Track;
-import net.osmand.gpx.GPXUtilities.TrkSegment;
-import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
@@ -92,7 +94,6 @@ import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.RouteColorize.ColorizationType;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
@@ -123,7 +124,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton nextTurn;
 	private JButton playPauseButton;
 	private JButton stopButton;
-	private GPXFile selectedGPXFile;
+	private GpxFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
 
 
@@ -469,12 +470,12 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 					String name = new SimpleDateFormat("yyyy-MM-dd_HH-mm_EEE", Locale.US).format(new Date());
 					RouteExporter exporter = new RouteExporter(name, previousRoute, locations, null, null);
-					GPXFile gpxFile = exporter.exportRoute();
+					GpxFile gpxFile = exporter.exportRoute();
 					JFileChooser fileChooser = new JFileChooser(
 							DataExtractionSettings.getSettings().getDefaultWorkingDir());
 					if (fileChooser.showSaveDialog(map) == JFileChooser.APPROVE_OPTION) {
-						File file = fileChooser.getSelectedFile();
-						GPXUtilities.writeGpxFile(file, gpxFile);
+						KFile file = new KFile(fileChooser.getSelectedFile().getAbsolutePath());
+						GpxUtilities.INSTANCE.writeGpxFile(file, gpxFile);
 					}
 					// }
 					// }.start();
@@ -497,11 +498,12 @@ public class MapRouterLayer implements MapPanelLayer {
 							DataExtractionSettings.getSettings().getLastUsedDir());
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
+						KFile kFile = new KFile(file.getAbsolutePath());
 //						GpxUtilities gpxUtilities = GpxUtilities.INSTANCE;
 //						GpxFile gfile = gpxUtilities.loadGpxFile(new KFile(file.getAbsolutePath()));
 //						System.out.println(gfile.getTracksCount() + " " + gfile.getAllPoints().size());
 						DataExtractionSettings.getSettings().setLastUsedDir(file.getParent());
-						selectedGPXFile = GPXUtilities.loadGPXFile(file);
+						selectedGPXFile = GpxUtilities.INSTANCE.loadGpxFile(kFile);
 						displayGpxFiles();
 						map.fillPopupActions();
 					}
@@ -534,7 +536,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				public void actionPerformed(ActionEvent e) {
 					File[] missingFile = new File[1];
 					displayTrackInfo(selectedGPXFile, "Unprocessed track info");
-					GPXFile res = calculateAltitude(selectedGPXFile, missingFile);
+					GpxFile res = calculateAltitude(selectedGPXFile, missingFile);
 					if (res == null || missingFile[0] != null) {
 						String msg = missingFile[0] != null ? "Missing in 'srtm' folder: " + missingFile[0].getName()
 								: ("Missing 'srtm' folder: " + DataExtractionSettings.getSettings().getBinaryFilesDir() + "/srtm");
@@ -591,12 +593,12 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
-	protected void displayTrackInfo(GPXFile gpxFile, String header) {
-		GPXTrackAnalysis analysis = selectedGPXFile.getAnalysis(gpxFile.modifiedTime);
+	protected void displayTrackInfo(GpxFile gpxFile, String header) {
+		GpxTrackAnalysis analysis = selectedGPXFile.getAnalysis(gpxFile.getModifiedTime());
 		StringBuilder msg = new StringBuilder();
 
 		msg.append(String.format("Track: distance %.1f, distance no gaps %.1f, tracks %d, points %d\n", analysis.getTotalDistance(),
-				analysis.totalDistanceWithoutGaps, analysis.getTotalTracks(), analysis.getWptPoints()));
+				analysis.getTotalDistanceWithoutGaps(), analysis.getTotalTracks(), analysis.getWptPoints()));
 
 		if (analysis.hasElevationData()) {
 			msg.append(String.format("Ele: min - %.1f, max - %.1f, avg - %.1f, uphill - %.1f, downhill - %.1f\n",
@@ -606,12 +608,12 @@ public class MapRouterLayer implements MapPanelLayer {
 		if (analysis.hasSpeedData()) {
 			msg.append(String.format("Speed: min - %.1f, max - %.1f, avg - %.1f, dist+speed - %.1f, dist+speed no gaps - %.1f\n",
 					analysis.getMinSpeed(), analysis.getMaxSpeed(), analysis.getAvgSpeed(),
-					analysis.getTotalDistanceMoving(), analysis.totalDistanceMovingWithoutGaps));
+					analysis.getTotalDistanceMoving(), analysis.getTotalDistanceMovingWithoutGaps()));
 		}
 		if (analysis.getStartTime() != analysis.getEndTime()) {
 			msg.append(String.format("Time: start - %s, end - %s, span - %.1f min, span no gaps - %.1f min\n",
 					new Date(analysis.getStartTime()), new Date(analysis.getEndTime()), analysis.getTimeSpan() / 60000.0,
-					analysis.timeSpanWithoutGaps / 60000.0));
+					analysis.getTimeSpanWithoutGaps() / 60000.0));
 		}
 		log.info(header + " " + msg);
 		JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), msg, header,
@@ -627,20 +629,20 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
-	protected GPXFile calculateAltitude(GPXFile gpxFile, File[] missingFile) {
+	protected GpxFile calculateAltitude(GpxFile gpxFile, File[] missingFile) {
 		File srtmFolder = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "srtm");
 		if (!srtmFolder.exists()) {
 			return null;
 		}
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData(srtmFolder.getAbsolutePath(), srtmFolder);
-		for (Track tr : gpxFile.tracks) {
-			for (TrkSegment s : tr.segments) {
-				for (int i = 0; i < s.points.size(); i++) {
-					WptPt wpt = s.points.get(i);
-					double h = hd.getPointHeight(wpt.lat, wpt.lon, missingFile);
+		for (Track tr : gpxFile.getTracks()) {
+			for (TrkSegment s : tr.getSegments()) {
+				for (int i = 0; i < s.getPoints().size(); i++) {
+					WptPt wpt = s.getPoints().get(i);
+					double h = hd.getPointHeight(wpt.getLat(), wpt.getLon(), missingFile);
 					if (h != IndexHeightData.INEXISTENT_HEIGHT) {
-						wpt.ele = h;
+						wpt.setEle(h);
 					} else if (i == 0) {
 						return null;
 					}
@@ -654,12 +656,12 @@ public class MapRouterLayer implements MapPanelLayer {
 	private void displayGpxFiles() {
 		DataTileManager<Entity> points = new DataTileManager<Entity>(9);
 		if (selectedGPXFile != null) {
-			for (Track t : selectedGPXFile.tracks) {
-				for (TrkSegment ts : t.segments) {
+			for (Track t : selectedGPXFile.getTracks()) {
+				for (TrkSegment ts : t.getSegments()) {
 					Way w = new Way(-1);
 					int id = 0;
-					for (WptPt p : ts.points) {
-						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.lat, p.lon, -1);
+					for (WptPt p : ts.getPoints()) {
+						net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.getLat(), p.getLon(), -1);
 						w.addNode(n);
 						n.putTag(OSMTagKey.NAME.getValue(), String.valueOf(id));
 						n.putTag("gpx", "yes");
@@ -771,7 +773,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	private LatLon toLatLon(WptPt wptPt) {
-		return new LatLon(wptPt.lat, wptPt.lon);
+		return new LatLon(wptPt.getLat(), wptPt.getLon());
 	}
 
 	private void calcRouteGpx(List<LatLon> polyline, boolean useGeometryBased) {
@@ -1500,11 +1502,11 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private List<LatLon> selectedGPXFileToPolyline() {
 		if (selectedGPXFile.hasTrkPt()) {
-			TrkSegment trkSegment = selectedGPXFile.tracks.get(0).segments.get(0);
-			startRoute = toLatLon(trkSegment.points.get(0));
-			endRoute = toLatLon(trkSegment.points.get(trkSegment.points.size() - 1));
-			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.points.size());
-			for (WptPt p : trkSegment.points) {
+			TrkSegment trkSegment = selectedGPXFile.getTracks().get(0).getSegments().get(0);
+			startRoute = toLatLon(trkSegment.getPoints().get(0));
+			endRoute = toLatLon(trkSegment.getPoints().get(trkSegment.getPoints().size() - 1));
+			List<LatLon> polyline = new ArrayList<LatLon>(trkSegment.getPoints().size());
+			for (WptPt p : trkSegment.getPoints()) {
 				polyline.add(toLatLon(p));
 			}
 			return polyline;
