@@ -86,7 +86,7 @@ public class RenderingRulesStoragePrinter {
     private void printJavaInitProperties(RenderingRulesStorage storage, PrintStream out, String indent, String ti) {
         out.println("\n" + indent + "public void initProperties() {");
         out.println("" + indent + ti + "RenderingRuleProperty prop = null;");
-        for(RenderingRuleProperty p : storage.PROPS.customRules) {
+        for(RenderingRuleProperty p : storage.PROPS.getCustomRules()) {
             out.println("" + indent + ti + "prop = new RenderingRuleProperty("+javaString(p.attrName)+
                     "," +p.type+", "+p.input+");");
             out.println("" + indent + ti + "prop.setDescription("+javaString(p.description)+");");
