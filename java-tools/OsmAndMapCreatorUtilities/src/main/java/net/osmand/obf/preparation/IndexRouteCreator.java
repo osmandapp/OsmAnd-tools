@@ -607,6 +607,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					type = MapRenderingTypes.RESTRICTION_NO_U_TURN;
 				} else if ("no_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+				} else if ("no_entry".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					// reuse no straight on
+					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+				} else if ("no_exit".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					// reuse no straight on
+					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
 				} else if ("only_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN;
 				} else if ("only_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
