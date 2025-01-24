@@ -23,7 +23,6 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
-import net.osmand.util.JarvisAlgorithm;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -231,13 +230,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 
         ctx.loadEntityRelation((Relation) e);
-        MultipolygonBuilder original;
+        MultipolygonBuilder original = new MultipolygonBuilder();
+        original.setId(e.getId());
         boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
                 || "crag".equals(e.getTag(OSMTagKey.CLIMBING.getValue()));
         if (climbing) {
-            original = createClimbingMultipolygon(e, ctx);
+            Map<Long, Node> allNodes = new HashMap<>();
+            retrieveAllRelationNodes((Relation) e, allNodes, ctx);
+            List<Node> nodes = new ArrayList<>(allNodes.values());
+            original.createClimbingOuterWay(e, nodes);
         } else {
-            original = createMultipolygonBuilder(e);
+            original.createInnerAndOuterWays(e);
         }
         try {
             renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse,
@@ -341,26 +344,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                     addtypeUse, true, true);
 
         }
-    }
-
-    public static MultipolygonBuilder createMultipolygonBuilder(Entity e) {
-
-        // create a multipolygon object for this
-        MultipolygonBuilder original = new MultipolygonBuilder();
-        original.setId(e.getId());
-
-        // fill the multipolygon with all ways from the Relation
-        for (RelationMember es : ((Relation) e).getMembers()) {
-            if (es.getEntity() instanceof Way) {
-                boolean inner = "inner".equals(es.getRole()); //$NON-NLS-1$
-                if (inner) {
-                    original.addInnerWay((Way) es.getEntity());
-                } else if ("outer".equals(es.getRole())) {
-                    original.addOuterWay((Way) es.getEntity());
-                }
-            }
-        }
-        return original;
     }
 
     private void excludeFromMainIteration(List<Way> l) {
@@ -1347,26 +1330,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         return clockwiseAfter != clockwiseBefore;
     }
 
-    private static MultipolygonBuilder createClimbingMultipolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-
-        MultipolygonBuilder original = new MultipolygonBuilder();
-        original.setId(e.getId());
-
-        Map<Long, Node> allNodes = new HashMap<>();
-        retrieveAllRelationNodes((Relation) e, allNodes, ctx);
-        List<Node> nodes = new ArrayList<>(allNodes.values());
-        nodes = JarvisAlgorithm.createConvexPolygon(nodes);
-        int radius = "crag".equals(e.getTag(OSMTagKey.CLIMBING)) ? 10 : 50;
-        nodes = JarvisAlgorithm.expandPolygon(nodes, radius);
-
-        if (nodes != null) {
-            Way w = new Way(e.getId(), nodes);
-            original.addOuterWay(w);
-        }
-        return original;
-    }
-
-    private static void retrieveAllRelationNodes(Relation e, Map<Long, Node> allNodes, OsmDbAccessorContext ctx) throws SQLException {
+    private void retrieveAllRelationNodes(Relation e, Map<Long, Node> allNodes, OsmDbAccessorContext ctx) throws SQLException {
         for (RelationMember member : e.getMembers()) {
             Entity entity = member.getEntity();
             if (entity instanceof  Relation relation) {
