@@ -23,6 +23,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
+import net.osmand.util.JarvisAlgorithm;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -230,7 +231,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 
         ctx.loadEntityRelation((Relation) e);
-        MultipolygonBuilder original = createMultipolygonBuilder(e);
+        MultipolygonBuilder original;
+        boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
+                || "crag".equals(e.getTag(OSMTagKey.CLIMBING.getValue()));
+        if (climbing) {
+            original = createClimbingMultipolygon(e, ctx);
+        } else {
+            original = createMultipolygonBuilder(e);
+        }
         try {
             renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse,
                     namesUse, tempNameUse);
@@ -1337,6 +1345,43 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         boolean clockwiseBefore = OsmMapUtils.isClockwiseWay(e);
         boolean clockwiseAfter = OsmMapUtils.isClockwiseWay(new Way(e.getId(), simplyiedNodes));
         return clockwiseAfter != clockwiseBefore;
+    }
+
+    private static MultipolygonBuilder createClimbingMultipolygon(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+
+        MultipolygonBuilder original = new MultipolygonBuilder();
+        original.setId(e.getId());
+
+        Map<Long, Node> allNodes = new HashMap<>();
+        retrieveAllRelationNodes((Relation) e, allNodes, ctx);
+        List<Node> nodes = new ArrayList<>(allNodes.values());
+        nodes = JarvisAlgorithm.createConvexPolygon(nodes);
+        int radius = "crag".equals(e.getTag(OSMTagKey.CLIMBING)) ? 10 : 50;
+        nodes = JarvisAlgorithm.expandPolygon(nodes, radius);
+
+        if (nodes != null) {
+            Way w = new Way(e.getId(), nodes);
+            original.addOuterWay(w);
+        }
+        return original;
+    }
+
+    private static void retrieveAllRelationNodes(Relation e, Map<Long, Node> allNodes, OsmDbAccessorContext ctx) throws SQLException {
+        for (RelationMember member : e.getMembers()) {
+            Entity entity = member.getEntity();
+            if (entity instanceof  Relation relation) {
+                ctx.loadEntityRelation(relation);
+                retrieveAllRelationNodes(relation, allNodes, ctx);
+            }
+            if (entity instanceof Way way) {
+                for (Node node : way.getNodes()) {
+                    allNodes.put(node.getId(), node);
+                }
+            }
+            if (entity instanceof Node node) {
+                allNodes.put(node.getId(), node);
+            }
+        }
     }
 
 }
