@@ -17,6 +17,7 @@ import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
 import com.google.gson.Gson;
+import net.osmand.data.QuadRect;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -115,6 +116,17 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			    this.details = gson.fromJson(json, JsonObject.class);
 		    }
 	    }
+
+		public QuadRect getBbox() {
+			if (details != null) {
+				JsonObject bbox = details.getAsJsonObject("bbox");
+				if (bbox != null) {
+					return new QuadRect(bbox.get("left").getAsDouble(), bbox.get("top").getAsDouble(),
+							bbox.get("right").getAsDouble(), bbox.get("bottom").getAsDouble());
+				}
+			}
+			return null;
+		}
     }
 
     
