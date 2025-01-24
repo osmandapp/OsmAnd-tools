@@ -141,7 +141,7 @@ public class UserdataController {
 			HttpServletRequest request) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
@@ -259,7 +259,7 @@ public class UserdataController {
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		userdataService.deleteFile(name, type, deviceId, clienttime, dev);
 		return userdataService.ok();
@@ -274,7 +274,7 @@ public class UserdataController {
 	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
@@ -292,7 +292,7 @@ public class UserdataController {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);
 	}
@@ -311,7 +311,7 @@ public class UserdataController {
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		// remap needs to happen to all users & temporarily service should find files by both names (download)
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
@@ -332,7 +332,7 @@ public class UserdataController {
 		}
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
@@ -373,7 +373,7 @@ public class UserdataController {
 			throws IOException, SQLException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, type);
 		return ResponseEntity.ok(gson.toJson(res));
@@ -387,7 +387,7 @@ public class UserdataController {
 			HttpServletRequest request) throws ServletException {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		return userdataService.deleteAccount(token.token, dev, request);
 	}
@@ -398,7 +398,7 @@ public class UserdataController {
 			@RequestParam String accessToken) {
 		PremiumUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidError();
 		}
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {

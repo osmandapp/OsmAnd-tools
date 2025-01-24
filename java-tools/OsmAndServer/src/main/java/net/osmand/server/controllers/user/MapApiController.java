@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.Buffer;
@@ -26,14 +27,8 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
-import com.google.gson.JsonParser;
 import net.osmand.map.OsmandRegions;
-import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.*;
-import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -43,18 +38,13 @@ import org.apache.commons.lang3.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.AbstractResource;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
+import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -64,11 +54,8 @@ import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.controllers.pub.GpxController;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -79,11 +66,12 @@ public class MapApiController {
 	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
 	private static final String METADATA = "metadata";
+	private static final String SHARE = "share";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1692026215870L; // 14-08-2023
+	private static final long ANALYSIS_RERUN = 1737108563348L; // 17-01-2025
 
 	private static final String INFO_KEY = "info";
 
@@ -103,6 +91,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	ShareFileService shareFileService;
 
 	@Autowired
 	protected GpxService gpxService;
@@ -190,7 +181,7 @@ public class MapApiController {
 		}
 		request.login(username, password);
 
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		userdataService.updateDeviceLangInfo(dev, credentials.lang, BRAND_DEVICE_WEB, MODEL_DEVICE_WEB);
 
 		return okStatus();
@@ -199,9 +190,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/delete-account"})
 	public ResponseEntity<String> deleteAccount(@RequestParam String token, HttpServletRequest request)
 			throws ServletException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.deleteAccount(token, dev, request);
 	}
@@ -258,28 +249,15 @@ public class MapApiController {
 		return userdataService.validateToken(username, token);
 	}
 
-	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
-		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-			return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
-		}
-		return null;
-	}
-
-	private ResponseEntity<String> tokenNotValid() {
-	    return new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
-
-	}
-
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                     @RequestParam String name, @RequestParam String type) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
 
@@ -288,9 +266,9 @@ public class MapApiController {
 
 	@PostMapping(value = "/delete-file")
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		userdataService.deleteFile(name, type, null, null, dev);
 		return userdataService.ok();
@@ -300,9 +278,9 @@ public class MapApiController {
 	public ResponseEntity<String> deleteFile(@RequestParam String name,
 	                                         @RequestParam String type,
 	                                         @RequestParam Long updatetime) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
@@ -311,9 +289,9 @@ public class MapApiController {
 	@GetMapping(value = "/delete-file-all-versions")
 	public ResponseEntity<String> deleteFileAllVersions(@RequestParam String name,
 	                                         @RequestParam String type, @RequestParam Long updatetime, @RequestParam boolean isTrash) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		} else {
 			return userdataService.deleteFileAllVersions(dev.userid, name, type, updatetime, isTrash);
 		}
@@ -324,9 +302,9 @@ public class MapApiController {
 	                                         @RequestParam String newName,
 	                                         @RequestParam String type,
 	                                         @RequestParam boolean saveCopy) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		if (!oldName.equals(newName)) {
 			return userdataService.renameFile(oldName, newName, type, dev, saveCopy);
@@ -338,9 +316,9 @@ public class MapApiController {
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
 	                                           @RequestParam String newFolderName) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
@@ -348,9 +326,9 @@ public class MapApiController {
 	@GetMapping(value = "/delete-folder")
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
 	                                           @RequestParam String type) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.deleteFolder(folderName, type, dev);
 	}
@@ -361,21 +339,25 @@ public class MapApiController {
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		long start = System.currentTimeMillis();
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
 		List <UserFileNoData> filesToIgnore = new ArrayList<>();
-		int cloudReads = 0, cacheWrites = 0;
+		int cloudReads = 0;
+		int cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
+			boolean isSharedFile = isShared(nd, shareList);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
 			if (isGPZTrack || isFavorite) {
 				Optional<UserFile> of = userFilesRepository.findById(nd.id);
 				if (of.isPresent()) {
 					GpxTrackAnalysis analysis = null;
+					GpxFile gpxFile = null;
 					UserFile uf = of.get();
 					InputStream in;
 					try {
@@ -390,7 +372,6 @@ public class MapApiController {
 					}
 					if (in != null) {
 						in = new GZIPInputStream(in);
-						GpxFile gpxFile;
 						try (Source source = new Buffer().readFrom(in)) {
 							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 						} catch (IOException e) {
@@ -409,43 +390,20 @@ public class MapApiController {
 						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
-							Metadata metadata = gpxFile.getMetadata();
-							if (!metadata.isEmpty()) {
-								uf.details.add(METADATA, gson.toJsonTree(metadata));
-							}
-						} else {
-							Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
-							Map<String, Map<String,String>> pointGroupsAnalysis = new HashMap<>();
-							groups.keySet().forEach(k -> {
-								Map<String, String> groupInfo = new HashMap<>();
-								WebGpxParser.WebPointsGroup group = groups.get(k);
-								groupInfo.put("color", group.color);
-								groupInfo.put("groupSize", String.valueOf(group.points.size()));
-								groupInfo.put("hidden", String.valueOf(isHidden(group)));
-								pointGroupsAnalysis.put(k, groupInfo);
-							});
-							uf.details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
 						}
 					} else {
 						LOG.error(String.format(
 								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
 						filesToIgnore.add(nd);
 					}
-					saveAnalysis(ANALYSIS, uf, analysis);
+					// save details
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isSharedFile);
+					saveDetails(newDetails, ANALYSIS, uf);
 					nd.details = uf.details.deepCopy();
 					cacheWrites++;
 				}
 			}
-			if (analysisPresent(ANALYSIS, nd.details)) {
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("speedData");
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("elevationData");
-				nd.details.get(ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
-			}
-			if (analysisPresent(SRTM_ANALYSIS, nd.details)) {
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("speedData");
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("elevationData");
-				nd.details.get(SRTM_ANALYSIS).getAsJsonObject().remove("pointsAttributesData");
-			}
+			nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
@@ -465,7 +423,55 @@ public class MapApiController {
 		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
-	
+
+	private JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isFavorite, boolean isShared) {
+		JsonObject details = new JsonObject();
+		if (gpxFile != null) {
+			// add metadata without description
+			Metadata metadata = gpxFile.getMetadata();
+			if (!metadata.isEmpty()) {
+				metadata.setDesc(null);
+				details.add(METADATA, gson.toJsonTree(metadata));
+			}
+			// add point groups for favorites
+			if (isFavorite) {
+				Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
+				if (!groups.isEmpty()) {
+					Map<String, Map<String, String>> pointGroupsAnalysis = new HashMap<>();
+					groups.keySet().forEach(k -> {
+						Map<String, String> groupInfo = new HashMap<>();
+						WebGpxParser.WebPointsGroup group = groups.get(k);
+						groupInfo.put("color", group.color);
+						groupInfo.put("groupSize", String.valueOf(group.points.size()));
+						groupInfo.put("hidden", String.valueOf(isHidden(group)));
+						pointGroupsAnalysis.put(k, groupInfo);
+					});
+					details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
+				}
+			}
+			// add track analysis
+			if (isTrack && analysis != null) {
+				Map<String, Object> res = getDetails(analysis);
+				if (!res.isEmpty()) {
+					details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+				}
+			}
+		}
+		// add share information
+		details.add(SHARE, gson.toJsonTree(isShared));
+
+		return details;
+	}
+
+	private boolean isShared(UserFileNoData file, List<ShareFileRepository.ShareFile> shareList) {
+		for (ShareFileRepository.ShareFile sf : shareList) {
+			if (sf.getFilepath().equals(file.name) && sf.getType().equals(file.type)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
 		String deviceInfo = devices.get(file.deviceid);
 		if (deviceInfo == null) {
@@ -488,7 +494,7 @@ public class MapApiController {
 	}
 
 	private boolean analysisPresent(String tag, UserFile userFile) {
-		if(userFile == null) {
+		if (userFile == null) {
 			return false;
 		}
 		JsonObject details = userFile.details;
@@ -511,30 +517,36 @@ public class MapApiController {
 
 	@GetMapping(value = "/download-file")
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
-			@RequestParam String name,
-			@RequestParam String type,
-			@RequestParam(required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+	                    @RequestParam String name,
+	                    @RequestParam String type,
+	                    @RequestParam(required = false) Long updatetime,
+	                    @RequestParam(required = false) Boolean shared) throws IOException {
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
-            response.setStatus(error.getStatusCodeValue());
-            response.getWriter().write(Objects.requireNonNull(error.getBody()));
-            return;
-        }
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
+			response.setStatus(error.getStatusCodeValue());
+			response.getWriter().write(Objects.requireNonNull(error.getBody()));
+			return;
+		}
+		PremiumUserFilesRepository.UserFile userFile;
+		if (shared != null && shared) {
+			userFile = shareFileService.getSharedWithMeFile(name, type, dev);
+		} else {
+			userFile = userdataService.getUserFile(name, type, updatetime, dev);
+		}
 		if (userFile != null) {
 			userdataService.getFile(userFile, response, request, name, type, dev);
 		}
 	}
-	
+
 	@GetMapping(value = "/download-file-from-prev-version")
 	public void getFilePrevVersion(HttpServletResponse response, HttpServletRequest request,
 	                               @RequestParam String name,
 	                               @RequestParam String type,
 	                               @RequestParam Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			response.getWriter().write(Objects.requireNonNull(error.getBody()));
 			return;
@@ -547,9 +559,9 @@ public class MapApiController {
 	
 	@GetMapping(value = "/restore-file")
 	public ResponseEntity<String> restoreFile(@RequestParam String name, @RequestParam String type, @RequestParam Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.restoreFile(name, type, updatetime, dev);
 	}
@@ -562,9 +574,9 @@ public class MapApiController {
 	
 	@PostMapping(value = "/empty-trash")
 	public ResponseEntity<String> emptyTrash(@RequestBody List<FileData> files) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		return userdataService.emptyTrash(files, dev);
 	}
@@ -573,7 +585,7 @@ public class MapApiController {
 	public ResponseEntity<String> getGpxInfo(@RequestParam(name = "name") String name,
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
@@ -616,17 +628,33 @@ public class MapApiController {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			analysis.getPointAttributes().clear();
+			Map<String, Object> res = getDetails(analysis);
+			if (!res.isEmpty()) {
+				file.details.add(tag, gsonWithNans.toJsonTree(res));
+			}
+		}
+		saveDetails(file.details, tag, file);
+	}
 
+	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
+		if (analysis != null) {
 			Map<String, Object> res = new HashMap<>();
+			analysis.getPointAttributes().clear();
 			res.put("totalDistance", analysis.getTotalDistance());
+			res.put("startTime", analysis.getStartTime());
+			res.put("endTime", analysis.getEndTime());
 			res.put("timeMoving", analysis.getTimeMoving());
 			res.put("points", analysis.getPoints());
 			res.put("wptPoints", analysis.getWptPoints());
 
-			file.details.add(tag, gsonWithNans.toJsonTree(res));
+			return res;
 		}
-		file.details.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
+		return Collections.emptyMap();
+	}
+
+	private void saveDetails(JsonObject newDetails, String tag, UserFile file) {
+		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
+		file.details = newDetails;
 		userFilesRepository.save(file);
 	}
 
@@ -635,7 +663,7 @@ public class MapApiController {
 	public ResponseEntity<String> getSrtmGpx(@RequestParam(name = "name") String name,
 	                                         @RequestParam(name = "type") String type,
 	                                         @RequestParam(name = "updatetime", required = false) Long updatetime) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
@@ -671,9 +699,9 @@ public class MapApiController {
 	                         @RequestParam(name = "updatetime", required = false) boolean includeDeleted,
 	                         @RequestParam String format,
 	                         @RequestBody List<String> data) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			if (error.getBody() != null) {
 				response.getWriter().write(error.getBody());
@@ -685,19 +713,25 @@ public class MapApiController {
 
 	@PostMapping(value = "/download-backup-folder")
 	public void createBackupFolder(@RequestParam String format,
-	                               @RequestParam String folderName,
 	                               @RequestParam String type,
+	                               @RequestParam(required = false) String folderName,
+								   @RequestParam(required = false) Boolean shared,
 	                               HttpServletResponse response) throws IOException {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			ResponseEntity<String> error = tokenNotValid();
+			ResponseEntity<String> error = userdataService.tokenNotValidResponse();
 			response.setStatus(error.getStatusCodeValue());
 			if (error.getBody() != null) {
 				response.getWriter().write(error.getBody());
 			}
 			return;
 		}
-		userdataService.getBackupFolder(response, dev, folderName, format, type);
+		if (folderName != null) {
+			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+		} else if (shared != null && shared) {
+			List<PremiumUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			userdataService.getBackupFolder(response, dev, null, format, type, files);
+		}
 	}
 
 	@GetMapping(path = { "/check_download" }, produces = "text/html;charset=UTF-8")
@@ -707,27 +741,20 @@ public class MapApiController {
 	}
 
 	@RequestMapping(path = {"/download-obf"})
-	public ResponseEntity<Resource> downloadObf(HttpServletResponse response, @RequestBody List<String> names)
+	public ResponseEntity<Resource> downloadObf(HttpServletResponse response,
+	                                            @RequestBody List<String> names,
+	                                            @RequestParam(required = false) Boolean shared,
+	                                            @RequestParam(required = false) String sharedType)
 			throws IOException, SQLException, XmlPullParserException, InterruptedException {
-		PremiumUserDevice dev = checkUser();
-		InputStream is = null;
+		PremiumUserDevice dev = userdataService.checkUser();
 		FileInputStream fis = null;
 		File targetObf = null;
 		try (OutputStream os = response.getOutputStream()) {
-			Map<String, GpxFile> files = new HashMap<>();
-			for (String name : names) {
-				if (!name.endsWith(EMPTY_FILE_NAME)) {
-					UserFile userFile = userdataService.getUserFile(name, "GPX", null, dev);
-					if (userFile != null) {
-						is = userdataService.getInputStream(dev, userFile);
-						GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
-						if (file.getError() == null) {
-							file.setModifiedTime(userFile.updatetime.getTime());
-							files.put(name, file);
-						}
-					}
-				}
+			List<PremiumUserFilesRepository.UserFile> selectedFiles = null;
+			if (shared != null && shared && sharedType != null) {
+				selectedFiles = shareFileService.getOriginalSharedWithMeFiles(dev, sharedType);
 			}
+			Map<String, GpxFile> files = userdataService.getGpxFilesMap(dev, names, selectedFiles);
 			targetObf = osmAndMapsService.getObf(files);
 			fis = new FileInputStream(targetObf);
 			Algorithms.streamCopy(fis, os);
@@ -739,9 +766,6 @@ public class MapApiController {
 
 			return ResponseEntity.ok().headers(headers).body(new FileSystemResource(targetObf));
 		} finally {
-			if (is != null) {
-				is.close();
-			}
 			if (fis != null) {
 				fis.close();
 			}
@@ -760,10 +784,13 @@ public class MapApiController {
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
+		final String NICKNAME = "nickname";
 
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		Map<String, String> info = new HashMap<>();
+
+		info.put(NICKNAME, pu.nickname);
 
 		String orderId = pu.orderid;
 		if (orderId == null) {
@@ -790,9 +817,9 @@ public class MapApiController {
 
 	@PostMapping(path = {"/auth/send-code"})
 	public ResponseEntity<String> sendCode(@RequestParam String action, @RequestParam String lang) {
-		PremiumUserDevice dev = checkUser();
+		PremiumUserDevice dev = userdataService.checkUser();
 		if (dev == null) {
-			return tokenNotValid();
+			return userdataService.tokenNotValidResponse();
 		}
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
@@ -804,9 +831,9 @@ public class MapApiController {
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
 		if (emailSender.isEmail(email)) {
-			PremiumUserDevice dev = checkUser();
+			PremiumUserDevice dev = userdataService.checkUser();
 			if (dev == null) {
-				return tokenNotValid();
+				return userdataService.tokenNotValidResponse();
 			}
 			// check token from old email
 			PremiumUsersRepository.PremiumUser currentAcc = usersRepository.findById(dev.userid);
@@ -844,9 +871,9 @@ public class MapApiController {
 		}
 		username = username.toLowerCase().trim();
 		if (emailSender.isEmail(username)) {
-			PremiumUserDevice dev = checkUser();
+			PremiumUserDevice dev = userdataService.checkUser();
 			if (dev == null) {
-				return tokenNotValid();
+				return userdataService.tokenNotValidResponse();
 			}
 			return userdataService.changeEmail(username, token, dev, request);
 		}
@@ -863,4 +890,5 @@ public class MapApiController {
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
 	}
+
 }

@@ -49,35 +49,35 @@ class USFSRoadsTranslation(ogr2osm.TranslationBase):
 
 
 		if SURFACE_TYPE == 'NATIVE MATERIAL' or SURFACE_TYPE == 'NAT - NATIVE MATERIAL':
-			tags.update({'us_maps_road_surface':'native_material'})
+			tags.update({'surface':'native_material'})
 		if SURFACE_TYPE == 'AC - ASPHALT':
-			tags.update({'us_maps_road_surface':'asphalt'})
+			tags.update({'surface':'asphalt'})
 		if SURFACE_TYPE == 'AGG - CRUSHED AGGREGATE OR GRAVEL':
-			tags.update({'us_maps_road_surface':'crushed_aggregate_or_gravel'})
+			tags.update({'surface':'crushed_aggregate_or_gravel'})
 		if SURFACE_TYPE == 'AGG - LIMESTONE':
-			tags.update({'us_maps_road_surface':'limestone'})
+			tags.update({'surface':'limestone'})
 		if SURFACE_TYPE == 'AGG - SCORIA':
-			tags.update({'us_maps_road_surface':'scoria'})
+			tags.update({'surface':'scoria'})
 		if SURFACE_TYPE == 'BST - BITUMINOUS SURFACE TREATMENT':
-			tags.update({'us_maps_road_surface':'bituminous_surface_treatment'})
+			tags.update({'surface':'bituminous_surface_treatment'})
 		if SURFACE_TYPE == 'CIN - CINDER SURFACE':
-			tags.update({'us_maps_road_surface':'cinder'})
+			tags.update({'surface':'cinder'})
 		if SURFACE_TYPE == 'CSOIL - COMPACTED SOIL':
-			tags.update({'us_maps_road_surface':'compacted_soil'})
+			tags.update({'surface':'compacted_soil'})
 		if SURFACE_TYPE == 'FSOIL - FROZEN SOIL':
-			tags.update({'us_maps_road_surface':'frozen_soil'})
+			tags.update({'surface':'frozen_soil'})
 		if SURFACE_TYPE == 'GRA - GRASS (NAT)' or SURFACE_TYPE == 'SOD - GRASS':
-			tags.update({'us_maps_road_surface':'grass'})
+			tags.update({'surface':'grass'})
 		if SURFACE_TYPE == 'IMP - IMPROVED NATIVE MATERIAL':
-			tags.update({'us_maps_road_surface':'improved_native_material'})
+			tags.update({'surface':'improved_native_material'})
 		if SURFACE_TYPE == 'PCC - PORTLAND CEMENT CONCRETE':
-			tags.update({'us_maps_road_surface':'portland_cement_concrete'})
+			tags.update({'surface':'portland_cement_concrete'})
 		if SURFACE_TYPE == 'PIT - PIT RUN SHOT ROCK':
-			tags.update({'us_maps_road_surface':'pit_run_shot_rock'})
+			tags.update({'surface':'pit_run_shot_rock'})
 		if SURFACE_TYPE == 'P - PAVED':
-			tags.update({'us_maps_road_surface':'paved'})
+			tags.update({'surface':'paved'})
 		if SURFACE_TYPE == 'OTHER':
-			tags.update({'us_maps_road_surface':'other'})
+			tags.update({'surface':'other'})
 
 		if 'LANES' in attrs:
 			if '1' in LANES or LANES == 'SINGLE':

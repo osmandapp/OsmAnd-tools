@@ -64,6 +64,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
 
+    private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
+            "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
+            "TotalEnergies", "Aral", "Q8", "Petronas", "Caltex", "Esso", "Tesla Supercharger", "Ionity", "Walmart", "Carrefour",
+            "Tesco", "Lidl", "Aldi", "Costco", "Auchan", "IKEA", "H&M", "Zara", "Uniqlo", "Nike", "Adidas", "Decathlon", "REI",
+            "The North Face", "Apple Store", "Samsung", "Media Markt", "Best Buy", "Barnes & Noble",
+            "WHSmith", "Waterstones", "Marriott", "Hilton", "Holiday Inn", "Ibis", "Best Western", "Radisson",
+            "Planet Fitness", "Anytime Fitness", "Gold's Gym", "24 Hour Fitness", "Snap Fitness", "Walgreens", "CVS Pharmacy", "Boots", "Watsons",
+            "Hertz", "Avis", "Sixt", "Enterprise", "Europcar", "Mountain Warehouse", "Intersport", "Hudson News");
+
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
@@ -130,7 +139,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long ll = orig.getId();
 		return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
 	}
-	
+
 	private long genId(int baseShift, long id) {
 		long gen = (id << DUPLICATE_SPLIT) +  (1l << (baseShift - 1));
 		while (generatedIds.contains(gen)) {
@@ -145,11 +154,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			iterateEntityInternal(e, ctx, icc);
 		}
 	}
-	
+
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
-		
+
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
@@ -212,7 +221,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tagsTransform.handleRelationPropogatedTags(e, renderingTypes, ctx, EntityConvertApplyType.POI);
 	}
 
-	
+
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
 		closeAllPreparedStatements();
@@ -266,8 +275,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final char SPECIAL_CHAR = ((char) -1);
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
-		
-		Map<String, String> tempNames = new LinkedHashMap<String, String>(); 
+
+		Map<String, String> tempNames = new LinkedHashMap<String, String>();
 		if (!Algorithms.isEmpty(name)) {
 			tempNames.put("name", name);
 		}
@@ -279,7 +288,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		for(String e : amenity.getAdditionalInfoKeys()) {
 			tempNames.put(e, amenity.getAdditionalInfo(e));
 		}
-		
+
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
 			boolean text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue());
@@ -348,7 +357,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiIndexFile = poiIndexFile;
 		// delete previous file to save space
 		File parentFile = poiIndexFile.getParentFile();
-		if(parentFile != null) { 
+		if(parentFile != null) {
 			parentFile.mkdirs();
 		}
 		if (poiIndexFile.exists()) {
@@ -642,10 +651,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		topIndexAdditional = new HashMap<>();
 		ResultSet rs;
+        boolean isBrand = false;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			if (!topIndexKeys.contains(entry.getKey())) {
 				continue;
 			}
+            if (entry.getKey().equals("top_index_brand")) {
+                isBrand = true;
+            }
 			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
@@ -656,11 +669,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					" order by cnt desc");
 			HashSet<String> set = new HashSet<>();
 			while (rs.next()) {
-				set.add(rs.getString(2));
-				maxPerMap--;
-				if (maxPerMap <= 0) {
-					break;
-				}
+                String value = rs.getString(2);
+                if (maxPerMap > 0) {
+                    set.add(value);
+                } else if (isBrand && WORLD_BRANDS.contains(value)) {
+                    set.add(rs.getString(2));
+                }
+                maxPerMap--;
 			}
 			topIndexAdditional.put(column, set);
 		}
@@ -763,7 +778,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
-				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand")) 
+				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand"))
 						&& !"name:en".equals(e.getKey().getTag())) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
@@ -771,7 +786,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					otherNames.add(e.getValue());
 				}
 			}
-			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(), 
+			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
 					namesIndex, otherNames);
 
 			if (tagGroupIds.size() == 0) {
