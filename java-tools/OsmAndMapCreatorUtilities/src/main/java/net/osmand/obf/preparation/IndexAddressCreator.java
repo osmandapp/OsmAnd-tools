@@ -11,20 +11,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Collator;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -1269,19 +1257,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
                                               IndexCreatorSettings settings) {
         name = Algorithms.normalizeSearchText(name);
         name = stripBraces(name);
-		List<String> namesToAdd = splitNames(name);
-
+		Set<String> splitNames = splitNames(name);
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
-                List<String> splitArabic = Algorithms.splitByWordsLowercase(arabic);
-                for (String spl : splitArabic) {
-                    if (namesToAdd.contains(spl)) {
-                        namesToAdd.add(spl);
-                    }
-                }
+                splitNames.addAll(Algorithms.splitByWordsLowercase(arabic));
             }
         }
+        List<String> namesToAdd = new ArrayList<>(splitNames);
 		// remove common words
 		int pos = 0;
 		while(namesToAdd.size() > 1 && pos != -1) {
@@ -1317,9 +1300,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	}
 
-    private static List<String> splitNames(String name) {
+    private static Set<String> splitNames(String name) {
         int prev = -1;
-        List<String> namesToAdd = new ArrayList<>();
+        Set<String> namesToAdd = new HashSet<>();
 
         for (int i = 0; i <= name.length(); i++) {
             boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
