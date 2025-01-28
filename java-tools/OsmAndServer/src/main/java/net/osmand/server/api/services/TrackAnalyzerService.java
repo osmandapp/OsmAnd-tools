@@ -54,10 +54,10 @@ public class TrackAnalyzerService {
 
 	public static class TrackAnalyzerResponse {
 		Map<String, List<TrkSegment>> segments;
-		Map<String, Map<String, Double>> trackAnalysis;
+		Map<String, List<Map<String, Double>>> trackAnalysis;
 		Set<PremiumUserFilesRepository.UserFileNoData> files;
 
-		TrackAnalyzerResponse(Map<String, List<TrkSegment>> segments, Map<String, Map<String, Double>> trackAnalysis, Set<PremiumUserFilesRepository.UserFileNoData> files) {
+		TrackAnalyzerResponse(Map<String, List<TrkSegment>> segments, Map<String, List<Map<String, Double>>> trackAnalysis, Set<PremiumUserFilesRepository.UserFileNoData> files) {
 			this.segments = segments;
 			this.trackAnalysis = trackAnalysis;
 			this.files = files;
@@ -116,14 +116,21 @@ public class TrackAnalyzerService {
 							GpxTrackAnalysis analysis;
 							if (useOnePoint) {
 								analysis = gpxFile.getAnalysis(0);
+								Map<String, Double> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
 							} else {
-								GpxFile g = new GpxFile("");
-								g.getTracks().add(new Track());
-								g.getTracks().get(0).getSegments().add(s);
-								analysis = g.getAnalysis(0);
+								List<Map<String, Double>> statResults = new ArrayList<>();
+								for (TrkSegment seg : segments) {
+									GpxFile g = new GpxFile("");
+									g.getTracks().add(new Track());
+									g.getTracks().get(0).getSegments().add(seg);
+									analysis = g.getAnalysis(0);
+
+									Map<String, Double> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+									statResults.add(trackAnalysisData);
+								}
+								analysisResponse.trackAnalysis.put(uf.name, statResults);
 							}
-							Map<String, Double> trackAnalysisData = getSegmentAnalysis(analysis, uf);
-							analysisResponse.trackAnalysis.put(uf.name, trackAnalysisData);
 						}
 					}
 				}
@@ -152,7 +159,7 @@ public class TrackAnalyzerService {
 		trackAnalysisData.put("avgElevation", analysis.getAvgElevation());
 		trackAnalysisData.put("diffElevationUp", analysis.getDiffElevationUp());
 		trackAnalysisData.put("diffElevationDown", analysis.getDiffElevationDown());
-		trackAnalysisData.put("data", (double) uf.updatetime.getTime());
+		trackAnalysisData.put("date", (double) uf.updatetime.getTime());
 		trackAnalysisData.put("duration", (double) analysis.getDurationInMs());
 		trackAnalysisData.put("timeMoving", (double) analysis.getTimeMoving());
 		trackAnalysisData.put("totalDist", (double) analysis.getTotalDistance());
@@ -275,8 +282,7 @@ public class TrackAnalyzerService {
 						r.getPoints().add(s.getPoints().get(k));
 					}
 					r.getPoints().add(en);
-					r.setName(trackName + " " + startInd + " threshold=" + String.format("%.2f m",
-							MapUtils.getDistance(startProj, start) + MapUtils.getDistance(endProj, end)));
+					r.setName(trackName);
 					res.add(r);
 					startInd = -1;
 				}
