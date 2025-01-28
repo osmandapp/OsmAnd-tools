@@ -843,7 +843,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
-                splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
+                List<String> splitArabic = Algorithms.splitByWordsLowercase(arabic);
+                for (String spl : splitArabic) {
+                    if (splitName.contains(spl)) {
+                        splitName.add(spl);
+                    }
+                }
             }
         }
         for (String str : splitName) {
