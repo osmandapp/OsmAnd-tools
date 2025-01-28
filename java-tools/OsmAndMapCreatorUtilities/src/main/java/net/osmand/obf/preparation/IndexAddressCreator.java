@@ -1274,7 +1274,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
-                namesToAdd.addAll(Algorithms.splitByWordsLowercase(arabic));
+                List<String> splitArabic = Algorithms.splitByWordsLowercase(arabic);
+                for (String spl : splitArabic) {
+                    if (namesToAdd.contains(spl)) {
+                        namesToAdd.add(spl);
+                    }
+                }
             }
         }
 		// remove common words
