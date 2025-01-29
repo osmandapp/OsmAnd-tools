@@ -91,6 +91,9 @@ public class PropagateToNodes {
 		public void applyRule(PropagateRule rule, boolean end) {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
 			rl.osmId = end ? endId : startId;
+			if (rule.getPropAlso() != null) {
+				rl.tags.putAll(rule.getPropAlso());
+			}
 			rl.tags.put(rule.getPropagateTag(), rule.getPropagateValue());
 			if (rule.type.isBorder()) {
 				rl.ignoreBorderPoint = true;
@@ -156,7 +159,7 @@ public class PropagateToNodes {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
 				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix,
-						d.propagateNetworkIf, d.propagateIf);
+						d.propagateNetworkIf, d.propagateIf, d.propagateAlso);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -296,12 +299,15 @@ public class PropagateToNodes {
 		public String tagPrefix;
 		public Map<String, String> propMapIf;
 		public Map<String, String> propNetworkIf;
+		public Map<String, String> propAlso;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix,
-				Map<String, String> propNetworkIf, Map<String, String> propMapIf) {
+				Map<String, String> propNetworkIf, Map<String, String> propMapIf, 
+				Map<String, String> propAlso) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
 			this.propMapIf = propMapIf;
+			this.propAlso = propAlso;
 			this.propNetworkIf = propNetworkIf;
 		}
 
@@ -323,6 +329,10 @@ public class PropagateToNodes {
 				propagateTag = tagPrefix + propagateTag;
 			}
 			return propagateTag;
+		}
+		
+		public Map<String, String> getPropAlso() {
+			return propAlso;
 		}
 
 		public boolean applicableBorder(Map<String, String> tags) {
