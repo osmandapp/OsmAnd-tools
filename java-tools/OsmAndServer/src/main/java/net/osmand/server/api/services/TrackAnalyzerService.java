@@ -39,7 +39,7 @@ public class TrackAnalyzerService {
 	protected PremiumUserFilesRepository filesRepository;
 
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
-	static final double DIST_THRESHOLD = 20; // meters
+	static final double DIST_THRESHOLD = 50; // meters
 
 	@Getter
 	public static class TrackAnalyzerRequest {
