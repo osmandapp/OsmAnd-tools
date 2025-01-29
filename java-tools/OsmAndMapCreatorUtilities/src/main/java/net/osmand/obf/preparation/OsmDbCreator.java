@@ -184,7 +184,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long shiftedPositive = ((-id) << shiftId);
 			return -(shiftedPositive + additionId);
 		} else {
-			return (id << shiftId) + additionId;
+			// keep original id if it's positive
+			return id;
+//			return (id << shiftId) + additionId;
 		}
 		
 	}
