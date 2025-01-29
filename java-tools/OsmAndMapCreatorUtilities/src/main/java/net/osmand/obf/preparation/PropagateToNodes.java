@@ -1,11 +1,14 @@
 package net.osmand.obf.preparation;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -96,14 +99,10 @@ public class PropagateToNodes {
 				Iterator<Entry<String, String>> it = parentTags.entrySet().iterator();
 				while (it.hasNext()) {
 					Entry<String, String> wTag = it.next();
-					if (rule.getPropAlso().containsKey(wTag.getKey())) {
-						String expValue = rule.getPropAlso().get(wTag.getKey());
-						if (expValue == null || expValue.equals(wTag.getValue())) {
-							rl.tags.put(wTag.getKey(), wTag.getValue());
-						}
+					if (rule.getPropAlso().contains(wTag.getKey())) {
+						rl.tags.put(wTag.getKey(), wTag.getValue());
 					}
 				}
-				rl.tags.putAll(rule.getPropAlso());
 			}
 			rl.tags.put(rule.getPropagateTag(), rule.getPropagateValue());
 			if (rule.type.isBorder()) {
@@ -170,7 +169,7 @@ public class PropagateToNodes {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
 				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix,
-						d.propagateNetworkIf, d.propagateIf, d.propagateAlso);
+						d.propagateNetworkIf, d.propagateIf, d.propagateAlsoTags);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -310,15 +309,17 @@ public class PropagateToNodes {
 		public String tagPrefix;
 		public Map<String, String> propMapIf;
 		public Map<String, String> propNetworkIf;
-		public Map<String, String> propAlso;
+		public Set<String> propAlso;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix,
 				Map<String, String> propNetworkIf, Map<String, String> propMapIf, 
-				Map<String, String> propAlso) {
+				String[] propAlsoTags) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
 			this.propMapIf = propMapIf;
-			this.propAlso = propAlso;
+			if (propAlsoTags != null) {
+				this.propAlso = new HashSet<>(Arrays.asList(propAlsoTags));
+			}
 			this.propNetworkIf = propNetworkIf;
 		}
 
@@ -342,7 +343,7 @@ public class PropagateToNodes {
 			return propagateTag;
 		}
 		
-		public Map<String, String> getPropAlso() {
+		public Set<String> getPropAlso() {
 			return propAlso;
 		}
 
