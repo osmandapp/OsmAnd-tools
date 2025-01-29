@@ -11,20 +11,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Collator;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -37,7 +25,6 @@ import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
-import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
@@ -46,7 +33,6 @@ import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -55,6 +41,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
+import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -696,7 +683,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
         if (settings.indexByProximity) {
             cityPart = findCityPart(location, city);
         } else {
-            cityPart = city.getName(); 
+            cityPart = city.getName();
         }
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
 		if (foundStreet == null) {
@@ -1266,30 +1253,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return retName;
 	}
 
-	private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
-			IndexCreatorSettings settings) {
-		int prev = -1;
-		List<String> namesToAdd = new ArrayList<>();
-		name = Algorithms.normalizeSearchText(name);
-		name = stripBraces(name);
-
-		for (int i = 0; i <= name.length(); i++) {
-			boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
-					&& ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
-					|| (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
-			if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
-					name.charAt(i) != '\'' && !isHyphenNearNumber)) {
-				if (prev != -1) {
-					String substr = name.substring(prev, i);
-					namesToAdd.add(substr.toLowerCase());
-					prev = -1;
-				}
-			} else {
-				if (prev == -1) {
-					prev = i;
-				}
-			}
-		}
+    private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
+                                              IndexCreatorSettings settings) {
+        name = Algorithms.normalizeSearchText(name);
+        name = stripBraces(name);
+		Set<String> splitNames = splitNames(name);
+        if (ArabicNormalizer.isSpecialArabic(name)) {
+            String arabic = ArabicNormalizer.normalize(name);
+            if (arabic != null && !arabic.equals(name)) {
+                splitNames.addAll(Algorithms.splitByWordsLowercase(arabic));
+            }
+        }
+        List<String> namesToAdd = new ArrayList<>(splitNames);
 		// remove common words
 		int pos = 0;
 		while(namesToAdd.size() > 1 && pos != -1) {
@@ -1324,6 +1299,30 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 	}
+
+    private static Set<String> splitNames(String name) {
+        int prev = -1;
+        Set<String> namesToAdd = new HashSet<>();
+
+        for (int i = 0; i <= name.length(); i++) {
+            boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
+                    && ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
+                    || (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
+            if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
+                    name.charAt(i) != '\'' && !isHyphenNearNumber)) {
+                if (prev != -1) {
+                    String substr = name.substring(prev, i);
+                    namesToAdd.add(substr.toLowerCase());
+                    prev = -1;
+                }
+            } else {
+                if (prev == -1) {
+                    prev = i;
+                }
+            }
+        }
+        return namesToAdd;
+    }
 
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
