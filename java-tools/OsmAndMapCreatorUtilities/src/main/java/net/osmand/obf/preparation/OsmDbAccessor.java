@@ -7,11 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -37,7 +33,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private int allNodes;
 	private int allBoundaries;
 	private boolean realCounts = false;
-	 
+
 	protected Connection dbConn;
 	protected DBDialect dialect;
 
@@ -122,6 +118,31 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	public void loadEntityRelation(Relation e) throws SQLException {
 		loadEntityRelation(e, 1);
 	}
+
+    @Override
+    public Map<Long, Node> retrieveAllRelationNodes(Relation e) throws SQLException {
+        Map<Long, Node> allNodes = new HashMap<>();
+        retrieveAllRelationNodes(e, allNodes);
+        return allNodes;
+    }
+
+    private void retrieveAllRelationNodes(Relation e, Map<Long, Node> allNodes) throws SQLException {
+        loadEntityRelation(e);
+        for (RelationMember member : e.getMembers()) {
+            Entity entity = member.getEntity();
+            if (entity instanceof  Relation relation) {
+                retrieveAllRelationNodes(relation, allNodes);
+            }
+            if (entity instanceof Way way) {
+                for (Node node : way.getNodes()) {
+                    allNodes.put(node.getId(), node);
+                }
+            }
+            if (entity instanceof Node node) {
+                allNodes.put(node.getId(), node);
+            }
+        }
+    }
 
 	public void loadEntityRelation(Relation e, int level) throws SQLException {
 		if (e.isDataLoaded()) { //data was already loaded, nothing to do

@@ -235,8 +235,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
                 || "crag".equals(e.getTag(OSMTagKey.CLIMBING.getValue()));
         if (climbing) {
-            Map<Long, Node> allNodes = new HashMap<>();
-            retrieveAllRelationNodes((Relation) e, allNodes, ctx);
+            Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(e);
             List<Node> nodes = new ArrayList<>(allNodes.values());
             original.createClimbingOuterWay(e, nodes);
         } else {
@@ -1328,24 +1327,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         boolean clockwiseBefore = OsmMapUtils.isClockwiseWay(e);
         boolean clockwiseAfter = OsmMapUtils.isClockwiseWay(new Way(e.getId(), simplyiedNodes));
         return clockwiseAfter != clockwiseBefore;
-    }
-
-    private void retrieveAllRelationNodes(Relation e, Map<Long, Node> allNodes, OsmDbAccessorContext ctx) throws SQLException {
-        for (RelationMember member : e.getMembers()) {
-            Entity entity = member.getEntity();
-            if (entity instanceof  Relation relation) {
-                ctx.loadEntityRelation(relation);
-                retrieveAllRelationNodes(relation, allNodes, ctx);
-            }
-            if (entity instanceof Way way) {
-                for (Node node : way.getNodes()) {
-                    allNodes.put(node.getId(), node);
-                }
-            }
-            if (entity instanceof Node node) {
-                allNodes.put(node.getId(), node);
-            }
-        }
     }
 
 }
