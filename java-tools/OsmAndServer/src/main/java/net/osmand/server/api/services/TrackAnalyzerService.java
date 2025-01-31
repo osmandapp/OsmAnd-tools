@@ -54,10 +54,10 @@ public class TrackAnalyzerService {
 
 	public static class TrackAnalyzerResponse {
 		Map<String, List<TrkSegment>> segments;
-		Map<String, List<Map<String, Double>>> trackAnalysis;
+		Map<String, List<Map<String, String>>> trackAnalysis;
 		Set<PremiumUserFilesRepository.UserFileNoData> files;
 
-		TrackAnalyzerResponse(Map<String, List<TrkSegment>> segments, Map<String, List<Map<String, Double>>> trackAnalysis, Set<PremiumUserFilesRepository.UserFileNoData> files) {
+		TrackAnalyzerResponse(Map<String, List<TrkSegment>> segments, Map<String, List<Map<String, String>>> trackAnalysis, Set<PremiumUserFilesRepository.UserFileNoData> files) {
 			this.segments = segments;
 			this.trackAnalysis = trackAnalysis;
 			this.files = files;
@@ -116,17 +116,17 @@ public class TrackAnalyzerService {
 							GpxTrackAnalysis analysis;
 							if (useOnePoint) {
 								analysis = gpxFile.getAnalysis(0);
-								Map<String, Double> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
 								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
 							} else {
-								List<Map<String, Double>> statResults = new ArrayList<>();
+								List<Map<String, String>> statResults = new ArrayList<>();
 								for (TrkSegment seg : segments) {
 									GpxFile g = new GpxFile("");
 									g.getTracks().add(new Track());
 									g.getTracks().get(0).getSegments().add(seg);
 									analysis = g.getAnalysis(0);
 
-									Map<String, Double> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
 									statResults.add(trackAnalysisData);
 								}
 								analysisResponse.trackAnalysis.put(uf.name, statResults);
@@ -148,21 +148,45 @@ public class TrackAnalyzerService {
 	}
 
 	@NotNull
-	private static Map<String, Double> getSegmentAnalysis(GpxTrackAnalysis analysis, PremiumUserFilesRepository.UserFile uf) {
-		Map<String, Double> trackAnalysisData = new HashMap<>();
-
-		trackAnalysisData.put("minSpeed", (double) analysis.getMinSpeed());
-		trackAnalysisData.put("avgSpeed", (double) analysis.getAvgSpeed());
-		trackAnalysisData.put("maxSpeed", (double) analysis.getMaxSpeed());
-		trackAnalysisData.put("minElevation", analysis.getMinElevation());
-		trackAnalysisData.put("maxElevation", analysis.getMaxElevation());
-		trackAnalysisData.put("avgElevation", analysis.getAvgElevation());
-		trackAnalysisData.put("diffElevationUp", analysis.getDiffElevationUp());
-		trackAnalysisData.put("diffElevationDown", analysis.getDiffElevationDown());
-		trackAnalysisData.put("date", (double) uf.updatetime.getTime());
-		trackAnalysisData.put("duration", (double) analysis.getDurationInMs());
-		trackAnalysisData.put("timeMoving", (double) analysis.getTimeMoving());
-		trackAnalysisData.put("totalDist", (double) analysis.getTotalDistance());
+	private static Map<String, String> getSegmentAnalysis(GpxTrackAnalysis analysis, PremiumUserFilesRepository.UserFile uf) {
+		Map<String, String> trackAnalysisData = new HashMap<>();
+		final String DEFAULT = "NaN";
+		// add speed
+		float avgSpeed = analysis.getAvgSpeed();
+		if (avgSpeed == -1) {
+			// track without speed
+			trackAnalysisData.put("minSpeed", DEFAULT);
+			trackAnalysisData.put("avgSpeed", DEFAULT);
+			trackAnalysisData.put("maxSpeed", DEFAULT);
+		} else {
+			trackAnalysisData.put("minSpeed", String.valueOf(analysis.getMinSpeed()));
+			trackAnalysisData.put("avgSpeed", String.valueOf(avgSpeed));
+			trackAnalysisData.put("maxSpeed", String.valueOf(analysis.getMaxSpeed()));
+		}
+		// add elevation
+		double minElevation = analysis.getMinElevation();
+		if (minElevation == 99999.0) {
+			// track without elevation
+			trackAnalysisData.put("minElevation", DEFAULT);
+			trackAnalysisData.put("maxElevation", DEFAULT);
+			trackAnalysisData.put("avgElevation", DEFAULT);
+			trackAnalysisData.put("diffElevationUp", DEFAULT);
+			trackAnalysisData.put("diffElevationDown", DEFAULT);
+		} else {
+			trackAnalysisData.put("minElevation", String.valueOf(minElevation));
+			trackAnalysisData.put("maxElevation", String.valueOf(analysis.getMaxElevation()));
+			trackAnalysisData.put("avgElevation", String.valueOf(analysis.getAvgElevation()));
+			trackAnalysisData.put("diffElevationUp", String.valueOf(analysis.getDiffElevationUp()));
+			trackAnalysisData.put("diffElevationDown", String.valueOf(analysis.getDiffElevationDown()));
+		}
+		// add other data
+		trackAnalysisData.put("date", String.valueOf(uf.updatetime.getTime()));
+		double duration = analysis.getDurationInMs();
+		trackAnalysisData.put("duration", duration == 0.0 ? DEFAULT : String.valueOf(duration));
+		double timeMoving = analysis.getTimeMoving();
+		trackAnalysisData.put("timeMoving", timeMoving == 0.0 ? DEFAULT : String.valueOf(timeMoving));
+		double totalDist = analysis.getTotalDistance();
+		trackAnalysisData.put("totalDist", totalDist == 0.0 ? DEFAULT : String.valueOf(totalDist));
 
 		return trackAnalysisData;
 	}
