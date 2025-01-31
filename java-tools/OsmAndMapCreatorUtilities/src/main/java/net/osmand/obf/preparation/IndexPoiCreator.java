@@ -167,7 +167,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			long id = e.getId();
-			if (icc.basemap) {
+			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
 			} else if(e instanceof Relation) {
 //				id = GENERATE_OBJ_ID--;
