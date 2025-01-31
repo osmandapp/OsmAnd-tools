@@ -50,7 +50,7 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -62,7 +62,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1099,7 +1099,7 @@ public class BinaryInspector {
 
 		b.append(" id ").append(obj.getId());
 		b.append(" osmid ").append((obj.getId() >> (SHIFT_ID + 1)));
-		if (obj.getId() > ObfConstants.PROPAGATE_NODE_BIT) {
+		if (obj.getId() > ObfConstants.PROPAGATE_NODE_BIT && obj.getId() < ObfConstants.RELATION_BIT) {
 			long wayId = (obj.getId() & ((1L << ObfConstants.SHIFT_PROPAGATED_NODE_IDS) - 1)) >> ObfConstants.SHIFT_PROPAGATED_NODES_BITS;
 			wayId = wayId >> 1;
 			b.append(" (propagate from way: " + wayId + ") ");

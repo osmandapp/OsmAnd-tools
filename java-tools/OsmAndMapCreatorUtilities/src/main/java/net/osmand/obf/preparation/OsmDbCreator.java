@@ -117,7 +117,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
-			if (!addGeoHash) {
+			// for points id > 0 add always geohash (for basemap points)
+			if (!addGeoHash && id < 0) {
 				return getSimpleConvertId(id, EntityType.NODE, true);
 			}
 			int hash = getNodeHash(e);

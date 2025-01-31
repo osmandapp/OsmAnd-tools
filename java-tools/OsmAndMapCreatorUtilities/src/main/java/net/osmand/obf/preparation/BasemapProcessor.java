@@ -457,7 +457,7 @@ public class BasemapProcessor {
 				((Way) e).getNodeIds().reverse();
 			}
 		}
-		long refId = -Math.abs(e.getId());
+		long refId = e.getId();
 		
 		boolean coastline = "coastline".equals(e.getTag("natural"));
 		// save space with ids
@@ -694,7 +694,12 @@ public class BasemapProcessor {
         }
         SimplisticBinaryData data = new SimplisticBinaryData();
         // not needed
-        data.id = ID--; // don't use ref id
+		if (id > 0) {
+			// extra unneccessary byte see IndexVectorMapCreator.convertGeneratedIdToObfWrite !
+			data.id = id << 1;
+		} else {
+			data.id = ID--; // don't use ref id
+		}
         data.coordinates = bcoordinates.toByteArray();
         data.types = types;
         data.addTypes = addTypes;
