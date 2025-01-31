@@ -2,12 +2,11 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import net.osmand.data.LatLon;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import okio.Buffer;
-import okio.GzipSource;
-import okio.Okio;
 
 import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.*;
@@ -91,6 +90,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	TrackAnalyzerService trackAnalyzerService;
 
 	@Autowired
 	ShareFileService shareFileService;
@@ -889,6 +891,15 @@ public class MapApiController {
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
+	}
+
+	@PostMapping(path = {"/get-tracks-by-seg"}, produces = "application/json")
+	public ResponseEntity<String> getTracksBySegment(@RequestBody TrackAnalyzerService.TrackAnalyzerRequest request) throws IOException {
+		PremiumUserDevice dev = userdataService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
 	}
 
 }
