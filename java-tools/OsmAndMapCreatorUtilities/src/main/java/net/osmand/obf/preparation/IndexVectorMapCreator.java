@@ -230,7 +230,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 
         ctx.loadEntityRelation((Relation) e);
-        MultipolygonBuilder original = createMultipolygonBuilder(e);
+        MultipolygonBuilder original = new MultipolygonBuilder();
+        original.setId(e.getId());
+        boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
+                || "crag".equals(e.getTag(OSMTagKey.CLIMBING.getValue()));
+        if (climbing) {
+            Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(e);
+            List<Node> nodes = new ArrayList<>(allNodes.values());
+            original.createClimbingOuterWay(e, nodes);
+        } else {
+            original.createInnerAndOuterWays(e);
+        }
         try {
             renderingTypes.encodeEntityWithType(false, tags, mapZooms.getLevel(0).getMaxZoom(), typeUse, addtypeUse,
                     namesUse, tempNameUse);
@@ -333,26 +343,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                     addtypeUse, true, true);
 
         }
-    }
-
-    public static MultipolygonBuilder createMultipolygonBuilder(Entity e) {
-
-        // create a multipolygon object for this
-        MultipolygonBuilder original = new MultipolygonBuilder();
-        original.setId(e.getId());
-
-        // fill the multipolygon with all ways from the Relation
-        for (RelationMember es : ((Relation) e).getMembers()) {
-            if (es.getEntity() instanceof Way) {
-                boolean inner = "inner".equals(es.getRole()); //$NON-NLS-1$
-                if (inner) {
-                    original.addInnerWay((Way) es.getEntity());
-                } else if ("outer".equals(es.getRole())) {
-                    original.addOuterWay((Way) es.getEntity());
-                }
-            }
-        }
-        return original;
     }
 
     private void excludeFromMainIteration(List<Way> l) {

@@ -1,10 +1,14 @@
 package net.osmand.obf.preparation;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
@@ -84,13 +88,22 @@ public class PropagateToNodes {
 					st.getLongitude() / 2 + en.getLongitude() / 2);
 		}
 
-		public void applyRule(PropagateRule rule) {
-			applyRule(rule, false);
+		public void applyRule(PropagateRule rule, Map<String, String> parentTags) {
+			applyRule(rule, parentTags, false);
 		}
 
-		public void applyRule(PropagateRule rule, boolean end) {
+		public void applyRule(PropagateRule rule, Map<String, String> parentTags, boolean end) {
 			PropagateRuleFromWayToNode rl = new PropagateRuleFromWayToNode(this, rule);
 			rl.osmId = end ? endId : startId;
+			if (parentTags != null && rule.getPropAlso() != null) {
+				Iterator<Entry<String, String>> it = parentTags.entrySet().iterator();
+				while (it.hasNext()) {
+					Entry<String, String> wTag = it.next();
+					if (rule.getPropAlso().contains(wTag.getKey())) {
+						rl.tags.put(wTag.getKey(), wTag.getValue());
+					}
+				}
+			}
 			rl.tags.put(rule.getPropagateTag(), rule.getPropagateValue());
 			if (rule.type.isBorder()) {
 				rl.ignoreBorderPoint = true;
@@ -156,7 +169,7 @@ public class PropagateToNodes {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
 				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix,
-						d.propagateNetworkIf, d.propagateIf);
+						d.propagateNetworkIf, d.propagateIf, d.propagateAlsoTags);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -191,27 +204,27 @@ public class PropagateToNodes {
 			switch (rule.type) {
 			case ALL:
 				for (int i = 0; i < allIds.size(); i++) {
-					getNode(resultWay, w, i, i).applyRule(rule);
+					getNode(resultWay, w, i, i).applyRule(rule, w.getTags());
 				}
 				break;
 			case START:
-				getNode(resultWay, w, 0, 1).applyRule(rule);
+				getNode(resultWay, w, 0, 1).applyRule(rule, w.getTags());
 				break;
 			case END:
-				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
+				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, w.getTags(), true);
 				break;
 			case CENTER:
 				if (allIds.size() == 2) {
-					getNode(resultWay, w, 0, 1).applyRule(rule);
+					getNode(resultWay, w, 0, 1).applyRule(rule, w.getTags());
 				} else {
-					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule);
+					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule, w.getTags());
 				}
 				break;
 			case BORDERIN:
 				// possible fix for all interconnected roads assign on each point (not needed & more computational power)
 				for (int i = 0; i < allIds.size() - 1; i++) {
-					getNode(resultWay, w, i, i + 1).applyRule(rule, false);
-					getNode(resultWay, w, i, i + 1).applyRule(rule, true);
+					getNode(resultWay, w, i, i + 1).applyRule(rule, w.getTags(), false);
+					getNode(resultWay, w, i, i + 1).applyRule(rule, w.getTags(), true);
 				}
 //				getNode(resultWay, w, 0, 1).applyRule(rule);
 //				getNode(resultWay, w, allIds.size() - 2, allIds.size() - 1).applyRule(rule, true);
@@ -219,7 +232,7 @@ public class PropagateToNodes {
 			case BORDEROUT:
 				// fix for all interconnected roads assign on each point (not needed & more computational power)
 				for (int i = 0; i < allIds.size(); i++) {
-					getNode(resultWay, w, i, i).applyRule(rule);
+					getNode(resultWay, w, i, i).applyRule(rule, w.getTags());
 				}
 				break;
 			}
@@ -296,12 +309,17 @@ public class PropagateToNodes {
 		public String tagPrefix;
 		public Map<String, String> propMapIf;
 		public Map<String, String> propNetworkIf;
+		public Set<String> propAlso;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix,
-				Map<String, String> propNetworkIf, Map<String, String> propMapIf) {
+				Map<String, String> propNetworkIf, Map<String, String> propMapIf, 
+				String[] propAlsoTags) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
 			this.propMapIf = propMapIf;
+			if (propAlsoTags != null) {
+				this.propAlso = new HashSet<>(Arrays.asList(propAlsoTags));
+			}
 			this.propNetworkIf = propNetworkIf;
 		}
 
@@ -323,6 +341,10 @@ public class PropagateToNodes {
 				propagateTag = tagPrefix + propagateTag;
 			}
 			return propagateTag;
+		}
+		
+		public Set<String> getPropAlso() {
+			return propAlso;
 		}
 
 		public boolean applicableBorder(Map<String, String> tags) {

@@ -830,9 +830,9 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-		settings.indexMap = true;
+//		settings.indexMap = true;
 //		settings.indexAddress = true;
-		settings.indexPOI = true;
+//		settings.indexPOI = true;
 		// settings.indexTransport = true;
 		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
@@ -850,8 +850,8 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
-//		String file = rootFolder + "../temp/map.osm";
-		String file = rootFolder + "../temp/test_access.osm";
+		String file = rootFolder + "../temp/map.osm";
+//		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";

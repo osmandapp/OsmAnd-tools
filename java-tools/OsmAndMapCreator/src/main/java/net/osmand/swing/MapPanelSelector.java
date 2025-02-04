@@ -17,6 +17,10 @@ import javax.swing.AbstractAction;
 import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import org.apache.commons.logging.Log;
 
 import gnu.trove.list.array.TIntArrayList;
@@ -26,11 +30,6 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities.RouteType;
-import net.osmand.gpx.GPXUtilities.Track;
-import net.osmand.gpx.GPXUtilities.TrkSegment;
-import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
@@ -116,7 +115,7 @@ public class MapPanelSelector {
 	private JPopupMenu createMenu(RenderedObject renderedObject, int x, int y) throws IOException {
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(new JLabel("Select route"));
-		Map<RouteKey, GPXFile> routeMap;
+		Map<RouteKey, GpxFile> routeMap;
 		NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
 		NetworkRouteSelector routeSelector = new NetworkRouteSelector(
 				DataExtractionSettings.getSettings().getObfReaders(), f, null);
@@ -137,12 +136,12 @@ public class MapPanelSelector {
 				public void actionPerformed(ActionEvent actionEvent) {
 					threadPool.submit(() -> {
 						try {
-							Map<RouteKey, GPXFile> routes;
+							Map<RouteKey, GpxFile> routes;
 							long tms = System.currentTimeMillis();
 							if (routeMap == null || routeMap.get(routeKey) == null) {
 								System.out.println("Start loading " + routeKey.tags);
 								if (LOAD_ROUTE_BBOX) {
-									Map<RouteKey, GPXFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
+									Map<RouteKey, GpxFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
 									routes = Collections.singletonMap(routeKey, res.get(routeKey));
 								} else {
 									f.keyFilter = Collections.singleton(routeKey);
@@ -168,16 +167,16 @@ public class MapPanelSelector {
 		return menu;
 	}
 
-	private void drawGpxFiles(Collection<GPXFile> files) {
+	private void drawGpxFiles(Collection<GpxFile> files) {
 		DataTileManager<Entity> points = new DataTileManager<>(4);
 		List<Way> ways = new ArrayList<>();
-		for (GPXFile file : files) {
-			for (Track track : file.tracks) {
-				for (TrkSegment segment : track.segments) {
+		for (GpxFile file : files) {
+			for (Track track : file.getTracks()) {
+				for (TrkSegment segment : track.getSegments()) {
 					Way w = new Way(-1);
 					Node last = null, first = null;
-					for (WptPt point : segment.points) {
-						last = new Node(point.lat, point.lon, -1);
+					for (WptPt point : segment.getPoints()) {
+						last = new Node(point.getLat(), point.getLon(), -1);
 						if (first == null) {
 							first = last;
 						}

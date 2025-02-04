@@ -47,7 +47,6 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
-import net.osmand.shared.ToolsOsmAndContextImpl;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.*;
 import okio.GzipSource;

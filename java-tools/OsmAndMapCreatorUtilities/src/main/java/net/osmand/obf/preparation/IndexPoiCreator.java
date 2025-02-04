@@ -11,11 +11,11 @@ import net.osmand.data.*;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.osm.*;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.EntityParser;
-import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
+import net.osmand.util.ArabicNormalizer;
+import net.osmand.util.JarvisAlgorithm;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
@@ -162,11 +162,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
+            LatLon climbingCenter = retrieveClimbingCenter(e, ctx);
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
 			long id = e.getId();
-			if (icc.basemap) {
+			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
 			} else if(e instanceof Relation) {
 //				id = GENERATE_OBJ_ID--;
@@ -190,6 +191,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
+                if (climbingCenter != null) {
+                    a.setLocation(climbingCenter);
+                }
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
 				// checkEntity(e);
@@ -836,19 +840,25 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
-		name = Algorithms.normalizeSearchText(name);
-		List<String> splitName = Algorithms.splitByWordsLowercase(name);
-		for (String str : splitName) {
-			if (str.length() > settings.charsToBuildPoiNameIndex) {
-				str = str.substring(0, settings.charsToBuildPoiNameIndex);
-			}
-			if (!poiData.containsKey(str)) {
-				poiData.put(str, new LinkedHashSet<>());
-			}
-			poiData.get(str).add(data);
-		}
-	}
+    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
+        name = Algorithms.normalizeSearchText(name);
+        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
+        if (ArabicNormalizer.isSpecialArabic(name)) {
+            String arabic = ArabicNormalizer.normalize(name);
+            if (arabic != null && !arabic.equals(name)) {
+                splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
+            }
+        }
+        for (String str : splitName) {
+            if (str.length() > settings.charsToBuildPoiNameIndex) {
+                str = str.substring(0, settings.charsToBuildPoiNameIndex);
+            }
+            if (!poiData.containsKey(str)) {
+                poiData.put(str, new LinkedHashSet<>());
+            }
+            poiData.get(str).add(data);
+        }
+    }
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
 			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,
@@ -1139,4 +1149,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		return tagGroupIds;
 	}
+
+    private LatLon retrieveClimbingCenter(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+        if (e instanceof Relation relation) {
+            boolean climbing = "area".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()))
+                    || "crag".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()));
+            if (climbing) {
+                Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(relation);
+                if (!allNodes.isEmpty()) {
+                    ArrayList<Node> convexPolygon = JarvisAlgorithm.createConvexPolygon(new ArrayList<>(allNodes.values()));
+                    if (convexPolygon != null) {
+                        Way convexWay = new Way(1, convexPolygon);
+                        return OsmMapUtils.getCenter(convexWay);
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }

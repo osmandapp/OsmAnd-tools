@@ -62,7 +62,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
 
 	private final static float DOUGLAS_PEUKER_DISTANCE = 15;
-	
+
 	// flipped quad tree cause bottom > top
 	private QuadTree<Multipolygon> lowEmissionZones = new QuadTree<Multipolygon>(new QuadRect(-180, 90, 180, -90), 8, 0.55f);
 
@@ -76,7 +76,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
 	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
-	
+
 
 
 	static TreeMap<MapRoutingTypes.MapRouteType, String> createTreeMap() {
@@ -131,7 +131,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 		this.propagateToNodes = propagateToNodes;
 	}
-	
+
 	public void indexExtraRelations(OsmBaseStorage reader) {
 		for (Entity e : reader.getRegisteredEntities().values()) {
 			if (e instanceof Relation && "low_emission_zone".equals(e.getTags().get("boundary"))) {
@@ -140,7 +140,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if (e instanceof Relation) {
@@ -175,7 +175,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addLowEmissonZoneRelation(Relation e) {
-		MultipolygonBuilder multipolygonBuilder = IndexVectorMapCreator.createMultipolygonBuilder(e);
+		MultipolygonBuilder multipolygonBuilder = new MultipolygonBuilder();
+        multipolygonBuilder.setId(e.getId());
+        multipolygonBuilder.createInnerAndOuterWays(e);
 		Multipolygon lowEmissionZone = multipolygonBuilder.build();
 		if (lowEmissionZone != null) {
 			QuadRect bbox = lowEmissionZone.getLatLonBbox();
@@ -201,7 +203,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private QuadRect flipBbox(QuadRect bbox) {
 		return new QuadRect(bbox.left, bbox.bottom, bbox.right, bbox.top);
 	}
-	
+
 	private Map<String, String> addLowEmissionZoneTag(Way e, Map<String, String> tags) {
 		Node n = null;
 		// get first not null node
@@ -489,7 +491,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 
-	
+
 
 
 
@@ -606,6 +608,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				} else if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_NO_U_TURN;
 				} else if ("no_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+				} else if ("no_entry".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					// reuse no straight on
+					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+				} else if ("no_exit".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					// reuse no straight on
 					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
 				} else if ("only_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN;
@@ -1208,30 +1216,30 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	public static class RouteWriteContext {
 		PreparedStatement selectData ;
 		TLongObjectHashMap<RouteDataObject> objects;
-		
+
 		TLongObjectHashMap<BinaryFileReference> treeHeader;
 		Log logMapDataWarn;
 		private MapRoutingTypes routeTypes;
-		
+
 		TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 		TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
-		
+
 		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
 				PreparedStatement selectData) {
 			this.logMapDataWarn = logMapDataWarn;
 			this.treeHeader = treeHeader;
 			this.routeTypes = routeTypes;
 			this.selectData = selectData;
-			
+
 		}
-		
+
 		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
 				TLongObjectHashMap<RouteDataObject> objects) {
 			this.logMapDataWarn = logMapDataWarn;
 			this.treeHeader = treeHeader;
 			this.routeTypes = routeTypes;
 			this.objects = objects;
-			
+
 			for(RouteDataObject o : objects.valueCollection()){
 				List<RestrictionInfo> list = new ArrayList<>();
 				for(int k = 0 ; k < o.getRestrictionLength(); k++) {
@@ -1240,18 +1248,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				highwayRestrictions.put(o.getId(), list);
 			}
 		}
-		
-		
+
+
 		Map<String, Integer> stringTable = new LinkedHashMap<String, Integer>();
 		Map<MapRouteType, String> wayNames = createTreeMap();
 		List<MapPointName> pointNames = new ArrayList<MapRoutingTypes.MapPointName>();
 		TLongArrayList wayMapIds = new TLongArrayList();
 		TLongObjectHashMap<Integer> wayMapIdsCache = new TLongObjectHashMap<>();
-		
+
 		TLongArrayList pointMapIds = new TLongArrayList();
 		int[] wayTypes;
 		private ArrayList<RoutePointToWrite> points;
-		
+
 		protected void decodeNames(String name, Map<MapRouteType, String> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
@@ -1266,7 +1274,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				i = n;
 			}
 		}
-		
+
 		protected void decodeListNames(String name, List<MapPointName> tempNames) {
 			int i = name.indexOf(SPECIAL_CHAR);
 			while (i != -1) {
@@ -1280,8 +1288,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				i = n;
 			}
 		}
-		
-		
+
+
 		public int registerWayMapId(long id) {
 			if(!wayMapIdsCache.contains(id)) {
 				wayMapIdsCache.put(id, wayMapIdsCache.size());
@@ -1303,14 +1311,14 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				if(next) {
 					wayNames.clear();
 					decodeNames(rs.getString(5), wayNames);
-					
+
 					byte[] types = rs.getBytes(1);
 					this.wayTypes = new int[types.length / 2];
 					for (int j = 0; j < types.length; j += 2) {
 						int ids = Algorithms.parseSmallIntFromBytes(types, j);
 						wayTypes[j / 2] = routeTypes.getTypeByInternalId(ids).getTargetId();
 					}
-					
+
 					byte[] pointTypes = rs.getBytes(2);
 					//byte[] pointIds = rs.getBytes(3);
 					byte[] pointCoordinates = rs.getBytes(4);
@@ -1323,7 +1331,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					if(basemapNodesToReinsert != null && basemapNodesToReinsert.containsKey(id) ) {
 						missingPoints = basemapNodesToReinsert.get(id);
 					}
-					
+
 					int typeInd = 0;
 					points = new ArrayList<RoutePointToWrite>(pointsLength);
 					for (int j = 0; j < pointsLength; j++) {
@@ -1370,7 +1378,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							}
 						}
 					}
-					
+
 					wayNames.clear();
 					if (rdo.names != null) {
 						TIntObjectIterator<String> it = rdo.names.iterator();
@@ -1383,13 +1391,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 							wayNames.put(mrt, value);
 						}
 					}
-					
+
 					points = new ArrayList<>(rdo.pointsX.length);
 					for (int i = 0; i < rdo.pointsX.length; i++) {
 						RoutePointToWrite rw = new RoutePointToWrite();
 						rw.x = rdo.pointsX[i];
 						rw.y = rdo.pointsY[i];
-						if (rdo.pointTypes != null && 
+						if (rdo.pointTypes != null &&
 								i < rdo.pointTypes.length && rdo.pointTypes[i] != null) {
 							rw.types.addAll(rdo.pointTypes[i]);
 						}
@@ -1401,7 +1409,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			}
 
 		}
-		
+
 	}
 
 	private void writeBinaryRouteIndexBlocks(BinaryMapIndexWriter writer, RTree rte, boolean basemap,
@@ -1436,7 +1444,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		return treeHeader;
 	}
 
-	
+
 
 	public static void writeBinaryMapBlock(rtree.Node parent, Rect parentBounds, RTree r, BinaryMapIndexWriter writer, RouteWriteContext wc, boolean basemap)
 					throws IOException, RTreeException, SQLException {
@@ -1475,7 +1483,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 								int viaId = wc.registerWayMapId(rd.viaWay);
 								restriction.setVia(viaId);
 							}
-							
+
 							dataBlock.addRestrictions(restriction.build());
 						}
 					}
