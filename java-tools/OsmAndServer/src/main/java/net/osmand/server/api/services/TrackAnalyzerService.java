@@ -12,6 +12,7 @@ import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import okio.Buffer;
 import okio.Source;
@@ -27,7 +28,7 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
-import static net.osmand.data.QuadRect.intersects;
+import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 
 @Service
 public class TrackAnalyzerService {
@@ -40,11 +41,15 @@ public class TrackAnalyzerService {
 
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
 	static final double DIST_THRESHOLD = 50; // meters
+	static final Map<String, Number> DEFAULT_VALUES = Map.of(
+			"speed", -1L,
+			"elevation", 99999.0
+	);
 
 	@Getter
 	public static class TrackAnalyzerRequest {
-		List<Map<String, Double>> points;
-		List<String> folders;
+		final List<Map<String, Double>> points;
+		final List<String> folders;
 
 		TrackAnalyzerRequest(List<Map<String, Double>> points, List<String> folders) {
 			this.points = points;
@@ -53,31 +58,32 @@ public class TrackAnalyzerService {
 	}
 
 	public static class TrackAnalyzerResponse {
-		Map<String, List<TrkSegment>> segments;
-		Map<String, List<Map<String, String>>> trackAnalysis;
-		Set<PremiumUserFilesRepository.UserFileNoData> files;
+		final Map<String, List<TrkSegment>> segments;
+		final Map<String, List<Map<String, String>>> trackAnalysis;
+		final Set<PremiumUserFilesRepository.UserFileNoData> files;
 
-		TrackAnalyzerResponse(Map<String, List<TrkSegment>> segments, Map<String, List<Map<String, String>>> trackAnalysis, Set<PremiumUserFilesRepository.UserFileNoData> files) {
-			this.segments = segments;
-			this.trackAnalysis = trackAnalysis;
-			this.files = files;
+		public TrackAnalyzerResponse() {
+			this.segments = new HashMap<>();
+			this.trackAnalysis = new HashMap<>();
+			this.files = new HashSet<>();
 		}
 	}
 
 	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
-		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse(new HashMap<>(), new HashMap<>(), new HashSet<>());
+		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse();
 
 		//get files for analysis
 		UserdataController.UserFilesResults userFiles = userdataService.generateFiles(dev.userid, null, false, true, "GPX");
 		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
 
 		//get points
+		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
+			return null;
+		}
 		List<LatLon> latLonPoints = analyzerRequest.getPoints().stream()
 				.map(point -> new LatLon(point.get("lat"), point.get("lon")))
 				.toList();
-		if (analyzerRequest.points == null) {
-			return null;
-		}
+
 		QuadRect bboxPoints = latLonPoints.size() == 2 ? getBboxByPoints(latLonPoints) : null;
 		//when we have one point, check if the track intersects with the point and response all track stats
 		boolean useOnePoint = bboxPoints == null;
@@ -121,7 +127,7 @@ public class TrackAnalyzerService {
 							} else {
 								List<Map<String, String>> statResults = new ArrayList<>();
 								for (TrkSegment seg : segments) {
-									GpxFile g = new GpxFile("");
+									GpxFile g = new GpxFile(OSMAND_ROUTER_V2);
 									g.getTracks().add(new Track());
 									g.getTracks().get(0).getSegments().add(seg);
 									analysis = g.getAnalysis(0);
@@ -143,7 +149,7 @@ public class TrackAnalyzerService {
 		if (useOnePoint) {
 			return !intersectsWithPoint(trackBbox, latLonPoints.get(0));
 		} else {
-			return !intersects(trackBbox, bboxPoints);
+			return !QuadRect.intersects(trackBbox, bboxPoints);
 		}
 	}
 
@@ -153,7 +159,7 @@ public class TrackAnalyzerService {
 		final String DEFAULT = "NaN";
 		// add speed
 		float avgSpeed = analysis.getAvgSpeed();
-		if (avgSpeed == -1) {
+		if (avgSpeed == DEFAULT_VALUES.get("speed").floatValue()) {
 			// track without speed
 			trackAnalysisData.put("minSpeed", DEFAULT);
 			trackAnalysisData.put("avgSpeed", DEFAULT);
@@ -165,7 +171,7 @@ public class TrackAnalyzerService {
 		}
 		// add elevation
 		double minElevation = analysis.getMinElevation();
-		if (minElevation == 99999.0) {
+		if (minElevation == DEFAULT_VALUES.get("elevation").doubleValue()) {
 			// track without elevation
 			trackAnalysisData.put("minElevation", DEFAULT);
 			trackAnalysisData.put("maxElevation", DEFAULT);
@@ -199,7 +205,7 @@ public class TrackAnalyzerService {
 	private List<PremiumUserFilesRepository.UserFileNoData> getFilesForAnalysis(UserdataController.UserFilesResults userFiles, List<String> folders) {
 		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = new ArrayList<>();
 
-		if (folders == null) {
+		if (Algorithms.isEmpty(folders)) {
 			filesForAnalysis.addAll(userFiles.uniqueFiles);
 			return filesForAnalysis;
 		}
@@ -207,8 +213,7 @@ public class TrackAnalyzerService {
 		for (PremiumUserFilesRepository.UserFileNoData file : userFiles.uniqueFiles) {
 
 			boolean shouldAdd = folders.stream().anyMatch(folderName ->
-					(folderName.equals("_default_") && file.name.indexOf('/') == -1) ||
-							file.name.startsWith(folderName + "/")
+					file.name.startsWith(folderName + "/") || (folderName.equals("_default_") && file.name.indexOf('/') == -1)
 			);
 
 			if (shouldAdd) {
@@ -259,17 +264,21 @@ public class TrackAnalyzerService {
 
 	private List<TrkSegment> processSegments(String trackName, TrkSegment s, LatLon start, LatLon end) {
 		List<TrkSegment> res = new ArrayList<>();
+		List<WptPt> points = s.getPoints();
 		int startInd = -1;
-		for (int i = 1; i < s.getPoints().size(); ) {
+		for (int i = 1; i < points.size(); ) {
 			LatLon pnt = startInd == -1 ? start : end;
-			double dist = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(), s.getPoints().get(i - 1).getLat(),
-					s.getPoints().get(i - 1).getLon(), s.getPoints().get(i).getLat(), s.getPoints().get(i).getLon());
+			double dist = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
+					points.get(i - 1).getLat(), points.get(i - 1).getLon(),
+					points.get(i).getLat(), points.get(i).getLon());
+
 			if (dist < DIST_THRESHOLD) {
-				// check next 10 points
 				int ind = i;
-				for (int j = ind + 1; j < s.getPoints().size() && j < ind + 10; j++) {
+				for (int j = ind + 1; j < points.size() && j < ind + 10; j++) {
 					double d2 = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
-							s.getPoints().get(j - 1).getLat(), s.getPoints().get(j - 1).getLon(), s.getPoints().get(j).getLat(), s.getPoints().get(j).getLon());
+							points.get(j - 1).getLat(), points.get(j - 1).getLon(),
+							points.get(j).getLat(), points.get(j).getLon());
+
 					if (d2 < dist) {
 						dist = d2;
 						i = j;
@@ -279,31 +288,39 @@ public class TrackAnalyzerService {
 					startInd = i;
 				} else {
 					int finalInd = i;
-					// create new segment with start and end points
+					if (startInd >= points.size() - 1 || finalInd >= points.size()) {
+						return res;
+					}
+
 					TrkSegment r = new TrkSegment();
-					// calculate start and end points
+
 					LatLon startProj = MapUtils.getProjection(start.getLatitude(), start.getLongitude(),
 							lat(s, startInd - 1), lon(s, startInd - 1), lat(s, startInd), lon(s, startInd));
-					// calculate percentage of distance between startInd-1 and startInd
-					double stPercent = MapUtils.getDistance(startProj, lat(s, startInd), lon(s, startInd)) /
-							MapUtils.getDistance(lat(s, startInd - 1), lon(s, startInd - 1), lat(s, startInd), lon(s, startInd));
-					// create new point with calculated lat, lon, time and ele
+
+					double startDist = MapUtils.getDistance(lat(s, startInd - 1), lon(s, startInd - 1),
+							lat(s, startInd), lon(s, startInd));
+					double stPercent = startDist == 0 ? 0 :
+							MapUtils.getDistance(startProj, lat(s, startInd), lon(s, startInd)) / startDist;
+
 					WptPt st = new WptPt(startProj.getLatitude(), startProj.getLongitude());
 					st.setTime(time(s, startInd - 1) + (long) (stPercent * (time(s, startInd) - time(s, startInd - 1))));
-					st.setEle(s.getPoints().get(startInd).getEle());
+					st.setEle(points.get(startInd).getEle());
 
 					LatLon endProj = MapUtils.getProjection(end.getLatitude(), end.getLongitude(),
 							lat(s, finalInd - 1), lon(s, finalInd - 1), lat(s, finalInd), lon(s, finalInd));
-					double enPercent = MapUtils.getDistance(endProj, lat(s, finalInd), lon(s, finalInd)) /
-							MapUtils.getDistance(lat(s, finalInd - 1), lon(s, finalInd - 1), lat(s, finalInd), lon(s, finalInd));
+
+					double endDist = MapUtils.getDistance(lat(s, finalInd - 1), lon(s, finalInd - 1),
+							lat(s, finalInd), lon(s, finalInd));
+					double enPercent = endDist == 0 ? 0 :
+							MapUtils.getDistance(endProj, lat(s, finalInd), lon(s, finalInd)) / endDist;
+
 					WptPt en = new WptPt(endProj.getLatitude(), endProj.getLongitude());
 					en.setTime(time(s, finalInd - 1) + (long) (enPercent * (time(s, finalInd) - time(s, finalInd - 1))));
-					en.setEle(s.getPoints().get(finalInd).getEle());
+					en.setEle(points.get(finalInd).getEle());
 
 					r.getPoints().add(st);
-					// add all points between startInd and finalInd
 					for (int k = startInd + 1; k <= finalInd; k++) {
-						r.getPoints().add(s.getPoints().get(k));
+						r.getPoints().add(points.get(k));
 					}
 					r.getPoints().add(en);
 					r.setName(trackName);
@@ -356,24 +373,10 @@ public class TrackAnalyzerService {
 	}
 
 	private QuadRect calculateQuadRect(List<WptPt> points) {
-		if (points.isEmpty()) {
-			return new QuadRect(0, 0, 0, 0);
-		}
-
-		double minLat = Double.MAX_VALUE;
-		double maxLat = -Double.MAX_VALUE;
-		double minLon = Double.MAX_VALUE;
-		double maxLon = -Double.MAX_VALUE;
-
+		QuadRect bbox = new QuadRect();
 		for (WptPt point : points) {
-			double lat = point.getLat();
-			double lon = point.getLon();
-			if (lat < minLat) minLat = lat;
-			if (lat > maxLat) maxLat = lat;
-			if (lon < minLon) minLon = lon;
-			if (lon > maxLon) maxLon = lon;
+			bbox.expand(point.getLon(), point.getLat(), point.getLon(), point.getLat());
 		}
-
-		return new QuadRect(minLon, maxLat, maxLon, minLat);
+		return bbox;
 	}
 }
