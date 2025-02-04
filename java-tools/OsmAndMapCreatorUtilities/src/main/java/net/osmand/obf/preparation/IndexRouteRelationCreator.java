@@ -1,14 +1,16 @@
 package net.osmand.obf.preparation;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
+import net.osmand.binary.ObfConstants;
+import net.osmand.data.LatLon;
+import net.osmand.osm.edit.*;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -18,27 +20,27 @@ import net.osmand.obf.preparation.IndexHeightData.WayGeneralStats;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.OsmRouteType;
-import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.osm.edit.Way;
 import net.osmand.util.MapAlgorithms;
 
 public class IndexRouteRelationCreator {
 	private final static Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	public static final double DIST_STEP = 25;
-	
+
 	public static final int MAX_GRAPH_SKIP_POINTS_BITS = 3;
-	
-	
+    private Map<Long, Integer> syntheticMapRelationIds = new HashMap<>();
+
+
 	protected final Log logMapDataWarn;
 	private final Map<String, Integer> indexRouteRelationTypes = new TreeMap<String, Integer>();
 	private final MapRenderingTypesEncoder renderingTypes;
 	private final MapZooms mapZooms;
 	private final IndexCreatorSettings settings;
+
+    private final double precisionLatLonEquals = 1e-5;
 
 	public IndexRouteRelationCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 			IndexCreatorSettings settings) {
@@ -47,8 +49,8 @@ public class IndexRouteRelationCreator {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 	}
-	
-	
+
+
 	public void iterateRelation(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Relation) {
 			long ts = System.currentTimeMillis();
@@ -56,14 +58,14 @@ public class IndexRouteRelationCreator {
 			long tm = (System.currentTimeMillis() - ts) / 1000;
 			if (tm > 15) {
 				log.warn(String.format("Route relation %d took %d seconds to process", e.getId(), tm));
-			}		
-		}		
+			}
+		}
 	}
-	
+
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
-		
+
 	}
-	
+
 	private void processRouteRelation(Relation e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.MAP);
 		String rt = tags.get(OSMTagKey.ROUTE.name());
@@ -106,6 +108,95 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
+    private void joinWaysIntoTrackSegments(JoinedWays joinedWays, List<Way> ways) {
+        boolean[] done = new boolean[ways.size()];
+        while (true) {
+            List<Node> joinedNodes = new ArrayList<>();
+            for (int i = 0; i < ways.size(); i++) {
+                if (!done[i]) {
+                    done[i] = true;
+                    addWayToPoints(joinedNodes, false, ways.get(i), false); // "head" way
+                    while (true) {
+                        boolean stop = true;
+                        for (int j = 0; j < ways.size(); j++) {
+                            if (!done[j] && considerCandidateToJoin(joinedNodes, ways.get(j))) {
+                                done[j] = true;
+                                stop = false;
+                            }
+                        }
+                        if (stop) {
+                            break; // nothing joined
+                        }
+                    }
+                    break; // segment is done
+                }
+            }
+            if (joinedNodes.isEmpty()) {
+                break; // all done
+            }
+            Way joinedWay = new Way(1234, joinedNodes);
+            joinedWays.joinedWays.add(joinedWay);
+        }
+    }
+
+    private void addWayToPoints(List<Node> joinedNodes, boolean insert, Way way, boolean reverse) {
+        List<Node> points = new ArrayList<>(way.getNodes());
+        if (reverse) {
+            Collections.reverse(points);
+        }
+        joinedNodes.addAll(insert ? 0 : joinedNodes.size(), points);
+    }
+    private boolean considerCandidateToJoin(List<Node> joinedNodes, Way candidate) {
+        if (joinedNodes.isEmpty() || candidate.getNodes().isEmpty()) {
+            return true;
+        }
+
+        Node firstWpt = joinedNodes.get(0);
+        Node lastWpt = joinedNodes.get(joinedNodes.size() - 1);
+        LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
+        LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
+
+        if (eqWptToLatLon(lastWpt, firstCandidateLL)) {
+            addWayToPoints(joinedNodes, false, candidate, false); // wpts + Candidate
+        } else if (eqWptToLatLon(lastWpt, lastCandidateLL)) {
+            addWayToPoints(joinedNodes, false, candidate, true); // wpts + etadidnaC
+        } else if (eqWptToLatLon(firstWpt, firstCandidateLL)) {
+            addWayToPoints(joinedNodes, true, candidate, true); // etadidnaC + wpts
+        } else if (eqWptToLatLon(firstWpt, lastCandidateLL)) {
+            addWayToPoints(joinedNodes, true, candidate, false); // Candidate + wpts
+        } else {
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean eqWptToLatLon(Node node, LatLon ll) {
+        return MapUtils.areLatLonEqual(node.getLatLon(), ll, precisionLatLonEquals);
+    }
+
+
+    // Way ID for Map section
+    private long generateSyntheticId(Relation relation, Way mergedWay) {
+        long relationId = relation.getId();
+        long sum = 0;
+        LatLon l = OsmMapUtils.getWeightCenterForNodes(mergedWay.getNodes());
+        int y = MapUtils.get31TileNumberY(l.getLatitude());
+        int x = MapUtils.get31TileNumberX(l.getLongitude());
+        sum += (x + y);
+        Integer countId = syntheticMapRelationIds.get(relationId);
+        if (countId == null) {
+            countId = 1;
+            syntheticMapRelationIds.put(relationId, countId);
+        } else {
+            countId++;
+        }
+        return  (1l << (ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1)) + (relationId << 15) + (countId << 6) + (sum % 63);
+    }
+
+    // ID for POI section id << 6 (OsmDbCreator.SHIFT_ID)
+
+
 	private void addRouteRelationTags(Relation e, Way w, Map<String, String> tags, OsmRouteType activityType, IndexCreationContext icc) {
 		if (tags.get("color") != null) {
 			tags.put("colour", tags.get("color"));
@@ -145,7 +236,7 @@ public class IndexRouteRelationCreator {
 		tags.put("route_type", "other");
 		tags.put("route_id", "O-" + e.getId() );
 	}
-	
+
 	public void closeAllStatements() {
 		if (indexRouteRelationTypes.size() > 0) {
 			List<String> lst = new ArrayList<>(indexRouteRelationTypes.keySet());
@@ -171,6 +262,8 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	
+    private class JoinedWays {
+        public List<Way> joinedWays = new ArrayList<>();
+    }
 
 }
