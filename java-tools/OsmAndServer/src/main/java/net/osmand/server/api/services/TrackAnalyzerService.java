@@ -372,7 +372,7 @@ public class TrackAnalyzerService {
 		return s.getPoints().get(ind).getTime();
 	}
 
-	private QuadRect calculateQuadRect(List<WptPt> points) {
+	public QuadRect calculateQuadRect(List<WptPt> points) {
 		QuadRect bbox = new QuadRect();
 		for (WptPt point : points) {
 			bbox.expand(point.getLon(), point.getLat(), point.getLon(), point.getLat());

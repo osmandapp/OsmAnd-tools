@@ -3,9 +3,11 @@ package net.osmand.server.controllers.user;
 import java.io.*;
 
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
+import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Buffer;
 
 import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
@@ -64,13 +66,14 @@ public class MapApiController {
 
 	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
 	private static final String ANALYSIS = "analysis";
+	private static final String BBOX = "bbox";
 	private static final String METADATA = "metadata";
 	private static final String SHARE = "share";
 	private static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 
-	private static final long ANALYSIS_RERUN = 1737108563348L; // 17-01-2025
+	private static final long ANALYSIS_RERUN = 1738674947073L; // 04-02-2025
 
 	private static final String INFO_KEY = "info";
 
@@ -360,6 +363,7 @@ public class MapApiController {
 				if (of.isPresent()) {
 					GpxTrackAnalysis analysis = null;
 					GpxFile gpxFile = null;
+					QuadRect bbox = null;
 					UserFile uf = of.get();
 					InputStream in;
 					try {
@@ -392,6 +396,8 @@ public class MapApiController {
 						}
 						if (isGPZTrack) {
 							analysis = getAnalysis(uf, gpxFile);
+							List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
+							bbox = trackAnalyzerService.calculateQuadRect(allPoints);
 						}
 					} else {
 						LOG.error(String.format(
@@ -399,7 +405,7 @@ public class MapApiController {
 						filesToIgnore.add(nd);
 					}
 					// save details
-					JsonObject newDetails = preparedDetails(gpxFile, analysis, isGPZTrack, isFavorite, isSharedFile);
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isGPZTrack, isFavorite, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf);
 					nd.details = uf.details.deepCopy();
 					cacheWrites++;
@@ -426,7 +432,7 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isFavorite, boolean isShared) {
+	private JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isFavorite, boolean isShared) {
 		JsonObject details = new JsonObject();
 		if (gpxFile != null) {
 			// add metadata without description
@@ -452,10 +458,20 @@ public class MapApiController {
 				}
 			}
 			// add track analysis
-			if (isTrack && analysis != null) {
-				Map<String, Object> res = getDetails(analysis);
-				if (!res.isEmpty()) {
-					details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+			if (isTrack) {
+				if (analysis != null) {
+					Map<String, Object> res = getDetails(analysis);
+					if (!res.isEmpty()) {
+						details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+					}
+				}
+				if (bbox != null) {
+					JsonObject bboxJson = new JsonObject();
+					bboxJson.addProperty("left", bbox.left);
+					bboxJson.addProperty("top", bbox.top);
+					bboxJson.addProperty("right", bbox.right);
+					bboxJson.addProperty("bottom", bbox.bottom);
+					details.add(BBOX, bboxJson);
 				}
 			}
 		}
