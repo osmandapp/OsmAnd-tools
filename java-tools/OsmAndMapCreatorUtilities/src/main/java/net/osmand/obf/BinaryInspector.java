@@ -50,7 +50,7 @@ public class BinaryInspector {
 			in.inspector(new String[] {
 //					"-vpoi",
 					"-vmap", "-vmapobjects",
-//					"-vmapcoordinates",
+					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -62,7 +62,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
+					System.getProperty("maps.dir") + "Divoka_sarka.obf"
+//					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

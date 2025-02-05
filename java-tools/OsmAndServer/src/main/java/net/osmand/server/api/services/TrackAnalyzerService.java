@@ -40,7 +40,7 @@ public class TrackAnalyzerService {
 	protected PremiumUserFilesRepository filesRepository;
 
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
-	static final double DIST_THRESHOLD = 50; // meters
+	static final double DIST_THRESHOLD = 10; // meters
 	static final Map<String, Number> DEFAULT_VALUES = Map.of(
 			"speed", -1L,
 			"elevation", 99999.0
