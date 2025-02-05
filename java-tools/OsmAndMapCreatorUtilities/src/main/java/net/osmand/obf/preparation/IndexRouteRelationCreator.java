@@ -143,13 +143,11 @@ public class IndexRouteRelationCreator {
 		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 
-		if (relationId < 0 || relationId >= 1L << MAX_RELATION_ID_BITS) {
-			log.error("calcSyntheticId() relationId " + relationId + " is out of " + MAX_RELATION_ID_BITS + " bits");
-			throw new UnsupportedOperationException();
-		}
-
-		if (counter < 0 || counter >= 1L << MAX_COUNTER_BITS) {
-			log.error("calcSyntheticId() counter " + counter + " is out of " + MAX_COUNTER_BITS + " bits");
+		if (counter < 0 || counter >= (1L << MAX_COUNTER_BITS) ||
+				relationId < 0 || relationId >= (1L << MAX_RELATION_ID_BITS)) {
+			log.error(String.format(
+					"calcSyntheticId() relation %d/%d overflow (%d/%d bits)",
+					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
 			throw new UnsupportedOperationException();
 		}
 
