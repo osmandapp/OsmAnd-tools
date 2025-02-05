@@ -1,10 +1,15 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
+import net.osmand.data.LatLon;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.Node;
+import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -39,6 +44,8 @@ public class IndexRouteRelationCreator {
 			// Ignored: bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
+
+	public static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
 
 	private static final Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
 
@@ -82,13 +89,117 @@ public class IndexRouteRelationCreator {
 				}
 			}
 
-			if (relation.getId() == 8240320) {
-				System.err.printf("WARN: XXX relation (%s)\n", relation);
-				for (Relation.RelationMember member : relation.getMembers()) {
-					indexMapCreator.iterateMainEntity(member.getEntity(), ctx, icc);
+			List<Way> joinedWays = spliceWaysIntoSegments(waysToJoin, relation.getId());
+
+			for (Way way : joinedWays) {
+				way.replaceTags(tags);
+				indexMapCreator.iterateMainEntity(way, ctx, icc);
+			}
+
+//			if (relation.getId() == 8240320) {
+//				System.err.printf("WARN: XXX relation (%s)\n", relation);
+//				for (Relation.RelationMember member : relation.getMembers()) {
+//					indexMapCreator.iterateMainEntity(member.getEntity(), ctx, icc);
+//				}
+//			}
+		}
+	}
+
+	// based on RouteRelationExtractor.joinWaysIntoTrackSegments()
+	private List<Way> spliceWaysIntoSegments(List<Way> ways, long relationId) {
+		boolean[] done = new boolean[ways.size()];
+		List<Way> segments = new ArrayList<>();
+		while (true) {
+			List<Node> nodes = new ArrayList<>();
+			for (int i = 0; i < ways.size(); i++) {
+				if (!done[i]) {
+					done[i] = true;
+					addWayToNodes(nodes, false, ways.get(i), false); // "head" way
+					while (true) {
+						boolean stop = true;
+						for (int j = 0; j < ways.size(); j++) {
+							if (!done[j] && considerWayToJoin(nodes, ways.get(j))) {
+								done[j] = true;
+								stop = false;
+							}
+						}
+						if (stop) {
+							break; // nothing joined
+						}
+					}
+					break; // segment is done
 				}
 			}
+			if (nodes.isEmpty()) {
+				break; // all done
+			}
+			long generatedId = calcSyntheticId(relationId, segments.size(), nodes);
+			segments.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
 		}
+		return segments;
+	}
+
+	private long calcSyntheticId(long relationId, long counter, @Nonnull List<Node> nodes) {
+		final long MAX_RELATION_ID_BITS = 27;
+		final long MAX_COUNTER_BITS = 9;
+
+		if (relationId < 0 || relationId >= 1L << MAX_RELATION_ID_BITS) {
+			log.error("calcSyntheticId() relationId " + relationId + " is out of " + MAX_RELATION_ID_BITS + " bits");
+			throw new UnsupportedOperationException();
+		}
+
+		if (counter < 0 || counter >= 1L << MAX_COUNTER_BITS) {
+			log.error("calcSyntheticId() counter " + counter + " is out of " + MAX_COUNTER_BITS + " bits");
+			throw new UnsupportedOperationException();
+		}
+
+		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodes);
+
+		int hash = center == null
+				? nodes.size() % 64
+				: (int) (1000 * (center.getLatitude() + center.getLongitude())) % 64; // 0-63 = 6 bits
+
+		// Max OSM Relation ID has 25 bits @ 2025/02/05 = 18655715
+		return (1L << (ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1)) // 43rd bit = 1 (42 bits left for numbers)
+				+ (relationId << 15)                             // 27 bits (15 left) (with 4x reserve)
+				+ (counter << 6)                                 // 9 bits (6 left)
+				+ hash;                                          // 6 bits
+	}
+
+	private boolean considerWayToJoin(List<Node> nodes, Way candidate) {
+		if (nodes.isEmpty() || candidate.getNodes().isEmpty()) {
+			return true;
+		}
+
+		LatLon firstNodeLL = nodes.get(0).getLatLon();
+		LatLon lastNodeLL = nodes.get(nodes.size() - 1).getLatLon();
+		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
+		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
+
+		if (MapUtils.areLatLonEqual(lastNodeLL, firstCandidateLL)) {
+			addWayToNodes(nodes, false, candidate, false); // nodes + Candidate
+		} else if (MapUtils.areLatLonEqual(lastNodeLL, lastCandidateLL)) {
+			addWayToNodes(nodes, false, candidate, true); // nodes + etadidnaC
+		} else if (MapUtils.areLatLonEqual(firstNodeLL, firstCandidateLL)) {
+			addWayToNodes(nodes, true, candidate, true); // etadidnaC + nodes
+		} else if (MapUtils.areLatLonEqual(firstNodeLL, lastCandidateLL)) {
+			addWayToNodes(nodes, true, candidate, false); // Candidate + nodes
+		} else {
+			return false;
+		}
+
+		return true;
+	}
+
+	private void addWayToNodes(List<Node> nodes, boolean insert, Way way, boolean reverse) {
+		List<Node> points = new ArrayList<>();
+		for (Node n : way.getNodes()) {
+			points.add(new Node(n.getLatitude(), n.getLongitude(), INTERNAL_NEGATIVE_BASE_ID--));
+		}
+		if (reverse) {
+			Collections.reverse(points);
+		}
+		nodes.addAll(insert ? 0 : nodes.size(), points);
 	}
 
 	public static boolean isSupportedRouteType(@Nullable String routeType) {

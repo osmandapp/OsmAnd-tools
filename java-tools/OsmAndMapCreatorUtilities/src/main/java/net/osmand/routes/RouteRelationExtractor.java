@@ -58,13 +58,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
-import static net.osmand.obf.preparation.IndexRouteRelationCreator.getShieldTagsFromOsmcTags;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
@@ -75,9 +73,8 @@ public class RouteRelationExtractor {
 	int countWays;
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
-	private final double precisionLatLonEquals = 1e-5;
 
-	private String[] customStyles = {
+	private static final String[] customStyles = {
 			"default.render.xml",
 			"routes.addon.render.xml"
 			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
@@ -376,7 +373,7 @@ public class RouteRelationExtractor {
 				waysToJoin.add(way);
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-				gpxExtensions.putAll(getShieldTagsFromOsmcTags(way.getTags()));
+				gpxExtensions.putAll(IndexRouteRelationCreator.getShieldTagsFromOsmcTags(way.getTags()));
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
 			}
@@ -402,6 +399,7 @@ public class RouteRelationExtractor {
 		}
 	}
 
+	// TODO migrate to IndexRouteRelationCreator.spliceWaysIntoSegments()
 	private void joinWaysIntoTrackSegments(Track track, List<Way> ways) {
 		boolean[] done = new boolean[ways.size()];
 		while (true) {
@@ -471,7 +469,7 @@ public class RouteRelationExtractor {
 	}
 
 	private boolean eqWptToLatLon(WptPt wpt, LatLon ll) {
-		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
+		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll);
 	}
 
 	final String[] nodeNameTags = { "name", "name:en" }; // no more ref here
