@@ -6,10 +6,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.obf.preparation.OsmDbAccessor;
-import net.osmand.obf.preparation.OsmDbAccessorContext;
-import net.osmand.obf.preparation.OsmDbCreator;
+import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
@@ -67,6 +64,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
 import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.getShieldTagsFromOsmcTags;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
@@ -97,29 +95,6 @@ public class RouteRelationExtractor {
 			"showRunningRoutes", "true"
 			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
-	private final String[] filteredTags = {
-			"hiking", // 244k
-			"bicycle", // 119k
-			"foot", // 63k
-			"mtb", // 29k
-			"piste", // 14k
-			"ski", // 8k
-			"horse", // 4k
-			"running", // 1k
-			"snowmobile", // 1k
-			"fitness_trail", // 1k
-			"canoe", // 0.8k
-			"canyoning", // 0.6k
-			"motorboat", // 0.4k
-			"boat", // 0.3k
-			"waterway", // 0.3k
-			"inline_skates", // 0.2k
-			"via_ferrata", // 0.2k
-			"walking", // 0.2k
-			"ferrata", // proposed
-			// Ignored: bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
-			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
-	};
 
 	private final int ICON_SEARCH_ZOOM = 19;
 	private final RenderingRulesStorage renderingRules;
@@ -315,14 +290,7 @@ public class RouteRelationExtractor {
 			}
 
 			private boolean accessedRoute(@Nonnull String route) {
-				for (String tag : route.split("[;, ]")) {
-					for (String value : filteredTags) {
-						if (tag.startsWith(value) || tag.endsWith(value)) {
-							return true;
-						}
-					}
-				}
-				return false;
+				return IndexRouteRelationCreator.isSupportedRouteType(route);
 			}
 		});
 		for (Entity e : resultRelations) {
@@ -635,37 +603,5 @@ public class RouteRelationExtractor {
 				additionalEntities.putAll(map);
 			}
 		}
-	}
-
-	private static final Map<String, String> osmcTagsToShieldProps = Map.of(
-			"osmc_text", "shield_text",
-			"osmc_background", "shield_bg",
-			"osmc_foreground", "shield_fg",
-			"osmc_foreground2", "shield_fg_2",
-			"osmc_textcolor", "shield_textcolor",
-			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
-	);
-
-	private static final String OSMC_ICON_PREFIX = "osmc_";
-	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
-	private static final Set<String> shieldBgIcons = Set.of("shield_bg");
-	private static final Set<String> shieldFgIcons = Set.of("shield_fg", "sheld_fg_2");
-
-	@Nonnull
-	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags) {
-		Map<String, String> result = new LinkedHashMap<>();
-		for (String tag : tags.keySet()) {
-			for (String match : osmcTagsToShieldProps.keySet()) {
-				if (tag.endsWith(match)) {
-					final String key = osmcTagsToShieldProps.get(match);
-					final String prefix =
-							(shieldBgIcons.contains(key) || shieldFgIcons.contains(key)) ? OSMC_ICON_PREFIX : "";
-					final String suffix = shieldBgIcons.contains(key) ? OSMC_ICON_BG_SUFFIX : "";
-					final String val = prefix + tags.get(tag) + suffix;
-					result.putIfAbsent(key, val); // prefer 1st
-				}
-			}
-		}
-		return result;
 	}
 }

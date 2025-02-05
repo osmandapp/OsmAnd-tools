@@ -65,6 +65,7 @@ public class IndexCreator {
 	IndexPoiCreator indexPoiCreator;
 	IndexAddressCreator indexAddressCreator;
 	IndexVectorMapCreator indexMapCreator;
+	IndexRouteRelationCreator indexRouteRelationCreator;
 	IndexRouteRelationCreatorOld indexRouteRelationCreatorOld;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
@@ -515,6 +516,7 @@ public class IndexCreator {
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreatorOld = new IndexRouteRelationCreatorOld(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexRouteRelationCreator = new IndexRouteRelationCreator(settings, indexPoiCreator, indexMapCreator);
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {
@@ -753,7 +755,9 @@ public class IndexCreator {
 						} else {
 							indexRouteRelationCreatorOld.iterateRelation(e, ctx, icc);
 						}
-
+						if (settings.indexPOI && settings.indexMap) {
+							indexRouteRelationCreator.iterateRelation((Relation) e, ctx, icc);
+						}
 					}
 					if (settings.indexRouting) {
 						indexRouteCreator.indexRelations(e, ctx);
