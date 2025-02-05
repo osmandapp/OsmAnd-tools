@@ -65,7 +65,7 @@ public class IndexCreator {
 	IndexPoiCreator indexPoiCreator;
 	IndexAddressCreator indexAddressCreator;
 	IndexVectorMapCreator indexMapCreator;
-	IndexRouteRelationCreator indexRouteRelationCreator;
+	IndexRouteRelationCreatorOld indexRouteRelationCreatorOld;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
 	PropagateToNodes propagateToNodes;
@@ -217,7 +217,7 @@ public class IndexCreator {
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
 				indexMapCreator.iterateMainEntity(e, ctx, icc);
-				indexRouteRelationCreator.iterateMainEntity(e, ctx, icc);
+				indexRouteRelationCreatorOld.iterateMainEntity(e, ctx, icc);
 			}
 		}
 		if (settings.indexAddress) {
@@ -514,7 +514,7 @@ public class IndexCreator {
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
-		this.indexRouteRelationCreator = new IndexRouteRelationCreator(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexRouteRelationCreatorOld = new IndexRouteRelationCreatorOld(logMapDataWarn, mapZooms, renderingTypes, settings);
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {
@@ -672,7 +672,7 @@ public class IndexCreator {
 				if (REMOVE_POI_DB) {
 					indexPoiCreator.removePoiFile();
 				}
-				indexRouteRelationCreator.closeAllStatements();
+				indexRouteRelationCreatorOld.closeAllStatements();
 				indexAddressCreator.closeAllPreparedStatements();
 				indexTransportCreator.commitAndCloseFiles(getRTreeTransportStopsFileName(),
 						getRTreeTransportStopsPackFileName(), deleteDatabaseIndexes);
@@ -751,7 +751,7 @@ public class IndexCreator {
 						if (!settings.keepOnlyRouteRelationObjects) {
 							indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx, icc);
 						} else {
-							indexRouteRelationCreator.iterateRelation(e, ctx, icc);
+							indexRouteRelationCreatorOld.iterateRelation(e, ctx, icc);
 						}
 
 					}
