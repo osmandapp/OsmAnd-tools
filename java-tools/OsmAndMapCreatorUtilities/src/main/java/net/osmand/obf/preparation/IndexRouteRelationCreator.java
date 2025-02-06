@@ -45,7 +45,7 @@ public class IndexRouteRelationCreator {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
-	public static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
+	private static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
 
 	private static final Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
 
@@ -226,13 +226,23 @@ public class IndexRouteRelationCreator {
 	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
 	private static final Set<String> SHIELD_BG_ICONS = Set.of("shield_bg");
 	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "sheld_fg_2");
+	private static final String RELATION_ID = OSMSettings.OSMTagKey.RELATION_ID.getValue();
 
 	@Nonnull
-	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags) {
+	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags, long relationId) {
+		String requiredGroupPrefix = "route_"; // default prefix for generated OSMC-related tags
+		if (relationId != 0) {
+			for (String tag : tags.keySet()) {
+				if (tag.endsWith(RELATION_ID) && tags.get(tag).equals(Long.toString(relationId))) {
+					requiredGroupPrefix = tag.replace(RELATION_ID, "");
+					break; // use relation prefix to catch tags from distinct group
+				}
+			}
+		}
 		Map<String, String> result = new LinkedHashMap<>();
 		for (String tag : tags.keySet()) {
 			for (String match : OSMC_TAGS_TO_SHIELD_PROPS.keySet()) {
-				if (tag.endsWith(match)) {
+				if (tag.startsWith(requiredGroupPrefix) && tag.endsWith(match)) {
 					final String key = OSMC_TAGS_TO_SHIELD_PROPS.get(match);
 					final String prefix =
 							(SHIELD_BG_ICONS.contains(key) || SHIELD_FG_ICONS.contains(key)) ? OSMC_ICON_PREFIX : "";

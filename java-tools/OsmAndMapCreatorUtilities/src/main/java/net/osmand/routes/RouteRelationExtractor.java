@@ -370,7 +370,7 @@ public class RouteRelationExtractor {
 				waysToJoin.add(way);
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-				gpxExtensions.putAll(IndexRouteRelationCreator.getShieldTagsFromOsmcTags(way.getTags()));
+				gpxExtensions.putAll(IndexRouteRelationCreator.getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
 			}
