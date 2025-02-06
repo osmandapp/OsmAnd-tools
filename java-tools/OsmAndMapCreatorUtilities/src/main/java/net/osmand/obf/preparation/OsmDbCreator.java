@@ -128,7 +128,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
-				if (!addGeoHash) {
+				if (!addGeoHash && lids.get(i) < 0) {
 					ld = getSimpleConvertId(lids.get(i), EntityType.NODE, false);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
@@ -141,7 +141,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					lids.set(i, ld);
 				}
 			}
-			if (!addGeoHash) {
+			if (!addGeoHash && id < 0) {
 				return getSimpleConvertId(id, EntityType.WAY, true);
 			}
 			return getConvertId(id, ord, hash);
@@ -153,7 +153,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				EntityType entityType = i.getEntityId().getType();
 				if (i.getEntityId().getType() != EntityType.RELATION) {
 					Long newId ;
-					if (!addGeoHash) {
+					if (!addGeoHash && oldId < 0) {
 						newId = getSimpleConvertId(oldId, entityType, false);
 					} else {
 						newId = getGeneratedId(oldId, entityType.ordinal());
@@ -163,7 +163,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					}
 				}
 			}
-			if (!addGeoHash) {
+			if (!addGeoHash && id < 0) {
 				return getSimpleConvertId(id, EntityType.RELATION, true);
 			}
 			return id;
