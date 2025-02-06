@@ -3,7 +3,6 @@ package net.osmand.routes;
 import net.osmand.IProgress;
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.obf.preparation.*;
@@ -25,7 +24,6 @@ import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
-import net.osmand.util.MapUtils;
 import okio.Okio;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
@@ -53,7 +51,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -379,7 +376,7 @@ public class RouteRelationExtractor {
 			}
 		}
 
-		joinWaysIntoTrackSegments(track, waysToJoin);
+		joinWaysIntoTrackSegments(track, waysToJoin, relation.getId());
 
 		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
@@ -399,77 +396,19 @@ public class RouteRelationExtractor {
 		}
 	}
 
-	// TODO migrate to IndexRouteRelationCreator.spliceWaysIntoSegments()
-	private void joinWaysIntoTrackSegments(Track track, List<Way> ways) {
-		boolean[] done = new boolean[ways.size()];
-		while (true) {
-			List<WptPt> wpts = new ArrayList<>();
-			for (int i = 0; i < ways.size(); i++) {
-				if (!done[i]) {
-					done[i] = true;
-					addWayToPoints(wpts, false, ways.get(i), false); // "head" way
-					while (true) {
-						boolean stop = true;
-						for (int j = 0; j < ways.size(); j++) {
-							if (!done[j] && considerCandidateToJoin(wpts, ways.get(j))) {
-								done[j] = true;
-								stop = false;
-							}
-						}
-						if (stop) {
-							break; // nothing joined
-						}
-					}
-					break; // segment is done
+	private void joinWaysIntoTrackSegments(Track track, List<Way> waysToJoin, long id) {
+		List<Way> joinedWays = IndexRouteRelationCreator.spliceWaysIntoSegments(waysToJoin, id);
+		for (Way way : joinedWays) {
+			if (!way.getNodes().isEmpty()) {
+				List<WptPt> wpts = new ArrayList<>();
+				for (Node n : way.getNodes()) {
+					wpts.add(new WptPt(n.getLatitude(), n.getLongitude()));
 				}
+				TrkSegment segment = new TrkSegment();
+				segment.getPoints().addAll(wpts);
+				track.getSegments().add(segment);
 			}
-			if (wpts.isEmpty()) {
-				break; // all done
-			}
-			TrkSegment segment = new TrkSegment();
-			segment.getPoints().addAll(wpts);
-			track.getSegments().add(segment);
 		}
-	}
-
-	private boolean considerCandidateToJoin(List<WptPt> wpts, Way candidate) {
-		if (wpts.isEmpty() || candidate.getNodes().isEmpty()) {
-			return true;
-		}
-
-		WptPt firstWpt = wpts.get(0);
-		WptPt lastWpt = wpts.get(wpts.size() - 1);
-		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
-		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
-
-		if (eqWptToLatLon(lastWpt, firstCandidateLL)) {
-			addWayToPoints(wpts, false, candidate, false); // wpts + Candidate
-		} else if (eqWptToLatLon(lastWpt, lastCandidateLL)) {
-			addWayToPoints(wpts, false, candidate, true); // wpts + etadidnaC
-		} else if (eqWptToLatLon(firstWpt, firstCandidateLL)) {
-			addWayToPoints(wpts, true, candidate, true); // etadidnaC + wpts
-		} else if (eqWptToLatLon(firstWpt, lastCandidateLL)) {
-			addWayToPoints(wpts, true, candidate, false); // Candidate + wpts
-		} else {
-			return false;
-		}
-
-		return true;
-	}
-
-	private void addWayToPoints(List<WptPt> wpts, boolean insert, Way way, boolean reverse) {
-		List<WptPt> points = new ArrayList<>();
-		for (Node n : way.getNodes()) {
-			points.add(new WptPt(n.getLatitude(), n.getLongitude()));
-		}
-		if (reverse) {
-			Collections.reverse(points);
-		}
-		wpts.addAll(insert ? 0 : wpts.size(), points);
-	}
-
-	private boolean eqWptToLatLon(WptPt wpt, LatLon ll) {
-		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll);
 	}
 
 	final String[] nodeNameTags = { "name", "name:en" }; // no more ref here

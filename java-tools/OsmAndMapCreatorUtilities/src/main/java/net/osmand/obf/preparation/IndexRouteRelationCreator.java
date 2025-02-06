@@ -106,7 +106,7 @@ public class IndexRouteRelationCreator {
 	}
 
 	// based on RouteRelationExtractor.joinWaysIntoTrackSegments()
-	private List<Way> spliceWaysIntoSegments(List<Way> ways, long relationId) {
+	public static List<Way> spliceWaysIntoSegments(List<Way> ways, long relationId) {
 		boolean[] done = new boolean[ways.size()];
 		List<Way> segments = new ArrayList<>();
 		while (true) {
@@ -139,7 +139,7 @@ public class IndexRouteRelationCreator {
 		return segments;
 	}
 
-	private long calcSyntheticId(long relationId, long counter, @Nonnull List<Node> nodes) {
+	private static long calcSyntheticId(long relationId, long counter, @Nonnull List<Node> nodes) {
 		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 
@@ -164,7 +164,7 @@ public class IndexRouteRelationCreator {
 				+ hash;                                          // 6 bits
 	}
 
-	private boolean considerWayToJoin(List<Node> nodes, Way candidate) {
+	private static boolean considerWayToJoin(List<Node> nodes, Way candidate) {
 		if (nodes.isEmpty() || candidate.getNodes().isEmpty()) {
 			return true;
 		}
@@ -189,7 +189,7 @@ public class IndexRouteRelationCreator {
 		return true;
 	}
 
-	private void addWayToNodes(List<Node> nodes, boolean insert, Way way, boolean reverse) {
+	private static void addWayToNodes(List<Node> nodes, boolean insert, Way way, boolean reverse) {
 		List<Node> points = new ArrayList<>();
 		for (Node n : way.getNodes()) {
 			points.add(new Node(n.getLatitude(), n.getLongitude(), INTERNAL_NEGATIVE_BASE_ID--));
