@@ -255,7 +255,7 @@ public class IndexCreator {
 
 	private OsmDbCreator extractOsmToNodesDB(OsmDbAccessor accessor, File readFile, IProgress progress,
 			IOsmStorageFilter addFilter, int idSourceMapInd, int idShift,
-			boolean generateNewIds, OsmDbCreator previous) throws IOException, SQLException, XmlPullParserException {
+			boolean generateNewIds, OsmDbCreator previous, boolean isBasemap) throws IOException, SQLException, XmlPullParserException {
 		boolean pbfFile = false;
 		InputStream stream = new BufferedInputStream(new FileInputStream(readFile), 8192 * 4);
 		InputStream streamFile = stream;
@@ -287,7 +287,7 @@ public class IndexCreator {
 		});
 
 		// 1. Loading osm file
-		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift) : new OsmDbCreator();
+		OsmDbCreator dbCreator = generateNewIds ? new OsmDbCreator(idSourceMapInd, idShift, isBasemap) : new OsmDbCreator();
 		if (!this.settings.ignorePropagate) {
 			dbCreator.setPropagateToNodes(propagateToNodes);
 		}
@@ -319,7 +319,7 @@ public class IndexCreator {
 	}
 
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
-			boolean generateUniqueIdsForEachFile) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+			boolean generateUniqueIdsForEachFile, boolean isBasemap) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
@@ -337,7 +337,7 @@ public class IndexCreator {
 		}
 		int idSourceMapInd = 0;
 		for (File read : readFile) {
-			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, idSourceMapInd, idShift, generateUniqueIdsForEachFile, null);
+			dbCreator = extractOsmToNodesDB(accessor, read, progress, addFilter, idSourceMapInd, idShift, generateUniqueIdsForEachFile, null, isBasemap);
 			accessor.updateCounts(dbCreator);
 			if (readFile.length > 1) {
 				log.info("Processing " + (idSourceMapInd + 1) + " file out of " + readFile.length);
@@ -402,7 +402,7 @@ public class IndexCreator {
 			if (settings.indexPOI) {
 				poiCreator.createDatabaseStructure(getPoiFile());
 			}
-			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true);
+			OsmDbAccessor accessor = initDbAccessor(readFiles, progress, addFilter, true, true);
 			// 2. Create index connections and index structure
 
 			IndexCreationContext icc = new IndexCreationContext(this, regionName, true);
@@ -561,7 +561,7 @@ public class IndexCreator {
 			} else {
 				// 2. Create index connections and index structure
 				createDatabaseIndexesStructure();
-				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds);
+				OsmDbAccessor accessor = initDbAccessor(readFile, progress, addFilter, generateUniqueIds, false);
 
 				// 3. Processing all entries
 				// 3.1 write all cities
