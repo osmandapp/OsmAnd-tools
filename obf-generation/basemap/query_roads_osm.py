@@ -80,8 +80,8 @@ def process_roads(cond, filename, fields):
 		if way_id == row[0]:
 			print("Warning duplicate road id %s in db" % row[0])
 			with global_way_id_lock:
-                global_way_id_counter += 1
-                wd_id = global_way_id_counter
+				global_way_id_counter += 1
+				wd_id = global_way_id_counter
 			way_xml = '\n<way version="1" id="%s" >\n' % (wd_id)
 		else:
 			way_id = row[0]
@@ -97,8 +97,8 @@ def process_roads(cond, filename, fields):
 		coordinates = LineString(row[1][len("LINESTRING("):-1])
 		for c in coordinates :
 			with global_node_id_lock:
-                global_node_id_counter -= 1
-                nid = global_node_id_counter
+				global_node_id_counter -= 1
+				nid = global_node_id_counter
 			if 'e' in c[1]:
 				c[1] = format(float(c[1]), '.12f')
 			if 'e' in c[0]: 
