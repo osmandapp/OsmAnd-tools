@@ -397,7 +397,8 @@ public class RouteRelationExtractor {
 	}
 
 	private void joinWaysIntoTrackSegments(Track track, List<Way> waysToJoin, long id) {
-		List<Way> joinedWays = IndexRouteRelationCreator.spliceWaysIntoSegments(waysToJoin, id);
+		List<Way> joinedWays = new ArrayList<>();
+		IndexRouteRelationCreator.spliceWaysIntoSegments(waysToJoin, joinedWays, id);
 		for (Way way : joinedWays) {
 			if (!way.getNodes().isEmpty()) {
 				List<WptPt> wpts = new ArrayList<>();

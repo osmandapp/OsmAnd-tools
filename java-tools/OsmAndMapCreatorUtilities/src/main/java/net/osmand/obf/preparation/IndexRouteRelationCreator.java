@@ -5,10 +5,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
-import net.osmand.osm.edit.OsmMapUtils;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
-import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.*;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -67,58 +64,115 @@ public class IndexRouteRelationCreator {
 	}
 
 	// based on RouteRelationExtractor.saveGpx()
-	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc)
+			throws SQLException {
 		if ("route".equals(relation.getTag("type")) && isSupportedRouteType(relation.getTag("route"))) {
-			Map<String, String> tags = new LinkedHashMap<>(relation.getTags());
+			List<Way> joinedWays = new ArrayList<>();
+			Map<String, String> shieldTags = new LinkedHashMap<>();
+			collectJoinedWaysAndShieldTags(relation, joinedWays, shieldTags);
 
-			tags.put("width", "roadstyle");
-			tags.put("translucent_line_colors", "yes");
-			tags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
+			Map<String, String> mapSectionTags = new LinkedHashMap<>();
+			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+			collectMapAndPoiSectionTags(relation, shieldTags, mapSectionTags, poiSectionTags);
 
-			List<Way> waysToJoin = new ArrayList<>();
-			relation.getMembers();
-			for (Relation.RelationMember member : relation.getMembers()) {
-				if (member.getEntity() instanceof Way way) {
-					if ("yes".equals(way.getTag("area"))) {
-						continue; // skip (eg https://www.openstreetmap.org/way/746544031)
-					}
-					waysToJoin.add(way);
-					transformer.addPropogatedTags(renderingTypes,
-							MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-					tags.putAll(getShieldTagsFromOsmcTags(way.getTags()));
-				}
-			}
-
-			List<Way> joinedWays = spliceWaysIntoSegments(waysToJoin, relation.getId());
+			// TODO create pointsForPoiSearch splitted in POI_SEARCH_POINTS_DISTANCE_M based on joinedWays
 
 			for (Way way : joinedWays) {
-				way.replaceTags(tags);
+				way.replaceTags(mapSectionTags);
 				indexMapCreator.iterateMainEntity(way, ctx, icc);
 			}
 
-//			if (relation.getId() == 8240320) {
-//				System.err.printf("WARN: XXX relation (%s)\n", relation);
-//				for (Relation.RelationMember member : relation.getMembers()) {
-//					indexMapCreator.iterateMainEntity(member.getEntity(), ctx, icc);
-//				}
-//			}
 		}
 	}
 
+	private void collectMapAndPoiSectionTags(@Nonnull Relation relation,
+	                                         @Nonnull Map<String, String> shieldTags,
+	                                         @Nonnull Map<String, String> mapSectionTags,
+	                                         @Nonnull Map<String, String> poiSectionTags) {
+
+		// TODO
+//	// TODO refactor
+//	final Set<String> alwaysExtraTags = Set.of("route", "note", "fixme"); // avoid garbage in Map section
+
+		Map<String, String> relationTags = relation.getTags();
+		Map<String, String> cleanedOsmTags = new LinkedHashMap<>();
+
+		for (String tag : relationTags.keySet()) {
+			if (tag.startsWith("osmc")) {
+				continue;
+			}
+			if (tag.equals("route")) {
+				continue;
+			}
+			cleanedOsmTags.put(tag, relationTags.get(tag));
+		}
+
+		// TODO drop osmc:symbol !
+
+		mapSectionTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
+		mapSectionTags.put("translucent_line_colors", "yes");
+		mapSectionTags.put("width", "roadstyle");
+		mapSectionTags.put("route", "segment");
+		mapSectionTags.put("route_activity_type", "hiking"); // not for map
+		mapSectionTags.put("track_color", "red");
+		mapSectionTags.putAll(shieldTags);
+
+		mapSectionTags.putAll(cleanedOsmTags);
+
+//			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+
+		// TODO
+
+		// remove "route" (OSM tag)
+
+		// ROUTE_TYPE, ROUTE_ACTIVITY_TYPE
+		// mapSectionTags - way (lines) -- add route=segment, remove ROUTE_TYPE
+		// poiSectionTags - node (search) - remove TRACK_COLOR -- with ROUTE_TYPE !
+
+		// shieldTags
+		// route_bbox_radius
+
+		// consider XML_COLON
+
+//			tags.put("width", "roadstyle");
+//			tags.put("translucent_line_colors", "yes");
+//			tags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
+
+	}
+
+	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
+	                                            @Nonnull List<Way> joinedWays,
+	                                            @Nonnull Map<String, String> shieldTags) {
+		List<Way> waysToJoin = new ArrayList<>();
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Way way) {
+				if ("yes".equals(way.getTag("area"))) {
+					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
+				}
+				waysToJoin.add(way);
+				transformer.addPropogatedTags(renderingTypes,
+						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
+				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
+			}
+		}
+		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId());
+	}
+
 	// based on RouteRelationExtractor.joinWaysIntoTrackSegments()
-	public static List<Way> spliceWaysIntoSegments(List<Way> ways, long relationId) {
-		boolean[] done = new boolean[ways.size()];
-		List<Way> segments = new ArrayList<>();
+	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
+	                                          @Nonnull List<Way> joinedWays,
+	                                          long relationId) {
+		boolean[] done = new boolean[waysToJoin.size()];
 		while (true) {
 			List<Node> nodes = new ArrayList<>();
-			for (int i = 0; i < ways.size(); i++) {
+			for (int i = 0; i < waysToJoin.size(); i++) {
 				if (!done[i]) {
 					done[i] = true;
-					addWayToNodes(nodes, false, ways.get(i), false); // "head" way
+					addWayToNodes(nodes, false, waysToJoin.get(i), false); // "head" way
 					while (true) {
 						boolean stop = true;
-						for (int j = 0; j < ways.size(); j++) {
-							if (!done[j] && considerWayToJoin(nodes, ways.get(j))) {
+						for (int j = 0; j < waysToJoin.size(); j++) {
+							if (!done[j] && considerWayToJoin(nodes, waysToJoin.get(j))) {
 								done[j] = true;
 								stop = false;
 							}
@@ -133,10 +187,9 @@ public class IndexRouteRelationCreator {
 			if (nodes.isEmpty()) {
 				break; // all done
 			}
-			long generatedId = calcSyntheticId(relationId, segments.size(), nodes);
-			segments.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
+			long generatedId = calcSyntheticId(relationId, joinedWays.size(), nodes);
+			joinedWays.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
 		}
-		return segments;
 	}
 
 	private static long calcSyntheticId(long relationId, long counter, @Nonnull List<Node> nodes) {
