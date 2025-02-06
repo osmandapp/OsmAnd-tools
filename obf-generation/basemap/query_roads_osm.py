@@ -18,6 +18,10 @@ def LineString(geoStr):
 def esc(s):
 	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
+node_id = -1 #10 000 000 000 000
+max_way_id_start = 10*1000*1000*1000
+wd_id = max_way_id_start
+
 def process_roads(cond, filename, fields):
 	print("Query %s" % cond)
 	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
@@ -61,10 +65,6 @@ def process_roads(cond, filename, fields):
 	#print sql
 	cursor.execute(sql)
  
-	node_id = -1 #10 000 000 000 000
-	max_way_id_start = 10*1000*1000*1000
-
-	wd_id = max_way_id_start
 	way_id = 0
 	extra_way_xml = ""
 	for row in cursor:
