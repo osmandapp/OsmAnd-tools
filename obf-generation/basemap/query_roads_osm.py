@@ -4,6 +4,7 @@ import sys
 import pprint
 import re
 import os
+import threading
 
 regSpaces = re.compile('\s+')
 def Point(geoStr):
