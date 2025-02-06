@@ -18,9 +18,6 @@ def LineString(geoStr):
 def esc(s):
 	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
-way_id = -1
-node_id = -1
-
 def process_roads(cond, filename, fields):
 	print("Query %s" % cond)
 	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
@@ -64,21 +61,24 @@ def process_roads(cond, filename, fields):
 	#print sql
 	cursor.execute(sql)
  
+	node_id = -1 #10 000 000 000 000
+	max_way_id_start = 10*1000*1000*1000
+
+	wd_id = max_way_id_start
+	way_id = 0
 	extra_way_xml = ""
 	for row in cursor:
 		if row[1] is None:
 			continue;
 		node_xml = ""
 
-		# if way_id == row[0]:
-		# 	print("Warning duplicate road id %s in db" % row[0])
-		# 	wd_id = wd_id + 1
-		# 	way_xml = '\n<way version="1" id="%s" >\n' % (wd_id)
-		# else:
-		# 	way_id = row[0]
-		# 	way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
-		way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
-		way_id = way_id - 1
+		if way_id == row[0]:
+			print("Warning duplicate road id %s in db" % row[0])
+			wd_id = wd_id + 1
+			way_xml = '\n<way version="1" id="%s" >\n' % (wd_id)
+		else:
+			way_id = row[0]
+			way_xml = '\n<way version="1" id="%s" >\n' % (way_id)
 		base = shift
 		while base - shift < len(array):
 			if row[base] is not None:
