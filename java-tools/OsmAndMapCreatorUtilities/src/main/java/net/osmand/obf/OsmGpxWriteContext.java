@@ -2,6 +2,7 @@ package net.osmand.obf;
 
 import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.MIN_REF_LENGTH_TO_USE_FOR_SEARCH;
 import static net.osmand.obf.preparation.IndexRouteRelationCreatorOld.DIST_STEP;
 import static net.osmand.obf.preparation.IndexRouteRelationCreatorOld.MAX_GRAPH_SKIP_POINTS_BITS;
 import static net.osmand.osm.MapPoiTypes.OTHER_MAP_CATEGORY;
@@ -45,6 +46,7 @@ import java.util.zip.GZIPOutputStream;
 import com.google.gson.Gson;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.obf.preparation.IndexRouteRelationCreator;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.gpx.RouteActivityHelper;
@@ -93,12 +95,6 @@ public class OsmGpxWriteContext {
 	public static final String COLOUR = "colour"; // osmand:colour
 	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
 	public static final String[] colorTagsForMapSection = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
-
-	public static final String SHIELD_FG = "shield_fg";
-	public static final String SHIELD_BG = "shield_bg";
-	public static final String SHIELD_TEXT = "shield_text";
-	public static final String SHIELD_STUB_NAME = "shield_stub_name";
-	public static final int MIN_REF_LENGTH_FOR_SEARCH = 3;
 
 	private final static NumberFormat distanceFormat = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.US));
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
@@ -300,7 +296,7 @@ public class OsmGpxWriteContext {
 		addExtensionsTags(allTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
 
 		finalizeActivityTypeAndColors(allTags, metadataExtraTags, extensionsExtraTags, gpxInfo);
-		finalizeGpxShieldTags(allTags);
+		IndexRouteRelationCreator.finalizeRouteShieldTags(allTags);
 
 		allTags.put("route_bbox_radius", gpxFile.getOuterRadius());
 
@@ -383,20 +379,6 @@ public class OsmGpxWriteContext {
 		}
 
 		gpxTrackTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
-	}
-
-	private void finalizeGpxShieldTags(Map<String, String> gpxTrackTags) {
-		if (gpxTrackTags.containsKey("ref") || gpxTrackTags.containsKey(SHIELD_TEXT)) {
-			gpxTrackTags.remove(SHIELD_STUB_NAME);
-		} else if (gpxTrackTags.containsKey(SHIELD_FG) || gpxTrackTags.containsKey(SHIELD_BG)) {
-			gpxTrackTags.put(SHIELD_STUB_NAME, ".");
-		}
-		if (gpxTrackTags.containsKey(SHIELD_TEXT)) {
-			String text = gpxTrackTags.get(SHIELD_TEXT);
-			if (text.length() >= MIN_REF_LENGTH_FOR_SEARCH && !text.equals(gpxTrackTags.get("ref"))) {
-				gpxTrackTags.put("name:sym", text);
-			}
-		}
 	}
 
 	private void addPointGroupsTags(Map<String, String> gpxTrackTags, Map<String, PointsGroup> pointsGroups) {
@@ -508,7 +490,7 @@ public class OsmGpxWriteContext {
 			}
 			if (!Algorithms.isEmpty(gpxInfo.ref)) {
 				gpxTrackTags.put("ref", gpxInfo.ref);
-				if (gpxInfo.ref.length() >= MIN_REF_LENGTH_FOR_SEARCH) {
+				if (gpxInfo.ref.length() >= MIN_REF_LENGTH_TO_USE_FOR_SEARCH) {
 					gpxTrackTags.put("name:ref", gpxInfo.ref);
 				}
 			}

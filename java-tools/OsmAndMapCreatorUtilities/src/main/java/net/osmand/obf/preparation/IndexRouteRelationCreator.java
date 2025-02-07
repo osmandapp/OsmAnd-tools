@@ -84,19 +84,22 @@ public class IndexRouteRelationCreator {
 	}
 
 	private static final String ROUTE = "route";
+
+	// TODO move all const from OsmGpxWriteContext to this
 	private static final String ROUTE_TYPE = OsmGpxWriteContext.ROUTE_TYPE;
 	private static final String ROUTE_ID_TAG = OsmGpxWriteContext.ROUTE_ID_TAG;
 	private static final String TRACK_COLOR = OsmGpxWriteContext.TRACK_COLOR;
 
+	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+
 	private void collectMapAndPoiSectionTags(@Nonnull Relation relation,
-	                                         @Nonnull Map<String, String> shieldTags,
+	                                         @Nonnull Map<String, String> preparedTags,
 	                                         @Nonnull Map<String, String> mapSectionTags,
 	                                         @Nonnull Map<String, String> poiSectionTags) {
 		// TODO consider XML_COLON (compare with RouteRelationExtractor obf)
 		Map<String, String> commonTags = new LinkedHashMap<>(relation.getTags());
 
 		// route-related tags
-		// TODO route_bbox_radius
 		commonTags.remove(ROUTE); // see also OsmGpxWriteContext.alwaysExtraTags
 		commonTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 
@@ -104,32 +107,42 @@ public class IndexRouteRelationCreator {
 		commonTags.put("width", "roadstyle");
 		commonTags.put("translucent_line_colors", "yes");
 
-		// shield tags
-		commonTags.putAll(shieldTags);
+		// shield tags, etc
+		commonTags.putAll(preparedTags);
 
-		// TODO ROUTE_TYPE, ROUTE_ACTIVITY_TYPE, TRACK_COLOR
-		mapSectionTags.put("track_color", "red");
-		mapSectionTags.put("route_activity_type", "hiking"); // not for map
+		String ref = commonTags.get("ref");
+		if (ref != null && ref.length() >= MIN_REF_LENGTH_TO_USE_FOR_SEARCH) {
+			commonTags.put("name:ref", ref);
+		}
 
-		// fill and cleanup Map/POI tags
+		// TODO finalizeActivityTypeAndColors() - TRACK_COLOR, ROUTE_TYPE, ROUTE_ACTIVITY_TYPE -- test with ROUTE_TYPE="other", TRACK_COLOR="red"
+		finalizeRouteShieldTags(commonTags);
+
+		// prepare section tags
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
 		mapSectionTags.put(ROUTE, "segment");
-		// mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
-		// poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+		mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
+		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+	}
 
-		/*
-			name (optional)
-			name:ref = ref
-			description (optional)
-			ROUTE_ID_TAG = OSMxxxxxxxx
-			route_bbox_radius -- calc ?
+	private static final String SHIELD_FG = "shield_fg";
+	private static final String SHIELD_BG = "shield_bg";
+	private static final String SHIELD_TEXT = "shield_text";
+	private static final String SHIELD_STUB_NAME = "shield_stub_name";
 
-			finalizeGpxShieldTags() - stub, name:sym
-			finalizeActivityTypeAndColors() - TRACK_COLOR, ROUTE_TYPE, ROUTE_ACTIVITY_TYPE -- test with ROUTE_TYPE="other", TRACK_COLOR="red"
-
-			LATER: distance = calc?, ele/analytics = avoid
-		 */
+	public static void finalizeRouteShieldTags(Map<String, String> tags) {
+		if (tags.containsKey("ref") || tags.containsKey(SHIELD_TEXT)) {
+			tags.remove(SHIELD_STUB_NAME);
+		} else if (tags.containsKey(SHIELD_FG) || tags.containsKey(SHIELD_BG)) {
+			tags.put(SHIELD_STUB_NAME, ".");
+		}
+		if (tags.containsKey(SHIELD_TEXT)) {
+			String text = tags.get(SHIELD_TEXT);
+			if (text.length() >= MIN_REF_LENGTH_TO_USE_FOR_SEARCH && !text.equals(tags.get("ref"))) {
+				tags.put("name:sym", text);
+			}
+		}
 	}
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
@@ -148,6 +161,7 @@ public class IndexRouteRelationCreator {
 			}
 		}
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId());
+		// TODO add route_bbox_radius based on joinedWays (bbox -> radius), calc distance (if not exists in relation)
 	}
 
 	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
