@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
@@ -14,8 +15,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
 import java.util.*;
-
-import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
 
 public class IndexRouteRelationCreator {
 	private static final String[] FILTERED_TAGS = {
@@ -63,7 +62,6 @@ public class IndexRouteRelationCreator {
 		this.renderingTypes = indexMapCreator.renderingTypes;
 	}
 
-	// based on RouteRelationExtractor.saveGpx()
 	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc)
 			throws SQLException {
 		if ("route".equals(relation.getTag("type")) && isSupportedRouteType(relation.getTag("route"))) {
@@ -75,7 +73,7 @@ public class IndexRouteRelationCreator {
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
 			collectMapAndPoiSectionTags(relation, shieldTags, mapSectionTags, poiSectionTags);
 
-			// TODO create pointsForPoiSearch splitted in POI_SEARCH_POINTS_DISTANCE_M based on joinedWays
+			// TODO create pointsForPoiSearch split in POI_SEARCH_POINTS_DISTANCE_M based on joinedWays (ID ???)
 
 			for (Way way : joinedWays) {
 				way.replaceTags(mapSectionTags);
@@ -85,59 +83,53 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
+	private static final String ROUTE = "route";
+	private static final String ROUTE_TYPE = OsmGpxWriteContext.ROUTE_TYPE;
+	private static final String ROUTE_ID_TAG = OsmGpxWriteContext.ROUTE_ID_TAG;
+	private static final String TRACK_COLOR = OsmGpxWriteContext.TRACK_COLOR;
+
 	private void collectMapAndPoiSectionTags(@Nonnull Relation relation,
 	                                         @Nonnull Map<String, String> shieldTags,
 	                                         @Nonnull Map<String, String> mapSectionTags,
 	                                         @Nonnull Map<String, String> poiSectionTags) {
+		// TODO consider XML_COLON (compare with RouteRelationExtractor obf)
+		Map<String, String> commonTags = new LinkedHashMap<>(relation.getTags());
 
-		// TODO
-//	// TODO refactor
-//	final Set<String> alwaysExtraTags = Set.of("route", "note", "fixme"); // avoid garbage in Map section
+		// route-related tags
+		// TODO route_bbox_radius
+		commonTags.remove(ROUTE); // see also OsmGpxWriteContext.alwaysExtraTags
+		commonTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 
-		Map<String, String> relationTags = relation.getTags();
-		Map<String, String> cleanedOsmTags = new LinkedHashMap<>();
+		// appearance tags
+		commonTags.put("width", "roadstyle");
+		commonTags.put("translucent_line_colors", "yes");
 
-		for (String tag : relationTags.keySet()) {
-			if (tag.startsWith("osmc")) {
-				continue;
-			}
-			if (tag.equals("route")) {
-				continue;
-			}
-			cleanedOsmTags.put(tag, relationTags.get(tag));
-		}
+		// shield tags
+		commonTags.putAll(shieldTags);
 
-		// TODO drop osmc:symbol !
-
-		mapSectionTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
-		mapSectionTags.put("translucent_line_colors", "yes");
-		mapSectionTags.put("width", "roadstyle");
-		mapSectionTags.put("route", "segment");
-		mapSectionTags.put("route_activity_type", "hiking"); // not for map
+		// TODO ROUTE_TYPE, ROUTE_ACTIVITY_TYPE, TRACK_COLOR
 		mapSectionTags.put("track_color", "red");
-		mapSectionTags.putAll(shieldTags);
+		mapSectionTags.put("route_activity_type", "hiking"); // not for map
 
-		mapSectionTags.putAll(cleanedOsmTags);
+		// fill and cleanup Map/POI tags
+		mapSectionTags.putAll(commonTags);
+		poiSectionTags.putAll(commonTags);
+		mapSectionTags.put(ROUTE, "segment");
+		// mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
+		// poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
 
-//			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+		/*
+			name (optional)
+			name:ref = ref
+			description (optional)
+			ROUTE_ID_TAG = OSMxxxxxxxx
+			route_bbox_radius -- calc ?
 
-		// TODO
+			finalizeGpxShieldTags() - stub, name:sym
+			finalizeActivityTypeAndColors() - TRACK_COLOR, ROUTE_TYPE, ROUTE_ACTIVITY_TYPE -- test with ROUTE_TYPE="other", TRACK_COLOR="red"
 
-		// remove "route" (OSM tag)
-
-		// ROUTE_TYPE, ROUTE_ACTIVITY_TYPE
-		// mapSectionTags - way (lines) -- add route=segment, remove ROUTE_TYPE
-		// poiSectionTags - node (search) - remove TRACK_COLOR -- with ROUTE_TYPE !
-
-		// shieldTags
-		// route_bbox_radius
-
-		// consider XML_COLON
-
-//			tags.put("width", "roadstyle");
-//			tags.put("translucent_line_colors", "yes");
-//			tags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
-
+			LATER: distance = calc?, ele/analytics = avoid
+		 */
 	}
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
@@ -158,7 +150,6 @@ public class IndexRouteRelationCreator {
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId());
 	}
 
-	// based on RouteRelationExtractor.joinWaysIntoTrackSegments()
 	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
 	                                          @Nonnull List<Way> joinedWays,
 	                                          long relationId) {
