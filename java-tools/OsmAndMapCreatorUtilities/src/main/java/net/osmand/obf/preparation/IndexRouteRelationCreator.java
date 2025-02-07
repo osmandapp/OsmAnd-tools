@@ -3,10 +3,12 @@ package net.osmand.obf.preparation;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
-import net.osmand.obf.OsmGpxWriteContext;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
+import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -15,6 +17,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
 import java.util.*;
+
+import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
 
 public class IndexRouteRelationCreator {
 	private static final String[] FILTERED_TAGS = {
@@ -41,11 +45,48 @@ public class IndexRouteRelationCreator {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
-	private static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
+	private static final String SHIELD_FG = "shield_fg";
+	private static final String SHIELD_BG = "shield_bg";
+	private static final String SHIELD_TEXT = "shield_text";
+	private static final String SHIELD_STUB_NAME = "shield_stub_name";
 
+	private static final String ROUTE = "route";
+
+	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+
+	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
+	public static final String ROUTE_TYPE = "route_type";
+	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+
+	private static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
+	public static final String COLOR = "color"; // osmand:color
+	private static final String COLOUR = "colour"; // osmand:colour
+	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
+
+	private static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
+	private static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
+	private static final String[] COLOR_TAGS_FOR_MAP_SECTION = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
+
+	private static final Map<String, String> OSMC_TAGS_TO_SHIELD_PROPS = Map.of(
+			"osmc_text", "shield_text",
+			"osmc_background", "shield_bg",
+			"osmc_foreground", "shield_fg",
+			"osmc_foreground2", "shield_fg_2",
+			"osmc_textcolor", "shield_textcolor",
+			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
+	);
+
+	private static final String OSMC_ICON_PREFIX = "osmc_";
+	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
+	private static final Set<String> SHIELD_BG_ICONS = Set.of("shield_bg");
+	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "sheld_fg_2");
+	private static final String RELATION_ID = OSMSettings.OSMTagKey.RELATION_ID.getValue();
+
+	private static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
+	private static final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 	private static final Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
 
-	private final IndexCreatorSettings settings;
+	private final IndexCreatorSettings settings; // TODO remove
 	private final IndexPoiCreator indexPoiCreator;
 	private final IndexVectorMapCreator indexMapCreator;
 
@@ -83,15 +124,6 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private static final String ROUTE = "route";
-
-	// TODO move all const from OsmGpxWriteContext to this
-	private static final String ROUTE_TYPE = OsmGpxWriteContext.ROUTE_TYPE;
-	private static final String ROUTE_ID_TAG = OsmGpxWriteContext.ROUTE_ID_TAG;
-	private static final String TRACK_COLOR = OsmGpxWriteContext.TRACK_COLOR;
-
-	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
-
 	private void collectMapAndPoiSectionTags(@Nonnull Relation relation,
 	                                         @Nonnull Map<String, String> preparedTags,
 	                                         @Nonnull Map<String, String> mapSectionTags,
@@ -115,8 +147,8 @@ public class IndexRouteRelationCreator {
 			commonTags.put("name:ref", ref);
 		}
 
-		// TODO finalizeActivityTypeAndColors() - TRACK_COLOR, ROUTE_TYPE, ROUTE_ACTIVITY_TYPE -- test with ROUTE_TYPE="other", TRACK_COLOR="red"
 		finalizeRouteShieldTags(commonTags);
+		finalizeActivityTypeAndColors(commonTags, null, null, null);
 
 		// prepare section tags
 		mapSectionTags.putAll(commonTags);
@@ -125,11 +157,6 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
 	}
-
-	private static final String SHIELD_FG = "shield_fg";
-	private static final String SHIELD_BG = "shield_bg";
-	private static final String SHIELD_TEXT = "shield_text";
-	private static final String SHIELD_STUB_NAME = "shield_stub_name";
 
 	public static void finalizeRouteShieldTags(Map<String, String> tags) {
 		if (tags.containsKey("ref") || tags.containsKey(SHIELD_TEXT)) {
@@ -143,6 +170,64 @@ public class IndexRouteRelationCreator {
 				tags.put("name:sym", text);
 			}
 		}
+	}
+
+	public static void finalizeActivityTypeAndColors(@Nonnull Map<String, String> commonTags,
+	                                                 @Nullable Map<String, String> metadataExtraTags,
+	                                                 @Nullable Map<String, String> extensionsExtraTags,
+	                                                 @Nullable String[] gpxInfoTags) {
+		// route_activity_type (user-defined) - osmand:activity (OsmAnd) - route (OSM)
+		final String[] activityTags = {ROUTE_ACTIVITY_TYPE, OSMAND_ACTIVITY, "route"};
+
+		// OsmGpxFile.tags compatibility (might be used by DownloadOsmGPX)
+		if (gpxInfoTags != null) {
+			OsmRouteType compatibleOsmRouteType = OsmRouteType.getTypeFromTags(gpxInfoTags);
+			if (extensionsExtraTags != null) {
+				for (String tg : gpxInfoTags) {
+					extensionsExtraTags.put("tag_" + tg, "yes");
+				}
+			}
+			if (compatibleOsmRouteType != null) {
+				commonTags.putIfAbsent(TRACK_COLOR, compatibleOsmRouteType.getColor());
+				commonTags.putIfAbsent(ROUTE_ACTIVITY_TYPE, compatibleOsmRouteType.getName().toLowerCase());
+			}
+		}
+
+		Map<String, String> allTags = new LinkedHashMap<>(commonTags);
+		if (metadataExtraTags != null) {
+			allTags.putAll(metadataExtraTags);
+		}
+		if (extensionsExtraTags != null) {
+			allTags.putAll(extensionsExtraTags);
+		}
+
+		for (String tag : COLOR_TAGS_FOR_MAP_SECTION) {
+			if (allTags.containsKey(tag)) {
+				commonTags.put(TRACK_COLOR,
+						MapRenderingTypesEncoder.formatColorToPalette(allTags.get(tag), false));
+				break;
+			}
+		}
+
+		for (String tag : activityTags) {
+			String values = allTags.get(tag);
+			if (values != null) {
+				// "hiking;horse" "mountain_bike, bicycle"
+				for (String val : values.split("[;, ]")) {
+					RouteActivity activity = routeActivityHelper.findRouteActivity(val); // find by id
+					if (activity == null) {
+						activity = routeActivityHelper.findActivityByTag(val); // try to find by tags
+					}
+					if (activity != null) {
+						commonTags.put(ROUTE_TYPE, activity.getGroup().getId());
+						commonTags.put(ROUTE_ACTIVITY_TYPE, activity.getId()); // to split into poi_additional_category
+						return; // success
+					}
+				}
+			}
+		}
+
+		commonTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
 	}
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
@@ -270,21 +355,6 @@ public class IndexRouteRelationCreator {
 		}
 		return false;
 	}
-
-	private static final Map<String, String> OSMC_TAGS_TO_SHIELD_PROPS = Map.of(
-			"osmc_text", "shield_text",
-			"osmc_background", "shield_bg",
-			"osmc_foreground", "shield_fg",
-			"osmc_foreground2", "shield_fg_2",
-			"osmc_textcolor", "shield_textcolor",
-			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
-	);
-
-	private static final String OSMC_ICON_PREFIX = "osmc_";
-	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
-	private static final Set<String> SHIELD_BG_ICONS = Set.of("shield_bg");
-	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "sheld_fg_2");
-	private static final String RELATION_ID = OSMSettings.OSMTagKey.RELATION_ID.getValue();
 
 	@Nonnull
 	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags, long relationId) {
