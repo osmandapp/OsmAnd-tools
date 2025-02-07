@@ -240,19 +240,18 @@ public class WikiService {
 			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
 		}
 
-		String query = "SELECT id, photoId, photoTitle, catId, catTitle, depId, depTitle, wikiTitle, wikiLang, wikiDesc, wikiArticles, osmid, osmtype, poitype, poisubtype, lat, lon, wvLinks, "
-				+ "CASE "
-				+ "WHEN qrank > 1000000 THEN 2000 "
-				+ "WHEN qrank < 1000 THEN 1000 "
-				+ "ELSE 1000 + 1000 * LOG10(qrank / 1000) / LOG10(1000000 / 1000) "
-				+ "END AS elo_qrank "
-				+ "FROM wikidata WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
-				+ filterQuery
-				+ zoomCondition
-				+ osmidCondition
-				+ osmcntFilter
-				+ " " + subtypeFilter
-				+ " ORDER BY elo_qrank DESC LIMIT " + LIMIT_OBJS_QUERY;
+		String query = "SELECT w.id, w.photoId, w.photoTitle, w.catId, w.catTitle, w.depId, w.depTitle, " +
+				"w.wikiTitle, w.wikiLang, w.wikiDesc, w.wikiArticles, w.osmid, w.osmtype, w.poitype, " +
+				"w.poisubtype, w.lat, w.lon, w.wvLinks, e.elo " +
+				"FROM wikidata w " +
+				"LEFT JOIN wiki.elo_rating e ON w.id = e.id " +
+				"WHERE w.lat BETWEEN ? AND ? AND w.lon BETWEEN ? AND ? " +
+				filterQuery +
+				zoomCondition +
+				osmidCondition +
+				osmcntFilter +
+				" " + subtypeFilter +
+				" ORDER BY e.elo DESC LIMIT " + LIMIT_OBJS_QUERY;
 		
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
