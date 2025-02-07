@@ -33,14 +33,14 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	public static String OSMAND_DELETE_TAG = "osmand_change";
 	public static String OSMAND_DELETE_VALUE = "delete";
-	
+
 	private static final Log log = LogFactory.getLog(OsmDbCreator.class);
 	public static final int SHIFT_ID = 6;
 	public static final int BATCH_SIZE_OSM = 100000;
 
 	// do not store these tags in the database, just ignore them
 	final String[] tagsToIgnore= {"created_by","converted_by"};
-	
+
 	DBDialect dialect;
 	int currentCountNode = 0;
 	private PreparedStatement prepNode;
@@ -57,10 +57,10 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	int propagateCount = 0;
 	private PreparedStatement prepPropagateNode;
-	
-	
 
-	
+
+
+
 	// not used for now
 	private PreparedStatement delNode;
 	private PreparedStatement delRelations;
@@ -71,18 +71,18 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private Connection dbConn;
 
-	
+
 	private static boolean VALIDATE_DUPLICATES = false;
 	private TLongObjectHashMap<Long> generatedIds = new TLongObjectHashMap<Long>();
 	private TLongObjectHashMap<Long> hashes = new TLongObjectHashMap<Long>();
 	private TLongSet idSetToValidateDuplicates = new TLongHashSet();
-	
+
 
 	private final int shiftId;
 	private final int additionId;
 	private final boolean generateNewIds;
 	private final boolean addGeoHash;
-	
+
 	private long generatedId = -100;
 
 	private PropagateToNodes propagateToNodes;
@@ -92,33 +92,34 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public OsmDbCreator(int additionId, int shiftId) {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
-		// Before for basemap it was true but cause too much memory to keep, so it's simplified 
+		// Before for basemap it was true but cause too much memory to keep, so it's simplified
 		this.generateNewIds = false;
 		this.addGeoHash = false;
 	}
-	
+
 	public OsmDbCreator(boolean addGeoHash) {
 		this.additionId = 0;
 		this.shiftId = 0;
 		this.generateNewIds = false;
 		this.addGeoHash = addGeoHash;
 	}
-	
+
 	public OsmDbCreator() {
 		this.additionId = 0;
 		this.shiftId = 0;
 		this.generateNewIds = false;
 		this.addGeoHash = true;
 	}
-	
-	
+
+
 	private long convertId(Entity e) {
 		long id = e.getId();
-		
+
 		int ord = EntityType.valueOf(e).ordinal();
+        boolean isSynthetic = !addGeoHash && id < 0;
 		if (e instanceof Node) {
 			// for points id > 0 add always geohash (for basemap points)
-			if (!addGeoHash && id < 0) {
+			if (isSynthetic) {
 				return getSimpleConvertId(id, EntityType.NODE, true);
 			}
 			int hash = getNodeHash(e);
@@ -128,7 +129,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			long hash = 0;
 			for (int i = 0; i < lids.size(); i++) {
 				Long ld;
-				if (!addGeoHash) {
+				if (isSynthetic) {
 					ld = getSimpleConvertId(lids.get(i), EntityType.NODE, false);
 				} else {
 					ld = getGeneratedId(lids.get(i), 0);
@@ -141,7 +142,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					lids.set(i, ld);
 				}
 			}
-			if (!addGeoHash) {
+			if (isSynthetic) {
 				return getSimpleConvertId(id, EntityType.WAY, true);
 			}
 			return getConvertId(id, ord, hash);
@@ -153,7 +154,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				EntityType entityType = i.getEntityId().getType();
 				if (i.getEntityId().getType() != EntityType.RELATION) {
 					Long newId ;
-					if (!addGeoHash) {
+					if (isSynthetic) {
 						newId = getSimpleConvertId(oldId, entityType, false);
 					} else {
 						newId = getGeneratedId(oldId, entityType.ordinal());
@@ -163,7 +164,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 					}
 				}
 			}
-			if (!addGeoHash) {
+			if (isSynthetic) {
 				return getSimpleConvertId(id, EntityType.RELATION, true);
 			}
 			return id;
@@ -189,7 +190,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			return id;
 //			return (id << shiftId) + additionId;
 		}
-		
+
 	}
 
 	private int getNodeHash(Entity e) {
@@ -198,8 +199,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		int hash = (x + y) >> 10;
 		return hash;
 	}
-	
-	
+
+
 	private Long getHash(long l, int ord) {
 		if(l < 0) {
 			long lid = (l << shiftId) + additionId;
@@ -233,7 +234,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		hashes.put(fid, hash);
 		return cid;
 	}
-	
+
 
 	public void initDatabase(DBDialect dialect, Object databaseConn, boolean create, OsmDbCreator previous) throws SQLException {
 
@@ -282,7 +283,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			s.close();
 		}
 	}
-	
+
 
 	public void finishLoading() throws SQLException {
 		try {
@@ -315,9 +316,9 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			delRelations.close();
 		}
 	}
-	
-	
-	
+
+
+
 	protected void checkEntityExists(Entity e, long id) throws SQLException {
 		if (delNode == null) {
 			delNode = dbConn.prepareStatement("delete from node where id = ?"); //$NON-NLS-1$
@@ -406,7 +407,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 							if (latLon == null) {
 								continue;
 							}
-							long wayId = e.getId(); 
+							long wayId = e.getId();
 							if (wayId < 0) {
 								wayId = Math.abs(wayId) % (1l << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - ObfConstants.SHIFT_PROPAGATED_NODES_BITS - 1));
 							}
@@ -536,6 +537,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public void setPropagateToNodes(PropagateToNodes propagateToNodes) {
 		this.propagateToNodes = propagateToNodes;
 	}
-	
+
 
 }
