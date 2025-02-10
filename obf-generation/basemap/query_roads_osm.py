@@ -4,6 +4,7 @@ import sys
 import pprint
 import re
 import os
+import threading
 
 regSpaces = re.compile('\s+')
 def Point(geoStr):
@@ -18,7 +19,16 @@ def LineString(geoStr):
 def esc(s):
 	return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'","&apos;")
 
+# Global counter and lock
+global_node_id_counter = 0
+global_node_id_lock = threading.Lock()
+global_max_way_id_start = 10*1000*1000*1000
+global_way_id_counter = global_max_way_id_start
+global_way_id_lock = threading.Lock()
+
 def process_roads(cond, filename, fields):
+	global global_node_id_counter
+	global global_way_id_counter
 	print("Query %s" % cond)
 	conn_string = "host='127.0.0.1' dbname='"+os.environ['DB_NAME']+"' user='"+os.environ['DB_USER']+"' password='"+os.environ['DB_PWD']+"' port='5432'"
 	f = open(filename,'w')
@@ -61,10 +71,6 @@ def process_roads(cond, filename, fields):
 	#print sql
 	cursor.execute(sql)
  
-	node_id =10000 #10 000 000 000 000
-	max_way_id_start = 10*1000*1000*1000
-
-	wd_id = max_way_id_start
 	way_id = 0
 	extra_way_xml = ""
 	for row in cursor:
@@ -74,7 +80,9 @@ def process_roads(cond, filename, fields):
 
 		if way_id == row[0]:
 			print("Warning duplicate road id %s in db" % row[0])
-			wd_id = wd_id + 1
+			with global_way_id_lock:
+				global_way_id_counter += 1
+				wd_id = global_way_id_counter
 			way_xml = '\n<way version="1" id="%s" >\n' % (wd_id)
 		else:
 			way_id = row[0]
@@ -89,8 +97,9 @@ def process_roads(cond, filename, fields):
 			raise Exception("Object " + row[0] + " has bad geometry" + row[1])
 		coordinates = LineString(row[1][len("LINESTRING("):-1])
 		for c in coordinates :
-			node_id = node_id + 1
-			nid = node_id
+			with global_node_id_lock:
+				global_node_id_counter -= 1
+				nid = global_node_id_counter
 			if 'e' in c[1]:
 				c[1] = format(float(c[1]), '.12f')
 			if 'e' in c[0]: 
@@ -99,7 +108,7 @@ def process_roads(cond, filename, fields):
 			way_xml += '\t<nd ref="%s" />\n' % (nid)
 		f.write(node_xml)
 		way_xml += '</way>\n'
-		if way_id > max_way_id_start:
+		if way_id > global_max_way_id_start:
 			extra_way_xml += way_xml
 		else:
 			fway.write(way_xml)
