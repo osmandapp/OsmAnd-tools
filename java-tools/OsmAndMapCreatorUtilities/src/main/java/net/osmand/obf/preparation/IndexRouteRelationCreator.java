@@ -83,12 +83,12 @@ public class IndexRouteRelationCreator {
 	private static final String OSMC_ICON_PREFIX = "osmc_";
 	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
 	private static final Set<String> SHIELD_BG_ICONS = Set.of("shield_bg");
-	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "sheld_fg_2");
+	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "shield_fg_2");
 	private static final String RELATION_ID = OSMSettings.OSMTagKey.RELATION_ID.getValue();
 
 	private static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
 	private static final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
-	private static final Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
+	private static final Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
 
 	private final IndexPoiCreator indexPoiCreator;
 	private final IndexVectorMapCreator indexMapCreator;
