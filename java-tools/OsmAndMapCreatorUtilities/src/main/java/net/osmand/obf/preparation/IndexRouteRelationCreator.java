@@ -309,27 +309,27 @@ public class IndexRouteRelationCreator {
 			if (nodes.isEmpty()) {
 				break; // all done
 			}
-			long generatedId = calcSyntheticId(relationId, joinedWays.size(), nodes);
+			long generatedId = calcWayIdFromRelationId(relationId, joinedWays.size(), nodes);
 			joinedWays.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
 		}
 	}
 
-	private static long calcSyntheticId(long relationId, long counter, @Nonnull List<Node> nodes) {
+	private static long calcWayIdFromRelationId(long relationId, long counter, @Nonnull List<Node> wayNodes) {
 		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 
 		if (counter < 0 || counter >= (1L << MAX_COUNTER_BITS) ||
 				relationId < 0 || relationId >= (1L << MAX_RELATION_ID_BITS)) {
 			log.error(String.format(
-					"calcSyntheticId() relation %d/%d overflow (%d/%d bits)",
+					"calcWayIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
 					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
 			throw new UnsupportedOperationException();
 		}
 
-		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodes);
+		LatLon center = OsmMapUtils.getWeightCenterForNodes(wayNodes);
 
 		int hash = center == null
-				? nodes.size() % 64
+				? wayNodes.size() % 64
 				: (int) (1000 * (center.getLatitude() + center.getLongitude())) % 64; // 0-63 = 6 bits
 
 		// Max OSM Relation ID has 25 bits @ 2025/02/05 = 18655715
