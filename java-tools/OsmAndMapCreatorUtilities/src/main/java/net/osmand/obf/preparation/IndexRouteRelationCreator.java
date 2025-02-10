@@ -4,6 +4,7 @@ import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
@@ -55,6 +56,7 @@ public class IndexRouteRelationCreator {
 	private static final String ROUTE = "route";
 
 	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
@@ -100,48 +102,69 @@ public class IndexRouteRelationCreator {
 		this.indexMapCreator = indexMapCreator;
 		this.transformer = indexMapCreator.tagsTransformer;
 		this.renderingTypes = indexMapCreator.renderingTypes;
+		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 	}
 
 	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc)
 			throws SQLException {
 		if ("route".equals(relation.getTag("type")) && isSupportedRouteType(relation.getTag("route"))) {
 			List<Way> joinedWays = new ArrayList<>();
+			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags);
-			calcRouteBboxRadiusAndDistance(joinedWays, preparedTags);
+			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags);
 
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
 
-			// TODO create pointsForPoiSearch split in POI_SEARCH_POINTS_DISTANCE_M based on joinedWays (ID ???)
-
 			for (Way way : joinedWays) {
 				way.replaceTags(mapSectionTags);
 				indexMapCreator.iterateMainEntity(way, ctx, icc);
 			}
-
+			for (Node node : pointsForPoiSearch) {
+				node.replaceTags(poiSectionTags);
+				indexPoiCreator.iterateEntity(node, ctx, icc);
+			}
 		}
 	}
 
-	private void calcRouteBboxRadiusAndDistance(@Nonnull List<Way> joinedWays, @Nonnull Map<String, String> tags) {
+	private void calcRadiusDistanceAndPoiSearchPoints(long relationId,
+	                                                  @Nonnull List<Way> joinedWays,
+	                                                  @Nonnull List<Node> pointsForPoiSearch,
+	                                                  @Nonnull Map<String, String> tagsToFill) {
 		double distance = 0;
 		QuadRect bbox = new QuadRect();
-		boolean shouldCalcDistance = !tags.containsKey("distance");
+		int searchPointsCounter = 0; // 512 * 5 km = 2560 km max (in case of 9-bit limit)...
 
 		for (Way way : joinedWays) {
 			QuadRect wayBbox = way.getLatLonBBox();
 			bbox.expand(wayBbox.left, wayBbox.top, wayBbox.right, wayBbox.bottom);
+			List<Node> localPoints = new ArrayList<>();
 			List<Node> nodes = way.getNodes();
-			if (shouldCalcDistance && nodes.size() >= 2) {
+			if (nodes.size() >= 2) {
 				for (int i = 1; i < nodes.size(); i++) {
-					distance += MapUtils.getDistance(nodes.get(i).getLatLon(), nodes.get(i - 1).getLatLon());
+					LatLon firstLatLon = nodes.get(i - 1).getLatLon();
+					LatLon secondLatLon = nodes.get(i).getLatLon();
+					if (localPoints.isEmpty() ||
+							MapUtils.getDistance(firstLatLon, localPoints.get(localPoints.size() - 1).getLatLon())
+									> POI_SEARCH_POINTS_DISTANCE_M) {
+						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, nodes);
+						localPoints.add(new Node(firstLatLon.getLatitude(), firstLatLon.getLongitude(), nodeId));
+					}
+					distance += MapUtils.getDistance(firstLatLon, secondLatLon);
 				}
 			}
+			pointsForPoiSearch.addAll(localPoints);
 		}
 
-		if (shouldCalcDistance && distance > 0) {
-			tags.put("distance", String.valueOf((int) distance));
+		if (searchPointsCounter > 100) {
+			System.err.printf("WARN: XXX relation %d distance %d searchPointsCounter %d\n",
+					relationId, (int) distance, searchPointsCounter); // TODO remove debug
+		}
+
+		if (distance > 0) {
+			tagsToFill.putIfAbsent("distance", String.valueOf((int) distance));
 		}
 
 		if (!bbox.hasInitialState()) {
@@ -153,7 +176,7 @@ public class IndexRouteRelationCreator {
 					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1,
 					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2
 			);
-			tags.put("route_bbox_radius", routeBboxRadius);
+			tagsToFill.put("route_bbox_radius", routeBboxRadius);
 		}
 	}
 
@@ -161,16 +184,12 @@ public class IndexRouteRelationCreator {
 	                                         @Nonnull Map<String, String> preparedTags,
 	                                         @Nonnull Map<String, String> mapSectionTags,
 	                                         @Nonnull Map<String, String> poiSectionTags) {
-		// TODO consider XML_COLON (compare with RouteRelationExtractor obf)
 		Map<String, String> commonTags = new LinkedHashMap<>(relation.getTags());
 
-		// route-related tags
-		commonTags.remove(ROUTE); // see also OsmGpxWriteContext.alwaysExtraTags
-		commonTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
-
-		// appearance tags
+		// route_id and appearance tags
 		commonTags.put("width", "roadstyle");
 		commonTags.put("translucent_line_colors", "yes");
+		commonTags.put(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
 
 		// shield tags, etc
 		commonTags.putAll(preparedTags);
@@ -189,6 +208,7 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.put(ROUTE, "segment");
 		mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+		poiSectionTags.remove(ROUTE); // see also OsmGpxWriteContext.alwaysExtraTags
 	}
 
 	public static void finalizeRouteShieldTags(Map<String, String> tags) {
@@ -309,28 +329,28 @@ public class IndexRouteRelationCreator {
 			if (nodes.isEmpty()) {
 				break; // all done
 			}
-			long generatedId = calcWayIdFromRelationId(relationId, joinedWays.size(), nodes);
+			long generatedId = calcEntityIdFromRelationId(relationId, joinedWays.size(), nodes);
 			joinedWays.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
 		}
 	}
 
-	private static long calcWayIdFromRelationId(long relationId, long counter, @Nonnull List<Node> wayNodes) {
+	private static long calcEntityIdFromRelationId(long relationId, long counter, @Nonnull List<Node> nodesToHash) {
 		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 
 		if (counter < 0 || counter >= (1L << MAX_COUNTER_BITS) ||
 				relationId < 0 || relationId >= (1L << MAX_RELATION_ID_BITS)) {
 			log.error(String.format(
-					"calcWayIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
+					"calcEntityIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
 					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
 			throw new UnsupportedOperationException();
 		}
 
-		LatLon center = OsmMapUtils.getWeightCenterForNodes(wayNodes);
+		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodesToHash);
 
 		int hash = center == null
-				? wayNodes.size() % 64
-				: (int) (1000 * (center.getLatitude() + center.getLongitude())) % 64; // 0-63 = 6 bits
+				? nodesToHash.size() % 64
+				: (int) (1000.0 * (center.getLatitude() + center.getLongitude())) % 64; // 0-63 = 6 bits
 
 		// Max OSM Relation ID has 25 bits @ 2025/02/05 = 18655715
 		return (1L << (ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1)) // 43rd bit = 1 (42 bits left for numbers)

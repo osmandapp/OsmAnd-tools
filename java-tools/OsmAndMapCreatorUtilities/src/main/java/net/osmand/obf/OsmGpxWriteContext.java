@@ -79,8 +79,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
-	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
-
 	private final static NumberFormat distanceFormat = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.US));
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 
