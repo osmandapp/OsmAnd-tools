@@ -3,10 +3,12 @@ package net.osmand.obf.preparation;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.util.MapUtils;
@@ -107,12 +109,13 @@ public class IndexRouteRelationCreator {
 			throws SQLException {
 		if ("route".equals(relation.getTag("type")) && isSupportedRouteType(relation.getTag("route"))) {
 			List<Way> joinedWays = new ArrayList<>();
-			Map<String, String> shieldTags = new LinkedHashMap<>();
-			collectJoinedWaysAndShieldTags(relation, joinedWays, shieldTags);
+			Map<String, String> preparedTags = new LinkedHashMap<>();
+			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags);
+			calcRouteBboxRadiusAndDistance(joinedWays, preparedTags);
 
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
-			collectMapAndPoiSectionTags(relation, shieldTags, mapSectionTags, poiSectionTags);
+			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
 
 			// TODO create pointsForPoiSearch split in POI_SEARCH_POINTS_DISTANCE_M based on joinedWays (ID ???)
 
@@ -121,6 +124,39 @@ public class IndexRouteRelationCreator {
 				indexMapCreator.iterateMainEntity(way, ctx, icc);
 			}
 
+		}
+	}
+
+	private void calcRouteBboxRadiusAndDistance(@Nonnull List<Way> joinedWays, @Nonnull Map<String, String> tags) {
+		double distance = 0;
+		QuadRect bbox = new QuadRect();
+		boolean shouldCalcDistance = !tags.containsKey("distance");
+
+		for (Way way : joinedWays) {
+			QuadRect wayBbox = way.getLatLonBBox();
+			bbox.expand(wayBbox.left, wayBbox.top, wayBbox.right, wayBbox.bottom);
+			List<Node> nodes = way.getNodes();
+			if (shouldCalcDistance && nodes.size() >= 2) {
+				for (int i = 1; i < nodes.size(); i++) {
+					distance += MapUtils.getDistance(nodes.get(i).getLatLon(), nodes.get(i - 1).getLatLon());
+				}
+			}
+		}
+
+		if (shouldCalcDistance && distance > 0) {
+			tags.put("distance", String.valueOf((int) distance));
+		}
+
+		if (!bbox.hasInitialState()) {
+			int radius = (int) MapUtils.getDistance(bbox.left, bbox.top, bbox.right, bbox.bottom);
+			String routeBboxRadius = MapUtils.convertDistToChar(
+					radius,
+					GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_LETTER,
+					GpxUtilities.TRAVEL_GPX_CONVERT_FIRST_DIST,
+					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1,
+					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2
+			);
+			tags.put("route_bbox_radius", routeBboxRadius);
 		}
 	}
 
@@ -246,7 +282,6 @@ public class IndexRouteRelationCreator {
 			}
 		}
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId());
-		// TODO add route_bbox_radius based on joinedWays (bbox -> radius), calc distance (if not exists in relation)
 	}
 
 	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
