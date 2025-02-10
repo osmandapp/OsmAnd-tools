@@ -516,7 +516,7 @@ public class IndexCreator {
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreatorOld = new IndexRouteRelationCreatorOld(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteRelationCreator = new IndexRouteRelationCreator(settings, indexPoiCreator, indexMapCreator);
+		this.indexRouteRelationCreator = new IndexRouteRelationCreator(indexPoiCreator, indexMapCreator);
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {

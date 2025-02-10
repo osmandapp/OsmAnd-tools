@@ -88,17 +88,14 @@ public class IndexRouteRelationCreator {
 	private static final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 	private static final Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
 
-	private final IndexCreatorSettings settings; // TODO remove
 	private final IndexPoiCreator indexPoiCreator;
 	private final IndexVectorMapCreator indexMapCreator;
 
 	private final RelationTagsPropagation transformer;
 	private final MapRenderingTypesEncoder renderingTypes;
 
-	public IndexRouteRelationCreator(@Nonnull IndexCreatorSettings settings,
-	                                 @Nonnull IndexPoiCreator indexPoiCreator,
+	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator) {
-		this.settings = settings;
 		this.indexPoiCreator = indexPoiCreator;
 		this.indexMapCreator = indexMapCreator;
 		this.transformer = indexMapCreator.tagsTransformer;
