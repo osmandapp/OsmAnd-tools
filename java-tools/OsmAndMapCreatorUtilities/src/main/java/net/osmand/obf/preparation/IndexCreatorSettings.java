@@ -65,10 +65,12 @@ public class IndexCreatorSettings {
 	public boolean keepOnlyRouteRelationObjects;
 
 	public boolean indexMultipolygon = true;
-	
-    public boolean indexByProximity = true;
 
-    public boolean ignorePropagate = false;
+	public boolean indexByProximity = true;
+
+	public boolean ignorePropagate = false;
+
+	public boolean indexRouteRelations = true;
 
 	public String getString(String key) {
 		// IndexCreator.INDEX_LO_LEVEL_WAYS

@@ -756,7 +756,9 @@ public class IndexCreator {
 							indexRouteRelationCreatorOld.iterateRelation(e, ctx, icc);
 						}
 						if (settings.indexPOI && settings.indexMap) {
-							indexRouteRelationCreator.iterateRelation((Relation) e, ctx, icc);
+							if (settings.indexRouteRelations) {
+								indexRouteRelationCreator.iterateRelation((Relation) e, ctx, icc);
+							}
 						}
 					}
 					if (settings.indexRouting) {
