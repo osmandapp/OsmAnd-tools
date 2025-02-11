@@ -623,10 +623,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					type = MapRenderingTypes.RESTRICTION_ONLY_STRAIGHT_ON;
 				}
 				if (type != -1) {
-					ctx.loadEntityRelation((Relation) e);
-					Collection<RelationMember> fromL = ((Relation) e).getMembers("from"); //$NON-NLS-1$
-					Collection<RelationMember> toL = ((Relation) e).getMembers("to"); //$NON-NLS-1$
-					Collection<RelationMember> viaL = ((Relation) e).getMembers("via"); //$NON-NLS-1$
+					ctx.loadEntityRelation(r);
+					Collection<RelationMember> fromL = r.getMembers("from"); //$NON-NLS-1$
+					Collection<RelationMember> toL = r.getMembers("to"); //$NON-NLS-1$
+					Collection<RelationMember> viaL = r.getMembers("via"); //$NON-NLS-1$
 					if (!fromL.isEmpty() && !toL.isEmpty()) {
 						RelationMember from = fromL.iterator().next();
 						RelationMember to = toL.iterator().next();
