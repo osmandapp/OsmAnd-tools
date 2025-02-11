@@ -600,6 +600,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						return;
 					}
 				}
+
+				boolean allowMultipleFrom = false;
+				boolean allowMultipleTo = false;
 				byte type = -1;
 				if ("no_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_NO_RIGHT_TURN;
@@ -612,9 +615,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				} else if ("no_entry".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					// reuse no straight on
 					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+					allowMultipleFrom = true;
 				} else if ("no_exit".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					// reuse no straight on
 					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+					allowMultipleTo = true;
 				} else if ("only_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
 					type = MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN;
 				} else if ("only_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
@@ -627,23 +632,35 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					Collection<RelationMember> fromL = r.getMembers("from"); //$NON-NLS-1$
 					Collection<RelationMember> toL = r.getMembers("to"); //$NON-NLS-1$
 					Collection<RelationMember> viaL = r.getMembers("via"); //$NON-NLS-1$
-					if (!fromL.isEmpty() && !toL.isEmpty()) {
-						RelationMember from = fromL.iterator().next();
-						RelationMember to = toL.iterator().next();
-						if (from.getEntityId().getType() == EntityType.WAY) {
-							if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
-								highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
-							}
-							RestrictionInfo rd = new RestrictionInfo();
-							rd.toWay = to.getEntityId().getId();
-							rd.type = type;
-							if(!viaL.isEmpty()) {
-								RelationMember via = viaL.iterator().next();
-								if(via.getEntityId().getType() == EntityType.WAY) {
-									rd.viaWay = via.getEntityId().getId();
+					if (!toL.isEmpty()) {
+						for (RelationMember from : fromL) {
+							if (from.getEntityId().getType() == EntityType.WAY) {
+								if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
+									highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
+								}
+
+								List<RestrictionInfo> rdList = highwayRestrictions.get(from.getEntityId().getId());
+								for (RelationMember to : toL) {
+									RestrictionInfo rd = new RestrictionInfo();
+									rd.toWay = to.getEntityId().getId();
+									rd.type = type;
+									if (!viaL.isEmpty()) {
+										RelationMember via = viaL.iterator().next();
+										if (via.getEntityId().getType() == EntityType.WAY) {
+											rd.viaWay = via.getEntityId().getId();
+										}
+									}
+									rdList.add(rd);
+
+									if (!allowMultipleTo) {
+										break;
+									}
+								}
+
+								if (!allowMultipleFrom) {
+									break;
 								}
 							}
-							highwayRestrictions.get(from.getEntityId().getId()).add(rd);
 						}
 					}
 				}
