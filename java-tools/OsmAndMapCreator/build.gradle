@@ -58,15 +58,8 @@ task buildDistribution(type: Zip) {
 	archiveFileName = 'OsmAndMapCreator.zip'
 }
 
-task collectActivities(type: Copy) {
-	from("../../../resources/poi/") {
-		include "activities.json"
-	}
-	into "src/main/resources/resources/"
-}
-
 compileJava {
-	dependsOn collectFonts, downloadCoreJni, collectActivities
+	dependsOn collectFonts, downloadCoreJni
 }
 
 dependencies {
