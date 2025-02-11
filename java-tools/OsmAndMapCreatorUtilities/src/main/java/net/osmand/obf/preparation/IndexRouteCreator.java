@@ -591,10 +591,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			String val = e.getTag("restriction"); //$NON-NLS-1$
 			if (val != null) {
 				Relation r = (Relation) e;
-				List<RelationMember> lfrom = r.getMembers("from");
-				List<RelationMember> lto = r.getMembers("to");
-				if("no_u_turn".equalsIgnoreCase(val)) {
-					if(lfrom.size() == 1 && lto.size() == 1 &&
+				if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+					List<RelationMember> lfrom = r.getMembers("from"); //$NON-NLS-1$
+					List<RelationMember> lto = r.getMembers("to"); //$NON-NLS-1$
+					if (lfrom.size() == 1 && lto.size() == 1 &&
 							lfrom.get(0).getEntityId().equals(lto.get(0).getEntityId())) {
 						// don't index such roads - can't go through issue https://www.openstreetmap.org/way/338099991#map=17/46.86699/-0.20473
 						return;
