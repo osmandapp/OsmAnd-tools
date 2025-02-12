@@ -44,6 +44,7 @@ public class GpxService {
         
         gpxData.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
         gpxData.wpts = webGpxParser.getWpts(gpxFile);
+        gpxData.routeTypes = webGpxParser.getRouteTypes(gpxFile);
         gpxData.tracks = webGpxParser.getTracks(gpxFile);
         gpxData.ext = gpxFile.getExtensions();
         

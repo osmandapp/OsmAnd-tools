@@ -39,6 +39,7 @@ public class WebGpxParser {
         public Map<String, WebPointsGroup> pointsGroups;
         public Map<String, Object> analysis;
         public Map<String, String> ext;
+        public List<GpxUtilities.RouteType> routeTypes;
     }
     
     public static class WebMetaData {
@@ -197,7 +198,7 @@ public class WebGpxParser {
                     }
                     pointsSeg.add(p);
                 });
-                addRouteSegmentsToPoints(seg, pointsSeg);
+                addRouteSegmentsToPoints(seg, pointsSeg, false);
                 segments.add(pointsSeg);
                 points.addAll(pointsSeg);
             });
@@ -272,6 +273,17 @@ public class WebGpxParser {
     public static class RouteSegment {
         public GpxUtilities.RouteSegment ext;
         public List<GpxUtilities.RouteType> routeTypes;
+    }
+
+    public List<GpxUtilities.RouteType> getRouteTypes(GpxFile gpxFile) {
+        List<Track> tracks = gpxFile.getTracks().stream().filter(t -> !t.getGeneralTrack()).toList();
+        List<GpxUtilities.RouteType> res = null;
+        for (Track track : tracks) {
+            for (TrkSegment seg : track.getSegments()) {
+                res = seg.getRouteTypes();
+            }
+        }
+        return res;
     }
     
     public void addRoutePoints(GpxFile gpxFile, TrackData gpxData) {
@@ -573,10 +585,10 @@ public class WebGpxParser {
                         }
                         gpxFile.getRoutes().add(route);
                         if (!trkPoints.isEmpty()) {
-                            addSegmentsToTrack(trkPoints, segments);
+                            addSegmentsToTrack(trkPoints, segments, trackData.routeTypes);
                         }
                     } else {
-                        addSegmentsToTrack(t.points, segments);
+                        addSegmentsToTrack(t.points, segments, trackData.routeTypes);
                     }
                     track.setSegments(segments);
                     gpxFile.getTracks().add(track);
@@ -618,11 +630,10 @@ public class WebGpxParser {
         return point;
     }
     
-    private void addSegmentsToTrack(List<Point> points, List<TrkSegment> segments) {
+    private void addSegmentsToTrack(List<Point> points, List<TrkSegment> segments, List<GpxUtilities.RouteType> routeTypes) {
         TrkSegment segment = new TrkSegment();
         boolean isNanEle = isNanEle(points);
         int lastStartTrkptIdx = 0;
-        int prevTypesSize = 0;
         Point lastPointWithSeg = null;
         for (Point point : points) {
             WptPt filePoint = point.ext;
@@ -643,6 +654,7 @@ public class WebGpxParser {
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
                 filePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
                 segment.getPoints().add(filePoint);
+                segment.getRouteTypes().addAll(routeTypes);
                 segments.add(segment);
                 segment = new TrkSegment();
             } else {
@@ -658,68 +670,31 @@ public class WebGpxParser {
                     int segmentLength = currentLength == 1 ? 1 : currentLength - 1;
                     int lastPointWithSegStartInd = lastPointWithSeg.segment.ext.getStartTrackPointIndex() != null ? Integer.parseInt(lastPointWithSeg.segment.ext.getStartTrackPointIndex()) : points.indexOf(lastPointWithSeg);
                     lastStartTrkptIdx = segmentLength + lastPointWithSegStartInd;
-                    prevTypesSize += lastPointWithSeg.segment.routeTypes.size();
-                    segment.getRouteTypes().addAll(point.segment.routeTypes);
                 }
                 seg.setStartTrackPointIndex(Integer.toString(segStartInd + lastStartTrkptIdx));
                 
-                seg.setTypes(prepareTypes(seg.getTypes(), prevTypesSize));
-                seg.setPointTypes(prepareTypes(seg.getPointTypes(), prevTypesSize));
-                seg.setNames(prepareTypes(seg.getNames(), prevTypesSize));
-                
                 segment.getRouteSegments().add(seg);
-                
-                if (segment.getRouteTypes().isEmpty()) {
-                    segment.getRouteTypes().addAll(point.segment.routeTypes);
-                }
+
                 lastPointWithSeg = point;
             }
         }
+        segment.getRouteTypes().addAll(routeTypes);
         segments.add(segment);
-    }
-    
-    private String prepareTypes(String stringTypes, int prevTypesSize) {
-        if (stringTypes != null) {
-            List<Character> characterList = stringTypes.chars()
-                    .mapToObj(e->((char)e)).
-                    collect(Collectors.toList());
-            StringBuilder sbNumber = null;
-            StringBuilder sb = new StringBuilder();
-            for (char current : characterList) {
-                if (Character.isDigit(current)) {
-                    if (sbNumber == null) {
-                        sbNumber = new StringBuilder();
-                    }
-                    sbNumber.append(current);
-                } else {
-                    if (sbNumber != null) {
-                        sb.append(Integer.parseInt(String.valueOf(sbNumber)) + prevTypesSize);
-                        sbNumber = null;
-                    }
-                    sb.append(current);
-                }
-            }
-            if (sbNumber != null) {
-                sb.append(Integer.parseInt(String.valueOf(sbNumber)) + prevTypesSize);
-            }
-            
-            return sb.toString();
-        } else {
-            return null;
-        }
     }
     
     private boolean isNanEle(List<Point> points) {
         return points.get(0).ele == NAN_MARKER;
     }
     
-    public void addRouteSegmentsToPoints(TrkSegment seg, List<WebGpxParser.Point> points) {
+    public void addRouteSegmentsToPoints(TrkSegment seg, List<WebGpxParser.Point> points, boolean addRouteTypes) {
         int startInd = 0;
         if (!seg.getRouteSegments().isEmpty()) {
             for (GpxUtilities.RouteSegment rs : seg.getRouteSegments()) {
                 WebGpxParser.RouteSegment segment = new WebGpxParser.RouteSegment();
                 segment.ext = rs;
-                segment.routeTypes = seg.getRouteTypes();
+                if (addRouteTypes) {
+                    segment.routeTypes = seg.getRouteTypes();
+                }
                 int length = Integer.parseInt(rs.getLength());
                 points.get(startInd).segment = segment;
                 startInd = startInd + (length - 1);
