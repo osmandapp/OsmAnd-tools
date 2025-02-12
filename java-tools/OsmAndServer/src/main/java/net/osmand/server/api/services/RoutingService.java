@@ -63,7 +63,7 @@ public class RoutingService {
 
         TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
         if (hasRouting) {
-            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes, true);
+            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes, true, null);
         }
         addDistance(pointsRes);
         return pointsRes;
@@ -75,7 +75,7 @@ public class RoutingService {
         List<WebGpxParser.Point> gpxPoints = getPoints(approximateResult, locations);
         if (!gpxPoints.isEmpty()) {
             TrkSegment seg = generateRouteSegments(approximateResult, locations);
-            webGpxParser.addRouteSegmentsToPoints(seg, gpxPoints, true);
+            webGpxParser.addRouteSegmentsToPoints(seg, gpxPoints, true, null);
             addDistance(gpxPoints);
         }
         return gpxPoints;

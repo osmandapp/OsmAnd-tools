@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import kotlin.Pair;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
@@ -26,6 +27,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.*;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 @Service
@@ -44,8 +46,9 @@ public class GpxService {
         
         gpxData.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
         gpxData.wpts = webGpxParser.getWpts(gpxFile);
-        gpxData.routeTypes = webGpxParser.getRouteTypes(gpxFile);
-        gpxData.tracks = webGpxParser.getTracks(gpxFile);
+        Pair<List<WebGpxParser.WebTrack>, List<GpxUtilities.RouteType>> tracksResult = webGpxParser.getTracks(gpxFile);
+        gpxData.tracks = tracksResult.getFirst();
+        gpxData.routeTypes = tracksResult.getSecond();
         gpxData.ext = gpxFile.getExtensions();
         
         if (!gpxFile.getRoutes().isEmpty()) {
