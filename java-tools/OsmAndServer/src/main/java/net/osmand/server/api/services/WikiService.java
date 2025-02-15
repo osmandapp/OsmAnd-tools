@@ -465,7 +465,7 @@ public class WikiService {
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
 				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
-			handleArticleAndCategoryQueries(articleId, categoryName, h);
+			queryImagesByWikidataAndCategory(articleId, categoryName, h);
 		}
 		return images;
 	}
@@ -490,7 +490,7 @@ public class WikiService {
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
 				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
-			handleArticleAndCategoryQueries(articleId, categoryName, h);
+			queryImagesByWikidataAndCategory(articleId, categoryName, h);
 		}
 		return imagesWithDetails;
 	}
@@ -511,7 +511,12 @@ public class WikiService {
 		jdbcTemplate.query(query, pss, rowCallbackHandler);
 	}
 	
-	private void handleArticleAndCategoryQueries(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+	private void queryImagesByWikidataAndCategory(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+		// TODO 1. photos should be sorted by view all 3 queries should be joined
+		// TODO 2. exclude duplicate
+		// TODO 3. write comment to explain what images and from where do we retrieve
+		// TODO 4. retrieve wikimedia commons category based on wikidata id automatically 
+		// already present in wiki.wikidata catId (check android?)
 		if (articleId != null && !Algorithms.isEmpty(articleId)) {
 			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
 			String finalArticleId = articleId;
@@ -523,9 +528,18 @@ public class WikiService {
 		}
 		
 		if (categoryName != null && !Algorithms.isEmpty(categoryName)) {
-			boolean found = findImagesByCatWithWikidataid(categoryName, rowCallbackHandler);
+			AtomicBoolean found = new AtomicBoolean(false);
+			processImageQuery(
+					"SELECT imageTitle, mediaId, date, author, license FROM wiki.wikiimages WHERE id = " +
+							"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
+							"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, categoryName.replace(' ', '_')),
+					rs -> {
+						rowCallbackHandler.processRow(rs);
+						found.set(true);
+					});
 			
-			if (!found) {
+			if (!found.get()) {
 				processImageQuery(
 						"SELECT imgName AS imageTitle, imgId AS mediaId, '' AS date, '' AS author, '' AS license " +
 								"FROM wiki.categoryimages WHERE catName = ? ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
@@ -535,21 +549,6 @@ public class WikiService {
 		}
 	}
 	
-	private boolean findImagesByCatWithWikidataid(String categoryName, RowCallbackHandler rowCallbackHandler) {
-		AtomicBoolean found = new AtomicBoolean(false);
-		
-		processImageQuery(
-				"SELECT imageTitle, mediaId, date, author, license FROM wiki.wikiimages WHERE id = " +
-						"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
-						"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
-				ps -> ps.setString(1, categoryName.replace(' ', '_')),
-				rs -> {
-					rowCallbackHandler.processRow(rs);
-					found.set(true);
-				});
-		
-		return found.get();
-	}
 
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
 		String title = wiki;
