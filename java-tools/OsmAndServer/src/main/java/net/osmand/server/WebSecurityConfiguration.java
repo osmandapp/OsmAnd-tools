@@ -2,6 +2,7 @@ package net.osmand.server;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -25,6 +26,8 @@ import org.springframework.context.annotation.*;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -144,10 +147,12 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 
 		@Bean
 		public RedisConnectionFactory redisConnectionFactory() {
-			LettuceConnectionFactory factory = new LettuceConnectionFactory(redisHost, Integer.parseInt(redisPort));
-			factory.afterPropertiesSet();
-			LOG.info("Redis connection established: " + factory.getConnection().ping());
-			return factory;
+			LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+					.commandTimeout(Duration.ofSeconds(5))  // Sets the maximum time to wait for a Redis command to complete
+					.shutdownTimeout(Duration.ofMillis(100)) // Defines how long to wait when shutting down the Redis connection
+					.build();
+			return new LettuceConnectionFactory(
+					new RedisStandaloneConfiguration(redisHost, Integer.parseInt(redisPort)), clientConfig);
 		}
 	}
 
@@ -177,8 +182,17 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 	    http.sessionManagement()
 			    .maximumSessions(1)
 			    .and()
-			    .sessionCreationPolicy(SessionCreationPolicy.ALWAYS);
+			    .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED);
 
+	    http.addFilterBefore((request, response, chain) -> {
+		    if (request instanceof HttpServletRequest httpRequest) {
+			    String uri = httpRequest.getRequestURI();
+			    if (!uri.startsWith("/mapapi") && !uri.startsWith("/share")) {
+				    httpRequest.getSession(false);
+			    }
+		    }
+		    chain.doFilter(request, response);
+	    }, org.springframework.security.web.context.SecurityContextPersistenceFilter.class);
 
 	    // 1. CSRF
     	Set<String> enabledMethods = new TreeSet<>(

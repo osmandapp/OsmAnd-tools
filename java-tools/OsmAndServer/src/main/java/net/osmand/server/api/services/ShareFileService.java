@@ -37,6 +37,9 @@ public class ShareFileService {
 	protected PremiumUsersRepository usersRepository;
 
 	@Autowired
+	protected OsmAndMapsService osmAndMapsService;
+
+	@Autowired
 	UserdataService userdataService;
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
@@ -147,7 +150,7 @@ public class ShareFileService {
 		if (file.isPublicAccess()) {
 			return null;
 		} else {
-			PremiumUserDevicesRepository.PremiumUserDevice dev = userdataService.checkUser();
+			PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {
 				return userdataService.tokenNotValidResponse();
 			}
