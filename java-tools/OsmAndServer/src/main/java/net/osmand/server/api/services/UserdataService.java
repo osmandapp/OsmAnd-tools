@@ -169,14 +169,6 @@ public class UserdataService {
             this.lastCheckTime = lastCheckTime;
         }
     }
-
-	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
-		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-			return ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
-		}
-		return null;
-	}
     
     private ResponseEntity<String> trackRequest(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
