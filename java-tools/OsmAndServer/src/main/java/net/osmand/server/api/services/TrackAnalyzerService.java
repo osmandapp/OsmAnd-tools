@@ -123,6 +123,7 @@ public class TrackAnalyzerService {
 							if (useOnePoint) {
 								analysis = gpxFile.getAnalysis(0);
 								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+								trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
 								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
 							} else {
 								List<Map<String, String>> statResults = new ArrayList<>();
@@ -133,6 +134,7 @@ public class TrackAnalyzerService {
 									analysis = g.getAnalysis(0);
 
 									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+									trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
 									statResults.add(trackAnalysisData);
 								}
 								analysisResponse.trackAnalysis.put(uf.name, statResults);
@@ -186,7 +188,6 @@ public class TrackAnalyzerService {
 			trackAnalysisData.put("diffElevationDown", String.valueOf(analysis.getDiffElevationDown()));
 		}
 		// add other data
-		trackAnalysisData.put("date", String.valueOf(uf.updatetime.getTime()));
 		double duration = analysis.getDurationInMs();
 		trackAnalysisData.put("duration", duration == 0.0 ? DEFAULT : String.valueOf(duration));
 
@@ -195,9 +196,9 @@ public class TrackAnalyzerService {
 		double timeSpan = analysis.getTimeSpan();
 		trackAnalysisData.put("timeSpan", timeSpan == 0.0 ? DEFAULT : String.valueOf(timeSpan));
 		long startTime = analysis.getStartTime();
-		trackAnalysisData.put("startTime", startTime == 1735023268000L ? DEFAULT : String.valueOf(startTime));
+		trackAnalysisData.put("startTime", (startTime == 1735023268000L || startTime == 0L) ? DEFAULT : String.valueOf(startTime));
 		long endTime = analysis.getEndTime();
-		trackAnalysisData.put("endTime", endTime == 1735023268000L ? DEFAULT : String.valueOf(endTime));
+		trackAnalysisData.put("endTime", (endTime == 1735023268000L || endTime == 0L) ? DEFAULT : String.valueOf(endTime));
 
 		double totalDist = analysis.getTotalDistance();
 		trackAnalysisData.put("totalDist", totalDist == 0.0 ? DEFAULT : String.valueOf(totalDist));
