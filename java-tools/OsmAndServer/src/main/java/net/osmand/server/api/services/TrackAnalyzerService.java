@@ -189,8 +189,16 @@ public class TrackAnalyzerService {
 		trackAnalysisData.put("date", String.valueOf(uf.updatetime.getTime()));
 		double duration = analysis.getDurationInMs();
 		trackAnalysisData.put("duration", duration == 0.0 ? DEFAULT : String.valueOf(duration));
+
 		double timeMoving = analysis.getTimeMoving();
 		trackAnalysisData.put("timeMoving", timeMoving == 0.0 ? DEFAULT : String.valueOf(timeMoving));
+		double timeSpan = analysis.getTimeSpan();
+		trackAnalysisData.put("timeSpan", timeSpan == 0.0 ? DEFAULT : String.valueOf(timeSpan));
+		long startTime = analysis.getStartTime();
+		trackAnalysisData.put("startTime", startTime == 1735023268000L ? DEFAULT : String.valueOf(startTime));
+		long endTime = analysis.getEndTime();
+		trackAnalysisData.put("endTime", endTime == 1735023268000L ? DEFAULT : String.valueOf(endTime));
+
 		double totalDist = analysis.getTotalDistance();
 		trackAnalysisData.put("totalDist", totalDist == 0.0 ? DEFAULT : String.valueOf(totalDist));
 
