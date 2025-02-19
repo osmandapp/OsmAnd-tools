@@ -205,8 +205,8 @@ public class IndexRouteRelationCreator {
 		// prepare section tags
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
-		mapSectionTags.put(ROUTE, "segment");
-		mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
+		//mapSectionTags.put(ROUTE, "segment");//
+		//mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
 		poiSectionTags.remove(ROUTE); // see also OsmGpxWriteContext.alwaysExtraTags
 	}
@@ -287,6 +287,9 @@ public class IndexRouteRelationCreator {
 	                                            @Nonnull List<Way> joinedWays,
 	                                            @Nonnull Map<String, String> shieldTags) {
 		List<Way> waysToJoin = new ArrayList<>();
+        RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
+        Map<String, String> relationTags = relation.getTags();//RelationTagsPropagation.getRelationTags(relation, renderingTypes);
+        shieldTags.putAll(relationTags);
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
 				if ("yes".equals(way.getTag("area"))) {
