@@ -196,9 +196,9 @@ public class TrackAnalyzerService {
 		double timeSpan = analysis.getTimeSpan();
 		trackAnalysisData.put("timeSpan", timeSpan == 0.0 ? DEFAULT : String.valueOf(timeSpan));
 		long startTime = analysis.getStartTime();
-		trackAnalysisData.put("startTime", (startTime == 1735023268000L || startTime == 0L) ? DEFAULT : String.valueOf(startTime));
+		trackAnalysisData.put("startTime", (startTime == 0L) ? DEFAULT : String.valueOf(startTime));
 		long endTime = analysis.getEndTime();
-		trackAnalysisData.put("endTime", (endTime == 1735023268000L || endTime == 0L) ? DEFAULT : String.valueOf(endTime));
+		trackAnalysisData.put("endTime", (endTime == 0L) ? DEFAULT : String.valueOf(endTime));
 
 		double totalDist = analysis.getTotalDistance();
 		trackAnalysisData.put("totalDist", totalDist == 0.0 ? DEFAULT : String.valueOf(totalDist));
