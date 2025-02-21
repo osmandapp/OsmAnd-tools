@@ -599,6 +599,8 @@ public class SearchService {
     public enum PoiTypeField {
         NAME("web_name"),
         TYPE("web_type"),
+        ADDRESS_1("web_address1"),
+        ADDRESS_2("web_address2"),
         KEY_NAME("web_keyName"),
         OSM_TAG("web_typeOsmTag"),
         OSM_VALUE("web_typeOsmValue"),
@@ -636,6 +638,15 @@ public class SearchService {
                 feature = new Feature(geometry)
                         .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
                         .prop(PoiTypeField.NAME.getFieldName(), result.localeName);
+                if (result.objectType == ObjectType.HOUSE) {
+                    if (result.localeRelatedObjectName != null) {
+                        feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
+                    }
+                    SearchResult parentResult = result.parentSearchResult;
+                    if (parentResult != null && parentResult.localeRelatedObjectName != null) {
+                        feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
+                    }
+                }
                 Map<String, String> tags = getPoiTypeFields(result.object);
                 for (Map.Entry<String, String> entry : tags.entrySet()) {
                     feature.prop(entry.getKey(), entry.getValue());
