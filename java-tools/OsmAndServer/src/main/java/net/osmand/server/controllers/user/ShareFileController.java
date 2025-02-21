@@ -116,6 +116,15 @@ public class ShareFileController {
 		if (errorAccess != null) {
 			return errorAccess;
 		}
+		if (shareFile.isPublicAccess()) {
+			PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+			if (dev.userid != shareFile.ownerid) {
+				boolean hasAccess = shareFileService.hasUserAccessToSharedFile(shareFile, dev.userid);
+				if (!hasAccess) {
+					shareFileService.createAccess(shareFile, dev, null);
+				}
+			}
+		}
 		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile != null && gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
