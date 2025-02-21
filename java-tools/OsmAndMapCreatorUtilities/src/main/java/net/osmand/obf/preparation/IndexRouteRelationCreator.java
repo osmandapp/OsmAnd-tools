@@ -287,9 +287,15 @@ public class IndexRouteRelationCreator {
 	                                            @Nonnull List<Way> joinedWays,
 	                                            @Nonnull Map<String, String> shieldTags) {
 		List<Way> waysToJoin = new ArrayList<>();
-        RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
-        Map<String, String> relationTags = relation.getTags();//RelationTagsPropagation.getRelationTags(relation, renderingTypes);
-        shieldTags.putAll(relationTags);
+
+		///////////////////////////////////////////////////////////
+		// TODO this is just a test block to pass all relation tags
+		// RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
+		// Map<String, String> relationTags = relation.getTags(); // RelationTagsPropagation.getRelationTags(relation, renderingTypes);
+		// shieldTags.putAll(relationTags);
+		shieldTags.putAll(relation.getTags());
+		///////////////////////////////////////////////////////////
+
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
 				if ("yes".equals(way.getTag("area"))) {
