@@ -319,20 +319,22 @@ public class IndexRouteRelationCreator {
 			for (int i = 0; i < waysToJoin.size(); i++) {
 				if (!done[i]) {
 					done[i] = true;
-					addWayToNodes(nodes, false, waysToJoin.get(i), false); // "head" way
-					while (true) {
-						boolean stop = true;
-						for (int j = 0; j < waysToJoin.size(); j++) {
-							if (!done[j] && considerWayToJoin(nodes, waysToJoin.get(j))) {
-								done[j] = true;
-								stop = false;
+					if (!waysToJoin.get(i).getNodeIds().isEmpty()) {
+						addWayToNodes(nodes, false, waysToJoin.get(i), false); // "head" way
+						while (true) {
+							boolean stop = true;
+							for (int j = 0; j < waysToJoin.size(); j++) {
+								if (!done[j] && considerWayToJoin(nodes, waysToJoin.get(j))) {
+									done[j] = true;
+									stop = false;
+								}
+							}
+							if (stop) {
+								break; // nothing joined
 							}
 						}
-						if (stop) {
-							break; // nothing joined
-						}
+						break; // segment is done
 					}
-					break; // segment is done
 				}
 			}
 			if (nodes.isEmpty()) {
@@ -369,7 +371,11 @@ public class IndexRouteRelationCreator {
 	}
 
 	private static boolean considerWayToJoin(List<Node> nodes, Way candidate) {
-		if (nodes.isEmpty() || candidate.getNodes().isEmpty()) {
+		if (nodes.isEmpty()) {
+			return false;
+		}
+
+		if (candidate.getNodes().isEmpty()) {
 			return true;
 		}
 
