@@ -11,8 +11,14 @@ import java.sql.SQLException;
 import java.util.*;
 
 import net.osmand.MainUtilities.CommandLineOpts;
+import net.osmand.gpx.TravelObfGpxTrackOptimizer;
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 
@@ -82,16 +88,56 @@ public class RandomRouteTester {
 	}
 
 	public static void main(String[] args) throws Exception {
-		RandomRouteTester test = new RandomRouteTester(args);
+		if (true) {
+			testOverlappedSegmentsMerger();
+		} else {
+			RandomRouteTester test = new RandomRouteTester(args);
 
-		test.applyCommandLineOpts();
-		test.loadNativeLibrary();
-		test.initObfReaders();
-		test.generateRoutes();
-		test.startSlowDown();
-		test.collectRoutes();
-		test.stopSlowDown();
-		test.reportResult();
+			test.applyCommandLineOpts();
+			test.loadNativeLibrary();
+			test.initObfReaders();
+			test.generateRoutes();
+			test.startSlowDown();
+			test.collectRoutes();
+			test.stopSlowDown();
+			test.reportResult();
+		}
+	}
+
+	private static void testOverlappedSegmentsMerger() {
+		GpxFile testGpxFile = GpxUtilities.INSTANCE.loadGpxFile(new KFile("test/test.gpx"), null, false);
+
+		Track singleTrack = new Track();
+		for (Track t : testGpxFile.getTracks()) {
+			for (TrkSegment segment : t.getSegments()) {
+				singleTrack.getSegments().add(segment);
+			}
+		}
+
+		int runs = 0;
+		Track mergedTrack;
+		final long TIMEOUT = 0;
+		long startTime = System.currentTimeMillis();
+
+		do {
+//			mergedTrack = OverlappedSegmentsMergerGPT.mergeSegmentsWithOverlapHandling(singleTrack);
+//			mergedTrack = OverlappedSegmentsMergerDS.mergeSegmentsWithOverlapHandling(singleTrack);
+			mergedTrack = TravelObfGpxTrackOptimizer.mergeOverlappedSegmentsAtEdges(singleTrack);
+			runs++;
+		} while(System.currentTimeMillis() - startTime < TIMEOUT);
+
+		int points = 0;
+		for (TrkSegment segment : mergedTrack.getSegments()) {
+			points += segment.getPoints().size();
+		}
+
+		System.err.printf("WARN: XXX segments = %d, points = %d, runs = %d\n",
+				mergedTrack.getSegments().size(), points, runs
+		);
+
+		GpxFile gpxFile = new GpxFile("OsmAnd");
+		gpxFile.getTracks().add(mergedTrack);
+		GpxUtilities.INSTANCE.writeGpxFile(new KFile("test/out.gpx"), gpxFile);
 	}
 
 	private CommandLineOpts opts;
