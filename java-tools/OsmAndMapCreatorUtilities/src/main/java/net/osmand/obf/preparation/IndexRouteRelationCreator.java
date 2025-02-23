@@ -407,7 +407,12 @@ public class IndexRouteRelationCreator {
 		if (reverse) {
 			Collections.reverse(points);
 		}
-		nodes.addAll(insert ? 0 : nodes.size(), points);
+		if (!nodes.isEmpty() && !points.isEmpty()) {
+			List<Node> skipLeadingPoint = points.subList(insert ? 0 : 1, points.size() - (insert ? 1 : 0));
+			nodes.addAll(insert ? 0 : nodes.size(), skipLeadingPoint); // avoid duplicate point at joints
+		} else {
+			nodes.addAll(insert ? 0 : nodes.size(), points); // first addition to the result
+		}
 	}
 
 	public static boolean isSupportedRouteType(@Nullable String routeType) {
