@@ -330,4 +330,32 @@ public class ShareFileService {
 		}
 		return ResponseEntity.badRequest().body("Shared file not found");
 	}
+
+	public boolean hasUserAccessToSharedFile(ShareFileRepository.ShareFile shareFile, int userId) {
+		List<ShareFileRepository.ShareFilesAccess> accessList = shareFile.getAccessRecords();
+		for (ShareFileRepository.ShareFilesAccess access : accessList) {
+			if (access.getUser().id == userId) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Transactional
+	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		if (dev.userid == shareFile.ownerid) {
+			return false;
+		}
+		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
+		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
+		access.setUser(user);
+		access.setAccess(PermissionType.READ.name());
+		access.setRequestDate(new Date());
+
+		shareFile.addAccessRecord(access);
+
+		shareFileRepository.saveAndFlush(shareFile);
+
+		return true;
+	}
 }
