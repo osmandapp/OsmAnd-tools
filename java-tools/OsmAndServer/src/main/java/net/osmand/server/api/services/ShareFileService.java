@@ -342,16 +342,12 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String nickname) {
+	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev) {
 		if (dev.userid == shareFile.ownerid) {
 			return false;
 		}
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
 		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
-		if (user.nickname == null && nickname != null) {
-			user.nickname = nickname;
-			user = usersRepository.saveAndFlush(user);
-		}
 		access.setUser(user);
 		access.setAccess(PermissionType.READ.name());
 		access.setRequestDate(new Date());
@@ -359,6 +355,7 @@ public class ShareFileService {
 		shareFile.addAccessRecord(access);
 
 		shareFileRepository.saveAndFlush(shareFile);
+
 		return true;
 	}
 }
