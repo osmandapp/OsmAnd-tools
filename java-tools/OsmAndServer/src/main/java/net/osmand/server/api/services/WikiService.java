@@ -55,7 +55,6 @@ public class WikiService {
 	
 	private static final int FILTER_ZOOM_LEVEL = 15;
 	
-	private static final Map<Integer, Set<String>> EXCLUDED_POI_SUBTYPES_BY_ZOOM = Map.of(FILTER_ZOOM_LEVEL, Set.of("commercial", "battlefield"));
 
 	private final Map<String, String> licenseMap = new HashMap<>();
 	
@@ -226,31 +225,21 @@ public class WikiService {
 			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
 		}
 		
-		Set<String> excludedPoiSubtypes = getExcludedTypes(EXCLUDED_POI_SUBTYPES_BY_ZOOM, zoom);
 		
 		String osmidCondition = "";
-		String osmcntFilter = "";
 		if (zoom < FILTER_ZOOM_LEVEL) {
 			osmidCondition = "AND osmid != 0 ";
-			osmcntFilter = "AND osmcnt < 4 ";
-		}
-		
-		String subtypeFilter = "";
-		if (!excludedPoiSubtypes.isEmpty()) {
-			subtypeFilter += "AND poisubtype NOT IN (" + excludedPoiSubtypes.stream().map(s -> "'" + s + "'").collect(Collectors.joining(", ")) + ") ";
 		}
 
 		String query = "SELECT w.id, w.photoId, w.photoTitle, w.catId, w.catTitle, w.depId, w.depTitle, " +
 				"w.wikiTitle, w.wikiLang, w.wikiDesc, w.wikiArticles, w.osmid, w.osmtype, w.poitype, " +
-				"w.poisubtype, w.lat, w.lon, w.wvLinks, e.elo " +
+				"w.poisubtype, e.elo, w.lat, w.lon, w.wvLinks " +
 				"FROM wikidata w " +
 				"LEFT JOIN wiki.elo_rating e ON w.id = e.id " +
 				"WHERE w.lat BETWEEN ? AND ? AND w.lon BETWEEN ? AND ? " +
 				filterQuery +
 				zoomCondition +
 				osmidCondition +
-				osmcntFilter +
-				" " + subtypeFilter +
 				" ORDER BY e.elo DESC LIMIT " + LIMIT_OBJS_QUERY;
 		
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
@@ -417,7 +406,6 @@ public class WikiService {
 								if (!result.isEmpty()) {
 									f.properties.put("wvLinks", result);
 								}
-								break;
 							}
 						} else if (col.equals("wikiTitle") && !f.properties.containsKey("wikiTitle")) {
 							f.properties.put("wikiTitle", rs.getString(i));
