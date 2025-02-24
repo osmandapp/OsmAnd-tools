@@ -342,7 +342,10 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public void createAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String nickname) {
+	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String nickname) {
+		if (dev.userid == shareFile.ownerid) {
+			return false;
+		}
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
 		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
 		if (user.nickname == null && nickname != null) {
@@ -356,5 +359,6 @@ public class ShareFileService {
 		shareFile.addAccessRecord(access);
 
 		shareFileRepository.saveAndFlush(shareFile);
+		return true;
 	}
 }

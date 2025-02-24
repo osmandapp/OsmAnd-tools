@@ -121,7 +121,10 @@ public class ShareFileController {
 			if (dev.userid != shareFile.ownerid) {
 				boolean hasAccess = shareFileService.hasUserAccessToSharedFile(shareFile, dev.userid);
 				if (!hasAccess) {
-					shareFileService.createAccess(shareFile, dev, null);
+					boolean created = shareFileService.createPublicReadAccess(shareFile, dev, null);
+					if (!created) {
+						return ResponseEntity.badRequest().body("Error creating public access");
+					}
 				}
 			}
 		}
