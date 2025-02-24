@@ -158,11 +158,6 @@ public class IndexRouteRelationCreator {
 			pointsForPoiSearch.addAll(localPoints);
 		}
 
-		if (searchPointsCounter > 100) {
-			System.err.printf("WARN: XXX relation %d distance %d searchPointsCounter %d\n",
-					relationId, (int) distance, searchPointsCounter); // TODO remove debug
-		}
-
 		if (distance > 0) {
 			tagsToFill.putIfAbsent("distance", String.valueOf((int) distance));
 		}
@@ -354,7 +349,7 @@ public class IndexRouteRelationCreator {
 			log.error(String.format(
 					"calcEntityIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
 					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
-			throw new UnsupportedOperationException();
+//			throw new UnsupportedOperationException(); // continue
 		}
 
 		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodesToHash);
