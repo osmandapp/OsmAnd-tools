@@ -116,7 +116,8 @@ public class SearchController {
         String address = searchService.getPoiAddress(new LatLon(lat, lon));
         return ResponseEntity.ok(gson.toJson(address));
     }
-    
+
+    @MultiPlatform
     @GetMapping(path = {"/get-wiki-data"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikiData(@RequestParam String northWest,
