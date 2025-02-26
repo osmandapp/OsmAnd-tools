@@ -14,6 +14,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
 import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -211,47 +213,36 @@ public class WikiService {
 		
 		return license;
 	}
-	
+
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
+		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
-		if (!filters.isEmpty()) {
-			filterQuery = "AND poitype IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
+
+		if (!showAll && !filters.isEmpty()) {
+			filterQuery = "AND e.topic IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
 			filterParams.addAll(filters);
 		}
-		
-		String zoomCondition = "";
-		if (zoom < FILTER_ZOOM_LEVEL) {
-			zoomCondition = "AND wlat != 0 AND wlon != 0 ";
-		}
-		
-		
-		String osmidCondition = "";
-		if (zoom < FILTER_ZOOM_LEVEL) {
-			osmidCondition = "AND osmid != 0 ";
-		}
+
+		String lat = "COALESCE(w.lat, w.wlat)";
+		String lon = "COALESCE(w.lon, w.wlon)";
 
 		String query = "SELECT w.id, w.photoId, w.photoTitle, w.catId, w.catTitle, w.depId, w.depTitle, " +
 				"w.wikiTitle, w.wikiLang, w.wikiDesc, w.wikiArticles, w.osmid, w.osmtype, w.poitype, " +
-				"w.poisubtype, e.elo, w.lat, w.lon, w.wvLinks " +
+				"w.poisubtype, " +
+				lat + " AS lat, " +
+				lon + " AS lon, " +
+				"w.wvLinks, COALESCE(e.elo, 900) AS elo, e.topic AS topic, e.categories AS categories, w.qrank " +
 				"FROM wikidata w " +
 				"LEFT JOIN wiki.elo_rating e ON w.id = e.id " +
-				"WHERE w.lat BETWEEN ? AND ? AND w.lon BETWEEN ? AND ? " +
-				filterQuery +
-				zoomCondition +
-				osmidCondition +
-				" ORDER BY e.elo DESC LIMIT " + LIMIT_OBJS_QUERY;
-		
+				"WHERE (" + lat + " BETWEEN ? AND ? AND " + lon + " BETWEEN ? AND ?) " +
+				(showAll ? "" : filterQuery) +
+				"ORDER BY elo DESC, w.qrank DESC " +
+				"LIMIT " + LIMIT_OBJS_QUERY;
+
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
 	}
-	
-	private static Set<String> getExcludedTypes(Map<Integer, Set<String>> map, int zoom) {
-		return map.entrySet().stream()
-				.filter(entry -> entry.getKey() >= zoom)
-				.flatMap(entry -> entry.getValue().stream())
-				.collect(Collectors.toSet());
-	}
-	
+
 	public String getWikipediaContent(String title, String lang) {
 		String query = "SELECT hex(zipContent) AS ziphex FROM wiki.wiki_content WHERE title = ? AND lang = ?";
 		return jdbcTemplate.query(query, ps -> {
@@ -413,6 +404,15 @@ public class WikiService {
 							f.properties.put("wikiDesc", rs.getString(i));
 						} else if (col.equals("wikiLang") && !f.properties.containsKey("wikiLang")) {
 							f.properties.put("wikiLang", rs.getString(i));
+						} else if (col.equals("poisubtype")) {
+							String poiType = rs.getString(i);
+							PoiType type = MapPoiTypes.getDefault().getPoiTypeByKey(poiType);
+							if (type != null) {
+								f.properties.put(SearchService.PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
+								f.properties.put(SearchService.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
+								f.properties.put(SearchService.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
+							}
+							f.properties.put("poisubtype", rs.getString(i));
 						} else {
 							f.properties.put(col, rs.getString(i));
 						}
