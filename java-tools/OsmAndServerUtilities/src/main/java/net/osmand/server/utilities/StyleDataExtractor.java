@@ -37,7 +37,7 @@ public class StyleDataExtractor {
     
     public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
         //parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
-        parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/poi_types.json");
+        parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
     }
     
     /**

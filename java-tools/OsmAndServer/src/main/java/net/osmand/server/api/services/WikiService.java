@@ -14,6 +14,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
 import net.osmand.shared.util.WikiImagesUtil;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -402,12 +404,15 @@ public class WikiService {
 							f.properties.put("wikiDesc", rs.getString(i));
 						} else if (col.equals("wikiLang") && !f.properties.containsKey("wikiLang")) {
 							f.properties.put("wikiLang", rs.getString(i));
-						} else if (col.equals("topic")) {
-							f.properties.put("topic", rs.getString(i));
-						} else if (col.equals("categories")) {
-							f.properties.put("categories", rs.getString(i));
-						} else if (col.equals("elo")) {
-							f.properties.put("elo", rs.getInt(i));
+						} else if (col.equals("poisubtype")) {
+							String poiType = rs.getString(i);
+							PoiType type = MapPoiTypes.getDefault().getPoiTypeByKey(poiType);
+							if (type != null) {
+								f.properties.put(SearchService.PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
+								f.properties.put(SearchService.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
+								f.properties.put(SearchService.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
+							}
+							f.properties.put("poisubtype", rs.getString(i));
 						} else {
 							f.properties.put(col, rs.getString(i));
 						}
