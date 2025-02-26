@@ -112,8 +112,12 @@ public class IndexRouteRelationCreator {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
-			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags);
-			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags);
+            int hash = getRelationHash(relation);
+            if (hash == -1) {
+                return;//incomplete relation
+            }
+            collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
+			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags, hash);
 
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
@@ -133,7 +137,8 @@ public class IndexRouteRelationCreator {
 	private void calcRadiusDistanceAndPoiSearchPoints(long relationId,
 	                                                  @Nonnull List<Way> joinedWays,
 	                                                  @Nonnull List<Node> pointsForPoiSearch,
-	                                                  @Nonnull Map<String, String> tagsToFill) {
+	                                                  @Nonnull Map<String, String> tagsToFill,
+                                                      int hash) {
 		double distance = 0;
 		QuadRect bbox = new QuadRect();
 		int searchPointsCounter = 0; // 512 * 5 km = 2560 km max (in case of 9-bit limit)...
@@ -150,7 +155,7 @@ public class IndexRouteRelationCreator {
 					if (localPoints.isEmpty() ||
 							MapUtils.getDistance(firstLatLon, localPoints.get(localPoints.size() - 1).getLatLon())
 									> POI_SEARCH_POINTS_DISTANCE_M) {
-						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, nodes);
+						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
 						localPoints.add(new Node(firstLatLon.getLatitude(), firstLatLon.getLongitude(), nodeId));
 					}
 					distance += MapUtils.getDistance(firstLatLon, secondLatLon);
@@ -281,16 +286,11 @@ public class IndexRouteRelationCreator {
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
 	                                            @Nonnull List<Way> joinedWays,
-	                                            @Nonnull Map<String, String> shieldTags) {
+	                                            @Nonnull Map<String, String> shieldTags, int hash) {
 		List<Way> waysToJoin = new ArrayList<>();
 
-		///////////////////////////////////////////////////////////
-		// TODO this is just a test block to pass all relation tags
-		// RelationTagsPropagation tagsTransformer = new RelationTagsPropagation();
-		// Map<String, String> relationTags = relation.getTags(); // RelationTagsPropagation.getRelationTags(relation, renderingTypes);
-		// shieldTags.putAll(relationTags);
-		shieldTags.putAll(relation.getTags());
-		///////////////////////////////////////////////////////////
+		//TODO refactor
+        shieldTags.putAll(relation.getTags());
 
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
@@ -303,12 +303,13 @@ public class IndexRouteRelationCreator {
 				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			}
 		}
-		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId());
+		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId(), hash);
 	}
 
 	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
 	                                          @Nonnull List<Way> joinedWays,
-	                                          long relationId) {
+	                                          long relationId,
+                                              int hash) {
 		boolean[] done = new boolean[waysToJoin.size()];
 		while (true) {
 			List<Node> nodes = new ArrayList<>();
@@ -336,12 +337,35 @@ public class IndexRouteRelationCreator {
 			if (nodes.isEmpty()) {
 				break; // all done
 			}
-			long generatedId = calcEntityIdFromRelationId(relationId, joinedWays.size(), nodes);
+			long generatedId = calcEntityIdFromRelationId(relationId, joinedWays.size(), hash);
 			joinedWays.add(new Way(generatedId, nodes)); // ID = relationId + counter + hash(nodes)
 		}
 	}
 
-	private static long calcEntityIdFromRelationId(long relationId, long counter, @Nonnull List<Node> nodesToHash) {
+    private int getRelationHash(@Nonnull Relation relation) {
+        List<Node> allNodes = new ArrayList<>();
+        for (Relation.RelationMember member : relation.getMembers()) {
+            if (member.getEntity() instanceof Node node) {
+                allNodes.add(node);
+            }
+            if (member.getEntity() instanceof Way way) {
+                if (way.getNodes().isEmpty()) {
+                    return -1;
+                }
+                for (Node n : way.getNodes()) {
+                    allNodes.add(n);
+                }
+            }
+        }
+        LatLon center = OsmMapUtils.getWeightCenterForNodes(allNodes);
+
+        int hash = center == null
+                ? allNodes.size() % 64
+                : (int) (1000.0 * (center.getLatitude() + center.getLongitude())) % 64;
+        return hash;
+    }
+
+	private static long calcEntityIdFromRelationId(long relationId, long counter, int hash) {
 		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 
@@ -350,14 +374,7 @@ public class IndexRouteRelationCreator {
 			log.error(String.format(
 					"calcEntityIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
 					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
-//			throw new UnsupportedOperationException(); // continue
 		}
-
-		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodesToHash);
-
-		int hash = center == null
-				? nodesToHash.size() % 64
-				: (int) (1000.0 * (center.getLatitude() + center.getLongitude())) % 64; // 0-63 = 6 bits
 
 		// Max OSM Relation ID has 25 bits @ 2025/02/05 = 18655715
 		return (1L << (ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1)) // 43rd bit = 1 (42 bits left for numbers)
