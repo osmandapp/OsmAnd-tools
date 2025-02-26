@@ -7,9 +7,14 @@ import net.osmand.render.RenderingRule;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
+import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 import org.xmlpull.v1.XmlPullParserException;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -30,8 +35,9 @@ public class StyleDataExtractor {
     
     private static final String STYLE_RULES_RESULT_JSON = "styleRulesResult.json";
     
-    public static void main(String[] args) throws IOException {
-        parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
+    public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
+        //parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
+        parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/poi_types.json");
     }
     
     /**
@@ -188,5 +194,47 @@ public class StyleDataExtractor {
                 .forEach(r -> getRules(r, allRules));
         return allRules;
     }
-    
+
+    public static void parsePoiStylesXml(String xmlPath, String jsonPath) throws IOException, SAXException, ParserConfigurationException {
+        File xmlFile = new File(xmlPath);
+        if (!xmlFile.exists()) {
+            throw new IOException("File not found: " + xmlPath);
+        }
+        List<Map<String, String>> poiTypes = new ArrayList<>();
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser saxParser = factory.newSAXParser();
+
+        DefaultHandler handler = new DefaultHandler() {
+            private Map<String, String> currentPoiType;
+
+            @Override
+            public void startElement(String uri, String localName, String qName, Attributes attributes) {
+                if ("poi_type".equals(qName)) {
+                    currentPoiType = new LinkedHashMap<>();
+
+                    String name = attributes.getValue("name");
+                    String tag = attributes.getValue("tag");
+                    String value = attributes.getValue("value");
+
+                    if (name != null) currentPoiType.put("name", name);
+                    if (tag != null) currentPoiType.put("tag", tag);
+                    if (value != null) currentPoiType.put("value", value);
+                }
+            }
+
+            @Override
+            public void endElement(String uri, String localName, String qName) {
+                if ("poi_type".equals(qName) && currentPoiType != null) {
+                    poiTypes.add(currentPoiType);
+                    currentPoiType = null;
+                }
+            }
+        };
+
+        saxParser.parse(xmlFile, handler);
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        String jsonResult = gson.toJson(poiTypes);
+        Files.write(Paths.get(jsonPath), jsonResult.getBytes());
+    }
 }
