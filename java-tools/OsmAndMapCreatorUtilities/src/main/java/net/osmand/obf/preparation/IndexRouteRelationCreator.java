@@ -56,6 +56,7 @@ public class IndexRouteRelationCreator {
 	private static final String ROUTE = "route";
 
 	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+	public static final int MAX_JOINED_POINTS_PER_SEGMENT = 2000; // ~25m * 2000 = ~50 km (optimize Map-section)
 	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
@@ -156,11 +157,6 @@ public class IndexRouteRelationCreator {
 				}
 			}
 			pointsForPoiSearch.addAll(localPoints);
-		}
-
-		if (searchPointsCounter > 100) {
-			System.err.printf("WARN: XXX relation %d distance %d searchPointsCounter %d\n",
-					relationId, (int) distance, searchPointsCounter); // TODO remove debug
 		}
 
 		if (distance > 0) {
@@ -354,7 +350,7 @@ public class IndexRouteRelationCreator {
 			log.error(String.format(
 					"calcEntityIdFromRelationId() relation %d/%d overflow (%d/%d bits)",
 					relationId, counter, MAX_RELATION_ID_BITS, MAX_COUNTER_BITS));
-			throw new UnsupportedOperationException();
+//			throw new UnsupportedOperationException(); // continue
 		}
 
 		LatLon center = OsmMapUtils.getWeightCenterForNodes(nodesToHash);
@@ -370,8 +366,8 @@ public class IndexRouteRelationCreator {
 				+ hash;                                          // 6 bits
 	}
 
-	private static boolean considerWayToJoin(List<Node> nodes, Way candidate) {
-		if (nodes.isEmpty()) {
+	private static boolean considerWayToJoin(List<Node> result, Way candidate) {
+		if (result.isEmpty() || result.size() > MAX_JOINED_POINTS_PER_SEGMENT) {
 			return false;
 		}
 
@@ -379,19 +375,19 @@ public class IndexRouteRelationCreator {
 			return true;
 		}
 
-		LatLon firstNodeLL = nodes.get(0).getLatLon();
-		LatLon lastNodeLL = nodes.get(nodes.size() - 1).getLatLon();
+		LatLon firstNodeLL = result.get(0).getLatLon();
+		LatLon lastNodeLL = result.get(result.size() - 1).getLatLon();
 		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
 		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
 
 		if (MapUtils.areLatLonEqual(lastNodeLL, firstCandidateLL)) {
-			addWayToNodes(nodes, false, candidate, false); // nodes + Candidate
+			addWayToNodes(result, false, candidate, false); // result + Candidate
 		} else if (MapUtils.areLatLonEqual(lastNodeLL, lastCandidateLL)) {
-			addWayToNodes(nodes, false, candidate, true); // nodes + etadidnaC
+			addWayToNodes(result, false, candidate, true); // result + etadidnaC
 		} else if (MapUtils.areLatLonEqual(firstNodeLL, firstCandidateLL)) {
-			addWayToNodes(nodes, true, candidate, true); // etadidnaC + nodes
+			addWayToNodes(result, true, candidate, true); // etadidnaC + result
 		} else if (MapUtils.areLatLonEqual(firstNodeLL, lastCandidateLL)) {
-			addWayToNodes(nodes, true, candidate, false); // Candidate + nodes
+			addWayToNodes(result, true, candidate, false); // Candidate + result
 		} else {
 			return false;
 		}
@@ -407,7 +403,12 @@ public class IndexRouteRelationCreator {
 		if (reverse) {
 			Collections.reverse(points);
 		}
-		nodes.addAll(insert ? 0 : nodes.size(), points);
+		if (!nodes.isEmpty() && !points.isEmpty()) {
+			List<Node> skipLeadingPoint = points.subList(insert ? 0 : 1, points.size() - (insert ? 1 : 0));
+			nodes.addAll(insert ? 0 : nodes.size(), skipLeadingPoint); // avoid duplicate point at joints
+		} else {
+			nodes.addAll(insert ? 0 : nodes.size(), points); // first addition to the result
+		}
 	}
 
 	public static boolean isSupportedRouteType(@Nullable String routeType) {
