@@ -404,7 +404,7 @@ public class WikiService {
 							f.properties.put("wikiLang", rs.getString(i));
 						} else if (col.equals("topic")) {
 							f.properties.put("topic", rs.getString(i));
-						} else if (col.equals("catId")) {
+						} else if (col.equals("categories")) {
 							f.properties.put("categories", rs.getString(i));
 						} else if (col.equals("elo")) {
 							f.properties.put("elo", rs.getInt(i));
