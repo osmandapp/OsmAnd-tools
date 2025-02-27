@@ -12,43 +12,45 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 public class OverpassFetcher {
 
-    private static final Log log = LogFactory.getLog(OverpassFetcher.class);
-    private static OverpassFetcher instance;
-    private final String overpassUrl;
+	private static final Log log = LogFactory.getLog(OverpassFetcher.class);
+	private static OverpassFetcher instance;
+	private final String overpassUrl;
 
-    private OverpassFetcher() {
-        this.overpassUrl = System.getenv("OVERPASS_URL");
-        if (this.overpassUrl == null || this.overpassUrl.isEmpty()) {
-            log.warn("OVERPASS_URL environment variable is not set.");
-        }
-    }
+	private OverpassFetcher() {
+		this.overpassUrl = System.getenv("OVERPASS_URL");
+		if (this.overpassUrl == null || this.overpassUrl.isEmpty()) {
+			log.warn("OVERPASS_URL environment variable is not set.");
+		} else {
+			log.warn("OVERPASS_URL is configured.");
+		}
+	}
 
-    public static synchronized OverpassFetcher getInstance() {
-        if (instance == null) {
-            instance = new OverpassFetcher();
-        }
-        return instance;
-    }
+	public static synchronized OverpassFetcher getInstance() {
+		if (instance == null) {
+			instance = new OverpassFetcher();
+		}
+		return instance;
+	}
 
-    public boolean isOverpassConfigured() {
-        return overpassUrl != null && !overpassUrl.isEmpty();
-    }
+	public boolean isOverpassConfigured() {
+		return overpassUrl != null && !overpassUrl.isEmpty();
+	}
 
-    public void fetchCompleteGeometryRelation(Relation relation) {
-        if (!isOverpassConfigured()) {
-            log.error("Overpass URL is not configured.");
-            return;
-        }
+	public void fetchCompleteGeometryRelation(Relation relation) {
 
-        // Collect way IDs with missing nodes
-        List<Long> wayIdsToFetch = new ArrayList<>();
+		// Collect way IDs with missing nodes
+		List<Long> wayIdsToFetch = new ArrayList<>();
 		for (Relation.RelationMember member : relation.getMembers()) {
 			// Check if the member is a Way
 			if (member.getEntity() instanceof Way) {
@@ -61,107 +63,118 @@ public class OverpassFetcher {
 						break;
 					}
 				}
-
-				// Check if the way has any null nodes
-				if (way != null) {
-					boolean hasNullNodes = false;
+				boolean hasNullNodes = false;
+				if (way == null || way.getNodeIds().isEmpty() || way.getNodes().size() != way.getNodeIds().size()) {
+					hasNullNodes = true;
+				} else {
 					for (Node node : way.getNodes()) {
 						if (node == null) {
 							hasNullNodes = true;
 							break;
 						}
 					}
-					// If the way has null nodes, add its ID to the list
-					if (hasNullNodes) {
-						wayIdsToFetch.add(wayId);
-					}
-				} else {
+				}
+				if (hasNullNodes) {
 					wayIdsToFetch.add(wayId);
 				}
 			}
 		}
-        if (wayIdsToFetch.isEmpty()) {
-            return;
-        }
+		if (wayIdsToFetch.isEmpty()) {
+			return;
+		}
+		if (!isOverpassConfigured()) {
+//            log.error("Overpass URL is not configured to fetch incomplete data.");
+			return;
+		}
 
-        long startTime = System.currentTimeMillis();
-        String wayIds = wayIdsToFetch.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
+		long startTime = System.currentTimeMillis();
+		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
 
-        String query = "[out:json];way(id:" + wayIds + "); out skel;";
-        String urlString = overpassUrl + "/api/interpreter?data=" + query;
+		// Construct the Overpass QL query
+		String query = "[out:json];way(id:" + wayIds + "); out geom;";
+		String urlString = overpassUrl + "/api/interpreter";
 
-        try {
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
+		try {
+			URL url = new URL(urlString);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+			connection.setDoOutput(true);
 
-            int responseCode = connection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String inputLine;
-                StringBuilder response = new StringBuilder();
+			// Write the query to the request body
+			String body = "data=" + URLEncoder.encode(query, StandardCharsets.UTF_8.toString());
+			try (OutputStream os = connection.getOutputStream()) {
+				byte[] input = body.getBytes(StandardCharsets.UTF_8);
+				os.write(input, 0, input.length);
+			}
 
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
-                in.close();
+			int responseCode = connection.getResponseCode();
+			if (responseCode == HttpURLConnection.HTTP_OK) {
+				BufferedReader in = new BufferedReader(
+						new InputStreamReader(new GZIPInputStream(connection.getInputStream())));
+				String inputLine;
+				StringBuilder response = new StringBuilder();
 
-                // Parse the JSON response
-                JSONObject jsonResponse = new JSONObject(response.toString());
-                JSONArray elements = jsonResponse.getJSONArray("elements");
+				while ((inputLine = in.readLine()) != null) {
+					response.append(inputLine);
+				}
+				in.close();
 
-                // Map to store fetched entities (ways and nodes)
-                Map<EntityId, Entity> fetchedEntities = new HashMap<>();
+				// Parse the JSON response
+				JSONObject jsonResponse = new JSONObject(response.toString());
+				JSONArray elements = jsonResponse.getJSONArray("elements");
 
-                // First, parse all nodes and add them to the map
-                for (int i = 0; i < elements.length(); i++) {
-                    JSONObject element = elements.getJSONObject(i);
-                    if (element.getString("type").equals("node")) {
-                        long nodeId = element.getLong("id");
-                        double lat = element.getDouble("lat");
-                        double lon = element.getDouble("lon");
-                        Node node = new Node(lat, lon, nodeId);
-                        fetchedEntities.put(new EntityId(Entity.EntityType.NODE, nodeId), node);
-                    }
-                }
+				// Map to store fetched entities (ways and nodes)
+				Map<EntityId, Entity> fetchedEntities = new HashMap<>();
 
-                // Then, parse all ways and add them to the map
-                for (int i = 0; i < elements.length(); i++) {
-                    JSONObject element = elements.getJSONObject(i);
-                    if (element.getString("type").equals("way")) {
-                        long wayId = element.getLong("id");
-                        JSONArray nodeIds = element.getJSONArray("nodes");
+				// First, parse all nodes and add them to the map
+				for (int i = 0; i < elements.length(); i++) {
+					JSONObject element = elements.getJSONObject(i);
+					if (element.getString("type").equals("node")) {
+						long nodeId = element.getLong("id");
+						double lat = element.getDouble("lat");
+						double lon = element.getDouble("lon");
+						Node node = new Node(lat, lon, nodeId);
+						fetchedEntities.put(new EntityId(Entity.EntityType.NODE, nodeId), node);
+					}
+				}
 
-                        // Create a new Way object
-                        Way way = new Way(wayId);
-                        List<Node> nodes = new ArrayList<>();
+				// Then, parse all ways and add them to the map
+				for (int i = 0; i < elements.length(); i++) {
+					JSONObject element = elements.getJSONObject(i);
+					if (element.getString("type").equals("way")) {
+						long wayId = element.getLong("id");
+						JSONArray nodeIds = element.getJSONArray("nodes");
+						JSONArray geoms = element.getJSONArray("geometry");
 
-                        // Fetch nodes for the way
-                        for (int j = 0; j < nodeIds.length(); j++) {
-                            long nodeId = nodeIds.getLong(j);
-                            Node node = (Node) fetchedEntities.get(new EntityId(Entity.EntityType.NODE, nodeId));
-                            if (node != null) {
-                                nodes.add(node);
-                            }
-                        }
+						// Create a new Way object
+						Way way = new Way(wayId);
 
-                        // Set nodes for the way
-                        way.getNodes().addAll(nodes);
-                        fetchedEntities.put(new EntityId(Entity.EntityType.WAY, wayId), way);
-                    }
-                }
+						// Fetch nodes for the way
+						for (int j = 0; j < nodeIds.length(); j++) {
+							long nodeId = nodeIds.getLong(j);
+							Node node = (Node) fetchedEntities.get(new EntityId(Entity.EntityType.NODE, nodeId));
+							if (node == null) {
+								double lat = geoms.getJSONObject(j).getDouble("lat");
+								double lon = geoms.getJSONObject(j).getDouble("lon");
+								node = new Node(lat, lon, nodeId);
+							}
+							way.addNode(node);
+						}
+						fetchedEntities.put(new EntityId(Entity.EntityType.WAY, wayId), way);
+					}
+				}
 
-                // Update the relation with the fetched ways and nodes
-                relation.initializeLinks(fetchedEntities);
+				// Update the relation with the fetched ways and nodes
+				relation.initializeLinks(fetchedEntities);
 
-                log.info("Fetched members for relation " + relation.getId() + ": " + wayIds + " - fetched in " + (System.currentTimeMillis() - startTime) + " ms");
-            } else {
-                log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
-            }
-        } catch (Exception e) {
-            log.error("Error fetching data from Overpass API", e);
-        }
-    }
+				log.info(String.format("Fetched members for relation %d (%.2f sec): %s", relation.getId(),
+						(System.currentTimeMillis() - startTime) / 1e3, wayIds));
+			} else {
+				log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
+			}
+		} catch (Exception e) {
+			log.error("Error fetching data from Overpass API", e);
+		}
+	}
 }
