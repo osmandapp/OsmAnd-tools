@@ -3,13 +3,9 @@ package net.osmand.routes;
 import net.osmand.IProgress;
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.data.Amenity;
-import net.osmand.data.LatLon;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.OsmGpxWriteContext;
-import net.osmand.obf.preparation.DBDialect;
-import net.osmand.obf.preparation.OsmDbAccessor;
-import net.osmand.obf.preparation.OsmDbAccessorContext;
-import net.osmand.obf.preparation.OsmDbCreator;
+import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
@@ -28,7 +24,6 @@ import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
-import net.osmand.util.MapUtils;
 import okio.Okio;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
@@ -56,17 +51,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
-import static net.osmand.obf.OsmGpxWriteContext.ROUTE_ID_TAG;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.ROUTE_ID_TAG;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
@@ -77,9 +70,8 @@ public class RouteRelationExtractor {
 	int countWays;
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
-	private final double precisionLatLonEquals = 1e-5;
 
-	private String[] customStyles = {
+	private static final String[] customStyles = {
 			"default.render.xml",
 			"routes.addon.render.xml"
 			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
@@ -97,29 +89,6 @@ public class RouteRelationExtractor {
 			"showRunningRoutes", "true"
 			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
-	private final String[] filteredTags = {
-			"hiking", // 244k
-			"bicycle", // 119k
-			"foot", // 63k
-			"mtb", // 29k
-			"piste", // 14k
-			"ski", // 8k
-			"horse", // 4k
-			"running", // 1k
-			"snowmobile", // 1k
-			"fitness_trail", // 1k
-			"canoe", // 0.8k
-			"canyoning", // 0.6k
-			"motorboat", // 0.4k
-			"boat", // 0.3k
-			"waterway", // 0.3k
-			"inline_skates", // 0.2k
-			"via_ferrata", // 0.2k
-			"walking", // 0.2k
-			"ferrata", // proposed
-			// Ignored: bus detour emergency_access evacuation ferry funicular historic light_rail motorcycle
-			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
-	};
 
 	private final int ICON_SEARCH_ZOOM = 19;
 	private final RenderingRulesStorage renderingRules;
@@ -315,14 +284,7 @@ public class RouteRelationExtractor {
 			}
 
 			private boolean accessedRoute(@Nonnull String route) {
-				for (String tag : route.split("[;, ]")) {
-					for (String value : filteredTags) {
-						if (tag.startsWith(value) || tag.endsWith(value)) {
-							return true;
-						}
-					}
-				}
-				return false;
+				return IndexRouteRelationCreator.isSupportedRouteType(route);
 			}
 		});
 		for (Entity e : resultRelations) {
@@ -408,13 +370,13 @@ public class RouteRelationExtractor {
 				waysToJoin.add(way);
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
-				gpxExtensions.putAll(getShieldTagsFromOsmcTags(way.getTags()));
+				gpxExtensions.putAll(IndexRouteRelationCreator.getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
 			}
 		}
 
-		joinWaysIntoTrackSegments(track, waysToJoin);
+		joinWaysIntoTrackSegments(track, waysToJoin, relation.getId());
 
 		File outFile = new File(gpxDir, relation.getId() + GPX_GZ_FILE_EXT);
 		try {
@@ -434,76 +396,20 @@ public class RouteRelationExtractor {
 		}
 	}
 
-	private void joinWaysIntoTrackSegments(Track track, List<Way> ways) {
-		boolean[] done = new boolean[ways.size()];
-		while (true) {
-			List<WptPt> wpts = new ArrayList<>();
-			for (int i = 0; i < ways.size(); i++) {
-				if (!done[i]) {
-					done[i] = true;
-					addWayToPoints(wpts, false, ways.get(i), false); // "head" way
-					while (true) {
-						boolean stop = true;
-						for (int j = 0; j < ways.size(); j++) {
-							if (!done[j] && considerCandidateToJoin(wpts, ways.get(j))) {
-								done[j] = true;
-								stop = false;
-							}
-						}
-						if (stop) {
-							break; // nothing joined
-						}
-					}
-					break; // segment is done
+	private void joinWaysIntoTrackSegments(Track track, List<Way> waysToJoin, long id) {
+		List<Way> joinedWays = new ArrayList<>();
+		IndexRouteRelationCreator.spliceWaysIntoSegments(waysToJoin, joinedWays, id, 0);
+		for (Way way : joinedWays) {
+			if (!way.getNodes().isEmpty()) {
+				List<WptPt> wpts = new ArrayList<>();
+				for (Node n : way.getNodes()) {
+					wpts.add(new WptPt(n.getLatitude(), n.getLongitude()));
 				}
+				TrkSegment segment = new TrkSegment();
+				segment.getPoints().addAll(wpts);
+				track.getSegments().add(segment);
 			}
-			if (wpts.isEmpty()) {
-				break; // all done
-			}
-			TrkSegment segment = new TrkSegment();
-			segment.getPoints().addAll(wpts);
-			track.getSegments().add(segment);
 		}
-	}
-
-	private boolean considerCandidateToJoin(List<WptPt> wpts, Way candidate) {
-		if (wpts.isEmpty() || candidate.getNodes().isEmpty()) {
-			return true;
-		}
-
-		WptPt firstWpt = wpts.get(0);
-		WptPt lastWpt = wpts.get(wpts.size() - 1);
-		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
-		LatLon lastCandidateLL = candidate.getNodes().get(candidate.getNodes().size() - 1).getLatLon();
-
-		if (eqWptToLatLon(lastWpt, firstCandidateLL)) {
-			addWayToPoints(wpts, false, candidate, false); // wpts + Candidate
-		} else if (eqWptToLatLon(lastWpt, lastCandidateLL)) {
-			addWayToPoints(wpts, false, candidate, true); // wpts + etadidnaC
-		} else if (eqWptToLatLon(firstWpt, firstCandidateLL)) {
-			addWayToPoints(wpts, true, candidate, true); // etadidnaC + wpts
-		} else if (eqWptToLatLon(firstWpt, lastCandidateLL)) {
-			addWayToPoints(wpts, true, candidate, false); // Candidate + wpts
-		} else {
-			return false;
-		}
-
-		return true;
-	}
-
-	private void addWayToPoints(List<WptPt> wpts, boolean insert, Way way, boolean reverse) {
-		List<WptPt> points = new ArrayList<>();
-		for (Node n : way.getNodes()) {
-			points.add(new WptPt(n.getLatitude(), n.getLongitude()));
-		}
-		if (reverse) {
-			Collections.reverse(points);
-		}
-		wpts.addAll(insert ? 0 : wpts.size(), points);
-	}
-
-	private boolean eqWptToLatLon(WptPt wpt, LatLon ll) {
-		return MapUtils.areLatLonEqual(new LatLon(wpt.getLatitude(), wpt.getLongitude()), ll, precisionLatLonEquals);
 	}
 
 	final String[] nodeNameTags = { "name", "name:en" }; // no more ref here
@@ -635,37 +541,5 @@ public class RouteRelationExtractor {
 				additionalEntities.putAll(map);
 			}
 		}
-	}
-
-	private static final Map<String, String> osmcTagsToShieldProps = Map.of(
-			"osmc_text", "shield_text",
-			"osmc_background", "shield_bg",
-			"osmc_foreground", "shield_fg",
-			"osmc_foreground2", "shield_fg_2",
-			"osmc_textcolor", "shield_textcolor",
-			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
-	);
-
-	private static final String OSMC_ICON_PREFIX = "osmc_";
-	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
-	private static final Set<String> shieldBgIcons = Set.of("shield_bg");
-	private static final Set<String> shieldFgIcons = Set.of("shield_fg", "sheld_fg_2");
-
-	@Nonnull
-	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags) {
-		Map<String, String> result = new LinkedHashMap<>();
-		for (String tag : tags.keySet()) {
-			for (String match : osmcTagsToShieldProps.keySet()) {
-				if (tag.endsWith(match)) {
-					final String key = osmcTagsToShieldProps.get(match);
-					final String prefix =
-							(shieldBgIcons.contains(key) || shieldFgIcons.contains(key)) ? OSMC_ICON_PREFIX : "";
-					final String suffix = shieldBgIcons.contains(key) ? OSMC_ICON_BG_SUFFIX : "";
-					final String val = prefix + tags.get(tag) + suffix;
-					result.putIfAbsent(key, val); // prefer 1st
-				}
-			}
-		}
-		return result;
 	}
 }

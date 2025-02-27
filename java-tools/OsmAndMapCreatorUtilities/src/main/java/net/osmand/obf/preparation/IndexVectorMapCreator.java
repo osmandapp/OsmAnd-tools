@@ -47,7 +47,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                                                            // not used by basemap
 
     private final Log logMapDataWarn;
-    private MapRenderingTypesEncoder renderingTypes;
+    protected MapRenderingTypesEncoder renderingTypes;
     private MapZooms mapZooms;
     private IndexCreatorSettings settings;
 
