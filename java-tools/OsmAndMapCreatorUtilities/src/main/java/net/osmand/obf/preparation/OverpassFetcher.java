@@ -1,15 +1,5 @@
 package net.osmand.obf.preparation;
 
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -17,9 +7,22 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Way;
 
 public class OverpassFetcher {
 
@@ -48,37 +51,7 @@ public class OverpassFetcher {
 	}
 
 	public void fetchCompleteGeometryRelation(Relation relation) {
-
-		// Collect way IDs with missing nodes
-		List<Long> wayIdsToFetch = new ArrayList<>();
-		for (Relation.RelationMember member : relation.getMembers()) {
-			// Check if the member is a Way
-			if (member.getEntity() instanceof Way) {
-				long wayId = ((Way) member.getEntity()).getId();
-				// Find the corresponding Way object in the relation
-				Way way = null;
-				for (Relation.RelationMember m : relation.getMembers()) {
-					if (m.getEntity() instanceof Way && ((Way) m.getEntity()).getId() == wayId) {
-						way = (Way) m.getEntity();
-						break;
-					}
-				}
-				boolean hasNullNodes = false;
-				if (way == null || way.getNodeIds().isEmpty() || way.getNodes().size() != way.getNodeIds().size()) {
-					hasNullNodes = true;
-				} else {
-					for (Node node : way.getNodes()) {
-						if (node == null) {
-							hasNullNodes = true;
-							break;
-						}
-					}
-				}
-				if (hasNullNodes) {
-					wayIdsToFetch.add(wayId);
-				}
-			}
-		}
+		List<Long> wayIdsToFetch = getIncompleteWayIdsForRelation(relation);
 		if (wayIdsToFetch.isEmpty()) {
 			return;
 		}
@@ -176,5 +149,39 @@ public class OverpassFetcher {
 		} catch (Exception e) {
 			log.error("Error fetching data from Overpass API", e);
 		}
+	}
+
+	public List<Long> getIncompleteWayIdsForRelation(Relation relation) {
+		// Collect way IDs with missing nodes
+		List<Long> wayIdsToFetch = new ArrayList<>();
+		for (Relation.RelationMember member : relation.getMembers()) {
+			// Check if the member is a Way
+			if (member.getEntity() instanceof Way) {
+				long wayId = ((Way) member.getEntity()).getId();
+				// Find the corresponding Way object in the relation
+				Way way = null;
+				for (Relation.RelationMember m : relation.getMembers()) {
+					if (m.getEntity() instanceof Way && ((Way) m.getEntity()).getId() == wayId) {
+						way = (Way) m.getEntity();
+						break;
+					}
+				}
+				boolean hasNullNodes = false;
+				if (way == null || way.getNodeIds().isEmpty() || way.getNodes().size() != way.getNodeIds().size()) {
+					hasNullNodes = true;
+				} else {
+					for (Node node : way.getNodes()) {
+						if (node == null) {
+							hasNullNodes = true;
+							break;
+						}
+					}
+				}
+				if (hasNullNodes) {
+					wayIdsToFetch.add(wayId);
+				}
+			}
+		}
+		return wayIdsToFetch;
 	}
 }
