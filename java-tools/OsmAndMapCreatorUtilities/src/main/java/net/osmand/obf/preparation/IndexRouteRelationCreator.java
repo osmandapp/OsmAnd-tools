@@ -142,6 +142,10 @@ public class IndexRouteRelationCreator {
 	                                                  @Nonnull List<Node> pointsForPoiSearch,
 	                                                  @Nonnull Map<String, String> tagsToFill,
 	                                                  int hash) {
+		final int MIN_RADIUS_FOR_SHORT_LINK = 50 * 1000; // 50 km
+		final int SHORT_LINK_ZOOM = 9; // z9 = 3 chars ~50x50km
+		Set<String> shortLinkTiles = new TreeSet<>();
+
 		double distance = 0;
 		QuadRect bbox = new QuadRect();
 		int searchPointsCounter = 0; // 512 * 5 km = 2560 km max (in case of 9-bit limit)...
@@ -160,6 +164,8 @@ public class IndexRouteRelationCreator {
 									> POI_SEARCH_POINTS_DISTANCE_M) {
 						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
 						localPoints.add(new Node(firstLatLon.getLatitude(), firstLatLon.getLongitude(), nodeId));
+						shortLinkTiles.add(MapUtils.createShortLinkString(
+								firstLatLon.getLatitude(), firstLatLon.getLongitude(), SHORT_LINK_ZOOM - 8));
 					}
 					distance += MapUtils.getDistance(firstLatLon, secondLatLon);
 				}
@@ -180,6 +186,13 @@ public class IndexRouteRelationCreator {
 					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_1,
 					GpxUtilities.TRAVEL_GPX_CONVERT_MULT_2
 			);
+
+			if (radius > MIN_RADIUS_FOR_SHORT_LINK) {
+				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.bottom, bbox.left, SHORT_LINK_ZOOM - 8));
+				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.top, bbox.right, SHORT_LINK_ZOOM - 8));
+				tagsToFill.put("route_shortlink_tiles", String.join(",", shortLinkTiles));
+			}
+
 			tagsToFill.put("route_bbox_radius", routeBboxRadius);
 		}
 	}
