@@ -193,12 +193,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         // coastlines)
         boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue()))
                 && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
+        ctx.loadEntityRelation(e);
+        OverpassFetcher.getInstance().fetchCompleteGeometryRelation(e);
         if (polygonIsland) {
             int coastlines = 0;
             int otherWays = 0;
-            ctx.loadEntityRelation((Relation) e);
             List<Entity> me = e.getMemberEntities("outer");
-
             for (Entity es : me) {
                 if (es instanceof Way && !((Way) es).getEntityIds().isEmpty()) {
                     boolean coastline = "coastline".equals(tags.get(OSMTagKey.NATURAL.getValue()));
@@ -229,7 +229,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             }
         }
 
-        ctx.loadEntityRelation((Relation) e);
+        
         MultipolygonBuilder original = new MultipolygonBuilder();
         original.setId(e.getId());
         boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
@@ -260,10 +260,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 //		excludeFromMainIteration(original.getInnerWays()); // fix issue with different type of swamp inside each other (inner ring has same tag as multipolygon but has a different meaning)
 
-        // Rings with different types (inner or outer) in one ring will be logged in the
-        // previous case
-        // The Rings are only composed by type, so if one way gets in a different Ring,
-        // the rings will be incomplete
+        // Rings with different types (inner or outer) in one ring will be logged in the previous case
+        // The Rings are only composed by type, so if one way gets in a different Ring, the rings will be incomplete
         List<Multipolygon> multipolygons = original.splitPerOuterRing(logMapDataWarn);
 
         if (multipolygons.size() > 1 && "boundary".equals(tags.get(OSMTagKey.TYPE.getValue()))) {
