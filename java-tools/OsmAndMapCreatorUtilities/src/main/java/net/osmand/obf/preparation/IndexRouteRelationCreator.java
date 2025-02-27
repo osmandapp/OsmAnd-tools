@@ -118,7 +118,7 @@ public class IndexRouteRelationCreator {
 			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
 			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
 
-			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
+			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx);
 
 			int hash = getRelationHash(relation);
 			if (hash == -1) {

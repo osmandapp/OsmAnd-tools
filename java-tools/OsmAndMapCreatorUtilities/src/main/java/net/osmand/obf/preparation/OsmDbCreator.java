@@ -112,7 +112,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 	
 	
-	private long convertId(Entity e) {
+	public long convertId(Entity e) {
 		long id = e.getId();
 		
 		int ord = EntityType.valueOf(e).ordinal();

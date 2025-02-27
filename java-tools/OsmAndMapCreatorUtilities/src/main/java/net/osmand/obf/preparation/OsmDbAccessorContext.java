@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import java.sql.SQLException;
 import java.util.Map;
 
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -21,4 +22,6 @@ public interface OsmDbAccessorContext {
 	public void loadEntityRelation(Relation e) throws SQLException;
 
     public Map<Long, Node> retrieveAllRelationNodes(Relation e) throws SQLException;
+    
+    public long convertId(Entity e);
 }
