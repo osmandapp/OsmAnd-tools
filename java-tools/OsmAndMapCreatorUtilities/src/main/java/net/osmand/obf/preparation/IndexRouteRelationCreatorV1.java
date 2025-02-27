@@ -28,8 +28,8 @@ import net.osmand.util.MapAlgorithms;
 
 // TODO delete unused IndexRouteRelationCreator and IndexCreatorSettings.keepOnlyRouteRelationObjects
 
-public class IndexRouteRelationCreatorOld {
-	private final static Log log = LogFactory.getLog(IndexRouteRelationCreatorOld.class);
+public class IndexRouteRelationCreatorV1 {
+	private final static Log log = LogFactory.getLog(IndexRouteRelationCreatorV1.class);
 	public static long GENERATE_OBJ_ID = - (1l << 20l); // million million
 	public static final double DIST_STEP = 25;
 	
@@ -42,7 +42,7 @@ public class IndexRouteRelationCreatorOld {
 	private final MapZooms mapZooms;
 	private final IndexCreatorSettings settings;
 
-	public IndexRouteRelationCreatorOld(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
+	public IndexRouteRelationCreatorV1(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
 	                                    IndexCreatorSettings settings) {
 		this.logMapDataWarn = logMapDataWarn;
 		this.mapZooms = mapZooms;

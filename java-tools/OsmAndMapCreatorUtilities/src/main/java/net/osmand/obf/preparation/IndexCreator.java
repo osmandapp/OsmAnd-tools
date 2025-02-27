@@ -65,8 +65,10 @@ public class IndexCreator {
 	IndexPoiCreator indexPoiCreator;
 	IndexAddressCreator indexAddressCreator;
 	IndexVectorMapCreator indexMapCreator;
-	IndexRouteRelationCreator indexRouteRelationCreator;
-	IndexRouteRelationCreatorOld indexRouteRelationCreatorOld;
+	// v2 indexes combined route relations as a long chain of ways
+	IndexRouteRelationCreator indexRouteRelationCreatorV2;
+	// v1 indexes propagate route relations into ways with tag prefixes
+	IndexRouteRelationCreatorV1 indexRouteRelationCreatorV1;
 	IndexRouteCreator indexRouteCreator;
 	IndexHeightData heightData = null;
 	PropagateToNodes propagateToNodes;
@@ -218,7 +220,7 @@ public class IndexCreator {
 		if (settings.indexMap) {
 			if (settings.boundary == null || checkBoundary(e)) {
 				indexMapCreator.iterateMainEntity(e, ctx, icc);
-				indexRouteRelationCreatorOld.iterateMainEntity(e, ctx, icc);
+				indexRouteRelationCreatorV1.iterateMainEntity(e, ctx, icc);
 			}
 		}
 		if (settings.indexAddress) {
@@ -515,8 +517,8 @@ public class IndexCreator {
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
 		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
-		this.indexRouteRelationCreatorOld = new IndexRouteRelationCreatorOld(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteRelationCreator = new IndexRouteRelationCreator(indexPoiCreator, indexMapCreator);
+		this.indexRouteRelationCreatorV1 = new IndexRouteRelationCreatorV1(logMapDataWarn, mapZooms, renderingTypes, settings);
+		this.indexRouteRelationCreatorV2 = new IndexRouteRelationCreator(indexPoiCreator, indexMapCreator);
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {
@@ -674,7 +676,8 @@ public class IndexCreator {
 				if (REMOVE_POI_DB) {
 					indexPoiCreator.removePoiFile();
 				}
-				indexRouteRelationCreatorOld.closeAllStatements();
+				indexRouteRelationCreatorV1.closeAllStatements();
+				indexRouteRelationCreatorV2.closeAllStatements();
 				indexAddressCreator.closeAllPreparedStatements();
 				indexTransportCreator.commitAndCloseFiles(getRTreeTransportStopsFileName(),
 						getRTreeTransportStopsPackFileName(), deleteDatabaseIndexes);
@@ -753,11 +756,11 @@ public class IndexCreator {
 						if (!settings.keepOnlyRouteRelationObjects) {
 							indexMapCreator.indexMapRelationsAndMultiPolygons(e, ctx, icc);
 						} else {
-							indexRouteRelationCreatorOld.iterateRelation(e, ctx, icc);
+							indexRouteRelationCreatorV1.iterateRelation(e, ctx, icc);
 						}
 						if (settings.indexPOI && settings.indexMap) {
 							if (settings.indexRouteRelations) {
-								indexRouteRelationCreator.iterateRelation((Relation) e, ctx, icc);
+								indexRouteRelationCreatorV2.iterateRelation((Relation) e, ctx, icc);
 							}
 						}
 					}

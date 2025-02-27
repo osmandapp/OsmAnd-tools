@@ -470,4 +470,8 @@ public class IndexRouteRelationCreator {
 		}
 		return result;
 	}
+
+	public void closeAllStatements() {
+		
+	}
 }
