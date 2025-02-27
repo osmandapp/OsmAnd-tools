@@ -110,14 +110,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private TLongObjectHashMap<Long> duplicateIds = new TLongObjectHashMap<Long>();
     private BasemapProcessor checkSeaTile;
 	private PropagateToNodes propagateToNodes;
+	private final Long lastModifiedDate;
 
     public IndexVectorMapCreator(Log logMapDataWarn, MapZooms mapZooms, MapRenderingTypesEncoder renderingTypes,
-            IndexCreatorSettings settings, PropagateToNodes propagateToNodes) {
+            IndexCreatorSettings settings, PropagateToNodes propagateToNodes, Long lastModifiedDate) {
         this.logMapDataWarn = logMapDataWarn;
         this.mapZooms = mapZooms;
         this.settings = settings;
         this.renderingTypes = renderingTypes;
 		this.propagateToNodes = propagateToNodes;
+		this.lastModifiedDate = lastModifiedDate;
         lowLevelWays = -1;
     }
 
@@ -220,8 +222,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue()))
                 && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
         ctx.loadEntityRelation(e);
-        // 
-        OverpassFetcher.getInstance().fetchCompleteGeometryRelation(e, ctx);
+        //
+        OverpassFetcher.getInstance().fetchCompleteGeometryRelation(e, ctx, lastModifiedDate);
         if (polygonIsland) {
             int coastlines = 0;
             int otherWays = 0;
@@ -256,7 +258,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             }
         }
 
-        
+
         MultipolygonBuilder original = new MultipolygonBuilder();
         original.setId(e.getId());
         boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))

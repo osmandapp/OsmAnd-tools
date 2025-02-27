@@ -160,7 +160,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	private String regionName;
 	private SearchUICore searchUICore;
 	private OsmandRegions osmandRegions;
-	
+
 
 	public OsmExtractionUI() {
 		createUI();
@@ -194,7 +194,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    content.add(statusBarLabel, BorderLayout.SOUTH);
 	    File workingDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
 	    statusBarLabel.setText(workingDir == null ? Messages.getString("OsmExtractionUI.WORKING_DIR_UNSPECIFIED") : Messages.getString("OsmExtractionUI.WORKING_DIRECTORY") + workingDir.getAbsolutePath()); //$NON-NLS-1$ //$NON-NLS-2$
-		
+
 	    String loc = DataExtractionSettings.getSettings().getSearchLocale();
 	    if(loc.isEmpty()) {
 	    	loc = null;
@@ -236,7 +236,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 	    frame.setJMenuBar(bar);
 	}
-	
+
 	JScrollPopupMenu popup;
 	boolean focusPopup = false;
 	private void updateStatusField(final JTextField statusField) {
@@ -244,14 +244,14 @@ public class OsmExtractionUI implements IMapLocationListener {
 		popup.setMaximumVisibleRows(25);
 		popup.setFocusable(false);
 		searchUICore.setOnResultsComplete(new Runnable() {
-			
+
 			@Override
 			public void run() {
 				SwingUtilities.invokeLater(new Runnable() {
-					
+
 					@Override
 					public void run() {
-						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), true);						
+						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), true);
 					}
 				});
 			}
@@ -263,7 +263,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 //					popup.setVisible(false);
 //				}
 			}
-			
+
 			@Override
 			public void focusGained(FocusEvent e) {
 				popup.setFocusable(false);
@@ -317,7 +317,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 //	    			updateSearchResult(statusField, c, false);
 //	    		}
 	    	}
-			
+
 		});
 	    statusField.addActionListener(new ActionListener() {
 
@@ -336,7 +336,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 	}
 
-	
+
 	private void updateSearchResult(final JTextField statusField, SearchResultCollection res, boolean addMore) {
 		popup.setVisible(false);
 		popup.removeAll();
@@ -394,7 +394,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						locationString += " (CLOSED)";
 					}
 				}
-				String r = String.format("%s [%d, %s, %f] ", sr.localeName, sr.getFoundWordCount(), sr.objectType, 
+				String r = String.format("%s [%d, %s, %f] ", sr.localeName, sr.getFoundWordCount(), sr.objectType,
 						sr.getUnknownPhraseMatchWeight()) + locationString;
 				mi.setText(r);
 				mi.addActionListener(new ActionListener() {
@@ -485,8 +485,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 		});
 		return panel;
 	}
-	
-	
+
+
 
 	private void initNativeRendering(String renderingProperties) {
 		String genFile = DataExtractionSettings.getSettings().getRenderGenXmlPath();
@@ -603,7 +603,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 							@Override
 							public void run() {
 								try {
-									SQLiteBigPlanetIndex.createSQLiteDatabase( 
+									SQLiteBigPlanetIndex.createSQLiteDatabase(
 											new net.osmand.SQLiteBigPlanetIndex.SQLiteParams(DataExtractionSettings.getSettings().getTilesDirectory(), regionName, map));
 								} catch (SQLException e1) {
 									throw new IllegalArgumentException(e1);
@@ -777,6 +777,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					} catch (NumberFormatException e) {
 					}
 					IndexCreator creator = new IndexCreator(dir, settings);
+					creator.setLastModifiedDate(f.lastModified());
 					try {
 						String fn = DataExtractionSettings.getSettings().getMapRenderingTypesFile();
 						if(!Algorithms.isEmpty(DataExtractionSettings.getSettings().getPoiTypesFile())) {

@@ -7,6 +7,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,7 +52,7 @@ public class OverpassFetcher {
 		return overpassUrl != null && !overpassUrl.isEmpty();
 	}
 
-	public void fetchCompleteGeometryRelation(Relation relation, OsmDbAccessorContext ctx) {
+	public void fetchCompleteGeometryRelation(Relation relation, OsmDbAccessorContext ctx, Long lastModifiedDate) {
 		List<Long> wayIdsToFetch = getIncompleteWayIdsForRelation(relation);
 		if (wayIdsToFetch.isEmpty()) {
 			return;
@@ -64,10 +66,13 @@ public class OverpassFetcher {
 		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
 
 		// Construct the Overpass QL query
-		// example with date to be used
-//		String query = "[out:json][date:\"2025-02-01T00:00:00Z\"];way(id:" + wayIds + "); out geom;";
-
 		String query = "[out:json];way(id:" + wayIds + "); out geom;";
+		if (lastModifiedDate != null) {
+			Instant instant = Instant.ofEpochMilli(lastModifiedDate);
+			DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+			String formattedDate = formatter.format(instant);
+			query = "[out:json][date:\"" + formattedDate + "\"];way(id:" + wayIds + "); out geom;";
+		}
 		String urlString = overpassUrl + "/api/interpreter";
 
 		try {

@@ -19,6 +19,8 @@ import org.apache.commons.logging.LogFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
@@ -98,13 +100,16 @@ public class IndexRouteRelationCreator {
 
 	private final RelationTagsPropagation transformer;
 	private final MapRenderingTypesEncoder renderingTypes;
+	private final Long lastModifiedDate;
 
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
-	                                 @Nonnull IndexVectorMapCreator indexMapCreator) {
+	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
+									 Long lastModifiedDate) {
 		this.indexPoiCreator = indexPoiCreator;
 		this.indexMapCreator = indexMapCreator;
 		this.transformer = indexMapCreator.tagsTransformer;
 		this.renderingTypes = indexMapCreator.renderingTypes;
+		this.lastModifiedDate = lastModifiedDate;
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 	}
 
@@ -118,7 +123,7 @@ public class IndexRouteRelationCreator {
 			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
 			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
 
-			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx);
+			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx, lastModifiedDate);
 
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
