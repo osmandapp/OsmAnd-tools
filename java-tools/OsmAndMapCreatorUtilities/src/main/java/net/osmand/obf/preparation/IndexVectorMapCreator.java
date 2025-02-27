@@ -1,5 +1,27 @@
 package net.osmand.obf.preparation;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -10,37 +32,34 @@ import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.*;
+import net.osmand.data.LatLon;
+import net.osmand.data.Multipolygon;
+import net.osmand.data.MultipolygonBuilder;
+import net.osmand.data.QuadRect;
+import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.RelationTagsPropagation.PropagateEntityTags;
-import net.osmand.osm.edit.*;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
-import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
-import net.osmand.osm.io.OsmBaseStorage;
-import net.osmand.osm.io.OsmStorageWriter;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import rtree.*;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.sql.*;
-import java.util.*;
-
-import javax.xml.stream.FactoryConfigurationError;
-import javax.xml.stream.XMLStreamException;
+import rtree.Element;
+import rtree.IllegalValueException;
+import rtree.LeafElement;
+import rtree.RTree;
+import rtree.RTreeException;
+import rtree.RTreeInsertException;
+import rtree.Rect;
 
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
@@ -285,24 +304,24 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             // Log the fact that Rings aren't complete, but continue with the relation, try
             // to close it as well as possible
             if (!m.areRingsComplete()) {
-            	
-            	OsmBaseStorage storage = new OsmBaseStorage();
-				for (Multipolygon m2 : multipolygons) {
-					for (Ring r : m2.getOuterRings()) {
-						storage.registerEntity(r.getBorderWay(), null);
-						List<Node> nodes = r.getBorderWay().getNodes();
-						for (Node n : nodes) {
-							storage.registerEntity(n, null);
-						}
-					}
-				}
-				try {
-					new OsmStorageWriter().saveStorage(
-							new FileOutputStream(new File("/Users/victorshcherb/Desktop/test.osm")), storage, null,
-							false);
-				} catch (Exception e1) {
-					e1.printStackTrace();
-				}
+            	// create to test
+//            	OsmBaseStorage storage = new OsmBaseStorage();
+//				for (Multipolygon m2 : multipolygons) {
+//					for (Ring r : m2.getOuterRings()) {
+//						storage.registerEntity(r.getBorderWay(), null);
+//						List<Node> nodes = r.getBorderWay().getNodes();
+//						for (Node n : nodes) {
+//							storage.registerEntity(n, null);
+//						}
+//					}
+//				}
+//				try {
+//					new OsmStorageWriter().saveStorage(
+//							new FileOutputStream(new File("test-broken.osm")), storage, null,
+//							false);
+//				} catch (Exception e1) {
+//					e1.printStackTrace();
+//				}
 
                 logMapDataWarn.warn("In multipolygon  " + e.getId() + " there are incompleted ways");
             }

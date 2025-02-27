@@ -64,7 +64,10 @@ public class OverpassFetcher {
 		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
 
 		// Construct the Overpass QL query
-		String query = "[out:json][date:\"2025-02-01T00:00:00Z\"];way(id:" + wayIds + "); out geom;";
+		// example with date to be used
+//		String query = "[out:json][date:\"2025-02-01T00:00:00Z\"];way(id:" + wayIds + "); out geom;";
+
+		String query = "[out:json];way(id:" + wayIds + "); out geom;";
 		String urlString = overpassUrl + "/api/interpreter";
 
 		try {
