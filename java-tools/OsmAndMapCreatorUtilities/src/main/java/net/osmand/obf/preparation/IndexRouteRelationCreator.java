@@ -48,7 +48,7 @@ public class IndexRouteRelationCreator {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
-	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = true;
+	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = false;
 
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
