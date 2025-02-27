@@ -115,6 +115,9 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
+			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
+			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
+
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
 
 			int hash = getRelationHash(relation);
@@ -131,12 +134,29 @@ public class IndexRouteRelationCreator {
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
 
 			for (Way way : joinedWays) {
-				way.replaceTags(mapSectionTags);
-				indexMapCreator.iterateMainEntity(way, ctx, icc);
+				for (Node node : way.getNodes()) {
+					if (geometryBeforeCompletion.contains(node.getLatLon())) {
+						way.replaceTags(mapSectionTags);
+						indexMapCreator.iterateMainEntity(way, ctx, icc);
+						break; // one-off
+					}
+				}
 			}
 			for (Node node : pointsForPoiSearch) {
-				node.replaceTags(poiSectionTags);
-				indexPoiCreator.iterateEntity(node, ctx, icc);
+				if (geometryBeforeCompletion.contains(node.getLatLon())) {
+					node.replaceTags(poiSectionTags);
+					indexPoiCreator.iterateEntity(node, ctx, icc);
+				}
+			}
+		}
+	}
+
+	private void fillRelationWaysGeometrySet(Relation relation, Set<LatLon> geometryBeforeCompletion) {
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Way way) {
+				for (Node node : way.getNodes()) {
+					geometryBeforeCompletion.add(node.getLatLon());
+				}
 			}
 		}
 	}
