@@ -50,7 +50,7 @@ public class OverpassFetcher {
 		return overpassUrl != null && !overpassUrl.isEmpty();
 	}
 
-	public void fetchCompleteGeometryRelation(Relation relation) {
+	public void fetchCompleteGeometryRelation(Relation relation, OsmDbAccessorContext ctx) {
 		List<Long> wayIdsToFetch = getIncompleteWayIdsForRelation(relation);
 		if (wayIdsToFetch.isEmpty()) {
 			return;
@@ -64,7 +64,7 @@ public class OverpassFetcher {
 		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
 
 		// Construct the Overpass QL query
-		String query = "[out:json];way(id:" + wayIds + "); out geom;";
+		String query = "[out:json][date:\"2025-02-01T00:00:00Z\"];way(id:" + wayIds + "); out geom;";
 		String urlString = overpassUrl + "/api/interpreter";
 
 		try {
@@ -131,6 +131,10 @@ public class OverpassFetcher {
 								double lat = geoms.getJSONObject(j).getDouble("lat");
 								double lon = geoms.getJSONObject(j).getDouble("lon");
 								node = new Node(lat, lon, nodeId);
+							}
+							if (ctx != null) {
+								long nid = ctx.convertId(node);
+								node = new Node(node.getLatitude(), node.getLongitude(), nid);
 							}
 							way.addNode(node);
 						}

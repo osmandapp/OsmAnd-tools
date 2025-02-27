@@ -22,6 +22,8 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
+import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
@@ -30,10 +32,15 @@ import rtree.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.*;
 import java.util.*;
+
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLStreamException;
 
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
@@ -194,7 +201,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue()))
                 && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
         ctx.loadEntityRelation(e);
-        OverpassFetcher.getInstance().fetchCompleteGeometryRelation(e);
+        // 
+        OverpassFetcher.getInstance().fetchCompleteGeometryRelation(e, ctx);
         if (polygonIsland) {
             int coastlines = 0;
             int otherWays = 0;
@@ -277,6 +285,25 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             // Log the fact that Rings aren't complete, but continue with the relation, try
             // to close it as well as possible
             if (!m.areRingsComplete()) {
+            	
+            	OsmBaseStorage storage = new OsmBaseStorage();
+				for (Multipolygon m2 : multipolygons) {
+					for (Ring r : m2.getOuterRings()) {
+						storage.registerEntity(r.getBorderWay(), null);
+						List<Node> nodes = r.getBorderWay().getNodes();
+						for (Node n : nodes) {
+							storage.registerEntity(n, null);
+						}
+					}
+				}
+				try {
+					new OsmStorageWriter().saveStorage(
+							new FileOutputStream(new File("/Users/victorshcherb/Desktop/test.osm")), storage, null,
+							false);
+				} catch (Exception e1) {
+					e1.printStackTrace();
+				}
+
                 logMapDataWarn.warn("In multipolygon  " + e.getId() + " there are incompleted ways");
             }
             Ring out = m.getOuterRings().get(0);

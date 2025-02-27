@@ -41,11 +41,15 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private PreparedStatement iterateWays;
 	private PreparedStatement iterateRelations;
 	private PreparedStatement iterateWayBoundaries;
+	private OsmDbCreator dbCreator;
 
 	public interface OsmDbVisitor {
 		public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException;
 	}
 
+	public OsmDbAccessor() {
+		
+	}
 
 	public void initDatabase()
 			throws SQLException {
@@ -194,6 +198,16 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			e.initializeLinks(map);
 			e.entityDataLoaded();
 		}
+	}
+	
+	public void setCreator(OsmDbCreator dbCreator) {
+		this.dbCreator = dbCreator;
+		
+	}
+	
+	@Override
+	public long convertId(Entity e) {
+		return dbCreator == null ? e.getId() : dbCreator.convertId(e);
 	}
 
 	public void readTags(Entity e, byte[] tags){

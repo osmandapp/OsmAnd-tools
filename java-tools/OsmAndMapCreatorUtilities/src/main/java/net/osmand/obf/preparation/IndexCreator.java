@@ -293,6 +293,7 @@ public class IndexCreator {
 		if (!this.settings.ignorePropagate) {
 			dbCreator.setPropagateToNodes(propagateToNodes);
 		}
+		accessor.setCreator(dbCreator);
 
 		try {
 			setGeneralProgress(progress, "[15 / 100]"); //$NON-NLS-1$
