@@ -48,6 +48,8 @@ public class IndexRouteRelationCreator {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
+	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = false;
+
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
 	private static final String SHIELD_TEXT = "shield_text";
@@ -113,7 +115,11 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
+			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
+			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
+
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx);
+
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
 				log.error(String.format("Route relation %d is incomplete", relation.getId()));
@@ -128,12 +134,29 @@ public class IndexRouteRelationCreator {
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
 
 			for (Way way : joinedWays) {
-				way.replaceTags(mapSectionTags);
-				indexMapCreator.iterateMainEntity(way, ctx, icc);
+				for (Node node : way.getNodes()) {
+					if (geometryBeforeCompletion.contains(node.getLatLon())) {
+						way.replaceTags(mapSectionTags);
+						indexMapCreator.iterateMainEntity(way, ctx, icc);
+						break; // one-off
+					}
+				}
 			}
 			for (Node node : pointsForPoiSearch) {
-				node.replaceTags(poiSectionTags);
-				indexPoiCreator.iterateEntity(node, ctx, icc);
+				if (geometryBeforeCompletion.contains(node.getLatLon())) {
+					node.replaceTags(poiSectionTags);
+					indexPoiCreator.iterateEntity(node, ctx, icc);
+				}
+			}
+		}
+	}
+
+	private void fillRelationWaysGeometrySet(Relation relation, Set<LatLon> geometryBeforeCompletion) {
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Way way) {
+				for (Node node : way.getNodes()) {
+					geometryBeforeCompletion.add(node.getLatLon());
+				}
 			}
 		}
 	}
@@ -226,7 +249,9 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
 
-		// mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
+		if (DEBUG_GENERATE_ROUTE_SEGMENT) {
+			mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
+		}
 		// mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 
 		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
