@@ -67,10 +67,11 @@ public class OverpassFetcher {
 
 		// Construct the Overpass QL query
 		String query = "[out:json];way(id:" + wayIds + "); out geom;";
+		String formattedDate = "";
 		if (lastModifiedDate != null) {
 			Instant instant = Instant.ofEpochMilli(lastModifiedDate);
 			DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
-			String formattedDate = formatter.format(instant);
+			formattedDate = formatter.format(instant);
 			query = "[out:json][date:\"" + formattedDate + "\"];way(id:" + wayIds + "); out geom;";
 		}
 		String urlString = overpassUrl + "/api/interpreter";
@@ -153,7 +154,7 @@ public class OverpassFetcher {
 				// Update the relation with the fetched ways and nodes
 				relation.initializeLinks(fetchedEntities);
 
-				log.info(String.format("Fetched members for relation %d (%.2f sec): %s", relation.getId(),
+				log.info(String.format("Fetched members on date \"%s\" for relation %d (%.2f sec): %s", formattedDate, relation.getId(),
 						(System.currentTimeMillis() - startTime) / 1e3, wayIds));
 			} else {
 				log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
