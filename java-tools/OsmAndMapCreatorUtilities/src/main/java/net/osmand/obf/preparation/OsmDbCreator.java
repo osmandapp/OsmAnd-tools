@@ -82,7 +82,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	private final int additionId;
 	private final boolean generateNewIds;
 	private final boolean addGeoHash;
-	private final boolean isBasemap;
+    private final boolean isBasemap;
 
 	private long generatedId = -100;
 
@@ -96,7 +96,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		// Before for basemap it was true but cause too much memory to keep, so it's simplified
 		this.generateNewIds = false;
 		this.addGeoHash = false;
-		this.isBasemap = isBasemap;
+        this.isBasemap = isBasemap;
 	}
 
 	public OsmDbCreator(boolean addGeoHash) {
@@ -104,7 +104,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this.shiftId = 0;
 		this.generateNewIds = false;
 		this.addGeoHash = addGeoHash;
-		this.isBasemap = false;
+        this.isBasemap = false;
 	}
 
 	public OsmDbCreator() {
@@ -112,7 +112,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this.shiftId = 0;
 		this.generateNewIds = false;
 		this.addGeoHash = true;
-		this.isBasemap = false;
+        this.isBasemap = false;
 	}
 
 
@@ -121,7 +121,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 		int ord = EntityType.valueOf(e).ordinal();
 		if (e instanceof Node) {
-			boolean basemapPositiveId = isBasemap && id > 0;
+            boolean basemapPositiveId = isBasemap && id > 0;
 			// for points id > 0 add always geohash (for basemap points)
 			if (!addGeoHash && !basemapPositiveId) {
 				return getSimpleConvertId(id, EntityType.NODE, true);
@@ -541,5 +541,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public void setPropagateToNodes(PropagateToNodes propagateToNodes) {
 		this.propagateToNodes = propagateToNodes;
 	}
+
 
 }
