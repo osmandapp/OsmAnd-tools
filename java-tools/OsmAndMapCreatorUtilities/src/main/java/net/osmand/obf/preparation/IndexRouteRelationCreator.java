@@ -115,8 +115,12 @@ public class IndexRouteRelationCreator {
 
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
-				log.error(String.format("route relation %d is incomplete", relation.getId()));
-				return; // incomplete relation - skip until supported
+				OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
+				hash = getRelationHash(relation);
+				if (hash == -1) {
+					log.error(String.format("route relation %d is incomplete", relation.getId()));
+					return; // incomplete relation
+				}
 			}
 
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
@@ -472,6 +476,6 @@ public class IndexRouteRelationCreator {
 	}
 
 	public void closeAllStatements() {
-		
+
 	}
 }
