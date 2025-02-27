@@ -48,19 +48,38 @@ public class OverpassFetcher {
         }
 
         // Collect way IDs with missing nodes
-        List<Long> wayIdsToFetch = relation.getMembers().stream()
-                .filter(member -> member.getEntity() instanceof Way)
-                .map(member -> ((Way) member.getEntity()).getId())
-                .filter(wayId -> {
-                    Way way = (Way) relation.getMembers().stream()
-                            .filter(m -> m.getEntity() instanceof Way && ((Way) m.getEntity()).getId() == wayId)
-                            .findFirst()
-                            .map(Relation.RelationMember::getEntity)
-                            .orElse(null);
-                    return way != null && way.getNodes().stream().anyMatch(Objects::isNull);
-                })
-                .collect(Collectors.toList());
+        List<Long> wayIdsToFetch = new ArrayList<>();
+		for (Relation.RelationMember member : relation.getMembers()) {
+			// Check if the member is a Way
+			if (member.getEntity() instanceof Way) {
+				long wayId = ((Way) member.getEntity()).getId();
+				// Find the corresponding Way object in the relation
+				Way way = null;
+				for (Relation.RelationMember m : relation.getMembers()) {
+					if (m.getEntity() instanceof Way && ((Way) m.getEntity()).getId() == wayId) {
+						way = (Way) m.getEntity();
+						break;
+					}
+				}
 
+				// Check if the way has any null nodes
+				if (way != null) {
+					boolean hasNullNodes = false;
+					for (Node node : way.getNodes()) {
+						if (node == null) {
+							hasNullNodes = true;
+							break;
+						}
+					}
+					// If the way has null nodes, add its ID to the list
+					if (hasNullNodes) {
+						wayIdsToFetch.add(wayId);
+					}
+				} else {
+					wayIdsToFetch.add(wayId);
+				}
+			}
+		}
         if (wayIdsToFetch.isEmpty()) {
             return;
         }
