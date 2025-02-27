@@ -48,6 +48,8 @@ public class IndexRouteRelationCreator {
 			// Ignored: power railway road share_taxi subway taxi tracks train tram transhumance trolleybus worship
 	};
 
+	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = true;
+
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
 	private static final String SHIELD_TEXT = "shield_text";
@@ -114,6 +116,7 @@ public class IndexRouteRelationCreator {
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
+
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
 				log.error(String.format("Route relation %d is incomplete", relation.getId()));
@@ -226,7 +229,9 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
 
-		// mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
+		if (DEBUG_GENERATE_ROUTE_SEGMENT) {
+			mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
+		}
 		// mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
 
 		poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
