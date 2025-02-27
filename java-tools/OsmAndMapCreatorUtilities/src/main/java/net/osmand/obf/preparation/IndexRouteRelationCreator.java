@@ -113,14 +113,11 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
+			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
-				OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation);
-				hash = getRelationHash(relation);
-				if (hash == -1) {
-					log.error(String.format("route relation %d is incomplete", relation.getId()));
-					return; // incomplete relation
-				}
+				log.error(String.format("Route relation %d is incomplete", relation.getId()));
+				return; // incomplete relation
 			}
 
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
