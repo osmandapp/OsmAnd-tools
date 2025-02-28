@@ -87,10 +87,12 @@ public class MapUserFileService {
 		for (UserFileUpdate file : files) {
 			if (file.isError) {
 				if (file.time == null) {
+					LOG.warn(String.format("Skipping file %s: isError=true and time is null", file.name));
 					continue;
 				}
 				long time = Long.parseLong(file.time);
 				if (System.currentTimeMillis() - time > ERROR_LIFETIME) {
+					LOG.warn(String.format("Skipping file %s: isError=true and time exceeded ERROR_LIFETIME", file.name));
 					continue;
 				}
 			}
@@ -118,10 +120,12 @@ public class MapUserFileService {
 					in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
 				} catch (Exception e) {
 					String isError = String.format(
-							"web-list-files-error: input-stream-error %s id=%d userid=%d error (%s)",
+							"refreshListFiles error: input-stream-error %s id=%d userid=%d error (%s)",
 							uf.name, uf.id, uf.userid, e.getMessage());
 					LOG.error(isError);
-					saveError(details, uf, isError);
+					saveError(details, isError, uf);
+					nd.details = uf.details;
+					result.add(nd);
 					continue;
 				}
 				if (in != null) {
@@ -130,18 +134,22 @@ public class MapUserFileService {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 					} catch (IOException e) {
 						String loadError = String.format(
-								"web-list-files-error: load-gpx-error %s id=%d userid=%d error (%s)",
+								"refreshListFiles error: load-gpx-error %s id=%d userid=%d error (%s)",
 								uf.name, uf.id, uf.userid, e.getMessage());
 						LOG.error(loadError);
-						saveError(details, uf, loadError);
+						saveError(details, loadError, uf);
+						nd.details = uf.details;
+						result.add(nd);
 						continue;
 					}
 					if (gpxFile.getError() != null) {
 						String corruptedError = String.format(
-								"web-list-files-error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
+								"refreshListFiles error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
 								uf.name, uf.id, uf.userid, gpxFile.getError().getMessage());
 						LOG.error(corruptedError);
-						saveError(details, uf, corruptedError);
+						saveError(details, corruptedError, uf);
+						nd.details = uf.details;
+						result.add(nd);
 						continue;
 					}
 					if (isTrack) {
@@ -151,14 +159,17 @@ public class MapUserFileService {
 					}
 				} else {
 					String noIsError = String.format(
-							"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid);
+							"refreshListFiles error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid);
 					LOG.error(noIsError);
-					saveError(details, uf, noIsError);
+					saveError(details, noIsError, uf);
+					nd.details = uf.details;
+					result.add(nd);
+					continue;
 				}
 				boolean isSharedFile = isShared(nd, shareList);
 				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isSharedFile);
 				saveDetails(newDetails, ANALYSIS, uf);
-				nd.details = uf.details.deepCopy();
+				nd.details = uf.details;
 				result.add(nd);
 			}
 		}
@@ -297,7 +308,7 @@ public class MapUserFileService {
 		}
 	}
 
-	private void saveError(JsonObject details, PremiumUserFilesRepository.UserFile uf, String error) {
+	private void saveError(JsonObject details, String error, PremiumUserFilesRepository.UserFile uf) {
 		if (details == null) {
 			details = new JsonObject();
 		}
