@@ -26,6 +26,7 @@ import java.io.*;
 import java.util.*;
 
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 
 @Controller
 @RequestMapping("/mapapi/fav")
@@ -71,10 +72,24 @@ public class FavoriteController {
         GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
-            data.forEach(d -> {
+            boolean hidden = false;
+            for (String d : data) {
                 WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
-                file.updateWptPt(wptPt.getName(), data.indexOf(d), wptPt, updateTimestamp);
-            });
+                if (!hidden) {
+                    hidden = Objects.requireNonNull(wptPt.getExtensions()).get(HIDDEN_EXTENSION) != null
+                            && wptPt.getExtensions().get(HIDDEN_EXTENSION).equals("true");
+                }
+                file.updateWptPt(Objects.requireNonNull(wptPt.getName()), data.indexOf(d), wptPt, updateTimestamp);
+            }
+
+            // Todo: Fix for / and : in group name
+            String groupName = fileName.replaceAll("^favorites-", "").replaceAll("\\.gpx$", "");
+            boolean groupHidden = file.getPointsGroups().get(groupName).getHidden();
+            if (groupHidden != hidden) {
+                file.getPointsGroups().get(groupName).setHidden(hidden);
+            }
+            file.updatePointsGroup(groupName, file.getPointsGroups().get(groupName));
+
             File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
             Date clienttime = null;
             

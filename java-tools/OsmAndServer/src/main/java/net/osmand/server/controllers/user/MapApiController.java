@@ -2,20 +2,14 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
-import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
-import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
-import net.osmand.shared.gpx.primitives.Metadata;
-import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Buffer;
 
-import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
+import static net.osmand.server.api.services.MapUserFileService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
@@ -31,7 +25,6 @@ import javax.validation.constraints.NotNull;
 
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.services.*;
-import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
@@ -47,7 +40,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -67,31 +59,17 @@ import org.xmlpull.v1.XmlPullParserException;
 public class MapApiController {
 
 	protected static final Log LOG = LogFactory.getLog(MapApiController.class);
-	private static final String ANALYSIS = "analysis";
-	private static final String BBOX = "bbox";
-	private static final String METADATA = "metadata";
-	private static final String SHARE = "share";
-	private static final String SRTM_ANALYSIS = "srtm-analysis";
-	private static final String DONE_SUFFIX = "-done";
-	private static final String FAV_POINT_GROUPS = "pointGroups";
-
-	private static final long ANALYSIS_RERUN = 1738674947073L; // 04-02-2025
 
 	private static final String INFO_KEY = "info";
-
-	private static final int LOG_SLOW_WEB_LIST_FILES_MS = 1000;
-
-	@Autowired
-	PremiumUserFilesRepository userFilesRepository;
 
 	@Autowired
 	AuthenticationManager authManager;
 
 	@Autowired
-	PremiumUsersRepository usersRepository;
-	
+	MapUserFileService mapUserFileService;
+
 	@Autowired
-	PremiumUserDevicesRepository userDevicesRepository;
+	PremiumUsersRepository usersRepository;
 
 	@Autowired
 	UserdataService userdataService;
@@ -104,10 +82,6 @@ public class MapApiController {
 
 	@Autowired
 	protected GpxService gpxService;
-
-	@Autowired
-	WebGpxParser webGpxParser;
-
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -344,195 +318,39 @@ public class MapApiController {
 	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
-	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
-		long start = System.currentTimeMillis();
+	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) {
 		PremiumUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
 		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
-		List <UserFileNoData> filesToIgnore = new ArrayList<>();
-		int cloudReads = 0;
-		int cacheWrites = 0;
 		for (UserFileNoData nd : res.uniqueFiles) {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			boolean isSharedFile = isShared(nd, shareList);
-			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx") && !analysisPresent(ANALYSIS, nd.details);
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx") && !analysisPresentFavorites(ANALYSIS, nd.details);
-			if (isGPZTrack || isFavorite) {
-				Optional<UserFile> of = userFilesRepository.findById(nd.id);
-				if (of.isPresent()) {
-					GpxTrackAnalysis analysis = null;
-					GpxFile gpxFile = null;
-					QuadRect bbox = null;
-					UserFile uf = of.get();
-					InputStream in;
-					try {
-						in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
-						cloudReads++;
-					} catch (Exception e) {
-						LOG.error(String.format(
-								"web-list-files-error: input-stream-error %s id=%d userid=%d error (%s)",
-								uf.name, uf.id, uf.userid, e.getMessage()));
-						filesToIgnore.add(nd);
-						continue;
-					}
-					if (in != null) {
-						in = new GZIPInputStream(in);
-						try (Source source = new Buffer().readFrom(in)) {
-							gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
-						} catch (IOException e) {
-							LOG.error(String.format(
-									"web-list-files-error: load-gpx-error %s id=%d userid=%d error (%s)",
-									uf.name, uf.id, uf.userid, e.getMessage()));
-							filesToIgnore.add(nd);
-							continue;
-						}
-						if (gpxFile.getError() != null) {
-							LOG.error(String.format(
-									"web-list-files-error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
-									uf.name, uf.id, uf.userid, gpxFile.getError().getMessage()));
-							filesToIgnore.add(nd);
-							continue;
-						}
-						if (isGPZTrack) {
-							analysis = getAnalysis(uf, gpxFile);
-							List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
-							bbox = trackAnalyzerService.calculateQuadRect(allPoints);
-						}
-					} else {
-						LOG.error(String.format(
-								"web-list-files-error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid));
-						filesToIgnore.add(nd);
-					}
-					// save details
-					JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isGPZTrack, isFavorite, isSharedFile);
-					saveDetails(newDetails, ANALYSIS, uf);
-					nd.details = uf.details.deepCopy();
-					cacheWrites++;
+			if (!mapUserFileService.detailsPresent(nd.details)) {
+				if (nd.details == null) {
+					nd.details = new JsonObject();
 				}
+				nd.details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 			}
+			boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
 			nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
 			for (UserFileNoData nd : res.allFiles) {
-				addDeviceInformation(nd, devices);
+				mapUserFileService.addDeviceInformation(nd, devices);
 			}
 		}
-
-		long elapsed = System.currentTimeMillis() - start;
-
-		if (LOG_SLOW_WEB_LIST_FILES_MS > 0 && elapsed > LOG_SLOW_WEB_LIST_FILES_MS) {
-			LOG.info(String.format(
-					"web-list-files-slow: userid=%d totalFiles=%d ignoredFiles=%d cloudReads=%d cacheWrites=%d elapsed=%d ms",
-					dev.userid, res.uniqueFiles.size(), filesToIgnore.size(), cloudReads, cacheWrites, elapsed));
-		}
-
-		res.uniqueFiles.removeAll(filesToIgnore);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isFavorite, boolean isShared) {
-		JsonObject details = new JsonObject();
-		if (gpxFile != null) {
-			// add metadata without description
-			Metadata metadata = gpxFile.getMetadata();
-			if (!metadata.isEmpty()) {
-				metadata.setDesc(null);
-				details.add(METADATA, gson.toJsonTree(metadata));
-			}
-			// add point groups for favorites
-			if (isFavorite) {
-				Map<String, WebGpxParser.WebPointsGroup> groups = webGpxParser.getPointsGroups(gpxFile);
-				if (!groups.isEmpty()) {
-					Map<String, Map<String, String>> pointGroupsAnalysis = new HashMap<>();
-					groups.keySet().forEach(k -> {
-						Map<String, String> groupInfo = new HashMap<>();
-						WebGpxParser.WebPointsGroup group = groups.get(k);
-						groupInfo.put("color", group.color);
-						groupInfo.put("groupSize", String.valueOf(group.points.size()));
-						groupInfo.put("hidden", String.valueOf(isHidden(group)));
-						pointGroupsAnalysis.put(k, groupInfo);
-					});
-					details.add(FAV_POINT_GROUPS, gson.toJsonTree(gsonWithNans.toJson(pointGroupsAnalysis)));
-				}
-			}
-			// add track analysis
-			if (isTrack) {
-				if (analysis != null) {
-					Map<String, Object> res = getDetails(analysis);
-					if (!res.isEmpty()) {
-						details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
-					}
-				}
-				if (bbox != null) {
-					JsonObject bboxJson = new JsonObject();
-					bboxJson.addProperty("left", bbox.left);
-					bboxJson.addProperty("top", bbox.top);
-					bboxJson.addProperty("right", bbox.right);
-					bboxJson.addProperty("bottom", bbox.bottom);
-					details.add(BBOX, bboxJson);
-				}
-			}
+	@PostMapping(value = "/refresh-list-files")
+	public ResponseEntity<String> refreshListFiles(@RequestBody List<UserFileUpdate> files) throws IOException {
+		PremiumUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
 		}
-		// add share information
-		details.add(SHARE, gson.toJsonTree(isShared));
-
-		return details;
-	}
-
-	private boolean isShared(UserFileNoData file, List<ShareFileRepository.ShareFile> shareList) {
-		for (ShareFileRepository.ShareFile sf : shareList) {
-			if (sf.getFilepath().equals(file.name) && sf.getType().equals(file.type)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private void addDeviceInformation(UserFileNoData file, Map<Integer, String> devices) {
-		String deviceInfo = devices.get(file.deviceid);
-		if (deviceInfo == null) {
-			PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
-			if (device != null && device.brand != null && device.model != null) {
-				deviceInfo = device.brand + "__model__" + device.model;
-				devices.put(file.deviceid, deviceInfo);
-			}
-		}
-		file.setDeviceInfo(deviceInfo);
-	}
-
-	private boolean isHidden(WebGpxParser.WebPointsGroup group) {
-		for (WebGpxParser.Wpt wpt:  group.points) {
-			if (wpt.hidden != null && wpt.hidden.equals("true")) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private boolean analysisPresent(String tag, UserFile userFile) {
-		if (userFile == null) {
-			return false;
-		}
-		JsonObject details = userFile.details;
-		return analysisPresent(tag, details);
-	}
-
-	private boolean analysisPresent(String tag, JsonObject details) {
-		return details != null && details.has(tag + DONE_SUFFIX)
-				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN
-				&& details.has(tag) && !details.get(tag).isJsonNull();
-	}
-
-	private boolean analysisPresentFavorites(String tag, JsonObject details) {
-		return details != null
-				&& details.has(tag + DONE_SUFFIX)
-				&& details.has(FAV_POINT_GROUPS)
-				&& !details.get(FAV_POINT_GROUPS).getAsString().equals("{}")
-				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
+		return mapUserFileService.refreshListFiles(files, dev);
 	}
 
 	@GetMapping(value = "/download-file")
@@ -609,7 +427,7 @@ public class MapApiController {
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
-			if (analysisPresent(ANALYSIS, userFile)) {
+			if (mapUserFileService.analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
 			in = userdataService.getInputStream(dev, userFile);
@@ -623,9 +441,9 @@ public class MapApiController {
 			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GpxTrackAnalysis analysis = getAnalysis(userFile, gpxFile);
-			if (!analysisPresent(ANALYSIS, userFile)) {
-				saveAnalysis(ANALYSIS, userFile, analysis);
+			GpxTrackAnalysis analysis = mapUserFileService.getAnalysis(userFile, gpxFile);
+			if (!mapUserFileService.analysisPresent(ANALYSIS, userFile)) {
+				mapUserFileService.saveAnalysis(ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
@@ -635,50 +453,6 @@ public class MapApiController {
 		}
 	}
 
-	private GpxTrackAnalysis getAnalysis(UserFile file, GpxFile gpxFile) {
-		gpxFile.setPath(file.name);
-		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
-		gpxService.cleanupFromNan(analysis);
-
-		return analysis;
-	}
-
-	private void saveAnalysis(String tag, UserFile file, GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			if (file.details == null) {
-				file.details = new JsonObject();
-			}
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				file.details.add(tag, gsonWithNans.toJsonTree(res));
-			}
-		}
-		saveDetails(file.details, tag, file);
-	}
-
-	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			Map<String, Object> res = new HashMap<>();
-			analysis.getPointAttributes().clear();
-			res.put("totalDistance", analysis.getTotalDistance());
-			res.put("startTime", analysis.getStartTime());
-			res.put("endTime", analysis.getEndTime());
-			res.put("timeMoving", analysis.getTimeMoving());
-			res.put("points", analysis.getPoints());
-			res.put("wptPoints", analysis.getWptPoints());
-
-			return res;
-		}
-		return Collections.emptyMap();
-	}
-
-	private void saveDetails(JsonObject newDetails, String tag, UserFile file) {
-		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
-		file.details = newDetails;
-		userFilesRepository.save(file);
-	}
-
-
 	@GetMapping(path = {"/get-srtm-gpx-info"}, produces = "application/json")
 	public ResponseEntity<String> getSrtmGpx(@RequestParam(name = "name") String name,
 	                                         @RequestParam(name = "type") String type,
@@ -687,7 +461,7 @@ public class MapApiController {
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
-			if (analysisPresent(SRTM_ANALYSIS, userFile)) {
+			if (mapUserFileService.analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
 			in = userdataService.getInputStream(dev, userFile);
@@ -702,9 +476,9 @@ public class MapApiController {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
-			GpxTrackAnalysis analysis = srtmGpx == null ? null : getAnalysis(userFile, srtmGpx);
-			if (!analysisPresent(SRTM_ANALYSIS, userFile)) {
-				saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
+			GpxTrackAnalysis analysis = srtmGpx == null ? null : mapUserFileService.getAnalysis(userFile, srtmGpx);
+			if (!mapUserFileService.analysisPresent(SRTM_ANALYSIS, userFile)) {
+				mapUserFileService.saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
