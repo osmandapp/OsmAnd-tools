@@ -162,7 +162,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-            LatLon climbingCenter = retrieveClimbingCenter(e, ctx);
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
@@ -184,6 +183,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+			LatLon center = null;
+			if (e instanceof Relation relation) {
+				List<Entity> entities = relation.getMemberEntities("admin_centre");
+				if (entities.size() ==  1) {
+					center = entities.get(0).getLatLon();
+				} else {
+					center = retrieveClimbingCenter(e, ctx);
+				}
+			}
+
 			for (Amenity a : tempAmenityList) {
 				if (icc.basemap) {
 					PoiType st = a.getType().getPoiTypeByKeyName(a.getSubType());
@@ -191,8 +200,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-                if (climbingCenter != null) {
-                    a.setLocation(climbingCenter);
+                if (center != null) {
+                    a.setLocation(center);
                 }
 				// do not add that check because it is too much printing for batch creation
 				// by statistic < 1% creates maps manually
