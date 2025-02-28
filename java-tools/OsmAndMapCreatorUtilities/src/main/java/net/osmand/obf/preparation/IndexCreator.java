@@ -516,10 +516,10 @@ public class IndexCreator {
 		this.indexTransportCreator = new IndexTransportCreator(settings);
 		this.indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		this.indexAddressCreator = new IndexAddressCreator(logMapDataWarn, settings);
-		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes);
+		this.indexMapCreator = new IndexVectorMapCreator(logMapDataWarn, mapZooms, renderingTypes, settings, propagateToNodes, getLastModifiedDate());
 		this.indexRouteCreator = new IndexRouteCreator(renderingTypes, logMapDataWarn, settings, propagateToNodes);
 		this.indexRouteRelationCreatorV1 = new IndexRouteRelationCreatorV1(logMapDataWarn, mapZooms, renderingTypes, settings);
-		this.indexRouteRelationCreatorV2 = new IndexRouteRelationCreator(indexPoiCreator, indexMapCreator);
+		this.indexRouteRelationCreatorV2 = new IndexRouteRelationCreator(indexPoiCreator, indexMapCreator, getLastModifiedDate());
 
 		if (!settings.extraRelations.isEmpty()) {
 			for (File inputFile : settings.extraRelations) {
