@@ -28,7 +28,6 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
-import static net.osmand.server.api.services.UserdataService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 
 @Service
@@ -72,7 +71,7 @@ public class MapUserFileService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 7 * 86400000L; // 1 week
 
-	private static final long ANALYSIS_RERUN = 1738674947073L; // 04-02-2025
+	private static final long ANALYSIS_RERUN = 1709034532000L; // 27-02-2024
 
 	Gson gson = new Gson();
 
@@ -156,9 +155,8 @@ public class MapUserFileService {
 					LOG.error(noIsError);
 					saveError(details, uf, noIsError);
 				}
-				boolean isFavorite = file.type.equals(FILE_TYPE_FAVOURITES);
 				boolean isSharedFile = isShared(nd, shareList);
-				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isFavorite, isSharedFile);
+				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isSharedFile);
 				saveDetails(newDetails, ANALYSIS, uf);
 				nd.details = uf.details.deepCopy();
 				result.add(nd);
@@ -167,13 +165,10 @@ public class MapUserFileService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
-	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isFavorite, boolean isShared) {
+	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isShared) {
 		JsonObject details = new JsonObject();
 		if (gpxFile != null) {
 			addMetadata(details, gpxFile);
-			if (isFavorite) {
-				addFavData(details, gpxFile);
-			}
 			if (isTrack) {
 				addTrackData(details, analysis, bbox);
 			}
