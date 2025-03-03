@@ -324,7 +324,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
+		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, type);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
