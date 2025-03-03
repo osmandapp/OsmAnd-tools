@@ -192,9 +192,8 @@ public class MapUserFileService {
 
 	public boolean detailsPresent(JsonObject details) {
 		return details != null
-				&& !details.has(ERROR_DETAILS)
-				&& detailsErrorWasChecked(details)
 				&& details.has(UPDATETIME)
+				&& (!details.has(ERROR_DETAILS) || detailsErrorWasChecked(details))
 				&& details.get(UPDATETIME).getAsLong() >= ANALYSIS_RERUN;
 	}
 
