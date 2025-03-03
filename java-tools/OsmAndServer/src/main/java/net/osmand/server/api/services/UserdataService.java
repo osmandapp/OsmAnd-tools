@@ -230,6 +230,7 @@ public class UserdataService {
         List<UserFileNoData> fl;
 	    long start = System.currentTimeMillis();
         if (types != null) {
+	        long queryStart = System.currentTimeMillis();
             for (String t : types) {
                 fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
                         filesRepository.listFilesByUserid(userId, name, t);
@@ -238,12 +239,11 @@ public class UserdataService {
                     break;
                 }
             }
-        } else {
-	        long queryStart = System.currentTimeMillis();
-            fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, null) :
-                    filesRepository.listFilesByUserid(userId, name, null);
 	        long queryEnd = System.currentTimeMillis();
 	        LOG.info(String.format("DB Query for all types took %d ms", queryEnd - queryStart));
+        } else {
+            fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, null) :
+                    filesRepository.listFilesByUserid(userId, name, null);
             allFiles.addAll(fl);
         }
 
