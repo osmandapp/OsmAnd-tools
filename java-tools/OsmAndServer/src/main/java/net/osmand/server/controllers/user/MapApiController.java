@@ -329,8 +329,7 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx");
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
-			if ((isGPZTrack || isFavorite) && !mapUserFileService.detailsPresent(nd.details)) {
+			if (isGPZTrack && !mapUserFileService.detailsPresent(nd.details)) {
 				if (nd.details == null) {
 					nd.details = new JsonObject();
 				}
