@@ -324,7 +324,7 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
-		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
+		//List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx");
@@ -335,10 +335,10 @@ public class MapApiController {
 				}
 				nd.details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 			}
-			if (isGPZTrack || isFavorite) {
-				boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
-				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
-			}
+//			if (isGPZTrack || isFavorite) {
+//				boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
+//				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+//			}
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
