@@ -19,6 +19,7 @@ import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VALUE;
@@ -101,8 +102,13 @@ public class ShareFileService {
 		return shareFileRepository.findByOwneridAndFilepath(ownerid, filepath);
 	}
 
-	public List<ShareFileRepository.ShareFile> getFilesByOwner(int ownerid) {
-		return shareFileRepository.findByOwnerid(ownerid);
+	public Map<String, Set<String>> getFilesByOwner(int ownerid) {
+		List<ShareFileRepository.ShareFile> shareList = shareFileRepository.findByOwnerid(ownerid);
+		return shareList.stream()
+				.collect(Collectors.groupingBy(
+						ShareFileRepository.ShareFile::getFilepath,
+						Collectors.mapping(ShareFileRepository.ShareFile::getType, Collectors.toSet())
+				));
 	}
 
 	public ShareFileRepository.ShareFile getFileById(long id) {

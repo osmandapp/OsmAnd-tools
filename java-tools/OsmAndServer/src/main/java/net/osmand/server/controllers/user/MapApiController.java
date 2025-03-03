@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import javax.servlet.ServletException;
@@ -324,22 +325,29 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
-		//List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
-		for (UserFileNoData nd : res.uniqueFiles) {
+		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
+
+		res.uniqueFiles.forEach(nd -> {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx");
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
-			if (isGPZTrack && !mapUserFileService.detailsPresent(nd.details)) {
-				if (nd.details == null) {
-					nd.details = new JsonObject();
+			boolean isGpx = "gpx".equalsIgnoreCase(ext);
+
+			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && isGpx;
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && isGpx;
+
+			if (isGPZTrack) {
+				JsonObject details = nd.details != null ? nd.details : new JsonObject();
+				if (!mapUserFileService.detailsPresent(details)) {
+					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
-				nd.details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
+				nd.details = details;
 			}
-//			if (isGPZTrack || isFavorite) {
-//				boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
-//				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
-//			}
-		}
+
+			if (isGPZTrack || isFavorite) {
+				boolean isSharedFile = mapUserFileService.isShared(nd, sharedFilesMap);
+				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+			}
+		});
+
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
 			for (UserFileNoData nd : res.allFiles) {

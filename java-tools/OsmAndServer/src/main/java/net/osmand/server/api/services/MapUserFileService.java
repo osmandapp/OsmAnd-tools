@@ -6,7 +6,6 @@ import com.google.gson.JsonObject;
 import net.osmand.data.QuadRect;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
-import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
@@ -82,7 +81,7 @@ public class MapUserFileService {
 
 
 	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
-		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
+		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 		List<PremiumUserFilesRepository.UserFileNoData> result = new ArrayList<>();
 		for (UserFileUpdate file : files) {
 			if (file.isError) {
@@ -166,7 +165,7 @@ public class MapUserFileService {
 					result.add(nd);
 					continue;
 				}
-				boolean isSharedFile = isShared(nd, shareList);
+				boolean isSharedFile = isShared(nd, sharedFilesMap);
 				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isSharedFile);
 				saveDetails(newDetails, ANALYSIS, uf);
 				nd.details = uf.details;
@@ -218,13 +217,9 @@ public class MapUserFileService {
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
-	public boolean isShared(PremiumUserFilesRepository.UserFileNoData file, List<ShareFileRepository.ShareFile> shareList) {
-		for (ShareFileRepository.ShareFile sf : shareList) {
-			if (sf.getFilepath().equals(file.name) && sf.getType().equals(file.type)) {
-				return true;
-			}
-		}
-		return false;
+	public boolean isShared(PremiumUserFilesRepository.UserFileNoData file, Map<String, Set<String>> sharedFilesMap) {
+		Set<String> types = sharedFilesMap.get(file.name);
+		return types != null && types.contains(file.type);
 	}
 
 	public void addDeviceInformation(PremiumUserFilesRepository.UserFileNoData file, Map<Integer, String> devices) {
