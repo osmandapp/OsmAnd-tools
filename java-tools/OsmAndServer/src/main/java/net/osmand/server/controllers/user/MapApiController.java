@@ -6,7 +6,6 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
-import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.MapUserFileService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -329,14 +328,17 @@ public class MapApiController {
 		for (UserFileNoData nd : res.uniqueFiles) {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
 			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx");
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
 			if (isGPZTrack && !mapUserFileService.detailsPresent(nd.details)) {
 				if (nd.details == null) {
 					nd.details = new JsonObject();
 				}
 				nd.details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 			}
-			boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
-			nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+			if (isGPZTrack || isFavorite) {
+				boolean isSharedFile = mapUserFileService.isShared(nd, shareList);
+				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+			}
 		}
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();

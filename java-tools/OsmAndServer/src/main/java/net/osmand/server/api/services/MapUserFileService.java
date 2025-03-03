@@ -69,7 +69,7 @@ public class MapUserFileService {
 	public static final String UPDATE_DETAILS = "update";
 
 	private static final String ERROR_DETAILS = "error";
-	private static final long ERROR_LIFETIME = 7 * 86400000L; // 1 week
+	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
 	private static final long ANALYSIS_RERUN = 1709034532000L; // 27-02-2024
 
@@ -193,8 +193,16 @@ public class MapUserFileService {
 	public boolean detailsPresent(JsonObject details) {
 		return details != null
 				&& !details.has(ERROR_DETAILS)
+				&& detailsErrorWasChecked(details)
 				&& details.has(UPDATETIME)
 				&& details.get(UPDATETIME).getAsLong() >= ANALYSIS_RERUN;
+	}
+
+	public boolean detailsErrorWasChecked(JsonObject details) {
+		return details != null
+				&& details.has(ERROR_DETAILS)
+				&& details.has(UPDATETIME)
+				&& System.currentTimeMillis() - details.get(UPDATETIME).getAsLong() < ERROR_LIFETIME;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {
