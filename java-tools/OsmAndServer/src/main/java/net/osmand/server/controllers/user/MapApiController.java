@@ -6,6 +6,7 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
+import static net.osmand.server.api.services.FavoriteService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.MapUserFileService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -326,7 +327,10 @@ public class MapApiController {
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, type);
 		List<ShareFileRepository.ShareFile> shareList = shareFileService.getFilesByOwner(dev.userid);
 		for (UserFileNoData nd : res.uniqueFiles) {
-			if (!mapUserFileService.detailsPresent(nd.details)) {
+			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
+			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && ext.equalsIgnoreCase("gpx");
+			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && ext.equalsIgnoreCase("gpx");
+			if ((isGPZTrack || isFavorite) && !mapUserFileService.detailsPresent(nd.details)) {
 				if (nd.details == null) {
 					nd.details = new JsonObject();
 				}
