@@ -228,7 +228,7 @@ public class UserdataService {
     public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
         List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
         List<UserFileNoData> fl;
-
+	    long start = System.currentTimeMillis();
         if (types != null) {
             for (String t : types) {
                 fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
@@ -239,13 +239,28 @@ public class UserdataService {
                 }
             }
         } else {
+	        long queryStart = System.currentTimeMillis();
             fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, null) :
                     filesRepository.listFilesByUserid(userId, name, null);
+	        long queryEnd = System.currentTimeMillis();
+	        LOG.info(String.format("DB Query for all types took %d ms", queryEnd - queryStart));
             allFiles.addAll(fl);
         }
 
+	    long sanitizeStart = System.currentTimeMillis();
         sanitizeFileNames(allFiles);
-        return getUserFilesResults(allFiles, userId, allVersions);
+	    long sanitizeEnd = System.currentTimeMillis();
+	    LOG.info(String.format("sanitizeFileNames took %d ms", sanitizeEnd - sanitizeStart));
+
+	    long resultsStart = System.currentTimeMillis();
+	    UserdataController.UserFilesResults result = getUserFilesResults(allFiles, userId, allVersions);
+	    long resultsEnd = System.currentTimeMillis();
+	    LOG.info(String.format("getUserFilesResults took %d ms", resultsEnd - resultsStart));
+
+	    long end = System.currentTimeMillis();
+	    LOG.info(String.format("Total generateFiles execution time: %d ms", end - start));
+
+	    return result;
     }
 
 	private void sanitizeFileNames(List<UserFileNoData> files) {
