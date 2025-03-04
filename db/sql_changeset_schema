@@ -38,6 +38,9 @@ ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
 CREATE INDEX user_account_devices_userid_idx on user_account_devices(userid);
 CREATE INDEX user_files_userid_idx on user_files(userid);
 CREATE INDEX user_files_deviceid_idx on user_files(deviceid);
+CREATE INDEX user_files_name_idx on user_files(name);
+CREATE INDEX user_files_type_idx on user_files(type);
+CREATE INDEX user_files_updatetime_idx on user_files(updatetime);
 
 -- share file
 CREATE TABLE user_share_files (

@@ -225,28 +225,28 @@ public class UserdataService {
         }
     }
 
-    public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
-        List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
-        List<UserFileNoData> fl;
+	public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
+		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+		List<UserFileNoData> fl;
+		if (types != null) {
+			for (String t : types) {
+				fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
+						filesRepository.listFilesByUserid(userId, name, t);
+				allFiles.addAll(fl);
+				if (t == null) {
+					break;
+				}
+			}
+		} else {
+			fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, null) :
+					filesRepository.listFilesByUserid(userId, name, null);
+			allFiles.addAll(fl);
+		}
 
-        if (types != null) {
-            for (String t : types) {
-                fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
-                        filesRepository.listFilesByUserid(userId, name, t);
-                allFiles.addAll(fl);
-                if (t == null) {
-                    break;
-                }
-            }
-        } else {
-            fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, null) :
-                    filesRepository.listFilesByUserid(userId, name, null);
-            allFiles.addAll(fl);
-        }
+		sanitizeFileNames(allFiles);
 
-        sanitizeFileNames(allFiles);
-        return getUserFilesResults(allFiles, userId, allVersions);
-    }
+		return getUserFilesResults(allFiles, userId, allVersions);
+	}
 
 	private void sanitizeFileNames(List<UserFileNoData> files) {
 		for(UserFileNoData f : files) {
