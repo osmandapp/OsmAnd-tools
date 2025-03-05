@@ -592,6 +592,7 @@ public class MapApiController {
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
 		final String NICKNAME = "nickname";
+		final String PURCHASES = "purchases";
 
 		PremiumUserDevice dev = osmAndMapsService.checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
@@ -605,6 +606,11 @@ public class MapApiController {
 			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
+			if (subscriptions.isEmpty()) {
+				info.put(ACCOUNT_KEY, FREE_ACCOUNT);
+				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
+			}
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
 					.filter(s -> s.valid)
 					.findFirst()
@@ -618,6 +624,9 @@ public class MapApiController {
 				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
+			info.put(PURCHASES, gson.toJson(subscriptions.stream()
+					.map(s -> Map.of(TYPE_SUB, s.sku, START_TIME_KEY, s.starttime, EXPIRE_TIME_KEY, s.expiretime))
+					.toList()));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
