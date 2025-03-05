@@ -19,8 +19,6 @@ import org.apache.commons.logging.LogFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;

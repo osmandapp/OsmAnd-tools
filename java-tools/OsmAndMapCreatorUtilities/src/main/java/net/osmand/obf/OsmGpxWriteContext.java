@@ -79,7 +79,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
-	private final static NumberFormat distanceFormat = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.US));
+	private final static NumberFormat distanceFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 
 	public final QueryParams qp;
@@ -437,7 +437,7 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addAnalysisTags(Map<String, String> gpxTrackTags, GpxTrackAnalysis analysis) {
-		gpxTrackTags.put("distance", distanceFormat.format(analysis.getTotalDistance()));
+		gpxTrackTags.put("distance", distanceFormat.format(analysis.getTotalDistance() / 1000));
 		if (analysis.isTimeSpecified()) {
 			gpxTrackTags.put("time_span", analysis.getTimeSpan() + "");
 			gpxTrackTags.put("time_span_no_gaps", analysis.getTimeSpanWithoutGaps() + "");
