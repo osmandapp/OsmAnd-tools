@@ -5,13 +5,7 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.IdClass;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import javax.persistence.*;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -24,6 +18,8 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
 	
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
+
+	List<SupporterDeviceSubscription> findAllByUserId(int userId);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
 	@Entity
@@ -81,6 +77,10 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 		@Column(name = "introcycles")
 		public Integer introcycles ;
+
+		@ManyToOne
+		@JoinColumn(name = "userid", nullable = false)
+		private PremiumUsersRepository.PremiumUser user;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {

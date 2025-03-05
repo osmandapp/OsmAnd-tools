@@ -15,10 +15,12 @@ CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 
 --- Main primary key orderid + sku (alternative purchasetoken + sku  but there could be multiple orderid for same purchaseToken)
-CREATE TABLE supporters_device_sub(sku text, purchasetoken text, prevvalidpurchasetoken text, timestamp timestamp,
+CREATE TABLE supporters_device_sub(userid INTEGER NOT NULL, sku text, purchasetoken text, prevvalidpurchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
-        paymentstate int, valid boolean, checktime timestamp);
+        paymentstate int, valid boolean, checktime timestamp, 
+CONSTRAINT fk_supporters_device_sub_user FOREIGN KEY (userid) REFERENCES user_accounts(id) ON DELETE CASCADE
+);
 CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
 CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
 CREATE INDEX supporters_device_sub_orderid_idx on supporters_device_sub(orderid);
