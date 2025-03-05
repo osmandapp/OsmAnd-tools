@@ -712,13 +712,4 @@ public class MapApiController {
 		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
 	}
 
-	@PostMapping(path = {"/add-purchase"}, produces = "application/json")
-	public ResponseEntity<String> addPurchase(@RequestBody String code) {
-		PremiumUserDevice dev = osmAndMapsService.checkUser();
-		if (dev == null) {
-			return userdataService.tokenNotValidResponse();
-		}
-		return ResponseEntity.ok(gson.toJson(userdataService.addPurchase(code, dev)));
-	}
-
 }

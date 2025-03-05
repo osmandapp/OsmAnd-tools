@@ -1289,6 +1289,7 @@ public class UserdataService {
 		}
 		purchase.user = user;
 		subscriptionsRepository.saveAndFlush(purchase);
+
 		return ResponseEntity.ok("Purchase added");
 	}
 }
