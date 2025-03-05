@@ -26,6 +26,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.transaction.Transactional;
 
 import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.io.KFile;
@@ -101,6 +102,9 @@ public class UserdataService {
 
     @Autowired
     EmailSenderService emailSender;
+
+	@Autowired
+	DeviceSubscriptionsRepository subscriptionsRepository;
 
     @Autowired
     protected PremiumUserDevicesRepository devicesRepository;
@@ -1265,5 +1269,26 @@ public class UserdataService {
 				files.put(userFile.name, file);
 			}
 		}
+	}
+
+	public ResponseEntity<String> addPurchase(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+		PremiumUsersRepository.PremiumUser user = getUserById(dev.userid);
+		if (user == null) {
+			return ResponseEntity.ok("User not found");
+		}
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> purchases = subscriptionsRepository.findByOrderId(code);
+		if (purchases.isEmpty()) {
+			return ResponseEntity.ok("No purchase found");
+		}
+		if (purchases.size() > 1) {
+			return ResponseEntity.ok("Multiple purchases found");
+		}
+		DeviceSubscriptionsRepository.SupporterDeviceSubscription purchase = purchases.get(0);
+		if (purchase.user != null) {
+			return ResponseEntity.ok("Purchase already added");
+		}
+		purchase.user = user;
+		subscriptionsRepository.saveAndFlush(purchase);
+		return ResponseEntity.ok("Purchase added");
 	}
 }

@@ -80,7 +80,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 		@ManyToOne
 		@JoinColumn(name = "userid", nullable = false)
-		private PremiumUsersRepository.PremiumUser user;
+		public PremiumUsersRepository.PremiumUser user;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
