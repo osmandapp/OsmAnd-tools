@@ -79,7 +79,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		public Integer introcycles ;
 
 		@ManyToOne
-		@JoinColumn(name = "userid", nullable = false)
+		@JoinColumn(name = "userid")
 		public PremiumUsersRepository.PremiumUser user;
 	}
 
