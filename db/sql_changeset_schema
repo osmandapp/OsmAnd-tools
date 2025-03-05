@@ -15,7 +15,7 @@ CREATE SEQUENCE supporters_seq START 1000;
 ALTER TABLE supporters ADD PRIMARY KEY (userid);
 
 --- Main primary key orderid + sku (alternative purchasetoken + sku  but there could be multiple orderid for same purchaseToken)
-CREATE TABLE supporters_device_sub(userid INTEGER NOT NULL, sku text, purchasetoken text, prevvalidpurchasetoken text, timestamp timestamp,
+CREATE TABLE supporters_device_sub(userid INTEGER, sku text, purchasetoken text, prevvalidpurchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
         paymentstate int, valid boolean, checktime timestamp, 
