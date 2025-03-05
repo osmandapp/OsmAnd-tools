@@ -395,6 +395,12 @@ public class OsmGpxWriteContext {
 	private void addNameDescDisplaycolor(Map<String, String> gpxTrackTags, Map<String, String> extensionsExtraTags, Track t) {
 		if (t != null) {
 			if (!Algorithms.isEmpty(t.getName())) {
+				if (gpxTrackTags.containsKey("name") && gpxTrackTags.containsKey("filename")) {
+					if (!t.getName().equals(gpxTrackTags.get("name"))) {
+						// allow filename search if the original name is changed
+						gpxTrackTags.put("name:file", gpxTrackTags.get("filename"));
+					}
+				}
 				gpxTrackTags.put("name", t.getName());
 			}
 			if (!Algorithms.isEmpty(t.getDesc())) {
