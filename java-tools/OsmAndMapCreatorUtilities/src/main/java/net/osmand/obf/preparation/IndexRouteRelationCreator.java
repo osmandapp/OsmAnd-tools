@@ -120,7 +120,7 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
-			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
+			Set<LatLon> geometryBeforeCompletion = new HashSet<>(); // TODO TLongHashset long point = (x31 << 31) + y31
 			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
 
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx, lastModifiedDate);
@@ -203,6 +203,7 @@ public class IndexRouteRelationCreator {
 		}
 
 		if (distance > 0) {
+			// TODO put or putIfAbsent or add new track_distance tag?
 			tagsToFill.putIfAbsent("distance", String.valueOf((int) distance));
 		}
 
