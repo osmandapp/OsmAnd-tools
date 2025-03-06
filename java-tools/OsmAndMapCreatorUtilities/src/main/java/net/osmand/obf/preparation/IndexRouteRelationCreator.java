@@ -61,8 +61,11 @@ public class IndexRouteRelationCreator {
 	private static final String ROUTE = "route";
 
 	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+
 	public static final int MAX_JOINED_POINTS_PER_SEGMENT = 2000; // ~25m * 2000 = ~50 km (optimize Map-section)
-	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
+
+	public static final int POI_SEARCH_POINTS_INTERVAL_M = 5000; // store segments as POI-points every 5 km
+	public static final int POI_SEARCH_POINTS_EDGE_DISTANCE_M = 100; // distance POI-points from edges of the Way (100m)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
@@ -188,18 +191,29 @@ public class IndexRouteRelationCreator {
 			List<Node> localPoints = new ArrayList<>();
 			List<Node> nodes = way.getNodes();
 			if (nodes.size() >= 2) {
+				// place the very first point in the approx middle
+				LatLon middle = nodes.get(nodes.size() / 2).getLatLon();
+				long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
+				localPoints.add(new Node(middle.getLatitude(), middle.getLongitude(), nodeId));
+
 				for (int i = 1; i < nodes.size(); i++) {
-					LatLon firstLatLon = nodes.get(i - 1).getLatLon();
-					LatLon secondLatLon = nodes.get(i).getLatLon();
-					if (localPoints.isEmpty() ||
-							MapUtils.getDistance(firstLatLon, localPoints.get(localPoints.size() - 1).getLatLon())
-									> POI_SEARCH_POINTS_DISTANCE_M) {
-						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
-						localPoints.add(new Node(firstLatLon.getLatitude(), firstLatLon.getLongitude(), nodeId));
-						shortLinkTiles.add(MapUtils.createShortLinkString(
-								firstLatLon.getLatitude(), firstLatLon.getLongitude(), SHORT_LINK_ZOOM - 8));
+					LatLon currentLatLon = nodes.get(i).getLatLon();
+					LatLon previousLatLon = nodes.get(i - 1).getLatLon();
+					distance += MapUtils.getDistance(currentLatLon, previousLatLon);
+
+					// place the very next points close to start/end
+					// afterward, spread points evenly along the geometry
+					int alternateIndex = i % 2 == 0 ? i : nodes.size() - i - 1;
+					LatLon candidate = nodes.get(alternateIndex).getLatLon();
+					double distStart = MapUtils.getDistance(candidate, nodes.get(0).getLatLon());
+					double distEnd = MapUtils.getDistance(candidate, nodes.get(nodes.size() - 1).getLatLon());
+					if (distStart > POI_SEARCH_POINTS_EDGE_DISTANCE_M && distEnd > POI_SEARCH_POINTS_EDGE_DISTANCE_M) {
+						if (localPoints.stream().noneMatch(node ->
+								MapUtils.getDistance(candidate, node.getLatLon()) < POI_SEARCH_POINTS_INTERVAL_M)) {
+							nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
+							localPoints.add(new Node(candidate.getLatitude(), candidate.getLongitude(), nodeId));
+						}
 					}
-					distance += MapUtils.getDistance(firstLatLon, secondLatLon);
 				}
 			}
 			pointsForPoiSearch.addAll(localPoints);
@@ -220,6 +234,8 @@ public class IndexRouteRelationCreator {
 			);
 
 			if (radius > MIN_RADIUS_FOR_SHORT_LINK) {
+				pointsForPoiSearch.forEach(node -> shortLinkTiles.add(MapUtils
+						.createShortLinkString(node.getLatitude(), node.getLongitude(), SHORT_LINK_ZOOM - 8)));
 				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.bottom, bbox.left, SHORT_LINK_ZOOM - 8));
 				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.top, bbox.right, SHORT_LINK_ZOOM - 8));
 				tagsToFill.put("route_shortlink_tiles", String.join(",", shortLinkTiles));

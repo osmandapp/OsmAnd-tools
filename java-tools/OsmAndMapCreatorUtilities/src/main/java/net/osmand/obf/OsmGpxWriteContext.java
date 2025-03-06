@@ -213,7 +213,7 @@ public class OsmGpxWriteContext {
 					writePoint(baseOsmId--, p, null, null, null);
 					if (pointsForPoiSearch.isEmpty() ||
 							MapUtils.getDistance(pointsForPoiSearch.get(pointsForPoiSearch.size() - 1),
-									new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_DISTANCE_M) {
+									new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_INTERVAL_M) {
 						pointsForPoiSearch.add(new LatLon(p.getLatitude(), p.getLongitude()));
 					}
 				}
