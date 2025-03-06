@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import com.google.gson.Gson;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
@@ -44,6 +45,8 @@ public class ShareFileService {
 	UserdataService userdataService;
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
+
+	Gson gson = new Gson();
 
 	public enum PermissionType {
 		READ,
@@ -217,7 +220,7 @@ public class ShareFileService {
 	}
 
 	public PremiumUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {
-		return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.name, file.type);
+		return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
 	}
 
 	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
@@ -270,6 +273,7 @@ public class ShareFileService {
 				continue;
 			}
 			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
+			userFile.details.add("shareFileName", gson.toJsonTree(file.name));
 			allFiles.add(userFile);
 		}
 		return userdataService.getUserFilesResults(allFiles, userid, false);
@@ -289,11 +293,11 @@ public class ShareFileService {
 		return files;
 	}
 
-	public PremiumUserFilesRepository.UserFile getSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+	public PremiumUserFilesRepository.UserFile getSharedWithMeFile(String filepath, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
-			if (file.name.equals(name) && file.type.equals(type)) {
+			if (file.filepath.equals(filepath) && file.type.equals(type)) {
 				return getUserFile(file);
 			}
 		}
@@ -304,7 +308,7 @@ public class ShareFileService {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
-			if (file.name.equals(name) && file.type.equals(type)) {
+			if (file.filepath.equals(name) && file.type.equals(type)) {
 				shareFileRepository.removeShareFilesAccessById(file.getId(), dev.userid);
 				return true;
 			}
@@ -316,7 +320,7 @@ public class ShareFileService {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
-			if (file.name.equals(name) && file.type.equals(type)) {
+			if (file.filepath.equals(name) && file.type.equals(type)) {
 				PremiumUserFilesRepository.UserFile userFile = getUserFile(file);
 				if (userFile != null) {
 					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
