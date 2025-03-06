@@ -209,14 +209,36 @@ public class OsmGpxWriteContext {
 				// 1. Write points as <node> for the following <way> [MAP-section]
 				List<LatLon> pointsForPoiSearch = new ArrayList<>();
 				long idStart = baseOsmId;
-				for (WptPt p : s.getPoints()) {
-					writePoint(baseOsmId--, p, null, null, null);
-					if (pointsForPoiSearch.isEmpty() ||
-							MapUtils.getDistance(pointsForPoiSearch.get(pointsForPoiSearch.size() - 1),
-									new LatLon(p.getLatitude(), p.getLongitude())) > POI_SEARCH_POINTS_INTERVAL_M) {
-						pointsForPoiSearch.add(new LatLon(p.getLatitude(), p.getLongitude()));
+
+				List<WptPt> points = s.getPoints();
+				if (points.size() >= 2) {
+					// place the very first point in the approx middle
+					WptPt middle = points.get(points.size() / 2);
+					pointsForPoiSearch.add(new LatLon(middle.getLatitude(), middle.getLongitude()));
+
+					for (int i = 0; i < points.size(); i++) {
+						writePoint(baseOsmId--, points.get(i), null, null, null);
+
+						// place the very next points close to start/end
+						// afterward, spread points evenly along the geometry
+						int alternateIndex = i % 2 == 0 ? i : points.size() - i - 1;
+						WptPt candidate = points.get(alternateIndex);
+						WptPt firstPoint = points.get(0);
+						WptPt lastPoint = points.get(points.size() - 1);
+						double distStart = MapUtils.getDistance(candidate.getLatitude(), candidate.getLongitude(),
+								firstPoint.getLatitude(), firstPoint.getLongitude());
+						double distEnd = MapUtils.getDistance(candidate.getLatitude(), candidate.getLongitude(),
+								lastPoint.getLatitude(), lastPoint.getLongitude());
+						if (distStart > POI_SEARCH_POINTS_EDGE_DISTANCE_M && distEnd > POI_SEARCH_POINTS_EDGE_DISTANCE_M) {
+							if (pointsForPoiSearch.stream().noneMatch(wpt ->
+									MapUtils.getDistance(candidate.getLatitude(), candidate.getLongitude(),
+											wpt.getLatitude(), wpt.getLongitude()) < POI_SEARCH_POINTS_INTERVAL_M)) {
+								pointsForPoiSearch.add(new LatLon(candidate.getLatitude(), candidate.getLongitude()));
+							}
+						}
 					}
 				}
+
 				long idEnd = baseOsmId;
 
 				// 2. Write segment as <way> (without route_type tag) [MAP-section]
