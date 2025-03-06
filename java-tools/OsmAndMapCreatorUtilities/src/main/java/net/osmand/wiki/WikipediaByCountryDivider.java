@@ -90,7 +90,7 @@ public class WikipediaByCountryDivider {
 
 	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB,  boolean skip)
 			throws SQLException, IOException, InterruptedException, XmlPullParserException {
-		generateCountrySqlite(folder, database, skip, wikiRankingDB, skip, null);
+		generateCountrySqlite(folder, database, wikiRankingDB, skip, null);
 	}
 
 	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB, boolean skip, String[] testLatLon)
