@@ -79,7 +79,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class OsmGpxWriteContext {
-	private final static NumberFormat distanceFormat = new DecimalFormat("0.00", new DecimalFormatSymbols(Locale.US));
+	private final static NumberFormat distanceFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 	private final static NumberFormat latLonFormat = new DecimalFormat("0.00#####", new DecimalFormatSymbols(Locale.US));
 
 	public final QueryParams qp;
@@ -395,6 +395,12 @@ public class OsmGpxWriteContext {
 	private void addNameDescDisplaycolor(Map<String, String> gpxTrackTags, Map<String, String> extensionsExtraTags, Track t) {
 		if (t != null) {
 			if (!Algorithms.isEmpty(t.getName())) {
+				if (gpxTrackTags.containsKey("name") && gpxTrackTags.containsKey("filename")) {
+					if (!t.getName().equals(gpxTrackTags.get("name"))) {
+						// allow filename search if the original name is changed
+						gpxTrackTags.put("name:file", gpxTrackTags.get("filename"));
+					}
+				}
 				gpxTrackTags.put("name", t.getName());
 			}
 			if (!Algorithms.isEmpty(t.getDesc())) {
@@ -437,7 +443,7 @@ public class OsmGpxWriteContext {
 	}
 
 	private void addAnalysisTags(Map<String, String> gpxTrackTags, GpxTrackAnalysis analysis) {
-		gpxTrackTags.put("distance", distanceFormat.format(analysis.getTotalDistance()));
+		gpxTrackTags.put("distance", distanceFormat.format(analysis.getTotalDistance() / 1000));
 		if (analysis.isTimeSpecified()) {
 			gpxTrackTags.put("time_span", analysis.getTimeSpan() + "");
 			gpxTrackTags.put("time_span_no_gaps", analysis.getTimeSpanWithoutGaps() + "");
