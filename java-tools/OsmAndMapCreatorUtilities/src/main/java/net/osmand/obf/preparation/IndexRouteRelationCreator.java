@@ -19,6 +19,9 @@ import org.apache.commons.logging.LogFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
 import java.util.*;
 
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
@@ -99,6 +102,8 @@ public class IndexRouteRelationCreator {
 	private final RelationTagsPropagation transformer;
 	private final MapRenderingTypesEncoder renderingTypes;
 	private final Long lastModifiedDate;
+
+	private final static NumberFormat distanceKmFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
@@ -201,7 +206,7 @@ public class IndexRouteRelationCreator {
 		}
 
 		if (distance > 0) {
-			tagsToFill.putIfAbsent("distance", String.valueOf((int) distance));
+			tagsToFill.put("distance", distanceKmFormat.format(distance / 1000));
 		}
 
 		if (!bbox.hasInitialState()) {
