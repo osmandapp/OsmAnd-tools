@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -152,16 +153,16 @@ public class WikipediaByCountryDivider {
 			}
 			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName.toLowerCase());
 			boolean hasWiki = false;
-			if(list != null) {
-				for(BinaryMapDataObject o : list) {
+			if (list != null) {
+				for (BinaryMapDataObject o : list) {
 					Integer rl = o.getMapIndex().getRule("region_wiki", "yes");
-					if(o.containsAdditionalType(rl)) {
+					if (o.containsAdditionalType(rl)) {
 						hasWiki = true;
 						break;
 					}
 				}
 			}
-			if(!hasWiki) {
+			if (!hasWiki) {
 				System.out.println("Skip " + lcRegionName.toLowerCase() + " doesn't generate wiki");
 				continue;
 			}
@@ -175,7 +176,7 @@ public class WikipediaByCountryDivider {
 			}
 			if(!osmGz.exists()) {
 				System.out.println("Generate " + osmGz.getName());
-				generateOsmFile(conn, rs.getString(1), preferredLang, osmGz, testLatLon);
+				generateOsmFile(conn, rs.getString(1), preferredLang, wikiRankingConn, osmGz, testLatLon);
 			}
 			obfFile.delete();
 			generateObf(osmGz, obfFile);
@@ -187,8 +188,18 @@ public class WikipediaByCountryDivider {
 		
 	}
 
-	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, File osmGz,
+	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, Connection wikiRankingConn, File osmGz,
 	                                    String[] testLatLon) throws SQLException, IOException {
+
+//	    "id INTEGER PRIMARY KEY" "photoId INTEGER" "photoTitle TEXT" "catId INTEGER" "catTitle TEXT"
+//	    "poikey TEXT" "wikiTitle TEXT" "osmid INTEGER" "osmtype INTEGER"  "lat REAL" "lon REAL"
+//	    "elo REAL" "qrank INTEGER" "topic INTEGER" "categories TEXT"
+		PreparedStatement rankById = null;
+		if (wikiRankingConn != null) {
+			rankById = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
+					+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_ranking WHERE id = ?");
+		}
+
 		String query;
 		if (testLatLon == null) {
 			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent FROM wiki_region WR"
@@ -226,6 +237,24 @@ public class WikipediaByCountryDivider {
 			double lat = rps.getDouble(2);
 			double lon = rps.getDouble(3);
 			long wikiId = rps.getLong(1);
+			int travelElo = 0;
+			int qrank = 0;
+			int travelTopic = 0;
+			String photoTitle = null;
+			String catTitle = null;
+			if(rankById != null) {
+				rankById.setLong(1, wikiId);
+				ResultSet rankId = rankById.executeQuery();
+				if (rankId.next()) {
+					travelElo = rankId.getInt("elo");
+					qrank = rankId.getInt("qrank");
+					travelTopic = rankId.getInt("topic");
+					photoTitle = rankId.getString("photoTitle");
+					catTitle = rankId.getString("catTitle");
+					
+				}
+				rankById.close();
+			}
 			String wikiLang = rps.getString(4);
 			String title = rps.getString(5);
 			byte[] bytes = rps.getBytes(6);
@@ -241,7 +270,7 @@ public class WikipediaByCountryDivider {
 			contentStr = contentStr.replace((char) 0, ' ');
 			contentStr = contentStr.replace((char) 22, ' ');
 			contentStr = contentStr.replace((char) 27, ' ');
-			if(contentStr.trim().length() == 0) {
+			if (contentStr.trim().length() == 0) {
 				continue;
 			}
 			if (osmId != prevOsmId) {
@@ -260,6 +289,21 @@ public class WikipediaByCountryDivider {
 
 			}
 			addTag(serializer, "wikidata", "Q"+wikiId);
+			if (travelElo > 0) {
+				addTag(serializer, "travel_elo", "" + travelElo);
+			}
+			if (qrank > 0) {
+				addTag(serializer, "qrank", "" + qrank);
+			}
+			if (travelTopic > 0) {
+				addTag(serializer, "travel_topic", "" + travelTopic);
+			}
+			if (!Algorithms.isEmpty(photoTitle)) {
+				addTag(serializer, "wiki_photo", "" + photoTitle);
+			}
+			if (!Algorithms.isEmpty(catTitle)) {
+				addTag(serializer, "wiki_category", "" + catTitle);
+			}
 			if (wikiLang.equals("en")) {
 				nameAdded = true;
 				addTag(serializer, "name", title);
