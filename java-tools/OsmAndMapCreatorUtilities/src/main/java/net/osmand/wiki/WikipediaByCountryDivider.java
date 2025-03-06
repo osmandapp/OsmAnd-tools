@@ -194,9 +194,9 @@ public class WikipediaByCountryDivider {
 //	    "id INTEGER PRIMARY KEY" "photoId INTEGER" "photoTitle TEXT" "catId INTEGER" "catTitle TEXT"
 //	    "poikey TEXT" "wikiTitle TEXT" "osmid INTEGER" "osmtype INTEGER"  "lat REAL" "lon REAL"
 //	    "elo REAL" "qrank INTEGER" "topic INTEGER" "categories TEXT"
-		PreparedStatement rankById = null;
+		PreparedStatement rankByIdStatement = null;
 		if (wikiRankingConn != null) {
-			rankById = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
+			rankByIdStatement = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
 					+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_rating WHERE id = ?");
 		}
 
@@ -242,18 +242,18 @@ public class WikipediaByCountryDivider {
 			int travelTopic = 0;
 			String photoTitle = null;
 			String catTitle = null;
-			if(rankById != null) {
-				rankById.setLong(1, wikiId);
-				ResultSet rankId = rankById.executeQuery();
-				if (rankId.next()) {
-					travelElo = rankId.getInt("elo");
-					qrank = rankId.getInt("qrank");
-					travelTopic = rankId.getInt("topic");
-					photoTitle = rankId.getString("photoTitle");
-					catTitle = rankId.getString("catTitle");
-					
+			if (rankByIdStatement != null) {
+				rankByIdStatement.setLong(1, wikiId);
+				ResultSet rankIdRes = rankByIdStatement.executeQuery();
+				if (rankIdRes.next()) {
+					travelElo = rankIdRes.getInt("elo");
+					qrank = rankIdRes.getInt("qrank");
+					travelTopic = rankIdRes.getInt("topic");
+					photoTitle = rankIdRes.getString("photoTitle");
+					catTitle = rankIdRes.getString("catTitle");
+
 				}
-				rankById.close();
+				rankIdRes.close();
 			}
 			String wikiLang = rps.getString(4);
 			String title = rps.getString(5);
