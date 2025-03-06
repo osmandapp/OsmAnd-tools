@@ -1272,10 +1272,6 @@ public class UserdataService {
 	}
 
 	public ResponseEntity<String> addPurchase(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
-		PremiumUsersRepository.PremiumUser user = getUserById(dev.userid);
-		if (user == null) {
-			return ResponseEntity.ok("User not found");
-		}
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> purchases = subscriptionsRepository.findByOrderId(code);
 		if (purchases.isEmpty()) {
 			return ResponseEntity.ok("No purchase found");
@@ -1284,10 +1280,10 @@ public class UserdataService {
 			return ResponseEntity.ok("Multiple purchases found");
 		}
 		DeviceSubscriptionsRepository.SupporterDeviceSubscription purchase = purchases.get(0);
-		if (purchase.user != null) {
+		if (purchase.userid != null) {
 			return ResponseEntity.ok("Purchase already added");
 		}
-		purchase.user = user;
+		purchase.userid = dev.userid;
 		subscriptionsRepository.saveAndFlush(purchase);
 
 		return ResponseEntity.ok("Purchase added");

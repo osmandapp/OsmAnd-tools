@@ -619,7 +619,7 @@ public class MapApiController {
 				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> purchases = subscriptionsRepo.findAllByUserId(dev.userid);
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> purchases = subscriptionsRepo.findAllByUserid(dev.userid);
 			info.put(PURCHASES, gson.toJson(purchases.stream()
 					.map(s -> Map.of(TYPE_SUB, s.sku, START_TIME_KEY, s.starttime, EXPIRE_TIME_KEY, s.expiretime))
 					.toList()));

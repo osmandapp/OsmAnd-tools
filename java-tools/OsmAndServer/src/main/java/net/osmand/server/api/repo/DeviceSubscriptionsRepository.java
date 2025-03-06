@@ -19,7 +19,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 	
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
 
-	List<SupporterDeviceSubscription> findAllByUserId(int userId);
+	List<SupporterDeviceSubscription> findAllByUserid(int userId);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
 	@Entity
@@ -78,9 +78,8 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Column(name = "introcycles")
 		public Integer introcycles ;
 
-		@ManyToOne
-		@JoinColumn(name = "userid")
-		public PremiumUsersRepository.PremiumUser user;
+		@Column(name = "userid")
+		public Integer userid;
 	}
 
 	public class SupporterDeviceSubscriptionPrimaryKey implements Serializable {
