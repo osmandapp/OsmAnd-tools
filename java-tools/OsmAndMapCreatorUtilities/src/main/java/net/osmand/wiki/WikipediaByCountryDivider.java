@@ -197,7 +197,7 @@ public class WikipediaByCountryDivider {
 		PreparedStatement rankById = null;
 		if (wikiRankingConn != null) {
 			rankById = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
-					+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_ranking WHERE id = ?");
+					+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_rating WHERE id = ?");
 		}
 
 		String query;
