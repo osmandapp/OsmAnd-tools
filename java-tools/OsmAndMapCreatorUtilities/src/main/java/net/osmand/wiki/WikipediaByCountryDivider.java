@@ -202,12 +202,12 @@ public class WikipediaByCountryDivider {
 
 		String query;
 		if (testLatLon == null) {
-			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent FROM wiki_region WR"
+			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent, WC.shortDescription FROM wiki_region WR"
 					+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
 					+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
 					+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id";
 		} else {
-			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent "
+			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent, WC.shortDescription"
 					+ " FROM wiki_content WC";
 		}
 		ResultSet rps = conn.createStatement().executeQuery(query);
@@ -258,6 +258,7 @@ public class WikipediaByCountryDivider {
 			String wikiLang = rps.getString(4);
 			String title = rps.getString(5);
 			byte[] bytes = rps.getBytes(6);
+			String shortDescr = rps.getString(7);
 			GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(bytes));
 			BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
 			content.setLength(0);
@@ -308,6 +309,7 @@ public class WikipediaByCountryDivider {
 				nameAdded = true;
 				addTag(serializer, "name", title);
 				addTag(serializer, "content", contentStr);
+				addTag(serializer, "short_description", shortDescr);
 				addTag(serializer, "wiki_lang:en", "yes");
 			} else {
 				addTag(serializer, "name:" + wikiLang, title);
@@ -318,6 +320,7 @@ public class WikipediaByCountryDivider {
 					preferredAdded = preferredLang.contains(wikiLang);
 				}
 				addTag(serializer, "content:" + wikiLang, contentStr);
+				addTag(serializer, "short_description:" + wikiLang, shortDescr);
 			}
 		}
 		if (prevOsmId != -1) {
