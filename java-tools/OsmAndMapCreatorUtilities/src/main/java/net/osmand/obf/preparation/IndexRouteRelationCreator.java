@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
@@ -126,7 +127,7 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
-			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
+			TLongHashSet geometryBeforeCompletion = new TLongHashSet();
 			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
 
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx, lastModifiedDate);
@@ -146,7 +147,7 @@ public class IndexRouteRelationCreator {
 
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
-					if (geometryBeforeCompletion.contains(node.getLatLon())) {
+					if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
 						way.replaceTags(mapSectionTags);
 						indexMapCreator.iterateMainEntity(way, ctx, icc);
 						break; // one-off
@@ -154,7 +155,7 @@ public class IndexRouteRelationCreator {
 				}
 			}
 			for (Node node : pointsForPoiSearch) {
-				if (geometryBeforeCompletion.contains(node.getLatLon())) {
+				if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
 					node.replaceTags(poiSectionTags);
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
@@ -162,14 +163,20 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void fillRelationWaysGeometrySet(Relation relation, Set<LatLon> geometryBeforeCompletion) {
+	private void fillRelationWaysGeometrySet(Relation relation, TLongHashSet geometryBeforeCompletion) {
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
 				for (Node node : way.getNodes()) {
-					geometryBeforeCompletion.add(node.getLatLon());
+					geometryBeforeCompletion.add(getNodeLongId(node));
 				}
 			}
 		}
+	}
+
+	private long getNodeLongId(Node node) {
+		long y31 = MapUtils.get31TileNumberY(node.getLatitude());
+		long x31 = MapUtils.get31TileNumberX(node.getLongitude());
+		return (x31 << 31) + y31;
 	}
 
 	private void calcRadiusDistanceAndPoiSearchPoints(long relationId,
