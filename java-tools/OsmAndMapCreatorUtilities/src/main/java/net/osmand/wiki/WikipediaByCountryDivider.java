@@ -168,10 +168,10 @@ public class WikipediaByCountryDivider {
 			}
 			File osmGz = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.gz");
 			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
-			if(obfFile.exists() && skip) {
+			if (obfFile.exists() && skip) {
 				continue;
 			}
-			if(!skip) {
+			if (!skip) {
 				osmGz.delete();
 			}
 			if(!osmGz.exists()) {
@@ -242,6 +242,7 @@ public class WikipediaByCountryDivider {
 			int travelTopic = 0;
 			String photoTitle = null;
 			String catTitle = null;
+			String poiKey = null;
 			if (rankByIdStatement != null) {
 				rankByIdStatement.setLong(1, wikiId);
 				ResultSet rankIdRes = rankByIdStatement.executeQuery();
@@ -251,6 +252,7 @@ public class WikipediaByCountryDivider {
 					travelTopic = rankIdRes.getInt("topic");
 					photoTitle = rankIdRes.getString("photoTitle");
 					catTitle = rankIdRes.getString("catTitle");
+					poiKey = rankIdRes.getString("poikey");
 
 				}
 				rankIdRes.close();
@@ -305,20 +307,23 @@ public class WikipediaByCountryDivider {
 			if (!Algorithms.isEmpty(catTitle)) {
 				addTag(serializer, "wiki_category", "" + catTitle);
 			}
+			if (!Algorithms.isEmpty(poiKey)) {
+				addTag(serializer, "osmand_poi_key", "" + poiKey);
+			}
+			if (!preferredAdded) {
+				nameUnique = title;
+				preferredAdded = preferredLang.contains(wikiLang);
+			}
 			if (wikiLang.equals("en")) {
 				nameAdded = true;
 				addTag(serializer, "name", title);
+				addTag(serializer, "wiki_lang:en", "yes");
 				addTag(serializer, "content", contentStr);
 				addTag(serializer, "short_description", shortDescr);
-				addTag(serializer, "wiki_lang:en", "yes");
+				
 			} else {
 				addTag(serializer, "name:" + wikiLang, title);
-				
 				addTag(serializer, "wiki_lang:" + wikiLang, "yes");
-				if (!preferredAdded) {
-					nameUnique = title;
-					preferredAdded = preferredLang.contains(wikiLang);
-				}
 				addTag(serializer, "content:" + wikiLang, contentStr);
 				addTag(serializer, "short_description:" + wikiLang, shortDescr);
 			}
@@ -334,10 +339,10 @@ public class WikipediaByCountryDivider {
 
 	private static void closeOsmWikiNode(XmlSerializer serializer, String nameUnique, boolean nameAdded)
 			throws IOException {
-		if(!nameAdded && nameUnique != null) {
+		if (!nameAdded && nameUnique != null) {
 			addTag(serializer, "name", nameUnique);
 		}
-		if(nameAdded || nameUnique != null) {
+		if (nameAdded || nameUnique != null) {
 			addTag(serializer, "osmwiki", "wiki_place");
 		}
 		serializer.endTag(null, "node");
