@@ -604,6 +604,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			if (useInMemoryCreator) {
 				List<PoiData> poiData = entry.getKey().poiData;
+				Collections.sort(poiData, new Comparator<PoiData>() {
+
+					@Override
+					public int compare(PoiData o1, PoiData o2) {
+						return -Integer.compare(o1.getRating(), o2.getRating());
+					}
+				});
 
 				for (PoiData poi : poiData) {
 					int x31 = poi.x;
@@ -908,6 +915,24 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
+		
+		public int getRating() {
+			int rt = 0;
+			for (PoiAdditionalType t : additionalTags.keySet()) {
+				if (t.getTag().equals("travel_elo")) {
+					try {
+						rt = Integer.parseInt(additionalTags.get(t));
+					} catch (NumberFormatException e) {
+						e.printStackTrace();
+					}
+					break;
+				}
+			}
+			if (rt > 0) {
+				return rt;
+			}
+			return additionalTags.size();
+		}
 	}
 
 	public static class PoiTileBox {

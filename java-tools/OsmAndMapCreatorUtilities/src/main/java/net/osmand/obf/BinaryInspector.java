@@ -48,9 +48,9 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
-					"-vmap", "-vmapobjects",
-					"-vmapcoordinates",
+					"-vpoi",
+//					"-vmap", "-vmapobjects",
+//					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
@@ -58,11 +58,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-//					"-latlon=50.868332,15.24471",
+					"-latlon=50.439181,30.521017",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Divoka_sarka.obf"
+					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.wiki.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

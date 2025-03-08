@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -43,6 +44,7 @@ public class WikipediaByCountryDivider {
 		String folder = "";
 		boolean skip = false;
 		String database = "";
+		String wikiRankingDB = "";
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
@@ -54,6 +56,8 @@ public class WikipediaByCountryDivider {
 				mode = val;
 			} else if (arg.startsWith("--database=")) {
 				database = val;
+			} else if (arg.startsWith("--ranking=")) {
+				wikiRankingDB = val;
 			}
 		}
 
@@ -73,7 +77,7 @@ public class WikipediaByCountryDivider {
 				break;
 			case "generate_country_sqlite":
 				WikiDatabasePreparation.processWikidataRegions(sqliteFileName);
-				generateCountrySqlite(folder, sqliteFileName, skip);
+				generateCountrySqlite(folder, sqliteFileName, wikiRankingDB, skip);
 				break;
 			case "generate_test_obf":
 				String[] latLon = null;
@@ -81,16 +85,16 @@ public class WikipediaByCountryDivider {
 					String val = args[2].substring(args[2].indexOf("=") + 1);
 					latLon = val.split(";");
 				}
-				generateCountrySqlite(folder, sqliteFileName, skip, latLon);
+				generateCountrySqlite(folder, sqliteFileName, null, skip, latLon);
 		}
 	}
 
-	protected static void generateCountrySqlite(String folder, String database, boolean skip)
+	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB,  boolean skip)
 			throws SQLException, IOException, InterruptedException, XmlPullParserException {
-		generateCountrySqlite(folder, database, skip, null);
+		generateCountrySqlite(folder, database, wikiRankingDB, skip, null);
 	}
 
-	protected static void generateCountrySqlite(String folder, String database, boolean skip, String[] testLatLon)
+	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB, boolean skip, String[] testLatLon)
 			throws SQLException, IOException, InterruptedException, XmlPullParserException {
 		double lat = 0;
 		double lon = 0;
@@ -101,6 +105,11 @@ public class WikipediaByCountryDivider {
 		}
 		String testRegionName = "";
 		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(database, log);
+		
+		Connection wikiRankingConn = null;
+		if (!Algorithms.isEmpty(wikiRankingDB)) {
+			wikiRankingConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(wikiRankingDB, log);
+		}
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
@@ -144,47 +153,61 @@ public class WikipediaByCountryDivider {
 			}
 			LinkedList<BinaryMapDataObject> list = mapObjects.get(lcRegionName.toLowerCase());
 			boolean hasWiki = false;
-			if(list != null) {
-				for(BinaryMapDataObject o : list) {
+			if (list != null) {
+				for (BinaryMapDataObject o : list) {
 					Integer rl = o.getMapIndex().getRule("region_wiki", "yes");
-					if(o.containsAdditionalType(rl)) {
+					if (o.containsAdditionalType(rl)) {
 						hasWiki = true;
 						break;
 					}
 				}
 			}
-			if(!hasWiki) {
+			if (!hasWiki) {
 				System.out.println("Skip " + lcRegionName.toLowerCase() + " doesn't generate wiki");
 				continue;
 			}
 			File osmGz = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.gz");
 			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
-			if(obfFile.exists() && skip) {
+			if (obfFile.exists() && skip) {
 				continue;
 			}
-			if(!skip) {
+			if (!skip) {
 				osmGz.delete();
 			}
 			if(!osmGz.exists()) {
 				System.out.println("Generate " + osmGz.getName());
-				generateOsmFile(conn, rs.getString(1), preferredLang, osmGz, testLatLon);
+				generateOsmFile(conn, rs.getString(1), preferredLang, wikiRankingConn, osmGz, testLatLon);
 			}
 			obfFile.delete();
 			generateObf(osmGz, obfFile);
 		}
 		conn.close();
+		if (wikiRankingConn != null) {
+			wikiRankingConn.close();
+		}
+		
 	}
 
-	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, File osmGz,
+	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, Connection wikiRankingConn, File osmGz,
 	                                    String[] testLatLon) throws SQLException, IOException {
+
+//	    "id INTEGER PRIMARY KEY" "photoId INTEGER" "photoTitle TEXT" "catId INTEGER" "catTitle TEXT"
+//	    "poikey TEXT" "wikiTitle TEXT" "osmid INTEGER" "osmtype INTEGER"  "lat REAL" "lon REAL"
+//	    "elo REAL" "qrank INTEGER" "topic INTEGER" "categories TEXT"
+		PreparedStatement rankByIdStatement = null;
+		if (wikiRankingConn != null) {
+			rankByIdStatement = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
+					+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_rating WHERE id = ?");
+		}
+
 		String query;
 		if (testLatLon == null) {
-			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent FROM wiki_region WR"
+			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent, WC.shortDescription FROM wiki_region WR"
 					+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
 					+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
 					+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id";
 		} else {
-			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent "
+			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent, WC.shortDescription"
 					+ " FROM wiki_content WC";
 		}
 		ResultSet rps = conn.createStatement().executeQuery(query);
@@ -214,9 +237,30 @@ public class WikipediaByCountryDivider {
 			double lat = rps.getDouble(2);
 			double lon = rps.getDouble(3);
 			long wikiId = rps.getLong(1);
+			int travelElo = 0;
+			int qrank = 0;
+			int travelTopic = 0;
+			String photoTitle = null;
+			String catTitle = null;
+			String poiKey = null;
+			if (rankByIdStatement != null) {
+				rankByIdStatement.setLong(1, wikiId);
+				ResultSet rankIdRes = rankByIdStatement.executeQuery();
+				if (rankIdRes.next()) {
+					travelElo = rankIdRes.getInt("elo");
+					qrank = rankIdRes.getInt("qrank");
+					travelTopic = rankIdRes.getInt("topic");
+					photoTitle = rankIdRes.getString("photoTitle");
+					catTitle = rankIdRes.getString("catTitle");
+					poiKey = rankIdRes.getString("poikey");
+
+				}
+				rankIdRes.close();
+			}
 			String wikiLang = rps.getString(4);
 			String title = rps.getString(5);
 			byte[] bytes = rps.getBytes(6);
+			String shortDescr = rps.getString(7);
 			GZIPInputStream gzin = new GZIPInputStream(new ByteArrayInputStream(bytes));
 			BufferedReader br = new BufferedReader(new InputStreamReader(gzin));
 			content.setLength(0);
@@ -229,7 +273,7 @@ public class WikipediaByCountryDivider {
 			contentStr = contentStr.replace((char) 0, ' ');
 			contentStr = contentStr.replace((char) 22, ' ');
 			contentStr = contentStr.replace((char) 27, ' ');
-			if(contentStr.trim().length() == 0) {
+			if (contentStr.trim().length() == 0) {
 				continue;
 			}
 			if (osmId != prevOsmId) {
@@ -247,21 +291,41 @@ public class WikipediaByCountryDivider {
 				serializer.attribute(null, "lon", lon + "");
 
 			}
+			addTag(serializer, "wikidata", "Q"+wikiId);
+			if (travelElo > 0) {
+				addTag(serializer, "travel_elo", "" + travelElo);
+			}
+			if (qrank > 0) {
+				addTag(serializer, "qrank", "" + qrank);
+			}
+			if (travelTopic > 0) {
+				addTag(serializer, "travel_topic", "" + travelTopic);
+			}
+			if (!Algorithms.isEmpty(photoTitle)) {
+				addTag(serializer, "wiki_photo", "" + photoTitle);
+			}
+			if (!Algorithms.isEmpty(catTitle)) {
+				addTag(serializer, "wiki_category", "" + catTitle);
+			}
+			if (!Algorithms.isEmpty(poiKey)) {
+				addTag(serializer, "osmand_poi_key", "" + poiKey);
+			}
+			if (!preferredAdded) {
+				nameUnique = title;
+				preferredAdded = preferredLang.contains(wikiLang);
+			}
 			if (wikiLang.equals("en")) {
 				nameAdded = true;
 				addTag(serializer, "name", title);
-				addTag(serializer, "wiki_id", wikiId + "");
-				addTag(serializer, "content", contentStr);
 				addTag(serializer, "wiki_lang:en", "yes");
+				addTag(serializer, "content", contentStr);
+				addTag(serializer, "short_description", shortDescr);
+				
 			} else {
 				addTag(serializer, "name:" + wikiLang, title);
-				addTag(serializer, "wiki_id:" + wikiLang, wikiId + "");
 				addTag(serializer, "wiki_lang:" + wikiLang, "yes");
-				if (!preferredAdded) {
-					nameUnique = title;
-					preferredAdded = preferredLang.contains(wikiLang);
-				}
 				addTag(serializer, "content:" + wikiLang, contentStr);
+				addTag(serializer, "short_description:" + wikiLang, shortDescr);
 			}
 		}
 		if (prevOsmId != -1) {
@@ -275,10 +339,10 @@ public class WikipediaByCountryDivider {
 
 	private static void closeOsmWikiNode(XmlSerializer serializer, String nameUnique, boolean nameAdded)
 			throws IOException {
-		if(!nameAdded && nameUnique != null) {
+		if (!nameAdded && nameUnique != null) {
 			addTag(serializer, "name", nameUnique);
 		}
-		if(nameAdded || nameUnique != null) {
+		if (nameAdded || nameUnique != null) {
 			addTag(serializer, "osmwiki", "wiki_place");
 		}
 		serializer.endTag(null, "node");

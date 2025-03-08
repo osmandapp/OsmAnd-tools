@@ -71,6 +71,7 @@ public class WikiDatabasePreparation {
 	private static final Set<String> unitsOfDistance = new HashSet<>(
 			Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
 	public static final String WIKIPEDIA_SQLITE = "wikipedia.sqlite";
+	public static final String WIKIRATING_SQLITE = "wiki_rating.sqlite";
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
@@ -1564,15 +1565,25 @@ public class WikiDatabasePreparation {
 		log.info("Processing wikidata regions...");
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = dialect.getDatabaseConnection(wikiDB.getAbsolutePath(), log);
+		
 		OsmandRegions regions = new OsmandRegions();
 		regions.prepareFile();
 		regions.cacheAllCountries();
 		PreparedStatement wikiRegionPrep = conn
 				.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
-		ResultSet rs = conn.createStatement().executeQuery("SELECT id, lat, lon from wiki_coords");
+		ResultSet rs = conn.createStatement().executeQuery("SELECT id from wiki_region");
+		Set<Long> existingIds = new TreeSet<>();
+		while (rs.next()) {
+			existingIds.add(rs.getLong(1));
+		}
+		rs.close();
+		rs = conn.createStatement().executeQuery("SELECT id, lat, lon from wiki_coords");
 		int batch = 0;
 		List<String> rgs = new ArrayList<String>();
 		while (rs.next()) {
+			if (existingIds.contains(rs.getLong(1))) {
+				continue;
+			}
 			rgs = regions.getRegionsToDownload(rs.getDouble(2), rs.getDouble(3), rgs);
 			for (String reg : rgs) {
 				wikiRegionPrep.setLong(1, rs.getLong(1));
