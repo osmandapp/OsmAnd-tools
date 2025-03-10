@@ -4,12 +4,14 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.obf.preparation.OsmDbAccessor.OsmDbTagsPreparation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -26,7 +28,11 @@ import rtree.RTreeException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.zip.GZIPInputStream;
@@ -324,6 +330,11 @@ public class IndexCreator {
 	private OsmDbAccessor initDbAccessor(File[] readFile, IProgress progress, IOsmStorageFilter addFilter,
 			boolean generateUniqueIdsForEachFile) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
+		if (settings.wikidataMappingUrl != null) {
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl));
+		} else if (!Algorithms.isEmpty(System.getenv("WIKIDATA_MAPPING_URL"))) {
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL")));
+		}
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
 		}

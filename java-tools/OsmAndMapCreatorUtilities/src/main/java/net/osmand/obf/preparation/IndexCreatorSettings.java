@@ -33,6 +33,10 @@ public class IndexCreatorSettings {
 	// gtfs data for public transport
 	public File gtfsData;
 	
+	// sqlite file with wiki_mapping(id bigint, lang text, title text);
+	// mapping wikidata id <-> wikipedia articles
+	public String wikidataMappingUrl;
+	
 	// for example file with low emissions polygons 
 	public List<File> extraRelations = new ArrayList<>();
 	

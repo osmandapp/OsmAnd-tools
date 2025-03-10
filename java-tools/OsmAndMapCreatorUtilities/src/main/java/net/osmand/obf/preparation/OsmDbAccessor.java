@@ -42,14 +42,21 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private PreparedStatement iterateRelations;
 	private PreparedStatement iterateWayBoundaries;
 	private OsmDbCreator dbCreator;
+	private OsmDbTagsPreparation tagsPrepration;
 
 	public interface OsmDbVisitor {
+		
 		public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException;
-	}
-
-	public OsmDbAccessor() {
 		
 	}
+	
+	public interface OsmDbTagsPreparation {
+
+		void processTags(Entity e);
+		
+	}
+
+	public OsmDbAccessor() {}
 
 	public void initDatabase()
 			throws SQLException {
@@ -75,6 +82,10 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			allRelations += dbCreator.getAllRelations();
 			allWays += dbCreator.getAllWays();
 		}
+	}
+	
+	public void setTagsPrepration(OsmDbTagsPreparation tagsPrepration) {
+		this.tagsPrepration = tagsPrepration;
 	}
 
 	public Connection getDbConn() {
@@ -221,8 +232,11 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 						prev = i + 1;
 					}
 				}
-				for(int i=0; i<vs.size(); i+=2) {
-					e.putTag(vs.get(i), vs.get(i+1));
+				for (int i = 0; i < vs.size(); i += 2) {
+					e.putTag(vs.get(i), vs.get(i + 1));
+				}
+				if (tagsPrepration != null) {
+					tagsPrepration.processTags(e);
 				}
 			} catch (UnsupportedEncodingException e1) {
 				throw new RuntimeException(e1);

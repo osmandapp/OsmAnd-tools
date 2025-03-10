@@ -295,6 +295,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--srtm=")) {
 				settings.srtmDataFolderUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
+			} else if (s.startsWith("--wikimapping=")) {
+				settings.wikidataMappingUrl = s.substring(s.indexOf('=') + 1);
+				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
 				it.remove();
