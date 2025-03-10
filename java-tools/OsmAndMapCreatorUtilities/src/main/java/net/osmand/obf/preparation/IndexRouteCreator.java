@@ -644,31 +644,39 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 
 		for (RelationMember from : fromL) {
-			if (from.getEntityId().getType() == EntityType.WAY) {
-				if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
-					highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
+			if (from.getEntityId().getType() != EntityType.WAY) {
+				// only ways are valid with role "from"
+				continue;
+			}
+
+			if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
+				highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
+			}
+
+			List<RestrictionInfo> rdList = highwayRestrictions.get(from.getEntityId().getId());
+			for (RelationMember to : toL) {
+				if (to.getEntityId().getType() != EntityType.WAY) {
+					// only ways are valid with role "to"
+					continue;
 				}
 
-				List<RestrictionInfo> rdList = highwayRestrictions.get(from.getEntityId().getId());
-				for (RelationMember to : toL) {
-					RestrictionInfo rd = new RestrictionInfo();
-					rd.toWay = to.getEntityId().getId();
-					rd.type = type;
+				RestrictionInfo rd = new RestrictionInfo();
+				rd.toWay = to.getEntityId().getId();
+				rd.type = type;
 
-					RelationMember via = viaL.iterator().next();
-					if (via.getEntityId().getType() == EntityType.WAY) {
-						rd.viaWay = via.getEntityId().getId();
-					}
-					rdList.add(rd);
-
-					if (!allowMultipleTo) {
-						break;
-					}
+				RelationMember via = viaL.iterator().next();
+				if (via.getEntityId().getType() == EntityType.WAY) {
+					rd.viaWay = via.getEntityId().getId();
 				}
+				rdList.add(rd);
 
-				if (!allowMultipleFrom) {
+				if (!allowMultipleTo) {
 					break;
 				}
+			}
+
+			if (!allowMultipleFrom) {
+				break;
 			}
 		}
 	}
