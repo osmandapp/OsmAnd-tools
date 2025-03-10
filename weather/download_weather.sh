@@ -87,6 +87,9 @@ should_download_file() {
         elif [[ $SERVER_RESPONSE =~ "403" ]]; then   
             # We're blocked by server. Wait a bit and continue download
             sleep 60
+        elif [[ $SERVER_RESPONSE =~ "401" ]]; then
+            # HTTP/1.1 401 Unauthorized from data.ecmwf.int (sleep and try again)
+            sleep 300
         elif [[ $SERVER_RESPONSE =~ "404" ]]; then   
             echo 0
             return
