@@ -154,7 +154,7 @@ public class OverpassFetcher {
 				// Update the relation with the fetched ways and nodes
 				relation.initializeLinks(fetchedEntities);
 
-				log.info(String.format("Fetched members on date \"%s\" for relation %d (%.2f sec): %s", formattedDate, relation.getId(),
+				log.info(String.format("Fetched members on date \"%s\" for relation %d (%.2f sec)", formattedDate, relation.getId(),
 						(System.currentTimeMillis() - startTime) / 1e3, wayIds));
 			} else {
 				log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
