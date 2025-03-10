@@ -5,7 +5,6 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
@@ -16,7 +15,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
-import net.osmand.shared.util.WikiImagesUtil;
+import net.osmand.shared.wiki.WikiImage;
+import net.osmand.shared.wiki.WikiMetadata;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -584,14 +584,15 @@ public class WikiService {
 		return id;
 	}
 	
-	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
+	public FeatureCollection convertToFeatureCollection(List<WikiImage> images) {
 		List<Feature> features = images.stream().map(imageDetails -> {
 			Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
-			feature.properties.put("imageTitle", imageDetails.get("image"));
-			feature.properties.put("date", imageDetails.get("date"));
-			feature.properties.put("author", imageDetails.get("author"));
-			feature.properties.put("license", imageDetails.get("license"));
-			feature.properties.put("mediaId", imageDetails.get("mediaId"));
+			feature.properties.put("imageTitle", imageDetails.getImageName());
+			WikiMetadata.Metadata metadata = imageDetails.getMetadata();
+			feature.properties.put("date", metadata.getDate());
+			feature.properties.put("author", metadata.getAuthor());
+			feature.properties.put("license", metadata.getLicense());
+			feature.properties.put("mediaId", imageDetails.getMediaId());
 			return feature;
 		}).toList();
 		
