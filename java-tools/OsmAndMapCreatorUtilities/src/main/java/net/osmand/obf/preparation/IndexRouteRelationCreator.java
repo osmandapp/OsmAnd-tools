@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
@@ -19,6 +20,9 @@ import org.apache.commons.logging.LogFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.sql.SQLException;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
 import java.util.*;
 
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
@@ -58,8 +62,11 @@ public class IndexRouteRelationCreator {
 	private static final String ROUTE = "route";
 
 	public static final int MIN_REF_LENGTH_TO_USE_FOR_SEARCH = 3;
+
 	public static final int MAX_JOINED_POINTS_PER_SEGMENT = 2000; // ~25m * 2000 = ~50 km (optimize Map-section)
-	public static final int POI_SEARCH_POINTS_DISTANCE_M = 5000; // store segments as POI-points every 5 km (POI-search)
+
+	public static final int POI_SEARCH_POINTS_INTERVAL_M = 5000; // store segments as POI-points every 5 km
+	public static final int POI_SEARCH_POINTS_EDGE_DISTANCE_M = 100; // distance POI-points from edges of the Way (100m)
 
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
@@ -100,6 +107,8 @@ public class IndexRouteRelationCreator {
 	private final MapRenderingTypesEncoder renderingTypes;
 	private final Long lastModifiedDate;
 
+	private final static NumberFormat distanceKmFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
+
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
 									 Long lastModifiedDate) {
@@ -118,7 +127,7 @@ public class IndexRouteRelationCreator {
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
-			Set<LatLon> geometryBeforeCompletion = new HashSet<>();
+			TLongHashSet geometryBeforeCompletion = new TLongHashSet();
 			fillRelationWaysGeometrySet(relation, geometryBeforeCompletion);
 
 			OverpassFetcher.getInstance().fetchCompleteGeometryRelation(relation, ctx, lastModifiedDate);
@@ -138,7 +147,7 @@ public class IndexRouteRelationCreator {
 
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
-					if (geometryBeforeCompletion.contains(node.getLatLon())) {
+					if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
 						way.replaceTags(mapSectionTags);
 						indexMapCreator.iterateMainEntity(way, ctx, icc);
 						break; // one-off
@@ -146,7 +155,7 @@ public class IndexRouteRelationCreator {
 				}
 			}
 			for (Node node : pointsForPoiSearch) {
-				if (geometryBeforeCompletion.contains(node.getLatLon())) {
+				if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
 					node.replaceTags(poiSectionTags);
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
@@ -154,14 +163,20 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void fillRelationWaysGeometrySet(Relation relation, Set<LatLon> geometryBeforeCompletion) {
+	private void fillRelationWaysGeometrySet(Relation relation, TLongHashSet geometryBeforeCompletion) {
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
 				for (Node node : way.getNodes()) {
-					geometryBeforeCompletion.add(node.getLatLon());
+					geometryBeforeCompletion.add(getNodeLongId(node));
 				}
 			}
 		}
+	}
+
+	private long getNodeLongId(Node node) {
+		long y31 = MapUtils.get31TileNumberY(node.getLatitude());
+		long x31 = MapUtils.get31TileNumberX(node.getLongitude());
+		return (x31 << 31) + y31;
 	}
 
 	private void calcRadiusDistanceAndPoiSearchPoints(long relationId,
@@ -183,25 +198,36 @@ public class IndexRouteRelationCreator {
 			List<Node> localPoints = new ArrayList<>();
 			List<Node> nodes = way.getNodes();
 			if (nodes.size() >= 2) {
+				// place the very first point in the approx middle
+				LatLon middle = nodes.get(nodes.size() / 2).getLatLon();
+				long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
+				localPoints.add(new Node(middle.getLatitude(), middle.getLongitude(), nodeId));
+
 				for (int i = 1; i < nodes.size(); i++) {
-					LatLon firstLatLon = nodes.get(i - 1).getLatLon();
-					LatLon secondLatLon = nodes.get(i).getLatLon();
-					if (localPoints.isEmpty() ||
-							MapUtils.getDistance(firstLatLon, localPoints.get(localPoints.size() - 1).getLatLon())
-									> POI_SEARCH_POINTS_DISTANCE_M) {
-						long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
-						localPoints.add(new Node(firstLatLon.getLatitude(), firstLatLon.getLongitude(), nodeId));
-						shortLinkTiles.add(MapUtils.createShortLinkString(
-								firstLatLon.getLatitude(), firstLatLon.getLongitude(), SHORT_LINK_ZOOM - 8));
+					LatLon currentLatLon = nodes.get(i).getLatLon();
+					LatLon previousLatLon = nodes.get(i - 1).getLatLon();
+					distance += MapUtils.getDistance(currentLatLon, previousLatLon);
+
+					// place the very next points close to start/end
+					// afterward, spread points evenly along the geometry
+					int alternateIndex = i % 2 == 0 ? i : nodes.size() - i - 1;
+					LatLon candidate = nodes.get(alternateIndex).getLatLon();
+					double distStart = MapUtils.getDistance(candidate, nodes.get(0).getLatLon());
+					double distEnd = MapUtils.getDistance(candidate, nodes.get(nodes.size() - 1).getLatLon());
+					if (distStart > POI_SEARCH_POINTS_EDGE_DISTANCE_M && distEnd > POI_SEARCH_POINTS_EDGE_DISTANCE_M) {
+						if (localPoints.stream().noneMatch(node ->
+								MapUtils.getDistance(candidate, node.getLatLon()) < POI_SEARCH_POINTS_INTERVAL_M)) {
+							nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
+							localPoints.add(new Node(candidate.getLatitude(), candidate.getLongitude(), nodeId));
+						}
 					}
-					distance += MapUtils.getDistance(firstLatLon, secondLatLon);
 				}
 			}
 			pointsForPoiSearch.addAll(localPoints);
 		}
 
 		if (distance > 0) {
-			tagsToFill.putIfAbsent("distance", String.valueOf((int) distance));
+			tagsToFill.put("distance", distanceKmFormat.format(distance / 1000));
 		}
 
 		if (!bbox.hasInitialState()) {
@@ -215,6 +241,8 @@ public class IndexRouteRelationCreator {
 			);
 
 			if (radius > MIN_RADIUS_FOR_SHORT_LINK) {
+				pointsForPoiSearch.forEach(node -> shortLinkTiles.add(MapUtils
+						.createShortLinkString(node.getLatitude(), node.getLongitude(), SHORT_LINK_ZOOM - 8)));
 				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.bottom, bbox.left, SHORT_LINK_ZOOM - 8));
 				shortLinkTiles.add(MapUtils.createShortLinkString(bbox.top, bbox.right, SHORT_LINK_ZOOM - 8));
 				tagsToFill.put("route_shortlink_tiles", String.join(",", shortLinkTiles));
@@ -402,10 +430,9 @@ public class IndexRouteRelationCreator {
 			}
 		}
 		LatLon center = OsmMapUtils.getWeightCenterForNodes(allNodes);
-		int hash = center == null
+		return center == null
 				? allNodes.size() % 64
 				: (int) (1000.0 * (center.getLatitude() + center.getLongitude())) % 64;
-		return hash;
 	}
 
 	private static long calcEntityIdFromRelationId(long relationId, long counter, int hash) {
