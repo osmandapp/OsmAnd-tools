@@ -649,11 +649,12 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				continue;
 			}
 
-			if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
-				highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
+			Long fromId = from.getEntityId().getId();
+			if (!highwayRestrictions.containsKey(fromId)) {
+				highwayRestrictions.put(fromId, new ArrayList<>());
 			}
 
-			List<RestrictionInfo> rdList = highwayRestrictions.get(from.getEntityId().getId());
+			List<RestrictionInfo> rdList = highwayRestrictions.get(fromId);
 			for (RelationMember to : toL) {
 				if (to.getEntityId().getType() != EntityType.WAY) {
 					// only ways are valid with role "to"
