@@ -30,6 +30,15 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 	public void processTags(Entity e) {
 		String wikidata = e.getTag(OSMTagKey.WIKIDATA);
 		String wikipedia = e.getTag(OSMTagKey.WIKIPEDIA);
+		if (wikipedia == null && wikidata == null) {
+			return;
+		} else if (wikidata != null && wikipedia != null) {
+			return;
+		}	
+		syncReadTags(e, wikidata, wikipedia);
+	}
+
+	private synchronized void syncReadTags(Entity e, String wikidata, String wikipedia) {
 		try {
 			if (wikipedia != null && wikidata == null) {
 				if (!init()) {
