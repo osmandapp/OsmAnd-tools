@@ -91,13 +91,18 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 		try {
 			init = false;
 			String fileName = wikidataMappingUrl;
+			
 			if (wikidataMappingUrl.startsWith("http")) {
+				log.info("Downloading wikidata database by url " + wikidataMappingUrl);
 				URL url = new URL(wikidataMappingUrl);
 				URLConnection cn = url.openConnection();
 				fileName = "wikidata_mapping.sqlitedb";
 				FileOutputStream fous = new FileOutputStream(fileName);
 				Algorithms.streamCopy(cn.getInputStream(), fous);
 				fous.close();
+				log.info("Finished downloading wikidata database");
+			} else {
+				log.info("Using local wikidata database: " + wikidataMappingUrl);
 			}
 			Connection wikiMapping = DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 			selectById = wikiMapping.prepareStatement("SELECT lang, title from wiki_mapping where id = ?");

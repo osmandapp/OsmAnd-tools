@@ -334,6 +334,8 @@ public class IndexCreator {
 			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl));
 		} else if (!Algorithms.isEmpty(System.getenv("WIKIDATA_MAPPING_URL"))) {
 			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL")));
+		} else {
+			log.info("Not using wikidata database to map missing wikidata tags");
 		}
 		if (dbFile == null) {
 			dbFile = new File(workingDir, TEMP_NODES_DB);
