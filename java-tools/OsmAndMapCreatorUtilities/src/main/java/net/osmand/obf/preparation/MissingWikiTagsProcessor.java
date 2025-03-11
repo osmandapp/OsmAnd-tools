@@ -69,8 +69,8 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 						if (lang.equals("en")) {
 							e.putTag("wikipedia", "en:" + title);
 						} else {
-							// don't guess for second language
-							e.putTag("wikipedia:" + lang, title);
+							// ignore 2nd languages as it's too much data and not by OSM standard
+//							e.putTag("wikipedia:" + lang, title);
 						}
 					}
 				}
@@ -90,12 +90,15 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 		}
 		try {
 			init = false;
-			URL url = new URL(wikidataMappingUrl);
-			URLConnection cn = url.openConnection();
-			String fileName = "wikidata_mapping.sqlitedb";
-			FileOutputStream fous = new FileOutputStream(fileName);
-			Algorithms.streamCopy(cn.getInputStream(), fous);
-			fous.close();
+			String fileName = wikidataMappingUrl;
+			if (wikidataMappingUrl.startsWith("http")) {
+				URL url = new URL(wikidataMappingUrl);
+				URLConnection cn = url.openConnection();
+				fileName = "wikidata_mapping.sqlitedb";
+				FileOutputStream fous = new FileOutputStream(fileName);
+				Algorithms.streamCopy(cn.getInputStream(), fous);
+				fous.close();
+			}
 			Connection wikiMapping = DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 			selectById = wikiMapping.prepareStatement("SELECT lang, title from wiki_mapping where id = ?");
 			selectId = wikiMapping.prepareStatement("SELECT id from wiki_mapping where lang = ? and title = ? ");

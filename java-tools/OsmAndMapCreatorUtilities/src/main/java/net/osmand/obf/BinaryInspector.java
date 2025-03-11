@@ -58,11 +58,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=50.439181,30.521017",
+					"-latlon=52.372611,4.900323,0.0001",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.wiki.obf"
+					System.getProperty("maps.dir") + "Map.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -202,6 +202,9 @@ public class BinaryInspector {
 					double latmid = Double.parseDouble(values[0]);
 					double lonmid = Double.parseDouble(values[1]);
 					double dist = 0.005;
+					if (values.length > 2) {
+						dist = Double.parseDouble(values[2]);
+					}
 					lonleft = lonmid - dist;
 					lattop = latmid + dist;
 					lonright = lonmid + dist;

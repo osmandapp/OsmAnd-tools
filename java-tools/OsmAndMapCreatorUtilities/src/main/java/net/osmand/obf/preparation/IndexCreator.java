@@ -870,7 +870,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/Ukraine_kyiv-city_europe_2.wiki.osm.gz";
+		String file = rootFolder + "../temp/Map.osm";
 //		String file = rootFolder + "../temp/divoka_sarka.osm";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
