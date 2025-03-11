@@ -23,7 +23,9 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.data.*;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.MapUtils;
@@ -58,11 +60,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=52.372611,4.900323,0.0001",
+					"-latlon=50.078532,14.477454,0.0005",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "Czech-republic_praha_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -624,7 +626,8 @@ public class BinaryInspector {
 			if (t.contains(":")) {
 				t = t.substring(0, t.indexOf(":"));
 			}
-			t += "-" + it.key();
+//			System.out.println(rtr.tag + " " + rtr.value);
+//			t += "-" + rtr.value;
 			if (mp.containsKey(t)) {
 				mp.put(t, mp.get(t) + 1);
 			} else {
@@ -639,6 +642,7 @@ public class BinaryInspector {
 			}
 		});
 		Map<String, Integer> fmt = new LinkedHashMap<String, Integer>();
+		
 		for (String key : tagvalues) {
 			fmt.put(key, mp.get(key));
 		}
@@ -1446,31 +1450,47 @@ public class BinaryInspector {
 		List<String> cs = p.getCategories();
 		List<List<String>> subcategories = p.getSubcategories();
 		for (int i = 0; i < cs.size(); i++) {
-			println("\t\t\t" + cs.get(i));
-			for (int j = 0; j < subcategories.get(i).size(); j++) {
-				println("\t\t\t\t" + subcategories.get(i).get(j));
-			}
+			println(String.format("\t\t\t%s (%d): %s", cs.get(i), subcategories.get(i).size(), subcategories.get(i)));
 		}
-		println("\t\tSubtypes:");
+		println("\t\tPOI Aditionals:");
 		List<PoiSubType> subtypes = p.getSubTypes();
-		Map<String, List<String>> topIndex = new HashMap<>();
+		Set<String> text = new TreeSet<String>();
+		Set<String> refs = new TreeSet<String>();
+		Map<String, List<String>> singleValues = new TreeMap<String, List<String>>();
+		int singleVals = 0;
+		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
-			println("\t\t\t" + st.name + " " + (st.text ? "text" : (" encoded " + st.possibleValues.size())));
-			if (st.name.startsWith("top_index")) {
-				topIndex.put(st.name, st.possibleValues);
-			}
-		}
-		if (topIndex.size() > 0) {
-			println("");
-			println("\t\tTopindex (subtypes):");
-			for (Map.Entry<String, List<String>> e : topIndex.entrySet()) {
-				println("\t\t\t" + e.getKey() + ":");
-				for (String s : e.getValue()) {
-					println("\t\t\t\t" + s);
+			if (st.text) {
+				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
+				if(ref != null && !ref.isAdditional()) {
+					refs.add(st.name);
+				} else {
+					text.add(st.name);
 				}
+			} else if (st.possibleValues.size() == 1) {
+				singleVals++;
+				int lastIndexOf = st.name.lastIndexOf('_');
+				String key = st.name;
+				if (lastIndexOf >= 0) {
+					key = key.substring(0, lastIndexOf);
+				}
+				if (!singleValues.containsKey(key)) {
+					singleValues.put(key, new ArrayList<String>());
+				}
+				singleValues.get(key).add(st.name);
+			} else {
+				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), 
+						st.possibleValues.size() > 50 ? st.possibleValues.subList(0, 50) + "..." : st.possibleValues));	
 			}
 		}
+		StringBuilder singleValuesFmt = new StringBuilder();
+		for(String key : singleValues.keySet()) {
+			singleValuesFmt.append(key + " (" + singleValues.get(key).size()+ "), ");
+		}
+		println(String.format("\t\t\tReference to another poi (incorrect?) (%d): %s",  refs.size(), refs));
+		println(String.format("\t\t\tText based (%d): %s",  text.size(), text));
+		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(p, req);
 
