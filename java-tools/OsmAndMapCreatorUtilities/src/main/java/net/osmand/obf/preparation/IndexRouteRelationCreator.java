@@ -156,7 +156,7 @@ public class IndexRouteRelationCreator {
 			}
 			for (Node node : pointsForPoiSearch) {
 				if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
-					node.replaceTags(poiSectionTags);
+					poiSectionTags.forEach(node::putTag); // append tags
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
@@ -192,7 +192,8 @@ public class IndexRouteRelationCreator {
 		QuadRect bbox = new QuadRect();
 		int searchPointsCounter = 0; // 512 * 5 km = 2560 km max (in case of 9-bit limit)...
 
-		for (Way way : joinedWays) {
+		for (int segmentIndex = 0; segmentIndex < joinedWays.size(); segmentIndex++) {
+			Way way = joinedWays.get(segmentIndex);
 			QuadRect wayBbox = way.getLatLonBBox();
 			bbox.expand(wayBbox.left, wayBbox.top, wayBbox.right, wayBbox.bottom);
 			List<Node> localPoints = new ArrayList<>();
@@ -222,6 +223,9 @@ public class IndexRouteRelationCreator {
 						}
 					}
 				}
+			}
+			for (Node node : localPoints) {
+				node.putTag("route_segment_index", String.valueOf(segmentIndex));
 			}
 			pointsForPoiSearch.addAll(localPoints);
 		}
