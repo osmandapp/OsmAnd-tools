@@ -64,6 +64,8 @@ public class IndexCreatorSettings {
 	
 	public int charsToBuildPoiNameIndex = 4;
 	
+	public int charsToBuildPoiIdNameIndex = 8; // 0 to not create index at all
+	
 	public int charsToBuildAddressNameIndex = 4;
 	
 	public boolean keepOnlyRouteRelationObjects;

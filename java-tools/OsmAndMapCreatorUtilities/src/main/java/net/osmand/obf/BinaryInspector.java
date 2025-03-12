@@ -60,11 +60,11 @@ public class BinaryInspector {
 //					"-lang=ru",
 //					"-zoom=5",
 					// road
-					"-latlon=50.078532,14.477454,0.0005",
+//					"-latlon=50.07648,14.46652,0.5",
 					//"-xyz=12071,26142,16",
 //					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Czech-republic_praha_europe_2.obf"
+					System.getProperty("maps.dir") + "Map.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
