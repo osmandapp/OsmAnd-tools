@@ -23,6 +23,7 @@ import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
 import net.osmand.server.controllers.user.MapApiController;
+import net.osmand.server.utils.MultiPlatform;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -80,6 +81,9 @@ public class UserdataController {
 
 	@Autowired
 	protected UserSubscriptionService userSubService;
+
+	@Autowired
+	OsmAndMapsService osmAndMapsService;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -440,5 +444,17 @@ public class UserdataController {
 			return userdataService.confirmCode(username, token);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+
+	@MultiPlatform
+	@PostMapping(path = {"/add-purchase"}, produces = "application/json")
+	public ResponseEntity<String> addPurchase(@RequestBody String code,
+	                                          @RequestParam(name = "deviceid", required = false) Integer deviceId,
+	                                          @RequestParam(required = false) String accessToken) {
+		PremiumUserDevice dev = (deviceId != null && accessToken != null) ? checkToken(deviceId, accessToken) : osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return ResponseEntity.ok(gson.toJson(userdataService.addPurchase(code, dev)));
 	}
 }

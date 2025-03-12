@@ -592,6 +592,7 @@ public class MapApiController {
 		final String EXPIRE_TIME_KEY = "expireTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
 		final String NICKNAME = "nickname";
+		final String PURCHASES = "purchases";
 
 		PremiumUserDevice dev = osmAndMapsService.checkUser();
 		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
@@ -618,6 +619,10 @@ public class MapApiController {
 				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> purchases = subscriptionsRepo.findAllByUserid(dev.userid);
+			info.put(PURCHASES, gson.toJson(purchases.stream()
+					.map(s -> Map.of(TYPE_SUB, s.sku, START_TIME_KEY, s.starttime, EXPIRE_TIME_KEY, s.expiretime))
+					.toList()));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
