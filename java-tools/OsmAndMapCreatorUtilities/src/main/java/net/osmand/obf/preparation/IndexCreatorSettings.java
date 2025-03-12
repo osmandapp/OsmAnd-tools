@@ -62,7 +62,9 @@ public class IndexCreatorSettings {
 	
 	public int poiZipStringLimit = 100;
 	
-	public int charsToBuildPoiNameIndex = 8;
+	public int charsToBuildPoiNameIndex = 4;
+	
+	public int charsToBuildPoiIdNameIndex = 8; // 0 to not create index at all
 	
 	public int charsToBuildAddressNameIndex = 4;
 	

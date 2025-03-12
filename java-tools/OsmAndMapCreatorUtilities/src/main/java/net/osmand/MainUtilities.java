@@ -314,6 +314,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--chars-build-poi-nameindex=")) {
 				settings.charsToBuildPoiNameIndex = Integer.parseInt(s.substring("--chars-build-poi-nameindex=".length()));
 				it.remove();
+			} else if (s.startsWith("--chars-build-poiid-nameindex=")) {
+				settings.charsToBuildPoiIdNameIndex = Integer.parseInt(s.substring("--chars-build-poiid-nameindex=".length()));
+				it.remove();
 			} else if (s.startsWith("--chars-build-addr-nameindex=")) {
 				settings.charsToBuildAddressNameIndex = Integer.parseInt(s.substring("--chars-build-addr-nameindex=".length()));
 				it.remove();
