@@ -156,7 +156,11 @@ public class IndexRouteRelationCreator {
 			}
 			for (Node node : pointsForPoiSearch) {
 				if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
+					String filename = node.getTag("filename");
 					node.replaceTags(poiSectionTags);
+					if (filename != null) {
+						node.putTag("filename", filename);
+					}
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
@@ -201,7 +205,9 @@ public class IndexRouteRelationCreator {
 				// place the very first point in the approx middle
 				LatLon middle = nodes.get(nodes.size() / 2).getLatLon();
 				long nodeId = calcEntityIdFromRelationId(relationId, searchPointsCounter++, hash);
-				localPoints.add(new Node(middle.getLatitude(), middle.getLongitude(), nodeId));
+				Node middleNode = new Node(middle.getLatitude(), middle.getLongitude(), nodeId);
+				middleNode.putTag("filename", "unique");
+				localPoints.add(middleNode);
 
 				for (int i = 1; i < nodes.size(); i++) {
 					LatLon currentLatLon = nodes.get(i).getLatLon();
