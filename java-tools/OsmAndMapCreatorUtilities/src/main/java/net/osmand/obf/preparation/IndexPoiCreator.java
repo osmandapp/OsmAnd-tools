@@ -798,7 +798,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
-				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand"))
+				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand") ||
+						e.getKey().getTag().equals("wikidata") || e.getKey().getTag().equals("route_id") )
 						&& !"name:en".equals(e.getKey().getTag())) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
