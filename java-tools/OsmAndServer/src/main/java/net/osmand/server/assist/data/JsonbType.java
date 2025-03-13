@@ -56,7 +56,7 @@ public class JsonbType implements UserType<JsonObject> {
         if (jsonObject == null) {
             preparedStatement.setNull(i, Types.OTHER);
         } else {
-            preparedStatement.setObject(i, jsonObject.toString(), SqlTypes.JSON);
+            preparedStatement.setObject(i, jsonObject.toString(), Types.OTHER);
         }
     }
 
