@@ -9,22 +9,17 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.sql.DataSource;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
@@ -36,15 +31,14 @@ import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -57,10 +51,10 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.session.MapSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import org.springframework.web.client.DefaultResponseErrorHandler;
@@ -79,7 +73,7 @@ import net.osmand.util.Algorithms;
 
 @Configuration
 @EnableOAuth2Client
-public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
+public class WebSecurityConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
@@ -133,7 +127,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		if (!isRedisAvailable()) {
 			LOG.warn("Redis is not configured, falling back to MapSessionRepository.");
 			MapSessionRepository repository = new MapSessionRepository(new ConcurrentHashMap<>());
-			repository.setDefaultMaxInactiveInterval(SESSION_TTL_SECONDS);
+			repository.setDefaultMaxInactiveInterval(Duration.ofSeconds(SESSION_TTL_SECONDS));
 			return repository;
 		}
 		LOG.info("Redis configuration is detected, skipping MapSessionRepository.");
@@ -156,86 +150,75 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		}
 	}
 
-    @Override
-    protected void configure(final AuthenticationManagerBuilder auth) throws Exception {
-    	auth.userDetailsService(new UserDetailsService() {
-    	    @Override
-			public UserDetails loadUserByUsername(String username) {
-				PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
-				if (pu == null) {
-					throw new UsernameNotFoundException(username);
-				}
-				PremiumUserDevice pud = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
-						userdataService.TOKEN_DEVICE_WEB);
-				if (pud == null) {
-					throw new UsernameNotFoundException(username);
-				}
-				
-				return new OsmAndProUser(username, pud.accesstoken, pud,
-						AuthorityUtils.createAuthorityList(WebSecurityConfiguration.ROLE_PRO_USER));
-			}
-    	});
-    }
-    
-    @Override
-	protected void configure(HttpSecurity http) throws Exception {
-	    http.sessionManagement()
-			    .maximumSessions(1)
-			    .and()
-			    .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED);
+	@Bean
+	public UserDetailsService userDetailsService() {
+		return username -> {
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
+			if (pu == null) throw new UsernameNotFoundException(username);
 
-	    http.addFilterBefore((request, response, chain) -> {
-		    if (request instanceof HttpServletRequest httpRequest) {
-			    String uri = httpRequest.getRequestURI();
-			    if (!uri.startsWith("/mapapi") && !uri.startsWith("/share")) {
-				    httpRequest.getSession(false);
-			    }
-		    }
-		    chain.doFilter(request, response);
-	    }, org.springframework.security.web.context.SecurityContextPersistenceFilter.class);
+			PremiumUserDevice pud = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(
+					pu.id, userdataService.TOKEN_DEVICE_WEB);
+			if (pud == null) throw new UsernameNotFoundException(username);
 
-	    // 1. CSRF
-    	Set<String> enabledMethods = new TreeSet<>(
-    			Arrays.asList("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE"));
-    	http.csrf().requireCsrfProtectionMatcher(new RequestMatcher() {
-			
-			@Override
-			public boolean matches(HttpServletRequest request) {
-				String method = request.getMethod();
-				if(method != null && !enabledMethods.contains(method)) {
-					String url = request.getServletPath();
-					if (request.getPathInfo() != null) {
-						url += request.getPathInfo();
+			return new OsmAndProUser(username, pud.accesstoken, pud,
+					AuthorityUtils.createAuthorityList(ROLE_PRO_USER));
+		};
+	}
+
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		http
+				.sessionManagement(session -> session
+						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+						.maximumSessions(1)
+				)
+				.addFilterBefore((request, response, chain) -> {
+					if (request instanceof HttpServletRequest httpRequest) {
+						String uri = httpRequest.getRequestURI();
+						if (!uri.startsWith("/mapapi") && !uri.startsWith("/share")) {
+							httpRequest.getSession(false);
+						}
 					}
-					if(url.startsWith("/api/") || url.startsWith("/subscription/")) {
-						return false;
-					}
-					return true;
-				}
-				return false;
-			}
-		}).csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse());
-    	http.cors().configurationSource(corsConfigurationSource());
-    	
-    	http.authorizeRequests().antMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
-    							.antMatchers("/mapapi/auth/**").permitAll()
-    							.antMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
-    							.anyRequest().permitAll();
-    	http.oauth2Login().userInfoEndpoint().userService(oauthGithubUserService());
+					chain.doFilter(request, response);
+				}, org.springframework.security.web.context.SecurityContextPersistenceFilter.class)
+				.csrf(csrf -> csrf
+						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+						.requireCsrfProtectionMatcher(request -> {
+							String method = request.getMethod();
+							Set<String> enabledMethods = Set.of("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE");
+							if (method != null && !enabledMethods.contains(method)) {
+								String url = request.getServletPath();
+								if (request.getPathInfo() != null) {
+									url += request.getPathInfo();
+								}
+								return !(url.startsWith("/api/") || url.startsWith("/subscription/"));
+							}
+							return false;
+						})
+				)
+				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
+						.requestMatchers("/mapapi/auth/**").permitAll()
+						.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
+						.anyRequest().permitAll()
+				)
+				.oauth2Login(oauth -> oauth
+						.userInfoEndpoint(userInfo -> userInfo.userService(oauthGithubUserService())))
+						.exceptionHandling(ex -> ex
+								.defaultAuthenticationEntryPointFor(
+										new LoginUrlAuthenticationEntryPoint("/map/loginForm"),
+										new AntPathRequestMatcher("/mapapi/**"))
+						)
+						.rememberMe(remember -> remember.tokenValiditySeconds(3600 * 24 * 14))
+						.logout(logout -> logout
+								.deleteCookies("JSESSIONID")
+								.logoutSuccessUrl("/")
+								.logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
+								.permitAll()
+						);
 
-    	
-    	// SEE MapApiController.loginForm to test form
-//		http.formLogin().loginPage("/mapapi/auth/loginForm").
-//				loginProcessingUrl("/mapapi/auth/loginProcess").defaultSuccessUrl("/map/loginSuccess");
-		LoginUrlAuthenticationEntryPoint mapLogin = new LoginUrlAuthenticationEntryPoint("/map/loginForm");
-		if (getApplicationContext().getEnvironment().acceptsProfiles(Profiles.of("production"))) {
-			mapLogin.setForceHttps(true);
-		}
-		http.exceptionHandling().defaultAuthenticationEntryPointFor(mapLogin, new AntPathRequestMatcher("/mapapi/**"));
-		http.rememberMe().tokenValiditySeconds(3600*24*14);
-		http.logout().deleteCookies("JSESSIONID").
-			logoutSuccessUrl("/").logoutRequestMatcher(new AntPathRequestMatcher("/logout")).permitAll();
-    	
+		return http.build();
 	}
 
 	private DefaultOAuth2UserService oauthGithubUserService() {
@@ -246,7 +229,7 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			public void handleError(ClientHttpResponse response) throws IOException {
 			}
 		});
-		DefaultOAuth2UserService service = new DefaultOAuth2UserService() {
+		return new DefaultOAuth2UserService() {
 			@Override
     		public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
 				OAuth2User user = super.loadUser(userRequest);
@@ -278,20 +261,21 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 				ResponseEntity<Map<String, Object>> res = restTemplate.exchange(request, 
 						new ParameterizedTypeReference<Map<String, Object>>() {});
 				if (!res.getStatusCode().is2xxSuccessful()) {
-					LOG.warn("Result status code from github: " + res.getStatusCode().name() + " " + res.getBody());
+					LOG.warn("Result status code from github: " + res.getStatusCode() + " " + res.getBody());
 					return null;
 				}
 				return res.getBody();
 			}
     		
     	};
-    	return service;
 	}
 
-	@Bean("authenticationManager")
-	@Override
-	public AuthenticationManager authenticationManagerBean() throws Exception {
-		return super.authenticationManagerBean();
+	@Bean
+	public AuthenticationManager authenticationManager(PasswordEncoder passwordEncoder) {
+		DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+		provider.setUserDetailsService(userDetailsService());
+		provider.setPasswordEncoder(passwordEncoder);
+		return new ProviderManager(provider);
 	}
     
 

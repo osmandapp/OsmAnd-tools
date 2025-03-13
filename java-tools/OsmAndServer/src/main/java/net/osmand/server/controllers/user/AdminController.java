@@ -8,11 +8,11 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
-import javax.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
-import javax.validation.Valid;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;

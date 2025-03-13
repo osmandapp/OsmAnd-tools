@@ -19,8 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Nullable;
-import javax.transaction.Transactional;
+import jakarta.annotation.Nullable;
+import jakarta.transaction.Transactional;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;

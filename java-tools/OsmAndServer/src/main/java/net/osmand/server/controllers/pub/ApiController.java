@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -20,8 +21,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import org.apache.commons.logging.Log;
@@ -35,7 +36,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.util.Base64Utils;
+import java.util.Base64;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -510,12 +511,12 @@ public class ApiController {
     
     @GetMapping(path = {"/email/unsubscribe"}, produces = "text/html;charset=UTF-8")
     public String emailUnsubscribe(@RequestParam(required=false) String id, 
-    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
+    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) {
     	if(Algorithms.isEmpty(email)) {
     		if(Algorithms.isEmpty(id)) {
     			throw new IllegalArgumentException("Missing email parameter");
     		}
-    		email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+    		email = new String(Base64.getDecoder().decode(URLDecoder.decode(id, StandardCharsets.UTF_8)));
     	}
     	EmailUnsubscribed ent = new EmailUnsubscribedRepository.EmailUnsubscribed();
     	ent.timestamp = new Date();
@@ -531,12 +532,12 @@ public class ApiController {
     
     @GetMapping(path = {"/email/subscribe"}, produces = "text/html;charset=UTF-8")
     public String emailSubscribe(@RequestParam(required=false) String id, 
-    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) throws IOException  {
+    		@RequestParam(required=false) String email, @RequestParam(required=false) String group) {
 		if (Algorithms.isEmpty(email)) {
 			if (Algorithms.isEmpty(id)) {
 				throw new IllegalArgumentException("Missing email parameter");
 			}
-			email = new String(Base64Utils.decodeFromString(URLDecoder.decode(id, "UTF-8")));
+			email = new String(Base64.getDecoder().decode(URLDecoder.decode(id, StandardCharsets.UTF_8)));
 		}
     	unsubscribedRepo.deleteAllByEmailIgnoreCase(email);
     	return "pub/email/subscribe";
