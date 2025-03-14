@@ -56,7 +56,6 @@ public class MapUserFileService {
 	@Autowired
 	UserdataService userdataService;
 
-	private static final String BBOX = "bbox";
 	private static final String METADATA = "metadata";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
@@ -71,7 +70,8 @@ public class MapUserFileService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1709034532000L; // 27-02-2024
+	private static final long ANALYSIS_RERUN = 1741949863504L; // 14-03-2025
+
 
 	Gson gson = new Gson();
 
