@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;

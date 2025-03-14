@@ -166,6 +166,8 @@ server:
       pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
 
 spring:
-  profiles: production
+  config:
+    activate:
+      on-profile: production
   resources.static-locations: file:${osmand.web.location}
   thymeleaf.prefix: file:${osmand.web.location}/templates/

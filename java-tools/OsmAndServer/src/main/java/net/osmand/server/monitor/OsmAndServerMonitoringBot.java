@@ -2,7 +2,7 @@ package net.osmand.server.monitor;
 
 import java.util.Collection;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

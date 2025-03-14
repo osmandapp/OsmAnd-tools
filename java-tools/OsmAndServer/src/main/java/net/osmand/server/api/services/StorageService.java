@@ -28,9 +28,9 @@ import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.util.Algorithms;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 @Service
 public class StorageService {
