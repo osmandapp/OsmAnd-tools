@@ -3,7 +3,6 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import net.osmand.data.QuadRect;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -13,7 +12,6 @@ import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Metadata;
 import net.osmand.shared.gpx.primitives.WptPt;
-import net.osmand.util.MapUtils;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -111,8 +109,8 @@ public class MapUserFileService {
 			boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 			if (of.isPresent()) {
 				GpxTrackAnalysis analysis = null;
-				GpxFile gpxFile = null;
-				QuadRect bbox = null;
+				GpxFile gpxFile;
+				List<WptPt> points = null;
 				PremiumUserFilesRepository.UserFile uf = of.get();
 				JsonObject details = uf.details;
 				InputStream in;
@@ -154,8 +152,7 @@ public class MapUserFileService {
 					}
 					if (isTrack) {
 						analysis = getAnalysis(uf, gpxFile);
-						List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
-						bbox = trackAnalyzerService.calculateQuadRect(allPoints);
+						points = gpxFile.getAllSegmentsPoints();
 					}
 				} else {
 					String noIsError = String.format(
@@ -168,7 +165,7 @@ public class MapUserFileService {
 				}
 				boolean isSharedFile = isShared(nd, sharedFilesMap);
 				JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
-				saveDetails(newDetails, ANALYSIS, uf, bbox);
+				saveDetails(newDetails, ANALYSIS, uf, points);
 				nd.details = uf.details;
 				result.add(nd);
 			}
@@ -256,12 +253,12 @@ public class MapUserFileService {
 		saveDetails(file.details, tag, file, null);
 	}
 
-	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file, QuadRect bbox) {
+	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file, List<WptPt> points) {
 		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		file.details = newDetails;
 
-		if (bbox != null) {
-			file.quadTiles = trackAnalyzerService.getQuadTileShortlinks(bbox);
+		if (points != null) {
+			file.quadTiles = trackAnalyzerService.getQuadTileShortlinks(points);
 		}
 
 		userFilesRepository.save(file);

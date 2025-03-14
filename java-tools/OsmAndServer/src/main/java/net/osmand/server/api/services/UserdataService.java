@@ -46,6 +46,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -103,6 +104,9 @@ public class UserdataService {
 
     @Autowired
     protected PremiumUserDevicesRepository devicesRepository;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
 
     @Autowired
     WebGpxParser webGpxParser;
@@ -1256,12 +1260,30 @@ public class UserdataService {
 	}
 
 	public UserdataController.UserFilesResults generateGpxFilesByQuadTiles(int userId, boolean allVersions, String[] tiles) {
-		List<Object[]> results = filesRepository.listGPXFilesByTiles(userId, tiles);
-		List<UserFileNoData> userFileNoDataList = new ArrayList<>();
+		String query = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage " +
+				"FROM user_files u " +
+				"WHERE u.userid = ? " +
+				"AND u.type = 'GPX' " +
+				"AND u.quadtiles && CAST(? AS text[]) " +
+				"ORDER BY u.updatetime DESC";
 
-		for (Object[] result : results) {
-			UserFileNoData userFileNoData = UserFileNoData.fromObjectArray(result);
-			userFileNoDataList.add(userFileNoData);
+
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, userId, tiles);
+
+		List<UserFileNoData> userFileNoDataList = new ArrayList<>();
+		for (Map<String, Object> row : rows) {
+			long id = (Long) row.get("id");
+			int uId = (Integer) row.get("userid");
+			int deviceId = (Integer) row.get("deviceid");
+			String type = (String) row.get("type");
+			String name = (String) row.get("name");
+			Date updateTime = (Date) row.get("updatetime");
+			Date clientTime = (Date) row.get("clienttime");
+			Long fileSize = (Long) row.get("filesize");
+			Long zipFileSize = (Long) row.get("zipfilesize");
+			String storage = (String) row.get("storage");
+
+			userFileNoDataList.add(new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null));
 		}
 
 		sanitizeFileNames(userFileNoDataList);

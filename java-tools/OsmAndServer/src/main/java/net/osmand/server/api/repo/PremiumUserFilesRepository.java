@@ -44,14 +44,6 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
 			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
-
-	@Query(value = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage " +
-			"FROM user_files u " +
-			"WHERE u.userid = :userid " +
-			"AND u.type = 'GPX' " +
-			"AND u.quadtiles && :tiles " +
-			"ORDER BY u.updatetime DESC", nativeQuery = true)
-	List<Object[]> listGPXFilesByTiles(@Param(value = "userid") int userid, @Param(value = "tiles") String[] tiles);
 	
 	
 //	@Modifying
@@ -213,21 +205,6 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.details = details;
 			this.storage = storage;
 			this.deviceInfo = null;
-		}
-
-		public static UserFileNoData fromObjectArray(Object[] result) {
-			long id = (Long) result[0];
-			int uId = (Integer) result[1];
-			int deviceId = (Integer) result[2];
-			String type = (String) result[3];
-			String name = (String) result[4];
-			Date updateTime = (Date) result[5];
-			Date clientTime = (Date) result[6];
-			Long fileSize = (Long) result[7];
-			Long zipFileSize = (Long) result[8];
-			String storage = (String) result[9];
-
-			return new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null);
 		}
 	}
 	
