@@ -7,6 +7,9 @@ import java.util.*;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.utils.MultiPlatform;
+import net.osmand.shared.wiki.WikiHelper;
+import net.osmand.shared.wiki.WikiImage;
+import net.osmand.shared.wiki.WikiMetadata;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -14,11 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
 
@@ -234,13 +233,6 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(poi));
     }
     
-    @GetMapping(path = {"/get-wiki-photos"}, produces = "application/json")
-    @ResponseBody
-    public ResponseEntity<String> getWikiPhotosById(@RequestParam long id, @RequestParam double lat, @RequestParam double lon) {
-        FeatureCollection collection = wikiService.getImagesById(id, lat, lon);
-        return ResponseEntity.ok(gson.toJson(collection));
-    }
-    
     @GetMapping(path = {"/get-wiki-content"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikipediaContent(@RequestParam String title, @RequestParam String lang) {
@@ -254,14 +246,31 @@ public class SearchController {
         String content = wikiService.getWikivoyageContent(title, lang);
         return ResponseEntity.ok(gson.toJson(content));
     }
-    
-    @GetMapping(path = {"/get-poi-photos"}, produces = "application/json")
+
+    @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getPoiPhotos(@RequestParam(required = false) String article,
-                                               @RequestParam(required = false) String category,
-                                               @RequestParam(required = false) String wiki) {
-        Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(article, category, wiki);
-        FeatureCollection featureCollection = wikiService.convertToFeatureCollection(images);
+    public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {
+        WikiHelper.WikiTagData wikiTagData = WikiHelper.INSTANCE.extractWikiTagData(tags);
+
+        String wikidataId = wikiTagData.getWikidataId();
+        String wikiCategory = wikiTagData.getWikiCategory();
+        String wikiTitle = wikiTagData.getWikiTitle();
+        List<WikiImage> wikiImages = wikiTagData.getWikiImages();
+
+        Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
+
+        images.forEach(img -> {
+            WikiImage wikiImage = new WikiImage("", (String) img.get("image"), "", "", "");
+            WikiMetadata.Metadata metadata = wikiImage.getMetadata();
+            metadata.setDate((String) img.get("date"));
+            metadata.setAuthor((String) img.get("author"));
+            metadata.setLicense((String) img.get("license"));
+            metadata.setDescription((String) img.get("description"));
+            wikiImage.setMediaId((Long) img.get("mediaId"));
+
+            wikiImages.add(wikiImage);
+        });
+        FeatureCollection featureCollection = wikiService.convertToFeatureCollection(wikiImages);
         return ResponseEntity.ok(gson.toJson(featureCollection));
     }
 }
