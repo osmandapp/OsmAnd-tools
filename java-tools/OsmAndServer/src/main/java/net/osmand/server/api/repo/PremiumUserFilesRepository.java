@@ -96,9 +96,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Type(JsonbType.class)
         public JsonObject details;
 
-	    @Column(name = "quadtiles", columnDefinition = "text[]")
+	    @Column(name = "shortlinktiles", columnDefinition = "text[]")
 	    @Type(StringArrayType.class)
-	    public String[] quadTiles;
+	    public String[] shortlinktiles;
 
 	    @Column(name = "data", columnDefinition = "bytea")
 	    public byte[] data;

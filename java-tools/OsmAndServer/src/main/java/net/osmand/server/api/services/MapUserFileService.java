@@ -258,7 +258,7 @@ public class MapUserFileService {
 		file.details = newDetails;
 
 		if (points != null) {
-			file.quadTiles = trackAnalyzerService.getQuadTileShortlinks(points);
+			file.shortlinktiles = trackAnalyzerService.getQuadTileShortlinks(points);
 		}
 
 		userFilesRepository.save(file);

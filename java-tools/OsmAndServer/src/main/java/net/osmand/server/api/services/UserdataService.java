@@ -1264,7 +1264,7 @@ public class UserdataService {
 				"FROM user_files u " +
 				"WHERE u.userid = ? " +
 				"AND u.type = 'GPX' " +
-				"AND u.quadtiles && CAST(? AS text[]) " +
+				"AND u.shortlinktiles && CAST(? AS text[]) " +
 				"ORDER BY u.updatetime DESC";
 
 
