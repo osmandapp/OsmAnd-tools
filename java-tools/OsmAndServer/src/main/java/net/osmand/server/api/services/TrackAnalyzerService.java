@@ -351,12 +351,10 @@ public class TrackAnalyzerService {
 	}
 
 	public String[] getQuadTileShortlinks(List<WptPt> points) {
-		Set<String> shortLinkTiles = new TreeSet<>();
-
 		if (points == null || points.isEmpty()) {
 			return new String[0];
 		}
-
+		Set<String> shortLinkTiles = new TreeSet<>();
 		WptPt firstPoint = points.get(0);
 		shortLinkTiles.add(MapUtils.createShortLinkString(firstPoint.getLat(), firstPoint.getLon(), SHORT_LINK_ZOOM));
 
