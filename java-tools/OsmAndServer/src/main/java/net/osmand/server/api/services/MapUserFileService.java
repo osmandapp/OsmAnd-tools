@@ -3,7 +3,6 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import net.osmand.data.QuadRect;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -55,7 +54,6 @@ public class MapUserFileService {
 	@Autowired
 	UserdataService userdataService;
 
-	private static final String BBOX = "bbox";
 	private static final String METADATA = "metadata";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
@@ -70,7 +68,8 @@ public class MapUserFileService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1709034532000L; // 27-02-2024
+	private static final long ANALYSIS_RERUN = 1741949863504L; // 14-03-2025
+
 
 	Gson gson = new Gson();
 
@@ -110,8 +109,8 @@ public class MapUserFileService {
 			boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 			if (of.isPresent()) {
 				GpxTrackAnalysis analysis = null;
-				GpxFile gpxFile = null;
-				QuadRect bbox = null;
+				GpxFile gpxFile;
+				List<WptPt> points = null;
 				PremiumUserFilesRepository.UserFile uf = of.get();
 				JsonObject details = uf.details;
 				InputStream in;
@@ -153,8 +152,7 @@ public class MapUserFileService {
 					}
 					if (isTrack) {
 						analysis = getAnalysis(uf, gpxFile);
-						List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
-						bbox = trackAnalyzerService.calculateQuadRect(allPoints);
+						points = gpxFile.getAllSegmentsPoints();
 					}
 				} else {
 					String noIsError = String.format(
@@ -166,8 +164,8 @@ public class MapUserFileService {
 					continue;
 				}
 				boolean isSharedFile = isShared(nd, sharedFilesMap);
-				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isSharedFile);
-				saveDetails(newDetails, ANALYSIS, uf);
+				JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
+				saveDetails(newDetails, ANALYSIS, uf, points);
 				nd.details = uf.details;
 				result.add(nd);
 			}
@@ -175,12 +173,12 @@ public class MapUserFileService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
-	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isShared) {
+	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isShared) {
 		JsonObject details = new JsonObject();
 		if (gpxFile != null) {
 			addMetadata(details, gpxFile);
 			if (isTrack) {
-				addTrackData(details, analysis, bbox);
+				addTrackData(details, analysis);
 			}
 		}
 		details.add(SHARE, gson.toJsonTree(isShared));
@@ -252,12 +250,17 @@ public class MapUserFileService {
 				file.details.add(tag, gsonWithNans.toJsonTree(res));
 			}
 		}
-		saveDetails(file.details, tag, file);
+		saveDetails(file.details, tag, file, null);
 	}
 
-	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file) {
+	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file, List<WptPt> points) {
 		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		file.details = newDetails;
+
+		if (points != null) {
+			file.shortlinktiles = trackAnalyzerService.getQuadTileShortlinks(points);
+		}
+
 		userFilesRepository.save(file);
 	}
 
@@ -293,20 +296,12 @@ public class MapUserFileService {
 		}
 	}
 
-	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis, QuadRect bbox) {
+	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			Map<String, Object> res = getDetails(analysis);
 			if (!res.isEmpty()) {
 				details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
 			}
-		}
-		if (bbox != null) {
-			JsonObject bboxJson = new JsonObject();
-			bboxJson.addProperty("left", bbox.left);
-			bboxJson.addProperty("top", bbox.top);
-			bboxJson.addProperty("right", bbox.right);
-			bboxJson.addProperty("bottom", bbox.bottom);
-			details.add(BBOX, bboxJson);
 		}
 	}
 
