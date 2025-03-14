@@ -795,6 +795,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				prevTree = subtree;
 			}
 			Set<String> otherNames = null;
+			Set<String> idNames = null;
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
@@ -805,9 +806,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 					otherNames.add(e.getValue());
 				}
+				if (settings.charsToBuildPoiIdNameIndex > 0 && (
+						e.getKey().getTag().equals("wikidata") || e.getKey().getTag().equals("route_id"))) {
+					if (idNames == null) {
+						idNames = new TreeSet<String>();
+					}
+					idNames.add(e.getValue());
+				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames);
+					namesIndex, otherNames, idNames);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -836,27 +844,34 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names) {
+			Set<String> names, Set<String> idNames) {
 		if (name != null) {
-			parsePrefix(name, data, poiData);
+			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData);
+			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
+				}
+			}
+		}
+		if (idNames != null) {
+			for (String nk : idNames) {
+				if (!Algorithms.isEmpty(nk)) {
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
 				}
 			}
 		}
 	}
 
-    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData) {
+    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
         name = Algorithms.normalizeSearchText(name);
         Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
         if (ArabicNormalizer.isSpecialArabic(name)) {
@@ -866,8 +881,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             }
         }
         for (String str : splitName) {
-            if (str.length() > settings.charsToBuildPoiNameIndex) {
-                str = str.substring(0, settings.charsToBuildPoiNameIndex);
+            if (str.length() > ind) {
+                str = str.substring(0, ind);
             }
             if (!poiData.containsKey(str)) {
                 poiData.put(str, new LinkedHashSet<>());
@@ -1106,6 +1121,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return "";
 	}
 
+	@SuppressWarnings("unused")
 	private String getInsertValuesTopIndexAdditionals() {
 		if (poiTypes != null && poiTypes.topIndexPoiAdditional.size() > 0) {
 			String sql = "";

@@ -5,7 +5,6 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
@@ -16,7 +15,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
-import net.osmand.shared.util.WikiImagesUtil;
+import net.osmand.shared.wiki.WikiImage;
+import net.osmand.shared.wiki.WikiMetadata;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -498,45 +498,62 @@ public class WikiService {
 	private void processImageQuery(String query, PreparedStatementSetter pss, RowCallbackHandler rowCallbackHandler) {
 		jdbcTemplate.query(query, pss, rowCallbackHandler);
 	}
-	
+
 	private void queryImagesByWikidataAndCategory(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
-		// TODO 1. photos should be sorted by view all 3 queries should be joined
-		// TODO 2. exclude duplicate
-		// TODO 3. write comment to explain what images and from where do we retrieve
-		// TODO 4. retrieve wikimedia commons category based on wikidata id automatically 
-		// already present in wiki.wikidata catId (check android?)
-		if (articleId != null && !Algorithms.isEmpty(articleId)) {
+		if ((articleId == null || Algorithms.isEmpty(articleId)) && (categoryName == null || Algorithms.isEmpty(categoryName))) {
+			return;
+		}
+
+		List<Object> params = new ArrayList<>();
+		StringBuilder queryBuilder = new StringBuilder(
+				"SELECT DISTINCT mediaId, imageTitle, date, author, license FROM ("
+		);
+
+		boolean hasArticleId = articleId != null && !Algorithms.isEmpty(articleId);
+		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
+
+		if (hasArticleId) {
+			// Remove "Q" prefix from Wikidata ID if present
 			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
-			String finalArticleId = articleId;
-			processImageQuery(
-					"SELECT mediaId, imageTitle, date, author, license FROM wiki.wikiimages WHERE id = ? AND namespace = 6 " +
-							"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
-					ps -> ps.setString(1, finalArticleId),
-					rowCallbackHandler);
 		}
-		
-		if (categoryName != null && !Algorithms.isEmpty(categoryName)) {
-			AtomicBoolean found = new AtomicBoolean(false);
-			processImageQuery(
-					"SELECT imageTitle, mediaId, date, author, license FROM wiki.wikiimages WHERE id = " +
-							"(SELECT id FROM wiki.wikiimages WHERE imageTitle = ? AND namespace = 14 LIMIT 1) " +
-							"AND type = 'P373' AND namespace = 6 ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
-					ps -> ps.setString(1, categoryName.replace(' ', '_')),
-					rs -> {
-						rowCallbackHandler.processRow(rs);
-						found.set(true);
-					});
-			
-			if (!found.get()) {
-				processImageQuery(
-						"SELECT imgName AS imageTitle, imgId AS mediaId, '' AS date, '' AS author, '' AS license " +
-								"FROM wiki.categoryimages WHERE catName = ? ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY,
-						ps -> ps.setString(1, categoryName.replace(' ', '_')),
-						rowCallbackHandler);
-			}
+
+		if (hasArticleId || hasCategory) {
+			queryBuilder.append(
+					// Retrieve images directly linked to the Wikidata article ID
+					"SELECT w.mediaId, w.imageTitle, w.date, w.author, w.license, w.views " +
+							"FROM wiki.wikiimages w " +
+							"WHERE (w.id = ? OR w.id IN (" +
+							// Retrieve Wikimedia Commons category based on Wikidata ID
+							"    SELECT wd.catId FROM wiki.wikidata wd WHERE CAST(wd.id AS String) = ? " +
+							")) " +
+							"AND w.namespace = 6 " +
+							"UNION ALL " +
+							// Retrieve images based on the category name
+							"SELECT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views " +
+							"FROM wiki.categoryimages c WHERE c.catName = ?"
+			);
+			params.add(hasArticleId ? articleId : null);
+			params.add(hasArticleId ? articleId : null);
+			params.add(hasCategory ? categoryName.replace(' ', '_') : null);
 		}
+
+		// Sort results
+		queryBuilder.append(") AS combined ORDER BY views DESC LIMIT ").append(LIMIT_PHOTOS_QUERY);
+
+		processImageQuery(
+				queryBuilder.toString(),
+				ps -> {
+					for (int i = 0; i < params.size(); i++) {
+						if (params.get(i) != null) {
+							ps.setString(i + 1, (String) params.get(i));
+						} else {
+							ps.setNull(i + 1, Types.VARCHAR);
+						}
+					}
+				},
+				rowCallbackHandler
+		);
 	}
-	
 
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
 		String title = wiki;
@@ -567,14 +584,15 @@ public class WikiService {
 		return id;
 	}
 	
-	public FeatureCollection convertToFeatureCollection(Set<Map<String, Object>> images) {
+	public FeatureCollection convertToFeatureCollection(List<WikiImage> images) {
 		List<Feature> features = images.stream().map(imageDetails -> {
 			Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
-			feature.properties.put("imageTitle", imageDetails.get("image"));
-			feature.properties.put("date", imageDetails.get("date"));
-			feature.properties.put("author", imageDetails.get("author"));
-			feature.properties.put("license", imageDetails.get("license"));
-			feature.properties.put("mediaId", imageDetails.get("mediaId"));
+			feature.properties.put("imageTitle", imageDetails.getImageName());
+			WikiMetadata.Metadata metadata = imageDetails.getMetadata();
+			feature.properties.put("date", metadata.getDate());
+			feature.properties.put("author", metadata.getAuthor());
+			feature.properties.put("license", metadata.getLicense());
+			feature.properties.put("mediaId", imageDetails.getMediaId());
 			return feature;
 		}).toList();
 		
