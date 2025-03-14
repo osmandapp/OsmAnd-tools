@@ -13,6 +13,7 @@ import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Metadata;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.MapUtils;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -166,8 +167,8 @@ public class MapUserFileService {
 					continue;
 				}
 				boolean isSharedFile = isShared(nd, sharedFilesMap);
-				JsonObject newDetails = preparedDetails(gpxFile, analysis, bbox, isTrack, isSharedFile);
-				saveDetails(newDetails, ANALYSIS, uf);
+				JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
+				saveDetails(newDetails, ANALYSIS, uf, bbox);
 				nd.details = uf.details;
 				result.add(nd);
 			}
@@ -175,12 +176,12 @@ public class MapUserFileService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
-	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, QuadRect bbox, boolean isTrack, boolean isShared) {
+	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isShared) {
 		JsonObject details = new JsonObject();
 		if (gpxFile != null) {
 			addMetadata(details, gpxFile);
 			if (isTrack) {
-				addTrackData(details, analysis, bbox);
+				addTrackData(details, analysis);
 			}
 		}
 		details.add(SHARE, gson.toJsonTree(isShared));
@@ -252,12 +253,17 @@ public class MapUserFileService {
 				file.details.add(tag, gsonWithNans.toJsonTree(res));
 			}
 		}
-		saveDetails(file.details, tag, file);
+		saveDetails(file.details, tag, file, null);
 	}
 
-	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file) {
+	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file, QuadRect bbox) {
 		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		file.details = newDetails;
+
+		if (bbox != null) {
+			file.quadTiles = trackAnalyzerService.getQuadTileShortlinks(bbox);
+		}
+
 		userFilesRepository.save(file);
 	}
 
@@ -293,20 +299,12 @@ public class MapUserFileService {
 		}
 	}
 
-	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis, QuadRect bbox) {
+	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			Map<String, Object> res = getDetails(analysis);
 			if (!res.isEmpty()) {
 				details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
 			}
-		}
-		if (bbox != null) {
-			JsonObject bboxJson = new JsonObject();
-			bboxJson.addProperty("left", bbox.left);
-			bboxJson.addProperty("top", bbox.top);
-			bboxJson.addProperty("right", bbox.right);
-			bboxJson.addProperty("bottom", bbox.bottom);
-			details.add(BBOX, bboxJson);
 		}
 	}
 

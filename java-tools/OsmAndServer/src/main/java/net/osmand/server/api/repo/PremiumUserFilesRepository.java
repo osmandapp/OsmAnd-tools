@@ -6,9 +6,13 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
+
+import com.vladmihalcea.hibernate.type.array.StringArrayType;
 import jakarta.persistence.*;
 
 import com.google.gson.Gson;
+import lombok.Getter;
+import lombok.Setter;
 import net.osmand.data.QuadRect;
 import net.osmand.server.assist.data.JsonbType;
 import org.hibernate.annotations.Type;
@@ -40,6 +44,14 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
 			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
+
+	@Query(value = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage " +
+			"FROM user_files u " +
+			"WHERE u.userid = :userid " +
+			"AND u.type = 'GPX' " +
+			"AND u.quadtiles && :tiles " +
+			"ORDER BY u.updatetime DESC", nativeQuery = true)
+	List<Object[]> listGPXFilesByTiles(@Param(value = "userid") int userid, @Param(value = "tiles") String[] tiles);
 	
 	
 //	@Modifying
@@ -92,6 +104,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Type(JsonbType.class)
         public JsonObject details;
 
+	    @Column(name = "quadtiles", columnDefinition = "text[]")
+	    @Type(StringArrayType.class)
+	    public String[] quadTiles;
+
 	    @Column(name = "data", columnDefinition = "bytea")
 	    public byte[] data;
 
@@ -139,7 +155,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			+ " order by updatetime desc")
 	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, 
 			@Param(value = "name") String name, @Param(value = "type") String type);
-	
+
+	@Setter
+	@Getter
 	// file used to be transmitted to client as is
 	class UserFileNoData {
 		public int userid;
@@ -196,13 +214,20 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.storage = storage;
 			this.deviceInfo = null;
 		}
-		
-		public String getDeviceInfo() {
-			return deviceInfo;
-		}
-		
-		public void setDeviceInfo(String deviceInfo) {
-			this.deviceInfo = deviceInfo;
+
+		public static UserFileNoData fromObjectArray(Object[] result) {
+			long id = (Long) result[0];
+			int uId = (Integer) result[1];
+			int deviceId = (Integer) result[2];
+			String type = (String) result[3];
+			String name = (String) result[4];
+			Date updateTime = (Date) result[5];
+			Date clientTime = (Date) result[6];
+			Long fileSize = (Long) result[7];
+			Long zipFileSize = (Long) result[8];
+			String storage = (String) result[9];
+
+			return new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null);
 		}
 	}
 	

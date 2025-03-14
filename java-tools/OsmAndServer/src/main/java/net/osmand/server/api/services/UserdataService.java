@@ -1255,6 +1255,20 @@ public class UserdataService {
 		return files;
 	}
 
+	public UserdataController.UserFilesResults generateGpxFilesByQuadTiles(int userId, boolean allVersions, String[] tiles) {
+		List<Object[]> results = filesRepository.listGPXFilesByTiles(userId, tiles);
+		List<UserFileNoData> userFileNoDataList = new ArrayList<>();
+
+		for (Object[] result : results) {
+			UserFileNoData userFileNoData = UserFileNoData.fromObjectArray(result);
+			userFileNoDataList.add(userFileNoData);
+		}
+
+		sanitizeFileNames(userFileNoDataList);
+
+		return getUserFilesResults(userFileNoDataList, userId, allVersions);
+	}
+
 	private void processGpxFile(PremiumUserDevicesRepository.PremiumUserDevice dev, UserFile userFile,
 	                            Map<String, GpxFile> files) throws IOException {
 		try (InputStream is = getInputStream(dev, userFile)) {

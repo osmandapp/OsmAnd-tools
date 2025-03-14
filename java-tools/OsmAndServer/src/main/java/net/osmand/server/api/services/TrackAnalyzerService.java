@@ -72,14 +72,6 @@ public class TrackAnalyzerService {
 	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
 		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse();
 
-		//get files for analysis
-		UserdataController.UserFilesResults userFiles = userdataService.generateFiles(dev.userid, null, false, true, "GPX");
-		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
-
-		//get points
-		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
-			return null;
-		}
 		List<LatLon> latLonPoints = analyzerRequest.getPoints().stream()
 				.map(point -> new LatLon(point.get("lat"), point.get("lon")))
 				.toList();
@@ -87,6 +79,23 @@ public class TrackAnalyzerService {
 		QuadRect bboxPoints = latLonPoints.size() == 2 ? getBboxByPoints(latLonPoints) : null;
 		//when we have one point, check if the track intersects with the point and response all track stats
 		boolean useOnePoint = bboxPoints == null;
+		String[] tiles;
+		if (useOnePoint) {
+			LatLon point = latLonPoints.get(0);
+			QuadRect bbox = new QuadRect(point.getLatitude(), point.getLongitude(), point.getLatitude(), point.getLongitude());
+			tiles = getQuadTileShortlinks(bbox);
+		} else {
+			tiles = getQuadTileShortlinks(bboxPoints);
+		}
+
+		//get files for analysis
+		UserdataController.UserFilesResults userFiles = userdataService.generateGpxFilesByQuadTiles(dev.userid, false,  tiles);
+		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
+
+		//get points
+		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
+			return null;
+		}
 
 		//process files
 		for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
@@ -122,7 +131,7 @@ public class TrackAnalyzerService {
 							GpxTrackAnalysis analysis;
 							if (useOnePoint) {
 								analysis = gpxFile.getAnalysis(0);
-								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
 								trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
 								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
 							} else {
@@ -133,7 +142,7 @@ public class TrackAnalyzerService {
 									g.getTracks().get(0).getSegments().add(seg);
 									analysis = g.getAnalysis(0);
 
-									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
+									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
 									trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
 									statResults.add(trackAnalysisData);
 								}
@@ -156,7 +165,7 @@ public class TrackAnalyzerService {
 	}
 
 	@NotNull
-	private static Map<String, String> getSegmentAnalysis(GpxTrackAnalysis analysis, PremiumUserFilesRepository.UserFile uf) {
+	private static Map<String, String> getSegmentAnalysis(GpxTrackAnalysis analysis) {
 		Map<String, String> trackAnalysisData = new HashMap<>();
 		final String DEFAULT = "NaN";
 		// add speed
@@ -387,5 +396,12 @@ public class TrackAnalyzerService {
 			bbox.expand(point.getLon(), point.getLat(), point.getLon(), point.getLat());
 		}
 		return bbox;
+	}
+
+	public String[] getQuadTileShortlinks(QuadRect bbox) {
+		Set<String> shortLinkTiles = new TreeSet<>();
+		shortLinkTiles.add(MapUtils.createShortLinkString(bbox.bottom, bbox.left, 4));
+		shortLinkTiles.add(MapUtils.createShortLinkString(bbox.top, bbox.right, 4));
+		return shortLinkTiles.toArray(new String[0]);
 	}
 }
