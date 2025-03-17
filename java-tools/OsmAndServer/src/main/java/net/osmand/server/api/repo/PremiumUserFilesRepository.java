@@ -6,18 +6,11 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
-
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
+import jakarta.persistence.*;
 
 import com.google.gson.Gson;
 import net.osmand.data.QuadRect;
+import net.osmand.server.assist.data.JsonbType;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -96,7 +89,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         public String storage;
         
         @Column(name = "gendetails", columnDefinition = "jsonb")
-        @Type(type = "net.osmand.server.assist.data.JsonbType")
+        @Type(JsonbType.class)
         public JsonObject details;
 
 	    @Column(name = "data", columnDefinition = "bytea")

@@ -38,7 +38,7 @@ import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 import static net.osmand.wiki.WikiDatabasePreparation.*;
 

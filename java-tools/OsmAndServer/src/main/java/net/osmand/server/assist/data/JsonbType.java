@@ -7,18 +7,17 @@ import java.sql.SQLException;
 import java.sql.Types;
 
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
-import org.hibernate.type.SerializationException;
+import org.hibernate.type.SqlTypes;
 import org.hibernate.usertype.UserType;
-import org.springframework.lang.Nullable;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-public class JsonbType implements UserType {
+public class JsonbType implements UserType<JsonObject> {
 
     @Override
-    public int[] sqlTypes() {
-        return new int[] { Types.JAVA_OBJECT };
+    public int getSqlType() {
+        return SqlTypes.JSON;
     }
 
     @Override
@@ -27,60 +26,47 @@ public class JsonbType implements UserType {
     }
 
     @Override
-    public boolean equals(final Object x, final Object y) {
-        if (x == y) {
+    public boolean equals(JsonObject jsonObject, JsonObject j1) {
+        if (jsonObject == j1) {
             return true;
         }
-        if (x == null || y == null) {
+        if (jsonObject == null || j1 == null) {
             return false;
         }
-        return x.equals(y);
+        return jsonObject.equals(j1);
     }
 
     @Override
-    public int hashCode(final Object x) {
-        if (x == null) {
-            return 0;
-        }
-
-        return x.hashCode();
+    public int hashCode(JsonObject jsonObject) {
+        return jsonObject == null ? 0 : jsonObject.hashCode();
     }
 
-    @Nullable
     @Override
-    public Object nullSafeGet(final ResultSet rs,
-                              final String[] names,
-                              final SharedSessionContractImplementor session,
-                              final Object owner) throws SQLException {
-        final String json = rs.getString(names[0]);
+    public JsonObject nullSafeGet(ResultSet resultSet, int i, SharedSessionContractImplementor sharedSessionContractImplementor, Object o) throws SQLException {
+        String json = resultSet.getString(i);
         if (json == null) {
             return new JsonObject();
         }
-        final JsonParser jsonParser = new JsonParser();
+        JsonParser jsonParser = new JsonParser();
         return jsonParser.parse(json).getAsJsonObject();
     }
-    
-    @Override
-    public void nullSafeSet(final PreparedStatement st,
-                            final Object value,
-                            final int index,
-                            final SharedSessionContractImplementor session) throws SQLException {
-        if (value == null) {
-            st.setNull(index, Types.OTHER);
-            return;
-        }
 
-        st.setObject(index, value.toString(), Types.OTHER);
+    @Override
+    public void nullSafeSet(PreparedStatement preparedStatement, JsonObject jsonObject, int i, SharedSessionContractImplementor sharedSessionContractImplementor) throws SQLException {
+        if (jsonObject == null) {
+            preparedStatement.setNull(i, Types.OTHER);
+        } else {
+            preparedStatement.setObject(i, jsonObject.toString(), Types.OTHER);
+        }
     }
 
-    @Nullable
     @Override
-    public Object deepCopy(@Nullable final Object value) {
-        if (value == null) {
+    public JsonObject deepCopy(JsonObject jsonObject) {
+        if (jsonObject == null) {
             return null;
         }
-        final JsonParser jsonParser = new JsonParser();
-        return jsonParser.parse(value.toString()).getAsJsonObject();
+        JsonParser jsonParser = new JsonParser();
+        return jsonParser.parse(jsonObject.toString()).getAsJsonObject();
     }
 
     @Override
@@ -89,28 +75,24 @@ public class JsonbType implements UserType {
     }
 
     @Override
-    public Serializable disassemble(final Object value) {
-        final Object deepCopy = deepCopy(value);
-
-        if (!(deepCopy instanceof Serializable)) {
-            throw new SerializationException(
-                    String.format("deepCopy of %s is not serializable", value), null);
+    public Serializable disassemble(JsonObject jsonObject) {
+        if (jsonObject == null) {
+            return null;
         }
-
-        return (Serializable) deepCopy;
+        return jsonObject.toString();
     }
 
-    @Nullable
     @Override
-    public Object assemble(final Serializable cached, final Object owner) {
-        return deepCopy(cached);
+    public JsonObject assemble(Serializable serializable, Object o) {
+        if (serializable == null) {
+            return null;
+        }
+        JsonParser jsonParser = new JsonParser();
+        return jsonParser.parse((String) serializable).getAsJsonObject();
     }
 
-    @Nullable
     @Override
-    public Object replace(final Object original, final Object target, final Object owner) {
+    public JsonObject replace(JsonObject original, JsonObject target, Object owner) {
         return deepCopy(original);
     }
-
-	
 }
