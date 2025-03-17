@@ -43,7 +43,7 @@ public class TrackAnalyzerService {
 	private static final double MIN_DISTANCE_FOR_SHORTLINK = 400.0;
 
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
-	static final double DIST_THRESHOLD = 10; // meters
+	static final double DIST_THRESHOLD = 50; // meters
 	static final Map<String, Number> DEFAULT_VALUES = Map.of(
 			"speed", -1L,
 			"elevation", 99999.0
