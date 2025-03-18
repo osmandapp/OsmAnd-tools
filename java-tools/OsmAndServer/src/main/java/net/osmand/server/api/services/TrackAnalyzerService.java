@@ -43,7 +43,8 @@ public class TrackAnalyzerService {
 	private static final double MIN_DISTANCE_FOR_SHORTLINK = 400.0;
 
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
-	static final double DIST_THRESHOLD = 50; // meters
+	static final double MIN_DIST_THRESHOLD = 5; // meters
+	static final double MAX_DIST_THRESHOLD = 30; // meters
 	static final Map<String, Number> DEFAULT_VALUES = Map.of(
 			"speed", -1L,
 			"elevation", 99999.0
@@ -90,50 +91,60 @@ public class TrackAnalyzerService {
 		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
 			return null;
 		}
-
-		//process files
 		for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
-			Optional<PremiumUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
-			if (of.isPresent()) {
-				PremiumUserFilesRepository.UserFile uf = of.get();
-				GpxFile gpxFile = getGpxFile(uf);
-				if (gpxFile == null) {
-					continue;
-				}
-				for (Track t : gpxFile.getTracks()) {
-					for (TrkSegment s : t.getSegments()) {
-						List<TrkSegment> segments = useOnePoint
-								? processSegmentsForOnePoint(uf.name, s, wptPoints.get(0))
-								: processSegments(uf.name, s, wptPoints.get(0), wptPoints.get(1));
-						if (!segments.isEmpty()) {
-							analysisResponse.segments.put(uf.name, segments);
-							analysisResponse.files.add(file);
-							GpxTrackAnalysis analysis;
-							if (useOnePoint) {
-								analysis = gpxFile.getAnalysis(0);
-								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
-								trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
-								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
-							} else {
-								List<Map<String, String>> statResults = new ArrayList<>();
-								for (TrkSegment seg : segments) {
-									GpxFile g = new GpxFile(OSMAND_ROUTER_V2);
-									g.getTracks().add(new Track());
-									g.getTracks().get(0).getSegments().add(seg);
-									analysis = g.getAnalysis(0);
-
-									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
-									trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
-									statResults.add(trackAnalysisData);
-								}
-								analysisResponse.trackAnalysis.put(uf.name, statResults);
-							}
-						}
-					}
-				}
+			processFileForSegments(file, useOnePoint, wptPoints, MIN_DIST_THRESHOLD, analysisResponse);
+		}
+		if (analysisResponse.segments.isEmpty()) {
+			for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
+				processFileForSegments(file, useOnePoint, wptPoints, MAX_DIST_THRESHOLD, analysisResponse);
 			}
 		}
 		return analysisResponse;
+	}
+
+	private void processFileForSegments(
+			PremiumUserFilesRepository.UserFileNoData file,
+			boolean useOnePoint,
+			List<WptPt> wptPoints,
+			double distThreshold,
+			TrackAnalyzerResponse analysisResponse) throws IOException {
+
+		Optional<PremiumUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
+		if (of.isEmpty()) {
+			return;
+		}
+
+		PremiumUserFilesRepository.UserFile uf = of.get();
+		GpxFile gpxFile = getGpxFile(uf);
+		if (gpxFile == null) {
+			return;
+		}
+
+		for (Track t : gpxFile.getTracks()) {
+			for (TrkSegment s : t.getSegments()) {
+				List<TrkSegment> segments = useOnePoint
+						? processSegmentsForOnePoint(uf.name, s, wptPoints.get(0), distThreshold)
+						: processSegments(uf.name, s, wptPoints.get(0), wptPoints.get(1), distThreshold);
+
+				if (!segments.isEmpty()) {
+					analysisResponse.segments.put(uf.name, segments);
+					analysisResponse.files.add(file);
+
+					List<Map<String, String>> statResults = new ArrayList<>();
+					for (TrkSegment seg : segments) {
+						GpxFile g = new GpxFile(OSMAND_ROUTER_V2);
+						g.getTracks().add(new Track());
+						g.getTracks().get(0).getSegments().add(seg);
+						GpxTrackAnalysis analysis = g.getAnalysis(0);
+
+						Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
+						trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
+						statResults.add(trackAnalysisData);
+					}
+					analysisResponse.trackAnalysis.put(uf.name, statResults);
+				}
+			}
+		}
 	}
 
 	@NotNull
@@ -240,7 +251,7 @@ public class TrackAnalyzerService {
 		return null;
 	}
 
-	private List<TrkSegment> processSegments(String trackName, TrkSegment s, WptPt start, WptPt end) {
+	private List<TrkSegment> processSegments(String trackName, TrkSegment s, WptPt start, WptPt end, double distThreshold) {
 		List<TrkSegment> res = new ArrayList<>();
 		List<WptPt> points = s.getPoints();
 		int startInd = -1;
@@ -250,7 +261,7 @@ public class TrackAnalyzerService {
 					points.get(i - 1).getLat(), points.get(i - 1).getLon(),
 					points.get(i).getLat(), points.get(i).getLon());
 
-			if (dist < DIST_THRESHOLD) {
+			if (dist < distThreshold) {
 				int ind = i;
 				for (int j = ind + 1; j < points.size() && j < ind + 10; j++) {
 					double d2 = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
@@ -311,30 +322,30 @@ public class TrackAnalyzerService {
 		return res;
 	}
 
-	private List<TrkSegment> processSegmentsForOnePoint(String trackName, TrkSegment s, WptPt point) {
+	private List<TrkSegment> processSegmentsForOnePoint(String trackName, TrkSegment s, WptPt point, double distThreshold) {
 		List<TrkSegment> res = new ArrayList<>();
 
+		int startInd = -1;
 		for (int i = 0; i < s.getPoints().size(); i++) {
 			double dist = MapUtils.getDistance(
 					point.getLatitude(), point.getLongitude(),
 					s.getPoints().get(i).getLat(), s.getPoints().get(i).getLon()
 			);
-			if (dist < DIST_THRESHOLD) {
-				// check if we have previous and next points
-				WptPt prevPoint = (i > 0) ? s.getPoints().get(i - 1) : null;
-				WptPt nextPoint = (i < s.getPoints().size() - 1) ? s.getPoints().get(i + 1) : null;
-
-				if (prevPoint != null && nextPoint != null) {
-					TrkSegment segment = new TrkSegment();
-					segment.getPoints().add(prevPoint); // add previous point
-					segment.getPoints().add(s.getPoints().get(i)); // add current point
-					segment.getPoints().add(nextPoint); // add next point
-					segment.setName(trackName + " segment with point match");
-					res.add(segment);
-				}
-				break; // we found the point, no need to continue
+			if (dist < distThreshold) {
+				startInd = i;
+				break;
 			}
 		}
+
+		if (startInd != -1) {
+			TrkSegment segment = new TrkSegment();
+			for (int i = startInd; i < s.getPoints().size(); i++) {
+				segment.getPoints().add(s.getPoints().get(i));
+			}
+			segment.setName(trackName);
+			res.add(segment);
+		}
+
 		return res;
 	}
 
