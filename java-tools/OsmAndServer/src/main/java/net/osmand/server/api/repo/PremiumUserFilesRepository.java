@@ -8,7 +8,11 @@ import java.util.Date;
 import java.util.List;
 import jakarta.persistence.*;
 
+import com.vladmihalcea.hibernate.type.array.StringArrayType;
+
 import com.google.gson.Gson;
+import lombok.Getter;
+import lombok.Setter;
 import net.osmand.data.QuadRect;
 import net.osmand.server.assist.data.JsonbType;
 import org.hibernate.annotations.Type;
@@ -92,6 +96,10 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
         @Type(JsonbType.class)
         public JsonObject details;
 
+	    @Column(name = "shortlinktiles", columnDefinition = "text[]")
+	    @Type(StringArrayType.class)
+	    public String[] shortlinktiles;
+
 	    @Column(name = "data", columnDefinition = "bytea")
 	    public byte[] data;
 
@@ -139,7 +147,9 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			+ " order by updatetime desc")
 	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, 
 			@Param(value = "name") String name, @Param(value = "type") String type);
-	
+
+	@Setter
+	@Getter
 	// file used to be transmitted to client as is
 	class UserFileNoData {
 		public int userid;
@@ -195,14 +205,6 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 			this.details = details;
 			this.storage = storage;
 			this.deviceInfo = null;
-		}
-		
-		public String getDeviceInfo() {
-			return deviceInfo;
-		}
-		
-		public void setDeviceInfo(String deviceInfo) {
-			this.deviceInfo = deviceInfo;
 		}
 	}
 	

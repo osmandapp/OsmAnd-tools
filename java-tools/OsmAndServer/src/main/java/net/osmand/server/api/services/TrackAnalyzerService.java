@@ -2,7 +2,6 @@ package net.osmand.server.api.services;
 
 import lombok.Getter;
 import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -39,8 +38,13 @@ public class TrackAnalyzerService {
 	@Autowired
 	protected PremiumUserFilesRepository filesRepository;
 
+	private static final int ZOOM = 12;
+	private static final int SHORT_LINK_ZOOM = ZOOM - 8;
+	private static final double MIN_DISTANCE_FOR_SHORTLINK = 400.0;
+
 	protected static final Log LOG = LogFactory.getLog(TrackAnalyzerService.class);
-	static final double DIST_THRESHOLD = 10; // meters
+	static final double MIN_DIST_THRESHOLD = 5; // meters
+	static final double MAX_DIST_THRESHOLD = 30; // meters
 	static final Map<String, Number> DEFAULT_VALUES = Map.of(
 			"speed", -1L,
 			"elevation", 99999.0
@@ -72,91 +76,79 @@ public class TrackAnalyzerService {
 	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
 		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse();
 
+		List<WptPt> wptPoints = analyzerRequest.getPoints().stream()
+				.map(point -> new WptPt(point.get("lat"), point.get("lon")))
+				.toList();
+
+		//when we have one point, check if the track intersects with the point and response all track stats
+		boolean useOnePoint = wptPoints.size() == 1;
+		String[] tiles = getQuadTileShortlinks(wptPoints);
+
 		//get files for analysis
-		UserdataController.UserFilesResults userFiles = userdataService.generateFiles(dev.userid, null, false, true, "GPX");
+		UserdataController.UserFilesResults userFiles = userdataService.generateGpxFilesByQuadTiles(dev.userid, false,  tiles);
 		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
 
-		//get points
 		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
 			return null;
 		}
-		List<LatLon> latLonPoints = analyzerRequest.getPoints().stream()
-				.map(point -> new LatLon(point.get("lat"), point.get("lon")))
-				.toList();
-
-		QuadRect bboxPoints = latLonPoints.size() == 2 ? getBboxByPoints(latLonPoints) : null;
-		//when we have one point, check if the track intersects with the point and response all track stats
-		boolean useOnePoint = bboxPoints == null;
-
-		//process files
 		for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
-			Optional<PremiumUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
-			if (of.isPresent()) {
-				PremiumUserFilesRepository.UserFile uf = of.get();
-				QuadRect trackBbox = null;
-				if (uf.details != null) {
-					trackBbox = uf.getBbox();
-					if (trackBbox != null && isOutOfBounds(trackBbox, latLonPoints, bboxPoints, useOnePoint)) {
-						continue;
-					}
-				}
-				GpxFile gpxFile = getGpxFile(uf);
-				if (gpxFile == null) {
-					continue;
-				}
-				if (trackBbox == null) {
-					List<WptPt> allPoints = gpxFile.getAllSegmentsPoints();
-					trackBbox = calculateQuadRect(allPoints);
-					if (isOutOfBounds(trackBbox, latLonPoints, bboxPoints, useOnePoint)) {
-						continue;
-					}
-				}
-				for (Track t : gpxFile.getTracks()) {
-					for (TrkSegment s : t.getSegments()) {
-						List<TrkSegment> segments = useOnePoint
-								? processSegmentsForOnePoint(uf.name, s, latLonPoints.get(0))
-								: processSegments(uf.name, s, latLonPoints.get(0), latLonPoints.get(1));
-						if (!segments.isEmpty()) {
-							analysisResponse.segments.put(uf.name, segments);
-							analysisResponse.files.add(file);
-							GpxTrackAnalysis analysis;
-							if (useOnePoint) {
-								analysis = gpxFile.getAnalysis(0);
-								Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
-								trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
-								analysisResponse.trackAnalysis.put(uf.name, List.of(trackAnalysisData));
-							} else {
-								List<Map<String, String>> statResults = new ArrayList<>();
-								for (TrkSegment seg : segments) {
-									GpxFile g = new GpxFile(OSMAND_ROUTER_V2);
-									g.getTracks().add(new Track());
-									g.getTracks().get(0).getSegments().add(seg);
-									analysis = g.getAnalysis(0);
-
-									Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis, uf);
-									trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
-									statResults.add(trackAnalysisData);
-								}
-								analysisResponse.trackAnalysis.put(uf.name, statResults);
-							}
-						}
-					}
-				}
+			processFileForSegments(file, useOnePoint, wptPoints, MIN_DIST_THRESHOLD, analysisResponse);
+		}
+		if (analysisResponse.segments.isEmpty()) {
+			for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
+				processFileForSegments(file, useOnePoint, wptPoints, MAX_DIST_THRESHOLD, analysisResponse);
 			}
 		}
 		return analysisResponse;
 	}
 
-	private boolean isOutOfBounds(QuadRect trackBbox, List<LatLon> latLonPoints, QuadRect bboxPoints, boolean useOnePoint) {
-		if (useOnePoint) {
-			return !intersectsWithPoint(trackBbox, latLonPoints.get(0));
-		} else {
-			return !QuadRect.intersects(trackBbox, bboxPoints);
+	private void processFileForSegments(
+			PremiumUserFilesRepository.UserFileNoData file,
+			boolean useOnePoint,
+			List<WptPt> wptPoints,
+			double distThreshold,
+			TrackAnalyzerResponse analysisResponse) throws IOException {
+
+		Optional<PremiumUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
+		if (of.isEmpty()) {
+			return;
+		}
+
+		PremiumUserFilesRepository.UserFile uf = of.get();
+		GpxFile gpxFile = getGpxFile(uf);
+		if (gpxFile == null) {
+			return;
+		}
+
+		for (Track t : gpxFile.getTracks()) {
+			for (TrkSegment s : t.getSegments()) {
+				List<TrkSegment> segments = useOnePoint
+						? processSegmentsForOnePoint(uf.name, s, wptPoints.get(0), distThreshold)
+						: processSegments(uf.name, s, wptPoints.get(0), wptPoints.get(1), distThreshold);
+
+				if (!segments.isEmpty()) {
+					analysisResponse.segments.put(uf.name, segments);
+					analysisResponse.files.add(file);
+
+					List<Map<String, String>> statResults = new ArrayList<>();
+					for (TrkSegment seg : segments) {
+						GpxFile g = new GpxFile(OSMAND_ROUTER_V2);
+						g.getTracks().add(new Track());
+						g.getTracks().get(0).getSegments().add(seg);
+						GpxTrackAnalysis analysis = g.getAnalysis(0);
+
+						Map<String, String> trackAnalysisData = getSegmentAnalysis(analysis);
+						trackAnalysisData.put("date", String.valueOf(GpxUtilities.INSTANCE.getCreationTime(gpxFile)));
+						statResults.add(trackAnalysisData);
+					}
+					analysisResponse.trackAnalysis.put(uf.name, statResults);
+				}
+			}
 		}
 	}
 
 	@NotNull
-	private static Map<String, String> getSegmentAnalysis(GpxTrackAnalysis analysis, PremiumUserFilesRepository.UserFile uf) {
+	private static Map<String, String> getSegmentAnalysis(GpxTrackAnalysis analysis) {
 		Map<String, String> trackAnalysisData = new HashMap<>();
 		final String DEFAULT = "NaN";
 		// add speed
@@ -204,11 +196,6 @@ public class TrackAnalyzerService {
 		trackAnalysisData.put("totalDist", totalDist == 0.0 ? DEFAULT : String.valueOf(totalDist));
 
 		return trackAnalysisData;
-	}
-
-	private boolean intersectsWithPoint(QuadRect bbox, LatLon point) {
-		return bbox != null && point.getLatitude() >= bbox.bottom && point.getLatitude() <= bbox.top &&
-				point.getLongitude() >= bbox.left && point.getLongitude() <= bbox.right;
 	}
 
 	private List<PremiumUserFilesRepository.UserFileNoData> getFilesForAnalysis(UserdataController.UserFilesResults userFiles, List<String> folders) {
@@ -264,24 +251,17 @@ public class TrackAnalyzerService {
 		return null;
 	}
 
-	private QuadRect getBboxByPoints(List<LatLon> points) {
-		List<WptPt> wptPoints = points.stream()
-				.map(latLon -> new WptPt(latLon.getLatitude(), latLon.getLongitude()))
-				.toList();
-		return calculateQuadRect(wptPoints);
-	}
-
-	private List<TrkSegment> processSegments(String trackName, TrkSegment s, LatLon start, LatLon end) {
+	private List<TrkSegment> processSegments(String trackName, TrkSegment s, WptPt start, WptPt end, double distThreshold) {
 		List<TrkSegment> res = new ArrayList<>();
 		List<WptPt> points = s.getPoints();
 		int startInd = -1;
 		for (int i = 1; i < points.size(); ) {
-			LatLon pnt = startInd == -1 ? start : end;
+			WptPt pnt = startInd == -1 ? start : end;
 			double dist = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
 					points.get(i - 1).getLat(), points.get(i - 1).getLon(),
 					points.get(i).getLat(), points.get(i).getLon());
 
-			if (dist < DIST_THRESHOLD) {
+			if (dist < distThreshold) {
 				int ind = i;
 				for (int j = ind + 1; j < points.size() && j < ind + 10; j++) {
 					double d2 = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
@@ -342,30 +322,30 @@ public class TrackAnalyzerService {
 		return res;
 	}
 
-	private List<TrkSegment> processSegmentsForOnePoint(String trackName, TrkSegment s, LatLon point) {
+	private List<TrkSegment> processSegmentsForOnePoint(String trackName, TrkSegment s, WptPt point, double distThreshold) {
 		List<TrkSegment> res = new ArrayList<>();
 
+		int startInd = -1;
 		for (int i = 0; i < s.getPoints().size(); i++) {
 			double dist = MapUtils.getDistance(
 					point.getLatitude(), point.getLongitude(),
 					s.getPoints().get(i).getLat(), s.getPoints().get(i).getLon()
 			);
-			if (dist < DIST_THRESHOLD) {
-				// check if we have previous and next points
-				WptPt prevPoint = (i > 0) ? s.getPoints().get(i - 1) : null;
-				WptPt nextPoint = (i < s.getPoints().size() - 1) ? s.getPoints().get(i + 1) : null;
-
-				if (prevPoint != null && nextPoint != null) {
-					TrkSegment segment = new TrkSegment();
-					segment.getPoints().add(prevPoint); // add previous point
-					segment.getPoints().add(s.getPoints().get(i)); // add current point
-					segment.getPoints().add(nextPoint); // add next point
-					segment.setName(trackName + " segment with point match");
-					res.add(segment);
-				}
-				break; // we found the point, no need to continue
+			if (dist < distThreshold) {
+				startInd = i;
+				break;
 			}
 		}
+
+		if (startInd != -1) {
+			TrkSegment segment = new TrkSegment();
+			for (int i = startInd; i < s.getPoints().size(); i++) {
+				segment.getPoints().add(s.getPoints().get(i));
+			}
+			segment.setName(trackName);
+			res.add(segment);
+		}
+
 		return res;
 	}
 
@@ -381,11 +361,30 @@ public class TrackAnalyzerService {
 		return s.getPoints().get(ind).getTime();
 	}
 
-	public QuadRect calculateQuadRect(List<WptPt> points) {
-		QuadRect bbox = new QuadRect();
-		for (WptPt point : points) {
-			bbox.expand(point.getLon(), point.getLat(), point.getLon(), point.getLat());
+	public String[] getQuadTileShortlinks(List<WptPt> points) {
+		if (points == null || points.isEmpty()) {
+			return new String[0];
 		}
-		return bbox;
+		Set<String> shortLinkTiles = new TreeSet<>();
+		WptPt firstPoint = points.get(0);
+		shortLinkTiles.add(MapUtils.createShortLinkString(firstPoint.getLat(), firstPoint.getLon(), SHORT_LINK_ZOOM));
+
+		WptPt lastAddedPoint = firstPoint;
+
+		for (int i = 1; i < points.size(); i++) {
+			WptPt point = points.get(i);
+
+			double distance = MapUtils.getDistance(lastAddedPoint.getLat(), lastAddedPoint.getLon(), point.getLat(), point.getLon());
+
+			if (distance > MIN_DISTANCE_FOR_SHORTLINK) {
+				shortLinkTiles.add(MapUtils.createShortLinkString(point.getLat(), point.getLon(), SHORT_LINK_ZOOM));
+				lastAddedPoint = point;
+			}
+		}
+
+		WptPt lastPoint = points.get(points.size() - 1);
+		shortLinkTiles.add(MapUtils.createShortLinkString(lastPoint.getLat(), lastPoint.getLon(), SHORT_LINK_ZOOM));
+
+		return shortLinkTiles.toArray(new String[0]);
 	}
 }
