@@ -6,9 +6,9 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
+import jakarta.persistence.*;
 
 import com.vladmihalcea.hibernate.type.array.StringArrayType;
-import jakarta.persistence.*;
 
 import com.google.gson.Gson;
 import lombok.Getter;
