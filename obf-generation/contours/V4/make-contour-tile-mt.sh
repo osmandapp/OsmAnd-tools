@@ -138,7 +138,162 @@ process_tiff ()
 		size_str=$(gdalinfo $filepath | grep "Size is" | sed 's/Size is //g')
 		width=$(echo $size_str | sed 's/,.*//')
 		height=$(echo $size_str | sed 's/.*,//')
+  
+        if [[ $filename =~ ^([NS])([0-9]+)([EW])([0-9]+)$ ]]; then
+            lat_prefix="${BASH_REMATCH[1]}"
+            lon_prefix="${BASH_REMATCH[3]}"
+            lat="${BASH_REMATCH[2]}"
+            lon="${BASH_REMATCH[4]}"
+            lat_digits="${#lat}"
+            lon_digits="${#lon}"
+        else
+            echo "Error: Filename must be in the format [NS]XX[EW]YYY.tif"
+            exit 1
+        fi
+               
+        left_exists=0
+        right_exists=0
+        bottom_exists=0
+        top_exists=0
+  
+        neighbors=()
+        for dlat in -1 0 1; do
+            for dlon in -1 0 1; do
+                new_lat=$(echo "$lat + $dlat" | bc)
+                new_lon=$(echo "$lon + $dlon" | bc)
+
+                if (( $(echo "$new_lat >= 0" | bc -l) )); then
+                    if [[ "$lat_prefix" == "N" ]]; then
+                        lat_prefix="N"
+                    else
+                        lat_prefix="S"
+                    fi
+                else
+                    if [[ "$lat_prefix" == "N" ]]; then
+                        lat_prefix="S"
+                    else
+                        lat_prefix="N"
+                    fi
+                    new_lat="${new_lat#-}"  # Remove the negative sign
+                fi
+                
+                if (( $(echo "$new_lon >= 0" | bc -l) )); then
+                    if [[ "$lon_prefix" == "E" ]]; then
+                        lon_prefix="E"
+                    else
+                        lon_prefix="W"
+                    fi
+                else
+                    if [[ "$lon_prefix" == "E" ]]; then
+                        lon_prefix="W"
+                    else
+                        lon_prefix="E"
+                    fi
+                    new_lon="${new_lon#-}"  # Remove the negative sign
+                fi
+        
+                formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
+                formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
+
+                neighbor_filename="${indir}${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+
+                if [ -f "$neighbor_filename" ]; then
+                    neighbors+=("$neighbor_filename")
+
+                    if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
+                        left_exists=1
+                    elif [ $dlat -eq 0 ] && [ $dlon -eq 1 ]; then
+                        right_exists=1
+                    elif [ $dlat -eq -1 ] && [ $dlon -eq 0 ]; then
+                        bottom_exists=1
+                    elif [ $dlat -eq 1 ] && [ $dlon -eq 0 ]; then
+                        top_exists=1
+                    fi
+                fi
+            done
+        done
+            
+        echo "Merging:"
+        echo "${neighbors[@]}"
+
+        merged_file="$TMP_DIR/merged_${filename}.tif"
+        shifted_file="$TMP_DIR/shifted_${filename}.tif"
+
+        gdalwarp -overwrite -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
+
+        #Clipping
+        num_lat=$lat
+        num_lon=$lon
+        
+        shopt -s extglob
+        num_lat=$((10#$num_lat))
+        num_lon=$((10#$num_lon))
+        
+        if [[ $lat_prefix == "S" ]]; then
+            num_lat="-$num_lat"
+        fi
+
+        if [[ $lon_prefix == "W" ]]; then
+            num_lon="-$num_lon"
+        fi
+        
+        expansion=0.03
+        tile_size=1  # 1x1 degree
+        delta=$(echo "$tile_size * $expansion * 0.5" | bc -l)
+
+        if [ $left_exists -eq 1 ]; then
+            new_xmin=$(echo "$num_lon - $delta" | bc -l)
+        else
+            new_xmin="$num_lon"
+        fi
+
+        if [ $right_exists -eq 1 ]; then
+            new_xmax=$(echo "$num_lon + $tile_size + $delta" | bc -l)
+        else
+            new_xmax=$(echo "$num_lon + $tile_size" | bc -l)
+        fi
+
+        if [ $bottom_exists -eq 1 ]; then
+            new_ymin=$(echo "$num_lat - $delta" | bc -l)
+        else
+            new_ymin="$num_lat"
+        fi
+
+        if [ $top_exists -eq 1 ]; then
+            new_ymax=$(echo "$num_lat + $tile_size + $delta" | bc -l)
+        else
+            new_ymax=$(echo "$num_lat + $tile_size" | bc -l)
+        fi
+        
+        clippedFile="$TMP_DIR/${filename}.tif"
+        gdalwarp -overwrite -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
+        
+        rm -f "$merged_file"
+
+        if (( $num_lon % 2 == 0 )); then
+            ul=$(gdalinfo "$clippedFile" | awk '/Upper Left/ {gsub(/[(),]/," "); print $3, $4}')
+            lr=$(gdalinfo "$clippedFile" | awk '/Lower Right/ {gsub(/[(),]/," "); print $3, $4}')
+            pixel_size_x=$(gdalinfo "$clippedFile" | awk -F '[=(), ]+' '/Pixel Size/ {print $3}')
+            
+            ulx=$(echo "$ul" | awk '{print $1}')
+            uly=$(echo "$ul" | awk '{print $2}')
+            lrx=$(echo "$lr" | awk '{print $1}')
+            lry=$(echo "$lr" | awk '{print $2}')
+
+            # Calculate new coordinates
+            new_ulx=$(awk -v ulx="$ulx" -v pixel_size_x="$pixel_size_x" 'BEGIN {OFMT="%.12f"; print ulx - pixel_size_x}')
+            new_lrx=$(awk -v lrx="$lrx" -v pixel_size_x="$pixel_size_x" 'BEGIN {OFMT="%.12f"; print lrx - pixel_size_x}')
+
+            # Shift the file by 1 pixel
+            gdal_translate -of GTiff -a_ullr $new_ulx $uly $new_lrx $lry -co "COMPRESS=LZW" "$clippedFile" "$shifted_file"
+
+            mv "$shifted_file" "$clippedFile"
+        fi
+        
+        echo "Using $clippedFile as source file for contours"
+        filepath=$clippedFile
 		src_tiff=$filepath
+  
 		if [[ $width -ge 30000 ]] ; then
 			isolines_step=5
 		fi
@@ -204,19 +359,39 @@ process_tiff ()
 				mv ${TMP_DIR}/${filename}_split.shx ${TMP_DIR}/$filename.shx
 			fi
 		fi
-		if [[ $path_to_cutline ]] ; then
-			echo "Cropping by cutline …"
-			time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
-# 			time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
-			if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
-			if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
-				mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
-				mv ${TMP_DIR}/${filename}_cut.dbf ${TMP_DIR}/$filename.dbf
-				mv ${TMP_DIR}/${filename}_cut.prj ${TMP_DIR}/$filename.prj
-				mv ${TMP_DIR}/${filename}_cut.shx ${TMP_DIR}/$filename.shx
-			fi
+		if [[ ! $path_to_cutline ]] ; then
+            lat_min="$num_lat"
+            lon_min="$num_lon"
+            
+            if [[ $num_lat == -* ]]; then
+                lat_max=$(( - (10#${num_lat:1}) + 1 ))
+            else
+                lat_max=$((10#$num_lat + 1))
+            fi
 
+            if [[ $num_lon == -* ]]; then
+                lon_max=$(( - (10#${num_lon:1}) + 1 ))
+            else
+                lon_max=$((10#$num_lon + 1))
+            fi
+
+            path_to_cutline="${TMP_DIR}/bbox_${filename}.geojson"
+            echo '{"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "EPSG:4326"}}, "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[['"$lon_min"', '"$lat_min"'], ['"$lon_max"', '"$lat_min"'], ['"$lon_max"', '"$lat_max"'], ['"$lon_min"', '"$lat_max"'], ['"$lon_min"', '"$lat_min"']]]}}]}' > $path_to_cutline
 		fi
+  
+        echo "Cropping by cutline …"
+        time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
+#             time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
+        if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
+        if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
+            mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
+            mv ${TMP_DIR}/${filename}_cut.dbf ${TMP_DIR}/$filename.dbf
+            mv ${TMP_DIR}/${filename}_cut.prj ${TMP_DIR}/$filename.prj
+            mv ${TMP_DIR}/${filename}_cut.shx ${TMP_DIR}/$filename.shx
+        fi
+        if [ -f ${TMP_DIR}/${filename}_cut.cpg ]; then rm -f ${TMP_DIR}/${filename}_cut.cpg; fi
+        rm -f $path_to_cutline
+
 		echo "Building osm file …"
 		if [[ -f $outdir/$filename.osm ]] ; then rm -f $outdir/$filename.osm ; fi
 		if [[ -f ${TMP_DIR}/$filename.tif ]] ; then rm -f ${TMP_DIR}/$filename.tif ; fi
