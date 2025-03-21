@@ -66,6 +66,7 @@ public class FavoriteController {
     @ResponseBody
     public ResponseEntity<String> updateAllFavorites(@RequestBody List<String> data,
                                                      @RequestParam String fileName,
+                                                     @RequestParam String groupName,
                                                      @RequestParam Long updatetime,
                                                      @RequestParam boolean updateTimestamp) throws IOException {
         PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
@@ -81,9 +82,6 @@ public class FavoriteController {
                 }
                 file.updateWptPt(Objects.requireNonNull(wptPt.getName()), data.indexOf(d), wptPt, updateTimestamp);
             }
-
-            // Todo: Fix for / and : in group name
-            String groupName = fileName.replaceAll("^favorites-", "").replaceAll("\\.gpx$", "");
             boolean groupHidden = file.getPointsGroups().get(groupName).getHidden();
             if (groupHidden != hidden) {
                 file.getPointsGroups().get(groupName).setHidden(hidden);
