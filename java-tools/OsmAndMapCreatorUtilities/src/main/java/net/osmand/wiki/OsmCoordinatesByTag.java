@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -74,6 +75,8 @@ public class OsmCoordinatesByTag {
 		public long id; // 
 		public int type; // 0 - node
 		public long wikidataId;
+		public String wikiCommonsImg;
+		public String wikiCommonsCat;
 		public String tagsJson;
 		public OsmLatLonId next;
 		public Amenity amenity;
@@ -198,6 +201,9 @@ public class OsmCoordinatesByTag {
 				osmLatLonId.id = entity.getId();
 				osmLatLonId.type = EntityType.valueOf(entity).ordinal();
 				Map<String, String> etags = renderingTypes.transformTags(entity.getTags(), EntityType.valueOf(entity), EntityConvertApplyType.POI);
+				Map<String, String> wikiCommonsTags = getWikiCommonsTag(etags);
+				osmLatLonId.wikiCommonsImg = wikiCommonsTags.get("img");
+				osmLatLonId.wikiCommonsCat = wikiCommonsTags.get("cat");
 				osmLatLonId.tagsJson = gson.toJson(etags);
 				alist.clear();
 				alist = EntityParser.parseAmenities(poiTypes, entity, etags, alist);
@@ -210,6 +216,21 @@ public class OsmCoordinatesByTag {
 			}
 		}
 
+	}
+
+	private Map<String, String> getWikiCommonsTag(Map<String, String> etags) {
+		Map<String, String> tags = new HashMap<>();
+		String wikiCommonsTag = etags.get("wikiCommonsTag");
+		if (wikiCommonsTag == null) {
+			return Collections.emptyMap();
+		}
+		if (wikiCommonsTag.startsWith("File:")) {
+			tags.put("img", wikiCommonsTag.substring("File:".length()));
+		}
+		if (wikiCommonsTag.startsWith("Category:")) {
+			tags.put("cat", wikiCommonsTag.substring("Category:".length()));
+		}
+		return tags;
 	}
 
 	public void parseOSMCoordinates(File readFile, ConsoleProgressImplementation progress, boolean parseRelations) throws IOException, SQLException, XmlPullParserException, InterruptedException {

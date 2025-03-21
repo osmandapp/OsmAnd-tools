@@ -1665,10 +1665,10 @@ public class WikiDatabasePreparation {
 			System.err.println("Table osm_wikidata doesn't exist");
 		}
 		st.execute(
-				"CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string)");
+				"CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string)");
 		st.close();
 		PreparedStatement ps = commonsWikiConn
-				.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?)");
+				.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		int batch = 0;
 		for (OsmLatLonId o : res.values()) {
 			ps.setLong(1, o.id);
@@ -1679,6 +1679,8 @@ public class WikiDatabasePreparation {
 			ps.setString(6, o.tagsJson);
 			ps.setString(7, o.amenity == null ? null : o.amenity.getType().getKeyName());
 			ps.setString(8, o.amenity == null ? null : o.amenity.getSubType());
+			ps.setString(9, o.wikiCommonsImg);
+			ps.setString(10, o.wikiCommonsCat);
 			ps.addBatch();
 			if (batch++ >= 1000) {
 				ps.executeBatch();
