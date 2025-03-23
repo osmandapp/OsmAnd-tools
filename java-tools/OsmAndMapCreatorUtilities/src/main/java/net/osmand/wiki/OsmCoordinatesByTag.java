@@ -220,7 +220,7 @@ public class OsmCoordinatesByTag {
 
 	private Map<String, String> getWikiCommonsTag(Map<String, String> etags) {
 		Map<String, String> tags = new HashMap<>();
-		String wikiCommonsTag = etags.get("wikiCommonsTag");
+		String wikiCommonsTag = etags.get("wikimedia_commons");
 		if (wikiCommonsTag == null) {
 			return Collections.emptyMap();
 		}
