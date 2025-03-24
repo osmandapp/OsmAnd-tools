@@ -13,9 +13,9 @@ import net.osmand.osm.*;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
-import net.osmand.util.JarvisAlgorithm;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
@@ -162,9 +162,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			List<LatLon> centers = Collections.singletonList(null);
+			String memberIds = "";
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+				for (RelationMember members : relation.getMembers()) {
+					if (members.getEntityId().getType() == EntityType.RELATION) {
+						if (memberIds.length() > 0) {
+							memberIds += ",";
+						}
+						memberIds += "R" + members.getEntityId().getId();
+					}
+				}
 				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
 				if (adminCenters.size() == 1) {
 					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
@@ -236,6 +245,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     				if (centers.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
     				}
+					if (memberIds.length() > 0) {
+						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+					}
     				
     				if (a.getLocation() != null) {
     					// do not convert english name
@@ -831,13 +843,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 					otherNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && (tag.equals("wikidata") || tag.equals("route_id"))) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && (tag.equals(Amenity.WIKIDATA) || tag.equals(Amenity.ROUTE_ID))) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
 					idNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals("route_members_ids")) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals(Amenity.ROUTE_MEMBERS_IDS)) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
