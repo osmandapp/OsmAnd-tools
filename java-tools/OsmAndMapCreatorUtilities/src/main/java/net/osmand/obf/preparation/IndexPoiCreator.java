@@ -162,8 +162,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-			if (e instanceof Relation) {
-				ctx.loadEntityRelation((Relation) e);
+			if (e instanceof Relation relation) {
+				ctx.loadEntityRelation(relation);
+				boolean isAdministrative = etags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+				if (OsmMapUtils.isMultipolygon(etags) && !isAdministrative) {
+					// Don't handle things that aren't multipolygon, and nothing administrative
+					indexMultipolygon(etags, relation);
+					return;
+				}
 			}
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
@@ -271,6 +277,45 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			topIndex++;
 		}
 		addBatch(poiPreparedStatement);
+	}
+
+	private void indexMultipolygon(Map<String, String> tags, Relation relation) throws SQLException {
+		if (Algorithms.isEmpty(tempAmenityList)) {
+			return;
+		}
+		tags = new LinkedHashMap<>(tags);
+
+		MultipolygonBuilder original = new MultipolygonBuilder();
+		original.setId(relation.getId());
+		original.createInnerAndOuterWays(relation);
+		List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
+		if (multipolygons.size() > 1) {
+			tags.put(Amenity.ROUTE_ID, "R" + relation.getId()); // route_id tag for link different POI-s
+		}
+		long assignId = assignIdForMultipolygon(relation);
+		for (Multipolygon m : multipolygons) {
+			assert m.getOuterRings().size() == 1;
+			if (!m.areRingsComplete()) {
+				log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
+			}
+			Ring out = m.getOuterRings().get(0);
+			if (out.getBorder().size() == 0) {
+				log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
+				// don't index this
+				continue;
+			}
+			LatLon center = OsmMapUtils.getCenter(out.getBorderWay());
+			for (Amenity amenity : tempAmenityList) {
+				EntityParser.parseMapObject(amenity, relation, tags);
+				amenity.setLocation(center);
+				while (generatedIds.contains(assignId)) {
+					assignId += 2;
+				}
+				generatedIds.add(assignId);
+				amenity.setId(assignId);
+				insertAmenityIntoPoi(amenity);
+			}
+		}
 	}
 
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
@@ -930,7 +975,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
-		
+
 		public int getRating() {
 			int rt = 0;
 			for (PoiAdditionalType t : additionalTags.keySet()) {
