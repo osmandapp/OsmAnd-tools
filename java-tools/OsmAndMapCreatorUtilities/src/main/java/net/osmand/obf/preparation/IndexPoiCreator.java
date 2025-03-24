@@ -799,19 +799,27 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
-				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand"))
-						&& !"name:en".equals(e.getKey().getTag())) {
+				String tag = e.getKey().getTag();
+				if ((tag.contains("name") || tag.equals("brand"))
+						&& !"name:en".equals(tag)) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
 					}
 					otherNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && (
-						e.getKey().getTag().equals("wikidata") || e.getKey().getTag().equals("route_id"))) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && (tag.equals("wikidata") || tag.equals("route_id"))) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
 					idNames.add(e.getValue());
+				}
+				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals("route_members_ids")) {
+					if (idNames == null) {
+						idNames = new TreeSet<String>();
+					}
+					for(String id : e.getValue().split(",")) {
+						idNames.add(id);
+					}
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
