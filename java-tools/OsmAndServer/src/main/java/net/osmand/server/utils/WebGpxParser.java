@@ -1,6 +1,5 @@
 package net.osmand.server.utils;
 
-import static net.osmand.gpx.GPXUtilities.parseColor;
 import static net.osmand.shared.gpx.GpxUtilities.ADDRESS_EXTENSION;
 import static net.osmand.shared.gpx.GpxUtilities.BACKGROUND_TYPE_EXTENSION;
 import static net.osmand.shared.gpx.GpxUtilities.GAP_PROFILE_TYPE;
@@ -557,13 +556,16 @@ public class WebGpxParser {
                 GpxUtilities.PointsGroup group;
                 if (dataGroup.ext != null) {
                     group = dataGroup.ext;
-                    group.setColor(parseColor(dataGroup.color, 0));
                     List<Wpt> wptsData = dataGroup.points;
                     for (Wpt wpt : wptsData) {
                         group.getPoints().add(convertToWptPt(wpt));
                     }
                 } else {
-                    group = new GpxUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, parseColor(dataGroup.color, 0));
+                    group = new GpxUtilities.PointsGroup(dataGroup.name, dataGroup.iconName, dataGroup.backgroundType, 0);
+                }
+                Integer parsedColor = GpxUtilities.INSTANCE.parseColor(dataGroup.color, 0);
+                if (parsedColor != null) {
+                    group.setColor(parsedColor);
                 }
                 res.put(key, group);
             }
