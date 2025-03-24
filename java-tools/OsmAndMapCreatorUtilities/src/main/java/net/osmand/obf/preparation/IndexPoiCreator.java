@@ -187,7 +187,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						original.createInnerAndOuterWays(relation);
 					}
 					List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
-					centers = new ArrayList<LatLon>(); 
+					centers = new ArrayList<>();
 					for (Multipolygon m : multipolygons) {
 						assert m.getOuterRings().size() == 1;
 						if (!m.areRingsComplete()) {
@@ -237,21 +237,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     				// by statistic < 1% creates maps manually
     				// checkEntity(e);
     				EntityParser.parseMapObject(a, e, tags);
-    				while (generatedIds.contains(id)) {
-    					id += 2;
-    				}
-    				generatedIds.add(id);
     				a.setId(id);
+					generatedIds.add(id);
     				if (centers.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
+						while (generatedIds.contains(id)) {
+							id += 2;
+						}
     				}
-					if (memberIds.length() > 0) {
+					if (!memberIds.isEmpty()) {
 						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
 					}
-    				
+
     				if (a.getLocation() != null) {
-    					// do not convert english name
-    					// convertEnglishName(a);
     					try {
     						insertAmenityIntoPoi(a);
     					} catch (Exception excpt) {
@@ -260,7 +258,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     					}
     				}
                 }
-		
+
 			}
 		}
 	}
