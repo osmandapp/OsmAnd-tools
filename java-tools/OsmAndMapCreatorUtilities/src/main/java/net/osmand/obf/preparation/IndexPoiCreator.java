@@ -162,6 +162,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
+			LatLon center = null;
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = etags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
@@ -169,6 +170,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					// Don't handle things that aren't multipolygon, and nothing administrative
 					indexMultipolygon(etags, relation);
 					return;
+				}
+				List<Entity> entities = relation.getMemberEntities("admin_centre");
+				if (entities.size() ==  1) {
+					center = entities.get(0).getLatLon();
+				} else {
+					center = retrieveClimbingCenter(e, ctx);
 				}
 			}
 			long id = e.getId();
@@ -187,15 +194,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (id % 2 != (e.getId() % 2)) {
 						id ^= 1;
 					}
-				}
-			}
-			LatLon center = null;
-			if (e instanceof Relation relation) {
-				List<Entity> entities = relation.getMemberEntities("admin_centre");
-				if (entities.size() ==  1) {
-					center = entities.get(0).getLatLon();
-				} else {
-					center = retrieveClimbingCenter(e, ctx);
 				}
 			}
 
