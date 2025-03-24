@@ -157,19 +157,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
-		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
-
-		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
+		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
+		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			List<LatLon> centers = Collections.singletonList(null);
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
-				boolean isAdministrative = etags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
-				List<Entity> entities = relation.getMemberEntities("admin_centre");
-				if (entities.size() == 1) {
-					centers = Collections.singletonList(entities.get(0).getLatLon());
-				} else if (OsmMapUtils.isMultipolygon(etags) && !isAdministrative) {
+				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
+				if (adminCenters.size() == 1) {
+					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
+				} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
 					MultipolygonBuilder original = new MultipolygonBuilder();
 					original.setId(relation.getId());
 					if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
@@ -228,7 +227,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             		// do not add that check because it is too much printing for batch creation
     				// by statistic < 1% creates maps manually
     				// checkEntity(e);
-    				EntityParser.parseMapObject(a, e, etags);
+    				EntityParser.parseMapObject(a, e, tags);
     				while (generatedIds.contains(id)) {
     					id += 2;
     				}
@@ -255,14 +254,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-
-		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
-		for (String t : tags.keySet()) {
-			boolean index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
-			if (index) {
-				ctx.loadEntityRelation(e);
-			}
-		}
 		tagsTransform.handleRelationPropogatedTags(e, renderingTypes, ctx, EntityConvertApplyType.POI);
 	}
 
