@@ -54,6 +54,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private IndexCreatorSettings settings;
 	private Map<String, HashSet<String>> topIndexAdditional;
 	private Set<String> topIndexKeys = new HashSet<>();
+	private TLongHashSet excludedRelations = new TLongHashSet();
 
 	private QuadTree<Multipolygon> cityQuadTree;
 	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
@@ -150,6 +151,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
+			return;
+		}
 		if (!settings.keepOnlyRouteRelationObjects) {
 			iterateEntityInternal(e, ctx, icc);
 		}
@@ -166,14 +170,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
-				for (RelationMember members : relation.getMembers()) {
-					if (members.getEntityId().getType() == EntityType.RELATION) {
-						if (memberIds.length() > 0) {
-							memberIds += ",";
-						}
-						memberIds += "R" + members.getEntityId().getId();
-					}
-				}
 				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
 				if (adminCenters.size() == 1) {
 					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
@@ -200,6 +196,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							continue;
 						}
 						centers.add(OsmMapUtils.getCenter(out.getBorderWay()));
+					}
+				} else if (OsmMapUtils.isSuperRoute(tags)) {
+					for (RelationMember members : relation.getMembers()) {
+						if (members.getEntityId().getType() == EntityType.RELATION) {
+							if (memberIds.length() > 0) {
+								memberIds += ",";
+							}
+							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
+							if (centers.get(0) == null) {
+								Relation memberRel = (Relation) members.getEntity();
+								ctx.loadEntityRelation(memberRel);
+								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
+							}
+						}
 					}
 				}
 			}
@@ -434,6 +444,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		pStatements.put(tagGroupsPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
+	}
+
+	public void excludeFromMainIteration(long id) {
+		excludedRelations.add(id);
 	}
 
 

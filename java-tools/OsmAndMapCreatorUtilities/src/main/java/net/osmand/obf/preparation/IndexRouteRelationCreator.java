@@ -122,7 +122,10 @@ public class IndexRouteRelationCreator {
 
 	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc)
 			throws SQLException {
-		if ("route".equals(relation.getTag("type")) && isSupportedRouteType(relation.getTag("route"))) {
+		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
+			return;
+		}
+		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
@@ -160,6 +163,18 @@ public class IndexRouteRelationCreator {
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
+			indexPoiCreator.excludeFromMainIteration(relation.getId());
+		}
+		if (OsmMapUtils.isSuperRoute(relation.getTags())) {
+			Map<String, String> mapSectionTags = new LinkedHashMap<>();
+			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+			Map<String, String> preparedTags = new LinkedHashMap<>();
+			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
+			for (Map.Entry<String, String> entry : poiSectionTags.entrySet()) {
+				relation.putTag(entry.getKey(), entry.getValue());
+			}
+			indexPoiCreator.iterateEntity(relation, ctx, icc);
+			indexPoiCreator.excludeFromMainIteration(relation.getId());
 		}
 	}
 
