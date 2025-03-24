@@ -157,8 +157,13 @@ process_tiff ()
         top_exists=0
   
         neighbors=()
+        neighbors+=("${indir}/$filenamefull")
         for dlat in -1 0 1; do
             for dlon in -1 0 1; do
+                if [ "$dlat" -eq 0 ] && [ "$dlon" -eq 0 ]; then
+                    continue
+                fi
+            
                 new_lat=$(echo "$lat + $dlat" | bc)
                 new_lon=$(echo "$lon + $dlon" | bc)
 
@@ -195,7 +200,7 @@ process_tiff ()
                 formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
                 formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
 
-                neighbor_filename="${indir}${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                neighbor_filename="${indir}/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
 
                 if [ -f "$neighbor_filename" ]; then
                     neighbors+=("$neighbor_filename")
