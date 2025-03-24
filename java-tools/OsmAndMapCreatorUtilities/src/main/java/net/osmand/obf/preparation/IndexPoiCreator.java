@@ -289,9 +289,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		original.setId(relation.getId());
 		original.createInnerAndOuterWays(relation);
 		List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
-		if (multipolygons.size() > 1) {
-			tags.put(Amenity.ROUTE_ID, "R" + relation.getId()); // route_id tag for link different POI-s
-		}
 		long assignId = assignIdForMultipolygon(relation);
 		for (Multipolygon m : multipolygons) {
 			assert m.getOuterRings().size() == 1;
@@ -307,6 +304,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			LatLon center = OsmMapUtils.getCenter(out.getBorderWay());
 			for (Amenity amenity : tempAmenityList) {
 				EntityParser.parseMapObject(amenity, relation, tags);
+				if (multipolygons.size() > 1) {
+					amenity.setAdditionalInfo(Amenity.ROUTE_ID, "R" + relation.getId());
+				}
 				amenity.setLocation(center);
 				while (generatedIds.contains(assignId)) {
 					assignId += 2;
