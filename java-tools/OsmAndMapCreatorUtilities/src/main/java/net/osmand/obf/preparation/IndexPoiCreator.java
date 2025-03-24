@@ -162,20 +162,37 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-			LatLon center = null;
+			List<LatLon> centers = Collections.singletonList(null);
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = etags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
-				if (OsmMapUtils.isMultipolygon(etags) && !isAdministrative) {
-					// Don't handle things that aren't multipolygon, and nothing administrative
-					indexMultipolygon(etags, relation);
-					return;
-				}
 				List<Entity> entities = relation.getMemberEntities("admin_centre");
-				if (entities.size() ==  1) {
-					center = entities.get(0).getLatLon();
-				} else {
-					center = retrieveClimbingCenter(e, ctx);
+				if (entities.size() == 1) {
+					centers = Collections.singletonList(entities.get(0).getLatLon());
+				} else if (OsmMapUtils.isMultipolygon(etags) && !isAdministrative) {
+					MultipolygonBuilder original = new MultipolygonBuilder();
+					original.setId(relation.getId());
+					if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
+						Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
+						original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
+					} else {
+						original.createInnerAndOuterWays(relation);
+					}
+					List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
+					centers = new ArrayList<LatLon>(); 
+					for (Multipolygon m : multipolygons) {
+						assert m.getOuterRings().size() == 1;
+						if (!m.areRingsComplete()) {
+							log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
+						}
+						Ring out = m.getOuterRings().get(0);
+						if (out.getBorder().size() == 0) {
+							log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
+							// don't index this
+							continue;
+						}
+						centers.add(OsmMapUtils.getCenter(out.getBorderWay()));
+					}
 				}
 			}
 			long id = e.getId();
@@ -204,24 +221,35 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-                if (center != null) {
-                    a.setLocation(center);
-                }
-				// do not add that check because it is too much printing for batch creation
-				// by statistic < 1% creates maps manually
-				// checkEntity(e);
-				EntityParser.parseMapObject(a, e, etags);
-				a.setId(id);
-				if (a.getLocation() != null) {
-					// do not convert english name
-					// convertEnglishName(a);
-					try {
-						insertAmenityIntoPoi(a);
-					} catch (Exception excpt) {
-						System.out.println("TODO FIX " + a.getId() + " " + excpt);
-						excpt.printStackTrace();
+				for (LatLon cen : centers) {
+					if (cen != null) {
+						a.setLocation(cen);
 					}
-				}
+            		// do not add that check because it is too much printing for batch creation
+    				// by statistic < 1% creates maps manually
+    				// checkEntity(e);
+    				EntityParser.parseMapObject(a, e, etags);
+    				while (generatedIds.contains(id)) {
+    					id += 2;
+    				}
+    				generatedIds.add(id);
+    				a.setId(id);
+    				if (centers.size() > 1) {
+    					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
+    				}
+    				
+    				if (a.getLocation() != null) {
+    					// do not convert english name
+    					// convertEnglishName(a);
+    					try {
+    						insertAmenityIntoPoi(a);
+    					} catch (Exception excpt) {
+    						System.out.println("TODO FIX " + a.getId() + " " + excpt);
+    						excpt.printStackTrace();
+    					}
+    				}
+                }
+		
 			}
 		}
 	}
@@ -277,44 +305,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		addBatch(poiPreparedStatement);
 	}
 
-	private void indexMultipolygon(Map<String, String> tags, Relation relation) throws SQLException {
-		if (Algorithms.isEmpty(tempAmenityList)) {
-			return;
-		}
-		tags = new LinkedHashMap<>(tags);
-
-		MultipolygonBuilder original = new MultipolygonBuilder();
-		original.setId(relation.getId());
-		original.createInnerAndOuterWays(relation);
-		List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
-		long assignId = assignIdForMultipolygon(relation);
-		for (Multipolygon m : multipolygons) {
-			assert m.getOuterRings().size() == 1;
-			if (!m.areRingsComplete()) {
-				log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
-			}
-			Ring out = m.getOuterRings().get(0);
-			if (out.getBorder().size() == 0) {
-				log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
-				// don't index this
-				continue;
-			}
-			LatLon center = OsmMapUtils.getCenter(out.getBorderWay());
-			for (Amenity amenity : tempAmenityList) {
-				EntityParser.parseMapObject(amenity, relation, tags);
-				if (multipolygons.size() > 1) {
-					amenity.setAdditionalInfo(Amenity.ROUTE_ID, "R" + relation.getId());
-				}
-				amenity.setLocation(center);
-				while (generatedIds.contains(assignId)) {
-					assignId += 2;
-				}
-				generatedIds.add(assignId);
-				amenity.setId(assignId);
-				insertAmenityIntoPoi(amenity);
-			}
-		}
-	}
 
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
 		String ks = PoiAdditionalType.getKey(tag, value, text);
@@ -1243,21 +1233,4 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return tagGroupIds;
 	}
 
-    private LatLon retrieveClimbingCenter(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-        if (e instanceof Relation relation) {
-            boolean climbing = "area".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()))
-                    || "crag".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()));
-            if (climbing) {
-                Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(relation);
-                if (!allNodes.isEmpty()) {
-                    ArrayList<Node> convexPolygon = JarvisAlgorithm.createConvexPolygon(new ArrayList<>(allNodes.values()));
-                    if (convexPolygon != null) {
-                        Way convexWay = new Way(1, convexPolygon);
-                        return OsmMapUtils.getCenter(convexWay);
-                    }
-                }
-            }
-        }
-        return null;
-    }
 }

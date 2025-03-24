@@ -261,12 +261,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
         MultipolygonBuilder original = new MultipolygonBuilder();
         original.setId(e.getId());
-        boolean climbing = "area".equals(e.getTag(OSMTagKey.CLIMBING.getValue()))
-                || "crag".equals(e.getTag(OSMTagKey.CLIMBING.getValue()));
+        boolean climbing = MultipolygonBuilder.isClimbingMultipolygon(e);
         if (climbing) {
             Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(e);
-            List<Node> nodes = new ArrayList<>(allNodes.values());
-            original.createClimbingOuterWay(e, nodes);
+            original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
         } else {
             original.createInnerAndOuterWays(e);
         }
