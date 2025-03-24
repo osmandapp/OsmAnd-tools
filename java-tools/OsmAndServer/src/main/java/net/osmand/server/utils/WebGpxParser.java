@@ -15,9 +15,10 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import kotlin.Pair;
+import lombok.Getter;
+import lombok.Setter;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -34,22 +35,27 @@ public class WebGpxParser {
     
     public static final String LINE_PROFILE_TYPE = "line";
     public static final int NAN_MARKER = 99999;
-    
+
+    @Getter
+    @Setter
     public static class TrackData {
-        public WebMetaData metaData;
-        public List<Wpt> wpts;
-        public List<WebTrack> tracks;
-        public Map<String, WebPointsGroup> pointsGroups;
-        public Map<String, Object> analysis;
-        public Map<String, String> ext;
-        public List<GpxUtilities.RouteType> routeTypes;
+        private WebMetaData metaData;
+        private List<Wpt> wpts;
+        private List<WebTrack> tracks;
+        private Map<String, WebPointsGroup> pointsGroups;
+        private Map<String, Object> analysis;
+        private Map<String, Object> trackAppearance;
+        private Map<String, String> ext;
+        private List<GpxUtilities.RouteType> routeTypes;
     }
-    
+
+    @Getter
+    @Setter
     public static class WebMetaData {
-        public String name;
-        public String desc;
-        public Link link;
-        public Metadata ext;
+        private String name;
+        private String desc;
+        private Link link;
+        private Metadata ext;
     
         public WebMetaData(Metadata data) {
             if (data != null) {
@@ -80,20 +86,22 @@ public class WebGpxParser {
             }
         }
     }
-    
+
+    @Getter
+    @Setter
     public static class Wpt {
-        
-        public String name;
-        public String desc;
-        public String address;
-        public String color;
-        public String background;
-        public String hidden;
-        public String icon;
-        public double lat;
-        public double lon;
-        public String category;
-        public WptPt ext;
+
+        private String name;
+        private String desc;
+        private String address;
+        private String color;
+        private String background;
+        private String hidden;
+        private String icon;
+        private double lat;
+        private double lon;
+        private String category;
+        private WptPt ext;
         
         public Wpt(WptPt point) {
             if (point != null) {
@@ -147,14 +155,17 @@ public class WebGpxParser {
             ext = point;
         }
     }
-    
+
+    @Getter
+    @Setter
     public class WebPointsGroup {
-        public String color;
-        public String name;
-        public String iconName;
-        public String backgroundType;
-        public final List<Wpt> points = new ArrayList<>();
-        public GpxUtilities.PointsGroup ext;
+        private String color;
+        private String name;
+        private String iconName;
+        private String backgroundType;
+        private final List<Wpt> points = new ArrayList<>();
+        private GpxUtilities.PointsGroup ext;
+
         public WebPointsGroup(GpxUtilities.PointsGroup group) {
             if (group != null) {
                 if (group.getColor() != 0) {
@@ -182,12 +193,14 @@ public class WebGpxParser {
             ext = group;
         }
     }
-    
+
+    @Getter
+    @Setter
     public class WebTrack {
-        public List<Point> points;
-    
-        public List<List<Point>> segments = new ArrayList<>();
-        public Track ext;
+        private List<Point> points;
+
+        private List<List<Point>> segments = new ArrayList<>();
+        private Track ext;
         
         public WebTrack(Track track, List<GpxUtilities.RouteType> routeTypes) {
             points = new ArrayList<>();
@@ -231,20 +244,22 @@ public class WebGpxParser {
             return routeTypes.size() - 1;
         }
     }
-    
+
+    @Getter
+    @Setter
     public static class Point {
-        
-        public double lat;
-        public double lng;
-        public double ele = Double.NaN;
-        public double srtmEle = Double.NaN;
-        public double speed;
-        public double distance;
-        public String profile;
-        public List<Point> geometry;
-        public transient int geometrySize;
-        public RouteSegment segment; // on each turn point
-        public WptPt ext;
+
+        private double lat;
+        private double lng;
+        private double ele = Double.NaN;
+        private double srtmEle = Double.NaN;
+        private double speed;
+        private double distance;
+        private String profile;
+        private List<Point> geometry;
+        private transient int geometrySize;
+        private RouteSegment segment; // on each turn point
+        private WptPt ext;
     
         public Point(){}
         
@@ -291,10 +306,12 @@ public class WebGpxParser {
         }
         
     }
-    
+
+    @Getter
+    @Setter
     public static class RouteSegment {
-        public GpxUtilities.RouteSegment ext;
-        public List<GpxUtilities.RouteType> routeTypes;
+        private GpxUtilities.RouteSegment ext;
+        private List<GpxUtilities.RouteType> routeTypes;
     }
     
     public void addRoutePoints(GpxFile gpxFile, TrackData gpxData) {
