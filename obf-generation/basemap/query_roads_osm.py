@@ -61,6 +61,8 @@ def process_roads(cond, filename, fields):
 			field = "tags->'ice_road' as \"ice_road\""
 		if field == 'winter_road':
 			field = "tags->'winter_road' as \"winter_road\""
+		if field == 'wikidata':
+			field = "tags->'wikidata' as \"wikidata\""
 		selectFields += ", " + field	
 	shift = 2
 	# roads faster but doesn't contain ferry & river
@@ -129,7 +131,7 @@ if __name__ == "__main__":
 	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link'", "line_motorway_trunk_primary.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
 	process_roads("highway='primary' or highway='primary_link' or highway='motorway' or highway='motorway_link' or highway='trunk' or highway='trunk_link' or highway='secondary' or highway='secondary_link' or highway='tertiary' or highway='tertiary_link'", "line_all_roads.osm", ['highway', 'junction', 'route', 'toll', 'toll:bicycle', 'toll:motorcar', 'ice_road', 'winter_road', 'motorroad'])
 	process_roads("railway='rail'", "line_railway.osm", ['railway'])
-	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type'])
+	process_roads("route='ferry' or (tags->'seamark:type' in ('separation_line', 'separation_lane', 'separation_boundary'))", "line_ferry.osm", ['route', 'seamark:type', 'wikidata'])
 
 	
 	# not used

@@ -91,6 +91,10 @@ def process_polygons(tags, filename):
 			array.append("faa")
 			queryFields += ", tags->'faa' as \"faa\""
 			conditions += " or tags->'faa' <> ''"
+		elif tag == "wikidata" :
+			array.append("wikidata")
+			queryFields += ", tags->'wikidata' as \"wikidata\""
+			conditions += " or tags->'wikidata' <> ''"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
