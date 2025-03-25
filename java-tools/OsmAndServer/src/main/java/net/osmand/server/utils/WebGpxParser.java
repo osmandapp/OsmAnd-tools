@@ -1,13 +1,7 @@
 package net.osmand.server.utils;
 
-import static net.osmand.shared.gpx.GpxUtilities.ADDRESS_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.BACKGROUND_TYPE_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.GAP_PROFILE_TYPE;
-import static net.osmand.shared.gpx.GpxUtilities.ICON_NAME_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.PROFILE_TYPE_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.TRKPT_INDEX_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
+import static net.osmand.shared.gpx.GpxUtilities.*;
 import static net.osmand.util.Algorithms.colorToString;
 
 import java.util.*;
@@ -43,7 +37,7 @@ public class WebGpxParser {
         private List<WebTrack> tracks;
         private Map<String, WebPointsGroup> pointsGroups;
         private Map<String, Object> analysis;
-        private Map<String, Object> trackAppearance;
+        private WebTrackAppearance trackAppearance;
         private Map<String, String> ext;
         private List<GpxUtilities.RouteType> routeTypes;
     }
@@ -157,7 +151,7 @@ public class WebGpxParser {
 
     @Getter
     @Setter
-    public class WebPointsGroup {
+    public static class WebPointsGroup {
         private String color;
         private String name;
         private String iconName;
@@ -312,7 +306,36 @@ public class WebGpxParser {
         private GpxUtilities.RouteSegment ext;
         private List<GpxUtilities.RouteType> routeTypes;
     }
-    
+
+    @Getter
+    @Setter
+    public static class WebTrackAppearance {
+        private Boolean showArrows;
+        private Boolean showStartFinish;
+        private String color;
+        private String width;
+
+        public WebTrackAppearance(Map<String, String> gpxExtensions) {
+            if (gpxExtensions == null || gpxExtensions.isEmpty()) {
+                return;
+            }
+            for (Map.Entry<String, String> entry : gpxExtensions.entrySet()) {
+                if (entry.getKey().equals(GPX_EXT_SHOW_ARROWS)) {
+                    showArrows = Boolean.parseBoolean(entry.getValue());
+                }
+                if (entry.getKey().equals(GPX_EXT_SHOW_START_FINISH)) {
+                    showStartFinish = Boolean.parseBoolean(entry.getValue());
+                }
+                if (entry.getKey().equals(GPX_EXT_COLOR)) {
+                    color = entry.getValue();
+                }
+                if (entry.getKey().equals(GPX_EXT_WIDTH)) {
+                    width = entry.getValue();
+                }
+            }
+        }
+    }
+
     public void addRoutePoints(GpxFile gpxFile, TrackData gpxData) {
         Map<Integer, List<Point>> trackPointsMap = new HashMap<>();
         AtomicBoolean skip = new AtomicBoolean(false);
@@ -626,12 +649,25 @@ public class WebGpxParser {
                 }
             });
         }
-        
-        if (trackData.ext != null) {
-            gpxFile.setExtensions(trackData.ext);
-        }
+
+        gpxFile.setExtensions(parseTrackExt(trackData));
         
         return gpxFile;
+    }
+
+    private Map<String, String> parseTrackExt(WebGpxParser.TrackData trackData) {
+        Map<String, String> trackExt = trackData.getExt() != null ? trackData.getExt() : null;
+        WebTrackAppearance trackAppearance = trackData.getTrackAppearance();
+        if (trackAppearance != null) {
+            if (trackExt == null) {
+                trackExt = new LinkedHashMap<>();
+            }
+            trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.getShowArrows()));
+            trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.getShowStartFinish()));
+            trackExt.put(GPX_EXT_COLOR, trackAppearance.getColor());
+            trackExt.put(GPX_EXT_WIDTH, trackAppearance.getColor());
+        }
+        return trackExt;
     }
     
     public WptPt convertToWptPt(Wpt wpt) {
