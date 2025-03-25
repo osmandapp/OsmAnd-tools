@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.osmand.data.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -32,11 +33,6 @@ import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb.MapData;
 import net.osmand.binary.OsmandOdb.MapDataBlock;
-import net.osmand.data.LatLon;
-import net.osmand.data.Multipolygon;
-import net.osmand.data.MultipolygonBuilder;
-import net.osmand.data.QuadRect;
-import net.osmand.data.Ring;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
@@ -342,6 +338,9 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             // don't use the relation ids. Create new onesgetInnerRings
             Map<String, String> stags = splitEntities == null ? tags : splitEntities.get(0);
             long assignId = assignIdForMultipolygon((Relation) e);
+			if (multipolygons.size() > 1) {
+				stags.put(Amenity.ROUTE_ID, "R" + e.getId());
+			}
             createMultipolygonObject(stags, out, innerWays, assignId);
             if (splitEntities != null) {
                 for (int i = 1; i < splitEntities.size(); i++) {
