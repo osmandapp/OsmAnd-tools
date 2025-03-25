@@ -51,6 +51,8 @@ def process_points(cond, filename, array):
 			tag = 'tags->\'capital\' as "capital"'
 		if tag == 'ele':
 			tag = 'tags->\'ele\' as "ele"'
+		if tag == 'wikidata':
+			tag = 'tags->\'wikidata\' as "wikidata"'
 		queryFields += ", " + tag
 
 	for nm in names:
