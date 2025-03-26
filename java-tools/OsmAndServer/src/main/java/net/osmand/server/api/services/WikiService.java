@@ -54,9 +54,7 @@ public class WikiService {
 
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
-	
-	private static final int FILTER_ZOOM_LEVEL = 15;
-	
+
 
 	private final Map<String, String> licenseMap = new HashMap<>();
 	
@@ -299,11 +297,14 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, 
-			String lat, String lon, String preferredLang) {
+			String lat, String lon, String preferredLangs) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
-		
+		final List<String> plangs = Algorithms.isEmpty(preferredLangs) ? Arrays.asList("en")
+				: Arrays.asList(preferredLangs.split(","));
+
+
 		double north;
 		double south;
 		double east;
@@ -339,93 +340,96 @@ public class WikiService {
 					if (col.equals(lat) || col.equals(lon)) {
 						continue;
 					}
-					if (preferredLang != null) {
-						if (col.equals("wikiArticles")) {
-							Array array = rs.getArray(i);
-							if (array != null) {
-								Object[] wikiArticles = (Object[]) array.getArray();
-								StringBuilder langs = new StringBuilder();
-								StringBuilder langViews = new StringBuilder();
-								for (Object article : wikiArticles) {
-									if (article instanceof List<?> articleList) {
-										String artLang = (String) articleList.get(0);
-										String title = getFromArray(articleList, 1);
-										String shortDescription = getFromArray(articleList, 2);
-										String views = getFromArray(articleList, 3);
-										if(!langs.isEmpty()) {
-											langs.append(",");
-											langViews.append(",");
+					if (col.equals("wikiArticles")) {
+						Array array = rs.getArray(i);
+						if (array != null) {
+							Object[] wikiArticles = (Object[]) array.getArray();
+							StringBuilder langs = new StringBuilder();
+							StringBuilder langViews = new StringBuilder();
+							int pind = 100;
+							for (Object article : wikiArticles) {
+								if (article instanceof List<?> articleList) {
+									String artLang = (String) articleList.get(0);
+									String title = getFromArray(articleList, 1);
+									String shortDescription = getFromArray(articleList, 2);
+									String views = getFromArray(articleList, 3);
+									if (!langs.isEmpty()) {
+										langs.append(",");
+										langViews.append(",");
+									}
+									langs.append(artLang);
+									langViews.append(views != null ? views : "0");
+									int lind = plangs.indexOf(artLang);
+									if (lind < pind && lind >= 0) {
+										pind = lind;
+										f.properties.put("wikiLang", artLang);
+										if (shortDescription != null) {
+											f.properties.put("wikiDesc", shortDescription);
 										}
-										langs.append(artLang);
-										langViews.append(views != null ? views : "0");
-										if (preferredLang.contains(artLang)) {
-											f.properties.put("wikiLang", artLang);
-											if (shortDescription != null) {
-												f.properties.put("wikiDesc", shortDescription);
-											}
-											if (title != null) {
-												f.properties.put("wikiTitle", title);
-											}
+										if (title != null) {
+											f.properties.put("wikiTitle", title);
 										}
 									}
 								}
-								f.properties.put("wikiLangs", langs.toString());
-								f.properties.put("wikiLangViews", langViews.toString());
 							}
-						} else if (col.equals("wvLinks")) {
-							Array array = rs.getArray(i);
-							if (array != null) {
-								Object[] wvLinks = (Object[]) array.getArray();
-								Map<Long, List<String>> result = new HashMap<>();
-								Map<Long, List<String>> enLinks = new HashMap<>();
-								Map<Long, List<String>> otherLinks = new HashMap<>();
-								for (Object linkInfo : wvLinks) {
-									if (linkInfo instanceof List) {
-										List<?> linkInfoList = (List<?>) linkInfo;
-										long tripId = ((UnsignedLong) linkInfoList.get(0)).longValue();
-										String artLang = getFromArray(linkInfoList, 1);
-										String title = getFromArray(linkInfoList, 2);
-										if (artLang != null) {
-											String url = "https://" + artLang + ".wikivoyage.org/wiki/" + title;
-											List<String> urlInfo = Arrays.asList(title, url);
-											if (preferredLang.contains(artLang)) {
-												result.put(tripId, urlInfo);
-											} else if (artLang.equals("en")) {
-												enLinks.put(tripId, urlInfo);
-											} else {
-												otherLinks.put(tripId, urlInfo);
-											}
-										}
-									}
-								}
-								for (Long tripId : enLinks.keySet()) {
-									result.putIfAbsent(tripId, enLinks.get(tripId));
-								}
-								for (Long tripId : otherLinks.keySet()) {
-									result.putIfAbsent(tripId, otherLinks.get(tripId));
-								}
-								if (!result.isEmpty()) {
-									f.properties.put("wvLinks", result);
-								}
-							}
-						} else if (col.equals("wikiTitle") && !f.properties.containsKey("wikiTitle")) {
-							f.properties.put("wikiTitle", rs.getString(i));
-						} else if (col.equals("wikiDesc") && !f.properties.containsKey("wikiDesc")) {
-							f.properties.put("wikiDesc", rs.getString(i));
-						} else if (col.equals("wikiLang") && !f.properties.containsKey("wikiLang")) {
-							f.properties.put("wikiLang", rs.getString(i));
-						} else if (col.equals("poisubtype")) {
-							String poiType = rs.getString(i);
-							PoiType type = MapPoiTypes.getDefault().getPoiTypeByKey(poiType);
-							if (type != null) {
-								f.properties.put(SearchService.PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
-								f.properties.put(SearchService.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
-								f.properties.put(SearchService.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
-							}
-							f.properties.put("poisubtype", rs.getString(i));
-						} else {
-							f.properties.put(col, rs.getString(i));
+							f.properties.put("wikiLangs", langs.toString());
+							f.properties.put("wikiLangViews", langViews.toString());
 						}
+					} else if (col.equals("wvLinks")) {
+						Array array = rs.getArray(i);
+						if (array != null) {
+							Object[] wvLinks = (Object[]) array.getArray();
+							Map<Long, List<String>> result = new HashMap<>();
+							Map<Long, List<String>> enLinks = new HashMap<>();
+							Map<Long, List<String>> otherLinks = new HashMap<>();
+							int pind = 100;
+							for (Object linkInfo : wvLinks) {
+								if (linkInfo instanceof List) {
+									List<?> linkInfoList = (List<?>) linkInfo;
+									long tripId = ((UnsignedLong) linkInfoList.get(0)).longValue();
+									String artLang = getFromArray(linkInfoList, 1);
+									String title = getFromArray(linkInfoList, 2);
+									if (artLang != null) {
+										String url = "https://" + artLang + ".wikivoyage.org/wiki/" + title;
+										List<String> urlInfo = Arrays.asList(title, url);
+										int lind = plangs.indexOf(artLang);
+										if (lind < pind && lind >= 0) {
+											pind = lind;
+											result.put(tripId, urlInfo);
+										} else if (artLang.equals("en")) {
+											enLinks.put(tripId, urlInfo);
+										} else {
+											otherLinks.put(tripId, urlInfo);
+										}
+									}
+								}
+							}
+							for (Long tripId : enLinks.keySet()) {
+								result.putIfAbsent(tripId, enLinks.get(tripId));
+							}
+							for (Long tripId : otherLinks.keySet()) {
+								result.putIfAbsent(tripId, otherLinks.get(tripId));
+							}
+							if (!result.isEmpty()) {
+								f.properties.put("wvLinks", result);
+							}
+						}
+					} else if (col.equals("wikiTitle") && !f.properties.containsKey("wikiTitle")) {
+						f.properties.put("wikiTitle", rs.getString(i));
+					} else if (col.equals("wikiDesc") && !f.properties.containsKey("wikiDesc")) {
+						f.properties.put("wikiDesc", rs.getString(i));
+					} else if (col.equals("wikiLang") && !f.properties.containsKey("wikiLang")) {
+						f.properties.put("wikiLang", rs.getString(i));
+					} else if (col.equals("poisubtype")) {
+						String poiType = rs.getString(i);
+						PoiType type = MapPoiTypes.getDefault().getPoiTypeByKey(poiType);
+						if (type != null) {
+							f.properties.put(SearchService.PoiTypeField.ICON_NAME.getFieldName(),
+									type.getIconKeyName());
+							f.properties.put(SearchService.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
+							f.properties.put(SearchService.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
+						}
+						f.properties.put("poisubtype", rs.getString(i));
 					} else {
 						f.properties.put(col, rs.getString(i));
 					}
