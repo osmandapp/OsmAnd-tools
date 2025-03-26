@@ -298,7 +298,8 @@ public class WikiService {
 		}
 	}
 	
-	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, String lat, String lon, String lang) {
+	public FeatureCollection getPoiData(String northWest, String southEast, String query, List<Object> filterParams, 
+			String lat, String lon, String preferredLang) {
 		if (!config.wikiInitialized()) {
 			return new FeatureCollection();
 		}
@@ -338,7 +339,7 @@ public class WikiService {
 					if (col.equals(lat) || col.equals(lon)) {
 						continue;
 					}
-					if (lang != null) {
+					if (preferredLang != null) {
 						if (col.equals("wikiArticles")) {
 							Array array = rs.getArray(i);
 							if (array != null) {
@@ -358,8 +359,8 @@ public class WikiService {
 										}
 										langs.append(artLang);
 										langViews.append(views != null ? views : "0");
-										if (artLang.equals(lang)) {
-											f.properties.put("wikiLang", lang);
+										if (preferredLang.contains(artLang)) {
+											f.properties.put("wikiLang", artLang);
 											if (shortDescription != null) {
 												f.properties.put("wikiDesc", shortDescription);
 											}
@@ -383,14 +384,14 @@ public class WikiService {
 									if (linkInfo instanceof List) {
 										List<?> linkInfoList = (List<?>) linkInfo;
 										long tripId = ((UnsignedLong) linkInfoList.get(0)).longValue();
-										String langInArray = linkInfoList.get(1) != null ? (String) linkInfoList.get(1) : null;
-										String title = linkInfoList.get(2) != null ? (String) linkInfoList.get(2) : null;
-										String url = "https://" + langInArray + ".wikivoyage.org/wiki/" + title;
-										List<String> urlInfo = Arrays.asList(title, url);
-										if (langInArray != null) {
-											if (langInArray.equals(lang)) {
+										String artLang = getFromArray(linkInfoList, 1);
+										String title = getFromArray(linkInfoList, 2);
+										if (artLang != null) {
+											String url = "https://" + artLang + ".wikivoyage.org/wiki/" + title;
+											List<String> urlInfo = Arrays.asList(title, url);
+											if (preferredLang.contains(artLang)) {
 												result.put(tripId, urlInfo);
-											} else if (langInArray.equals("en")) {
+											} else if (artLang.equals("en")) {
 												enLinks.put(tripId, urlInfo);
 											} else {
 												otherLinks.put(tripId, urlInfo);
