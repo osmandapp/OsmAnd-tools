@@ -347,13 +347,12 @@ public class WikiService {
 								StringBuilder langs = new StringBuilder();
 								StringBuilder langViews = new StringBuilder();
 								for (Object article : wikiArticles) {
-									if (article instanceof List) {
-										List<?> articleList = (List<?>) article;
+									if (article instanceof List<?> articleList) {
 										String artLang = (String) articleList.get(0);
 										String title = getFromArray(articleList, 1);
 										String shortDescription = getFromArray(articleList, 2);
 										String views = getFromArray(articleList, 3);
-										if(langs.length() > 0) {
+										if(!langs.isEmpty()) {
 											langs.append(",");
 											langViews.append(",");
 										}
@@ -452,7 +451,11 @@ public class WikiService {
 	}
 	
 	private static String getFromArray(List<?> articleList, int ind) {
-		return ind < articleList.size() && articleList.get(ind) != null ? (String) articleList.get(ind) : null;
+		if (ind < articleList.size()) {
+			Object val = articleList.get(ind);
+			return val != null ? val.toString() : null;
+		}
+		return null;
 	}
 	
 	private static String[] getHash(String s) {
