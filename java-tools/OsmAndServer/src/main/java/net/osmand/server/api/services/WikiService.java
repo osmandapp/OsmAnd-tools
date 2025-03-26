@@ -343,13 +343,22 @@ public class WikiService {
 							Array array = rs.getArray(i);
 							if (array != null) {
 								Object[] wikiArticles = (Object[]) array.getArray();
+								StringBuilder langs = new StringBuilder();
+								StringBuilder langViews = new StringBuilder();
 								for (Object article : wikiArticles) {
 									if (article instanceof List) {
 										List<?> articleList = (List<?>) article;
-										String langInArray = (String) articleList.get(0);
-										String title = articleList.get(1) != null ? (String) articleList.get(1) : null;
-										String shortDescription = articleList.get(2) != null ? (String) articleList.get(2) : null;
-										if (langInArray.equals(lang)) {
+										String artLang = (String) articleList.get(0);
+										String title = getFromArray(articleList, 1);
+										String shortDescription = getFromArray(articleList, 2);
+										String views = getFromArray(articleList, 3);
+										if(langs.length() > 0) {
+											langs.append(",");
+											langViews.append(",");
+										}
+										langs.append(artLang);
+										langViews.append(views != null ? views : "0");
+										if (artLang.equals(lang)) {
 											f.properties.put("wikiLang", lang);
 											if (shortDescription != null) {
 												f.properties.put("wikiDesc", shortDescription);
@@ -357,10 +366,11 @@ public class WikiService {
 											if (title != null) {
 												f.properties.put("wikiTitle", title);
 											}
-											break;
 										}
 									}
 								}
+								f.properties.put("wikiLangs", langs.toString());
+								f.properties.put("wikiLangViews", langViews.toString());
 							}
 						} else if (col.equals("wvLinks")) {
 							Array array = rs.getArray(i);
@@ -422,6 +432,8 @@ public class WikiService {
 				}
 				return f;
 			}
+
+			
 		};
 		List<Feature> stream = jdbcTemplate.query(query,
 				ps -> {
@@ -436,6 +448,10 @@ public class WikiService {
 					}
 				}, rowMapper);
 		return new FeatureCollection(stream.toArray(new Feature[stream.size()]));
+	}
+	
+	private static String getFromArray(List<?> articleList, int ind) {
+		return ind < articleList.size() && articleList.get(ind) != null ? (String) articleList.get(ind) : null;
 	}
 	
 	private static String[] getHash(String s) {
