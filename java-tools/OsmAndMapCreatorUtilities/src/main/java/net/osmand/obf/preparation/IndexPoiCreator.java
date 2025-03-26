@@ -13,9 +13,9 @@ import net.osmand.osm.*;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
-import net.osmand.util.JarvisAlgorithm;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 import org.apache.commons.logging.Log;
@@ -54,6 +54,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private IndexCreatorSettings settings;
 	private Map<String, HashSet<String>> topIndexAdditional;
 	private Set<String> topIndexKeys = new HashSet<>();
+	private TLongHashSet excludedRelations = new TLongHashSet();
 
 	private QuadTree<Multipolygon> cityQuadTree;
 	private Map<Multipolygon, List<PoiCreatorTagGroup>> cityTagsGroup;
@@ -150,6 +151,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
+		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
+			return;
+		}
 		if (!settings.keepOnlyRouteRelationObjects) {
 			iterateEntityInternal(e, ctx, icc);
 		}
@@ -157,13 +161,57 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
-		Map<String, String> etags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
-
-		etags = renderingTypes.transformTags(etags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, etags, tempAmenityList);
+		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
+		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-			if (e instanceof Relation) {
-				ctx.loadEntityRelation((Relation) e);
+			List<LatLon> centers = Collections.singletonList(null);
+			String memberIds = "";
+			if (e instanceof Relation relation) {
+				ctx.loadEntityRelation(relation);
+				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
+				if (adminCenters.size() == 1) {
+					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
+				} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
+					MultipolygonBuilder original = new MultipolygonBuilder();
+					original.setId(relation.getId());
+					if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
+						Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
+						original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
+					} else {
+						original.createInnerAndOuterWays(relation);
+					}
+					List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
+					centers = new ArrayList<>();
+					for (Multipolygon m : multipolygons) {
+						assert m.getOuterRings().size() == 1;
+						if (!m.areRingsComplete()) {
+							log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
+						}
+						Ring out = m.getOuterRings().get(0);
+						if (out.getBorder().size() == 0) {
+							log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
+							// don't index this
+							continue;
+						}
+						centers.add(OsmMapUtils.getCenter(out.getBorderWay()));
+					}
+				} else if (OsmMapUtils.isSuperRoute(tags)) {
+					for (RelationMember members : relation.getMembers()) {
+						if (members.getEntityId().getType() == EntityType.RELATION) {
+							if (memberIds.length() > 0) {
+								memberIds += ",";
+							}
+							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
+							if (centers.get(0) == null) {
+								Relation memberRel = (Relation) members.getEntity();
+								ctx.loadEntityRelation(memberRel);
+								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
+							}
+						}
+					}
+				}
 			}
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
@@ -183,15 +231,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			LatLon center = null;
-			if (e instanceof Relation relation) {
-				List<Entity> entities = relation.getMemberEntities("admin_centre");
-				if (entities.size() ==  1) {
-					center = entities.get(0).getLatLon();
-				} else {
-					center = retrieveClimbingCenter(e, ctx);
-				}
-			}
 
 			for (Amenity a : tempAmenityList) {
 				if (icc.basemap) {
@@ -200,37 +239,41 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-                if (center != null) {
-                    a.setLocation(center);
-                }
-				// do not add that check because it is too much printing for batch creation
-				// by statistic < 1% creates maps manually
-				// checkEntity(e);
-				EntityParser.parseMapObject(a, e, etags);
-				a.setId(id);
-				if (a.getLocation() != null) {
-					// do not convert english name
-					// convertEnglishName(a);
-					try {
-						insertAmenityIntoPoi(a);
-					} catch (Exception excpt) {
-						System.out.println("TODO FIX " + a.getId() + " " + excpt);
-						excpt.printStackTrace();
+				for (LatLon cen : centers) {
+					if (cen != null) {
+						a.setLocation(cen);
 					}
-				}
+            		// do not add that check because it is too much printing for batch creation
+    				// by statistic < 1% creates maps manually
+    				// checkEntity(e);
+    				EntityParser.parseMapObject(a, e, tags);
+    				a.setId(id);
+					generatedIds.add(id);
+    				if (centers.size() > 1) {
+    					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
+						while (generatedIds.contains(id)) {
+							id += 2;
+						}
+    				}
+					if (!memberIds.isEmpty()) {
+						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+					}
+
+    				if (a.getLocation() != null) {
+    					try {
+    						insertAmenityIntoPoi(a);
+    					} catch (Exception excpt) {
+    						System.out.println("TODO FIX " + a.getId() + " " + excpt);
+    						excpt.printStackTrace();
+    					}
+    				}
+                }
+
 			}
 		}
 	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-
-		Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.POI);
-		for (String t : tags.keySet()) {
-			boolean index = poiTypes.parseAmenity(t, tags.get(t), true, tags) != null;
-			if (index) {
-				ctx.loadEntityRelation(e);
-			}
-		}
 		tagsTransform.handleRelationPropogatedTags(e, renderingTypes, ctx, EntityConvertApplyType.POI);
 	}
 
@@ -272,6 +315,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		addBatch(poiPreparedStatement);
 	}
+
 
 	private PoiAdditionalType getOrCreate(String tag, String value, boolean text) {
 		String ks = PoiAdditionalType.getKey(tag, value, text);
@@ -400,6 +444,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		pStatements.put(tagGroupsPreparedStatement, 0);
 
 		poiConnection.setAutoCommit(false);
+	}
+
+	public void excludeFromMainIteration(long id) {
+		excludedRelations.add(id);
 	}
 
 
@@ -799,19 +847,27 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
-				if ((e.getKey().getTag().contains("name") || e.getKey().getTag().equals("brand"))
-						&& !"name:en".equals(e.getKey().getTag())) {
+				String tag = e.getKey().getTag();
+				if ((tag.contains("name") || tag.equals("brand"))
+						&& !"name:en".equals(tag)) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
 					}
 					otherNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && (
-						e.getKey().getTag().equals("wikidata") || e.getKey().getTag().equals("route_id"))) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && (tag.equals(Amenity.WIKIDATA) || tag.equals(Amenity.ROUTE_ID))) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
 					idNames.add(e.getValue());
+				}
+				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals(Amenity.ROUTE_MEMBERS_IDS)) {
+					if (idNames == null) {
+						idNames = new TreeSet<String>();
+					}
+					for(String id : e.getValue().split(",")) {
+						idNames.add(id);
+					}
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
@@ -930,7 +986,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
-		
+
 		public int getRating() {
 			int rt = 0;
 			for (PoiAdditionalType t : additionalTags.keySet()) {
@@ -1200,21 +1256,4 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return tagGroupIds;
 	}
 
-    private LatLon retrieveClimbingCenter(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-        if (e instanceof Relation relation) {
-            boolean climbing = "area".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()))
-                    || "crag".equals(relation.getTag(OSMSettings.OSMTagKey.CLIMBING.getValue()));
-            if (climbing) {
-                Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes(relation);
-                if (!allNodes.isEmpty()) {
-                    ArrayList<Node> convexPolygon = JarvisAlgorithm.createConvexPolygon(new ArrayList<>(allNodes.values()));
-                    if (convexPolygon != null) {
-                        Way convexWay = new Way(1, convexPolygon);
-                        return OsmMapUtils.getCenter(convexWay);
-                    }
-                }
-            }
-        }
-        return null;
-    }
 }
