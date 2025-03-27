@@ -19,6 +19,8 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.osm.io.NetworkUtils;
+import net.osmand.util.Algorithms;
 
 
 public class OsmDbAccessor implements OsmDbAccessorContext {
@@ -28,6 +30,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	protected PreparedStatement pselectNode;
 	protected PreparedStatement pselectWay;
 	protected PreparedStatement pselectRelation;
+    protected PreparedStatement pselectPartOf;
 	private int allRelations;
 	private int allWays;
 	private int allNodes;
@@ -45,15 +48,15 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	private OsmDbTagsPreparation tagsPrepration;
 
 	public interface OsmDbVisitor {
-		
+
 		public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException;
-		
+
 	}
-	
+
 	public interface OsmDbTagsPreparation {
 
 		void processTags(Entity e);
-		
+
 	}
 
 	public OsmDbAccessor() {}
@@ -65,6 +68,8 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 				"from ways w left join node n on w.node = n.id where w.id = ? order by w.ord"); //$NON-NLS-1$
 		pselectRelation = dbConn.prepareStatement("select r.member, r.type, r.role, r.ord, r.tags " + //$NON-NLS-1$
 				"from relations r where r.id = ? order by r.ord"); //$NON-NLS-1$
+
+        pselectPartOf = dbConn.prepareStatement("select r.id from relations r where r.member=? AND r.type=?");
 
 		iterateNodes = dbConn
 				.prepareStatement("select n.id, n.latitude, n.longitude, n.tags from node n where length(n.tags) > 0 or n.propagate = 1"); //$NON-NLS-1$
@@ -83,7 +88,7 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			allWays += dbCreator.getAllWays();
 		}
 	}
-	
+
 	public void setTagsPrepration(OsmDbTagsPreparation tagsPrepration) {
 		this.tagsPrepration = tagsPrepration;
 	}
@@ -159,6 +164,26 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
         }
     }
 
+    @Override
+    public void loadEntityPartOf(Entity entity) throws SQLException {
+        EntityType type = EntityType.valueOf(entity);
+        if (entity.getPartOf() != null || type == null) {
+            return;
+        }
+        pselectPartOf.setLong(1, entity.getId());
+        pselectPartOf.setLong(2, type.ordinal());
+        if (pselectPartOf.execute()) {
+            ResultSet rs = pselectPartOf.getResultSet();
+            while (rs.next()) {
+                int relation = rs.getInt(1);
+                entity.addPartOf(relation);
+            }
+        }
+        if (Algorithms.isEmpty(entity.getPartOf())) {
+            entity.setPartOf(new ArrayList<>());
+        }
+    }
+
 	public void loadEntityRelation(Relation e, int level) throws SQLException {
 		if (e.isDataLoaded()) { //data was already loaded, nothing to do
 			return;
@@ -210,12 +235,12 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 			e.entityDataLoaded();
 		}
 	}
-	
+
 	public void setCreator(OsmDbCreator dbCreator) {
 		this.dbCreator = dbCreator;
-		
+
 	}
-	
+
 	@Override
 	public long convertId(Entity e) {
 		return dbCreator == null ? e.getId() : dbCreator.convertId(e);
@@ -320,6 +345,9 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		if (pselectRelation != null) {
 			pselectRelation.close();
 		}
+        if (pselectPartOf != null) {
+            pselectPartOf.close();
+        }
 		if (iterateNodes != null) {
 			iterateNodes.close();
 		}

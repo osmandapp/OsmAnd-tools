@@ -157,9 +157,15 @@ public class IndexRouteRelationCreator {
 					}
 				}
 			}
+            Collection<Integer> partOf = null;
+            if (!pointsForPoiSearch.isEmpty()) {
+                ctx.loadEntityPartOf(relation);
+                partOf = relation.getPartOf();
+            }
 			for (Node node : pointsForPoiSearch) {
 				if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
 					poiSectionTags.forEach(node::putTag); // append tags
+                    node.setPartOf(partOf);
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}

@@ -166,7 +166,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			List<LatLon> centers = Collections.singletonList(null);
-			String memberIds = "";
 			if (e instanceof Relation relation) {
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
@@ -199,16 +198,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				} else if (OsmMapUtils.isSuperRoute(tags)) {
 					for (RelationMember members : relation.getMembers()) {
-						if (members.getEntityId().getType() == EntityType.RELATION) {
-							if (memberIds.length() > 0) {
-								memberIds += ",";
-							}
-							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
-							if (centers.get(0) == null) {
-								Relation memberRel = (Relation) members.getEntity();
-								ctx.loadEntityRelation(memberRel);
-								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
-							}
+						if (centers.get(0) == null) {
+							Relation memberRel = (Relation) members.getEntity();
+							ctx.loadEntityRelation(memberRel);
+							centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
 						}
 					}
 				}
@@ -231,6 +224,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+
+            String partOf = "";
+            if (!Algorithms.isEmpty(e.getPartOf())) {
+                for (int rel : e.getPartOf()) {
+                    if (!partOf.isEmpty()) {
+                        partOf += ",";
+                    }
+                    partOf += "O" + rel; // OSM route_id start from symbol "O"
+                }
+            }
 
 			for (Amenity a : tempAmenityList) {
 				if (icc.basemap) {
@@ -255,8 +258,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							id += 2;
 						}
     				}
-					if (!memberIds.isEmpty()) {
-						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+					if (!Algorithms.isEmpty(partOf)) {
+						a.setAdditionalInfo(Amenity.ROUTE_PART_OF, partOf);
 					}
 
     				if (a.getLocation() != null) {
@@ -861,7 +864,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 					idNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals(Amenity.ROUTE_MEMBERS_IDS)) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && tag.equals(Amenity.ROUTE_PART_OF)) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}

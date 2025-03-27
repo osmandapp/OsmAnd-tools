@@ -21,7 +21,9 @@ public interface OsmDbAccessorContext {
 	 */
 	public void loadEntityRelation(Relation e) throws SQLException;
 
+    public void loadEntityPartOf(Entity entity) throws SQLException;
+
     public Map<Long, Node> retrieveAllRelationNodes(Relation e) throws SQLException;
-    
+
     public long convertId(Entity e);
 }
