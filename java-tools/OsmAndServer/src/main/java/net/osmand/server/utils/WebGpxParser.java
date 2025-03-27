@@ -29,6 +29,12 @@ public class WebGpxParser {
     public static final String LINE_PROFILE_TYPE = "line";
     public static final int NAN_MARKER = 99999;
 
+    // Track Appearance
+    public static final String GPX_EXT_SHOW_ARROWS = "show_arrows";
+    public static final String GPX_EXT_SHOW_START_FINISH = "show_start_finish";
+    public static final String GPX_EXT_COLOR = "color";
+    public static final String GPX_EXT_WIDTH = "width";
+
     @Getter
     @Setter
     public static class TrackData {
@@ -650,13 +656,16 @@ public class WebGpxParser {
             });
         }
 
-        gpxFile.setExtensions(parseTrackExt(trackData));
+        Map<String, String> trackExt = parseTrackExt(trackData);
+        if (trackExt != null) {
+            gpxFile.setExtensions(trackExt);
+        }
         
         return gpxFile;
     }
 
     private Map<String, String> parseTrackExt(WebGpxParser.TrackData trackData) {
-        Map<String, String> trackExt = trackData.getExt() != null ? trackData.getExt() : null;
+        Map<String, String> trackExt = trackData.getExt();
         WebTrackAppearance trackAppearance = trackData.getTrackAppearance();
         if (trackAppearance != null) {
             if (trackExt == null) {
@@ -665,7 +674,7 @@ public class WebGpxParser {
             trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.getShowArrows()));
             trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.getShowStartFinish()));
             trackExt.put(GPX_EXT_COLOR, trackAppearance.getColor());
-            trackExt.put(GPX_EXT_WIDTH, trackAppearance.getColor());
+            trackExt.put(GPX_EXT_WIDTH, trackAppearance.getWidth());
         }
         return trackExt;
     }
