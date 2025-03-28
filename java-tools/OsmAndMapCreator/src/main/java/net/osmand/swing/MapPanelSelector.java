@@ -77,7 +77,7 @@ public class MapPanelSelector {
 					continue;
 				}
 				if (o.getX().size() > 1) {
-					List<RouteKey> keys = OsmRouteType.getRouteKeys(o.getTags());
+					List<RouteKey> keys = NetworkRouteSelector.getRouteKeys(o.getTags());
 					if (keys.size() > 0) {
 						try {
 							createMenu(o, e.getX(), e.getY()).show(panel, e.getX(), e.getY());
@@ -126,7 +126,7 @@ public class MapPanelSelector {
 			routeKeys = routeMap.keySet();
 		} else {
 			routeMap = null;
-			routeKeys = OsmRouteType.getRouteKeys(renderedObject.getTags());
+			routeKeys = NetworkRouteSelector.getRouteKeys(renderedObject.getTags());
 		}
 		for (RouteKey routeKey : routeKeys) {
 			menu.add(new AbstractAction(routeKey.tags.toString()) {
