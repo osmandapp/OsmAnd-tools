@@ -1,16 +1,26 @@
 def processType(tp, uniqueset, tags) {
-	def tg = tp."@tag".text();
-	def value = tp."@value".text();
+	def tg = tp."@tag".text()
+	def value = tp."@value".text()
+
 	if (uniqueset[tg + "=" + value]) {
-		return ;
+		return
 	}
-		uniqueset[tg + "=" + value] = tg;
-	def notosm = tp."@no_edit".text();
-	if (!tg.contains("osmand") && value != "" && notosm != "true") {
+	uniqueset[tg + "=" + value] = tg
+
+	boolean skipTag = (
+		tg.contains("osmand") || 
+		tp.@"no_edit" == "true" || 
+		tp.@"notosm" == "true"
+	)
+	if (skipTag) {
+		return
+	}
+
+	if (value != "") {
 		def taginfop = [:]
-		taginfop["key"] = tg;
-		taginfop["value"] = value;
-		taginfop["description"] = "Used to create maps";
+		taginfop["key"] = tg
+		taginfop["value"] = value
+		taginfop["description"] = "Used to create maps"
 		tags << taginfop
 	}
 }
@@ -37,31 +47,41 @@ def processEntityConvert(tp, uniqueset, tags) {
 DEFAULT_HTTP_URL = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/"; 
 
 def processPOItype(tp, uniqueset, tags) {
-	def tg = tp."@tag".text();
-	def value = tp."@value".text();
-	def name = tp."@name".text();
+	def tg = tp."@tag".text()
+	def value = tp."@value".text()
+	def name = tp."@name".text()
+
 	if (uniqueset[tg + "=" + value]) {
-		return ;
+		return
 	}
-		uniqueset[tg + "=" + value] = tg;
-	def notosm = tp."@no_edit".text();
-	if (!tg.contains("osmand") && notosm != "true") {
-		def taginfop = [:]
-		taginfop["key"] = tg;
-		if (value != "") {
-			taginfop["value"] = value;
-		}
-		taginfop["description"] = "Used to create maps (POI)";
-		String folder = "resources/rendering_styles/style-icons/drawable-hdpi/";
-		if (new File(folder, "mx_" + name + ".png").exists()) {
-			taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + name + ".png";
-		} else if (new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
-			taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + tg + "_" + value + ".png";
-		} else if (new File(folder, "mx_" + value + ".png").exists()) {
-			taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + value + ".png";
-		}
-		tags << taginfop
+	uniqueset[tg + "=" + value] = tg
+
+	boolean skipTag = (
+		tg.contains("osmand") || 
+		tp.@"no_edit" == "true" || 
+		tp.@"notosm" == "true"
+	)
+	if (skipTag) {
+		return
 	}
+
+	def taginfop = [:]
+	taginfop["key"] = tg
+	if (value != "") {
+		taginfop["value"] = value
+	}
+	taginfop["description"] = "Used to create maps (POI)"
+
+	String folder = "resources/rendering_styles/style-icons/drawable-hdpi/"
+	if (new File(folder, "mx_" + name + ".png").exists()) {
+		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + name + ".png"
+	} else if (new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
+		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + tg + "_" + value + ".png"
+	} else if (new File(folder, "mx_" + value + ".png").exists()) {
+		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + value + ".png"
+	}
+
+	tags << taginfop
 }
 
 def processPOIGroup(group, uniqueset, tags) {
