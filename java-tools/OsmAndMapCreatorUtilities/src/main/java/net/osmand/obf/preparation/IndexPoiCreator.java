@@ -201,7 +201,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					for (RelationMember members : relation.getMembers()) {
 						if (members.getEntityId().getType() == EntityType.RELATION) {
 							if (memberIds.length() > 0) {
-								memberIds += ",";
+								memberIds += " ";
 							}
 							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
 							if (centers.get(0) == null) {
@@ -865,7 +865,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
-					for(String id : e.getValue().split(",")) {
+					for(String id : e.getValue().split(" ")) {
 						idNames.add(id);
 					}
 				}
