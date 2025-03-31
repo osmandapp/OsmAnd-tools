@@ -73,7 +73,8 @@ public class OsmAndServerMonitorTasks {
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
-			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", "maptile.osmand.net"};
+			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", 
+			 "maptile.osmand.net", "data.osmand.net"};
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
 			"maptile.osmand.net" };
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
@@ -90,6 +91,8 @@ public class OsmAndServerMonitorTasks {
 		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
 		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
 		buildServers.add(new BuildServerCheckInfo("https://maptile.osmand.net:8080", "jenkins-maptile"));
+		buildServers.add(new BuildServerCheckInfo("https://data.osmand.net:8080", "jenkins-data"));
+		buildServers.add(new BuildServerCheckInfo("https://veles.osmand.net:8080", "jenkins-veles"));
 	}
 	
 
