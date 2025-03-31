@@ -1,6 +1,6 @@
-/* !!! RUN AS OWNER USER  */ 
+/* !!! RUN AS OWNER USER  */
 
--- psql 
+-- psql
 -- create database changeset owner test;
 -- psql -U test -d changeset
 /*  DDL for changeset database */
@@ -18,19 +18,28 @@ ALTER TABLE supporters ADD PRIMARY KEY (userid);
 CREATE TABLE supporters_device_sub(sku text, purchasetoken text, prevvalidpurchasetoken text, timestamp timestamp,
         autorenewing boolean, starttime timestamp, expiretime timestamp, kind text, payload text, orderid text,
         price int, pricecurrency text, introprice int, intropricecurrency text, introcycles int, introcyclename text,
-        paymentstate int, valid boolean, checktime timestamp);
+        paymentstate int, valid boolean, checktime timestamp, userid int, supporterid bigint);
 CREATE INDEX supporters_device_sub_starttime_idx on supporters_device_sub(starttime);
 CREATE INDEX supporters_device_sub_expiretime_idx on supporters_device_sub(expiretime);
 CREATE INDEX supporters_device_sub_orderid_idx on supporters_device_sub(orderid);
+CREATE INDEX supporters_device_sub_userid_idx on supporters_device_sub(userid);
+CREATE INDEX supporters_device_sub_supporterid_idx on supporters_device_sub(supporterid);
 ALTER TABLE supporters_device_sub add primary key (sku, orderid);
 
+CREATE TABLE supporters_device_iap(sku text, orderid text, purchasetoken text, platform text,
+        checktime timestamp, valid boolean, userid int, supporterid bigint, timestamp timestamp);
+CREATE INDEX supporters_device_iap_orderid_idx on supporters_device_iap(orderid);
+CREATE INDEX supporters_device_iap_userid_idx on supporters_device_iap(userid);
+CREATE INDEX supporters_device_iap_supporterid_idx on supporters_device_iap(supporterid);
+ALTER TABLE supporters_device_iap add primary key (sku, orderid);
+
 ------ PREMIUM accounts ----
-CREATE TABLE user_accounts(id serial primary key, email text not null, nickname text, tokendevice text, orderid text, token text, tokentime timestamp, regtime timestamp); 
-CREATE TABLE user_account_devices(id serial primary key, userid integer, deviceid text, accesstoken text, lang text, brand text, model text, udpatetime timestamp); 
+CREATE TABLE user_accounts(id serial primary key, email text not null, nickname text, tokendevice text, orderid text, token text, tokentime timestamp, regtime timestamp);
+CREATE TABLE user_account_devices(id serial primary key, userid integer, deviceid text, accesstoken text, lang text, brand text, model text, udpatetime timestamp);
 CREATE TABLE user_files(id bigserial primary key, type text, name text, userid integer, deviceid integer, updatetime timestamp, clienttime timestamp, filesize bigint, zipfilesize bigint, storage text, shortlinktiles text[], gendetails jsonb, data bytea);
 CREATE TABLE promo_campaigns(name text, starttime timestamp, endtime timestamp, subactivemonths integer, numberlimit integer, used integer, lastusers text);
 ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
---- 
+---
 --- alter table user_files add column storage text;
 --- alter table user_files alter column filesize type bigint;
 --- alter table user_files add column zipfilesize bigint;
@@ -95,18 +104,18 @@ CREATE TABLE final_reports (name text, month text, region text, report text, tim
 CREATE INDEX final_reports_grp_idx on final_reports(name,month,region);
 
 --  CURRENT MONTH MATERIALIZED VIEW
-CREATE MATERIALIZED VIEW changesets_view AS SELECT * FROM changesets where 
+CREATE MATERIALIZED VIEW changesets_view AS SELECT * FROM changesets where
 closed_at > ( (SELECT max(closed_at) FROM changesets)::date - '60 day'::interval) WITH DATA;
 CREATE MATERIALIZED VIEW changeset_country_view AS SELECT * FROM changeset_country c where exists (select 1 from changesets_view d where d.id = c.changesetid) WITH DATA;
 --  REFRESH MATERIALIZED VIEW  changesets_view ;
 --  REFRESH MATERIALIZED VIEW  changeset_country_view ;
 
---  TELEGRAM SERVER MONITORING 
+--  TELEGRAM SERVER MONITORING
 CREATE TABLE telegram_monitoring (
   id bigint NOT NULL, first_name varchar(100)  DEFAULT NULL, last_name varchar(100)  DEFAULT NULL, user_id bigint DEFAULT NULL, data jsonb, PRIMARY KEY (id)
 );
 
---  TELEGRAM TRACKER CONFIGURATION 
+--  TELEGRAM TRACKER CONFIGURATION
 CREATE TABLE telegram_devices (id bigint NOT NULL, chat_id bigint NOT NULL, created_date timestamp NOT NULL,
     modified_date timestamp, device_name character varying(200)  NOT NULL, user_id bigint NOT NULL, data jsonb, PRIMARY KEY (id)
 );
@@ -124,13 +133,13 @@ CREATE TABLE lottery_series(name text, type text, promocodes text, usedpromos te
 
 CREATE TABLE poll_results (ip text, date timestamp, pollid text, answer integer);
 
---  ANALYTICS 
+--  ANALYTICS
 CREATE TABLE analytics (
     ip text, date timestamp, aid text, nd integer, ns integer, version text,
     lang text, start_date timestamp, finish_date timestamp, data bytea
 );
 
--- SPECIFY USER -- -- -- -- -- -- -- -- -- -- -- -- 
+-- SPECIFY USER -- -- -- -- -- -- -- -- -- -- -- --
 -- \set DBUSER test;
 -- GRANT ALL privileges ON ALL TABLES IN SCHEMA public to :DBUSER;
 -- GRANT ALL privileges ON supporters_seq to  <user>;

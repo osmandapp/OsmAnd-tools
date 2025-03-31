@@ -20,8 +20,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.purchases.ReceiptValidationHelper;
+import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 
 @Service
 public class ReceiptValidationService {
@@ -51,7 +51,7 @@ public class ReceiptValidationService {
 			return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
 		}
 	}
-	
+
 	@Nullable
 	public List<InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
 		List<InAppReceipt> result = null;

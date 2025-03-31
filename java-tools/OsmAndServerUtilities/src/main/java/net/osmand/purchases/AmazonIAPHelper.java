@@ -1,4 +1,4 @@
-package net.osmand.live.subscriptions;
+package net.osmand.purchases;
 
 import net.osmand.util.Algorithms;
 

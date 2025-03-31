@@ -1,4 +1,4 @@
-package net.osmand.live.subscriptions;
+package net.osmand.purchases;
 
 import net.osmand.util.Algorithms;
 
@@ -66,10 +66,10 @@ public class HuaweiIAPHelper {
 	private String accessToken = null;
 	private long accessTokenExpireTime = 0;
 
-	
+
 	public HuaweiIAPHelper() {
 	}
-	
+
 	public String getAccessToken() throws IOException {
 		if (accessTokenExpireTime < System.currentTimeMillis()) {
 			// fetch accessToken
@@ -230,7 +230,7 @@ public class HuaweiIAPHelper {
 		}
 		return new HuaweiSubscription(inappPurchaseData);
 	}
-	
+
 	private static String httpPost(String httpUrl, String contentType, String data, int connectTimeout, int readTimeout,
 								   Map<String, String> headers) throws IOException {
 		OutputStream output = null;
