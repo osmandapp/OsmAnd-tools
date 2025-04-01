@@ -10,7 +10,7 @@ def processType(tp, uniqueset, tags) {
 	boolean skipTag = (
 		tg.contains("osmand") || 
 		tp.@"no_edit" == "true" || 
-		tp.@"notosm" == "true"
+		tp.@"hidden" == "true"
 	)
 	if (skipTag) {
 		return
@@ -32,8 +32,8 @@ def processEntityConvert(tp, uniqueset, tags) {
 		return ;
 	}
 		uniqueset[tg + "=" + value] = tg;
-	def notosm = tp."@notosm".text();
-	if (!tg.contains("osmand") && notosm != "true") {
+	def hidden = tp."@hidden".text();
+	if (!tg.contains("osmand") && hidden != "true") {
 		def taginfop = [:]
 		taginfop["key"] = tg;
 		if (value != "") {
@@ -59,7 +59,7 @@ def processPOItype(tp, uniqueset, tags) {
 	boolean skipTag = (
 		tg.contains("osmand") || 
 		tp.@"no_edit" == "true" || 
-		tp.@"notosm" == "true"
+		tp.@"hidden" == "true"
 	)
 	if (skipTag) {
 		return
