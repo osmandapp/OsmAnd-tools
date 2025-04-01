@@ -164,13 +164,14 @@ public class OsmAndGithubProjectMonitorTasks {
 		StringBuilder projItemsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectItems.graphql"));
 		StringBuilder res = null;
 		boolean hasNext = true;
-		String nextCursor = "null";
+		String nextCursor = "";
 		Map<String, ProjectItem> items = new LinkedHashMap<>();
 		
 //		while (hasNext && pages++ < 1) {
 		try {
 			while (hasNext && pages++ < MAX_PAGES) {
-				String graphQLQuery = projItemsQL.toString().replace("after: null", "after: \"" + nextCursor + "\" ");
+				String graphQLQuery = projItemsQL.toString().replace(", after: null", 
+						nextCursor.length() == 0 ? "" : (", after: \"" + nextCursor + "\" "));
 				HttpURLConnection graphQLConn = (HttpURLConnection) new URL("https://api.github.com/graphql")
 						.openConnection();
 				graphQLConn.addRequestProperty("Authorization", "Bearer " + loginToken);
