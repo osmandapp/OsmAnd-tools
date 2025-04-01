@@ -125,6 +125,9 @@ public class ApiController {
     private PremiumUsersRepository premiumUsersRepository;
 
     @Autowired
+    private PremiumUserDevicesRepository premiumUserDevicesRepository;
+
+    @Autowired
 	OsmAndServerMonitorTasks monitoring;
 
 	@Autowired
@@ -139,9 +142,6 @@ public class ApiController {
 	Gson gson = new Gson();
 
 	OsmandRegions osmandRegions;
-    @Autowired
-    private PremiumUserDevicesRepository premiumUserDevicesRepository;
-
 
     @GetMapping(path = {"/osmlive_status.php", "/osmlive_status"}, produces = "text/html;charset=UTF-8")
     @ResponseBody
@@ -493,8 +493,9 @@ public class ApiController {
     private Supporter resolveSupporter(String userId, String userToken) {
         if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
             Optional<Supporter> sup = supportersRepository.findByUserId(Long.parseLong(userId));
-            if (sup.isPresent()) {
-                return sup.get();
+            Supporter supporter = sup.orElse(null);
+            if (supporter != null && userToken.equals(sup.get().token)) {
+                return supporter;
             }
         }
         return null;

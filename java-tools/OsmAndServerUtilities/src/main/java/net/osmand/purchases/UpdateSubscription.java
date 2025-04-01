@@ -69,8 +69,8 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription.pro";
 
 	private static final int BATCH_SIZE = 200;
-	private static final long DAY = 1000l * 60 * 60 * 24;
-	private static final long HOUR = 1000l * 60 * 60;
+	private static final long DAY = 1000L * 60 * 60 * 24;
+	private static final long HOUR = 1000L * 60 * 60;
 
 	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 14 * DAY;
 	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;

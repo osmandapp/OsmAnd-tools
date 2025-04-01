@@ -1,4 +1,3 @@
-// --- START OF FILE UpdateInAppPurchase.java ---
 package net.osmand.purchases;
 
 import com.google.api.client.auth.oauth2.Credential;
@@ -38,14 +37,17 @@ public class UpdateInAppPurchase {
     public static final String PLATFORM_APPLE = "apple";
 
     private static final int BATCH_SIZE = 200;
+    private static final long HOUR = 1000L * 60 * 60;
+
+    private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
     private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = TimeUnit.DAYS.toMillis(5); // If pending/invalid for too long
 
     private int changes = 0;
     private int checkChanges = 0;
-    private int deletions = 0; // Should deletions happen for IAPs? Maybe just mark invalid.
+    private int deletions = 0;
     private final String selQuery;
     private final String updQuery;
-    private final String delQuery; // Consider if needed
+    private final String delQuery;
     private final String updCheckQuery;
     private PreparedStatement updStat;
     private PreparedStatement delStat;
@@ -70,7 +72,7 @@ public class UpdateInAppPurchase {
 
         // --- Define SQL Queries for the `supporters_device_iap` table ---
         // Select purchases that are pending validation or haven't been checked recently
-        selQuery = "SELECT sku, purchaseToken, orderid, platform, purchase_time, checktime, valid, userid, timestamp "
+        selQuery = "SELECT sku, purchaseToken, orderid, platform, purchase_time, checktime, valid, userid, supporterid, timestamp "
                 + "FROM supporters_device_iap "
                 + "WHERE valid IS NULL OR valid = TRUE " // Focus on potentially valid ones first
                 // Add condition based on checktime later in the loop
@@ -156,11 +158,19 @@ public class UpdateInAppPurchase {
                 // Timestamp recordTimestamp = rs.getTimestamp("timestamp");
 
                 long currentTime = System.currentTimeMillis();
+                long delayBetweenChecks = checkTimeTs == null ? MINIMUM_WAIT_TO_REVALIDATE : (currentTime - checkTimeTs.getTime());
+                if (delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll) {
+                    // in case validate all (ignore minimum waiting time)
+                    continue;
+                }
 
                 // Determine platform enum
                 PurchasePlatform purchasePlatform = PurchasePlatform.UNKNOWN;
-                if (PLATFORM_GOOGLE.equalsIgnoreCase(platform)) purchasePlatform = PurchasePlatform.GOOGLE;
-                else if (PLATFORM_APPLE.equalsIgnoreCase(platform)) purchasePlatform = PurchasePlatform.APPLE;
+                if (PLATFORM_GOOGLE.equalsIgnoreCase(platform)) {
+                    purchasePlatform = PurchasePlatform.GOOGLE;
+                } else if (PLATFORM_APPLE.equalsIgnoreCase(platform)) {
+                    purchasePlatform = PurchasePlatform.APPLE;
+                }
 
                 // Skip based on platform filter
                 if ((onlyGoogle && purchasePlatform != PurchasePlatform.GOOGLE) || (onlyApple && purchasePlatform != PurchasePlatform.APPLE)) {
@@ -472,23 +482,7 @@ public class UpdateInAppPurchase {
     }
 
     public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
-        List<String> scopes = List.of("https://www.googleapis.com/auth/androidpublisher");
-        File dataStoreDir = new File(new File(file).getParentFile(), ".credentials_iap"); // Use different credential store potentially
-        JacksonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jsonFactory, new InputStreamReader(new FileInputStream(file)));
-        NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-
-        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-                httpTransport, jsonFactory, clientSecrets, scopes)
-                .setDataStoreFactory(new FileDataStoreFactory(dataStoreDir))
-                .setAccessType("offline")
-                .build();
-        LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(5001).build(); // Different port?
-        Credential credential = new AuthorizationCodeInstalledApp(flow, receiver).authorize("user_iap"); // Different user id?
-        System.out.println("IAP Credentials saved to " + dataStoreDir.getAbsolutePath());
-        return new AndroidPublisher.Builder(httpTransport, jsonFactory, setHttpTimeout(credential))
-                .setApplicationName("OsmAnd IAP Validator").build(); // Different app name?
+        return UpdateSubscription.getPublisherApi(file);
     }
 
     // Exception class
@@ -513,6 +507,4 @@ public class UpdateInAppPurchase {
             return sku;
         }
     }
-
 }
-// --- END OF FILE UpdateInAppPurchase.java ---

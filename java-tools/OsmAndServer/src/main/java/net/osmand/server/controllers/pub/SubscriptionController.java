@@ -58,11 +58,13 @@ public class SubscriptionController {
     private PrivateKey subscriptionPrivateKey;
 
     @Autowired
+    private PremiumUserDevicesRepository premiumUserDevicesRepository;
+
+    @Autowired
     private SupportersRepository supportersRepository;
 
     @Autowired
     private LotteryPlayService lotteryPlayService;
-
 
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;
@@ -82,8 +84,6 @@ public class SubscriptionController {
 
 	@Value("${logging.purchase.debug}")
 	private boolean purchaseDebugInfo;
-    @Autowired
-    private PremiumUserDevicesRepository premiumUserDevicesRepository;
 
     @Autowired
     public SubscriptionController(RestTemplateBuilder builder) {

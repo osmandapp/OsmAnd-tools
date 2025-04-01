@@ -254,41 +254,41 @@ public class UserdataController {
             try {
                 Optional<Supporter> supOpt = supportersRepository.findById(Long.parseLong(userId));
                 supporter = supOpt.orElse(null);
+                if (supporter != null && !userToken.equals(supporter.token)) {
+                    LOG.warn("Supporter token mismatch during cloud registration for supporterId: " + userId);
+                    supporter = null;
+                }
             } catch (NumberFormatException e) {
                 LOG.warn("Supporter ID is in wrong format: " + userId);
             }
             if (supporter != null) {
-                if (supporter.token.equals(userToken)) {
-                    // Supporter verified, find their IAPs
-                    List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findByUserId(supporter.userId.intValue());
-                    int linkedCount = 0;
-                    for (SupporterDeviceInAppPurchase iap : iapsToLink) {
-                        // Update the userId to the PremiumUser ID
-                        if (iap.userId == null) { // Check if update is needed
-                            iap.userId = pu.id;
-                            iapsRepository.save(iap); // Save the updated IAP record
-                            linkedCount++;
-                        }
+                // Supporter verified, find their IAPs
+                List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findByUserId(supporter.userId.intValue());
+                int linkedCount = 0;
+                for (SupporterDeviceInAppPurchase iap : iapsToLink) {
+                    // Update the userId to the PremiumUser ID
+                    if (iap.userId == null) { // Check if update is needed
+                        iap.userId = pu.id;
+                        iapsRepository.save(iap); // Save the updated IAP record
+                        linkedCount++;
                     }
-                    if (linkedCount > 0) {
-                        LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
+                }
+                if (linkedCount > 0) {
+                    LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
+                }
+                // Optionally link subscription orderId if needed
+                List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId.intValue());
+                linkedCount = 0;
+                for (SupporterDeviceSubscription sub : subsToLink) {
+                    // Update the userId to the PremiumUser ID
+                    if (sub.userId == null) { // Check if update is needed
+                        sub.userId = pu.id;
+                        subscriptionsRepository.save(sub); // Save the updated subscription record
+                        linkedCount++;
                     }
-                    // Optionally link subscription orderId if needed
-                    List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId.intValue());
-                    linkedCount = 0;
-                    for (SupporterDeviceSubscription sub : subsToLink) {
-                        // Update the userId to the PremiumUser ID
-                        if (sub.userId == null) { // Check if update is needed
-                            sub.userId = pu.id;
-                            subscriptionsRepository.save(sub); // Save the updated subscription record
-                            linkedCount++;
-                        }
-                    }
-                    if (linkedCount > 0) {
-                        LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
-                    }
-                } else {
-                    LOG.warn("Supporter token mismatch during cloud registration for supporterId: " + userId);
+                }
+                if (linkedCount > 0) {
+                    LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
                 }
             } else {
                 LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);

@@ -13,7 +13,6 @@ import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
 
 public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterDeviceInAppPurchase, SupporterDeviceInAppPurchasePrimaryKey> {
 
-    // Add custom query methods if needed, e.g.:
     List<SupporterDeviceInAppPurchase> findByUserId(Integer userId);
 
     List<SupporterDeviceInAppPurchase> findByOrderId(String orderId);
