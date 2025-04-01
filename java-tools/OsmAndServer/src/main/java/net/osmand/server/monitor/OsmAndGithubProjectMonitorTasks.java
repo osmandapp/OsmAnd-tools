@@ -158,109 +158,119 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 
 
-	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException, MalformedURLException, ParseException {
+	private Map<String, ProjectItem> loadGithubProjectItems() throws IOException {
 		int pages = 0;
 //		StringBuilder projFieldsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectFields.graphql"));
 		StringBuilder projItemsQL = Algorithms.readFromInputStream(this.getClass().getResourceAsStream("/projectItems.graphql"));
+		StringBuilder res = null;
 		boolean hasNext = true;
 		String nextCursor = "null";
 		Map<String, ProjectItem> items = new LinkedHashMap<>();
 		
 //		while (hasNext && pages++ < 1) {
-		while (hasNext && pages++ < MAX_PAGES) {
-			String graphQLQuery = projItemsQL.toString().replace("after: null", "after: \"" + nextCursor+"\" ");
-			HttpURLConnection graphQLConn = (HttpURLConnection) new URL("https://api.github.com/graphql")
-					.openConnection();
-			graphQLConn.addRequestProperty("Authorization", "Bearer " + loginToken);
-			graphQLConn.setDoInput(true);
-			graphQLConn.setDoOutput(true);
-			OutputStream out = graphQLConn.getOutputStream();
-			out.write(gson.toJson(Collections.singletonMap("query", graphQLQuery)).getBytes());
-			StringBuilder res = Algorithms.readFromInputStream(graphQLConn.getInputStream());
-			JsonElement resJson = gson.fromJson(res.toString(), JsonElement.class);
+		try {
+			while (hasNext && pages++ < MAX_PAGES) {
+				String graphQLQuery = projItemsQL.toString().replace("after: null", "after: \"" + nextCursor + "\" ");
+				HttpURLConnection graphQLConn = (HttpURLConnection) new URL("https://api.github.com/graphql")
+						.openConnection();
+				graphQLConn.addRequestProperty("Authorization", "Bearer " + loginToken);
+				graphQLConn.setDoInput(true);
+				graphQLConn.setDoOutput(true);
+				OutputStream out = graphQLConn.getOutputStream();
+				out.write(gson.toJson(Collections.singletonMap("query", graphQLQuery)).getBytes());
+				res = Algorithms.readFromInputStream(graphQLConn.getInputStream());
+				JsonElement resJson = gson.fromJson(res.toString(), JsonElement.class);
 
-			JsonObject projJson = resJson.getAsJsonObject().getAsJsonObject("data").getAsJsonObject("organization").getAsJsonObject("projectV2");
-			
-			JsonArray nodes = projJson.getAsJsonObject("items").getAsJsonArray("nodes");
-			for (int i = 0; i < nodes.size(); i++) {
-				JsonObject obj = nodes.get(i).getAsJsonObject();
-				JsonObject content = obj.getAsJsonObject("content");
-				if (content == null || content.get("title") == null) {
-					System.out.println("Skip PR " + obj);
-					continue;
-				}
-				String repo = content.get("repository").getAsJsonObject().get("name").getAsString();
-				String number = content.get("number").getAsString();
-				ProjectItem proj = new ProjectItem(repo, number);
-				items.put(proj.id, proj);
-				proj.githubId = obj.get("id").getAsString();
-				proj.title = content.get("title").getAsString();
-				proj.url = getStringOrEmpty(content, "url");
-				if(!Algorithms.isEmpty(getStringOrEmpty(content, "publishedAt"))) {
-					proj.publishedAt = dbDate.format(githubDateTime.parse(getStringOrEmpty(content, "publishedAt")).getTime());
-				}
-				if(!Algorithms.isEmpty(getStringOrEmpty(content, "closedAt"))) {
-					proj.closedAt = dbDate.format(githubDateTime.parse(getStringOrEmpty(content, "closedAt")).getTime());
-				}
-				proj.closed = Boolean.parseBoolean(getStringOrEmpty(content, "closed"));
-				proj.author = getStringOrEmpty(content, "author", "login");
-				proj.milestoneName = getStringOrEmpty(content, "milestone", "title");
-				proj.milestoneId = getStringOrEmpty(content, "milestone", "id");
-				proj.assignees = new ArrayList<>();
-				if (content.getAsJsonObject("assignees") != null) {
-					JsonArray assignees = content.getAsJsonObject("assignees").getAsJsonArray("nodes");
-					for (int j = 0; j < assignees.size(); j++) {
-						String as = getStringOrEmpty(assignees.get(j).getAsJsonObject(), "login");
-						if (!Algorithms.isEmpty(as)) {
-							proj.assignees.add(as);
-						}
-					}
-				}
-				Collections.sort(proj.assignees);
-				if (content.getAsJsonObject("labels") != null) {
-					JsonArray labels = content.getAsJsonObject("labels").getAsJsonArray("nodes");
-					for (int j = 0; j < labels.size(); j++) {
-						String lb = getStringOrEmpty(labels.get(j).getAsJsonObject(), "name");
-						String lbId = getStringOrEmpty(labels.get(j).getAsJsonObject(), "id");
-						if (!Algorithms.isEmpty(lb)) {
-							proj.labels.add(lb);
-							proj.labelIds.add(lbId);
-						}
-					}
-				}
-				if (obj.getAsJsonObject("fieldValues") == null) {
-					continue;
-				}
-				JsonArray fieldValues = obj.getAsJsonObject("fieldValues").getAsJsonArray("nodes");
-				for (int j = 0; j < fieldValues.size(); j++) {
-					JsonObject fldV = fieldValues.get(j).getAsJsonObject();
-					if (fldV.getAsJsonObject("field") == null) {
+				JsonObject projJson = resJson.getAsJsonObject().getAsJsonObject("data").getAsJsonObject("organization")
+						.getAsJsonObject("projectV2");
+
+				JsonArray nodes = projJson.getAsJsonObject("items").getAsJsonArray("nodes");
+				for (int i = 0; i < nodes.size(); i++) {
+					JsonObject obj = nodes.get(i).getAsJsonObject();
+					JsonObject content = obj.getAsJsonObject("content");
+					if (content == null || content.get("title") == null) {
+						System.out.println("Skip PR " + obj);
 						continue;
 					}
-					String fldName = fldV.getAsJsonObject("field").get("name").getAsString();
-					if (fldName.equals("Status")) {
-						proj.statusId = getStringOrEmpty(fldV, "optionId");
-						proj.statusName = getStringOrEmpty(fldV, "name"); 
-					} else if (fldName.equals("Iteration")) {
-						proj.iterationId = getStringOrEmpty(fldV, "iterationId");
-						proj.iterationName = getStringOrEmpty(fldV, "title");
-						if (!Algorithms.isEmpty(getStringOrEmpty(content, "startDate"))) {
-							proj.iterationStartDate = dbDate.format(githubDate.parse(getStringOrEmpty(fldV, "startDate")).getTime());
-						}
-					} else if (fldName.equals("Complexity")) {
-						proj.complexity = fldV.get("number").getAsDouble();
-					} else if (fldName.equals("StoryPoints")) {
-						proj.storyPoints = fldV.get("number").getAsDouble();
-					} else if (fldName.equals("Value")) {
-						proj.value = fldV.get("number").getAsDouble();
+					String repo = content.get("repository").getAsJsonObject().get("name").getAsString();
+					String number = content.get("number").getAsString();
+					ProjectItem proj = new ProjectItem(repo, number);
+					items.put(proj.id, proj);
+					proj.githubId = obj.get("id").getAsString();
+					proj.title = content.get("title").getAsString();
+					proj.url = getStringOrEmpty(content, "url");
+					if (!Algorithms.isEmpty(getStringOrEmpty(content, "publishedAt"))) {
+						proj.publishedAt = dbDate
+								.format(githubDateTime.parse(getStringOrEmpty(content, "publishedAt")).getTime());
 					}
-				}
+					if (!Algorithms.isEmpty(getStringOrEmpty(content, "closedAt"))) {
+						proj.closedAt = dbDate
+								.format(githubDateTime.parse(getStringOrEmpty(content, "closedAt")).getTime());
+					}
+					proj.closed = Boolean.parseBoolean(getStringOrEmpty(content, "closed"));
+					proj.author = getStringOrEmpty(content, "author", "login");
+					proj.milestoneName = getStringOrEmpty(content, "milestone", "title");
+					proj.milestoneId = getStringOrEmpty(content, "milestone", "id");
+					proj.assignees = new ArrayList<>();
+					if (content.getAsJsonObject("assignees") != null) {
+						JsonArray assignees = content.getAsJsonObject("assignees").getAsJsonArray("nodes");
+						for (int j = 0; j < assignees.size(); j++) {
+							String as = getStringOrEmpty(assignees.get(j).getAsJsonObject(), "login");
+							if (!Algorithms.isEmpty(as)) {
+								proj.assignees.add(as);
+							}
+						}
+					}
+					Collections.sort(proj.assignees);
+					if (content.getAsJsonObject("labels") != null) {
+						JsonArray labels = content.getAsJsonObject("labels").getAsJsonArray("nodes");
+						for (int j = 0; j < labels.size(); j++) {
+							String lb = getStringOrEmpty(labels.get(j).getAsJsonObject(), "name");
+							String lbId = getStringOrEmpty(labels.get(j).getAsJsonObject(), "id");
+							if (!Algorithms.isEmpty(lb)) {
+								proj.labels.add(lb);
+								proj.labelIds.add(lbId);
+							}
+						}
+					}
+					if (obj.getAsJsonObject("fieldValues") == null) {
+						continue;
+					}
+					JsonArray fieldValues = obj.getAsJsonObject("fieldValues").getAsJsonArray("nodes");
+					for (int j = 0; j < fieldValues.size(); j++) {
+						JsonObject fldV = fieldValues.get(j).getAsJsonObject();
+						if (fldV.getAsJsonObject("field") == null) {
+							continue;
+						}
+						String fldName = fldV.getAsJsonObject("field").get("name").getAsString();
+						if (fldName.equals("Status")) {
+							proj.statusId = getStringOrEmpty(fldV, "optionId");
+							proj.statusName = getStringOrEmpty(fldV, "name");
+						} else if (fldName.equals("Iteration")) {
+							proj.iterationId = getStringOrEmpty(fldV, "iterationId");
+							proj.iterationName = getStringOrEmpty(fldV, "title");
+							if (!Algorithms.isEmpty(getStringOrEmpty(content, "startDate"))) {
+								proj.iterationStartDate = dbDate
+										.format(githubDate.parse(getStringOrEmpty(fldV, "startDate")).getTime());
+							}
+						} else if (fldName.equals("Complexity")) {
+							proj.complexity = fldV.get("number").getAsDouble();
+						} else if (fldName.equals("StoryPoints")) {
+							proj.storyPoints = fldV.get("number").getAsDouble();
+						} else if (fldName.equals("Value")) {
+							proj.value = fldV.get("number").getAsDouble();
+						}
+					}
 //				System.out.println((ind++) + " " + proj.toString()); // debug
+				}
+				JsonObject info = projJson.getAsJsonObject("items").getAsJsonObject("pageInfo");
+				hasNext = info.get("hasNextPage").getAsBoolean();
+				nextCursor = info.get("endCursor").getAsString();
+
 			}
-			JsonObject info = projJson.getAsJsonObject("items").getAsJsonObject("pageInfo");
-			hasNext = info.get("hasNextPage").getAsBoolean();
-			nextCursor = info.get("endCursor").getAsString();
-			
+		} catch (Exception e) {
+			System.err.println("Error parsing github project info: " + res);
+			throw new RuntimeException(e);
 		}
 		return items;
 	}
