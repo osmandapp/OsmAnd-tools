@@ -54,6 +54,8 @@ public class SubscriptionController {
     public static final String PURCHASE_TYPE_INAPP = "inapp";
     public static final String PLATFORM_GOOGLE = "google";
     public static final String PLATFORM_APPLE = "apple";
+    public static final String PLATFORM_AMAZON = "amazon";
+    public static final String PLATFORM_HUAWEI = "huawei";
 
     private PrivateKey subscriptionPrivateKey;
 
@@ -473,8 +475,12 @@ public class SubscriptionController {
         String skuParam = request.getParameter("sku");
 
         // Platform and Effective IDs
-        boolean ios = Algorithms.isEmpty(orderIdParam);
-        String platform = ios ? PLATFORM_APPLE : PLATFORM_GOOGLE;
+        String platformParam = request.getParameter("platform");
+        if (!Algorithms.isEmpty(platformParam)) {
+            platformParam = platformParam.toLowerCase().trim();
+        }
+        boolean ios = PLATFORM_APPLE.equals(platformParam) || Algorithms.isEmpty(orderIdParam);
+        String platform = ios ? PLATFORM_APPLE : platformParam;
         String effectivePurchaseToken = ios ? payloadParam : purchaseTokenParam;
         String effectiveOrderId = ios ? purchaseTokenParam : orderIdParam;
 

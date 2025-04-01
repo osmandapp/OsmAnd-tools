@@ -1,16 +1,7 @@
 package net.osmand.purchases;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.androidpublisher.AndroidPublisher;
 import com.google.api.services.androidpublisher.model.ProductPurchase;
 import com.google.gson.JsonArray;
@@ -20,13 +11,17 @@ import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
 import org.json.JSONException;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.Serial;
 import java.security.GeneralSecurityException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static net.osmand.purchases.AmazonIAPHelper.*;
+import static net.osmand.purchases.HuaweiIAPHelper.*;
 
 public class UpdateInAppPurchase {
 
@@ -35,6 +30,8 @@ public class UpdateInAppPurchase {
     public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
     public static final String PLATFORM_GOOGLE = "google";
     public static final String PLATFORM_APPLE = "apple";
+    public static final String PLATFORM_AMAZON = "amazon";
+    public static final String PLATFORM_HUAWEI = "huawei";
 
     private static final int BATCH_SIZE = 200;
     private static final long HOUR = 1000L * 60 * 60;
@@ -55,9 +52,11 @@ public class UpdateInAppPurchase {
 
     private final AndroidPublisher publisher; // Google API
     private final ReceiptValidationHelper receiptHelper; // Apple API
+    private final AmazonIAPHelper amazonHelper; // Amazon Helper
+    private final HuaweiIAPHelper huaweiHelper; // Huawei Helper
 
     public enum PurchasePlatform {
-        GOOGLE, APPLE, UNKNOWN
+        GOOGLE, APPLE, AMAZON, HUAWEI, UNKNOWN
     }
 
     private static class UpdateParams {
@@ -66,9 +65,11 @@ public class UpdateInAppPurchase {
     }
 
     // Constructor would take repositories and helpers
-    public UpdateInAppPurchase(AndroidPublisher publisher) {
+    public UpdateInAppPurchase(AndroidPublisher publisher, ReceiptValidationHelper receiptHelper, AmazonIAPHelper amazonHelper, HuaweiIAPHelper huaweiHelper) {
         this.publisher = publisher;
-        this.receiptHelper = new ReceiptValidationHelper();
+        this.receiptHelper = receiptHelper;
+        this.amazonHelper = amazonHelper;
+        this.huaweiHelper = huaweiHelper;
 
         // --- Define SQL Queries for the `supporters_device_iap` table ---
         // Select purchases that are pending validation or haven't been checked recently
@@ -98,6 +99,8 @@ public class UpdateInAppPurchase {
         String androidClientSecretFile = "";
         boolean onlyGoogle = false;
         boolean onlyApple = false;
+        boolean onlyAmazon = false;
+        boolean onlyHuawei = false;
 
         for (String arg : args) {
             if ("-verifyall".equals(arg)) up.verifyAll = true;
@@ -105,24 +108,30 @@ public class UpdateInAppPurchase {
             else if (arg.startsWith("-androidclientsecret=")) androidClientSecretFile = arg.substring("-androidclientsecret=".length());
             else if ("-onlygoogle".equals(arg)) onlyGoogle = true;
             else if ("-onlyapple".equals(arg)) onlyApple = true;
+            else if ("-onlyamazon".equals(arg)) onlyAmazon = true;
+            else if ("-onlyhuawei".equals(arg)) onlyHuawei = true;
         }
 
         AndroidPublisher publisher = null;
-        if (!onlyApple && !Algorithms.isEmpty(androidClientSecretFile)) {
+        // Initialize publisher only if needed
+        if (!onlyApple && !onlyAmazon && !onlyHuawei && !Algorithms.isEmpty(androidClientSecretFile)) {
             publisher = getPublisherApi(androidClientSecretFile);
-        } else if (!onlyApple) {
+        } else if (!onlyApple && !onlyAmazon && !onlyHuawei) {
             System.err.println("Warning: Android client secret not provided. Cannot verify Google IAPs.");
         }
+
+        // Initialize helpers (consider conditional initialization based on flags)
+        ReceiptValidationHelper receiptHelper = new ReceiptValidationHelper();
+        AmazonIAPHelper amazonHelper = new AmazonIAPHelper();
+        HuaweiIAPHelper huaweiHelper = new HuaweiIAPHelper();
 
         Class.forName("org.postgresql.Driver");
         List<PurchaseUpdateException> exceptionsUpdates = new ArrayList<>();
         try (Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
                 System.getenv("DB_USER"), System.getenv("DB_PWD"))) {
 
-            // Note: In a Spring Boot app, you'd inject the DataSource/JdbcTemplate/Repository
-            // For this standalone structure, we use direct JDBC
-            UpdateInAppPurchase updater = new UpdateInAppPurchase(publisher); // Pass repo if using Spring context
-            updater.queryPurchases(conn, up, exceptionsUpdates, onlyGoogle, onlyApple);
+            UpdateInAppPurchase updater = new UpdateInAppPurchase(publisher, receiptHelper, amazonHelper, huaweiHelper);
+            updater.queryPurchases(conn, up, exceptionsUpdates, onlyGoogle, onlyApple, onlyAmazon, onlyHuawei);
         }
 
         if (!exceptionsUpdates.isEmpty()) {
@@ -136,20 +145,21 @@ public class UpdateInAppPurchase {
         }
     }
 
-    void queryPurchases(Connection conn, UpdateParams pms, List<PurchaseUpdateException> exceptionsUpdates, boolean onlyGoogle, boolean onlyApple) throws SQLException {
+    void queryPurchases(Connection conn, UpdateParams pms, List<PurchaseUpdateException> exceptionsUpdates,
+                        boolean onlyGoogle, boolean onlyApple, boolean onlyAmazon, boolean onlyHuawei) throws SQLException {
         ResultSet rs = null;
         Statement stmt = null;
         try {
             stmt = conn.createStatement();
             rs = stmt.executeQuery(selQuery);
             updStat = conn.prepareStatement(updQuery);
-            delStat = conn.prepareStatement(delQuery); // For marking invalid
+            delStat = conn.prepareStatement(delQuery);
             updCheckStat = conn.prepareStatement(updCheckQuery);
 
             while (rs.next()) {
                 String sku = rs.getString("sku");
-                String purchaseToken = rs.getString("purchaseToken");
-                String orderId = rs.getString("orderid");
+                String purchaseToken = rs.getString("purchaseToken"); // Might be purchaseToken, userId, or receipt data depending on platform
+                String orderId = rs.getString("orderid"); // Might be orderId, transaction_id, or receiptId depending on platform
                 String platform = rs.getString("platform");
                 Timestamp purchaseTimeTs = rs.getTimestamp("purchase_time");
                 Timestamp checkTimeTs = rs.getTimestamp("checktime");
@@ -170,10 +180,17 @@ public class UpdateInAppPurchase {
                     purchasePlatform = PurchasePlatform.GOOGLE;
                 } else if (PLATFORM_APPLE.equalsIgnoreCase(platform)) {
                     purchasePlatform = PurchasePlatform.APPLE;
+                } else if (PLATFORM_AMAZON.equalsIgnoreCase(platform)) {
+                    purchasePlatform = PurchasePlatform.AMAZON;
+                } else if (PLATFORM_HUAWEI.equalsIgnoreCase(platform)) {
+                    purchasePlatform = PurchasePlatform.HUAWEI;
                 }
 
                 // Skip based on platform filter
-                if ((onlyGoogle && purchasePlatform != PurchasePlatform.GOOGLE) || (onlyApple && purchasePlatform != PurchasePlatform.APPLE)) {
+                if ((onlyGoogle && purchasePlatform != PurchasePlatform.GOOGLE) ||
+                        (onlyApple && purchasePlatform != PurchasePlatform.APPLE) ||
+                        (onlyAmazon && purchasePlatform != PurchasePlatform.AMAZON) ||
+                        (onlyHuawei && purchasePlatform != PurchasePlatform.HUAWEI)) {
                     continue;
                 }
 
@@ -197,19 +214,34 @@ public class UpdateInAppPurchase {
                     if (purchasePlatform == PurchasePlatform.GOOGLE && publisher != null) {
                         updated = processGoogleInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
                     } else if (purchasePlatform == PurchasePlatform.APPLE) {
+                        // Assuming purchaseToken field stores the receipt data for Apple
                         updated = processAppleInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
+                    } else if (purchasePlatform == PurchasePlatform.AMAZON && amazonHelper != null) { // Add Amazon Call
+                        // Parameters for Amazon might need adjustment based on what's stored
+                        // Assuming orderId = receiptId, purchaseToken = userId for Amazon helper
+                        updated = processAmazonInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
+                    } else if (purchasePlatform == PurchasePlatform.HUAWEI && huaweiHelper != null) { // Add Huawei Call
+                        // Parameters for Huawei might need adjustment
+                        // Assuming purchaseToken = purchaseToken, sku = productId
+                        updated = processHuaweiInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
                     } else {
-                        // Mark as invalid or log error if platform is unknown or handler unavailable
+                        // Handle unknown or unconfigured platforms
                         if (purchasePlatform == PurchasePlatform.UNKNOWN) {
-                            invalidReason = "Unknown platform";
+                            invalidReason = "Unknown platform: " + platform;
                             markInvalid = true;
                         } else if (purchasePlatform == PurchasePlatform.GOOGLE && publisher == null) {
-                            System.err.println("Skipping Google IAP check - publisher API not configured.");
-                            // Just update check time to avoid constant retries
+                            System.err.printf("Skipping Google IAP check - publisher API not configured (Sku: %s, OrderId: %s)%n", sku, hiddenOrderId);
                             updateCheckTimeOnly(orderId, sku, currentTime);
-                            updated = true; // Mark as processed for batching
+                            updated = true;
+                        } else if (purchasePlatform == PurchasePlatform.AMAZON && amazonHelper == null) {
+                            System.err.printf("Skipping Amazon IAP check - helper not configured (Sku: %s, OrderId: %s)%n", sku, hiddenOrderId);
+                            updateCheckTimeOnly(orderId, sku, currentTime);
+                            updated = true;
+                        } else if (purchasePlatform == PurchasePlatform.HUAWEI && huaweiHelper == null) {
+                            System.err.printf("Skipping Huawei IAP check - helper not configured (Sku: %s, OrderId: %s)%n", sku, hiddenOrderId);
+                            updateCheckTimeOnly(orderId, sku, currentTime);
+                            updated = true;
                         }
-                        // else: platform known but no handler (e.g. Huawei/Amazon) - skip or mark invalid? Skip for now.
                     }
 
                     if (!updated && markInvalid) {
@@ -274,11 +306,9 @@ public class UpdateInAppPurchase {
         try {
             String packageName = sku.contains("_plus") ? GOOGLE_PACKAGE_NAME : GOOGLE_PACKAGE_NAME_FREE;
             purchase = publisher.purchases().products().get(packageName, sku, purchaseToken).execute();
-
             if (pms.verbose) {
                 System.out.println("Google API Result: " + purchase.toPrettyString());
             }
-
         } catch (IOException e) {
             int errorCode = 0;
             if (e instanceof GoogleJsonResponseException) {
@@ -410,7 +440,6 @@ public class UpdateInAppPurchase {
             if (foundAndValid) break; // Stop searching if found
         }
 
-
         // --- Update DB based on validation result ---
         int ind = 1;
         updStat.setTimestamp(ind++, new Timestamp(currentTime)); // checktime
@@ -436,6 +465,144 @@ public class UpdateInAppPurchase {
             changes = 0;
         }
         return true; // Update processed
+    }
+
+    private boolean processAmazonInAppPurchase(String amazonUserId, String sku, String amazonReceiptId, Timestamp lastCheckTime, long currentTime, UpdateParams pms) throws SQLException, PurchaseUpdateException {
+        // Note: Mapped DB purchaseToken -> amazonUserId, DB orderId -> amazonReceiptId
+        if (Algorithms.isEmpty(amazonReceiptId) || Algorithms.isEmpty(amazonUserId)) {
+            markAsInvalid(amazonReceiptId != null ? amazonReceiptId : "null_receipt", sku, currentTime, "Missing amazonReceiptId or amazonUserId for validation");
+            return true;
+        }
+
+        AmazonInAppPurchaseData purchase = null;
+        boolean shouldMarkInvalid = false;
+        String invalidReason = null;
+
+        try {
+            // Call the specific IAP validation method in the helper
+            purchase = amazonHelper.getAmazonInAppPurchase(amazonReceiptId, amazonUserId);
+            if (pms.verbose && purchase != null) {
+                System.out.println("Amazon API Result: " + purchase.toString());
+            }
+        } catch (IOException e) {
+            int errorCode = 0;
+            if (e instanceof AmazonIOException) {
+                errorCode = ((AmazonIOException) e).responseCode;
+            }
+            if (errorCode == RESPONSE_CODE_TRANSACTION_ERROR || errorCode == RESPONSE_CODE_USER_ID_ERROR) {
+                shouldMarkInvalid = true;
+                invalidReason = "Purchase invalid/not found via Amazon API (" + errorCode + "): " + e.getMessage();
+            } else { // Other IO or internal errors
+                System.err.printf("WARN: IOException verifying Amazon IAP %s (Receipt: %s): %s%n", sku, amazonReceiptId, e.getMessage());
+                return false; // Let check time update only
+            }
+        }
+
+        if (shouldMarkInvalid) {
+            // Use the original DB orderId (which we assumed is amazonReceiptId here) for marking invalid
+            markAsInvalid(amazonReceiptId, sku, currentTime, invalidReason);
+            return true;
+        }
+
+        if (purchase != null) {
+            // --- Update DB based on Amazon API response ---
+            int ind = 1;
+            updStat.setTimestamp(ind++, new Timestamp(currentTime)); // checktime
+
+            long purchaseTimeMillis = purchase.purchaseDate != null ? purchase.purchaseDate : 0;
+            updStat.setTimestamp(ind++, new Timestamp(purchaseTimeMillis)); // purchase_time
+
+            // Determine validity based on the purchase data (e.g., using purchase.isValid())
+            boolean isValid = purchase.isValid(); // Use the validity logic from AmazonInAppPurchaseData
+            updStat.setBoolean(ind++, isValid); // valid
+
+            // Where clause parameters (use original DB orderId and sku)
+            // We assumed DB orderId = amazonReceiptId for this method call.
+            updStat.setString(ind++, amazonReceiptId); // DB orderId
+            updStat.setString(ind, sku);           // DB sku
+
+            updStat.addBatch();
+            changes++;
+            if (changes >= BATCH_SIZE) {
+                updStat.executeBatch(); changes = 0;
+            }
+            System.out.println("Updated Amazon IAP: " + sku + " (Receipt: " + amazonReceiptId + ") - Valid: " + isValid);
+            return true;
+        }
+
+        System.err.println("WARN: Reached unexpected state for Amazon IAP " + sku + " (Receipt: " + amazonReceiptId + ")");
+        return false;
+    }
+
+    private boolean processHuaweiInAppPurchase(String purchaseToken, String sku, String orderId, Timestamp lastCheckTime, long currentTime, UpdateParams pms) throws SQLException, PurchaseUpdateException {
+        // Note: Assuming DB purchaseToken = Huawei purchaseToken, DB sku = productId
+        if (Algorithms.isEmpty(purchaseToken) || Algorithms.isEmpty(sku)) {
+            markAsInvalid(orderId != null ? orderId : "null_order", sku, currentTime, "Missing purchaseToken or productId (sku) for Huawei validation");
+            return true;
+        }
+
+        HuaweiInAppPurchaseData purchase = null;
+        boolean shouldMarkInvalid = false;
+        String invalidReason = null;
+
+        try {
+            // Call the specific IAP validation method in the helper
+            purchase = huaweiHelper.getHuaweiInAppPurchase(purchaseToken, sku);
+            if (pms.verbose && purchase != null) {
+                System.out.println("Huawei API Result: " + purchase.toString());
+            }
+        } catch (IOException e) {
+            int errorCode = 0;
+            if (e instanceof HuaweiJsonResponseException) {
+                errorCode = ((HuaweiJsonResponseException) e).responseCode;
+            }
+            // Check error codes relevant to non-existence or invalidity
+            if (errorCode == RESPONSE_CODE_ORDER_NOT_EXIST_ERROR || errorCode == RESPONSE_CODE_USER_CONSUME_ERROR) {
+                shouldMarkInvalid = true;
+                invalidReason = "Purchase invalid/not found via Huawei API (" + errorCode + "): " + e.getMessage();
+            } else { // Other IO or internal errors
+                System.err.printf("WARN: IOException verifying Huawei IAP %s (Token: %s): %s%n", sku, purchaseToken, e.getMessage());
+                return false; // Let check time update only
+            }
+        }
+
+        if (shouldMarkInvalid) {
+            // Use the original DB orderId (which might be null/different for Huawei) and sku for marking invalid
+            markAsInvalid(orderId, sku, currentTime, invalidReason);
+            return true;
+        }
+
+        if (purchase != null) {
+            // --- Update DB based on Huawei API response ---
+            int ind = 1;
+            updStat.setTimestamp(ind++, new Timestamp(currentTime)); // checktime
+
+            long purchaseTimeMillis = purchase.purchaseTime != null ? purchase.purchaseTime : 0;
+            updStat.setTimestamp(ind++, new Timestamp(purchaseTimeMillis)); // purchase_time
+
+            // Determine validity based on purchase data (e.g., using purchase.isValid())
+            boolean isValid = purchase.isValid(); // Use the validity logic from HuaweiInAppPurchaseData
+            updStat.setBoolean(ind++, isValid); // valid
+
+            // Where clause parameters (use original DB orderId and sku)
+            // Need to ensure the combination of orderId and sku uniquely identifies the record in *our* DB.
+            // If Huawei IAPs don't provide a unique orderId that we store in the 'orderid' column,
+            // the primary key or update logic might need adjustment.
+            // For now, assume the DB record is uniquely identified by the passed 'orderId' and 'sku'.
+            updStat.setString(ind++, orderId); // DB orderId
+            updStat.setString(ind, sku);       // DB sku
+
+            updStat.addBatch();
+            changes++;
+            if (changes >= BATCH_SIZE) {
+                updStat.executeBatch(); changes = 0;
+            }
+            System.out.println("Updated Huawei IAP: " + sku + " (DB OrderId: " + orderId + ", Token: " + purchaseToken + ") - Valid: " + isValid);
+            return true;
+        }
+
+        System.err.println("WARN: Reached unexpected state for Huawei IAP " + sku + " (Token: " + purchaseToken + ")");
+        return false;
     }
 
     private void markAsInvalid(String orderId, String sku, long tm, String reason) throws SQLException {
