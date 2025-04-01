@@ -196,7 +196,7 @@ process_tiff ()
                     fi
                     new_lon="${new_lon#-}"  # Remove the negative sign
                 fi
-        
+                
                 formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
                 formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
 
@@ -216,15 +216,19 @@ process_tiff ()
                     fi
                 fi
             done
-        done
-            
+        done       
+           
         echo "Merging:"
         echo "${neighbors[@]}"
 
-        merged_file="$TMP_DIR/merged_${filename}.tif"
-        shifted_file="$TMP_DIR/shifted_${filename}.tif"
+        resolution_line=$(gdalinfo "$indir/$filename.tif" | grep "Pixel Size")
+	
+        xres=$(echo "$resolution_line" | sed -n 's/.*(\([0-9.]*\),.*/\1/p')
+        yres=$(echo "$resolution_line" | sed -n 's/.*,\(-*[0-9.]*\)).*/\1/p')
+        yres=${yres#-}
 
-        gdalwarp -overwrite -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
+        merged_file="$TMP_DIR/merged_${filename}.tif"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr "$xres" "$yres" -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
 
         #Clipping
         num_lat=$lat
@@ -242,59 +246,41 @@ process_tiff ()
             num_lon="-$num_lon"
         fi
         
+        read ulx uly < <(gdalinfo "${indir}/$filenamefull" | awk '/Upper Left/ {gsub(/[(),]/,""); print $3, $4}')
+
         expansion=0.03
         tile_size=1  # 1x1 degree
         delta=$(echo "$tile_size * $expansion * 0.5" | bc -l)
 
         if [ $left_exists -eq 1 ]; then
-            new_xmin=$(echo "$num_lon - $delta" | bc -l)
+            new_xmin=$(echo "$ulx - $delta" | bc -l)
         else
-            new_xmin="$num_lon"
+            new_xmin="$ulx"
         fi
 
         if [ $right_exists -eq 1 ]; then
-            new_xmax=$(echo "$num_lon + $tile_size + $delta" | bc -l)
+            new_xmax=$(echo "$ulx + $tile_size + $delta" | bc -l)
         else
-            new_xmax=$(echo "$num_lon + $tile_size" | bc -l)
-        fi
-
-        if [ $bottom_exists -eq 1 ]; then
-            new_ymin=$(echo "$num_lat - $delta" | bc -l)
-        else
-            new_ymin="$num_lat"
+            new_xmax=$(echo "$ulx + $tile_size" | bc -l)
         fi
 
         if [ $top_exists -eq 1 ]; then
-            new_ymax=$(echo "$num_lat + $tile_size + $delta" | bc -l)
+            new_ymax=$(echo "$uly + $delta" | bc -l)
         else
-            new_ymax=$(echo "$num_lat + $tile_size" | bc -l)
+            new_ymax="$uly"
         fi
-        
+
+        if [ $bottom_exists -eq 1 ]; then
+            new_ymin=$(echo "$uly - $tile_size - $delta" | bc -l)
+        else
+            new_ymin=$(echo "$uly - $tile_size" | bc -l)
+        fi
+      
         clippedFile="$TMP_DIR/${filename}.tif"
-        gdalwarp -overwrite -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr "$xres" "$yres" -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
         
         rm -f "$merged_file"
 
-        if (( $num_lon % 2 == 0 )); then
-            ul=$(gdalinfo "$clippedFile" | awk '/Upper Left/ {gsub(/[(),]/," "); print $3, $4}')
-            lr=$(gdalinfo "$clippedFile" | awk '/Lower Right/ {gsub(/[(),]/," "); print $3, $4}')
-            pixel_size_x=$(gdalinfo "$clippedFile" | awk -F '[=(), ]+' '/Pixel Size/ {print $3}')
-            
-            ulx=$(echo "$ul" | awk '{print $1}')
-            uly=$(echo "$ul" | awk '{print $2}')
-            lrx=$(echo "$lr" | awk '{print $1}')
-            lry=$(echo "$lr" | awk '{print $2}')
-
-            # Calculate new coordinates
-            new_ulx=$(awk -v ulx="$ulx" -v pixel_size_x="$pixel_size_x" 'BEGIN {OFMT="%.12f"; print ulx - pixel_size_x}')
-            new_lrx=$(awk -v lrx="$lrx" -v pixel_size_x="$pixel_size_x" 'BEGIN {OFMT="%.12f"; print lrx - pixel_size_x}')
-
-            # Shift the file by 1 pixel
-            gdal_translate -of GTiff -a_ullr $new_ulx $uly $new_lrx $lry -co "COMPRESS=LZW" "$clippedFile" "$shifted_file"
-
-            mv "$shifted_file" "$clippedFile"
-        fi
-        
         echo "Using $clippedFile as source file for contours"
         filepath=$clippedFile
 		src_tiff=$filepath
