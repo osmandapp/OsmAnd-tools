@@ -158,45 +158,46 @@ process_tiff ()
   
         neighbors=()
         neighbors+=("${indir}/$filenamefull")
+
+        orig_lat_prefix="$lat_prefix"
+        orig_lon_prefix="$lon_prefix"
+
         for dlat in -1 0 1; do
             for dlon in -1 0 1; do
                 if [ "$dlat" -eq 0 ] && [ "$dlon" -eq 0 ]; then
                     continue
                 fi
-            
+
                 new_lat=$(echo "$lat + $dlat" | bc)
                 new_lon=$(echo "$lon + $dlon" | bc)
 
+                lat_prefix="$orig_lat_prefix"
+                lon_prefix="$orig_lon_prefix"
+
                 if (( $(echo "$new_lat >= 0" | bc -l) )); then
-                    if [[ "$lat_prefix" == "N" ]]; then
-                        lat_prefix="N"
-                    else
-                        lat_prefix="S"
-                    fi
+                    lat_prefix="N"
                 else
-                    if [[ "$lat_prefix" == "N" ]]; then
-                        lat_prefix="S"
-                    else
-                        lat_prefix="N"
+                    lat_prefix="S"
+                    new_lat="${new_lat#-}"  # Remove negative sign
+
+                    # Special case: N00 to S01
+                    if [[ "$orig_lat_prefix" == "N" && "$lat" -eq 0 && "$dlat" -eq -1 ]]; then
+                        new_lat="01"
                     fi
-                    new_lat="${new_lat#-}"  # Remove the negative sign
                 fi
-                
+
                 if (( $(echo "$new_lon >= 0" | bc -l) )); then
-                    if [[ "$lon_prefix" == "E" ]]; then
-                        lon_prefix="E"
-                    else
-                        lon_prefix="W"
-                    fi
+                    lon_prefix="E"
                 else
-                    if [[ "$lon_prefix" == "E" ]]; then
-                        lon_prefix="W"
-                    else
-                        lon_prefix="E"
+                    lon_prefix="W"
+                    new_lon="${new_lon#-}"  # Remove negative sign
+
+                    # Special case: W00 should become W01
+                    if [[ "$orig_lon_prefix" == "W" && "$lon" -eq 0 && "$dlon" -eq -1 ]]; then
+                        new_lon="01"
                     fi
-                    new_lon="${new_lon#-}"  # Remove the negative sign
                 fi
-                
+
                 formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
                 formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
 
@@ -216,19 +217,15 @@ process_tiff ()
                     fi
                 fi
             done
-        done       
-           
-        echo "Merging:"
+        done 
+
         echo "${neighbors[@]}"
 
-        resolution_line=$(gdalinfo "$indir/$filename.tif" | grep "Pixel Size")
-	
-        xres=$(echo "$resolution_line" | sed -n 's/.*(\([0-9.]*\),.*/\1/p')
-        yres=$(echo "$resolution_line" | sed -n 's/.*,\(-*[0-9.]*\)).*/\1/p')
-        yres=${yres#-}
+        xres=0.0002776235424764020234
+        yres=0.0002776235424764020234
 
         merged_file="$TMP_DIR/merged_${filename}.tif"
-        gdalwarp -overwrite -t_srs EPSG:4326 -tr "$xres" "$yres" -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
 
         #Clipping
         num_lat=$lat
@@ -277,7 +274,7 @@ process_tiff ()
         fi
       
         clippedFile="$TMP_DIR/${filename}.tif"
-        gdalwarp -overwrite -t_srs EPSG:4326 -tr "$xres" "$yres" -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
         
         rm -f "$merged_file"
 
