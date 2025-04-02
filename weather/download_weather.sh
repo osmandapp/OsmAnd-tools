@@ -483,6 +483,10 @@ get_raw_ecmwf_files() {
                 # https://data.ecmwf.int/forecasts/20220909/00z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
                 download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
+                if [ ! -f "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" ]; then
+                    echo "File $SAVING_FILENAME.grib2 not found, skipping"
+                    continue
+                fi
                 GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
                 if (( $GRIB_SIZE < 5000 )); then
                     echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
