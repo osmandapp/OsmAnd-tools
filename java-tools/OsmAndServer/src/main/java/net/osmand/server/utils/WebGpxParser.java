@@ -393,12 +393,12 @@ public class WebGpxParser {
         }
         gpxData.tracks.forEach(track -> track.points = trackPointsMap.get(gpxData.tracks.indexOf(track)));
     }
-    
+
     public List<Point> getPointsFromSegmentIndex(TrackData gpxData, int index) {
         List<List<Point>> segments = new ArrayList<>();
         gpxData.tracks.forEach(track -> segments.addAll(track.segments));
-        
-        return segments.isEmpty() ? Collections.emptyList() : segments.get(index);
+
+        return (segments.isEmpty() || index > segments.size() - 1) ? Collections.emptyList() : segments.get(index);
     }
     
     public int getTrackBySegmentIndex(TrackData gpxData, int index) {
