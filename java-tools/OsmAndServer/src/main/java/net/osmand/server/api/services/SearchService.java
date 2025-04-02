@@ -638,7 +638,7 @@ public class SearchService {
                 feature = new Feature(geometry)
                         .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
                         .prop(PoiTypeField.NAME.getFieldName(), result.localeName);
-                if (result.objectType == ObjectType.HOUSE) {
+                if (result.objectType == ObjectType.STREET || result.objectType == ObjectType.HOUSE) {
                     if (result.localeRelatedObjectName != null) {
                         feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
                     }
