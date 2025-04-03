@@ -47,6 +47,7 @@ import com.google.gson.Gson;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
@@ -92,6 +93,9 @@ public class AdminController {
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
+
+	@Autowired
+	private DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 	
 	@Autowired
 	private PremiumUsersRepository usersRepository;
@@ -202,6 +206,13 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
 		return "redirect:info#audience";
 	}
+
+	@PostMapping(path = {"/search-inapps"})
+	public String searchInapps(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
+		List<SupporterDeviceInAppPurchase> purchases = getInappsDetailsByIdentifier(identifier);
+		redirectAttrs.addFlashAttribute("inapps", purchases);
+		return "redirect:info#audience";
+	}
 	
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
@@ -266,6 +277,21 @@ public class AdminController {
 		}
 		
 		return deviceSub;
+	}
+
+	private List<SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
+		String orderId = identifier;
+
+		if (emailSender.isEmail(identifier)) {
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
+			orderId = pu != null ? pu.orderid : null;
+		}
+
+		return orderId != null
+				? Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(orderId))
+				.filter(list -> !list.isEmpty())
+				.orElse(Collections.emptyList())
+				: Collections.emptyList();
 	}
 	
 	@PostMapping("/get-email-by-orderId")
