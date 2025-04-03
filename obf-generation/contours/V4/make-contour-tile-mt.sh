@@ -174,28 +174,24 @@ process_tiff ()
                 lat_prefix="$orig_lat_prefix"
                 lon_prefix="$orig_lon_prefix"
 
-                if (( $(echo "$new_lat >= 0" | bc -l) )); then
-                    lat_prefix="N"
-                else
+                if [[ "$orig_lat_prefix" == "N" && "$new_lat" -eq -1 ]]; then
                     lat_prefix="S"
-                    new_lat="${new_lat#-}"  # Remove negative sign
-
-                    # Special case: N00 to S01
-                    if [[ "$orig_lat_prefix" == "N" && "$lat" -eq 0 && "$dlat" -eq -1 ]]; then
-                        new_lat="01"
-                    fi
+                    new_lat="1"
+                elif [[ "$orig_lat_prefix" == "S" && "$new_lat" -eq 0 ]]; then
+                    lat_prefix="N"
+                    new_lat="0"
+                else
+                    lat_prefix="$orig_lat_prefix"
                 fi
 
-                if (( $(echo "$new_lon >= 0" | bc -l) )); then
-                    lon_prefix="E"
-                else
+                if [[ "$orig_lon_prefix" == "E" && "$new_lon" -eq -1 ]]; then
                     lon_prefix="W"
-                    new_lon="${new_lon#-}"  # Remove negative sign
-
-                    # Special case: W00 should become W01
-                    if [[ "$orig_lon_prefix" == "W" && "$lon" -eq 0 && "$dlon" -eq -1 ]]; then
-                        new_lon="01"
-                    fi
+                    new_lon="1"
+                elif [[ "$orig_lon_prefix" == "W" && "$new_lon" -eq 0 ]]; then
+                    lon_prefix="E"
+                    new_lon="0"
+                else
+                    lon_prefix="$orig_lon_prefix"
                 fi
 
                 formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
