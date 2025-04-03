@@ -263,7 +263,7 @@ public class UserdataController {
             }
             if (supporter != null) {
                 // Supporter verified, find their IAPs
-                List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findByUserId(supporter.userId.intValue());
+                List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findBySupporterId(supporter.userId);
                 int linkedCount = 0;
                 for (SupporterDeviceInAppPurchase iap : iapsToLink) {
                     // Update the userId to the PremiumUser ID
@@ -277,7 +277,7 @@ public class UserdataController {
                     LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
                 }
                 // Optionally link subscription orderId if needed
-                List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId.intValue());
+                List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId);
                 linkedCount = 0;
                 for (SupporterDeviceSubscription sub : subsToLink) {
                     // Update the userId to the PremiumUser ID
