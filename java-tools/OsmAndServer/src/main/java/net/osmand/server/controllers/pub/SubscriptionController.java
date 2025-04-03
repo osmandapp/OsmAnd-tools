@@ -1,6 +1,31 @@
 package net.osmand.server.controllers.pub;
 
-import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
+import com.google.gson.*;
+import jakarta.servlet.http.HttpServletRequest;
+import net.osmand.purchases.ReceiptValidationHelper;
+import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.server.api.repo.*;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
+import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.LotteryPlayService;
+import net.osmand.server.api.services.ReceiptValidationService;
+import net.osmand.server.utils.BTCAddrValidator;
+import net.osmand.util.Algorithms;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.*;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import java.net.URLEncoder;
 import java.security.KeyFactory;
@@ -10,54 +35,14 @@ import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import jakarta.servlet.http.HttpServletRequest;
-
-import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
-import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
-import net.osmand.server.api.repo.SupportersRepository;
-import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.LotteryPlayService;
-import net.osmand.server.api.services.ReceiptValidationService;
-import net.osmand.server.utils.BTCAddrValidator;
-import net.osmand.util.Algorithms;
+import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
+import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchasePrimaryKey;
+import static net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
 
 @RestController
 @RequestMapping("/subscription")
@@ -65,26 +50,40 @@ public class SubscriptionController {
     private static final Log LOG = LogFactory.getLog(SubscriptionController.class);
 
     private static final int TIMEOUT = 20000;
+    public static final String PURCHASE_TYPE_SUBSCRIPTION = "subscription";
+    public static final String PURCHASE_TYPE_INAPP = "inapp";
+    public static final String PLATFORM_GOOGLE = "google";
+    public static final String PLATFORM_APPLE = "apple";
+    public static final String PLATFORM_AMAZON = "amazon";
+    public static final String PLATFORM_HUAWEI = "huawei";
 
     private PrivateKey subscriptionPrivateKey;
 
     @Autowired
+    private PremiumUserDevicesRepository premiumUserDevicesRepository;
+
+    @Autowired
     private SupportersRepository supportersRepository;
-    
+
     @Autowired
     private LotteryPlayService lotteryPlayService;
-    
-    
+
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;
-    
+
+    @Autowired
+    private DeviceInAppPurchasesRepository iapsRepository;
+
+    @Autowired
+    private PremiumUsersRepository premiumUsersRepository; // Keep for potentially updating PremiumUser.orderId
+
     @Autowired
     private ReceiptValidationService validationService;
-    
+
     private Gson gson = new Gson();
 
     private final RestTemplate restTemplate;
-    
+
 	@Value("${logging.purchase.debug}")
 	private boolean purchaseDebugInfo;
 
@@ -140,17 +139,17 @@ public class SubscriptionController {
     private ResponseEntity<String> ok(String body, Object... args) {
 		return ResponseEntity.ok().body(String.format(body, args));
 	}
-    
+
     private ResponseEntity<String> error(String txt) {
     	// clients don't accept error requests (neither mobile, neither http)
     	return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
 	}
-    
+
     @PostMapping(path = {"/register_email", "/register_email.php"},
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> registerEmail(HttpServletRequest request) {
-    	
+
 		return ok(gson.toJson(lotteryPlayService.subscribeToGiveaways(request, request.getParameter("aid"),
 				request.getParameter("email"), request.getParameter("os"))));
     }
@@ -158,7 +157,7 @@ public class SubscriptionController {
 	private String userInfoAsJson(Supporter s) {
 		String response = String.format(
 				"{\"userid\": \"%d\", \"token\": \"%s\", \"visibleName\": \"%s\", \"email\": \"%s\", "
-						+ "\"preferredCountry\": \"%s\"}", 
+						+ "\"preferredCountry\": \"%s\"}",
 				s.userId, s.token, s.visibleName, s.userEmail, s.preferredRegion);
 		return response;
 	}
@@ -238,7 +237,7 @@ public class SubscriptionController {
     public ResponseEntity<String> registerOsm(HttpServletRequest request) {
         String bitcoinAddress = request.getParameter("bitcoin_addr");
         // empty means deleted (keep it)
-        if (bitcoinAddress != null && bitcoinAddress.length() > 0 && 
+        if (bitcoinAddress != null && bitcoinAddress.length() > 0 &&
         		!BTCAddrValidator.validate(bitcoinAddress) ) {
         	return error("Please validate bitcoin address.");
         }
@@ -275,7 +274,7 @@ public class SubscriptionController {
     private boolean isEmpty(String s) {
 		return s == null || s.length() == 0;
 	}
-    
+
 	@PostMapping(path = { "/ios-receipt-validate" })
 	public ResponseEntity<String> validateReceiptIos(HttpServletRequest request) throws Exception {
 		String receipt = request.getParameter("receipt");
@@ -425,12 +424,13 @@ public class SubscriptionController {
 		return null;
 	}
 
-	
+
 	@PostMapping(path = {"/restore-purchased"})
 	public ResponseEntity<String> restorePurchased(HttpServletRequest request) {
-		return purchased(request);
+        // Assume restore only applies to subscriptions for now, but could be extended
+        return purchased(request, PURCHASE_TYPE_SUBSCRIPTION);
 	}
-	
+
 	// Android sends
 	//	parameters.put("userid", userId);
 	//	parameters.put("sku", info.getSku());
@@ -451,74 +451,173 @@ public class SubscriptionController {
     // [params setObject:transactionId forKey:@"purchaseToken"];
     // [params setObject:receiptStr forKey:@"payload"];
     // [params setObject:email forKey:@"email"];
-	@PostMapping(path = {"/purchased", "/purchased.php"})
-	public ResponseEntity<String> purchased(HttpServletRequest request) {
-		SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
-		// it was mixed in early ios versions, so orderid was passed as purchaseToken and payload as purchaseToken;
-		// "ios".equals(request.getParameter("purchaseToken")) ||
-		boolean ios = Algorithms.isEmpty(request.getParameter("orderId"));
-		subscr.purchaseToken = ios ? request.getParameter("payload") : request.getParameter("purchaseToken");
-		subscr.orderId = ios ? request.getParameter("purchaseToken") : request.getParameter("orderId");
-		subscr.sku = request.getParameter("sku");
-		subscr.timestamp = new Date();
-		StringBuilder req = new StringBuilder("Purchased info: ");
-		for (Entry<String, String[]> s : request.getParameterMap().entrySet()) {
-			req.append(s.getKey()).append("=").append(Arrays.toString(s.getValue())).append(" ");
-		}
-		LOG.info(req);
-		if (isEmpty(subscr.orderId)) {
-			return error("Please validate the purchase (orderid is empty).");
-		}
-		if (isEmpty(subscr.purchaseToken)) {
-			return error("Please validate the purchase (purchase token is empty).");
-		}
-		String userId = request.getParameter("userid");
-		if (!isEmpty(userId)) {
-			connectUserWithOrderId(userId, subscr.orderId, request);
-		}
-		
-		Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
-						new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
-		if (subscrOpt.isPresent() && !Algorithms.isEmpty(subscr.purchaseToken)) {
-			SupporterDeviceSubscription dbSubscription = subscrOpt.get();
-			if (!Algorithms.isEmpty(dbSubscription.purchaseToken) && !Algorithms.objectEquals(subscr.purchaseToken, dbSubscription.purchaseToken)) {
-				if (dbSubscription.valid != null && dbSubscription.valid.booleanValue()) {
-					dbSubscription.prevvalidpurchasetoken = dbSubscription.purchaseToken;
-				}
-				dbSubscription.valid = null;
-				dbSubscription.kind = null;
-				dbSubscription.purchaseToken = subscr.purchaseToken;
-				subscriptionsRepository.save(dbSubscription);
-			}
-			return ResponseEntity.ok("{ \"res\" : \"OK\" }");
-		}
-		subscriptionsRepository.save(subscr);
-		return ResponseEntity.ok("{ \"res\" : \"OK\" }");
+    @PostMapping(path = {"/purchased", "/purchased.php"})
+    public ResponseEntity<String> purchased(HttpServletRequest request,
+                                            @RequestParam(name = "purchaseType", required = false, defaultValue = PURCHASE_TYPE_SUBSCRIPTION) String purchaseType
+    ) {
 
-	}
-	
-	private boolean connectUserWithOrderId(String userId, String orderId, HttpServletRequest request) {
-		String token = request.getParameter("token");
-		if (isEmpty(token)) {
-			LOG.warn("USER: Token was not provided: " + toString(request.getParameterMap()));
-			return false;
-		}
-		Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
-		if (!sup.isPresent()) {
-			LOG.warn("USER: Couldn't find your user id: " + toString(request.getParameterMap()));
-			return false;
-		}
-		Supporter supporter = sup.get();
-		if (token != null && !token.equals(supporter.token)) {
-			LOG.warn("USER: Token failed validation: " + toString(request.getParameterMap()));
-			return false;
-		}
-		if (!Algorithms.objectEquals(supporter.orderId, orderId)) {
-			supporter.orderId = orderId;
-			supportersRepository.saveAndFlush(supporter);
-		}
-		return true;
-	}
+        StringBuilder req = new StringBuilder("Purchase info: ");
+        for (Entry<String, String[]> s : request.getParameterMap().entrySet()) {
+            req.append(s.getKey()).append("=").append(Arrays.toString(s.getValue())).append(" ");
+        }
+        LOG.info(req);
+
+        // --- Identify Credentials Provided ---
+        String premiumUserDeivceIdParam = request.getParameter("deviceid"); // PremiumUserDevice ID
+        String premiumUserDeivceAccessTokenParam = request.getParameter("accessToken");   // PremiumUserDevice Access Token
+        String supporterUserIdParam = request.getParameter("userid"); // Supporter ID
+        String supporterTokenParam = request.getParameter("token"); // Supporter Token
+
+        // Purchase details
+        String orderIdParam = request.getParameter("orderId");
+        String purchaseTokenParam = request.getParameter("purchaseToken");
+        String payloadParam = request.getParameter("payload");
+        String skuParam = request.getParameter("sku");
+
+        // Platform and Effective IDs
+        String platformParam = request.getParameter("platform");
+        if (!Algorithms.isEmpty(platformParam)) {
+            platformParam = platformParam.toLowerCase().trim();
+        }
+        boolean ios = PLATFORM_APPLE.equals(platformParam) || Algorithms.isEmpty(orderIdParam);
+        String platform = ios ? PLATFORM_APPLE : platformParam;
+        String effectivePurchaseToken = ios ? payloadParam : purchaseTokenParam;
+        String effectiveOrderId = ios ? purchaseTokenParam : orderIdParam;
+
+        // Validation of purchase details
+        if (isEmpty(effectiveOrderId) || isEmpty(effectivePurchaseToken) || isEmpty(skuParam)) {
+            return error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
+        }
+
+        Integer premiumUserId = resolvePremiumUserId(request, premiumUserDeivceIdParam, premiumUserDeivceAccessTokenParam);
+        Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
+                PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
+
+        // --- Process Purchase ---
+        if (PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType)) {
+            SupporterDeviceSubscription subscr = new SupporterDeviceSubscription();
+            subscr.purchaseToken = effectivePurchaseToken;
+            subscr.orderId = effectiveOrderId;
+            subscr.sku = skuParam;
+            subscr.userId = premiumUserId;
+            subscr.supporterId = supporterUserId;
+            subscr.timestamp = new Date(); // Record creation/update time
+
+            Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
+                    new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
+            if (subscrOpt.isPresent()) { // Update existing subscription record
+                SupporterDeviceSubscription dbSubscription = subscrOpt.get();
+                // Only update if purchaseToken changes (e.g., iOS receipt update)
+                // Or if it was previously null (though our validation above tries to prevent this)
+                if (!Algorithms.isEmpty(subscr.purchaseToken) && !Algorithms.objectEquals(subscr.purchaseToken, dbSubscription.purchaseToken)) {
+                    if (dbSubscription.valid != null && dbSubscription.valid) {
+                        dbSubscription.prevvalidpurchasetoken = dbSubscription.purchaseToken;
+                    }
+                    // Reset validation status when token changes, let verification task re-check
+                    dbSubscription.valid = null;
+                    dbSubscription.kind = null;
+                    dbSubscription.purchaseToken = subscr.purchaseToken;
+                    if (subscr.userId != null) {
+                        dbSubscription.userId = subscr.userId;
+                    }
+                    if (subscr.supporterId != null) {
+                        dbSubscription.supporterId = subscr.supporterId;
+                    }
+                    dbSubscription.timestamp = subscr.timestamp; // Update timestamp
+                    subscriptionsRepository.save(dbSubscription);
+                    LOG.info("Updated existing subscription: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+                } else {
+                    LOG.info("Subscription already exists, no changes needed: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+                }
+            } else { // Insert new subscription record
+                subscriptionsRepository.save(subscr);
+                LOG.info("Saved new subscription: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+            }
+            return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
+
+        } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
+            SupporterDeviceInAppPurchase iap = new SupporterDeviceInAppPurchase();
+            iap.purchaseToken = effectivePurchaseToken;
+            iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
+            iap.sku = skuParam;
+            iap.platform = platform;
+            iap.valid = null; // Needs verification
+            iap.timestamp = new Date(); // Record creation time
+            iap.userId = premiumUserId;
+            iap.supporterId = supporterUserId;
+
+            Optional<SupporterDeviceInAppPurchase> iapOpt = iapsRepository.findById(
+                    new SupporterDeviceInAppPurchasePrimaryKey(iap.sku, iap.orderId));
+            if (iapOpt.isPresent()) {
+                SupporterDeviceInAppPurchase dbIap = iapOpt.get();
+                // Update only if userId was null and is now being set, or if context changed
+                if ((dbIap.userId == null && iap.userId != null) || (dbIap.supporterId == null && iap.supporterId != null)) {
+                    if (iap.userId != null) {
+                        dbIap.userId = iap.userId;
+                    }
+                    if (iap.supporterId != null) {
+                        dbIap.supporterId = iap.supporterId;
+                    }
+                    dbIap.timestamp = iap.timestamp; // Update timestamp on link change
+                    iapsRepository.save(dbIap);
+                    LOG.info("Updated/Linked existing IAP: sku=" + iap.sku + ", orderId=" + iap.orderId + " to userId " + iap.userId + " to supporterId " + iap.supporterId + ")");
+                } else {
+                    LOG.info("IAP already exists/linked, no changes needed: sku=" + iap.sku + ", orderId=" + iap.orderId);
+                }
+            } else { // Insert new IAP record
+                iapsRepository.save(iap);
+                LOG.info("Saved new IAP: sku=" + iap.sku + ", orderId=" + iap.orderId + " with userId " + iap.userId + " with supporterId " + iap.supporterId + ")");
+            }
+            return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"inapp\" }");
+        } else {
+            return error("Invalid purchaseType specified: " + purchaseType);
+        }
+    }
+
+    private Integer resolvePremiumUserId(HttpServletRequest request, String premiumUserDeivceIdParam,
+                                         String premiumUserDeivceAccessTokenParam) {
+        if (!isEmpty(premiumUserDeivceIdParam) && !isEmpty(premiumUserDeivceAccessTokenParam)) {
+            try {
+                int premiumUserDeviceId = Integer.parseInt(premiumUserDeivceIdParam);
+                PremiumUserDevice premiumDevice = premiumUserDevicesRepository.findById(premiumUserDeviceId);
+                if (premiumDevice != null && premiumUserDeivceAccessTokenParam.equals(premiumDevice.accesstoken)) {
+                    return premiumDevice.userid;
+                } else {
+                    LOG.warn("PremiumUserDevice access token mismatch or device not found: " + toString(request.getParameterMap()));
+                }
+            } catch (NumberFormatException e) {
+                LOG.error("Invalid premiumUserId format in /purchased: " + premiumUserDeivceIdParam);
+            }
+        }
+        return null;
+    }
+
+    private Long resolveSupporterId(HttpServletRequest request, String supporterUserIdParam,
+                                    String supporterTokenParam, String orderId, boolean updateOrderId) {
+        Long res = null;
+        if (!isEmpty(supporterUserIdParam) && !isEmpty(supporterTokenParam)) {
+            try {
+                long supporterId = Long.parseLong(supporterUserIdParam);
+                Optional<Supporter> supOpt = supportersRepository.findById(supporterId);
+                if (supOpt.isPresent() && supporterTokenParam.equals(supOpt.get().token)) {
+                    res = supporterId;
+                    // Link subscription orderId to Supporter if needed (handle conflicts)
+                    if (updateOrderId) {
+                        Supporter supporter = supOpt.get();
+                        if (!Algorithms.objectEquals(supporter.orderId, orderId)) {
+                            supporter.orderId = orderId;
+                            supportersRepository.saveAndFlush(supporter);
+                        }
+                    }
+                } else {
+                    LOG.warn("Supporter token mismatch or supporter not found: " + toString(request.getParameterMap()));
+                }
+            } catch (NumberFormatException | ArithmeticException e) {
+                LOG.warn("Invalid supporterUserId format in /purchased: " + supporterUserIdParam);
+            }
+        }
+        return res;
+    }
 
 	private String toString(Map<String, String[]> parameterMap) {
 		StringBuilder bld = new StringBuilder();

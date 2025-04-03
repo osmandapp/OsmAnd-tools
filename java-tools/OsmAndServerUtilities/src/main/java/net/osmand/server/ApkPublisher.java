@@ -28,7 +28,7 @@ import com.google.api.services.androidpublisher.model.Track;
 import com.google.api.services.androidpublisher.model.TrackRelease;
 
 import net.osmand.PlatformUtil;
-import net.osmand.live.subscriptions.UpdateSubscription;
+import net.osmand.purchases.UpdateSubscription;
 
 public class ApkPublisher {
 	private static final Log log = LogFactory.getLog(ApkPublisher.class);
@@ -41,14 +41,14 @@ public class ApkPublisher {
 
 	protected static final String TRACK_ALPHA = "alpha";
 	protected static final String TRACK_BETA = "beta";
-	
+
 	protected static String DEFAULT_PATH = "android/OsmAnd/res/";
-	
+
 	protected static String RELEASE_KEY = "release";
-	protected static int MAX_RELEASE_SYMBOLS = 490; 
-	
+	protected static int MAX_RELEASE_SYMBOLS = 490;
+
 	protected static String[][] LOCALES = new String[][] {
-		{"en-US", ""}, 
+		{"en-US", ""},
 		{"ar", "ar"},
 		{"bg", "bg"},
 		{"cs-CZ", "cs"},
@@ -73,13 +73,13 @@ public class ApkPublisher {
 		{"tr-TR", "tr"},
 		{"uk", "uk"},
 	};
-	
-	
-	
+
+
+
 	public static void main2(String[] args) {
 		gatherReleaseNotes(new File(DEFAULT_PATH), "4305");
 	}
-//	
+//
 	public static List<LocalizedText> gatherReleaseNotes(File file, String version) {
 		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
 		for(int i = 0; i < LOCALES.length; i++) {
@@ -147,7 +147,7 @@ public class ApkPublisher {
 		return releaseNotes;
 //		System.out.println(releaseNotes);
 	}
-	
+
 	public static void main(String[] args) throws JSONException, IOException, GeneralSecurityException {
 		String androidClientSecretFile = "";
 		String path = "";
@@ -167,7 +167,7 @@ public class ApkPublisher {
 				track = args[i].substring("--track=".length());
 			}
 		}
-		
+
 //		List<LocalizedText> releaseNotes = new ArrayList<LocalizedText>();
 //		releaseNotes.add(new LocalizedText().setLanguage("en-US").setText("Release " + version));
 		List<LocalizedText> releaseNotes = gatherReleaseNotes(new File(DEFAULT_PATH), apkNumber);
@@ -185,7 +185,7 @@ public class ApkPublisher {
 		}
 		String version = v1 + "." + v2 + "." + v3;
 		String name = pack + "-" + version + "-" + apkNumber + ".aab";
-		String appName = pack.contains("plus") ? "OsmAnd+" : "OsmAnd"; 
+		String appName = pack.contains("plus") ? "OsmAnd+" : "OsmAnd";
 		//
 		FileContent aabFile = new FileContent("application/octet-stream", new File(path, name));
 		final Edits edits = publisher.edits();

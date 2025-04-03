@@ -1,4 +1,4 @@
-package net.osmand.live.subscriptions;
+package net.osmand.purchases;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -32,7 +32,7 @@ public class ReceiptValidationHelper {
 	public static final String FIELD_STATUS = "status";
 	public static final String FIELD_RECEIPT = "receipt";
 	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
-	
+
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
 	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
 
@@ -42,27 +42,27 @@ public class ReceiptValidationHelper {
 	// https://developer.apple.com/documentation/appstorereceipts/status
 	// The user account cannot be found or has been deleted.
 	public static final int USER_GONE = 21010;
-	
+
 	// This receipt is from the test environment, but it was sent to the production environment for verification.
 	public static final int SANDBOX_ERROR_CODE_TEST = 21007;
-	
-	
+
+
 	public static class ReceiptResult {
 		public boolean result;
 		public int error;
 		public JsonObject response;
 	}
-	
-	
+
+
 	public static void main(String[] args) {
-		// load ios subscription 
+		// load ios subscription
 		String prevReceipt = "";
 //		String currReceipt = "";
-		
+
 		ReceiptValidationHelper helper = new ReceiptValidationHelper();
 		ReceiptResult loadReceipt = helper.loadReceipt(prevReceipt, false);
 		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
-		
+
 //		loadReceipt = helper.loadReceipt(currReceipt, false);
 //		System.out.println(loadReceipt.error + " " + loadReceipt.result + " " + loadReceipt.response);
 	}
@@ -193,15 +193,15 @@ public class ReceiptValidationHelper {
 		return null;
 	}
 
-	
+
 	public static class InAppReceipt {
 		public Map<String, String> fields = new HashMap<>();
 		public Boolean autoRenew;
-		
+
 		public String getProductId() {
 			return fields.get(FIELD_PRODUCT_ID);
 		}
-		
+
 		public String getOrderId() {
 			return fields.get(FIELD_ORIGINAL_TRANSACTION_ID);
 		}

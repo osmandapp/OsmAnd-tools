@@ -47,6 +47,7 @@ import com.google.gson.Gson;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
@@ -92,6 +93,9 @@ public class AdminController {
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
+
+	@Autowired
+	private DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 	
 	@Autowired
 	private PremiumUsersRepository usersRepository;
@@ -195,11 +199,18 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
 		return "redirect:info#audience";
 	}
-	
+
 	@PostMapping(path = {"/search-subscription"})
-	public String searchSubscription(@RequestParam String orderId, final RedirectAttributes redirectAttrs) {
-		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(orderId);
-		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(deviceSub));
+	public String searchSubscription(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
+		List<SupporterDeviceSubscription> deviceSubList = getSubscriptionListDetailsByIdentifier(identifier);
+		redirectAttrs.addFlashAttribute("subscriptions", deviceSubList);
+		return "redirect:info#audience";
+	}
+
+	@PostMapping(path = {"/search-inapps"})
+	public String searchInapps(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
+		List<SupporterDeviceInAppPurchase> purchases = getInappsDetailsByIdentifier(identifier);
+		redirectAttrs.addFlashAttribute("inapps", purchases);
 		return "redirect:info#audience";
 	}
 	
@@ -234,13 +245,13 @@ public class AdminController {
 		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(email);
 		return ResponseEntity.ok(deviceSub);
 	}
-	
+
 	private SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {
 		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
 		deviceSub.sku = "not found";
 		deviceSub.orderId = "none";
 		deviceSub.valid = false;
-		
+
 		if (emailSender.isEmail(identifier)) {
 			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
 			if (pu != null) {
@@ -264,8 +275,48 @@ public class AdminController {
 				deviceSub = ls.get(0);
 			}
 		}
-		
+
 		return deviceSub;
+	}
+
+	private List<SupporterDeviceSubscription> getSubscriptionListDetailsByIdentifier(String identifier) {
+		List<SupporterDeviceSubscription> result = Collections.emptyList();
+
+		if (emailSender.isEmail(identifier)) {
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
+			if (pu != null && pu.orderid != null) {
+				result = subscriptionsRepository.findByOrderId(pu.orderid);
+				if (!result.isEmpty()) {
+					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
+					ufs.allFiles.clear();
+					ufs.uniqueFiles.clear();
+					String payloadInfo = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") +
+							" at " + pu.tokenTime + "\n" + gson.toJson(ufs);
+					for (SupporterDeviceSubscription s : result) {
+						s.payload = payloadInfo;
+					}
+				}
+			}
+		} else {
+			result = subscriptionsRepository.findByOrderId(identifier);
+		}
+
+		return result == null ? Collections.emptyList() : result;
+	}
+
+	private List<SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
+		String orderId = identifier;
+
+		if (emailSender.isEmail(identifier)) {
+			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
+			orderId = pu != null ? pu.orderid : null;
+		}
+
+		return orderId != null
+				? Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(orderId))
+				.filter(list -> !list.isEmpty())
+				.orElse(Collections.emptyList())
+				: Collections.emptyList();
 	}
 	
 	@PostMapping("/get-email-by-orderId")

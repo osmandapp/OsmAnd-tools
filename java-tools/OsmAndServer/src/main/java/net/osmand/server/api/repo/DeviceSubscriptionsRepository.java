@@ -22,8 +22,12 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
-	
+
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
+
+    List<SupporterDeviceSubscription> findAllByUserId(int userId);
+
+    List<SupporterDeviceSubscription> findAllBySupporterId(int supporterId);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
 	@Entity
@@ -44,8 +48,13 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 		@Column(name = "purchasetoken")
 		public String purchaseToken;
 
+        @Column(name = "userid")
+        public Integer userId; // Link to user_accounts
 
-		@Column(name = "payload")
+        @Column(name = "supporterid")
+        public Long supporterId; // Link to supporters
+
+        @Column(name = "payload")
 		public String payload;
 
 		@Column(name = "timestamp")

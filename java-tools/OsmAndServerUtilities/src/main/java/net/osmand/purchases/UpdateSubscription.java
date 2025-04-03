@@ -1,4 +1,4 @@
-package net.osmand.live.subscriptions;
+package net.osmand.purchases;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,12 +42,12 @@ import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
 import net.osmand.PlatformUtil;
-import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonIOException;
-import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
-import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiJsonResponseException;
-import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
+import net.osmand.purchases.AmazonIAPHelper.AmazonIOException;
+import net.osmand.purchases.AmazonIAPHelper.AmazonSubscription;
+import net.osmand.purchases.HuaweiIAPHelper.HuaweiJsonResponseException;
+import net.osmand.purchases.HuaweiIAPHelper.HuaweiSubscription;
+import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
 
 
@@ -69,8 +69,8 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription.pro";
 
 	private static final int BATCH_SIZE = 200;
-	private static final long DAY = 1000l * 60 * 60 * 24;
-	private static final long HOUR = 1000l * 60 * 60;
+	private static final long DAY = 1000L * 60 * 60 * 24;
+	private static final long HOUR = 1000L * 60 * 60;
 
 	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 14 * DAY;
 	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
@@ -740,12 +740,12 @@ public class UpdateSubscription {
 		    public void initialize(HttpRequest httpRequest) throws IOException {
 		      requestInitializer.initialize(httpRequest);
 		      // 12 min
-		      httpRequest.setConnectTimeout(12 * 60000);  
-		      httpRequest.setReadTimeout(12 * 60000);  
+		      httpRequest.setConnectTimeout(12 * 60000);
+		      httpRequest.setReadTimeout(12 * 60000);
 		    }
 		  };
 	}
-	
+
 	public static AndroidPublisher getPublisherApi(String file) throws JSONException, IOException, GeneralSecurityException {
 		List<String> scopes = new ArrayList<String>();
 		scopes.add("https://www.googleapis.com/auth/androidpublisher");
