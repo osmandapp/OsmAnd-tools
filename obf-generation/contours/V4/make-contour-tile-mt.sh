@@ -203,13 +203,29 @@ process_tiff ()
                     neighbors+=("$neighbor_filename")
 
                     if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
-                        left_exists=1
+			    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        	left_exists=1
+			    else
+				right_exists=1
+			    fi
                     elif [ $dlat -eq 0 ] && [ $dlon -eq 1 ]; then
-                        right_exists=1
+       			    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        	right_xists=1
+			    else
+				left_exists=1
+			    fi
                     elif [ $dlat -eq -1 ] && [ $dlon -eq 0 ]; then
-                        bottom_exists=1
+       			    if [[ "$orig_lat_prefix" == "N" ]]; then
+                        	bottom_exists=1
+			    else
+				top_exists=1
+			    fi
                     elif [ $dlat -eq 1 ] && [ $dlon -eq 0 ]; then
-                        top_exists=1
+       			    if [[ "$orig_lat_prefix" == "N" ]]; then
+				top_exists=1
+                            else
+				bottom_exists=1
+			    fi
                     fi
                 fi
             done
@@ -218,7 +234,7 @@ process_tiff ()
         echo "${neighbors[@]}"
 
         xres=0.0002776235424764020234
-        yres=0.0002776235424764020234
+        yres=$xres
 
         merged_file="$TMP_DIR/merged_${filename}.tif"
         gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
