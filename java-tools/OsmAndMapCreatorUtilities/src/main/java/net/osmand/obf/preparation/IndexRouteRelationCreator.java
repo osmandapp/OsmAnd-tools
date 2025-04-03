@@ -13,6 +13,7 @@ import net.osmand.osm.edit.*;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -125,7 +126,12 @@ public class IndexRouteRelationCreator {
 		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
 			return;
 		}
-		if ("route".equals(relation.getTag("type"))) {
+        if (relation.getId() == 9549493) {
+            System.out.println("----");
+        }
+        boolean isSuperRoute = OsmMapUtils.isSuperRoute(relation.getTags());
+        boolean isRoute = "route".equals(relation.getTag("type"));
+		if (isRoute || isSuperRoute) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
@@ -147,6 +153,27 @@ public class IndexRouteRelationCreator {
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
+            if (isSuperRoute) {
+                for (Map.Entry<String, String> entry : poiSectionTags.entrySet()) {
+                    relation.putTag(entry.getKey(), entry.getValue());
+                }
+                ctx.loadEntityRelation(relation);
+                String memberIds = "";
+                for (Relation.RelationMember members : relation.getMembers()) {
+                    if (members.getEntityId().getType() == Entity.EntityType.RELATION) {
+                        if (!memberIds.isEmpty()) {
+                            memberIds += " ";
+                        }
+                        memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
+                    }
+                }
+                poiSectionTags.put(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+                if (Algorithms.isEmpty(pointsForPoiSearch)) {
+                    // process relation if no geometry
+                    poiSectionTags.forEach(relation::putTag);
+                    indexPoiCreator.iterateEntity(relation, ctx, icc);
+                }
+            }
 
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
@@ -163,18 +190,7 @@ public class IndexRouteRelationCreator {
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
-			indexPoiCreator.excludeFromMainIteration(relation.getId());
-		}
-		if (OsmMapUtils.isSuperRoute(relation.getTags())) {
-			Map<String, String> mapSectionTags = new LinkedHashMap<>();
-			Map<String, String> poiSectionTags = new LinkedHashMap<>();
-			Map<String, String> preparedTags = new LinkedHashMap<>();
-			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
-			for (Map.Entry<String, String> entry : poiSectionTags.entrySet()) {
-				relation.putTag(entry.getKey(), entry.getValue());
-			}
-			indexPoiCreator.iterateEntity(relation, ctx, icc);
-			indexPoiCreator.excludeFromMainIteration(relation.getId());
+            indexPoiCreator.excludeFromMainIteration(relation.getId());
 		}
 	}
 

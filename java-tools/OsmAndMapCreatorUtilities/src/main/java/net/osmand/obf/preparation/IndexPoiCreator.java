@@ -166,8 +166,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			List<LatLon> centers = Collections.singletonList(null);
-			String memberIds = "";
 			if (e instanceof Relation relation) {
+                if (relation.getId() == 9549493) {
+                    System.out.println("----");
+                }
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
 				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
@@ -198,19 +200,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						centers.add(OsmMapUtils.getCenter(out.getBorderWay()));
 					}
 				} else if (OsmMapUtils.isSuperRoute(tags)) {
-					for (RelationMember members : relation.getMembers()) {
-						if (members.getEntityId().getType() == EntityType.RELATION) {
-							if (memberIds.length() > 0) {
-								memberIds += " ";
-							}
-							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
-							if (centers.get(0) == null) {
-								Relation memberRel = (Relation) members.getEntity();
-								ctx.loadEntityRelation(memberRel);
-								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
-							}
-						}
-					}
+                    centers = Collections.singletonList(retreiveFirstLatLon(relation, ctx));
 				}
 			}
 			long id = e.getId();
@@ -255,10 +245,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							id += 2;
 						}
     				}
-					if (!memberIds.isEmpty()) {
-						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
-					}
-
     				if (a.getLocation() != null) {
     					try {
     						insertAmenityIntoPoi(a);
@@ -375,6 +361,31 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return b.toString();
 	}
 
+    private LatLon retreiveFirstLatLon(Relation relation, OsmDbAccessorContext ctx) throws SQLException {
+        for (RelationMember members : relation.getMembers()) {
+            if (members.getEntity() == null) {
+                continue;
+            }
+            if (members.getEntityId().getType() == EntityType.RELATION) {
+                Relation memberRel = (Relation) members.getEntity();
+                ctx.loadEntityRelation(memberRel);
+                LatLon latLon = retreiveFirstLatLon(memberRel, ctx);
+                if (latLon != null) {
+                    return latLon;
+                }
+            } else if (members.getEntityId().getType() == EntityType.WAY) {
+                Way way = (Way) members.getEntity();
+                List<Node> nodes = way.getNodes();
+                if (!Algorithms.isEmpty(nodes)) {
+                    return nodes.get(nodes.size() / 2).getLatLon();
+                }
+            } else  if (members.getEntityId().getType() == EntityType.NODE) {
+                Node node = (Node) members.getEntity();
+                return node.getLatLon();
+            }
+        }
+        return null;
+    }
 
 	private Map<PoiAdditionalType, String> decodeAdditionalInfo(String name,
 			Map<PoiAdditionalType, String> tempNames) {
