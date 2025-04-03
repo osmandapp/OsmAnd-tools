@@ -546,17 +546,12 @@ public class WikiService {
 					// Retrieve images directly linked to the Wikidata article ID
 					"SELECT w.mediaId, w.imageTitle, w.date, w.author, w.license, w.views " +
 							"FROM wiki.wikiimages w " +
-							"WHERE (w.id = ? OR w.id IN (" +
-							// Retrieve Wikimedia Commons category based on Wikidata ID
-							"    SELECT wd.catId FROM wiki.wikidata wd WHERE CAST(wd.id AS String) = ? " +
-							")) " +
-							"AND w.namespace = 6 " +
+							"WHERE w.id = ? AND w.namespace = 6 " +
 							"UNION ALL " +
 							// Retrieve images based on the category name
 							"SELECT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views " +
 							"FROM wiki.categoryimages c WHERE c.catName = ?"
 			);
-			params.add(hasArticleId ? articleId : null);
 			params.add(hasArticleId ? articleId : null);
 			params.add(hasCategory ? categoryName.replace(' ', '_') : null);
 		}
