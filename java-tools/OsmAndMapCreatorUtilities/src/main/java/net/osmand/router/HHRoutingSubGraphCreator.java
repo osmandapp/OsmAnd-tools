@@ -1506,7 +1506,7 @@ public class HHRoutingSubGraphCreator {
 							lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
 					continue;
 				}
-				String msg = String.format("Can't merge points ", lstMerge);
+				String msg = String.format("Can't merge points %s", lstMerge);
 				throw new IllegalArgumentException(msg);
 			}
 		}
