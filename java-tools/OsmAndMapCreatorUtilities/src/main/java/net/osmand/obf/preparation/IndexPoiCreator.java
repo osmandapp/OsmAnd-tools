@@ -167,9 +167,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			List<LatLon> centers = Collections.singletonList(null);
 			if (e instanceof Relation relation) {
-                if (relation.getId() == 9549493) {
-                    System.out.println("----");
-                }
 				ctx.loadEntityRelation(relation);
 				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
 				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");

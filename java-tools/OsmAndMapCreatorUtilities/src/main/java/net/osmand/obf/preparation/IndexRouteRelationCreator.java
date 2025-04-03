@@ -126,9 +126,6 @@ public class IndexRouteRelationCreator {
 		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
 			return;
 		}
-        if (relation.getId() == 9549493) {
-            System.out.println("----");
-        }
         boolean isSuperRoute = OsmMapUtils.isSuperRoute(relation.getTags());
         boolean isRoute = "route".equals(relation.getTag("type"));
 		if (isRoute || isSuperRoute) {
