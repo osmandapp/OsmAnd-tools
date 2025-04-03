@@ -1,87 +1,111 @@
 def processType(tp, uniqueset, tags) {
-	def tg = tp."@tag".text()
-	def value = tp."@value".text()
+    def tg = tp.@tag.toString()
+    def value = tp.@value.toString()
 
-	if (uniqueset[tg + "=" + value]) {
-		return
-	}
-	uniqueset[tg + "=" + value] = tg
+    if (uniqueset[tg + "=" + value]) {
+        return
+    }
+    uniqueset[tg + "=" + value] = tg
 
-	boolean skipTag = (
-		tg.contains("osmand") || 
-		tp.@"no_edit" == "true" || 
-		tp.@"hidden" == "true"
-	)
-	if (skipTag) {
-		return
-	}
+    boolean skipTag = (
+        tg.contains("osmand") || 
+        tp.@"no_edit" == "true" || 
+        tp.@"hidden" == "true" ||
+        tp.@"notosm" == "true"  // Добавлена проверка notosm
+    )
+    if (skipTag) {
+        return
+    }
 
-	if (value != "") {
-		def taginfop = [:]
-		taginfop["key"] = tg
-		taginfop["value"] = value
-		taginfop["description"] = "Used to create maps"
-		tags << taginfop
-	}
+    if (value != "") {
+        def taginfop = [:]
+        taginfop["key"] = tg
+        taginfop["value"] = value
+        taginfop["description"] = "Used to create maps"
+        tags << taginfop
+    }
 }
-	
+
 def processEntityConvert(tp, uniqueset, tags) {
-	def tg = tp."@from_tag".text();
-	def value = tp."@from_value".text();
-	if (uniqueset[tg + "=" + value]) {
-		return ;
-	}
-		uniqueset[tg + "=" + value] = tg;
-	def hidden = tp."@hidden".text();
-	if (!tg.contains("osmand") && hidden != "true") {
-		def taginfop = [:]
-		taginfop["key"] = tg;
-		if (value != "") {
-			taginfop["value"] = value;
-		}
-		taginfop["description"] = "Used to create maps";
-		tags << taginfop
-	}
+    def tg = tp.@"from_tag".toString()
+    def value = tp.@"from_value".toString()
+    if (uniqueset[tg + "=" + value]) {
+        return
+    }
+    uniqueset[tg + "=" + value] = tg
+
+    boolean skipTag = (
+        tg.contains("osmand") || 
+        tp.@"hidden" == "true" ||
+        tp.@"notosm" == "true"  // Добавлена проверка notosm
+    )
+    if (skipTag) {
+        return
+    }
+
+    def taginfop = [:]
+    taginfop["key"] = tg
+    if (value != "") {
+        taginfop["value"] = value
+    }
+    taginfop["description"] = "Used to create maps"
+    tags << taginfop
 }
 
 DEFAULT_HTTP_URL = "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/rendering_styles/style-icons/drawable-hdpi/"; 
 
 def processPOItype(tp, uniqueset, tags) {
-	def tg = tp."@tag".text()
-	def value = tp."@value".text()
-	def name = tp."@name".text()
+    def mainTag = tp.@edit_tag?.toString() ?: tp.@tag.toString()
+    def mainValue = tp.@edit_value?.toString() ?: tp.@value.toString()
+    def name = tp.@name.toString()
 
-	if (uniqueset[tg + "=" + value]) {
-		return
-	}
-	uniqueset[tg + "=" + value] = tg
+    def altTag = tp.@edit_tag2?.toString()
+    def altValue = tp.@edit_value2?.toString()
 
-	boolean skipTag = (
-		tg.contains("osmand") || 
-		tp.@"no_edit" == "true" || 
-		tp.@"hidden" == "true"
-	)
-	if (skipTag) {
-		return
-	}
+    processTag(mainTag, mainValue, name, tp, uniqueset, tags)
+    
+    if (altTag && altValue) {
+        processTag(altTag, altValue, name, tp, uniqueset, tags)
+    }
+}
 
-	def taginfop = [:]
-	taginfop["key"] = tg
-	if (value != "") {
-		taginfop["value"] = value
-	}
-	taginfop["description"] = "Used to create maps (POI)"
+def processTag(tag, value, name, tp, uniqueset, tags) {
+    if (uniqueset[tag + "=" + value]) {
+        return
+    }
+    uniqueset[tag + "=" + value] = tag
 
-	String folder = "resources/rendering_styles/style-icons/drawable-hdpi/"
-	if (new File(folder, "mx_" + name + ".png").exists()) {
-		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + name + ".png"
-	} else if (new File(folder, "mx_" + tg + "_" + value + ".png").exists()) {
-		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + tg + "_" + value + ".png"
-	} else if (new File(folder, "mx_" + value + ".png").exists()) {
-		taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + value + ".png"
-	}
+    boolean skipTag = (
+        tag.contains("osmand") || 
+        tp.@"no_edit" == "true" || 
+        tp.@"hidden" == "true" ||
+        tp.@"notosm" == "true"  // Добавлена проверка notosm
+    )
+    if (skipTag) {
+        return
+    }
 
-	tags << taginfop
+    def taginfop = [:]
+    taginfop["key"] = tag
+    if (value != "") {
+        taginfop["value"] = value
+    }
+    taginfop["description"] = "Used to create maps (POI)"
+
+    String folder = "resources/rendering_styles/style-icons/drawable-hdpi/"
+    def originalName = tp.@"name".toString()
+    def originalTag = tp.@"tag".toString()
+    def originalValue = tp.@"value".toString()
+    
+    if (new File(folder, "mx_" + originalName + ".png").exists()) {
+        taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + originalName + ".png"
+    } else if (new File(folder, "mx_" + originalTag + "_" + originalValue + ".png").exists()) {
+        taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + originalTag + "_" + originalValue + ".png"
+    } else if (new File(folder, "mx_" + originalValue + ".png").exists()) {
+        taginfop["icon_url"] = DEFAULT_HTTP_URL + "mx_" + originalValue + ".png"
+    }
+
+    tags << taginfop
 }
 
 def processPOIGroup(group, uniqueset, tags) {
