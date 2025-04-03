@@ -25,7 +25,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
 
-    List<SupporterDeviceSubscription> findAllByUserid(int userId);
+    List<SupporterDeviceSubscription> findAllByUserId(int userId);
 
     List<SupporterDeviceSubscription> findAllBySupporterId(int supporterId);
 
