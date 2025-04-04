@@ -48,6 +48,10 @@ public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterD
         @Column(name = "platform", nullable = false)
         public String platform; // "google", "apple"
 
+        @Column(name = "purchase_time")
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date purchaseTime;
+
         @Column(name = "checktime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date checktime; // Last time checked with platform API
