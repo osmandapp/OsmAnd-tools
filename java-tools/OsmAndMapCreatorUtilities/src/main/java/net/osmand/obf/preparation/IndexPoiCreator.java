@@ -207,7 +207,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							if (centers.get(0) == null) {
 								Relation memberRel = (Relation) members.getEntity();
 								ctx.loadEntityRelation(memberRel);
-								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel));
+								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel, true));
 							}
 						}
 					}
