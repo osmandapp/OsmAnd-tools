@@ -754,7 +754,9 @@ public class WebGpxParser {
                 lastPointWithSeg = point;
             }
         }
-        segment.getRouteTypes().addAll(routeTypes);
+        if (routeTypes != null) {
+            segment.getRouteTypes().addAll(routeTypes);
+        }
         segments.add(segment);
     }
     
