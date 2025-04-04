@@ -1490,20 +1490,23 @@ public class HHRoutingSubGraphCreator {
 					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
 					continue;
 				}
-				RouteSegmentBorderPoint singlePointCluster = null;
+				List<RouteSegmentBorderPoint> singlePointClusters = new ArrayList<>();
 				for (RouteSegmentBorderPoint p : lstMerge) {
 					if (clusters.get(p.clusterDbId) == 1) {
-						singlePointCluster = p;
-						break;
+						singlePointClusters.add(p);
 					}
 				}
-				if (clusters.size() == 2 && singlePointCluster != null) {
-					System.out.printf(
-							"Complex scenario with 2 clusters (%s) and main point %s merging with points (%s) \n",
-							clusters, singlePointCluster, lstMerge);
-					lstMerge.remove(singlePointCluster);
-					simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId,
-							lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
+				if (clusters.size() >= 2 && singlePointClusters.size() == clusters.size() - 1) {
+					for (RouteSegmentBorderPoint singlePointCluster : singlePointClusters) {
+						lstMerge.remove(singlePointCluster);
+					}
+					for (RouteSegmentBorderPoint singlePointCluster : singlePointClusters) {
+						System.out.printf(
+								"Complex scenario with [%d] clusters (%s) and [%d] main points (%s) merging with lstMerge [%d] (%s)\n",
+								clusters.size(), clusters, singlePointClusters.size(), singlePointCluster, lstMerge.size(), lstMerge);
+						simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId,
+								lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
+					}
 					continue;
 				}
 				String msg = String.format("Can't merge points %s", lstMerge);
