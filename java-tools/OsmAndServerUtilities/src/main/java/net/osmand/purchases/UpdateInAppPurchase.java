@@ -198,7 +198,7 @@ public class UpdateInAppPurchase {
                     continue; // Skip check if already valid
                 }
 
-                String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...") : orderId;
+                String hiddenOrderId = getHiddenOrderId(orderId);
                 System.out.printf("Validate IAP (%s, %s): %s - %s (Platform: %s, Valid: %s)%n",
                         sku, hiddenOrderId,
                         purchaseTimeTs == null ? "?" : new Date(purchaseTimeTs.getTime()),
@@ -298,6 +298,10 @@ public class UpdateInAppPurchase {
         }
     }
 
+    private static String getHiddenOrderId(String orderId) {
+        return orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...") : null;
+    }
+
     private boolean processGoogleInAppPurchase(String purchaseToken, String sku, String orderId, Timestamp lastCheckTime, long currentTime, UpdateParams pms) throws SQLException, PurchaseUpdateException {
         ProductPurchase purchase = null;
         boolean shouldMarkInvalid = false;
@@ -354,7 +358,7 @@ public class UpdateInAppPurchase {
                 updStat.executeBatch();
                 changes = 0;
             }
-            System.out.println("Updated Google IAP: " + sku + " (" + orderId + ") - Valid: " + isValid);
+            System.out.println("Updated Google IAP: " + sku + " (" + getHiddenOrderId(orderId) + ") - Valid: " + isValid);
             return true; // Update processed
         }
 
@@ -447,7 +451,7 @@ public class UpdateInAppPurchase {
         if (foundAndValid) {
             updStat.setTimestamp(ind++, new Timestamp(purchaseTimeMillis)); // purchase_time
             updStat.setBoolean(ind++, true); // valid
-            System.out.println("Updated Apple IAP: " + sku + " (" + orderId + ") - Valid: true");
+            System.out.println("Updated Apple IAP: " + sku + " (" + getHiddenOrderId(orderId) + ") - Valid: true");
         } else {
             // If validation succeeded (status 0) but the specific IAP wasn't found in the arrays
             markAsInvalid(orderId, sku, currentTime, "IAP not found within the validated Apple receipt");
@@ -526,7 +530,7 @@ public class UpdateInAppPurchase {
             if (changes >= BATCH_SIZE) {
                 updStat.executeBatch(); changes = 0;
             }
-            System.out.println("Updated Amazon IAP: " + sku + " (Receipt: " + amazonReceiptId + ") - Valid: " + isValid);
+            System.out.println("Updated Amazon IAP: " + sku + " (Receipt: " + getHiddenOrderId(amazonReceiptId) + ") - Valid: " + isValid);
             return true;
         }
 
@@ -597,7 +601,7 @@ public class UpdateInAppPurchase {
             if (changes >= BATCH_SIZE) {
                 updStat.executeBatch(); changes = 0;
             }
-            System.out.println("Updated Huawei IAP: " + sku + " (DB OrderId: " + orderId + ", Token: " + purchaseToken + ") - Valid: " + isValid);
+            System.out.println("Updated Huawei IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ", Token: " + purchaseToken + ") - Valid: " + isValid);
             return true;
         }
 
