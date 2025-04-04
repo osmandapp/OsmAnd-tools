@@ -273,12 +273,6 @@ public class SearchService {
         final int mapZoom = 15;
         LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
         LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
-        List<LatLon> bbox = Arrays.asList(p1, p2);
-        QuadRect searchBbox = getSearchBbox(bbox);
-        
-        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
-        SearchResult res = null;
-        
         BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
                 MapUtils.get31TileNumberX(p1.getLongitude()),
                 MapUtils.get31TileNumberX(p2.getLongitude()),
@@ -297,7 +291,51 @@ public class SearchService {
                         return false;
                     }
                 });
-        
+
+        SearchResult res = searchPoiByReq(req, p1, p2);
+        if (res != null) {
+            return getPoiFeature(res);
+        }
+        return null;
+    }
+
+    public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
+        final double SEARCH_POI_RADIUS_DEGREE = 0.0001;
+        final int mapZoom = 15;
+        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
+        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
+        BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+                MapUtils.get31TileNumberX(p1.getLongitude()),
+                MapUtils.get31TileNumberX(p2.getLongitude()),
+                MapUtils.get31TileNumberY(p1.getLatitude()),
+                MapUtils.get31TileNumberY(p2.getLatitude()),
+                mapZoom,
+                BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
+                new ResultMatcher<>() {
+                    @Override
+                    public boolean publish(Amenity amenity) {
+                        return amenity.getEnName(false).equals(enName);
+                    }
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                });
+
+        SearchResult res = searchPoiByReq(req, p1, p2);
+        if (res != null) {
+            return getPoiFeature(res);
+        }
+        return null;
+    }
+
+    private SearchResult searchPoiByReq(BinaryMapIndexReader.SearchRequest<Amenity> req, LatLon p1, LatLon p2) throws IOException {
+        List<LatLon> bbox = Arrays.asList(p1, p2);
+        QuadRect searchBbox = getSearchBbox(bbox);
+
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        SearchResult res = null;
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
             if (!mapList.isEmpty()) {
@@ -307,8 +345,7 @@ public class SearchService {
                         break;
                     }
                     for (BinaryIndexPart indexPart : map.getIndexes()) {
-                        if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion) {
-                            BinaryMapPoiReaderAdapter.PoiRegion p = (BinaryMapPoiReaderAdapter.PoiRegion) indexPart;
+                        if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion p) {
                             map.initCategories(p);
                             List<Amenity> poiRes = map.searchPoi(p, req);
                             if (!poiRes.isEmpty()) {
@@ -323,11 +360,9 @@ public class SearchService {
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
-        if (res != null) {
-            return getPoiFeature(res);
-        }
-        return null;
+        return res;
     }
+
     
     private boolean isContainsBbox(SearchService.PoiSearchData data) {
         QuadRect searchBbox = getSearchBbox(data.bbox);
@@ -592,12 +627,15 @@ public class SearchService {
         } else if (obj instanceof AbstractPoiType type) {
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
             tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
+        } else if (obj instanceof MapObject type) {
+            tags.put(PoiTypeField.EN_NAME.getFieldName(), type.getEnName(false));
         }
         return tags;
     }
 
     public enum PoiTypeField {
         NAME("web_name"),
+        EN_NAME("web_en_name"),
         TYPE("web_type"),
         ADDRESS_1("web_address1"),
         ADDRESS_2("web_address2"),
