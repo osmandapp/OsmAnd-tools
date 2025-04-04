@@ -232,6 +232,15 @@ public class SearchController {
         Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
         return ResponseEntity.ok(gson.toJson(poi));
     }
+
+    @GetMapping(path = {"/get-poi-by-name"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
+                                                @RequestParam double lon,
+                                                @RequestParam String enName) throws IOException {
+        Feature poi = searchService.searchPoiByEnName(new LatLon(lat, lon), enName);
+        return ResponseEntity.ok(gson.toJson(poi));
+    }
     
     @GetMapping(path = {"/get-wiki-content"}, produces = "application/json")
     @ResponseBody
