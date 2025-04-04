@@ -305,18 +305,18 @@ public class AdminController {
 	}
 
 	private List<SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
-		String orderId = identifier;
-
 		if (emailSender.isEmail(identifier)) {
 			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
-			orderId = pu != null ? pu.orderid : null;
+			if (pu != null) {
+				Integer userid = pu.id;
+				List<SupporterDeviceInAppPurchase> list = deviceInAppPurchasesRepository.findByUserId(userid);
+				return !list.isEmpty() ? list : Collections.emptyList();
+			}
 		}
 
-		return orderId != null
-				? Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(orderId))
+		return Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(identifier))
 				.filter(list -> !list.isEmpty())
-				.orElse(Collections.emptyList())
-				: Collections.emptyList();
+				.orElse(Collections.emptyList());
 	}
 	
 	@PostMapping("/get-email-by-orderId")
