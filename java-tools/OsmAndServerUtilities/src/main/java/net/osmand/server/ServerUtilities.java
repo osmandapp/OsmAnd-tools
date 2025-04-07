@@ -7,7 +7,8 @@ import java.util.List;
 import net.osmand.data.changeset.CalculateOsmChangesets;
 import net.osmand.data.changeset.OsmAndLiveReports;
 import net.osmand.exceptionanalyzer.ExceptionAnalyzerMain;
-import net.osmand.live.subscriptions.UpdateSubscription;
+import net.osmand.purchases.UpdateInAppPurchase;
+import net.osmand.purchases.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
 import net.osmand.server.utilities.GenerateWebTranslations;
@@ -22,8 +23,10 @@ public class ServerUtilities {
 		String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
 		if (utl.equals("update-subscriptions")) {
 			UpdateSubscription.main(subArgsArray);
+        } else if (utl.equals("update-inapps")) {
+            UpdateInAppPurchase.main(subArgsArray);
 		} else if (utl.equals("upload-apk")) {
-			ApkPublisher.main(subArgsArray); 
+			ApkPublisher.main(subArgsArray);
 		} else if (utl.equals("send-email")) {
 			EmailSenderMain.main(subArgsArray);
 		} else if (utl.equals("analyze-exceptions")) {

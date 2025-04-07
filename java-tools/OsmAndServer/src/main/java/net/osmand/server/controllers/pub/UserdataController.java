@@ -1,16 +1,13 @@
 package net.osmand.server.controllers.pub;
 
+import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
+import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
+import static net.osmand.server.api.repo.SupportersRepository.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
-import java.util.Map;
+import java.util.*;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +16,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
@@ -29,17 +27,15 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.util.Algorithms;
 
@@ -86,6 +82,18 @@ public class UserdataController {
 
 	@Autowired
 	UserdataService userdataService;
+
+    @Autowired
+    DeviceInAppPurchasesRepository iapsRepository;
+
+    @Autowired
+    DeviceSubscriptionsRepository subscriptionsRepository;
+
+    @Autowired
+    PremiumUsersRepository premiumUsersRepository;
+
+    @Autowired
+    SupportersRepository supportersRepository;
 
 	public static class TokenPost {
 		public String token;
@@ -182,13 +190,17 @@ public class UserdataController {
 		return userdataService.ok();
 	}
 
-	@PostMapping(value = "/user-register")
-	public ResponseEntity<String> userRegister(@RequestParam(name = "email") String email,
-	                                           @RequestParam(name = "deviceid", required = false) String deviceId,
-	                                           @RequestParam(name = "orderid", required = false) String orderid,
-	                                           @RequestParam(name = "login", required = false) boolean login,
-	                                           @RequestParam(name = "lang", required = false) String lang,
-	                                           HttpServletRequest request) {
+    @PostMapping(value = "/user-register")
+    @Transactional // Make linking atomic with registration
+    public ResponseEntity<String> userRegister(
+            @RequestParam(name = "email") String email,
+            @RequestParam(name = "deviceid", required = false) String deviceId, // PremiumUserDevice deviceId (e.g., "web")
+            @RequestParam(name = "orderid", required = false) String orderid, // Subscription orderId
+            @RequestParam(name = "login", required = false) boolean login,
+            @RequestParam(name = "lang", required = false) String lang,
+            @RequestParam(name = "userId", required = false) String userId,
+            @RequestParam(name = "userToken", required = false) String userToken,
+            HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
@@ -235,6 +247,57 @@ public class UserdataController {
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
 		usersRepository.saveAndFlush(pu);
+
+        // --- Attempt to Link Supporter IAPs ---
+        if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
+            Supporter supporter = null;
+            try {
+                Optional<Supporter> supOpt = supportersRepository.findById(Long.parseLong(userId));
+                supporter = supOpt.orElse(null);
+                if (supporter != null && !userToken.equals(supporter.token)) {
+                    LOG.warn("Supporter token mismatch during cloud registration for supporterId: " + userId);
+                    supporter = null;
+                }
+            } catch (NumberFormatException e) {
+                LOG.warn("Supporter ID is in wrong format: " + userId);
+            }
+            if (supporter != null) {
+                // Supporter verified, find their IAPs
+                List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findBySupporterId(supporter.userId);
+                int linkedCount = 0;
+                for (SupporterDeviceInAppPurchase iap : iapsToLink) {
+                    // Update the userId to the PremiumUser ID
+                    if (iap.userId == null) { // Check if update is needed
+                        iap.userId = pu.id;
+                        iapsRepository.save(iap); // Save the updated IAP record
+                        linkedCount++;
+                    }
+                }
+                if (linkedCount > 0) {
+                    LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
+                }
+                // Optionally link subscription orderId if needed
+                List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId);
+                linkedCount = 0;
+                for (SupporterDeviceSubscription sub : subsToLink) {
+                    // Update the userId to the PremiumUser ID
+                    if (sub.userId == null) { // Check if update is needed
+                        sub.userId = pu.id;
+                        subscriptionsRepository.save(sub); // Save the updated subscription record
+                        linkedCount++;
+                    }
+                }
+                if (linkedCount > 0) {
+                    LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
+                }
+            } else {
+                LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);
+            }
+        } else {
+            LOG.info("No supporter context provided during cloud registration for email: " + email);
+        }
+        // --- End Linking Logic ---
+
 		return userdataService.ok();
 	}
 

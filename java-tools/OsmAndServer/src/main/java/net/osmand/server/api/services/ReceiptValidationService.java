@@ -20,8 +20,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.purchases.ReceiptValidationHelper;
+import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 
 @Service
 public class ReceiptValidationService {
@@ -51,7 +51,7 @@ public class ReceiptValidationService {
 			return mapStatus(CANNOT_LOAD_RECEIPT_STATUS);
 		}
 	}
-	
+
 	@Nullable
 	public List<InAppReceipt> loadInAppReceipts(@NonNull JsonObject receiptObj) {
 		List<InAppReceipt> result = null;
@@ -102,26 +102,43 @@ public class ReceiptValidationService {
 		if (bundleId.equals(ReceiptValidationHelper.IOS_MAPS_BUNDLE_ID)) {
 			if (latestReceiptInfoArray.size() > 0) {
 				result.put("result", true);
-				List<String> inAppArray = new ArrayList<>();
+				List<String> inAppArray = new ArrayList<>(); // Original array for backward compatibility
+				List<Map<String, String>> inAppsDetailedArray = new ArrayList<>(); // New array with details
 				for (JsonElement jsonElement : latestReceiptInfoArray) {
 					Map<String, String> subscriptionObj = new HashMap<>();
 					JsonObject receipt = jsonElement.getAsJsonObject();
 					String productId = addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_PRODUCT_ID);
-					addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID);
-					addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_TRANSACTION_ID);
-					JsonElement expiresDateElement = receipt.get("expires_date_ms");
+					String transactionId = receipt.has(ReceiptValidationHelper.FIELD_TRANSACTION_ID)
+							? receipt.get(ReceiptValidationHelper.FIELD_TRANSACTION_ID).getAsString() : null;
+					JsonElement expiresDateElement = receipt.get(ReceiptValidationHelper.FIELD_EXPIRES_DATE_MS);
 					if (expiresDateElement != null) {
+						// It's a subscription
 						long expiresDateMs = expiresDateElement.getAsLong();
 						if (expiresDateMs > System.currentTimeMillis()) {
 							//Subscription is valid (active)
+							addStringField(subscriptionObj, receipt, ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID);
+							if (transactionId != null) { // Ensure transactionId exists before adding
+								subscriptionObj.put(ReceiptValidationHelper.FIELD_TRANSACTION_ID, transactionId);
+							}
 							subscriptionObj.put("expiration_date", Long.toString(expiresDateMs));
 							activeSubscriptions.add(subscriptionObj);
 						}
 					} else {
-						inAppArray.add(productId);
+						// It's an in-app purchase
+						inAppArray.add(productId); // Add only productId to the original array
+						Map<String, String> inAppDetailedObj = new HashMap<>(); // Create object for the new detailed array
+						inAppDetailedObj.put(ReceiptValidationHelper.FIELD_PRODUCT_ID, productId);
+						if (transactionId != null) {
+							inAppDetailedObj.put(ReceiptValidationHelper.FIELD_TRANSACTION_ID, transactionId);
+						}
+						// Optionally add other relevant fields like original_transaction_id or purchase_date_ms if needed
+						addStringField(inAppDetailedObj, receipt, ReceiptValidationHelper.FIELD_ORIGINAL_TRANSACTION_ID);
+						addStringField(inAppDetailedObj, receipt, ReceiptValidationHelper.FIELD_PURCHASE_DATE_MS);
+						inAppsDetailedArray.add(inAppDetailedObj);
 					}
 				}
-				result.put("in_apps", inAppArray);
+				result.put("in_apps", inAppArray); // Keep the original array
+				result.put("in_apps_detailed", inAppsDetailedArray); // Add the new detailed array
 				result.put("subscriptions", activeSubscriptions);
 				result.put("status", 0);
 				return result;
@@ -140,11 +157,11 @@ public class ReceiptValidationService {
 		}
 	}
 
-	private String addStringField(Map<String, String> subscriptionObj, JsonObject receipt, String FIELD) {
+	private String addStringField(Map<String, String> purchaseObj, JsonObject receipt, String FIELD) {
 		String val = "";
 		if (receipt.has(FIELD)) {
 			val = receipt.get(FIELD).getAsString();
-			subscriptionObj.put(FIELD, val);
+			purchaseObj.put(FIELD, val);
 		}
 		return val;
 	}

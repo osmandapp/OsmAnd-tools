@@ -15,13 +15,13 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subsc
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
-import net.osmand.live.subscriptions.AmazonIAPHelper;
-import net.osmand.live.subscriptions.HuaweiIAPHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper;
-import net.osmand.live.subscriptions.ReceiptValidationHelper.ReceiptResult;
-import net.osmand.live.subscriptions.UpdateSubscription;
-import net.osmand.live.subscriptions.AmazonIAPHelper.AmazonSubscription;
-import net.osmand.live.subscriptions.HuaweiIAPHelper.HuaweiSubscription;
+import net.osmand.purchases.AmazonIAPHelper;
+import net.osmand.purchases.HuaweiIAPHelper;
+import net.osmand.purchases.ReceiptValidationHelper;
+import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
+import net.osmand.purchases.UpdateSubscription;
+import net.osmand.purchases.AmazonIAPHelper.AmazonSubscription;
+import net.osmand.purchases.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
@@ -38,12 +38,12 @@ public class UserSubscriptionService {
 	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_2 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y;
 	private static final String OSMAND_PRO_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
 	private static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
-	
+
 	private static final Log LOG = LogFactory.getLog(UserSubscriptionService.class);
-	
+
 	@Value("${google.androidPublisher.clientSecret}")
 	protected String clientSecretFile;
-	
+
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
@@ -78,7 +78,7 @@ public class UserSubscriptionService {
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
-					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) && 
+					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
@@ -91,7 +91,7 @@ public class UserSubscriptionService {
 		}
 		return errorMsg;
 	}
-	
+
 	private SupporterDeviceSubscription revalidateGoogleSubscription(SupporterDeviceSubscription s) {
 		if (!Algorithms.isEmpty(clientSecretFile) ) {
 			if (androidPublisher == null) {
@@ -204,6 +204,6 @@ public class UserSubscriptionService {
 		return s;
 	}
 
-	
+
 
 }

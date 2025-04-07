@@ -107,6 +107,7 @@ public class GpxService {
         GpxTrackAnalysis gpxTrackAnalysis = getAnalysis(gpxFile, false);
         if (gpxTrackAnalysis != null) {
             Map<String, Object> analysis = webGpxParser.getTrackAnalysis(gpxTrackAnalysis, null);
+            trackData.setAnalysis(analysis);
             boolean addSpeed = analysis.get("avgSpeed") != null && analysis.get("hasSpeedInTrack") == "false";
             if (addSpeed || analysis.get("elevationData") != null) {
                 webGpxParser.addAdditionalInfo(trackData.getTracks(), gpxTrackAnalysis, addSpeed);
