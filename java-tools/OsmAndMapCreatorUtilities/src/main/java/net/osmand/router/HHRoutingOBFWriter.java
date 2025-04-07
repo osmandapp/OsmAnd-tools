@@ -479,7 +479,8 @@ public class HHRoutingOBFWriter {
 			}
 			boolean allowLongSize = false; // worldwide maps - 2 profiles by 8M points
 			if (profileParams.length * points.size() > 8 * 1000 * 1000 * 2) {
-				allowLongSize = true;
+				LOG.info("skip allowLongSize = true");
+//				allowLongSize = true;
 			}
 			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, allowLongSize, profileParams);
 			if (rootBounds != null) {
