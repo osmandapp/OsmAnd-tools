@@ -32,6 +32,8 @@ public class ReceiptValidationHelper {
 	public static final String FIELD_STATUS = "status";
 	public static final String FIELD_RECEIPT = "receipt";
 	public static final String FIELD_LATEST_RECEIPT_INFO = "latest_receipt_info";
+	public static final String FIELD_PURCHASE_DATE_MS = "purchase_date_ms";
+	public static final String FIELD_EXPIRES_DATE_MS = "expires_date_ms";
 
 	private final static String PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
 	private final static String SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
