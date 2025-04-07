@@ -478,9 +478,10 @@ public class HHRoutingOBFWriter {
 				}
 			}
 			boolean allowLongSize = false; // worldwide maps - 2 profiles by 8M points
-			if (profileParams.length * points.size() > 8 * 1000 * 1000 * 2) {
-				LOG.info("skip allowLongSize = true");
-//				allowLongSize = true;
+			if (filteredPoints != null && profileParams.length * filteredPoints.size() > 8 * 1000 * 1000 * 2) {
+				LOG.info(String.format("Use 64-bit allowLongSize = true (%d params, %d points)",
+						profileParams.length, filteredPoints.size()));
+				allowLongSize = true;
 			}
 			bmiw.startHHRoutingIndex(edition, profile, tagValuesDictionary, allowLongSize, profileParams);
 			if (rootBounds != null) {
