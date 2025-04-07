@@ -59,8 +59,6 @@ import net.osmand.server.api.services.MotdService.MotdSettings;
 import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
-import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
-import net.osmand.util.Algorithms;
 import net.osmand.server.controllers.pub.WebController;
 
 @Controller
@@ -81,9 +79,6 @@ public class AdminController {
 
 	@Autowired
 	private WebController web;
-	
-	@Autowired
-	UserdataService userdataService;
 
 	@Autowired
 	private ReportsController reports;
@@ -94,9 +89,6 @@ public class AdminController {
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
 
-	@Autowired
-	private DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
-	
 	@Autowired
 	private PremiumUsersRepository usersRepository;
 
@@ -135,6 +127,9 @@ public class AdminController {
 	
 	@Autowired
 	PromoService promoService;
+
+    @Autowired
+    AdminService adminService;
 
 	@Autowired
 	private EmailSenderService emailSender;
@@ -202,14 +197,14 @@ public class AdminController {
 
 	@PostMapping(path = {"/search-subscription"})
 	public String searchSubscription(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
-		List<SupporterDeviceSubscription> deviceSubList = getSubscriptionListDetailsByIdentifier(identifier);
+		List<SupporterDeviceSubscription> deviceSubList = adminService.getSubscriptionsByIdentifier(identifier);
 		redirectAttrs.addFlashAttribute("subscriptions", deviceSubList);
 		return "redirect:info#audience";
 	}
 
 	@PostMapping(path = {"/search-inapps"})
 	public String searchInapps(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
-		List<SupporterDeviceInAppPurchase> purchases = getInappsDetailsByIdentifier(identifier);
+		List<SupporterDeviceInAppPurchase> purchases = adminService.getInappsDetailsByIdentifier(identifier);
 		redirectAttrs.addFlashAttribute("inapps", purchases);
 		return "redirect:info#audience";
 	}
@@ -242,83 +237,10 @@ public class AdminController {
 	@GetMapping(path = {"/get-subscription-details"})
 	@ResponseBody
 	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String email) {
-		SupporterDeviceSubscription deviceSub = getSubscriptionDetailsByIdentifier(email);
+		SupporterDeviceSubscription deviceSub = adminService.getSubscriptionDetailsByIdentifier(email);
 		return ResponseEntity.ok(deviceSub);
 	}
 
-	private SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {
-		SupporterDeviceSubscription deviceSub = new SupporterDeviceSubscription();
-		deviceSub.sku = "not found";
-		deviceSub.orderId = "none";
-		deviceSub.valid = false;
-
-		if (emailSender.isEmail(identifier)) {
-			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
-			if (pu != null) {
-				String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
-				deviceSub.sku = identifier + suffix;
-				List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(pu.orderid);
-				if (ls != null && !ls.isEmpty()) {
-					deviceSub = ls.get(0);
-				}
-				if (deviceSub != null) {
-					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
-					ufs.allFiles.clear();
-					ufs.uniqueFiles.clear();
-					deviceSub.payload = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
-							+ pu.tokenTime + "\n" + gson.toJson(ufs);
-				}
-			}
-		} else {
-			List<SupporterDeviceSubscription> ls = subscriptionsRepository.findByOrderId(identifier);
-			if (ls != null && !ls.isEmpty()) {
-				deviceSub = ls.get(0);
-			}
-		}
-
-		return deviceSub;
-	}
-
-	private List<SupporterDeviceSubscription> getSubscriptionListDetailsByIdentifier(String identifier) {
-		List<SupporterDeviceSubscription> result = Collections.emptyList();
-
-		if (emailSender.isEmail(identifier)) {
-			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
-			if (pu != null && pu.orderid != null) {
-				result = subscriptionsRepository.findByOrderId(pu.orderid);
-				if (!result.isEmpty()) {
-					UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
-					ufs.allFiles.clear();
-					ufs.uniqueFiles.clear();
-					String payloadInfo = pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") +
-							" at " + pu.tokenTime + "\n" + gson.toJson(ufs);
-					for (SupporterDeviceSubscription s : result) {
-						s.payload = payloadInfo;
-					}
-				}
-			}
-		} else {
-			result = subscriptionsRepository.findByOrderId(identifier);
-		}
-
-		return result == null ? Collections.emptyList() : result;
-	}
-
-	private List<SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
-		if (emailSender.isEmail(identifier)) {
-			PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
-			if (pu != null) {
-				Integer userid = pu.id;
-				List<SupporterDeviceInAppPurchase> list = deviceInAppPurchasesRepository.findByUserId(userid);
-				return !list.isEmpty() ? list : Collections.emptyList();
-			}
-		}
-
-		return Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(identifier))
-				.filter(list -> !list.isEmpty())
-				.orElse(Collections.emptyList());
-	}
-	
 	@PostMapping("/get-email-by-orderId")
 	@ResponseBody
 	public ResponseEntity<String> getEmailByOrderId(@RequestParam String orderId) {
