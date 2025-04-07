@@ -125,9 +125,11 @@ process_tiff ()
 	indir=${1%/*}
 	highres_dir=${indir%/*}/$(basename $indir)_highres
 	filepath=$1
+    isHighRes=0
 	if [ -f $highres_dir/$filenamefull ] ; then
 		filepath=$highres_dir/$filenamefull
-		echo "Highres tile is found"
+		isHighRes=1
+        echo "Highres tile is found"
 		echo Using $filepath
 	fi
 	no_smooth=false
@@ -234,6 +236,9 @@ process_tiff ()
         echo "${neighbors[@]}"
 
         xres=0.0002776235424764020234
+        if ((  isHighRes  )); then
+            xres=$(echo "scale=20; 0.0002776235424764020234 / 4.54957740397" | bc)
+        fi
         yres=$xres
 
         merged_file="$TMP_DIR/merged_${filename}.tif"
