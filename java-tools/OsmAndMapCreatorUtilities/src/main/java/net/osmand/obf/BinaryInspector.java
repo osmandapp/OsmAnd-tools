@@ -33,6 +33,8 @@ import net.osmand.util.MapUtils;
 import java.io.*;
 import java.text.DecimalFormat;
 import java.text.MessageFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class BinaryInspector {
@@ -143,7 +145,7 @@ public class BinaryInspector {
 		public boolean isVpoi() {
 			return vpoi;
 		}
-		
+
 		public boolean isVHHrouting() {
 			return vhhrouting;
 		}
@@ -244,14 +246,14 @@ public class BinaryInspector {
 
 		}
 	}
-	
+
 	public class FileExtractFrom {
 		public List<File> from = new ArrayList<File>();
 		public Set<Integer> excludeParts;
 		public Set<Integer> includeParts;
 		public Set<Integer> excludeIndex;
 		public Set<Integer> includeIndex;
-		
+
 	}
 
 	public void inspector(String[] args) throws IOException {
@@ -264,13 +266,16 @@ public class BinaryInspector {
 				} else {
 					List<FileExtractFrom> parts = new ArrayList<>();
 					FileExtractFrom lastPart = null;
+                    String date = null;
 					for (int i = 2; i < args.length; i++) {
 						if ((args[i].startsWith("-") || args[i].startsWith("+"))) {
 							if(lastPart == null) {
 								System.err.println("Expected file name instead of " + args[i]);
 								return;
 							}
-							if (args[i].startsWith("--") || args[i].startsWith("++")) {
+                            if (args[i].startsWith("--date")) {
+                                date = args[i].replace("--date", "").replace("=", "");
+                            } else if (args[i].startsWith("--") || args[i].startsWith("++")) {
 								String[] st = args[i].substring(2).split(",");
 								TreeSet<Integer> ts = new TreeSet<>();
 								for (String s : st) {
@@ -314,7 +319,7 @@ public class BinaryInspector {
 							if (!file.exists()) {
 								System.err.println("File to extract from doesn't exist " + args[i]);
 								return;
-							}	
+							}
 							lastPart = new FileExtractFrom();
 							if (file.isDirectory()) {
 								for (File ch : file.listFiles()) {
@@ -372,11 +377,11 @@ public class BinaryInspector {
 		ous.writeRawByte((v >> 16) & 0xFF);
 		ous.writeRawByte((v >>  8) & 0xFF);
 		ous.writeRawByte(v & 0xFF);
-		
+
 		//written += 4;
 	}
 
-	public  static int combineParts(File fileToExtract, List<FileExtractFrom> partsToExtractFrom) throws IOException {
+	public  static int combineParts(File fileToExtract, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
 		Set<String> uniqueNames = new LinkedHashSet<String>();
 
 		int version = IndexConstants.BINARY_MAP_VERSION;
@@ -386,8 +391,17 @@ public class BinaryInspector {
 		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
-		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, System.currentTimeMillis());
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm");
+        long dateCreated = System.currentTimeMillis();
+        try {
+            Date d = dateFormat.parse(date);
+            dateCreated = d.getTime();
+        } catch (ParseException e) {
+            System.err.println("Date is wrong! Right format is yyyy-MM-ddHH:mm");
+        }
+
+        ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
+		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, dateCreated);
 		// Go through all files and validate conistency
 		int parts = 0;
 		for (FileExtractFrom extract : partsToExtractFrom) {
@@ -486,7 +500,7 @@ public class BinaryInspector {
 		if (file.isDirectory()) {
 			for(File f : file.listFiles()) {
 				if(f.getName().endsWith(".obf")) {
-					printFileInformation(f);		
+					printFileInformation(f);
 				}
 			}
 		} else {
@@ -543,12 +557,12 @@ public class BinaryInspector {
 				} else if (p instanceof MapIndex) {
 					MapIndex m = ((MapIndex) p);
 					int j = 1;
-					
+
 					for (MapRoot mi : m.getRoots()) {
 						println(MessageFormat.format("\t{4}.{5} Map level minZoom = {0}, maxZoom = {1}, size = {2,number,#,###} bytes \n\t\tBounds {3}",
 								new Object[] {
-								mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(), 
-								formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()), 
+								mi.getMinZoom(), mi.getMaxZoom(), mi.getLength(),
+								formatBounds(mi.getLeft(), mi.getRight(), mi.getTop(), mi.getBottom()),
 								i, j++}));
 					}
 					if ((vInfo != null && vInfo.isVmap())) {
@@ -611,7 +625,7 @@ public class BinaryInspector {
 		}
 		println(String.format("\tEncoding rules %d (%d KB): %s", ri.routeEncodingRules.size(), ri.routeEncodingRulesBytes / 1024, fmt.toString()));
 	}
-	
+
 	private void printMapEncodingRules(MapIndex ri) {
 		Map<String, Integer> mp = new HashMap<String, Integer>();
 		TIntObjectIterator<TagValuePair> it = ri.decodingRules.iterator();
@@ -642,7 +656,7 @@ public class BinaryInspector {
 			}
 		});
 		Map<String, Integer> fmt = new LinkedHashMap<String, Integer>();
-		
+
 		for (String key : tagvalues) {
 			fmt.put(key, mp.get(key));
 		}
@@ -954,7 +968,7 @@ public class BinaryInspector {
 			});
 
 			for (MapStatKey s : stats) {
-				println(String.format("%-35s [%7d] %8d KB: coord [%7d] %8d KB, names %8d KB  ",s.key, s.count, 
+				println(String.format("%-35s [%7d] %8d KB: coord [%7d] %8d KB, names %8d KB  ",s.key, s.count,
 						s.statObjectSize >> 10, s.statCoordinatesCount, s.statCoordinates >> 10, s.namesLength >> 10));
 			}
 
@@ -1051,10 +1065,10 @@ public class BinaryInspector {
 		}
 		int[] types = obj.getTypes();
 		if(obj.isLabelSpecified()) {
-			b.append(" ").append(new LatLon(MapUtils.get31LatitudeY(obj.getLabelY()), 
+			b.append(" ").append(new LatLon(MapUtils.get31LatitudeY(obj.getLabelY()),
 					MapUtils.get31LongitudeX(obj.getLabelX())));
 		}
-		
+
 		b.append(" types [");
 		for (int j = 0; j < types.length; j++) {
 			if (j > 0) {
@@ -1120,7 +1134,7 @@ public class BinaryInspector {
 				b.append(y).append(" / ").append(x).append(" , ");
 			}
 		}
-		
+
 	}
 
 
@@ -1222,7 +1236,7 @@ public class BinaryInspector {
 			}
 			tags.append("\t<tag k='").append(pair.tag).append("' v='").append(quoteName(pair.value)).append("' />\n");
 		}
-		
+
 		if (obj.getAdditionalTypes() != null && obj.getAdditionalTypes().length > 0) {
 			for (int j = 0; j < obj.getAdditionalTypes().length; j++) {
 				int addtype = obj.getAdditionalTypes()[j];
@@ -1249,7 +1263,7 @@ public class BinaryInspector {
 
 		tags.append("\t<tag k=\'").append("original_id").append("' v='").append(obj.getId() >> (SHIFT_ID + 1)).append("'/>\n");
 		tags.append("\t<tag k=\'").append("osmand_id").append("' v='").append(obj.getId()).append("'/>\n");
-		
+
 		if(point) {
 			float lon= (float) MapUtils.get31LongitudeX(obj.getPoint31XTile(0));
 			float lat = (float) MapUtils.get31LatitudeY(obj.getPoint31YTile(0));
@@ -1266,7 +1280,7 @@ public class BinaryInspector {
 				b.append("\t<node id = '" + id + "' version='1' lat='" + lat + "' lon='" + lon + "' />\n");
 				ids.add(id);
 			}
-			
+
 			long outerId = printWay(ids, b, multipolygon ? null : tags);
 			if (multipolygon) {
 				int[][] polygonInnerCoordinates = obj.getPolygonInnerCoordinates();
@@ -1293,7 +1307,7 @@ public class BinaryInspector {
 				b.append("</relation>\n");
 			}
 		}
-		
+
 	}
 
 
@@ -1480,8 +1494,8 @@ public class BinaryInspector {
 				}
 				singleValues.get(key).add(st.name);
 			} else {
-				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), 
-						st.possibleValues.size() > 50 ? st.possibleValues.subList(0, 50) + "..." : st.possibleValues));	
+				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(),
+						st.possibleValues.size() > 50 ? st.possibleValues.subList(0, 50) + "..." : st.possibleValues));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
