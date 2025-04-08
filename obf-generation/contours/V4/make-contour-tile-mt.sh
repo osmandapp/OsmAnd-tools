@@ -204,31 +204,34 @@ process_tiff ()
                 if [ -f "$neighbor_filename" ]; then
                     neighbors+=("$neighbor_filename")
 
-                    if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
-			    if [[ "$orig_lon_prefix" == "E" ]]; then
-                        	left_exists=1
-			    else
-				right_exists=1
-			    fi
-                    elif [ $dlat -eq 0 ] && [ $dlon -eq 1 ]; then
-       			    if [[ "$orig_lon_prefix" == "E" ]]; then
-                        	right_xists=1
-			    else
-				left_exists=1
-			    fi
-                    elif [ $dlat -eq -1 ] && [ $dlon -eq 0 ]; then
-       			    if [[ "$orig_lat_prefix" == "N" ]]; then
-                        	bottom_exists=1
-			    else
-				top_exists=1
-			    fi
-                    elif [ $dlat -eq 1 ] && [ $dlon -eq 0 ]; then
-       			    if [[ "$orig_lat_prefix" == "N" ]]; then
-				top_exists=1
-                            else
-				bottom_exists=1
-			    fi
+                if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
+                    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        left_exists=1
+                    else
+                        right_exists=1
                     fi
+                fi
+                if [ $dlat -eq 0 ] && [ $dlon -eq 1 ]; then
+                    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        right_exists=1
+                    else
+                        left_exists=1
+                    fi
+                fi
+                if [ $dlat -eq -1 ] && [ $dlon -eq 0 ]; then
+                    if [[ "$orig_lat_prefix" == "N" ]]; then
+                        bottom_exists=1
+                    else
+                        top_exists=1
+                    fi
+                fi
+                if [ $dlat -eq 1 ] && [ $dlon -eq 0 ]; then
+                    if [[ "$orig_lat_prefix" == "N" ]]; then
+                        top_exists=1
+                    else
+                        bottom_exists=1
+                    fi
+                fi
                 fi
             done
         done 
@@ -236,7 +239,7 @@ process_tiff ()
         echo "${neighbors[@]}"
 
         xres=0.0002776235424764020234
-        if ((  isHighRes  )); then
+        if ((  $isHighRes  )); then
             xres=$(echo "scale=20; 0.0002776235424764020234 / 4.54957740397" | bc)
         fi
         yres=$xres
