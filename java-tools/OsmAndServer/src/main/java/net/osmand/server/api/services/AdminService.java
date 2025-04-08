@@ -82,16 +82,19 @@ public class AdminService {
 				String info = createPayloadInfo(pu);
 				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : map.values()) {
 					s.payload = info;
-					if (s.purchaseToken != null) {
-						s.purchaseToken = s.purchaseToken.length() > 15 ? s.purchaseToken.substring(0, 15) : s.purchaseToken;
-					}
+					s.purchaseToken = trimPurchaseToken(s.purchaseToken);
 				}
 				if (!map.isEmpty()) {
 					result = new ArrayList<>(map.values());
 				}
 			}
 		} else {
-			result = subscriptionsRepository.findByOrderId(identifier);
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(identifier);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
+					s.purchaseToken = trimPurchaseToken(s.purchaseToken);
+				}
+			}
 		}
 
 		return result;
@@ -103,9 +106,7 @@ public class AdminService {
 					.map(pu -> {
 						List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(pu.id);
 						for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
-							if (s.purchaseToken != null) {
-								s.purchaseToken = s.purchaseToken.length() > 15 ? s.purchaseToken.substring(0, 15) : s.purchaseToken;
-							}
+							s.purchaseToken = trimPurchaseToken(s.purchaseToken);
 						}
 						return purchases;
 					})
@@ -116,15 +117,21 @@ public class AdminService {
 		return Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(identifier))
 				.map(purchases -> {
 					for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
-						if (s.purchaseToken != null) {
-							s.purchaseToken = s.purchaseToken.length() > 15 ? s.purchaseToken.substring(0, 15) : s.purchaseToken;
-						}
+						s.purchaseToken = trimPurchaseToken(s.purchaseToken);
 					}
 					return purchases;
 				})
 				.filter(list -> !list.isEmpty())
 				.orElse(Collections.emptyList());
 	}
+
+	private String trimPurchaseToken(String purchaseToken) {
+		if (purchaseToken != null) {
+			return purchaseToken.length() > 15 ? purchaseToken.substring(0, 15) : purchaseToken;
+		}
+		return null;
+	}
+
 
 
 	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {
