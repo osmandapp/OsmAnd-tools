@@ -28,6 +28,7 @@ import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import java.io.*;
@@ -266,16 +267,16 @@ public class BinaryInspector {
 				} else {
 					List<FileExtractFrom> parts = new ArrayList<>();
 					FileExtractFrom lastPart = null;
-                    String date = null;
+					String date = null;
 					for (int i = 2; i < args.length; i++) {
 						if ((args[i].startsWith("-") || args[i].startsWith("+"))) {
 							if(lastPart == null) {
 								System.err.println("Expected file name instead of " + args[i]);
 								return;
 							}
-                            if (args[i].startsWith("--date")) {
-                                date = args[i].replace("--date", "").replace("=", "");
-                            } else if (args[i].startsWith("--") || args[i].startsWith("++")) {
+							if (args[i].startsWith("--date")) {
+								date = args[i].replace("--date", "").replace("=", "");
+							} else if (args[i].startsWith("--") || args[i].startsWith("++")) {
 								String[] st = args[i].substring(2).split(",");
 								TreeSet<Integer> ts = new TreeSet<>();
 								for (String s : st) {
@@ -391,16 +392,18 @@ public class BinaryInspector {
 		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm");
-        long dateCreated = System.currentTimeMillis();
-        try {
-            Date d = dateFormat.parse(date);
-            dateCreated = d.getTime();
-        } catch (ParseException e) {
-            System.err.println("Date is wrong! Right format is yyyy-MM-ddHH:mm");
-        }
+		long dateCreated = System.currentTimeMillis();
+		if (!Algorithms.isEmpty(date)) {
+			SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm");
+			try {
+				Date d = dateFormat.parse(date);
+				dateCreated = d.getTime();
+			} catch (ParseException e) {
+				System.err.println("Date is wrong! Right format is yyyy-MM-ddHH:mm");
+			}
+		}
 
-        ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
+		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSION_FIELD_NUMBER, version);
 		ous.writeInt64(OsmandOdb.OsmAndStructure.DATECREATED_FIELD_NUMBER, dateCreated);
 		// Go through all files and validate conistency
 		int parts = 0;
