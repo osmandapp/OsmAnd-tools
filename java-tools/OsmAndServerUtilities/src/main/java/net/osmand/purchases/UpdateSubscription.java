@@ -93,6 +93,7 @@ public class UpdateSubscription {
 		public boolean verifyAll;
 		public boolean verbose;
 		public boolean forceUpdate;
+		public String orderId;
 	}
 
 	public enum SubscriptionType {
@@ -197,6 +198,8 @@ public class UpdateSubscription {
 				set = EnumSet.of(SubscriptionType.AMAZON);
 			} else if ("-forceupdate".equals(args[i])) {
 				up.forceUpdate = true;
+			} else if (args[i].startsWith("-orderid=")) {
+				up.orderId = args[i].substring("-orderid=".length());
 			}
 		}
 		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
@@ -248,7 +251,8 @@ public class UpdateSubscription {
 				continue;
 			}
 			long delayBetweenChecks = checkTime == null ? MINIMUM_WAIT_TO_REVALIDATE : (currentTime - checkTime.getTime());
-			if (delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll) {
+			boolean forceCheckOrderId = !Algorithms.isEmpty(pms.orderId) && pms.orderId.equals(orderId);
+			if (delayBetweenChecks < MINIMUM_WAIT_TO_REVALIDATE && !pms.verifyAll && !forceCheckOrderId) {
 				// in case validate all (ignore minimum waiting time)
 				continue;
 			}
