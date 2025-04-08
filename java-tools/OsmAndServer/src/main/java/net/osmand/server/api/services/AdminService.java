@@ -100,15 +100,32 @@ public class AdminService {
 	public List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
 		if (emailSender.isEmail(identifier)) {
 			return Optional.ofNullable(usersRepository.findByEmailIgnoreCase(identifier))
-					.map(pu -> deviceInAppPurchasesRepository.findByUserId(pu.id))
+					.map(pu -> {
+						List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(pu.id);
+						for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
+							if (s.purchaseToken != null) {
+								s.purchaseToken = s.purchaseToken.length() > 15 ? s.purchaseToken.substring(0, 15) : s.purchaseToken;
+							}
+						}
+						return purchases;
+					})
 					.filter(list -> !list.isEmpty())
 					.orElse(Collections.emptyList());
 		}
 
 		return Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(identifier))
+				.map(purchases -> {
+					for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
+						if (s.purchaseToken != null) {
+							s.purchaseToken = s.purchaseToken.length() > 15 ? s.purchaseToken.substring(0, 15) : s.purchaseToken;
+						}
+					}
+					return purchases;
+				})
 				.filter(list -> !list.isEmpty())
 				.orElse(Collections.emptyList());
 	}
+
 
 	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {
 		UserdataController.UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
