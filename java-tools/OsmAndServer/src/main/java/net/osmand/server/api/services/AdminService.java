@@ -82,19 +82,13 @@ public class AdminService {
 				String info = createPayloadInfo(pu);
 				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : map.values()) {
 					s.payload = info;
-					s.purchaseToken = trimPurchaseToken(s.purchaseToken);
 				}
 				if (!map.isEmpty()) {
 					result = new ArrayList<>(map.values());
 				}
 			}
 		} else {
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(identifier);
-			if (subscriptions != null && !subscriptions.isEmpty()) {
-				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
-					s.purchaseToken = trimPurchaseToken(s.purchaseToken);
-				}
-			}
+			result = subscriptionsRepository.findByOrderId(identifier);
 		}
 
 		return result;
@@ -103,36 +97,15 @@ public class AdminService {
 	public List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> getInappsDetailsByIdentifier(String identifier) {
 		if (emailSender.isEmail(identifier)) {
 			return Optional.ofNullable(usersRepository.findByEmailIgnoreCase(identifier))
-					.map(pu -> {
-						List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(pu.id);
-						for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
-							s.purchaseToken = trimPurchaseToken(s.purchaseToken);
-						}
-						return purchases;
-					})
+					.map(pu -> deviceInAppPurchasesRepository.findByUserId(pu.id))
 					.filter(list -> !list.isEmpty())
 					.orElse(Collections.emptyList());
 		}
 
 		return Optional.ofNullable(deviceInAppPurchasesRepository.findByOrderId(identifier))
-				.map(purchases -> {
-					for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase s : purchases) {
-						s.purchaseToken = trimPurchaseToken(s.purchaseToken);
-					}
-					return purchases;
-				})
 				.filter(list -> !list.isEmpty())
 				.orElse(Collections.emptyList());
 	}
-
-	private String trimPurchaseToken(String purchaseToken) {
-		if (purchaseToken != null) {
-			return purchaseToken.length() > 15 ? purchaseToken.substring(0, 15) : purchaseToken;
-		}
-		return null;
-	}
-
-
 
 	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {
 		UserdataController.UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
