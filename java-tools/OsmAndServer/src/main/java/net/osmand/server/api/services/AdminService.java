@@ -71,12 +71,12 @@ public class AdminService {
 				int userid = pu.id;
 				Map<String, DeviceSubscriptionsRepository.SupporterDeviceSubscription> map = new LinkedHashMap<>();
 				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptionsRepository.findAllByUserId(userid)) {
-					map.put(s.orderId, s);
+					map.put(s.orderId + s.sku, s);
 				}
 				String orderId = pu.orderid;
 				if (orderId != null) {
 					for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptionsRepository.findByOrderId(orderId)) {
-						map.put(s.orderId, s);
+						map.put(s.orderId + s.sku, s);
 					}
 				}
 				String info = createPayloadInfo(pu);
