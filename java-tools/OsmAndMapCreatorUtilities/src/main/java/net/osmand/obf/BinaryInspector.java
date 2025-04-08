@@ -343,7 +343,7 @@ public class BinaryInspector {
 						}
 					}
 					File to = new File(args[1]);
-					int partsS = combineParts(to, parts);
+					int partsS = combineParts(to, parts, date);
 					if (partsS > 0) {
 						println("\n" + partsS + " parts were successfully extracted to " + to.getName());
 					}
