@@ -23,6 +23,8 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 	List<SupporterDeviceSubscription> findByOrderId(String orderId);
 
+	List<SupporterDeviceSubscription> findByOrderIdAndPurchaseToken(String orderId, String purchaseToken);
+
 	List<SupporterDeviceSubscription> findFirst5BySkuOrderByStarttimeDesc(String sku);
 
     List<SupporterDeviceSubscription> findAllByUserId(Integer userId);
