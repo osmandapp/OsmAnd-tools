@@ -7,8 +7,10 @@ import com.google.api.services.androidpublisher.model.ProductPurchase;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.osmand.PlatformUtil;
 import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
+import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
 import java.io.IOException;
@@ -25,6 +27,8 @@ import static net.osmand.purchases.HuaweiIAPHelper.*;
 
 public class UpdateInAppPurchase {
 
+    private static final Log LOGGER = PlatformUtil.getLog(UpdateInAppPurchase.class);
+
     // Constants specific to IAP verification
     public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
     public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
@@ -32,6 +36,7 @@ public class UpdateInAppPurchase {
     public static final String PLATFORM_APPLE = "apple";
     public static final String PLATFORM_AMAZON = "amazon";
     public static final String PLATFORM_HUAWEI = "huawei";
+    public static final String PLATFORM_FASTSPRING = "fastspring";
 
     private static final int BATCH_SIZE = 200;
     private static final long HOUR = 1000L * 60 * 60;
@@ -54,9 +59,10 @@ public class UpdateInAppPurchase {
     private final ReceiptValidationHelper receiptHelper; // Apple API
     private final AmazonIAPHelper amazonHelper; // Amazon Helper
     private final HuaweiIAPHelper huaweiHelper; // Huawei Helper
+    private final FastSpringHelper fastSpringHelper;
 
     public enum PurchasePlatform {
-        GOOGLE, APPLE, AMAZON, HUAWEI, UNKNOWN
+        GOOGLE, APPLE, AMAZON, HUAWEI, FASTSPRING, UNKNOWN
     }
 
     private static class UpdateParams {
@@ -65,11 +71,12 @@ public class UpdateInAppPurchase {
     }
 
     // Constructor would take repositories and helpers
-    public UpdateInAppPurchase(AndroidPublisher publisher, ReceiptValidationHelper receiptHelper, AmazonIAPHelper amazonHelper, HuaweiIAPHelper huaweiHelper) {
+    public UpdateInAppPurchase(AndroidPublisher publisher, ReceiptValidationHelper receiptHelper, AmazonIAPHelper amazonHelper, HuaweiIAPHelper huaweiHelper, FastSpringHelper fastSpringHelper) {
         this.publisher = publisher;
         this.receiptHelper = receiptHelper;
         this.amazonHelper = amazonHelper;
         this.huaweiHelper = huaweiHelper;
+        this.fastSpringHelper = fastSpringHelper;
 
         // --- Define SQL Queries for the `supporters_device_iap` table ---
         // Select purchases that are pending validation or haven't been checked recently
@@ -101,6 +108,7 @@ public class UpdateInAppPurchase {
         boolean onlyApple = false;
         boolean onlyAmazon = false;
         boolean onlyHuawei = false;
+        boolean onlyFastSpring = false;
 
         for (String arg : args) {
             if ("-verifyall".equals(arg)) up.verifyAll = true;
@@ -110,13 +118,14 @@ public class UpdateInAppPurchase {
             else if ("-onlyapple".equals(arg)) onlyApple = true;
             else if ("-onlyamazon".equals(arg)) onlyAmazon = true;
             else if ("-onlyhuawei".equals(arg)) onlyHuawei = true;
+            else if ("-onlyfastspring".equals(arg)) onlyFastSpring = true;
         }
 
         AndroidPublisher publisher = null;
         // Initialize publisher only if needed
-        if (!onlyApple && !onlyAmazon && !onlyHuawei && !Algorithms.isEmpty(androidClientSecretFile)) {
+        if (!onlyApple && !onlyAmazon && !onlyHuawei && !onlyFastSpring && !Algorithms.isEmpty(androidClientSecretFile)) {
             publisher = getPublisherApi(androidClientSecretFile);
-        } else if (!onlyApple && !onlyAmazon && !onlyHuawei) {
+        } else if (!onlyApple && !onlyAmazon && !onlyHuawei && !onlyFastSpring) {
             System.err.println("Warning: Android client secret not provided. Cannot verify Google IAPs.");
         }
 
@@ -124,14 +133,15 @@ public class UpdateInAppPurchase {
         ReceiptValidationHelper receiptHelper = new ReceiptValidationHelper();
         AmazonIAPHelper amazonHelper = new AmazonIAPHelper();
         HuaweiIAPHelper huaweiHelper = new HuaweiIAPHelper();
+        FastSpringHelper fastSpringHelper = new FastSpringHelper();
 
         Class.forName("org.postgresql.Driver");
         List<PurchaseUpdateException> exceptionsUpdates = new ArrayList<>();
         try (Connection conn = DriverManager.getConnection(System.getenv("DB_CONN"),
                 System.getenv("DB_USER"), System.getenv("DB_PWD"))) {
 
-            UpdateInAppPurchase updater = new UpdateInAppPurchase(publisher, receiptHelper, amazonHelper, huaweiHelper);
-            updater.queryPurchases(conn, up, exceptionsUpdates, onlyGoogle, onlyApple, onlyAmazon, onlyHuawei);
+            UpdateInAppPurchase updater = new UpdateInAppPurchase(publisher, receiptHelper, amazonHelper, huaweiHelper, fastSpringHelper);
+            updater.queryPurchases(conn, up, exceptionsUpdates, onlyGoogle, onlyApple, onlyAmazon, onlyHuawei, onlyFastSpring);
         }
 
         if (!exceptionsUpdates.isEmpty()) {
@@ -146,7 +156,7 @@ public class UpdateInAppPurchase {
     }
 
     void queryPurchases(Connection conn, UpdateParams pms, List<PurchaseUpdateException> exceptionsUpdates,
-                        boolean onlyGoogle, boolean onlyApple, boolean onlyAmazon, boolean onlyHuawei) throws SQLException {
+                        boolean onlyGoogle, boolean onlyApple, boolean onlyAmazon, boolean onlyHuawei, boolean onlyFastspring) throws SQLException {
         ResultSet rs = null;
         Statement stmt = null;
         try {
@@ -184,13 +194,16 @@ public class UpdateInAppPurchase {
                     purchasePlatform = PurchasePlatform.AMAZON;
                 } else if (PLATFORM_HUAWEI.equalsIgnoreCase(platform)) {
                     purchasePlatform = PurchasePlatform.HUAWEI;
+                } else if (PLATFORM_FASTSPRING.equalsIgnoreCase(platform)) {
+                    purchasePlatform = PurchasePlatform.FASTSPRING;
                 }
 
                 // Skip based on platform filter
                 if ((onlyGoogle && purchasePlatform != PurchasePlatform.GOOGLE) ||
                         (onlyApple && purchasePlatform != PurchasePlatform.APPLE) ||
                         (onlyAmazon && purchasePlatform != PurchasePlatform.AMAZON) ||
-                        (onlyHuawei && purchasePlatform != PurchasePlatform.HUAWEI)) {
+                        (onlyHuawei && purchasePlatform != PurchasePlatform.HUAWEI) ||
+                (onlyFastspring && purchasePlatform != PurchasePlatform.FASTSPRING)) {
                     continue;
                 }
 
@@ -224,6 +237,8 @@ public class UpdateInAppPurchase {
                         // Parameters for Huawei might need adjustment
                         // Assuming purchaseToken = purchaseToken, sku = productId
                         updated = processHuaweiInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
+                    } else if (purchasePlatform == PurchasePlatform.FASTSPRING && fastSpringHelper != null) {
+                        updated = processFastspringInAppPurchase(purchaseToken, sku, orderId, currentTime, pms);
                     } else {
                         // Handle unknown or unconfigured platforms
                         if (purchasePlatform == PurchasePlatform.UNKNOWN) {
@@ -607,6 +622,44 @@ public class UpdateInAppPurchase {
 
         System.err.println("WARN: Reached unexpected state for Huawei IAP " + sku + " (Token: " + purchaseToken + ")");
         return false;
+    }
+
+    private boolean processFastspringInAppPurchase(String purchaseToken, String sku, String orderId, long currentTime, UpdateParams pms) throws SQLException {
+        if (Algorithms.isEmpty(purchaseToken) || Algorithms.isEmpty(sku)) {
+            markAsInvalid(orderId != null ? orderId : "null_order", sku, currentTime, "Missing purchaseToken or productId (sku) for Huawei validation");
+            return true;
+        }
+
+        FastSpringHelper.FastSpringPurchase purchase = null;
+
+        try {
+            purchase = FastSpringHelper.getInAppPurchaseByOrderIdAndSku(orderId, sku);
+            if (pms.verbose && purchase != null) {
+                LOGGER.info("Fastspring API Result: " + purchase);
+            }
+        } catch (IOException e) {
+            LOGGER.error("WARN: IOException verifying Fastspring IAP " + sku + " (OrderId: " + orderId + "): " + e.getMessage());
+        }
+
+        if (purchase == null) {
+            markAsInvalid(orderId, sku, currentTime, "Purchase not found via Fastspring API");
+        } else {
+            int ind = 1;
+            updStat.setTimestamp(ind++, new Timestamp(currentTime));
+            long purchaseTimeMillis = purchase.purchaseTime;
+            updStat.setTimestamp(ind++, new Timestamp(purchaseTimeMillis));
+            updStat.setBoolean(ind++, purchase.isValid());
+            updStat.setString(ind++, orderId);
+            updStat.setString(ind, sku);
+            updStat.addBatch();
+            changes++;
+            if (changes >= BATCH_SIZE) {
+                updStat.executeBatch();
+                changes = 0;
+            }
+            LOGGER.info("Updated Fastspring IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ", Token: " + purchaseToken + ") - Valid: " + purchase.isValid());
+        }
+        return true;
     }
 
     private void markAsInvalid(String orderId, String sku, long tm, String reason) throws SQLException {

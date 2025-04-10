@@ -50,6 +50,8 @@ import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.purchases.FastSpringHelper.*;
+
 
 public class UpdateSubscription {
 
@@ -103,6 +105,7 @@ public class UpdateSubscription {
 		ANDROID,
 //		ANDROID_LEGACY,
 		PROMO,
+		FASTSPRING,
 		UNKNOWN;
 
 		public static SubscriptionType fromSku(String sku) {
@@ -127,6 +130,8 @@ public class UpdateSubscription {
 				return ANDROID;
 			} else if (sku.startsWith("promo_")) {
 				return PROMO;
+			} else if (sku.startsWith("net.osmand.fastspring")) {
+				return FASTSPRING;
 			}
 			return UNKNOWN;
 		}
@@ -174,7 +179,8 @@ public class UpdateSubscription {
 				SubscriptionType.ANDROID,
 				SubscriptionType.IOS,
 				SubscriptionType.HUAWEI,
-				SubscriptionType.AMAZON);
+				SubscriptionType.AMAZON,
+				SubscriptionType.FASTSPRING);
 
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
@@ -196,6 +202,8 @@ public class UpdateSubscription {
 				set = EnumSet.of(SubscriptionType.HUAWEI);
 			} else if ("-onlyamazon".equals(args[i])) {
 				set = EnumSet.of(SubscriptionType.AMAZON);
+			} else if ("-onlyfastspring".equals(args[i])) {
+				set = EnumSet.of(SubscriptionType.FASTSPRING);
 			} else if ("-forceupdate".equals(args[i])) {
 				up.forceUpdate = true;
 			} else if (args[i].startsWith("-orderid=")) {
@@ -289,6 +297,8 @@ public class UpdateSubscription {
 				} else if (subType == SubscriptionType.ANDROID) {
 					sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
 							regTime, startTime, expireTime, currentTime, pms);
+				} else if (subType == SubscriptionType.FASTSPRING) {
+					sub = processFastSpringSubscription(sku, orderId, startTime, expireTime, currentTime, pms);
 				}
 				if (sub == null && prevpurchaseToken != null) {
 					exceptionsUpdates.add(new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid."));
@@ -594,6 +604,61 @@ public class UpdateSubscription {
 			deleteSubscription(orderId, sku, currentTime, reason, kind);
 		} else {
 			System.err.println(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
+			int ind = 1;
+			updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+			updCheckStat.setString(ind++, orderId);
+			updCheckStat.setString(ind++, sku);
+			updCheckStat.addBatch();
+			checkChanges++;
+			if (checkChanges > BATCH_SIZE) {
+				updCheckStat.executeBatch();
+				checkChanges = 0;
+			}
+		}
+		return subscription;
+	}
+
+	private SubscriptionPurchase processFastSpringSubscription(String sku, String orderId, Timestamp startTime, Timestamp expireTime,
+	                                                          long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
+		SubscriptionPurchase subscription = null;
+		String reason = "";
+		String kind = null;
+
+		try {
+			FastSpringHelper.FastSpringSubscription fsSub = getSubscriptionByOrderIdAndSku(orderId, sku);
+			if (fsSub == null) {
+				reason = "FastSpring: subscription not found";
+			} else if (!Boolean.TRUE.equals(fsSub.active)) {
+				kind = "expired";
+				reason = "FastSpring: subscription not active";
+			} else {
+				subscription = new SubscriptionPurchase();
+				subscription.setOrderId(fsSub.id);
+				subscription.setStartTimeMillis(fsSub.begin);
+				subscription.setExpiryTimeMillis(fsSub.nextChargeDate);
+				subscription.setAutoRenewing(fsSub.autoRenew);
+
+				if (pms.verbose) {
+					LOGGER.info("Result: " + subscription.toPrettyString());
+				}
+			}
+		} catch (Exception e) {
+			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+				reason = String.format(" subscription expired more than %.1f days ago (%s)",
+						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
+				kind = "expired";
+			} else {
+				reason = "FastSpring error: " + e.getMessage();
+			}
+		}
+
+		if (subscription != null) {
+			updateSubscriptionDb(orderId, sku, startTime, expireTime, currentTime, subscription, pms);
+			changes++;
+		} else if (kind != null) {
+			deleteSubscription(orderId, sku, currentTime, reason, kind);
+		} else {
+			LOGGER.error(String.format("ERROR updating sku '%s' orderId '%s': %s", sku, orderId, reason));
 			int ind = 1;
 			updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
 			updCheckStat.setString(ind++, orderId);
