@@ -50,7 +50,7 @@ import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
 
-import static net.osmand.purchases.FastSpringHelper.*;
+import static net.osmand.purchases.FastSpringHelper.FastSpringSubscription;
 
 
 public class UpdateSubscription {
@@ -629,7 +629,7 @@ public class UpdateSubscription {
 		String kind = null;
 
 		try {
-			FastSpringHelper.FastSpringSubscription fsSub = getSubscriptionByOrderIdAndSku(orderId, sku);
+			FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(orderId, sku);
 			if (fsSub == null) {
 				reason = "FastSpring: subscription not found";
 			} else if (!Boolean.TRUE.equals(fsSub.active)) {
@@ -641,7 +641,7 @@ public class UpdateSubscription {
 				subscription.setStartTimeMillis(fsSub.begin);
 				subscription.setExpiryTimeMillis(fsSub.nextChargeDate);
 				subscription.setAutoRenewing(fsSub.autoRenew);
-				subscription.setPriceAmountMicros(Math.round(fsSub.price * 100000));
+				subscription.setPriceAmountMicros(Math.round(fsSub.price * 1000000));
 				subscription.setPriceCurrencyCode(fsSub.currency);
 
 				if (pms.verbose) {

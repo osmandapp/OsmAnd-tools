@@ -9,10 +9,8 @@ import com.google.api.services.androidpublisher.model.ProductPurchase;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.osmand.PlatformUtil;
 import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
 import net.osmand.util.Algorithms;
-import org.apache.commons.logging.Log;
 import org.json.JSONException;
 
 import java.io.IOException;
@@ -27,8 +25,6 @@ import static net.osmand.purchases.AmazonIAPHelper.*;
 import static net.osmand.purchases.HuaweiIAPHelper.*;
 
 public class UpdateInAppPurchase {
-
-    private static final Log LOGGER = PlatformUtil.getLog(UpdateInAppPurchase.class);
 
     // Constants specific to IAP verification
     public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
@@ -708,10 +704,10 @@ public class UpdateInAppPurchase {
         try {
             purchase = FastSpringHelper.getInAppPurchaseByOrderIdAndSku(orderId, sku);
             if (pms.verbose && purchase != null) {
-                LOGGER.info("Fastspring API Result: " + purchase);
+                System.out.println("Fastspring API Result: " + purchase);
             }
         } catch (IOException e) {
-            LOGGER.error("WARN: IOException verifying Fastspring IAP " + sku + " (OrderId: " + orderId + "): " + e.getMessage());
+            System.err.println("WARN: IOException verifying Fastspring IAP " + sku + " (OrderId: " + orderId + "): " + e.getMessage());
         }
 
         if (purchase == null) {
@@ -722,6 +718,8 @@ public class UpdateInAppPurchase {
             long purchaseTimeMillis = purchase.purchaseTime;
             updStat.setTimestamp(ind++, new Timestamp(purchaseTimeMillis));
             updStat.setBoolean(ind++, purchase.isValid());
+            updStat.setInt(ind++, (int) (purchase.price * 1000));
+            updStat.setString(ind++, purchase.currency);
             updStat.setString(ind++, orderId);
             updStat.setString(ind, sku);
             updStat.addBatch();
@@ -730,7 +728,7 @@ public class UpdateInAppPurchase {
                 updStat.executeBatch();
                 changes = 0;
             }
-            LOGGER.info("Updated Fastspring IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ", Token: " + purchaseToken + ") - Valid: " + purchase.isValid());
+            System.out.println("Updated Fastspring IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ", Token: " + purchaseToken + ") - Valid: " + purchase.isValid());
         }
         return true;
     }

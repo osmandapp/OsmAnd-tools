@@ -97,7 +97,9 @@ public class FastSpringHelper {
 			if (sku.equals(item.sku)) {
 				Long purchaseTime = order.changed;
 				Boolean completed = order.completed;
-				return new FastSpringPurchase(item.sku, item.product, purchaseTime, completed);
+				String currency = order.currency;
+				Double price = item.subtotal;
+				return new FastSpringPurchase(item.sku, item.product, purchaseTime, completed, currency, price);
 			}
 		}
 		return null;
@@ -147,11 +149,13 @@ public class FastSpringHelper {
 		public String id;
 		public Long changed; //purchaseTime
 		public Boolean completed;
+		public String currency;
 		public List<Item> items;
 
 		public static class Item {
 			public String sku;
 			public String product;
+			public Double subtotal;
 			public String subscription; //subscriptionId
 		}
 	}
@@ -173,12 +177,16 @@ public class FastSpringHelper {
 		public String product;
 		public Long purchaseTime;
 		public Boolean completed;
+		public String currency;
+		public Double price;
 
-		FastSpringPurchase(String sku, String product, Long purchaseTime, Boolean completed) {
+		FastSpringPurchase(String sku, String product, Long purchaseTime, Boolean completed, String currency, Double price) {
 			this.sku = sku;
 			this.product = product;
 			this.purchaseTime = purchaseTime;
 			this.completed = completed;
+			this.currency = currency;
+			this.price = price;
 		}
 
 		public boolean isValid() {
