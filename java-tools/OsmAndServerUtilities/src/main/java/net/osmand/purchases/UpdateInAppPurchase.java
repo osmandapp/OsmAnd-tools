@@ -3,6 +3,8 @@ package net.osmand.purchases;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.androidpublisher.AndroidPublisher;
+import com.google.api.services.androidpublisher.model.InAppProduct;
+import com.google.api.services.androidpublisher.model.Price;
 import com.google.api.services.androidpublisher.model.ProductPurchase;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -17,9 +19,8 @@ import java.io.IOException;
 import java.io.Serial;
 import java.security.GeneralSecurityException;
 import java.sql.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.Date;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static net.osmand.purchases.AmazonIAPHelper.*;
@@ -61,6 +62,8 @@ public class UpdateInAppPurchase {
     private final HuaweiIAPHelper huaweiHelper; // Huawei Helper
     private final FastSpringHelper fastSpringHelper;
 
+    private final Map<String, InAppProduct> cachedGoogleProducts = new HashMap<>();
+
     public enum PurchasePlatform {
         GOOGLE, APPLE, AMAZON, HUAWEI, FASTSPRING, UNKNOWN
     }
@@ -88,7 +91,7 @@ public class UpdateInAppPurchase {
 
         // Update query for IAP status
         updQuery = "UPDATE supporters_device_iap SET "
-                + " checktime = ?, purchase_time = ?, valid = ? "
+                + " checktime = ?, purchase_time = ?, valid = ?, price = ?, pricecurrency = ?"
                 + " WHERE orderid = ? AND sku = ?";
 
         // Query to just update checktime if no other change needed or error occurred
@@ -322,8 +325,8 @@ public class UpdateInAppPurchase {
         boolean shouldMarkInvalid = false;
         String invalidReason = null;
 
+        String packageName = sku.contains("_plus") ? GOOGLE_PACKAGE_NAME : GOOGLE_PACKAGE_NAME_FREE;
         try {
-            String packageName = sku.contains("_plus") ? GOOGLE_PACKAGE_NAME : GOOGLE_PACKAGE_NAME_FREE;
             purchase = publisher.purchases().products().get(packageName, sku, purchaseToken).execute();
             if (pms.verbose) {
                 System.out.println("Google API Result: " + purchase.toPrettyString());
@@ -351,6 +354,37 @@ public class UpdateInAppPurchase {
         }
 
         if (purchase != null) {
+            // Acquire price and currency
+            Integer priceValue = null;
+            String currency = null;
+            try {
+                InAppProduct product = cachedGoogleProducts.get(sku);
+                if (product == null) {
+                    product = publisher.inappproducts().get(packageName, sku).execute();
+                    if (product != null) {
+                        cachedGoogleProducts.put(sku, product);
+                    }
+                }
+                if (product != null) {
+                    Object regionCodeObj = purchase.get("regionCode");
+                    String regionCode = null;
+                    if (regionCodeObj instanceof String) {
+                        regionCode = (String) regionCodeObj;
+                    }
+                    Map<String, Price> prices = product.getPrices();
+                    Price price = prices != null && regionCode != null ? prices.get(regionCode) : null;
+                    if (price == null) {
+                        price = product.getDefaultPrice();
+                    }
+                    if (price != null) {
+                        priceValue = getPriceFromMicros(price.getPriceMicros());
+                        currency = price.getCurrency();
+                    }
+                }
+            } catch (IOException e) {
+                System.err.printf("WARN: IOException acquiring IAP product %s: %s%n", sku, e.getMessage());
+            }
+
             // --- Update DB based on Google API response ---
             int ind = 1;
             updStat.setTimestamp(ind++, new Timestamp(currentTime)); // checktime
@@ -362,6 +396,15 @@ public class UpdateInAppPurchase {
             // 0: Purchased, 1: Canceled, 2: Pending
             boolean isValid = purchase.getPurchaseState() != null && purchase.getPurchaseState() == 0;
             updStat.setBoolean(ind++, isValid); // valid
+
+            // price
+            if (priceValue != null && currency != null) {
+                updStat.setInt(ind++, priceValue);
+                updStat.setString(ind++, currency);
+            } else {
+                updStat.setNull(ind++, Types.INTEGER);
+                updStat.setNull(ind++, Types.VARCHAR);
+            }
 
             // Where clause parameters
             updStat.setString(ind++, orderId);
@@ -473,6 +516,10 @@ public class UpdateInAppPurchase {
             return true; // Processed (marked invalid)
         }
 
+        // price
+        updStat.setNull(ind++, Types.INTEGER);
+        updStat.setNull(ind++, Types.VARCHAR);
+
         // Where clause parameters
         updStat.setString(ind++, orderId);
         updStat.setString(ind, sku);
@@ -534,6 +581,10 @@ public class UpdateInAppPurchase {
             // Determine validity based on the purchase data (e.g., using purchase.isValid())
             boolean isValid = purchase.isValid(); // Use the validity logic from AmazonInAppPurchaseData
             updStat.setBoolean(ind++, isValid); // valid
+
+            // price
+            updStat.setNull(ind++, Types.INTEGER);
+            updStat.setNull(ind++, Types.VARCHAR);
 
             // Where clause parameters (use original DB orderId and sku)
             // We assumed DB orderId = amazonReceiptId for this method call.
@@ -603,6 +654,17 @@ public class UpdateInAppPurchase {
             boolean isValid = purchase.isValid(); // Use the validity logic from HuaweiInAppPurchaseData
             updStat.setBoolean(ind++, isValid); // valid
 
+            // price
+            Long price = purchase.price;
+            String currency = purchase.currency;
+            if (price != null && currency != null) {
+                updStat.setInt(ind++, (int) (price * 10000));
+                updStat.setString(ind++, currency);
+            } else {
+                updStat.setNull(ind++, Types.INTEGER);
+                updStat.setNull(ind++, Types.VARCHAR);
+            }
+
             // Where clause parameters (use original DB orderId and sku)
             // Need to ensure the combination of orderId and sku uniquely identifies the record in *our* DB.
             // If Huawei IAPs don't provide a unique orderId that we store in the 'orderid' column,
@@ -622,6 +684,17 @@ public class UpdateInAppPurchase {
 
         System.err.println("WARN: Reached unexpected state for Huawei IAP " + sku + " (Token: " + purchaseToken + ")");
         return false;
+    }
+
+    private Integer getPriceFromMicros(String priceMicros) {
+        if (Algorithms.isEmpty(priceMicros)) {
+            return null;
+        }
+        try {
+            return (int) (Long.parseLong(priceMicros) / 1000L);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private boolean processFastspringInAppPurchase(String purchaseToken, String sku, String orderId, long currentTime, UpdateParams pms) throws SQLException {
