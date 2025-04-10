@@ -164,6 +164,8 @@ public class FastSpringHelper {
 		public Long nextChargeDate; //expiretime
 		public String product;
 		public Boolean autoRenew;
+		public Double price;
+		public String currency;
 	}
 
 	public static class FastSpringPurchase {

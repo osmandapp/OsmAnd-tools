@@ -165,6 +165,10 @@ public class UpdateSubscription {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
+		} else if (subType == SubscriptionType.FASTSPRING) {
+				updQuery = "UPDATE supporters_device_sub SET "
+						+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
+						+ " price = ?, pricecurrency = ?, valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else {
 			updQuery = "UPDATE supporters_device_sub SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
@@ -210,7 +214,7 @@ public class UpdateSubscription {
 				up.orderId = args[i].substring("-orderid=".length());
 			}
 		}
-		AndroidPublisher publisher = getPublisherApi(androidClientSecretFile);
+		AndroidPublisher publisher = !Algorithms.isEmpty(androidClientSecretFile) ? getPublisherApi(androidClientSecretFile) : null;
 //		if (true) {
 //			test(publisher, "osm_live_subscription_annual_free_v2", args[1]);
 //			return;
@@ -637,6 +641,8 @@ public class UpdateSubscription {
 				subscription.setStartTimeMillis(fsSub.begin);
 				subscription.setExpiryTimeMillis(fsSub.nextChargeDate);
 				subscription.setAutoRenewing(fsSub.autoRenew);
+				subscription.setPriceAmountMicros(Math.round(fsSub.price * 100000));
+				subscription.setPriceCurrencyCode(fsSub.currency);
 
 				if (pms.verbose) {
 					LOGGER.info("Result: " + subscription.toPrettyString());
@@ -748,6 +754,9 @@ public class UpdateSubscription {
 			updStat.setString(ind++, subscription.getPriceCurrencyCode());
 		} else if (subType == SubscriptionType.AMAZON) {
 			// none
+		} else if (subType == SubscriptionType.FASTSPRING) {
+			updStat.setInt(ind++, (int) (subscription.getPriceAmountMicros() / 1000l));
+			updStat.setString(ind++, subscription.getPriceCurrencyCode());
 		} else {
 			if (subscription.getPaymentState() == null) {
 				updStat.setNull(ind++, Types.INTEGER);
