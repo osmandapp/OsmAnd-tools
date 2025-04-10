@@ -128,7 +128,8 @@ process_tiff ()
     isHighRes=0
 	if [ -f $highres_dir/$filenamefull ] ; then
 		filepath=$highres_dir/$filenamefull
-		isHighRes=1
+		indir=$highres_dir
+        isHighRes=1
         echo "Highres tile is found"
 		echo Using $filepath
 	fi
@@ -140,7 +141,7 @@ process_tiff ()
 		size_str=$(gdalinfo $filepath | grep "Size is" | sed 's/Size is //g')
 		width=$(echo $size_str | sed 's/,.*//')
 		height=$(echo $size_str | sed 's/.*,//')
-  
+
         if [[ $filename =~ ^([NS])([0-9]+)([EW])([0-9]+)$ ]]; then
             lat_prefix="${BASH_REMATCH[1]}"
             lon_prefix="${BASH_REMATCH[3]}"
@@ -152,14 +153,13 @@ process_tiff ()
             echo "Error: Filename must be in the format [NS]XX[EW]YYY.tif"
             exit 1
         fi
-               
+
         left_exists=0
         right_exists=0
         bottom_exists=0
         top_exists=0
-  
+
         neighbors=()
-        neighbors+=("${indir}/$filenamefull")
 
         orig_lat_prefix="$lat_prefix"
         orig_lon_prefix="$lon_prefix"
@@ -167,6 +167,7 @@ process_tiff ()
         for dlat in -1 0 1; do
             for dlon in -1 0 1; do
                 if [ "$dlat" -eq 0 ] && [ "$dlon" -eq 0 ]; then
+                    neighbors+=("${indir}/$filenamefull")
                     continue
                 fi
 
@@ -234,9 +235,9 @@ process_tiff ()
                 fi
                 fi
             done
-        done 
+        done
 
-        echo "${neighbors[@]}"
+        echo Found neighbors: "${neighbors[@]}"
 
         xres=0.0002776235424764020234
         if ((  $isHighRes  )); then
@@ -250,11 +251,11 @@ process_tiff ()
         #Clipping
         num_lat=$lat
         num_lon=$lon
-        
+
         shopt -s extglob
         num_lat=$((10#$num_lat))
         num_lon=$((10#$num_lon))
-        
+
         if [[ $lat_prefix == "S" ]]; then
             num_lat="-$num_lat"
         fi
@@ -262,7 +263,7 @@ process_tiff ()
         if [[ $lon_prefix == "W" ]]; then
             num_lon="-$num_lon"
         fi
-        
+
         read ulx uly < <(gdalinfo "${indir}/$filenamefull" | awk '/Upper Left/ {gsub(/[(),]/,""); print $3, $4}')
 
         expansion=0.03
@@ -292,7 +293,7 @@ process_tiff ()
         else
             new_ymin=$(echo "$uly - $tile_size" | bc -l)
         fi
-      
+
         clippedFile="$TMP_DIR/${filename}.tif"
         gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
         
@@ -301,7 +302,7 @@ process_tiff ()
         echo "Using $clippedFile as source file for contours"
         filepath=$clippedFile
 		src_tiff=$filepath
-  
+
 		if [[ $width -ge 30000 ]] ; then
 			isolines_step=5
 		fi
@@ -370,7 +371,7 @@ process_tiff ()
 		if [[ ! $path_to_cutline ]] ; then
             lat_min="$num_lat"
             lon_min="$num_lon"
-            
+
             if [[ $num_lat == -* ]]; then
                 lat_max=$(( - (10#${num_lat:1}) + 1 ))
             else
@@ -386,7 +387,7 @@ process_tiff ()
             path_to_cutline="${TMP_DIR}/bbox_${filename}.geojson"
             echo '{"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "EPSG:4326"}}, "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[['"$lon_min"', '"$lat_min"'], ['"$lon_max"', '"$lat_min"'], ['"$lon_max"', '"$lat_max"'], ['"$lon_min"', '"$lat_max"'], ['"$lon_min"', '"$lat_min"']]]}}]}' > $path_to_cutline
 		fi
-  
+
         echo "Cropping by cutline …"
         time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
 #             time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
@@ -405,7 +406,7 @@ process_tiff ()
 		if [[ -f ${TMP_DIR}/$filename.tif ]] ; then rm -f ${TMP_DIR}/$filename.tif ; fi
 		${working_dir}/ogr2osm.py ${TMP_DIR}/$filename.shp -o $outdir/$filename.osm -e 4326 -t $translation_script
 		if [ $? -ne 0 ]; then echo $(date)' Error creating OSM file' & exit 5;fi
-	
+
 		echo "Compressing to osm.bz2 …"
 		lbzip2 -f $outdir/$filename.osm
 		if [ $? -ne 0 ]; then echo $(date)' Error compressing OSM file' & exit 6;fi
