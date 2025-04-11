@@ -18,9 +18,9 @@ public class FastSpringHelper {
 
 	public static final String FASTSPRING_PLATFORM = "fastspring";
 
-	public static final List<String> productMap = List.of("osmand-maps");
+	public static final List<String> productSkuMap = List.of("net.osmand.fastspring.inapp.maps.plus");
 
-	public static final List<String> subscriptionMap = List.of("osmand-pro-annual");
+	public static final List<String> subscriptionSkuMap = List.of("net.osmand.fastspring.subscription.pro.annual");
 
 	private static final String API_BASE = "https://api.fastspring.com";
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
@@ -40,38 +40,18 @@ public class FastSpringHelper {
 				LOG.warn("Failed to get subscription with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("Subscription[id=%s, sku=%s, product=%s, active=%s, autoRenew=%s, begin=%s, nextChargeDate=%s]",
-					sub.id, sub.sku, sub.product, sub.active, sub.autoRenew, sub.begin, sub.nextChargeDate));
+			LOG.info(String.format("Subscription[id=%s, sku=%s, active=%s, autoRenew=%s, begin=%s, nextChargeDate=%s]",
+					sub.id, sub.sku, sub.active, sub.autoRenew, sub.begin, sub.nextChargeDate));
 		} else if (type.equals("-inapp")) {
 			FastSpringPurchase inApp = getInAppPurchaseByOrderIdAndSku(orderId, sku);
 			if (inApp == null) {
 				LOG.warn("Failed to get in-app purchase with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("InAppPurchase[sku=%s, product=%s, purchaseTime=%s, completed=%s, valid=%s]",
-					inApp.sku, inApp.product, inApp.purchaseTime, inApp.completed, inApp.isValid()));
+			LOG.info(String.format("InAppPurchase[sku=%s, purchaseTime=%s, completed=%s, valid=%s]",
+					inApp.sku, inApp.purchaseTime, inApp.completed, inApp.isValid()));
 		} else {
 			LOG.warn("Unknown type: " + type);
-		}
-	}
-
-
-	public static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
-		HttpURLConnection connection = openConnection("/subscriptions/" + subscriptionId);
-		try (InputStream is = connection.getInputStream();
-		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			if (connection.getResponseCode() != 200) {
-				LOG.warn("Failed to get FastSpring subscription: " +
-						connection.getResponseCode() + " " + connection.getResponseMessage());
-				return null;
-			}
-			FastSpringSubscription subscription = new Gson().fromJson(reader, FastSpringSubscription.class);
-			if (subscription == null) {
-				LOG.warn("Failed to get FastSpring subscription: " + connection.getResponseCode() + " " + connection.getResponseMessage());
-				return null;
-			}
-
-			return subscription;
 		}
 	}
 
@@ -99,7 +79,7 @@ public class FastSpringHelper {
 				Boolean completed = order.completed;
 				String currency = order.currency;
 				Double price = item.subtotal;
-				return new FastSpringPurchase(item.sku, item.product, purchaseTime, completed, currency, price);
+				return new FastSpringPurchase(item.sku, purchaseTime, completed, currency, price);
 			}
 		}
 		return null;
@@ -121,6 +101,25 @@ public class FastSpringHelper {
 			}
 
 			return order;
+		}
+	}
+
+	private static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
+		HttpURLConnection connection = openConnection("/subscriptions/" + subscriptionId);
+		try (InputStream is = connection.getInputStream();
+		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			if (connection.getResponseCode() != 200) {
+				LOG.warn("Failed to get FastSpring subscription: " +
+						connection.getResponseCode() + " " + connection.getResponseMessage());
+				return null;
+			}
+			FastSpringSubscription subscription = new Gson().fromJson(reader, FastSpringSubscription.class);
+			if (subscription == null) {
+				LOG.warn("Failed to get FastSpring subscription: " + connection.getResponseCode() + " " + connection.getResponseMessage());
+				return null;
+			}
+
+			return subscription;
 		}
 	}
 
@@ -154,7 +153,6 @@ public class FastSpringHelper {
 
 		public static class Item {
 			public String sku;
-			public String product;
 			public Double subtotal;
 			public String subscription; //subscriptionId
 		}
@@ -166,7 +164,6 @@ public class FastSpringHelper {
 		public String sku;
 		public Long begin; //purchaseTime
 		public Long nextChargeDate; //expiretime
-		public String product;
 		public Boolean autoRenew;
 		public Double price;
 		public String currency;
@@ -174,15 +171,13 @@ public class FastSpringHelper {
 
 	public static class FastSpringPurchase {
 		public String sku;
-		public String product;
 		public Long purchaseTime;
 		public Boolean completed;
 		public String currency;
 		public Double price;
 
-		FastSpringPurchase(String sku, String product, Long purchaseTime, Boolean completed, String currency, Double price) {
+		FastSpringPurchase(String sku, Long purchaseTime, Boolean completed, String currency, Double price) {
 			this.sku = sku;
-			this.product = product;
 			this.purchaseTime = purchaseTime;
 			this.completed = completed;
 			this.currency = currency;

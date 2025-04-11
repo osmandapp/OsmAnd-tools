@@ -2,19 +2,19 @@ package net.osmand.server.controllers.pub;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.*;
-
-import static net.osmand.purchases.FastSpringHelper.*;
 
 @Controller
 @RequestMapping("/fs")
@@ -31,6 +31,7 @@ public class FastSpringController {
 
 	// Usually, "order-completed" is expected to arrive before "subscription.activated", but the order is not guaranteed, so both are handled independently.
 
+	@Transactional
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
 		for (FastSpringOrderCompletedRequest.Event event : request.events) {
@@ -42,11 +43,12 @@ public class FastSpringController {
 				if (user != null) {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = new ArrayList<>();
+					String orderId = data.order;
+					int userId = user.id;
 					for (FastSpringOrderCompletedRequest.Item item : data.items) {
-						String prodId = item.product;
-						if (productMap.contains(prodId)) {
+						String sku = item.sku;
+						if (FastSpringHelper.productSkuMap.contains(sku)) {
 							// Handle product purchase
-							String orderId = data.order;
 							List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
 
 							if (existingInApps != null && !existingInApps.isEmpty()) {
@@ -54,44 +56,41 @@ public class FastSpringController {
 							}
 
 							DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = new DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase();
-							iap.purchaseToken = data.reference;
-							iap.orderId = data.order;
-							iap.sku = item.sku;
-							iap.platform = FASTSPRING_PLATFORM;
+							iap.orderId = orderId;
+							iap.sku = sku;
+							iap.platform = FastSpringHelper.FASTSPRING_PLATFORM;
 							iap.purchaseTime = new Date(event.created);
 							iap.timestamp = new Date();
-							iap.userId = user.id;
+							iap.userId = userId;
 
 							purchases.add(iap);
-						} else if (subscriptionMap.contains(prodId)) {
+						} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
 							// Handle subscription purchase
-							String orderId = data.order;
 							List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
 
 							if (existingSubscriptions != null && !existingSubscriptions.isEmpty()) {
 								if (existingSubscriptions.size() > 1) {
-									return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and purchaseToken " + data.reference);
+									return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 								}
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription existingSubscription = existingSubscriptions.get(0);
 
-								if (!existingSubscription.purchaseToken.equals(data.reference) || !existingSubscription.orderId.equals(orderId)) {
-									return ResponseEntity.badRequest().body("FastSpring: purchaseToken or orderId mismatch " + data.reference + " " + orderId);
+								if (!existingSubscription.sku.equals(sku) || !existingSubscription.orderId.equals(orderId)) {
+									return ResponseEntity.badRequest().body("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
 								}
-								existingSubscription.userId = user.id;
+								existingSubscription.userId = userId;
 
 								subscriptions.add(existingSubscription);
 							} else {
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
-								subscription.purchaseToken = data.reference;
-								subscription.orderId = data.order;
-								subscription.sku = item.sku;
+								subscription.orderId = orderId;
+								subscription.sku = sku;
 								subscription.timestamp = new Date();
-								subscription.userId = user.id;
+								subscription.userId = userId;
 
 								subscriptions.add(subscription);
 							}
 						} else {
-							return ResponseEntity.badRequest().body("FastSpring: Unknown product " + prodId);
+							return ResponseEntity.badRequest().body("FastSpring: Unknown product " + sku);
 						}
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
@@ -103,24 +102,23 @@ public class FastSpringController {
 		return ResponseEntity.ok("OK");
 	}
 
+	@Transactional
 	@PostMapping("/subscription-activated")
 	public ResponseEntity<String> handleSubscriptionActivatedEvent(@RequestBody FastSpringSubscriptionActivatedRequest request) {
 		for (FastSpringSubscriptionActivatedRequest.Event event : request.events) {
 			if ("subscription.activated".equals(event.type)) {
 				FastSpringSubscriptionActivatedRequest.Data data = event.data;
-				if (!subscriptionMap.contains(data.product)) {
-					return ResponseEntity.badRequest().body("FastSpring: Unknown subscription " + data.product);
+				String sku = data.sku;
+				if (!FastSpringHelper.subscriptionSkuMap.contains(sku)) {
+					return ResponseEntity.badRequest().body("FastSpring: Unknown subscription " + sku);
 				}
 				String orderId = data.initialOrderId;
-				String sku = data.sku;
-				String purchaseToken = data.initialOrderReference;
-				List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderIdAndPurchaseTokenAndSku(orderId, purchaseToken, sku);
+				List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku);
 
 				if (existingSubscriptions == null || existingSubscriptions.isEmpty()) {
 					DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
-					subscription.purchaseToken = purchaseToken;
 					subscription.orderId = orderId;
-					subscription.sku = data.sku;
+					subscription.sku = sku;
 					subscription.starttime = new Date(data.begin);
 					subscription.expiretime = new Date(data.nextChargeDate);
 					subscription.timestamp = new Date();
@@ -130,7 +128,7 @@ public class FastSpringController {
 				}
 
 				if (existingSubscriptions.size() > 1) {
-					return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and purchaseToken " + purchaseToken + " and sku " + sku);
+					return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 				}
 
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = existingSubscriptions.get(0);
@@ -161,7 +159,6 @@ public class FastSpringController {
 		@Getter
 		@Setter
 		private static class Data {
-			private String reference; // purchaseToken
 			private String order; // orderId
 			private Customer customer;
 			private List<Item> items;
@@ -176,7 +173,6 @@ public class FastSpringController {
 		@Getter
 		@Setter
 		private static class Item {
-			private String product;
 			private String sku;
 		}
 	}
@@ -199,9 +195,7 @@ public class FastSpringController {
 		@Setter
 		private static class Data {
 			private String initialOrderId; // orderId
-			private String product;
 			private String sku;
-			private String initialOrderReference; // purchaseToken
 			private Long begin; // purchaseTime
 			private Long nextChargeDate; // expiretime
 		}

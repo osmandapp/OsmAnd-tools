@@ -237,7 +237,7 @@ public class UpdateInAppPurchase {
                         // Assuming purchaseToken = purchaseToken, sku = productId
                         updated = processHuaweiInAppPurchase(purchaseToken, sku, orderId, checkTimeTs, currentTime, pms);
                     } else if (purchasePlatform == PurchasePlatform.FASTSPRING && fastSpringHelper != null) {
-                        updated = processFastspringInAppPurchase(purchaseToken, sku, orderId, currentTime, pms);
+                        updated = processFastspringInAppPurchase(sku, orderId, currentTime, pms);
                     } else {
                         // Handle unknown or unconfigured platforms
                         if (purchasePlatform == PurchasePlatform.UNKNOWN) {
@@ -693,9 +693,9 @@ public class UpdateInAppPurchase {
         }
     }
 
-    private boolean processFastspringInAppPurchase(String purchaseToken, String sku, String orderId, long currentTime, UpdateParams pms) throws SQLException {
-        if (Algorithms.isEmpty(purchaseToken) || Algorithms.isEmpty(sku)) {
-            markAsInvalid(orderId != null ? orderId : "null_order", sku, currentTime, "Missing purchaseToken or productId (sku) for Huawei validation");
+    private boolean processFastspringInAppPurchase(String sku, String orderId, long currentTime, UpdateParams pms) throws SQLException {
+        if (Algorithms.isEmpty(sku)) {
+            markAsInvalid(orderId != null ? orderId : "null_order", sku, currentTime, "Missing productId (sku) for FastSpring validation");
             return true;
         }
 
@@ -728,7 +728,7 @@ public class UpdateInAppPurchase {
                 updStat.executeBatch();
                 changes = 0;
             }
-            System.out.println("Updated Fastspring IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ", Token: " + purchaseToken + ") - Valid: " + purchase.isValid());
+            System.out.println("Updated Fastspring IAP: " + sku + " (DB OrderId: " + getHiddenOrderId(orderId) + ") - Valid: " + purchase.isValid());
         }
         return true;
     }
