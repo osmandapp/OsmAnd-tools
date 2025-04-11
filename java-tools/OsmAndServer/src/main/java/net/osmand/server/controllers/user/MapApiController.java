@@ -612,7 +612,7 @@ public class MapApiController {
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
-					.filter(s -> s.valid)
+					.filter(s -> Boolean.TRUE.equals(s.valid))
 					.findFirst()
 					.orElse(null);
 			if (subscription != null) {
