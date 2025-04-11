@@ -42,10 +42,10 @@ public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterD
         @Column(name = "orderid", nullable = false)
         public String orderId; // Google: orderId, Apple: transaction_id
 
-        @Column(name = "purchasetoken", nullable = false)
+        @Column(name = "purchasetoken")
         public String purchaseToken;
 
-        @Column(name = "platform", nullable = false)
+        @Column(name = "platform")
         public String platform; // "google", "apple"
 
         @Column(name = "purchase_time")
