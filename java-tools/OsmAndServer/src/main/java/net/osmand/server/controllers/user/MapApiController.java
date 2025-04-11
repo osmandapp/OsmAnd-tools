@@ -93,6 +93,9 @@ public class MapApiController {
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
+	@Autowired
+	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
+
 	OsmandRegions osmandRegions;
 
 	Gson gson = new Gson();
@@ -590,6 +593,9 @@ public class MapApiController {
 		final String TYPE_SUB = "type";
 		final String START_TIME_KEY = "startTime";
 		final String EXPIRE_TIME_KEY = "expireTime";
+		final String VALID_KEY = "valid";
+		final String SKU_KEY = "sku";
+		final String PURCHASE_TIME_KEY = "purchaseTime";
 		final String MAX_ACCOUNT_SIZE = "maxAccSize";
 		final String NICKNAME = "nickname";
 
@@ -617,6 +623,33 @@ public class MapApiController {
 				info.put(START_TIME_KEY, prepareStartTime.toString());
 				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
+			}
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(dev.userid);
+			if (subscriptionList != null && !subscriptionList.isEmpty()) {
+				List<Map<String, Object>> subsInfo = new ArrayList<>();
+				subscriptionList.sort((a, b) -> b.starttime.compareTo(a.starttime));
+				subscriptionList.forEach(s -> {
+					Map<String, Object> sub = new HashMap<>();
+					sub.put(SKU_KEY, s.sku);
+					sub.put(VALID_KEY, s.valid);
+					sub.put(START_TIME_KEY, DateUtils.truncate(s.starttime, Calendar.SECOND).toString());
+					sub.put(EXPIRE_TIME_KEY, DateUtils.truncate(s.expiretime, Calendar.SECOND).toString());
+					subsInfo.add(sub);
+				});
+				info.put("subscriptions", gson.toJson(subsInfo));
+			}
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(dev.userid);
+			if (purchases != null && !purchases.isEmpty()) {
+				List<Map<String, Object>> inAppPurchasesInfo = new ArrayList<>();
+				purchases.sort((a, b) -> b.purchaseTime.compareTo(a.purchaseTime));
+				purchases.forEach(p -> {
+					Map<String, Object> purchase = new HashMap<>();
+					purchase.put(SKU_KEY, p.sku);
+					purchase.put(PURCHASE_TIME_KEY, DateUtils.truncate(p.purchaseTime, Calendar.SECOND).toString());
+					purchase.put(VALID_KEY, p.valid);
+					inAppPurchasesInfo.add(purchase);
+				});
+				info.put("inAppPurchases", gson.toJson(inAppPurchasesInfo));
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
