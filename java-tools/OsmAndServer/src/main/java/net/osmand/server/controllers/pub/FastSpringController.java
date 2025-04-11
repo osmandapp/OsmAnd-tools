@@ -2,10 +2,12 @@ package net.osmand.server.controllers.pub;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
+import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -28,6 +30,8 @@ public class FastSpringController {
 
 	@Autowired
 	DeviceSubscriptionsRepository deviceSubscriptionsRepository;
+
+	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
 	// Usually, "order-completed" is expected to arrive before "subscription.activated", but the order is not guaranteed, so both are handled independently.
 
@@ -52,6 +56,7 @@ public class FastSpringController {
 							List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
 
 							if (existingInApps != null && !existingInApps.isEmpty()) {
+								LOGGER.error("FastSpring: Purchase already recorded");
 								return ResponseEntity.badRequest().body("FastSpring: Purchase already recorded");
 							}
 
@@ -70,11 +75,13 @@ public class FastSpringController {
 
 							if (existingSubscriptions != null && !existingSubscriptions.isEmpty()) {
 								if (existingSubscriptions.size() > 1) {
+									LOGGER.error("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 									return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 								}
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription existingSubscription = existingSubscriptions.get(0);
 
 								if (!existingSubscription.sku.equals(sku) || !existingSubscription.orderId.equals(orderId)) {
+									LOGGER.error("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
 									return ResponseEntity.badRequest().body("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
 								}
 								existingSubscription.userId = userId;
@@ -90,6 +97,7 @@ public class FastSpringController {
 								subscriptions.add(subscription);
 							}
 						} else {
+							LOGGER.error("FastSpring: Unknown product " + sku);
 							return ResponseEntity.badRequest().body("FastSpring: Unknown product " + sku);
 						}
 					}
@@ -110,6 +118,7 @@ public class FastSpringController {
 				FastSpringSubscriptionActivatedRequest.Data data = event.data;
 				String sku = data.sku;
 				if (!FastSpringHelper.subscriptionSkuMap.contains(sku)) {
+					LOGGER.error("FastSpring: Unknown subscription " + sku);
 					return ResponseEntity.badRequest().body("FastSpring: Unknown subscription " + sku);
 				}
 				String orderId = data.initialOrderId;
@@ -128,6 +137,7 @@ public class FastSpringController {
 				}
 
 				if (existingSubscriptions.size() > 1) {
+					LOGGER.error("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 					return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
 				}
 
