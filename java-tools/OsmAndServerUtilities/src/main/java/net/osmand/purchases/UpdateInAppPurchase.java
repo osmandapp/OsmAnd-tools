@@ -643,7 +643,7 @@ public class UpdateInAppPurchase {
             Long price = purchase.price;
             String currency = purchase.currency;
             if (price != null && currency != null) {
-                updStat.setInt(ind++, (int) (price * 10000));
+                updStat.setInt(ind++, (int) (price * 10));
                 updStat.setString(ind++, currency);
             } else {
                 updStat.setNull(ind++, Types.INTEGER);
