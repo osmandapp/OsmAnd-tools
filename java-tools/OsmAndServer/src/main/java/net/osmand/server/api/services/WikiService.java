@@ -536,7 +536,7 @@ public class WikiService {
 			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
 					" FROM top_images_final WHERE wikidata_id = ? " + 
 					" ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(Long.parseLong(articleId));
+			params.add(articleId);
 		} else if (hasCategory) {
 			// Retrieve images based on the category name
 			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
