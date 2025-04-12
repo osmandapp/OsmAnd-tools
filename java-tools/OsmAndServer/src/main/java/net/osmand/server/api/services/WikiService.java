@@ -524,43 +524,31 @@ public class WikiService {
 	}
 
 	private void queryImagesByWikidataAndCategory(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
-		if ((articleId == null || Algorithms.isEmpty(articleId)) && (categoryName == null || Algorithms.isEmpty(categoryName))) {
-			return;
-		}
-
 		List<Object> params = new ArrayList<>();
-		StringBuilder queryBuilder = new StringBuilder(
-				"SELECT DISTINCT mediaId, imageTitle, date, author, license FROM ("
-		);
-
 		boolean hasArticleId = articleId != null && !Algorithms.isEmpty(articleId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
-
 		if (hasArticleId) {
 			// Remove "Q" prefix from Wikidata ID if present
 			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
 		}
-
-		if (hasArticleId || hasCategory) {
-			queryBuilder.append(
-					// Retrieve images directly linked to the Wikidata article ID
-					"SELECT w.mediaId, w.imageTitle, w.date, w.author, w.license, w.views " +
-							"FROM wiki.wikiimages w " +
-							"WHERE w.id = ? AND w.namespace = 6 " +
-							"UNION ALL " +
-							// Retrieve images based on the category name
-							"SELECT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views " +
-							"FROM wiki.categoryimages c WHERE c.catName = ?"
-			);
-			params.add(hasArticleId ? articleId : null);
-			params.add(hasCategory ? categoryName.replace(' ', '_') : null);
+		String query;
+		if (hasArticleId) {
+			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
+					" FROM top_images_final WHERE wikidata_id = ? " + 
+					" ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY;
+			params.add("articleId");
+		} else if (hasCategory) {
+			// Retrieve images based on the category name
+			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
+					+ " FROM wiki.categoryimages c WHERE c.catName = ? "
+					+ " ORDER BY views DESC LIMIT "+ LIMIT_PHOTOS_QUERY;
+			params.add(categoryName.replace(' ', '_'));
+		} else {
+			return;
 		}
 
-		// Sort results
-		queryBuilder.append(") AS combined ORDER BY views DESC LIMIT ").append(LIMIT_PHOTOS_QUERY);
-
 		processImageQuery(
-				queryBuilder.toString(),
+				query,
 				ps -> {
 					for (int i = 0; i < params.size(); i++) {
 						if (params.get(i) != null) {
