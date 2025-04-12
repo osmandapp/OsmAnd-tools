@@ -1216,6 +1216,8 @@ public class AdminController {
 		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
 		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+
+		case "net.osmand.fastspring.subscription.pro.annual": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		
 
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
@@ -1232,7 +1234,8 @@ public class AdminController {
 		IOS,
 		OSMAND,
 		AMAZON,
-		HUAWEI
+		HUAWEI,
+		FASTSPRING,
 	}
 	public static class Subscription {
 		
