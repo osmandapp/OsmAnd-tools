@@ -81,13 +81,13 @@ public class WikiService {
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
-		String query = String.format("SELECT id, mediaId, imageTitle, date, author, license " +
-				"FROM wikiimages WHERE id = %d " +
-				"ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
+		String query = String.format("SELECT wikidata_id, mediaId, imageTitle, date, author, license " +
+				"FROM top_images_final WHERE wikidata_id = %d " +
+				"ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
 		
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
 			Feature f = new Feature(Geometry.point(new LatLon(lat, lon)));
-			f.properties.put("id", rs.getLong("id"));
+			f.properties.put("id", rs.getLong("wikidata_id"));
 			f.properties.put("mediaId", rs.getLong("mediaId"));
 			f.properties.put("imageTitle", rs.getString("imageTitle"));
 			f.properties.put("date", rs.getString("date"));
