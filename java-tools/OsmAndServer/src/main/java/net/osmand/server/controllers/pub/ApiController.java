@@ -484,7 +484,12 @@ public class ApiController {
         for (SupporterDeviceInAppPurchase iap : validIaps) {
             Map<String, String> iapMap = new HashMap<>();
             iapMap.put("sku", iap.sku);
-            iapMap.put("platform", iap.platform);
+            if (iap.platform != null) {
+                iapMap.put("platform", iap.platform);
+            }
+            if (iap.purchaseTime != null) {
+                iapMap.put("purchaseTime", String.valueOf(iap.purchaseTime.getTime()));
+            }
             iapResults.add(iapMap);
         }
         return gson.toJson(iapResults);
