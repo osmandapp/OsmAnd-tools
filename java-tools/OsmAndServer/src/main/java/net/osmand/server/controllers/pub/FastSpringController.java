@@ -157,10 +157,7 @@ public class FastSpringController {
 	}
 
 	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
-		if (orderId == null) {
-			return;
-		}
-		if (!FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
+		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
 			return;
 		}
 		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
@@ -170,9 +167,10 @@ public class FastSpringController {
 		if (user.orderid != null && !user.orderid.isEmpty()) {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = deviceSubscriptionsRepository.findByOrderId(user.orderid);
 			if (subscriptions != null && !subscriptions.isEmpty()) {
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
-				if (subscription != null && Boolean.TRUE.equals(subscription.valid)) {
-					return;
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
+					if (s.sku.equals(sku) && Boolean.TRUE.equals(s.valid)) {
+						return;
+					}
 				}
 			}
 		}
