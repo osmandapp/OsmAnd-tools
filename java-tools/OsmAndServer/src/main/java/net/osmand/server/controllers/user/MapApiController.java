@@ -613,6 +613,12 @@ public class MapApiController {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
 			if (!subscriptions.isEmpty()) {
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
+				if (subscriptions.size() > 1) {
+					subscription = subscriptions.stream()
+							.filter(s -> Boolean.TRUE.equals(s.valid))
+							.findFirst()
+							.orElse(subscription);
+				}
 				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
 				info.put(TYPE_SUB, subscription.sku);
 				info.put(VALID_KEY, Boolean.TRUE.equals(subscription.valid) ? "true" : "false");
