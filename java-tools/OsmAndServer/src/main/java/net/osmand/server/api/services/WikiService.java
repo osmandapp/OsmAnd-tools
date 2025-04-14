@@ -49,8 +49,9 @@ public class WikiService {
 	// String url = WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + fileName;
 	public static final String WIKIMEDIA_COMMON_SPECIAL_FILE_PATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
+	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
 	private static final String THUMB_PREFIX = "320px-";
-	protected static final boolean FILENAME = true;
+	protected static int FILE_URL_TO_USE = 1;
 
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
@@ -508,12 +509,12 @@ public class WikiService {
 	}
 	
 	private String createImageUrl(String imageTitle) {
-		if (FILENAME) {
+		String[] hash = getHash(URLDecoder.decode(imageTitle, StandardCharsets.UTF_8));
+		if (FILE_URL_TO_USE == 0) {
 			return WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + imageTitle;
+		} else if (FILE_URL_TO_USE == 1) {
+			return OSMAND_IMAGE_ROOT_URL + hash[0] + "/" + hash[1] + "/"+ imageTitle;
 		} else {
-			imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
-			String[] hash = getHash(imageTitle);
-			imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
 			String suffix = imageTitle.endsWith(".svg") ? ".png" : "";
 			return IMAGE_ROOT_URL + "thumb/" + hash[0] + "/" + hash[1] + "/" + imageTitle + "/" + THUMB_PREFIX + imageTitle + suffix;
 		}
