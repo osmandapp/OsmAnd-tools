@@ -67,6 +67,7 @@ public class FastSpringController {
 							iap.purchaseTime = new Date(event.created);
 							iap.timestamp = new Date();
 							iap.userId = userId;
+							iap.valid = true;
 
 							purchases.add(iap);
 						} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
@@ -85,6 +86,7 @@ public class FastSpringController {
 									return ResponseEntity.badRequest().body("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
 								}
 								existingSubscription.userId = userId;
+								existingSubscription.valid = true;
 
 								subscriptions.add(existingSubscription);
 							} else {
@@ -144,6 +146,7 @@ public class FastSpringController {
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = existingSubscriptions.get(0);
 				subscription.starttime = new Date(data.begin);
 				subscription.expiretime = new Date(data.nextChargeDate);
+				subscription.valid = true;
 
 				deviceSubscriptionsRepository.saveAndFlush(subscription);
 			}
