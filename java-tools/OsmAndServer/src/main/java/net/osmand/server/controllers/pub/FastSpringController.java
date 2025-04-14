@@ -87,6 +87,7 @@ public class FastSpringController {
 								}
 								existingSubscription.userId = userId;
 								existingSubscription.valid = true;
+								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(existingSubscription);
 							} else {
@@ -147,11 +148,33 @@ public class FastSpringController {
 				subscription.starttime = new Date(data.begin);
 				subscription.expiretime = new Date(data.nextChargeDate);
 				subscription.valid = true;
+				updatePremiumUserOrderId(subscription.userId, orderId, sku);
 
 				deviceSubscriptionsRepository.saveAndFlush(subscription);
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
+		if (!FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
+			return;
+		}
+		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
+		if (user == null) {
+			return;
+		}
+		if (user.orderid != null && !user.orderid.isEmpty()) {
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = deviceSubscriptionsRepository.findByOrderId(user.orderid);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
+				if (subscription != null && Boolean.TRUE.equals(subscription.valid)) {
+					return;
+				}
+			}
+		}
+		user.orderid = orderId;
+		usersRepository.saveAndFlush(user);
 	}
 
 

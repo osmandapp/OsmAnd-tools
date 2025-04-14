@@ -611,13 +611,11 @@ public class MapApiController {
 			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
-			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
-					.filter(s -> Boolean.TRUE.equals(s.valid))
-					.findFirst()
-					.orElse(null);
-			if (subscription != null) {
+			if (!subscriptions.isEmpty()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
 				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
 				info.put(TYPE_SUB, subscription.sku);
+				info.put(VALID_KEY, Boolean.TRUE.equals(subscription.valid) ? "true" : "false");
 				Date prepareStartTime = DateUtils.truncate(subscription.starttime, Calendar.SECOND);
 				Date prepareExpireTime = DateUtils.truncate(subscription.expiretime, Calendar.SECOND);
 				info.put(START_TIME_KEY, prepareStartTime.toString());
