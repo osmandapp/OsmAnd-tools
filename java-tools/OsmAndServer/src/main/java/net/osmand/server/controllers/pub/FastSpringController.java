@@ -157,6 +157,9 @@ public class FastSpringController {
 	}
 
 	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
+		if (orderId == null) {
+			return;
+		}
 		if (!FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
 			return;
 		}
