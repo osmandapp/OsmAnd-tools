@@ -67,6 +67,7 @@ public class FastSpringController {
 							iap.purchaseTime = new Date(event.created);
 							iap.timestamp = new Date();
 							iap.userId = userId;
+							iap.valid = true;
 
 							purchases.add(iap);
 						} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
@@ -85,6 +86,8 @@ public class FastSpringController {
 									return ResponseEntity.badRequest().body("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
 								}
 								existingSubscription.userId = userId;
+								existingSubscription.valid = true;
+								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(existingSubscription);
 							} else {
@@ -144,11 +147,35 @@ public class FastSpringController {
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = existingSubscriptions.get(0);
 				subscription.starttime = new Date(data.begin);
 				subscription.expiretime = new Date(data.nextChargeDate);
+				subscription.valid = true;
+				updatePremiumUserOrderId(subscription.userId, orderId, sku);
 
 				deviceSubscriptionsRepository.saveAndFlush(subscription);
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
+		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
+			return;
+		}
+		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
+		if (user == null) {
+			return;
+		}
+		if (user.orderid != null && !user.orderid.isEmpty()) {
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = deviceSubscriptionsRepository.findByOrderId(user.orderid);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
+					if (s.sku.equals(sku) && Boolean.TRUE.equals(s.valid)) {
+						return;
+					}
+				}
+			}
+		}
+		user.orderid = orderId;
+		usersRepository.saveAndFlush(user);
 	}
 
 

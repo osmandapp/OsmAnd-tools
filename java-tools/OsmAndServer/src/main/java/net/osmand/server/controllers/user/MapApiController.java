@@ -611,29 +611,36 @@ public class MapApiController {
 			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
-			DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.stream()
-					.filter(s -> Boolean.TRUE.equals(s.valid))
-					.findFirst()
-					.orElse(null);
-			if (subscription != null) {
+			if (!subscriptions.isEmpty()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
+				if (subscriptions.size() > 1) {
+					subscription = subscriptions.stream()
+							.filter(s -> Boolean.TRUE.equals(s.valid))
+							.findFirst()
+							.orElse(subscription);
+				}
 				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
 				info.put(TYPE_SUB, subscription.sku);
-				Date prepareStartTime = DateUtils.truncate(subscription.starttime, Calendar.SECOND);
-				Date prepareExpireTime = DateUtils.truncate(subscription.expiretime, Calendar.SECOND);
-				info.put(START_TIME_KEY, prepareStartTime.toString());
-				info.put(EXPIRE_TIME_KEY, prepareExpireTime.toString());
+				info.put(VALID_KEY, Boolean.TRUE.equals(subscription.valid) ? "true" : "false");
+				info.put(START_TIME_KEY, subscription.starttime != null ? DateUtils.truncate(subscription.starttime, Calendar.SECOND).toString() : null);
+				info.put(EXPIRE_TIME_KEY, subscription.expiretime != null ? DateUtils.truncate(subscription.expiretime, Calendar.SECOND).toString() : null);
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(dev.userid);
 			if (subscriptionList != null && !subscriptionList.isEmpty()) {
 				List<Map<String, Object>> subsInfo = new ArrayList<>();
-				subscriptionList.sort((a, b) -> b.starttime.compareTo(a.starttime));
+				subscriptionList.sort((a, b) -> {
+					if (a.starttime == null && b.starttime == null) return 0;
+					if (a.starttime == null) return 1;
+					if (b.starttime == null) return -1;
+					return b.starttime.compareTo(a.starttime);
+				});
 				subscriptionList.forEach(s -> {
 					Map<String, Object> sub = new HashMap<>();
 					sub.put(SKU_KEY, s.sku);
 					sub.put(VALID_KEY, s.valid);
-					sub.put(START_TIME_KEY, DateUtils.truncate(s.starttime, Calendar.SECOND).toString());
-					sub.put(EXPIRE_TIME_KEY, DateUtils.truncate(s.expiretime, Calendar.SECOND).toString());
+					sub.put(START_TIME_KEY, s.starttime != null ? DateUtils.truncate(s.starttime, Calendar.SECOND).toString() : null);
+					sub.put(EXPIRE_TIME_KEY, s.expiretime != null ? DateUtils.truncate(s.expiretime, Calendar.SECOND).toString() : null);
 					subsInfo.add(sub);
 				});
 				info.put("subscriptions", gson.toJson(subsInfo));
@@ -641,11 +648,16 @@ public class MapApiController {
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(dev.userid);
 			if (purchases != null && !purchases.isEmpty()) {
 				List<Map<String, Object>> inAppPurchasesInfo = new ArrayList<>();
-				purchases.sort((a, b) -> b.purchaseTime.compareTo(a.purchaseTime));
+				purchases.sort((a, b) -> {
+					if (a.purchaseTime == null && b.purchaseTime == null) return 0;
+					if (a.purchaseTime == null) return 1;
+					if (b.purchaseTime == null) return -1;
+					return b.purchaseTime.compareTo(a.purchaseTime);
+				});
 				purchases.forEach(p -> {
 					Map<String, Object> purchase = new HashMap<>();
 					purchase.put(SKU_KEY, p.sku);
-					purchase.put(PURCHASE_TIME_KEY, DateUtils.truncate(p.purchaseTime, Calendar.SECOND).toString());
+					purchase.put(PURCHASE_TIME_KEY, p.purchaseTime != null ? DateUtils.truncate(p.purchaseTime, Calendar.SECOND).toString() : null);
 					purchase.put(VALID_KEY, p.valid);
 					inAppPurchasesInfo.add(purchase);
 				});
