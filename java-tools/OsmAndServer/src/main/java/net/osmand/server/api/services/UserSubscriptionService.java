@@ -67,7 +67,7 @@ public class UserSubscriptionService {
 					s = revalidateAmazonSubscription(s);
 				} else if (s.sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
 					s = revalidateiOSSubscription(s);
-				} else if (s.sku.contains(UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION)) {
+				} else if (s.sku.contains(UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX)) {
 					s = revalidateFastSpringSubscription(s);
 				}
 			}
@@ -79,7 +79,7 @@ public class UserSubscriptionService {
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
 					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION) &&
-					!s.sku.contains(UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION)) {
+					!s.sku.contains(UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
