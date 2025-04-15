@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 
+import net.osmand.purchases.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,11 +16,7 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Purchases.Subsc
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.JsonObject;
 
-import net.osmand.purchases.AmazonIAPHelper;
-import net.osmand.purchases.HuaweiIAPHelper;
-import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.ReceiptResult;
-import net.osmand.purchases.UpdateSubscription;
 import net.osmand.purchases.AmazonIAPHelper.AmazonSubscription;
 import net.osmand.purchases.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
@@ -38,6 +35,7 @@ public class UserSubscriptionService {
 	private static final String OSMAND_PRO_HUAWEI_SUBSCRIPTION_2 = UpdateSubscription.OSMAND_PRO_HUAWEI_SUBSCRIPTION_PART_Y;
 	private static final String OSMAND_PRO_AMAZON_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_AMAZON_SUBSCRIPTION_PART;
 	private static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
+	private static final String OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX;
 
 	private static final Log LOG = LogFactory.getLog(UserSubscriptionService.class);
 
@@ -70,16 +68,19 @@ public class UserSubscriptionService {
 					s = revalidateAmazonSubscription(s);
 				} else if (s.sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
 					s = revalidateiOSSubscription(s);
+				} else if (s.sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
+					s = revalidateFastSpringSubscription(s);
 				}
 			}
-			if (s.valid == null || !s.valid.booleanValue()) {
+			if (s.valid == null || !s.valid) {
 				errorMsg = "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
 					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION)) {
+					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION) &&
+					!s.sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
 				errorMsg = "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
@@ -204,6 +205,24 @@ public class UserSubscriptionService {
 		return s;
 	}
 
-
+	public SupporterDeviceSubscription revalidateFastSpringSubscription(SupporterDeviceSubscription s) {
+		try {
+			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
+			if (fsSub != null) {
+				if (s.expiretime == null) {
+					LOG.error(String.format("FastSpring subscription %s - %s has no expiretime", s.sku, s.orderId));
+				} else {
+					if (s.expiretime.getTime() < fsSub.nextChargeDate) {
+						s.expiretime = new Date(fsSub.nextChargeDate);
+					}
+				}
+				s.valid = System.currentTimeMillis() < fsSub.nextChargeDate;
+				subscriptionsRepo.save(s);
+			}
+		} catch (IOException e) {
+			LOG.error(String.format("Error retrieving fastspring subscription %s - %s: %s", s.sku, s.orderId, e.getMessage()), e);
+		}
+		return s;
+	}
 
 }
