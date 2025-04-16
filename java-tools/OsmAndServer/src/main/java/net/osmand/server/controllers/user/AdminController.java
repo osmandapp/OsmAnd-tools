@@ -208,6 +208,13 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("inapps", purchases);
 		return "redirect:info#audience";
 	}
+
+	@PostMapping(path = {"/search-purchases"})
+	public String searchUserPurchases(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
+		List<AdminService.Purchase> purchases = adminService.getUserPurchases(identifier);
+		redirectAttrs.addFlashAttribute("purchases", purchases);
+		return "redirect:info#audience";
+	}
 	
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
