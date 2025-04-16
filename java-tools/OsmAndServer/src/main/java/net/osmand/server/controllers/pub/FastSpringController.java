@@ -33,8 +33,6 @@ public class FastSpringController {
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
-	// Usually, "order-completed" is expected to arrive before "subscription.activated", but the order is not guaranteed, so both are handled independently.
-
 	@Transactional
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
@@ -75,27 +73,15 @@ public class FastSpringController {
 							List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
 
 							if (existingSubscriptions != null && !existingSubscriptions.isEmpty()) {
-								if (existingSubscriptions.size() > 1) {
-									LOGGER.error("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
-									return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
-								}
-								DeviceSubscriptionsRepository.SupporterDeviceSubscription existingSubscription = existingSubscriptions.get(0);
-
-								if (!existingSubscription.sku.equals(sku) || !existingSubscription.orderId.equals(orderId)) {
-									LOGGER.error("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
-									return ResponseEntity.badRequest().body("FastSpring: sku or orderId mismatch " + sku + " " + orderId);
-								}
-								existingSubscription.userId = userId;
-								existingSubscription.valid = true;
-								updatePremiumUserOrderId(user.id, orderId, sku);
-
-								subscriptions.add(existingSubscription);
+								return ResponseEntity.badRequest().body("FastSpring: Subscription already recorded " + orderId + " " + sku);
 							} else {
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 								subscription.orderId = orderId;
 								subscription.sku = sku;
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
+								subscription.valid = true;
+								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(subscription);
 							}
@@ -108,49 +94,6 @@ public class FastSpringController {
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
 				}
 
-			}
-		}
-		return ResponseEntity.ok("OK");
-	}
-
-	@Transactional
-	@PostMapping("/subscription-activated")
-	public ResponseEntity<String> handleSubscriptionActivatedEvent(@RequestBody FastSpringSubscriptionActivatedRequest request) {
-		for (FastSpringSubscriptionActivatedRequest.Event event : request.events) {
-			if ("subscription.activated".equals(event.type)) {
-				FastSpringSubscriptionActivatedRequest.Data data = event.data;
-				String sku = data.sku;
-				if (!FastSpringHelper.subscriptionSkuMap.contains(sku)) {
-					LOGGER.error("FastSpring: Unknown subscription " + sku);
-					return ResponseEntity.badRequest().body("FastSpring: Unknown subscription " + sku);
-				}
-				String orderId = data.initialOrderId;
-				List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku);
-
-				if (existingSubscriptions == null || existingSubscriptions.isEmpty()) {
-					DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
-					subscription.orderId = orderId;
-					subscription.sku = sku;
-					subscription.starttime = new Date(data.begin);
-					subscription.expiretime = new Date(data.nextChargeDate);
-					subscription.timestamp = new Date();
-
-					deviceSubscriptionsRepository.saveAndFlush(subscription);
-					return ResponseEntity.ok("OK");
-				}
-
-				if (existingSubscriptions.size() > 1) {
-					LOGGER.error("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
-					return ResponseEntity.badRequest().body("FastSpring: Multiple subscriptions found for orderId " + orderId + " and sku " + sku);
-				}
-
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = existingSubscriptions.get(0);
-				subscription.starttime = new Date(data.begin);
-				subscription.expiretime = new Date(data.nextChargeDate);
-				subscription.valid = true;
-				updatePremiumUserOrderId(subscription.userId, orderId, sku);
-
-				deviceSubscriptionsRepository.saveAndFlush(subscription);
 			}
 		}
 		return ResponseEntity.ok("OK");
@@ -211,30 +154,6 @@ public class FastSpringController {
 		@Setter
 		private static class Item {
 			private String sku;
-		}
-	}
-
-
-	@Getter
-	@Setter
-	public static class FastSpringSubscriptionActivatedRequest {
-
-		private List<Event> events;
-
-		@Getter
-		@Setter
-		public static class Event {
-			private String type;
-			private Data data;
-		}
-
-		@Getter
-		@Setter
-		private static class Data {
-			private String initialOrderId; // orderId
-			private String sku;
-			private Long begin; // purchaseTime
-			private Long nextChargeDate; // expiretime
 		}
 	}
 
