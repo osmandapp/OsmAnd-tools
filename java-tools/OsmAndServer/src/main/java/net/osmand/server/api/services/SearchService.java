@@ -519,7 +519,7 @@ public class SearchService {
     }
 
     private MapPoiTypes getMapPoiTypes(String locale) {
-        locale =  locale == null ? SEARCH_LOCALE : locale;
+        locale = locale == null ? SEARCH_LOCALE : locale;
 
         return poiTypesByLocale.computeIfAbsent(locale, loc -> {
             MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
