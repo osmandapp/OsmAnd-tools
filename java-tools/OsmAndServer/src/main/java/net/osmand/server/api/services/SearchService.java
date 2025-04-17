@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
-import static net.osmand.osm.MapPoiTypes.setDefault;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
@@ -53,7 +52,9 @@ public class SearchService {
     public static final long SPLIT_BIT = 1L << ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
     private static final String DELIMITER = " ";
-    
+
+    private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+
     public static class PoiSearchResult {
         
         public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, FeatureCollection features) {
@@ -185,7 +186,6 @@ public class SearchService {
         }
         
         MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        setDefault(mapPoiTypes);
         
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
@@ -517,17 +517,18 @@ public class SearchService {
             }
         });
     }
-    
-    private MapPoiTypes getMapPoiTypes(String locale, MapPoiTypes mapPoiTypes) {
-        Map<String, String> translations = getTranslations(locale);
-        Map<String, String> enTranslations = getTranslations("en");
-        
-        mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
-        return mapPoiTypes;
-    }
-    
+
     private MapPoiTypes getMapPoiTypes(String locale) {
-        return getMapPoiTypes(locale, MapPoiTypes.getDefault());
+        locale =  locale == null ? SEARCH_LOCALE : locale;
+
+        return poiTypesByLocale.computeIfAbsent(locale, loc -> {
+            MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
+            mapPoiTypes.init();
+            Map<String, String> translations = getTranslations(loc);
+            Map<String, String> enTranslations = getTranslations(SEARCH_LOCALE);
+            mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
+            return mapPoiTypes;
+        });
     }
     
     private Map<String, String> parseStringsXml(InputStream inputStream) throws XmlPullParserException, IOException {
