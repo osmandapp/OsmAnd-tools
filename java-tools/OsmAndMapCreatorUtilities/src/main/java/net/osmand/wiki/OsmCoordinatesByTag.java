@@ -282,7 +282,7 @@ public class OsmCoordinatesByTag {
 
 			Connection dbConn = (Connection) osmDBdialect.getDatabaseConnection(dbFile.getAbsolutePath(), log);
 			accessor.setDbConn(dbConn, osmDBdialect);
-			OsmDbCreator dbCreator = new OsmDbCreator(false);
+			OsmDbCreator dbCreator = new OsmDbCreator(true);
 			dbCreator.initDatabase(osmDBdialect, dbConn, true, null);
 			storage.getFilters().add(dbCreator);
 			progress.startTask("Reading osm file " + readFile.getName(), -1);
