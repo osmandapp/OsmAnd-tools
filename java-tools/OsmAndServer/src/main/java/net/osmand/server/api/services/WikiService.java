@@ -55,6 +55,7 @@ public class WikiService {
 
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
+	private static final String SIMILARITY_CF = "0.975";
 
 
 	private final Map<String, String> licenseMap = new HashMap<>();
@@ -83,7 +84,7 @@ public class WikiService {
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
 		String query = String.format("SELECT wikidata_id, mediaId, imageTitle, date, author, license " +
-				"FROM top_images_final WHERE wikidata_id = %d " +
+				"FROM top_images_final WHERE wikidata_id = %d and dup_sim < " + SIMILARITY_CF +
 				"ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
 		
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
@@ -535,7 +536,7 @@ public class WikiService {
 		String query;
 		if (hasArticleId) {
 			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? " + 
+					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF + 
 					" ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(articleId);
 		} else if (hasCategory) {
