@@ -192,26 +192,6 @@ public class WikiService {
 		prepareMetaData(result);
 		return result;
 	}
-	
-	private void prepareMetaData(Map<String, String> metaData) {
-		String license = metaData.get("license");
-		if (license != null) {
-			metaData.put("license", processLicense(license));
-		}
-	}
-	
-	private String processLicense(String license) {
-		license = license.replace("[[", "").replace("]]", "");
-		// Remove hyphens after "CC" and "PD"
-		license = license.replace("CC-", "CC ");
-		license = license.replace("PD-", "PD ");
-		
-		// Remove hyphen before "expired"
-		license = license.replace("-expired", " expired");
-		license = license.toUpperCase();
-		
-		return license;
-	}
 
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
 		boolean showAll = filters.contains("0");

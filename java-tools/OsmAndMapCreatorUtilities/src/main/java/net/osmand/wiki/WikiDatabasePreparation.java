@@ -390,6 +390,26 @@ public class WikiDatabasePreparation {
 		}
 		return bld.toString();
 	}
+
+	public static void prepareMetaData(Map<String, String> metaData) {
+		String license = metaData.get("license");
+		if (license != null) {
+			metaData.put("license", processLicense(license));
+		}
+	}
+
+	public static String processLicense(String license) {
+		license = license.replace("[[", "").replace("]]", "");
+		// Remove hyphens after "CC" and "PD"
+		license = license.replace("CC-", "CC ");
+		license = license.replace("PD-", "PD ");
+
+		// Remove hyphen before "expired"
+		license = license.replace("-expired", " expired");
+		license = license.toUpperCase();
+
+		return license;
+	}
 	
 	/**
 	 * Parses the {{Information}} block and extracts the author, date, and description.
@@ -1772,7 +1792,7 @@ public class WikiDatabasePreparation {
 			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute(
-					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, redirect text, zipContent blob)");
+					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, redirect text, zipContent blob, imageTitle text, author text, description text, license text, date text)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
@@ -1871,38 +1891,48 @@ public class WikiDatabasePreparation {
 							rs.close();
 							selectPrep.clearParameters();
 						}
+						Map<String, String> webBlockResults = new HashMap<>();
 						if (wikiId != 0) {
 							try {
 								CustomWikiModel wikiModel = new CustomWikiModel(
 										"https://" + lang + ".wikipedia.org/wiki/${image}",
 										"https://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
-								String rawWikiText = removeMacroBlocks(ctext, null, new HashMap<>(), null, lang,
+								String rawWikiText = removeMacroBlocks(ctext, webBlockResults, new HashMap<>(), null, lang,
 										title.toString(), null);
+								prepareMetaData(webBlockResults);
 								plainStr = generateHtmlArticle(rawWikiText, wikiModel);
 								shortDescr = getShortDescr(rawWikiText, wikiModel);
 							} catch (RuntimeException e) {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
 						}
-						if (plainStr != null) {
-							String redirect = getRedirect(ctext);
-							if (++counter % ARTICLES_BATCH == 0) {
-								log.info("Article accepted " + cid + " " + title.toString());
-//								double GB = (1l << 30); 
+						String redirect = getRedirect(ctext);
+						if (++counter % ARTICLES_BATCH == 0) {
+							log.info("Article accepted " + cid + " " + title.toString());
+//								double GB = (1l << 30);
 //								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
 //										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
-							}
-							try {
-								insertPrep.setLong(1, wikiId);
-								insertPrep.setString(2, title.toString());
-								insertPrep.setString(3, lang);
-								insertPrep.setString(4, shortDescr);
-								insertPrep.setString(5, redirect);
-								insertPrep.setBytes(6, gzip(plainStr));
-								addBatch();
-							} catch (SQLException e) {
-								throw new SAXException(e);
-							}
+						}
+						String imageTitle = title.toString().startsWith("File:") ? title.substring("File:".length()) : null;
+						String author = webBlockResults.getOrDefault("author", "");
+						String description = webBlockResults.getOrDefault("description", "");
+						String license = webBlockResults.getOrDefault("license", "");
+						String date = webBlockResults.getOrDefault("date", "");
+						try {
+							insertPrep.setLong(1, wikiId);
+							insertPrep.setString(2, title.toString());
+							insertPrep.setString(3, lang);
+							insertPrep.setString(4, shortDescr);
+							insertPrep.setString(5, redirect);
+							insertPrep.setBytes(6, plainStr != null ? gzip(plainStr) : null);
+							insertPrep.setString(7, imageTitle);
+							insertPrep.setString(8, author);
+							insertPrep.setString(9, description);
+							insertPrep.setString(10, license);
+							insertPrep.setString(11, date);
+							addBatch();
+						} catch (SQLException e) {
+							throw new SAXException(e);
 						}
 						ctext = null;
 					}
