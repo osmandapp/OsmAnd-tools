@@ -41,6 +41,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import com.google.gson.Gson;
 import info.bliki.wiki.model.WikiModel;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -213,7 +214,8 @@ public class WikiDatabasePreparation {
 	                                       @Nullable List<Map<PoiFieldType, Object>> pois,
 	                                       String lang,
 	                                       String title,
-	                                       @Nullable WikiDBBrowser browser)
+	                                       @Nullable WikiDBBrowser browser,
+	                                       @Nullable Boolean allLangs)
 			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -315,7 +317,7 @@ public class WikiDatabasePreparation {
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				} else if (vallc.startsWith(TAG_INFORMATION) || vallc.startsWith(TAG_ARTWORK)) {
-					parseInformationBlock(val, lang, webBlockResults);
+					parseInformationBlock(val, lang, webBlockResults, allLangs);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
 				EnumSet<WikivoyageTemplates> key = pc != null ? of(WikivoyageTemplates.POI) : getKey(vallc, lang);
@@ -421,7 +423,7 @@ public class WikiDatabasePreparation {
 	 * @param lang            The target language code to extract the description
 	 * @param webBlockResults A map to store the parsed author, date, and description fields
 	 */
-	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults) throws IOException {
+	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs) throws IOException {
 		
 		if (webBlockResults == null) {
 			return;
@@ -465,22 +467,26 @@ public class WikiDatabasePreparation {
         
         webBlockResults.put(AUTHOR, author);
         webBlockResults.put(DATE, date);
-        
-        for (Map.Entry<String, String> entry : description.entrySet()) {
-            if (entry.getKey().equals(lang)) {
-                webBlockResults.put(DESCRIPTION, entry.getValue());
-            }
-        }
-        
-        // If no description was found in the target language, fallback to English description (default language)
-        if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-            webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
-        }
-        
-        // If no description for English either, fallback to the first available description
-        if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
-            webBlockResults.put(DESCRIPTION, description.values().iterator().next());
-        }
+
+		if (Boolean.TRUE.equals(allLangs)) {
+			webBlockResults.put(DESCRIPTION, new Gson().toJson(description));
+		} else {
+			for (Map.Entry<String, String> entry : description.entrySet()) {
+				if (entry.getKey().equals(lang)) {
+					webBlockResults.put(DESCRIPTION, entry.getValue());
+				}
+			}
+
+			// If no description was found in the target language, fallback to English description (default language)
+			if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+				webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
+			}
+
+			// If no description for English either, fallback to the first available description
+			if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
+				webBlockResults.put(DESCRIPTION, description.values().iterator().next());
+			}
+		}
     }
 	
 	/**
@@ -1446,7 +1452,7 @@ public class WikiDatabasePreparation {
 		String title = "page";
 		CustomWikiModel wikiModel = new CustomWikiModel("https://" + lang + ".wikipedia.org/wiki/${image}",
 				"https://" + lang + ".wikipedia.org/wiki/${title}", null, true);
-		String rawWikiText = WikiDatabasePreparation.removeMacroBlocks(input, null, macros, pois, lang, title, null);
+		String rawWikiText = WikiDatabasePreparation.removeMacroBlocks(input, null, macros, pois, lang, title, null, null);
 
 //		System.out.println(text);
 
@@ -1792,7 +1798,7 @@ public class WikiDatabasePreparation {
 			conn = dialect.getDatabaseConnection(wikipediaSqlite.getAbsolutePath(), log);
 			log.info("Prepare wiki_content table");
 			conn.createStatement().execute(
-					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, redirect text, zipContent blob, imageTitle text, author text, description text, license text, date text)");
+					"CREATE TABLE IF NOT EXISTS wiki_content(id long, title text, lang text, shortDescription text, redirect text, zipContent blob)");
 			conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_wiki_content ON wiki_content(id)");
 			conn.createStatement()
 					.execute("CREATE INDEX IF NOT EXISTS lang_title_wiki_content ON wiki_content (lang, title)");
@@ -1891,15 +1897,13 @@ public class WikiDatabasePreparation {
 							rs.close();
 							selectPrep.clearParameters();
 						}
-						Map<String, String> webBlockResults = new HashMap<>();
 						if (wikiId != 0) {
 							try {
 								CustomWikiModel wikiModel = new CustomWikiModel(
 										"https://" + lang + ".wikipedia.org/wiki/${image}",
 										"https://" + lang + ".wikipedia.org/wiki/${title}", imageUrlStorage, true);
-								String rawWikiText = removeMacroBlocks(ctext, webBlockResults, new HashMap<>(), null, lang,
-										title.toString(), null);
-								prepareMetaData(webBlockResults);
+								String rawWikiText = removeMacroBlocks(ctext, null, new HashMap<>(), null, lang,
+										title.toString(), null, null);
 								plainStr = generateHtmlArticle(rawWikiText, wikiModel);
 								shortDescr = getShortDescr(rawWikiText, wikiModel);
 							} catch (RuntimeException e) {
@@ -1913,11 +1917,6 @@ public class WikiDatabasePreparation {
 //								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
 //										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
 						}
-						String imageTitle = title.toString().startsWith("File:") ? title.substring("File:".length()) : null;
-						String author = webBlockResults.getOrDefault("author", "");
-						String description = webBlockResults.getOrDefault("description", "");
-						String license = webBlockResults.getOrDefault("license", "");
-						String date = webBlockResults.getOrDefault("date", "");
 						try {
 							insertPrep.setLong(1, wikiId);
 							insertPrep.setString(2, title.toString());
@@ -1925,11 +1924,6 @@ public class WikiDatabasePreparation {
 							insertPrep.setString(4, shortDescr);
 							insertPrep.setString(5, redirect);
 							insertPrep.setBytes(6, plainStr != null ? gzip(plainStr) : null);
-							insertPrep.setString(7, imageTitle);
-							insertPrep.setString(8, author);
-							insertPrep.setString(9, description);
-							insertPrep.setString(10, license);
-							insertPrep.setString(11, date);
 							addBatch();
 						} catch (SQLException e) {
 							throw new SAXException(e);

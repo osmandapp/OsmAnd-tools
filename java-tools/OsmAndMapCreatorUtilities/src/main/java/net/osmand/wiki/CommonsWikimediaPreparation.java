@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-@Deprecated
+
 public class CommonsWikimediaPreparation {
 
     public static final String COMMONSWIKI_ARTICLES_GZ = "commonswiki-latest-pages-articles.xml.gz";
@@ -32,6 +32,7 @@ public class CommonsWikimediaPreparation {
     public static final String COMMONSWIKI_SQLITE = "wikidata_commons_osm.sqlitedb";
     public static final String CATEGORY_NAMESPACE = "14";
     public static final String FILE_NAMESPACE = "6";
+    public static final String FILE = "File:";
     public static final String DEPICT_KEY = "[[d:Special:EntityPage/";
     public static final String DEPICT_KEY_END = "]]";
     private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
@@ -46,12 +47,13 @@ public class CommonsWikimediaPreparation {
         add("License_migration_completed");
         add("Assumed_own_work");
     }};
-    private Map<String, Long> categoryCashe = new HashMap<>();
+    private Map<String, Long> categoryCache = new HashMap<>();
 
     public static void main(String[] args) {
         String folder = "";
         String mode = "";
         String database = "";
+        boolean recreateDb = false;
 
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
@@ -61,6 +63,8 @@ public class CommonsWikimediaPreparation {
                 mode = val;
             } else if (arg.startsWith("--result_db=")) {
                 database = val;
+            } else if (arg.startsWith("--recreate_db")) {
+                recreateDb = true;
             }
         }
 
@@ -75,12 +79,17 @@ public class CommonsWikimediaPreparation {
         try {
             switch (mode) {
                 case "parse-commonswiki-articles":
-                    p.parseCommonArticles(commonWikiArticles, sqliteFileName);
+                    p.parseCommonArticles(commonWikiArticles, sqliteFileName, false, recreateDb);
                     break;
                 case "parse-categorylinks-sql":
                     p.parseCategoryLinksSQL(categoryLinksSql, sqliteFileName);
                     // will be parse category_links.sql here
                     break;
+                case "parse-commonswiki-img-meta":
+                    p.parseCommonArticles(commonWikiArticles, sqliteFileName, true, recreateDb);
+                    break;
+	            default:
+		            throw new RuntimeException("Unknown mode: " + mode);
             }
         } catch (ParserConfigurationException e) {
             e.printStackTrace();
@@ -96,13 +105,13 @@ public class CommonsWikimediaPreparation {
     /** Parse page <id> and <title> for File: and Category: namespaces
      *  Parse depict from <comment>
     */
-    private void parseCommonArticles(String articles, String sqliteFileName) throws ParserConfigurationException, SAXException, IOException, SQLException {
+    private void parseCommonArticles(String articles, String sqliteFileName, boolean parseMeta, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
         SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
         FileProgressImplementation progress = new FileProgressImplementation("Read commonswiki articles file", new File(articles));
         InputStream streamFile = progress.openFileInputStream();
         InputSource is = getInputSource(streamFile);
 
-        final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, new File(sqliteFileName));
+        final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, new File(sqliteFileName), parseMeta, recreateDb);
         sx.parse(is, handler);
         handler.finish();
     }
@@ -124,37 +133,79 @@ public class CommonsWikimediaPreparation {
         private final StringBuilder format = new StringBuilder();
         private final StringBuilder ns = new StringBuilder();
         private final StringBuilder id = new StringBuilder();
-        private FileProgressImplementation progress;
-        public final static int BATCH_SIZE = 5000;
+        private final FileProgressImplementation progress;
+        public static final int BATCH_SIZE = 5000;
+        private final StringBuilder textContent = new StringBuilder();
+        private final boolean parseMeta;
 
 
-        CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile) throws SQLException {
+        CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress, File sqliteFile, boolean parseMeta, boolean recreateDb) throws SQLException {
             this.saxParser = saxParser;
             this.progress = progress;
+            this.parseMeta = parseMeta;
             conn = dialect.getDatabaseConnection(sqliteFile.getAbsolutePath(), log);
-            log.info("========= CREATE TABLES common_depict, common_content =========");
-            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_depict(id long, depict_qid long, depict_type text)");
-            conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_content(id long, name text, ns int)");
-            conn.createStatement().execute("DELETE FROM common_depict");
-            conn.createStatement().execute("DELETE FROM common_content");
-            prepDepict = conn.prepareStatement("INSERT INTO common_depict(id, depict_qid, depict_type) VALUES (?, ?, ?)");
-            prepContent = conn.prepareStatement("INSERT INTO common_content(id, name, ns) VALUES (?, ?, ?)");
+            if (parseMeta) {
+                log.info("========= CREATE TABLE common_meta =========");
+                if (recreateDb) {
+                    log.info("========= DROP old TABLE common_meta =========");
+                    conn.createStatement().execute("DROP TABLE IF EXISTS common_meta");
+                }
+                conn.createStatement().execute(
+                        "CREATE TABLE IF NOT EXISTS common_meta(" +
+                                "id long, " +
+                                "name text, " +
+                                "author text, " +
+                                "date text, " +
+                                "license text, " +
+                                "description text)"
+                );
+                conn.createStatement().execute("DELETE FROM common_meta");
+                prepContent = conn.prepareStatement(
+                        "INSERT INTO common_meta(id, name, author,  date, license, description) VALUES (?, ?, ?, ?, ?, ?)"
+                );
+            } else {
+                if (recreateDb) {
+                    log.info("========= DROP old TABLES common_depict, common_content =========");
+                    conn.createStatement().execute("DROP TABLE IF EXISTS common_depict");
+                    conn.createStatement().execute("DROP TABLE IF EXISTS common_content");
+                }
+                log.info("========= CREATE TABLES common_depict, common_content =========");
+                conn.createStatement().execute("CREATE TABLE IF NOT EXISTS common_depict(id long, depict_qid long, depict_type text)");
+                conn.createStatement().execute(
+                        "CREATE TABLE IF NOT EXISTS common_content(" +
+                                "id long, " +
+                                "name text, " +
+                                "ns int)"
+                );
+                conn.createStatement().execute("DELETE FROM common_depict");
+                conn.createStatement().execute("DELETE FROM common_content");
+                prepDepict = conn.prepareStatement("INSERT INTO common_depict(id, depict_qid, depict_type) VALUES (?, ?, ?)");
+                prepContent = conn.prepareStatement(
+                        "INSERT INTO common_content(id, name, ns) VALUES (?, ?, ?)"
+                );
+
+            }
         }
 
         public void finish() throws SQLException {
-            System.out.println("Create indexes");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_depict_index on common_depict(id)");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS qid_common_depict_index on common_depict(depict_qid)");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_content on common_content(id)");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_name_common_content on common_content(name)");
-            conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_ns_common_content on common_content(id, ns)");
-
-            prepDepict.executeBatch();
+            log.info("========= DONE =========");
+            log.info("Create indexes");
+            if (parseMeta) {
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_meta_index on common_meta(id)");
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS name_common_meta_index on common_meta(name)");
+            } else {
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_depict_index on common_depict(id)");
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS qid_common_depict_index on common_depict(depict_qid)");
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_common_content on common_content(id)");
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS category_name_common_content on common_content(name)");
+                conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_ns_common_content on common_content(id, ns)");
+                prepDepict.executeBatch();
+                prepDepict.close();
+            }
             prepContent.executeBatch();
             if (!conn.getAutoCommit()) {
                 conn.commit();
             }
-            prepDepict.close();
             prepContent.close();
             conn.close();
         }
@@ -181,6 +232,9 @@ public class CommonsWikimediaPreparation {
                     id.setLength(0);
                     ctext = id;
                     idPage = true;
+                } else if (name.equals("text")) {
+                    textContent.setLength(0);
+                    ctext = textContent;
                 }
             }
         }
@@ -218,39 +272,10 @@ public class CommonsWikimediaPreparation {
                             break;
                         }
 
-                        try {
-                            String n = title.toString().replace("File:", "");
-                            n = n.replace("Category:", "");
-                            prepContent.setLong(1, Long.parseLong(id.toString()));
-                            prepContent.setString(2, n);
-                            prepContent.setInt(3, Integer.parseInt(nameSpace));
-                            addBatch(prepContent, contentBatch);
-
-                            if (FILE_NAMESPACE.equals(nameSpace) && comment.toString().contains(DEPICT_KEY)) {
-                                String depictType = null;
-                                String depictQid = null;
-                                int l = DEPICT_KEY.length();
-                                String c = comment.toString();
-                                int s = c.indexOf(DEPICT_KEY);
-                                int e = c.indexOf(DEPICT_KEY_END, s + l);
-                                if (s != -1 && e != -1) {
-                                    depictType = c.substring(s + l, e);
-                                    s = c.indexOf(DEPICT_KEY, e);
-                                    e = c.indexOf(DEPICT_KEY_END, s + l);
-                                    if (s != -1 && e != -1) {
-                                        depictQid = c.substring(s + l, e);
-                                    }
-                                }
-                                if (depictQid != null) {
-                                    prepDepict.setLong(1, Long.parseLong(id.toString()));
-                                    prepDepict.setLong(2, Long.parseLong(depictQid.substring(1)));
-                                    prepDepict.setString(3, depictType);
-                                    addBatch(prepDepict, depictBatch);
-                                }
-                            }
-
-                        } catch (SQLException throwables) {
-                            throwables.printStackTrace();
+                        if (parseMeta) {
+                            parseMeta(nameSpace);
+                        } else {
+                            parseDepict(nameSpace);
                         }
                         break;
                 }
@@ -264,6 +289,70 @@ public class CommonsWikimediaPreparation {
             if (batch > BATCH_SIZE) {
                 prep.executeBatch();
                 bt[0] = 0;
+            }
+        }
+
+        private void parseMeta(String nameSpace) {
+            try {
+                if (FILE_NAMESPACE.equals(nameSpace)) {
+                    String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
+                    if (imageTitle == null) {
+                        return;
+                    }
+                    Map<String, String> meta = new HashMap<>();
+                    WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
+                    WikiDatabasePreparation.prepareMetaData(meta);
+                    String author = meta.getOrDefault("author", "");
+                    String license = meta.getOrDefault("license", "");
+                    String description = meta.getOrDefault("description", "");
+                    String date = meta.getOrDefault("date", "");
+                    prepContent.setLong(1, Long.parseLong(id.toString()));
+                    prepContent.setString(2, imageTitle.replace(" ", "_"));
+                    prepContent.setString(3, author);
+                    prepContent.setString(4, date);
+                    prepContent.setString(5, license);
+                    prepContent.setString(6, description);
+                    addBatch(prepContent, contentBatch);
+                }
+            } catch (SQLException | IOException exception) {
+                log.error(exception.getMessage(), exception);
+            }
+        }
+
+        private void parseDepict(String nameSpace) {
+            try {
+                String n = title.toString().replace("File:", "");
+                n = n.replace("Category:", "");
+                prepContent.setLong(1, Long.parseLong(id.toString()));
+                prepContent.setString(2, n);
+                prepContent.setInt(3, Integer.parseInt(nameSpace));
+                addBatch(prepContent, contentBatch);
+
+                if (FILE_NAMESPACE.equals(nameSpace) && comment.toString().contains(DEPICT_KEY)) {
+                    String depictType = null;
+                    String depictQid = null;
+                    int l = DEPICT_KEY.length();
+                    String c = comment.toString();
+                    int s = c.indexOf(DEPICT_KEY);
+                    int e = c.indexOf(DEPICT_KEY_END, s + l);
+                    if (s != -1 && e != -1) {
+                        depictType = c.substring(s + l, e);
+                        s = c.indexOf(DEPICT_KEY, e);
+                        e = c.indexOf(DEPICT_KEY_END, s + l);
+                        if (s != -1 && e != -1) {
+                            depictQid = c.substring(s + l, e);
+                        }
+                    }
+                    if (depictQid != null) {
+                        prepDepict.setLong(1, Long.parseLong(id.toString()));
+                        prepDepict.setLong(2, Long.parseLong(depictQid.substring(1)));
+                        prepDepict.setString(3, depictType);
+                        addBatch(prepDepict, depictBatch);
+                    }
+                }
+
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
             }
         }
     }
@@ -323,14 +412,14 @@ public class CommonsWikimediaPreparation {
                 selectPrep.clearParameters();
                 if (count > 0) {
                     long catId = 0;
-                    if (categoryCashe.containsKey(catName)) {
-                        catId = categoryCashe.get(catName);
+                    if (categoryCache.containsKey(catName)) {
+                        catId = categoryCache.get(catName);
                     } else {
                         selectCatPrep.setString(1, catName.replace("_", " "));
                         rs = selectCatPrep.executeQuery();
                         if (rs.next()) {
                             catId = rs.getLong(1);
-                            categoryCashe.put(catName, catId);
+                            categoryCache.put(catName, catId);
                         }
                         selectCatPrep.clearParameters();
                     }
@@ -347,8 +436,8 @@ public class CommonsWikimediaPreparation {
             if (cnt % 100000 == 0) {
                 System.out.println(cnt + " id:" + id + " cat:" + catName);
             }
-            if (categoryCashe.size() > 1000) {
-                categoryCashe.clear();
+            if (categoryCache.size() > 1000) {
+                categoryCache.clear();
             }
         }
 
