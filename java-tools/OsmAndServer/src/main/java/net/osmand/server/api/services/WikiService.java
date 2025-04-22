@@ -228,7 +228,7 @@ public class WikiService {
 				"w.wikiTitle, w.wikiLang, w.wikiDesc, w.wikiArticles, w.osmid, w.osmtype, w.poitype, " +
 				"w.poisubtype, w.search_lat AS lat, w.search_lon AS lon, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
-				"FROM prep_wikidata w " +
+				"FROM wikidata w " +
 				"WHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
 				"ORDER BY w.elo DESC, w.qrank DESC " +
