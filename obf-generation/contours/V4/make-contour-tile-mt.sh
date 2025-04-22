@@ -12,11 +12,15 @@ threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
 threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
 export QT_LOGGING_RULES="qt5ct.debug=false"
+export QT_QPA_PLATFORM=offscreen
+export XDG_RUNTIME_DIR=$(pwd)/runtime
+mkdir -p $XDG_RUNTIME_DIR
+chmod 0700 $XDG_RUNTIME_DIR
 TMP_DIR="/mnt/wd_2tb/tmp"
 isolines_step=10
 translation_script=contours.py
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] { -s -p -d -f -t [threads number]}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
@@ -27,11 +31,13 @@ function usage {
 }
 
 date
-while getopts ":i:o:spdt:fc:" opt; do
+while getopts ":i:o:m:spdt:fc:" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
     o) outdir="$OPTARG"
+    ;;
+    m) TMP_DIR="$OPTARG"
     ;;
     s) smooth=true
     ;;
@@ -421,4 +427,5 @@ find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel 
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
 find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'
 rm -rf $outdir/processing
+rm -rf $outdir/symbology-style.db
 date
