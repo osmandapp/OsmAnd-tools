@@ -21,7 +21,7 @@ isolines_step=10
 translation_script=contours.py
 
 if [[ $NON_INTERACTIVE == "true" ]]; then
-	NON_INTERACTIVE_OPTIONS="--ungroup"
+	NON_INTERACTIVE_OPTIONS="--plain"
 fi
 function usage {
         echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number]}"
