@@ -125,9 +125,12 @@ process_tiff ()
 	indir=${1%/*}
 	highres_dir=${indir%/*}/$(basename $indir)_highres
 	filepath=$1
+    isHighRes=0
 	if [ -f $highres_dir/$filenamefull ] ; then
 		filepath=$highres_dir/$filenamefull
-		echo "Highres tile is found"
+		indir=$highres_dir
+        isHighRes=1
+        echo "Highres tile is found"
 		echo Using $filepath
 	fi
 	no_smooth=false
@@ -138,7 +141,168 @@ process_tiff ()
 		size_str=$(gdalinfo $filepath | grep "Size is" | sed 's/Size is //g')
 		width=$(echo $size_str | sed 's/,.*//')
 		height=$(echo $size_str | sed 's/.*,//')
+
+        if [[ $filename =~ ^([NS])([0-9]+)([EW])([0-9]+)$ ]]; then
+            lat_prefix="${BASH_REMATCH[1]}"
+            lon_prefix="${BASH_REMATCH[3]}"
+            lat="${BASH_REMATCH[2]}"
+            lon="${BASH_REMATCH[4]}"
+            lat_digits="${#lat}"
+            lon_digits="${#lon}"
+        else
+            echo "Error: Filename must be in the format [NS]XX[EW]YYY.tif"
+            exit 1
+        fi
+
+        left_exists=0
+        right_exists=0
+        bottom_exists=0
+        top_exists=0
+
+        neighbors=()
+
+        orig_lat_prefix="$lat_prefix"
+        orig_lon_prefix="$lon_prefix"
+
+        for dlat in -1 0 1; do
+            for dlon in -1 0 1; do
+                if [ "$dlat" -eq 0 ] && [ "$dlon" -eq 0 ]; then
+                    neighbors+=("${indir}/$filenamefull")
+                    continue
+                fi
+
+                new_lat=$(echo "$lat + $dlat" | bc)
+                new_lon=$(echo "$lon + $dlon" | bc)
+
+                lat_prefix="$orig_lat_prefix"
+                lon_prefix="$orig_lon_prefix"
+
+                if [[ "$orig_lat_prefix" == "N" && "$new_lat" -eq -1 ]]; then
+                    lat_prefix="S"
+                    new_lat="1"
+                elif [[ "$orig_lat_prefix" == "S" && "$new_lat" -eq 0 ]]; then
+                    lat_prefix="N"
+                    new_lat="0"
+                else
+                    lat_prefix="$orig_lat_prefix"
+                fi
+
+                if [[ "$orig_lon_prefix" == "E" && "$new_lon" -eq -1 ]]; then
+                    lon_prefix="W"
+                    new_lon="1"
+                elif [[ "$orig_lon_prefix" == "W" && "$new_lon" -eq 0 ]]; then
+                    lon_prefix="E"
+                    new_lon="0"
+                else
+                    lon_prefix="$orig_lon_prefix"
+                fi
+
+                formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
+                formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
+
+                neighbor_filename="${indir}/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+
+                if [ -f "$neighbor_filename" ]; then
+                    neighbors+=("$neighbor_filename")
+
+                if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
+                    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        left_exists=1
+                    else
+                        right_exists=1
+                    fi
+                fi
+                if [ $dlat -eq 0 ] && [ $dlon -eq 1 ]; then
+                    if [[ "$orig_lon_prefix" == "E" ]]; then
+                        right_exists=1
+                    else
+                        left_exists=1
+                    fi
+                fi
+                if [ $dlat -eq -1 ] && [ $dlon -eq 0 ]; then
+                    if [[ "$orig_lat_prefix" == "N" ]]; then
+                        bottom_exists=1
+                    else
+                        top_exists=1
+                    fi
+                fi
+                if [ $dlat -eq 1 ] && [ $dlon -eq 0 ]; then
+                    if [[ "$orig_lat_prefix" == "N" ]]; then
+                        top_exists=1
+                    else
+                        bottom_exists=1
+                    fi
+                fi
+                fi
+            done
+        done
+
+        echo Found neighbors: "${neighbors[@]}"
+
+        xres=0.0002776235424764020234
+        if ((  $isHighRes  )); then
+            xres=$(echo "scale=20; 0.0002776235424764020234 / 4.54957740397" | bc)
+        fi
+        yres=$xres
+
+        merged_file="$TMP_DIR/merged_${filename}.tif"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" "${neighbors[@]}" "$merged_file"
+
+        #Clipping
+        num_lat=$lat
+        num_lon=$lon
+
+        shopt -s extglob
+        num_lat=$((10#$num_lat))
+        num_lon=$((10#$num_lon))
+
+        if [[ $lat_prefix == "S" ]]; then
+            num_lat="-$num_lat"
+        fi
+
+        if [[ $lon_prefix == "W" ]]; then
+            num_lon="-$num_lon"
+        fi
+
+        read ulx uly < <(gdalinfo "${indir}/$filenamefull" | awk '/Upper Left/ {gsub(/[(),]/,""); print $3, $4}')
+
+        expansion=0.03
+        tile_size=1  # 1x1 degree
+        delta=$(echo "$tile_size * $expansion * 0.5" | bc -l)
+
+        if [ $left_exists -eq 1 ]; then
+            new_xmin=$(echo "$ulx - $delta" | bc -l)
+        else
+            new_xmin="$ulx"
+        fi
+
+        if [ $right_exists -eq 1 ]; then
+            new_xmax=$(echo "$ulx + $tile_size + $delta" | bc -l)
+        else
+            new_xmax=$(echo "$ulx + $tile_size" | bc -l)
+        fi
+
+        if [ $top_exists -eq 1 ]; then
+            new_ymax=$(echo "$uly + $delta" | bc -l)
+        else
+            new_ymax="$uly"
+        fi
+
+        if [ $bottom_exists -eq 1 ]; then
+            new_ymin=$(echo "$uly - $tile_size - $delta" | bc -l)
+        else
+            new_ymin=$(echo "$uly - $tile_size" | bc -l)
+        fi
+
+        clippedFile="$TMP_DIR/${filename}.tif"
+        gdalwarp -overwrite -t_srs EPSG:4326 -tr $xres $yres -tap -ot Int16 -of GTiff -co "COMPRESS=LZW" -te "$new_xmin" "$new_ymin" "$new_xmax" "$new_ymax" "$merged_file" "$clippedFile"
+        
+        rm -f "$merged_file"
+
+        echo "Using $clippedFile as source file for contours"
+        filepath=$clippedFile
 		src_tiff=$filepath
+
 		if [[ $width -ge 30000 ]] ; then
 			isolines_step=5
 		fi
@@ -204,25 +368,45 @@ process_tiff ()
 				mv ${TMP_DIR}/${filename}_split.shx ${TMP_DIR}/$filename.shx
 			fi
 		fi
-		if [[ $path_to_cutline ]] ; then
-			echo "Cropping by cutline …"
-			time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
-# 			time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
-			if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
-			if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
-				mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
-				mv ${TMP_DIR}/${filename}_cut.dbf ${TMP_DIR}/$filename.dbf
-				mv ${TMP_DIR}/${filename}_cut.prj ${TMP_DIR}/$filename.prj
-				mv ${TMP_DIR}/${filename}_cut.shx ${TMP_DIR}/$filename.shx
-			fi
+		if [[ ! $path_to_cutline ]] ; then
+            lat_min="$num_lat"
+            lon_min="$num_lon"
 
+            if [[ $num_lat == -* ]]; then
+                lat_max=$(( - (10#${num_lat:1}) + 1 ))
+            else
+                lat_max=$((10#$num_lat + 1))
+            fi
+
+            if [[ $num_lon == -* ]]; then
+                lon_max=$(( - (10#${num_lon:1}) + 1 ))
+            else
+                lon_max=$((10#$num_lon + 1))
+            fi
+
+            path_to_cutline="${TMP_DIR}/bbox_${filename}.geojson"
+            echo '{"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "EPSG:4326"}}, "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[['"$lon_min"', '"$lat_min"'], ['"$lon_max"', '"$lat_min"'], ['"$lon_max"', '"$lat_max"'], ['"$lon_min"', '"$lat_max"'], ['"$lon_min"', '"$lat_min"']]]}}]}' > $path_to_cutline
 		fi
+
+        echo "Cropping by cutline …"
+        time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
+#             time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
+        if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
+        if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
+            mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
+            mv ${TMP_DIR}/${filename}_cut.dbf ${TMP_DIR}/$filename.dbf
+            mv ${TMP_DIR}/${filename}_cut.prj ${TMP_DIR}/$filename.prj
+            mv ${TMP_DIR}/${filename}_cut.shx ${TMP_DIR}/$filename.shx
+        fi
+        if [ -f ${TMP_DIR}/${filename}_cut.cpg ]; then rm -f ${TMP_DIR}/${filename}_cut.cpg; fi
+        rm -f $path_to_cutline
+
 		echo "Building osm file …"
 		if [[ -f $outdir/$filename.osm ]] ; then rm -f $outdir/$filename.osm ; fi
 		if [[ -f ${TMP_DIR}/$filename.tif ]] ; then rm -f ${TMP_DIR}/$filename.tif ; fi
 		${working_dir}/ogr2osm.py ${TMP_DIR}/$filename.shp -o $outdir/$filename.osm -e 4326 -t $translation_script
 		if [ $? -ne 0 ]; then echo $(date)' Error creating OSM file' & exit 5;fi
-	
+
 		echo "Compressing to osm.bz2 …"
 		lbzip2 -f $outdir/$filename.osm
 		if [ $? -ne 0 ]; then echo $(date)' Error compressing OSM file' & exit 6;fi
