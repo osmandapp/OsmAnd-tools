@@ -19,7 +19,7 @@ chmod 0700 $XDG_RUNTIME_DIR
 TMP_DIR="/mnt/wd_2tb/tmp"
 isolines_step=10
 translation_script=contours.py
-
+NON_INTERACTIVE=true
 if [[ $NON_INTERACTIVE == "true" ]]; then
 	NON_INTERACTIVE_OPTIONS="--ungroup"
 fi
