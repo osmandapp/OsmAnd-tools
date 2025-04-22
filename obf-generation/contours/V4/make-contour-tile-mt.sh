@@ -59,6 +59,8 @@ while getopts ":i:o:m:spdt:fc:" opt; do
     ;;
   esac
 done
+mkdir -p $TMP_DIR
+
 if [[ $make_feet == "true" ]] ; then
 	isolines_step=40
 	translation_script=contours_feet.py
