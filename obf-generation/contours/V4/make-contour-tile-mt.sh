@@ -19,6 +19,10 @@ chmod 0700 $XDG_RUNTIME_DIR
 TMP_DIR="/mnt/wd_2tb/tmp"
 isolines_step=10
 translation_script=contours.py
+
+if [[ $NON_INTERACTIVE == "true" ]]; then
+	NON_INTERACTIVE_OPTIONS="--ungroup"
+fi
 function usage {
         echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
@@ -423,11 +427,11 @@ process_tiff ()
 	fi
 }
 export -f process_tiff
-#find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel -P 5 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel -P $threads_number_0 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel -P $threads_number_1 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel -P $threads_number_2 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel -P $threads_number_3 --no-notice --bar time process_tiff '{}'
+#find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P 5 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice --bar time process_tiff '{}'
 rm -rf $outdir/processing
 rm -rf $outdir/symbology-style.db
 date
