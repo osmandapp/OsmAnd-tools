@@ -1910,23 +1910,25 @@ public class WikiDatabasePreparation {
 								log.error(String.format("Error with article %d - %s : %s", cid, title, e.getMessage()), e);
 							}
 						}
-						String redirect = getRedirect(ctext);
-						if (++counter % ARTICLES_BATCH == 0) {
-							log.info("Article accepted " + cid + " " + title.toString());
+						if (plainStr != null) {
+							String redirect = getRedirect(ctext);
+							if (++counter % ARTICLES_BATCH == 0) {
+								log.info("Article accepted " + cid + " " + title.toString());
 //								double GB = (1l << 30);
 //								log.info(String.format("Memory used : free %.2f GB of %.2f GB",
 //										Runtime.getRuntime().freeMemory() / GB, Runtime.getRuntime().totalMemory() / GB));
-						}
-						try {
-							insertPrep.setLong(1, wikiId);
-							insertPrep.setString(2, title.toString());
-							insertPrep.setString(3, lang);
-							insertPrep.setString(4, shortDescr);
-							insertPrep.setString(5, redirect);
-							insertPrep.setBytes(6, plainStr != null ? gzip(plainStr) : null);
-							addBatch();
-						} catch (SQLException e) {
-							throw new SAXException(e);
+							}
+							try {
+								insertPrep.setLong(1, wikiId);
+								insertPrep.setString(2, title.toString());
+								insertPrep.setString(3, lang);
+								insertPrep.setString(4, shortDescr);
+								insertPrep.setString(5, redirect);
+								insertPrep.setBytes(6, gzip(plainStr));
+								addBatch();
+							} catch (SQLException e) {
+								throw new SAXException(e);
+							}
 						}
 						ctext = null;
 					}
