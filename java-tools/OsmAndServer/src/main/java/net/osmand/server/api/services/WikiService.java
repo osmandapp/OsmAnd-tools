@@ -200,24 +200,18 @@ public class WikiService {
 		List<Object> filterParams = new ArrayList<>();
 
 		if (!showAll && !filters.isEmpty()) {
-			filterQuery = "AND e.topic IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
+			filterQuery = "AND w.topic IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
 			filterParams.addAll(filters);
 		}
 
-		String lat = "COALESCE(w.lat, w.wlat)";
-		String lon = "COALESCE(w.lon, w.wlon)";
-
 		String query = "SELECT w.id, w.photoId, w.photoTitle, w.catId, w.catTitle, w.depId, w.depTitle, " +
 				"w.wikiTitle, w.wikiLang, w.wikiDesc, w.wikiArticles, w.osmid, w.osmtype, w.poitype, " +
-				"w.poisubtype, " +
-				lat + " AS lat, " +
-				lon + " AS lon, " +
-				"w.wvLinks, COALESCE(e.elo, 900) AS elo, e.topic AS topic, e.categories AS categories, w.qrank " +
+				"w.poisubtype, w.search_lat AS lat, w.search_lon AS lon, " +
+				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
 				"FROM wikidata w " +
-				"LEFT JOIN wiki.elo_rating e ON w.id = e.id " +
-				"WHERE (" + lat + " BETWEEN ? AND ? AND " + lon + " BETWEEN ? AND ?) " +
+				"WHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
-				"ORDER BY elo DESC, w.qrank DESC " +
+				"ORDER BY w.elo DESC, w.qrank DESC " +
 				"LIMIT " + LIMIT_OBJS_QUERY;
 
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", lang);
