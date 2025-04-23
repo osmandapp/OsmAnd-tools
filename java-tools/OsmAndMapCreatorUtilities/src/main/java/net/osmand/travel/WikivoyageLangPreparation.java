@@ -759,7 +759,7 @@ public class WikivoyageLangPreparation {
 			Map<WikivoyageTemplates, List<String>> macroBlocks = new HashMap<>();
 			List<Map<PoiFieldType, Object>> pois = new ArrayList<Map<PoiFieldType, Object>>();
 			cInfo.title = title;
-			String wikiText = WikiDatabasePreparation.removeMacroBlocks(cont, null, macroBlocks, pois, lang, title, dbBrowser);
+			String wikiText = WikiDatabasePreparation.removeMacroBlocks(cont, null, macroBlocks, pois, lang, title, dbBrowser, null);
 			if (macroBlocks.containsKey(WikivoyageTemplates.DISAMB) || 
 					macroBlocks.containsKey(WikivoyageTemplates.MONUMENT_TITLE)) {
 //				System.out.println("Skip disambiguation " + title); 

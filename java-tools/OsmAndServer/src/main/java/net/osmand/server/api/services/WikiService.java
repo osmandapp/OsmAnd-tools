@@ -182,36 +182,16 @@ public class WikiService {
 	
 	public Map<String, String> parseImageInfo(String rawData) throws SQLException, IOException {
 		Map<String, String> result = new HashMap<>();
-		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, "en", "Old_parsing_without_title", null);
+		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, "en", "Old_parsing_without_title", null, null);
 		prepareMetaData(result);
 		return result;
 	}
 	
 	public Map<String, String> parseImageInfo(String rawData, String title, String lang) throws SQLException, IOException {
 		Map<String, String> result = new HashMap<>();
-		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, lang, title, null);
+		removeMacroBlocks(new StringBuilder(rawData), result, new HashMap<>(), null, lang, title, null, null);
 		prepareMetaData(result);
 		return result;
-	}
-	
-	private void prepareMetaData(Map<String, String> metaData) {
-		String license = metaData.get("license");
-		if (license != null) {
-			metaData.put("license", processLicense(license));
-		}
-	}
-	
-	private String processLicense(String license) {
-		license = license.replace("[[", "").replace("]]", "");
-		// Remove hyphens after "CC" and "PD"
-		license = license.replace("CC-", "CC ");
-		license = license.replace("PD-", "PD ");
-		
-		// Remove hyphen before "expired"
-		license = license.replace("-expired", " expired");
-		license = license.toUpperCase();
-		
-		return license;
 	}
 
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
