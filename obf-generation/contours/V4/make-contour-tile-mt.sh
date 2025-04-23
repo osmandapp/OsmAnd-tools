@@ -117,6 +117,7 @@ fi
 
 working_dir=$(pwd)
 cd $outdir
+rm -f $outdir/*.osm
 
 export outdir
 export TMP_DIR
