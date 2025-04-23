@@ -21,6 +21,7 @@ import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
 
 import net.osmand.mailsender.data.BlockedUser;
+import net.osmand.util.Algorithms;
 
 public class EmailSenderMain {
 
@@ -36,9 +37,10 @@ public class EmailSenderMain {
         String testAddresses = null;
         String subject = null;
         String mailFrom;
+        int skipFirstEmails = 0;
         int sentSuccess = 0;
         int sentFailed = 0;
-        int daySince;
+        int daySince = 0;
 		String giveawaySeries;
     }
 
@@ -66,15 +68,16 @@ public class EmailSenderMain {
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddresses = val;
             } else if (arg.startsWith("--since-days-ago=")) {
-            	if(val.length() > 0) {
-            		p.daySince = Integer.parseInt(val);
-            	}
+                p.daySince = Algorithms.parseIntSilently(val, 0);
+            } else if (arg.startsWith("--skip-first-emails=")) {
+                p.skipFirstEmails = Algorithms.parseIntSilently(val, 0);
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             } else if (arg.equals("--update_postfix_bounced")) {
               updatePostfixBounced = true;
             }
         }
+
         final String apiKey = System.getenv("SENDGRID_KEY");
         sendGridClient = new SendGrid(apiKey);
 
@@ -295,10 +298,12 @@ public class EmailSenderMain {
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
-            if (!unsubscribed.contains(address) && address != null) {
-                sendMail(address, p);
-            } else {
-                LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+            if (!Algorithms.isEmpty(address)) {
+                if (!unsubscribed.contains(address)) {
+                    sendMail(address, p);
+                } else {
+                    LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+                }
             }
         }
         LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
@@ -448,6 +453,13 @@ public class EmailSenderMain {
 
 		if ("giveaway".equals(p.topic)) {
 			sender.set("GIVEAWAY_SERIES", p.giveawaySeries);
+		}
+
+		if (p.skipFirstEmails > 0 && p.sentSuccess < p.skipFirstEmails) {
+			p.sentSuccess++;
+			LOGGER.info(String.format("Skip mail to: %s due to skipFirstEmails [%d/%d]",
+					mailTo.replaceFirst(".....", "....."), p.sentSuccess, p.skipFirstEmails));
+			return;
 		}
 
 		boolean ok = sender.send().isSuccess();
