@@ -21,6 +21,7 @@ import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
 
 import net.osmand.mailsender.data.BlockedUser;
+import net.osmand.util.Algorithms;
 
 public class EmailSenderMain {
 
@@ -295,10 +296,12 @@ public class EmailSenderMain {
         ResultSet resultSet = ps.executeQuery();
         while (resultSet.next()) {
             String address = resultSet.getString(1);
-            if (!unsubscribed.contains(address) && address != null) {
-                sendMail(address, p);
-            } else {
-                LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+            if (!Algorithms.isEmpty(address)) {
+                if (!unsubscribed.contains(address)) {
+                    sendMail(address, p);
+                } else {
+                    LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+                }
             }
         }
         LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
