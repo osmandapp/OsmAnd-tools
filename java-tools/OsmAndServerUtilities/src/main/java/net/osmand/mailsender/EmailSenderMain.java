@@ -37,9 +37,10 @@ public class EmailSenderMain {
         String testAddresses = null;
         String subject = null;
         String mailFrom;
+        int skipFirstEmails = 0;
         int sentSuccess = 0;
         int sentFailed = 0;
-        int daySince;
+        int daySince = 0;
 		String giveawaySeries;
     }
 
@@ -67,15 +68,16 @@ public class EmailSenderMain {
             } else if (arg.startsWith("--test_addr=")) {
             	p.testAddresses = val;
             } else if (arg.startsWith("--since-days-ago=")) {
-            	if(val.length() > 0) {
-            		p.daySince = Integer.parseInt(val);
-            	}
+                p.daySince = Algorithms.parseIntSilently(val, 0);
+            } else if (arg.startsWith("--skip-first-emails=")) {
+                p.skipFirstEmails = Algorithms.parseIntSilently(val, 0);
             } else if (arg.equals("--update_block_list")) {
                 updateBlockList = true;
             } else if (arg.equals("--update_postfix_bounced")) {
               updatePostfixBounced = true;
             }
         }
+
         final String apiKey = System.getenv("SENDGRID_KEY");
         sendGridClient = new SendGrid(apiKey);
 
@@ -451,6 +453,13 @@ public class EmailSenderMain {
 
 		if ("giveaway".equals(p.topic)) {
 			sender.set("GIVEAWAY_SERIES", p.giveawaySeries);
+		}
+
+		if (p.skipFirstEmails > 0 && p.sentSuccess < p.skipFirstEmails) {
+			p.sentSuccess++;
+			LOGGER.info(String.format("Skip mail to: %s due to skipFirstEmails [%d/%d]",
+					mailTo.replaceFirst(".....", "....."), p.sentSuccess, p.skipFirstEmails));
+			return;
 		}
 
 		boolean ok = sender.send().isSuccess();
