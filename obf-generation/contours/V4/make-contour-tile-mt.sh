@@ -13,10 +13,10 @@ threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
 export QT_LOGGING_RULES="qt5ct.debug=false"
 export QT_QPA_PLATFORM=offscreen
-chmod 0700 $XDG_RUNTIME_DIR
 TMP_DIR="/mnt/wd_2tb/tmp"
 export XDG_RUNTIME_DIR=$TMP_DIR/runtime
 mkdir -p $XDG_RUNTIME_DIR
+chmod 0700 $XDG_RUNTIME_DIR
 isolines_step=10
 translation_script=contours.py
 
