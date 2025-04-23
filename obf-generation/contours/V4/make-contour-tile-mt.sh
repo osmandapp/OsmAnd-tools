@@ -13,16 +13,13 @@ threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
 export QT_LOGGING_RULES="qt5ct.debug=false"
 export QT_QPA_PLATFORM=offscreen
-export XDG_RUNTIME_DIR=$(pwd)/runtime
-mkdir -p $XDG_RUNTIME_DIR
 chmod 0700 $XDG_RUNTIME_DIR
 TMP_DIR="/mnt/wd_2tb/tmp"
+export XDG_RUNTIME_DIR=$TMP_DIR/runtime
+mkdir -p $XDG_RUNTIME_DIR
 isolines_step=10
 translation_script=contours.py
-NON_INTERACTIVE=true
-if [[ $NON_INTERACTIVE == "true" ]]; then
-	NON_INTERACTIVE_OPTIONS="--ungroup --plain"
-fi
+
 function usage {
         echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
@@ -51,7 +48,9 @@ while getopts ":i:o:m:spdt:fc:" opt; do
     ;;
     d) simplify=true
     ;;
-    t) threads_number_1="$OPTARG"
+    t) 
+       threads_number_0="$OPTARG"
+       threads_number_1="$OPTARG"
        threads_number_2="$OPTARG"
        threads_number_3="$OPTARG"
        threads_number_is_set=true
@@ -137,7 +136,7 @@ process_tiff ()
 	indir=${1%/*}
 	highres_dir=${indir%/*}/$(basename $indir)_highres
 	filepath=$1
-    isHighRes=0
+	isHighRes=0
 	if [ -f $highres_dir/$filenamefull ] ; then
 		filepath=$highres_dir/$filenamefull
 		indir=$highres_dir
@@ -427,11 +426,12 @@ process_tiff ()
 	fi
 }
 export -f process_tiff
-#find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P 5 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice --bar time process_tiff '{}'
-find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "*.tif" | sort -R | parallel -P $threads_number_0 --bar process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice --bar time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice --bar time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice --bar time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice --bar time process_tiff '{}'
 rm -rf $outdir/processing
 rm -rf $outdir/symbology-style.db
 date
+rm -f $XDG_RUNTIME_DIR
