@@ -239,34 +239,34 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-				for (LatLon cen : centers) {
+				for (int i = 0; i < centers.size(); i++) {
+                    LatLon cen = centers.get(i);
 					if (cen != null) {
 						a.setLocation(cen);
 					}
-            		// do not add that check because it is too much printing for batch creation
-    				// by statistic < 1% creates maps manually
-    				// checkEntity(e);
+                    if (a.getLocation() == null) {
+                        continue;
+                    }
     				EntityParser.parseMapObject(a, e, tags);
-    				a.setId(id);
-					generatedIds.add(id);
     				if (centers.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
-						while (generatedIds.contains(id)) {
-							id += 2;
-						}
-    				}
+                        long cenId = id + ((long) i * 2);
+						a.setId(cenId);
+                        generatedIds.add(cenId);
+    				} else {
+                        a.setId(id);
+                        generatedIds.add(id);
+                    }
 					if (!memberIds.isEmpty()) {
 						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
 					}
 
-    				if (a.getLocation() != null) {
-    					try {
-    						insertAmenityIntoPoi(a);
-    					} catch (Exception excpt) {
-    						System.out.println("TODO FIX " + a.getId() + " " + excpt);
-    						excpt.printStackTrace();
-    					}
-    				}
+   					try {
+   						insertAmenityIntoPoi(a);
+   					} catch (Exception excpt) {
+   						System.out.println("TODO FIX " + a.getId() + " " + excpt);
+   						excpt.printStackTrace();
+   					}
                 }
 
 			}
