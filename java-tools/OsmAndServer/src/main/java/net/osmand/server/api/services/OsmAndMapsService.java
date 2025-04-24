@@ -97,6 +97,7 @@ public class OsmAndMapsService {
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
+	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 5 * 60 * 1000;
 
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
@@ -345,7 +346,7 @@ public class OsmAndMapsService {
 		});
 	}
 
-	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
+	@Scheduled(fixedRate = INTERVAL_TO_CLEANUP_ROUTING_CACHE)
 	public void cleanUpRoutingFiles() {
 		List<RoutingCacheContext> removed = new ArrayList<>();
 		synchronized (routingCaches) {
@@ -358,7 +359,7 @@ public class OsmAndMapsService {
 			});
 			System.out.println("Prepare to clean up global routing contexts " + routingCaches);
 			while (routingCaches.size() > HINT_SAME_ROUTING_CONTEXT_OPEN) {
-				RoutingCacheContext r = routingCaches.remove(routingCaches.size() - 1);
+				RoutingCacheContext r = routingCaches.remove(0); // FIFO
 				removed.add(r);
 			}
 			for (int i = 0; i < routingCaches.size(); ) {
