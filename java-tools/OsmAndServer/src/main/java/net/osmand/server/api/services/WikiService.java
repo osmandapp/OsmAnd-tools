@@ -226,7 +226,7 @@ public class WikiService {
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
-				"FROM wiki.prep_wikidata AS w " +
+				"FROM wiki.wikidata AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
 				"ORDER BY w.elo DESC, w.qrank DESC " +
