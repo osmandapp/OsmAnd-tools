@@ -214,7 +214,9 @@ public class WikiService {
 	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery) {
 
 		String langList = langPriority.stream()
-				.map(l -> "'" + l.trim() + "'")
+				.map(String::trim)
+				.filter(l -> l.matches("^[a-z]{1,3}$"))
+				.map(l -> "'" + l + "'")
 				.collect(Collectors.joining(", ", "[", "]"));
 
 		return "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
@@ -224,7 +226,7 @@ public class WikiService {
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
-				"FROM wiki.wikidata AS w " +
+				"FROM wiki.prep_wikidata AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
 				"ORDER BY w.elo DESC, w.qrank DESC " +
@@ -325,9 +327,9 @@ public class WikiService {
 						case "wikiArticles" -> fillWikiArticles(rs, i, f, langPriority);
 						case "availableLangs" -> f.properties.put("wikiLangs", rs.getString(i));
 						case "wvLinks" -> fillWvLinks(rs, i, f, langPriority);
-						case "wikiTitle" -> putIfAbsent(f, "wikiTitle", rs.getString(i));
-						case "wikiDesc" -> putIfAbsent(f, "wikiDesc", rs.getString(i));
-						case "wikiLang" -> putIfAbsent(f, "wikiLang", rs.getString(i));
+						case "wikiTitle" -> f.properties.putIfAbsent("wikiTitle", rs.getString(i));
+						case "wikiDesc" ->  f.properties.putIfAbsent("wikiDesc", rs.getString(i));
+						case "wikiLang" ->  f.properties.putIfAbsent("wikiLang", rs.getString(i));
 						case "poisubtype" -> fillPoiSubtype(rs.getString(i), f);
 						default -> f.properties.put(col, rs.getString(i));
 					}
@@ -370,12 +372,6 @@ public class WikiService {
 		return Algorithms.isEmpty(preferredLangs)
 				? List.of("en")
 				: List.of(preferredLangs.split(","));
-	}
-
-	private void putIfAbsent(Feature f, String key, String value) {
-		if (!f.properties.containsKey(key) && value != null) {
-			f.properties.put(key, value);
-		}
 	}
 
 	private void fillWikiArticles(ResultSet rs, int index, Feature f, List<String> langPriority) throws SQLException {
