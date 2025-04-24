@@ -606,6 +606,9 @@ public class SearchService {
             if (category != null) {
                 tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), category.getIconKeyName());
                 tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), category.getKeyName());
+            } else if (obj instanceof PoiCategory cat) {
+                tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), cat.getIconKeyName());
+                tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), cat.getKeyName());
             }
         } else if (obj instanceof SearchCoreFactory.PoiAdditionalCustomFilter type) {
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
