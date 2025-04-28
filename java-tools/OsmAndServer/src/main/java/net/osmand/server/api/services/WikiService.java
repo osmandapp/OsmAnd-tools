@@ -194,7 +194,7 @@ public class WikiService {
 		return result;
 	}
 
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
 		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
@@ -206,18 +206,24 @@ public class WikiService {
 
 		List<String> langPriority = buildLangPriorityList(lang);
 
-		String query = buildWikidataQuery(langPriority, showAll, filterQuery);
+		String query = buildWikidataQuery(langPriority, showAll, filterQuery, zoom);
 
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", langPriority);
 	}
 
-	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery) {
+	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery, int zoom) {
 
 		String langList = langPriority.stream()
 				.map(String::trim)
 				.filter(l -> l.matches("^[a-z]{1,3}$"))
 				.map(l -> "'" + l + "'")
 				.collect(Collectors.joining(", ", "[", "]"));
+
+		String table;
+		if (zoom <= 5)      table = "wiki.top1000_by_quad_z5";
+		else if (zoom <= 10) table = "wiki.top1000_by_quad_z10";
+		else if (zoom <= 16) table = "wiki.top1000_by_quad_z16";
+		else                table = "wiki.prep_wikidata";
 
 		return "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
 				"w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
@@ -226,7 +232,7 @@ public class WikiService {
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
-				"FROM wiki.wikidata AS w " +
+				"FROM " + table + " AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
 				"ORDER BY w.elo DESC, w.qrank DESC " +
