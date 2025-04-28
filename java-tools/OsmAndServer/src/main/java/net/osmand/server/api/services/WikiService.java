@@ -223,7 +223,7 @@ public class WikiService {
 		if (zoom <= 5)      table = "wiki.top1000_by_quad_z5";
 		else if (zoom <= 10) table = "wiki.top1000_by_quad_z10";
 		else if (zoom <= 16) table = "wiki.top1000_by_quad_z16";
-		else                table = "wiki.prep_wikidata";
+		else                table = "wiki.wikidata";
 
 		return "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
 				"w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
