@@ -205,7 +205,7 @@ public class WikiService {
 			filterParams.addAll(filters);
 		}
 
-		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast, 1);
+		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast);
 
 		List<String> langPriority = buildLangPriorityList(lang);
 
@@ -362,7 +362,7 @@ public class WikiService {
 		return new FeatureCollection(features.toArray(new Feature[0]));
 	}
 
-	private int calculateTileCount(String northWest, String southEast, float zoom) {
+	private int calculateOptimalZoom(String northWest, String southEast) {
 		String[] nw = northWest.split(",");
 		String[] se = southEast.split(",");
 		double lat1 = Double.parseDouble(nw[0]);
@@ -375,20 +375,13 @@ public class WikiService {
 		double minLon = Math.min(lon1, lon2);
 		double maxLon = Math.max(lon1, lon2);
 
-		int xMin = (int) Math.floor(MapUtils.getTileNumberX(zoom, minLon));
-		int xMax = (int) Math.floor(MapUtils.getTileNumberX(zoom, maxLon));
-		int yMin = (int) Math.floor(MapUtils.getTileNumberY(zoom, maxLat));
-		int yMax = (int) Math.floor(MapUtils.getTileNumberY(zoom, minLat));
-
-		int countX = xMax - xMin + 1;
-		int countY = yMax - yMin + 1;
-		return countX * countY;
-	}
-
-	private int calculateOptimalZoom(String northWest, String southEast, int maxTiles) {
 		final int MAX_Z = 21, MIN_Z = 0;
 		for (int z = MAX_Z; z >= MIN_Z; z--) {
-			if (calculateTileCount(northWest, southEast, z) <= maxTiles) {
+			double yDiff = Math.abs(MapUtils.getTileNumberY(z, maxLat)
+					- MapUtils.getTileNumberY(z, minLat));
+			double xDiff = Math.abs(MapUtils.getTileNumberX(z, maxLon)
+					- MapUtils.getTileNumberX(z, minLon));
+			if (yDiff < 1.5 && xDiff < 1.5) {
 				return z;
 			}
 		}
