@@ -166,7 +166,7 @@ class RandomRouteGenerator {
 
 		int seed = randomPoints.size(); // second random seed (unique for every method call)
 
-		int pointsToRead = 20 * Math.min(config.ITERATIONS, 10); // read up to 20 x ITERATIONS points every time
+		int pointsToRead = 30 * Math.min(config.ITERATIONS, 10); // read up to 30 x ITERATIONS points every time
 		int pointsPerObf = pointsToRead / obfReaders.size(); // how many to read per one obf
 		pointsPerObf = pointsPerObf > 10 ? pointsPerObf : 10; // as minimum as 10
 
