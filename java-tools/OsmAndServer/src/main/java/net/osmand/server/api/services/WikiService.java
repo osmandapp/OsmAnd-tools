@@ -195,7 +195,7 @@ public class WikiService {
 		return result;
 	}
 
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, Integer zoom) {
 		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
@@ -205,11 +205,11 @@ public class WikiService {
 			filterParams.addAll(filters);
 		}
 
-		int zoom = calculateOptimalZoom(northWest, southEast, 1);
+		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast, 1);
 
 		List<String> langPriority = buildLangPriorityList(lang);
 
-		String query = buildWikidataQuery(langPriority, showAll, filterQuery, zoom);
+		String query = buildWikidataQuery(langPriority, showAll, filterQuery, z);
 
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", langPriority);
 	}
