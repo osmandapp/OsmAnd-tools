@@ -17,6 +17,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
+import net.osmand.util.MapUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -194,7 +195,7 @@ public class WikiService {
 		return result;
 	}
 
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, Integer zoom) {
 		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
@@ -204,20 +205,28 @@ public class WikiService {
 			filterParams.addAll(filters);
 		}
 
+		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast, 1);
+
 		List<String> langPriority = buildLangPriorityList(lang);
 
-		String query = buildWikidataQuery(langPriority, showAll, filterQuery);
+		String query = buildWikidataQuery(langPriority, showAll, filterQuery, z);
 
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", langPriority);
 	}
 
-	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery) {
+	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery, int zoom) {
 
 		String langList = langPriority.stream()
 				.map(String::trim)
 				.filter(l -> l.matches("^[a-z]{1,3}$"))
 				.map(l -> "'" + l + "'")
 				.collect(Collectors.joining(", ", "[", "]"));
+
+		String table;
+		if (zoom <= 5)      table = "wiki.top1000_by_quad_z5";
+		else if (zoom <= 10) table = "wiki.top1000_by_quad_z10";
+		else if (zoom <= 16) table = "wiki.top1000_by_quad_z16";
+		else                table = "wiki.wikidata";
 
 		return "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
 				"w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
@@ -226,7 +235,7 @@ public class WikiService {
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
-				"FROM wiki.wikidata AS w " +
+				"FROM " + table + " AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
 				"ORDER BY w.elo DESC, w.qrank DESC " +
@@ -351,6 +360,39 @@ public class WikiService {
 		}, rowMapper);
 
 		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+
+	private int calculateTileCount(String northWest, String southEast, float zoom) {
+		String[] nw = northWest.split(",");
+		String[] se = southEast.split(",");
+		double lat1 = Double.parseDouble(nw[0]);
+		double lon1 = Double.parseDouble(nw[1]);
+		double lat2 = Double.parseDouble(se[0]);
+		double lon2 = Double.parseDouble(se[1]);
+
+		double minLat = Math.min(lat1, lat2);
+		double maxLat = Math.max(lat1, lat2);
+		double minLon = Math.min(lon1, lon2);
+		double maxLon = Math.max(lon1, lon2);
+
+		int xMin = (int) Math.floor(MapUtils.getTileNumberX(zoom, minLon));
+		int xMax = (int) Math.floor(MapUtils.getTileNumberX(zoom, maxLon));
+		int yMin = (int) Math.floor(MapUtils.getTileNumberY(zoom, maxLat));
+		int yMax = (int) Math.floor(MapUtils.getTileNumberY(zoom, minLat));
+
+		int countX = xMax - xMin + 1;
+		int countY = yMax - yMin + 1;
+		return countX * countY;
+	}
+
+	private int calculateOptimalZoom(String northWest, String southEast, int maxTiles) {
+		final int MAX_Z = 21, MIN_Z = 0;
+		for (int z = MAX_Z; z >= MIN_Z; z--) {
+			if (calculateTileCount(northWest, southEast, z) <= maxTiles) {
+				return z;
+			}
+		}
+		return MIN_Z;
 	}
 
 	private double[] parseBoundingBox(String northWest, String southEast) {
