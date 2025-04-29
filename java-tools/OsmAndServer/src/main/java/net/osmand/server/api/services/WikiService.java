@@ -17,6 +17,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
+import net.osmand.util.MapUtils;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
@@ -194,7 +195,7 @@ public class WikiService {
 		return result;
 	}
 
-	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, int zoom) {
+	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters) {
 		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
@@ -203,6 +204,8 @@ public class WikiService {
 			filterQuery = "AND w.topic IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
 			filterParams.addAll(filters);
 		}
+
+		int zoom = calculateOptimalZoom(northWest, southEast, 1);
 
 		List<String> langPriority = buildLangPriorityList(lang);
 
@@ -357,6 +360,39 @@ public class WikiService {
 		}, rowMapper);
 
 		return new FeatureCollection(features.toArray(new Feature[0]));
+	}
+
+	private int calculateTileCount(String northWest, String southEast, float zoom) {
+		String[] nw = northWest.split(",");
+		String[] se = southEast.split(",");
+		double lat1 = Double.parseDouble(nw[0]);
+		double lon1 = Double.parseDouble(nw[1]);
+		double lat2 = Double.parseDouble(se[0]);
+		double lon2 = Double.parseDouble(se[1]);
+
+		double minLat = Math.min(lat1, lat2);
+		double maxLat = Math.max(lat1, lat2);
+		double minLon = Math.min(lon1, lon2);
+		double maxLon = Math.max(lon1, lon2);
+
+		int xMin = (int) Math.floor(MapUtils.getTileNumberX(zoom, minLon));
+		int xMax = (int) Math.floor(MapUtils.getTileNumberX(zoom, maxLon));
+		int yMin = (int) Math.floor(MapUtils.getTileNumberY(zoom, maxLat));
+		int yMax = (int) Math.floor(MapUtils.getTileNumberY(zoom, minLat));
+
+		int countX = xMax - xMin + 1;
+		int countY = yMax - yMin + 1;
+		return countX * countY;
+	}
+
+	private int calculateOptimalZoom(String northWest, String southEast, int maxTiles) {
+		final int MAX_Z = 21, MIN_Z = 0;
+		for (int z = MAX_Z; z >= MIN_Z; z--) {
+			if (calculateTileCount(northWest, southEast, z) <= maxTiles) {
+				return z;
+			}
+		}
+		return MIN_Z;
 	}
 
 	private double[] parseBoundingBox(String northWest, String southEast) {
