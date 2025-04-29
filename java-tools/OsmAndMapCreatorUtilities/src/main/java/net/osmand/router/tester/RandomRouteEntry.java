@@ -158,6 +158,7 @@ class RandomRouteReport {
 	private boolean car2phase;
 	private double deviationRed;
 	private double deviationYellow;
+	private int failedResults, deviatedResults;
 
 	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain, boolean car2phase) {
 		this.deviationRed = red;
@@ -279,14 +280,21 @@ class RandomRouteReport {
 	}
 
 	private String costDistHtmlColor(double n) {
-		return n > 0 ? "green" : "red";
+		if (n > 0) {
+			return "green";
+		} else {
+			failedResults++;
+			return "red";
+		}
 	}
 
 	private String deviationHtmlColor(double percent, double value) {
 		if (value <= 0) {
+			failedResults++;
 			return "red";
 		}
 		if (Math.abs(percent) >= deviationRed) {
+			deviatedResults++;
 			return "red";
 		} else if (Math.abs(percent) >= deviationYellow) {
 			return "orange";
@@ -306,5 +314,13 @@ class RandomRouteReport {
 		System.err.printf("\n%s", text);
 		writer.write(html);
 		writer.close();
+	}
+
+	public boolean isFailed() {
+		return failedResults > 0;
+	}
+
+	public boolean isDeviated() {
+		return deviatedResults > 0;
 	}
 }

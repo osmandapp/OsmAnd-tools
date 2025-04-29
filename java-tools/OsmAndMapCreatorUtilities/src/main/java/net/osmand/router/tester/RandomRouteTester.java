@@ -91,7 +91,9 @@ public class RandomRouteTester {
 		test.startSlowDown();
 		test.collectRoutes();
 		test.stopSlowDown();
-		test.reportResult();
+
+		int exitCode = test.reportResult();
+		System.exit(exitCode);
 	}
 
 	private CommandLineOpts opts;
@@ -120,6 +122,10 @@ public class RandomRouteTester {
 	private List<RandomRouteEntry> testList = new ArrayList<>();
 
 	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
+
+	private final int EXIT_SUCCESS = 0;
+	private final int EXIT_TEST_FAILED = 1;
+	private final int EXIT_RED_LIMIT_REACHED = 2;
 
 	private RandomRouteTester(String[] args) {
 		this.opts = new CommandLineOpts(args);
@@ -229,18 +235,19 @@ public class RandomRouteTester {
 					"--car-2phase use COMPLEX mode for car (Android default)",
 					"--no-conditionals disable *:conditional restrictions",
 					"",
-					"--red=N % red-color limit",
 					"--yellow=N % yellow-color limit",
+					"--red=N % red-color limit (affects exit code)",
 					"",
 					"--help show help",
 					""
 			));
-			System.exit(0);
+			System.exit(EXIT_SUCCESS);
 		}
 	}
 
-	private void reportResult() throws IOException {
+	private int reportResult() throws IOException {
 		long runTime = System.currentTimeMillis() - started;
+
 		RandomRouteReport report = new RandomRouteReport(runTime, obfReaders.size(), testList.size(),
 				config.DEVIATION_RED, config.DEVIATION_YELLOW, optHtmlDomain, config.CAR_2PHASE_MODE);
 
@@ -260,6 +267,14 @@ public class RandomRouteTester {
 		}
 
 		report.flush(optHtmlReport);
+
+		if (report.isFailed()) {
+			return EXIT_TEST_FAILED;
+		} else if (report.isDeviated()) {
+			return EXIT_RED_LIMIT_REACHED;
+		} else {
+			return EXIT_SUCCESS;
+		}
 	}
 
 	private void initObfReaders() throws IOException {
