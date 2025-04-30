@@ -1749,6 +1749,7 @@ public class WikiDatabasePreparation {
 		mapSt.execute("DROP TABLE IF EXISTS wiki_mapping");
 		mapSt.execute("CREATE TABLE wiki_mapping(id LONG, lang TEXT, title TEXT)");
 		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_id ON wiki_mapping(id)");
+		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_lang_title ON wiki_mapping(lang, title)");
 
 		PreparedStatement ps = mappingConn
 				.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES(?, ?, ?)");
