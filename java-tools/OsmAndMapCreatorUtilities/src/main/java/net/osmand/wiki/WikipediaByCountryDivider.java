@@ -38,85 +38,86 @@ import rtree.RTree;
 
 public class WikipediaByCountryDivider {
 	private static final Log log = PlatformUtil.getLog(WikipediaByCountryDivider.class);
-
-	public static void main(String[] args) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+	
+	private static class GenerateCountryArgs {
 		String mode = "";
 		String folder = "";
 		boolean skip = false;
+		boolean noContent;
 		String database = "";
 		String wikiRankingDB = "";
+		String sqliteFileName;
+		
+		
+		String[] testLatLon = null; 
+		public double testLat;
+		public double testLon;
+	}
 
+	public static void main(String[] args) throws Exception {
+		
+		GenerateCountryArgs in = new GenerateCountryArgs();
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
 			if (arg.startsWith("--skip-existing=")) {
-				skip = true;
+				in.skip = true;
 			} else if (arg.startsWith("--dir=")) {
-				folder = val;
+				in.folder = val;
+			} else if (arg.startsWith("--no-content")) {
+				in.noContent = true;
 			} else if (arg.startsWith("--mode=")) {
-				mode = val;
+				in.mode = val;
 			} else if (arg.startsWith("--database=")) {
-				database = val;
+				in.database = val;
 			} else if (arg.startsWith("--ranking=")) {
-				wikiRankingDB = val;
+				in.wikiRankingDB = val;
 			}
 		}
 
-		if (mode.isEmpty()) {
+		if (in.mode.isEmpty()) {
 			throw new RuntimeException("Set --mode=inspect OR --mode=generate_country_sqlite OR --mode=generate_test_obf");
 		}
 
-		if (!mode.equals("inspect") && folder.isEmpty()) {
+		if (!in.mode.equals("inspect") && in.folder.isEmpty()) {
 			throw new RuntimeException("Set --dir=/path/to/wikipedia/source");
 		}
 
-		final String sqliteFileName = database.isEmpty() ? folder + WikiDatabasePreparation.WIKIPEDIA_SQLITE : database;
+		in.sqliteFileName = in.database.isEmpty() ? in.folder + WikiDatabasePreparation.WIKIPEDIA_SQLITE : in.database;
 
-		switch (mode) {
+		switch (in.mode) {
 			case "inspect":
-				inspectWikiFile(sqliteFileName);
+				inspectWikiFile(in.sqliteFileName);
 				break;
 			case "generate_country_sqlite":
-				WikiDatabasePreparation.processWikidataRegions(sqliteFileName);
-				generateCountrySqlite(folder, sqliteFileName, wikiRankingDB, skip);
+				WikiDatabasePreparation.processWikidataRegions(in.sqliteFileName);
+				generateCountrySqlite(in);
 				break;
 			case "generate_test_obf":
-				String[] latLon = null;
 				if (args.length > 2 && args[2].startsWith("--testLatLon=")) {
 					String val = args[2].substring(args[2].indexOf("=") + 1);
-					latLon = val.split(";");
+					in.testLatLon = val.split(";");
+					in.testLat = Double.parseDouble(in.testLatLon[0]);
+					in.testLon = Double.parseDouble(in.testLatLon[1]);
 				}
-				generateCountrySqlite(folder, sqliteFileName, null, skip, latLon);
+				generateCountrySqlite(in);
 		}
 	}
 
-	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB,  boolean skip)
-			throws SQLException, IOException, InterruptedException, XmlPullParserException {
-		generateCountrySqlite(folder, database, wikiRankingDB, skip, null);
-	}
 
-	protected static void generateCountrySqlite(String folder, String database, String wikiRankingDB, boolean skip, String[] testLatLon)
-			throws SQLException, IOException, InterruptedException, XmlPullParserException {
-		double lat = 0;
-		double lon = 0;
-		boolean test = testLatLon != null;
-		if (test) {
-			lat = Double.parseDouble(testLatLon[0]);
-			lon = Double.parseDouble(testLatLon[1]);
-		}
+	protected static void generateCountrySqlite(GenerateCountryArgs args) throws Exception{
 		String testRegionName = "";
-		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(database, log);
+		Connection conn = (Connection) DBDialect.SQLITE.getDatabaseConnection(args.database, log);
 		
 		Connection wikiRankingConn = null;
-		if (!Algorithms.isEmpty(wikiRankingDB)) {
-			wikiRankingConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(wikiRankingDB, log);
+		if (!Algorithms.isEmpty(args.wikiRankingDB)) {
+			wikiRankingConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(args.wikiRankingDB, log);
 		}
 		OsmandRegions regs = new OsmandRegions();
 		regs.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
-		File rgns = new File(folder, "regions");
+		File rgns = new File(args.folder, "regions");
 		rgns.mkdirs();
 		Map<String, String> preferredRegionLanguages = new LinkedHashMap<>();
-		QuadRect testRect = new QuadRect(lon, lat, lon, lat);
 		for (String key : mapObjects.keySet()) {
 			if (key == null) {
 				continue;
@@ -127,15 +128,15 @@ public class WikipediaByCountryDivider {
 			} else {
 				String regionLang = wr.getParams().getRegionLang();
 				preferredRegionLanguages.put(key.toLowerCase(), regionLang);
-				if (test) {
-					if (wr.containsBoundingBox(testRect)) {
+				if (args.testLatLon != null) {
+					if (wr.containsBoundingBox(new QuadRect(args.testLon, args.testLat, args.testLon, args.testLat))) {
 						testRegionName = key;
 					}
 				}
 			}
 		}
 		String query;
-		if (test) {
+		if (args.testLatLon != null) {
 			query = "SELECT '" + Algorithms.capitalizeFirstLetterAndLowercase(testRegionName) + "'";
 		} else {
 			query = "SELECT DISTINCT regionName FROM wiki_region";
@@ -168,15 +169,15 @@ public class WikipediaByCountryDivider {
 			}
 			File osmGz = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.osm.gz");
 			File obfFile = new File(rgns, regionName + "_" + IndexConstants.BINARY_MAP_VERSION + ".wiki.obf");
-			if (obfFile.exists() && skip) {
+			if (obfFile.exists() && args.skip) {
 				continue;
 			}
-			if (!skip) {
+			if (!args.skip) {
 				osmGz.delete();
 			}
 			if(!osmGz.exists()) {
 				System.out.println("Generate " + osmGz.getName());
-				generateOsmFile(conn, rs.getString(1), preferredLang, wikiRankingConn, osmGz, testLatLon);
+				generateOsmFile(conn, rs.getString(1), preferredLang, wikiRankingConn, osmGz, args);
 			}
 			obfFile.delete();
 			generateObf(osmGz, obfFile);
@@ -189,7 +190,7 @@ public class WikipediaByCountryDivider {
 	}
 
 	private static void generateOsmFile(Connection conn, String regionName, String preferredLang, Connection wikiRankingConn, File osmGz,
-	                                    String[] testLatLon) throws SQLException, IOException {
+	                                    GenerateCountryArgs args) throws SQLException, IOException {
 
 //	    "id INTEGER PRIMARY KEY" "photoId INTEGER" "photoTitle TEXT" "catId INTEGER" "catTitle TEXT"
 //	    "poikey TEXT" "wikiTitle TEXT" "osmid INTEGER" "osmtype INTEGER"  "lat REAL" "lon REAL"
@@ -201,13 +202,13 @@ public class WikipediaByCountryDivider {
 		}
 
 		String query;
-		if (testLatLon == null) {
+		if (args.testLatLon == null) {
 			query = "SELECT WC.id, WO.lat, WO.lon, WC.lang, WC.title, WC.zipContent, WC.shortDescription FROM wiki_region WR"
 					+ " INNER JOIN wiki_coords WO ON WR.id = WO.id "
 					+ " INNER JOIN wiki_content WC ON WC.id = WR.id "
 					+ " WHERE WR.regionName = '" + regionName + "' ORDER BY WC.id";
 		} else {
-			query = "SELECT WC.id, " + testLatLon[0] + ", " + testLatLon[1] + ", WC.lang, WC.title, WC.zipContent, WC.shortDescription"
+			query = "SELECT WC.id, " + args.testLatLon[0] + ", " + args.testLatLon[1] + ", WC.lang, WC.title, WC.zipContent, WC.shortDescription"
 					+ " FROM wiki_content WC";
 		}
 		ResultSet rps = conn.createStatement().executeQuery(query);
@@ -318,13 +319,17 @@ public class WikipediaByCountryDivider {
 				nameAdded = true;
 				addTag(serializer, "name", title);
 				addTag(serializer, "wiki_lang:en", "yes");
-				addTag(serializer, "content", contentStr);
+				if (!args.noContent) {
+					addTag(serializer, "content", contentStr);
+				}
 				addTag(serializer, "short_description", shortDescr);
 				
 			} else {
 				addTag(serializer, "name:" + wikiLang, title);
 				addTag(serializer, "wiki_lang:" + wikiLang, "yes");
-				addTag(serializer, "content:" + wikiLang, contentStr);
+				if (!args.noContent) {
+					addTag(serializer, "content:" + wikiLang, contentStr);
+				}
 				addTag(serializer, "short_description:" + wikiLang, shortDescr);
 			}
 		}
