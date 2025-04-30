@@ -290,26 +290,25 @@ public class WikipediaByCountryDivider {
 				serializer.attribute(null, "id", (osmId) + "");
 				serializer.attribute(null, "lat", lat + "");
 				serializer.attribute(null, "lon", lon + "");
-
-			}
-			addTag(serializer, "wikidata", "Q"+wikiId);
-			if (travelElo > 0) {
-				addTag(serializer, "travel_elo", "" + travelElo);
-			}
-			if (qrank > 0) {
-				addTag(serializer, "qrank", "" + qrank);
-			}
-			if (travelTopic > 0) {
-				addTag(serializer, "travel_topic", "" + travelTopic);
-			}
-			if (!Algorithms.isEmpty(photoTitle)) {
-				addTag(serializer, "wiki_photo", "" + photoTitle);
-			}
-			if (!Algorithms.isEmpty(catTitle)) {
-				addTag(serializer, "wiki_category", "" + catTitle);
-			}
-			if (!Algorithms.isEmpty(poiKey)) {
-				addTag(serializer, "osmand_poi_key", "" + poiKey);
+				addTag(serializer, "wikidata", "Q"+wikiId);
+				if (travelElo > 0) {
+					addTag(serializer, "travel_elo", "" + travelElo);
+				}
+				if (qrank > 0) {
+					addTag(serializer, "qrank", "" + qrank);
+				}
+				if (travelTopic > 0) {
+					addTag(serializer, "travel_topic", "" + travelTopic);
+				}
+				if (!Algorithms.isEmpty(photoTitle)) {
+					addTag(serializer, "wiki_photo", "" + photoTitle);
+				}
+				if (!Algorithms.isEmpty(catTitle)) {
+					addTag(serializer, "wiki_category", "" + catTitle);
+				}
+				if (!Algorithms.isEmpty(poiKey)) {
+					addTag(serializer, "osmand_poi_key", "" + poiKey);
+				}
 			}
 			if (!preferredAdded) {
 				nameUnique = title;
