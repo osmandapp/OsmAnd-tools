@@ -34,7 +34,7 @@ public class ArticleExtractor {
 			"mode test - creates obf file for the article with <articleID> by <LatLon> coordinates(lat;lon)\n" +
 			"results are written to a '<work_folder>/out' folder";
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws Exception {
 		String lang = null; //lang = null - process wikidata;
 		String workDir = "";
 		String mode = "test";
