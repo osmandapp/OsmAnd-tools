@@ -73,6 +73,7 @@ public class WikiDatabasePreparation {
 			Arrays.asList("mm", "cm", "m", "km", "in", "ft", "yd", "mi", "nmi", "m2"));
 	public static final String WIKIPEDIA_SQLITE = "wikipedia.sqlite";
 	public static final String WIKIRATING_SQLITE = "wiki_rating.sqlite";
+	public static final String WIKIDATA_MAPPING_SQLITE = "wikidata_mapping.sqlitedb";
 	public static final String WIKIDATA_ARTICLES_GZ = "wikidatawiki-latest-pages-articles.xml.gz";
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
@@ -1529,6 +1530,16 @@ public class WikiDatabasePreparation {
 			wikidataSqliteName = resultDB;
 		}
 
+		if (mode.equals("create-wikidata-mapping")) {
+			if (wikidataFolder.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --dir= is not set");
+			}
+			if (resultDB.isEmpty()) {
+				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
+			}
+			wikidataSqliteName = resultDB;
+		}
+
 		final String pathToWikiData = wikidataFolder + WIKIDATA_ARTICLES_GZ;
 		OsmCoordinatesByTag osmCoordinates = new OsmCoordinatesByTag(new String[] { "wikipedia", "wikidata" },
 				new String[] { "wikipedia:" });
@@ -1582,6 +1593,11 @@ public class WikiDatabasePreparation {
 			break;
 		case "test-wikipedia":
 			processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, testArticleID);
+			break;
+		case "create-wikidata-mapping":
+			wikidataDB = new File(wikidataSqliteName);
+			log.info("Create wikidata mapping DB.");
+			createWikidataMapping(wikidataDB, wikidataFolder);
 			break;
 		}
 	}
@@ -1715,6 +1731,44 @@ public class WikiDatabasePreparation {
 		ps.executeBatch();
 		ps.close();
 		commonsWikiConn.close();
+	}
+
+	public static void createWikidataMapping(File sourceDb, String wikidataFolder) throws SQLException {
+		Connection srcConn = DBDialect.SQLITE.getDatabaseConnection(sourceDb.getAbsolutePath(), log);
+		Statement srcSt = srcConn.createStatement();
+		ResultSet rs = srcSt.executeQuery("SELECT id, lang, title FROM wiki_mapping");
+
+		File mappingFile = new File(wikidataFolder, WIKIDATA_MAPPING_SQLITE);
+		if (mappingFile.exists()) {
+			mappingFile.delete();
+		}
+		Connection mappingConn = DBDialect.SQLITE.getDatabaseConnection(mappingFile.getAbsolutePath(), log);
+
+		Statement mapSt = mappingConn.createStatement();
+
+		mapSt.execute("DROP TABLE IF EXISTS wiki_mapping");
+		mapSt.execute("CREATE TABLE wiki_mapping(id LONG, lang TEXT, title TEXT)");
+		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_id ON wiki_mapping(id)");
+
+		PreparedStatement ps = mappingConn
+				.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES(?, ?, ?)");
+		int batch = 0;
+		while (rs.next()) {
+			ps.setLong(1, rs.getLong("id"));
+			ps.setString(2, rs.getString("lang"));
+			ps.setString(3, rs.getString("title"));
+			ps.addBatch();
+			if (++batch % 1000 == 0) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+
+		ps.close();
+		mapSt.close();
+		mappingConn.close();
+		srcSt.close();
+		srcConn.close();
 	}
 
 	private static void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {
