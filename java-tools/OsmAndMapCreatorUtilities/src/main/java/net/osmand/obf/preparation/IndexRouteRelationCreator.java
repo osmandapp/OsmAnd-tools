@@ -451,7 +451,7 @@ public class IndexRouteRelationCreator {
 		LatLon center = OsmMapUtils.getWeightCenterForNodes(allNodes);
 		return center == null
 				? allNodes.size() % 64
-				: (int) (1000.0 * (center.getLatitude() + center.getLongitude())) % 64;
+				: (int) (1000.0 * (Math.abs(center.getLatitude() + center.getLongitude()))) % 64;
 	}
 
 	private static long calcEntityIdFromRelationId(long relationId, long counter, int hash) {
