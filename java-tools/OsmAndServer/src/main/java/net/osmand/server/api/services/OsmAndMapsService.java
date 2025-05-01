@@ -796,7 +796,9 @@ public class OsmAndMapsService {
 			config.minPointApproximation = rp.minPointApproximation;
 		}
 
-		if (!rp.noConditionals) {
+		if (rp.noConditionals) {
+			config.routeCalculationTime = 0;
+		} else {
 			config.routeCalculationTime = rp.routeCalculationTime >= 0
 					? rp.routeCalculationTime
 					: System.currentTimeMillis();
