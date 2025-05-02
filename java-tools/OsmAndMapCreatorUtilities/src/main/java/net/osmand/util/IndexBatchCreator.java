@@ -172,6 +172,7 @@ public class IndexBatchCreator {
 	DockerClient dockerClient;
 	int dockerSlots = 4;
 	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new ConcurrentHashMap<>();
+	Set<String> dockerRetryGenerations = new TreeSet<String>();
 	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
 	
 	boolean indexPOI = false;
@@ -508,7 +509,15 @@ public class IndexBatchCreator {
 					if (!res.getState().getRunning()) {
 						Long l = res.getState().getExitCodeLong();
 						if (l == null || l.longValue() != 0) {
-							dockerFailedGenerations.add(p);
+							if (dockerRetryGenerations.contains(p.name)) {
+								log.info(String.format("FAILED 2nd GENERATION %s - container %s", p.name, p.container.getId()));
+								dockerFailedGenerations.add(p);
+							} else {
+								log.info(String.format("FAILED GENERATION %s - container %s retry last", p.name, p.container.getId()));
+								dockerRetryGenerations.add(p.name);
+								p.container = null;
+								queue.add(p);
+							}
 						} else {
 							log.info(String.format("Finished %s container %s at %s (started %s).",
 									getDuration(res.getState()), res.getName(), res.getState().getFinishedAt(),
