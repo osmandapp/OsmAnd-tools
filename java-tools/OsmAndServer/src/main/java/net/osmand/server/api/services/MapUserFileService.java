@@ -229,7 +229,7 @@ public class MapUserFileService {
 				devices.put(file.deviceid, deviceInfo);
 			}
 		}
-		file.setDeviceInfo(deviceInfo);
+		file.deviceInfo = (deviceInfo);
 	}
 
 	public boolean analysisPresent(String tag, PremiumUserFilesRepository.UserFile userFile) {
@@ -287,8 +287,8 @@ public class MapUserFileService {
 			groups.keySet().forEach(k -> {
 				Map<String, String> groupInfo = new HashMap<>();
 				WebGpxParser.WebPointsGroup group = groups.get(k);
-				groupInfo.put("color", group.getColor());
-				groupInfo.put("groupSize", String.valueOf(group.getPoints().size()));
+				groupInfo.put("color", group.color);
+				groupInfo.put("groupSize", String.valueOf(group.points.size()));
 				groupInfo.put("hidden", String.valueOf(isHidden(group)));
 				pointGroupsAnalysis.put(k, groupInfo);
 			});
@@ -317,8 +317,8 @@ public class MapUserFileService {
 	}
 
 	private boolean isHidden(WebGpxParser.WebPointsGroup group) {
-		for (WebGpxParser.Wpt wpt : group.getPoints()) {
-			if (wpt.getHidden() != null && wpt.getHidden().equals("true")) {
+		for (WebGpxParser.Wpt wpt : group.points) {
+			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
 			}
 		}

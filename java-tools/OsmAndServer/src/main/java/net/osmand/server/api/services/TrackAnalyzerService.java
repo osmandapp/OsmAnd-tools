@@ -76,7 +76,7 @@ public class TrackAnalyzerService {
 	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
 		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse();
 
-		List<WptPt> wptPoints = analyzerRequest.getPoints().stream()
+		List<WptPt> wptPoints = analyzerRequest.points.stream()
 				.map(point -> new WptPt(point.get("lat"), point.get("lon")))
 				.toList();
 
@@ -88,7 +88,7 @@ public class TrackAnalyzerService {
 		UserdataController.UserFilesResults userFiles = userdataService.generateGpxFilesByQuadTiles(dev.userid, false,  tiles);
 		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
 
-		if (Algorithms.isEmpty(analyzerRequest.getPoints())) {
+		if (Algorithms.isEmpty(analyzerRequest.points)) {
 			return null;
 		}
 		for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {

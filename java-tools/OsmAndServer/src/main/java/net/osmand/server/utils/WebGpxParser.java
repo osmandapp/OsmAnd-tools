@@ -35,26 +35,23 @@ public class WebGpxParser {
     public static final String GPX_EXT_COLOR = "color";
     public static final String GPX_EXT_WIDTH = "width";
 
-    @Getter
-    @Setter
     public static class TrackData {
-        private WebMetaData metaData;
-        private List<Wpt> wpts;
-        private List<WebTrack> tracks;
-        private Map<String, WebPointsGroup> pointsGroups;
-        private Map<String, Object> analysis;
-        private WebTrackAppearance trackAppearance;
-        private Map<String, String> ext;
-        private List<GpxUtilities.RouteType> routeTypes;
+    	public WebMetaData metaData;
+    	public List<Wpt> wpts;
+    	public List<WebTrack> tracks;
+    	public Map<String, WebPointsGroup> pointsGroups;
+    	public Map<String, Object> analysis;
+    	public WebTrackAppearance trackAppearance;
+    	public Map<String, String> ext;
+    	public List<GpxUtilities.RouteType> routeTypes;
+        
     }
 
-    @Getter
-    @Setter
     public static class WebMetaData {
-        private String name;
-        private String desc;
-        private Link link;
-        private Metadata ext;
+    	public String name;
+    	public String desc;
+        public Link link;
+        public Metadata ext;
     
         public WebMetaData(Metadata data) {
             if (data != null) {
@@ -86,21 +83,19 @@ public class WebGpxParser {
         }
     }
 
-    @Getter
-    @Setter
     public static class Wpt {
 
-        private String name;
-        private String desc;
-        private String address;
-        private String color;
-        private String background;
-        private String hidden;
-        private String icon;
-        private double lat;
-        private double lon;
-        private String category;
-        private WptPt ext;
+        public String name;
+        public String desc;
+        public String address;
+        public String color;
+        public String background;
+        public String hidden;
+        public String icon;
+        public double lat;
+        public double lon;
+        public String category;
+        public WptPt ext;
         
         public Wpt(WptPt point) {
             if (point != null) {
@@ -153,17 +148,16 @@ public class WebGpxParser {
             }
             ext = point;
         }
+        
     }
 
-    @Getter
-    @Setter
     public static class WebPointsGroup {
-        private String color;
-        private String name;
-        private String iconName;
-        private String backgroundType;
-        private final List<Wpt> points = new ArrayList<>();
-        private GpxUtilities.PointsGroup ext;
+        public String color;
+        public String name;
+        public String iconName;
+        public String backgroundType;
+        public final List<Wpt> points = new ArrayList<>();
+        public GpxUtilities.PointsGroup ext;
 
         public WebPointsGroup(GpxUtilities.PointsGroup group) {
             if (group != null) {
@@ -244,21 +238,19 @@ public class WebGpxParser {
         }
     }
 
-    @Getter
-    @Setter
     public static class Point {
 
-        private double lat;
-        private double lng;
-        private double ele = Double.NaN;
-        private double srtmEle = Double.NaN;
-        private double speed;
-        private double distance;
-        private String profile;
-        private List<Point> geometry;
-        private transient int geometrySize;
-        private RouteSegment segment; // on each turn point
-        private WptPt ext;
+    	public double lat;
+        public double lng;
+        public double ele = Double.NaN;
+        public double srtmEle = Double.NaN;
+        public double speed;
+        public double distance;
+        public String profile;
+        public List<Point> geometry;
+        public transient int geometrySize;
+        public RouteSegment segment; // on each turn point
+        public WptPt ext;
     
         public Point(){}
         
@@ -306,20 +298,16 @@ public class WebGpxParser {
         
     }
 
-    @Getter
-    @Setter
     public static class RouteSegment {
-        private GpxUtilities.RouteSegment ext;
-        private List<GpxUtilities.RouteType> routeTypes;
+    	public GpxUtilities.RouteSegment ext;
+        public List<GpxUtilities.RouteType> routeTypes;
     }
 
-    @Getter
-    @Setter
     public static class WebTrackAppearance {
-        private Boolean showArrows;
-        private Boolean showStartFinish;
-        private String color;
-        private String width;
+    	public Boolean showArrows;
+        public Boolean showStartFinish;
+        public String color;
+        public String width;
 
         public WebTrackAppearance(Map<String, String> gpxExtensions) {
             if (gpxExtensions == null || gpxExtensions.isEmpty()) {
@@ -340,6 +328,7 @@ public class WebGpxParser {
                 }
             }
         }
+
     }
 
     public void addRoutePoints(GpxFile gpxFile, TrackData gpxData) {
@@ -665,16 +654,16 @@ public class WebGpxParser {
     }
 
     private Map<String, String> parseTrackExt(WebGpxParser.TrackData trackData) {
-        Map<String, String> trackExt = trackData.getExt();
-        WebTrackAppearance trackAppearance = trackData.getTrackAppearance();
+        Map<String, String> trackExt = trackData.ext;
+        WebTrackAppearance trackAppearance = trackData.trackAppearance;
         if (trackAppearance != null) {
             if (trackExt == null) {
                 trackExt = new LinkedHashMap<>();
             }
-            trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.getShowArrows()));
-            trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.getShowStartFinish()));
-            trackExt.put(GPX_EXT_COLOR, trackAppearance.getColor());
-            trackExt.put(GPX_EXT_WIDTH, trackAppearance.getWidth());
+            trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.showArrows));
+            trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.showStartFinish));
+            trackExt.put(GPX_EXT_COLOR, trackAppearance.color);
+            trackExt.put(GPX_EXT_WIDTH, trackAppearance.width);
         }
         return trackExt;
     }

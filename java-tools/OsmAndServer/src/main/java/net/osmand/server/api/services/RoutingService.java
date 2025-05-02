@@ -87,12 +87,12 @@ public class RoutingService {
         for (int i = 1; i < points.size(); i++) {
             WebGpxParser.Point prevPoint = points.get(i - 1);
             WebGpxParser.Point currentPoint = points.get(i);
-            LatLon prevCoord = new LatLon(prevPoint.getLat(), prevPoint.getLng());
-            LatLon currentCoord = new LatLon(currentPoint.getLat(), currentPoint.getLng());
-            if (prevPoint.getProfile() == null || prevPoint.getProfile().equals(LINE_PROFILE_TYPE)) {
-                currentPoint.setGeometry(getStraightLine(prevPoint.getLat(), prevPoint.getLng(), currentPoint.getLat(), currentPoint.getLng()));
-            } else if (!prevPoint.getProfile().equals(GAP_PROFILE_TYPE)) {
-                currentPoint.setGeometry(updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.getProfile(), true, false, null));
+            LatLon prevCoord = new LatLon(prevPoint.lat, prevPoint.lng);
+            LatLon currentCoord = new LatLon(currentPoint.lat, currentPoint.lng);
+            if (prevPoint.profile == null || prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
+                currentPoint.geometry = (getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng));
+            } else if (!prevPoint.profile.equals(GAP_PROFILE_TYPE)) {
+                currentPoint.geometry = (updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false, null));
             }
             res.add(currentPoint);
         }
@@ -102,11 +102,11 @@ public class RoutingService {
     private List<WebGpxParser.Point> getStraightLine(double lat1, double lng1, double lat2, double lng2) {
         List<WebGpxParser.Point> line = new ArrayList<>();
         WebGpxParser.Point firstP = new WebGpxParser.Point();
-        firstP.setLat(lat1);
-        firstP.setLng(lng1);
+        firstP.lat = (lat1);
+        firstP.lng = (lng1);
         WebGpxParser.Point lastP = new WebGpxParser.Point();
-        lastP.setLat(lat2);
-        lastP.setLng(lng2);
+        lastP.lat = (lat2);
+        lastP.lng = (lng2);
         line.add(firstP);
         line.add(lastP);
 
@@ -397,7 +397,7 @@ public class RoutingService {
         for (int i = 1; i < pointsRes.size(); i++) {
             WebGpxParser.Point curr = pointsRes.get(i);
             WebGpxParser.Point prev = pointsRes.get(i - 1);
-            pointsRes.get(i).setDistance((float) MapUtils.getDistance(prev.getLat(), prev.getLng(), curr.getLat(), curr.getLng()));
+            pointsRes.get(i).distance = ((float) MapUtils.getDistance(prev.lat, prev.lng, curr.lat, curr.lng));
         }
     }
 
@@ -419,13 +419,13 @@ public class RoutingService {
 
             List <WptPt> waypoints = new ArrayList<>();
             pointsRes.forEach(p -> {
-                    WptPt waypoint = new WptPt(p.getLat(), p.getLng());
-                    waypoint.setEle(p.getEle());
+                    WptPt waypoint = new WptPt(p.lat, p.lng);
+                    waypoint.setEle(p.ele);
                     waypoints.add(waypoint);
             });
             GpxUtilities.INSTANCE.interpolateEmptyElevationWpts(waypoints);
             for (int i = 0; i < waypoints.size(); i++) {
-                pointsRes.get(i).setEle(waypoints.get(i).getEle());
+                pointsRes.get(i).ele = (waypoints.get(i).getEle());
             }
             return pointsRes;
         }

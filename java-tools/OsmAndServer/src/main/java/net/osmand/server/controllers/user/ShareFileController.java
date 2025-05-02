@@ -116,7 +116,7 @@ public class ShareFileController {
 		if (errorAccess != null) {
 			return errorAccess;
 		}
-		if (shareFile.isPublicAccess()) {
+		if (shareFile.publicAccess) {
 			PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
 			if (dev != null && dev.userid != shareFile.ownerid) {
 				boolean hasAccess = shareFileService.hasUserAccessToSharedFile(shareFile, dev.userid);
@@ -266,7 +266,7 @@ public class ShareFileController {
 			return ResponseEntity.ok(FILE_WAS_DELETED);
 		}
 		shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
-		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.isPublicAccess());
+		ShareFileRepository.ShareFileDTO shareFileDto = new ShareFileRepository.ShareFileDTO(shareFile, !shareFile.publicAccess);
 
 		return ResponseEntity.ok(gson.toJson(shareFileDto));
 	}
