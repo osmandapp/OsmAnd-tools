@@ -151,8 +151,8 @@ public class HHRoutingOBFWriter {
 	
 	public void writeFile(File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
 		if (THREAD_POOL > 1) {
-			System.err.println("Threads > 1 are not supported cause of current R-Tree limitations ");
-			THREAD_POOL = 1;
+			System.err.println("Threads > 1 are may be not supported cause of current R-Tree limitations (needs to be tested)");
+//			THREAD_POOL = 1;
 		}
 		if (obfPolyFileIn == null) {
 			File outFile = new File(dbFile.getParentFile(),
@@ -534,7 +534,10 @@ public class HHRoutingOBFWriter {
 			new File(rTreeFile).delete();
 			new File(rpTreeFile).delete();
 		}
-		RTree.clearCache();
+		if (THREAD_POOL == 1) {
+			// check if we can run in parallel
+			RTree.clearCache();
+		}
 		return log.toString();
 	}
 
