@@ -504,11 +504,9 @@ public class RandomRouteTester {
 
 	private void loadNativeLibrary() {
 		String nativePath = getNativeLibPath();
-		if (nativePath != null) {
-			if (NativeLibrary.loadOldLib(nativePath)) {
-				nativeLibrary = new NativeLibrary();
-				return; // success
-			}
+		if (NativeLibrary.loadOldLib(nativePath)) {
+			nativeLibrary = new NativeLibrary();
+			return; // success
 		}
 		throw new IllegalStateException("Native library not loaded");
 	}
