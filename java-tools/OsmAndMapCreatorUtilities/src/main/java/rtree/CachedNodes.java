@@ -211,6 +211,7 @@ public class CachedNodes
 {
   private static final int NODE = 0;
   private static final int SDNODE = 1;
+  private static final int MAX_CACHE_SHIFT = 12;
   Hashtable cache;
   BufferHeader buffHeader;
   int size = Node.CACHE_SIZE;
@@ -391,14 +392,14 @@ public class CachedNodes
     if(fileName != null) {
     	Integer i = fileNamesMap.get(fileName);
     	if(i == null){
-    		if(fileNamesMap.size() > 1023){
+    		if(fileNamesMap.size() >= (1 << MAX_CACHE_SHIFT)){
     			throw new ArrayIndexOutOfBoundsException();
     		}
     		fileNamesMap.put(fileName, fileNamesMap.size());
     		i = fileNamesMap.get(fileName);
     	}
 //      System.out.println(idx + " " + fileName + " " + ((idx << 5)+ fileName.toLowerCase().hashCode() % 32));
-      return ((idx << 10)+ i);
+      return ((idx << MAX_CACHE_SHIFT)+ i);
     } else{
       System.out.println("CachedNodes.calKey: fileName null");
       return 0;
