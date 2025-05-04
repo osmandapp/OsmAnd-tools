@@ -398,10 +398,10 @@ public class CachedNodes
   synchronized long calKey(String fileName,long idx)
   {
     if(fileName != null) {
-		if (idx < 0) {
+		if (idx < -(1 << (62 - MAX_CACHE_SHIFT))) {
 			throw new IllegalArgumentException("Id underflow: " + idx);
 		}
-		if (idx > (1 << (63 - MAX_CACHE_SHIFT))) {
+		if (idx > (1 << (62 - MAX_CACHE_SHIFT))) {
 			throw new IllegalArgumentException("Id overflow: " + idx);
 		}
     	Integer i = fileNamesMap.get(fileName);
