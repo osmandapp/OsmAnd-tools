@@ -211,7 +211,7 @@ public class CachedNodes
 {
   private static final int NODE = 0;
   private static final int SDNODE = 1;
-  private static final int MAX_CACHE_SHIFT = 12;
+  private static final int MAX_CACHE_SHIFT = 14;
   Hashtable cache;
   BufferHeader buffHeader;
   int size = Node.CACHE_SIZE;
