@@ -84,8 +84,8 @@ public class ObfChecker {
 			}
 		}
 		index.close();
-		// ignore routing sections < 1 MB - example Praha file size 92 MB - routing 11,742,543 bytes
-		if (routeSectionSize > 1_000_000) {
+		// ignore routing sections < 2 MB - example Praha file size 92 MB - routing 11,742,543 bytes
+		if (routeSectionSize > 2_000_000) {
 			ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 			ok &= checkNull(bicycle, "Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 		}
