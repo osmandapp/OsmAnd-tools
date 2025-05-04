@@ -18,6 +18,11 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 public class ObfChecker {
 
 	public static void main(String[] args) {
+		// TODO
+//		OsmAndMapCreator/utilities.sh random-route-tester \
+//        --maps-dir="$OBF_FOLDER" --iterations=3 --obf-prefix="$FILE" \
+//        --profile="$PROFILE" --min-dist=1 --no-conditionals \
+//        --max-dist=50 2>&1
 		Map<String, String> argMap = new LinkedHashMap<String, String>();
 		List<String> files = new ArrayList<String>();
 		for (String a : args) {
