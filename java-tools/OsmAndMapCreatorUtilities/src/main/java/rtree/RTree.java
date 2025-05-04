@@ -115,6 +115,7 @@ public class RTree //the tree that would be made
     try{
       return chdNodes.getReadNode(fileHdr.getFile(), fileName, index, fileHdr);
     }catch(Exception e){
+      e.printStackTrace();
       throw new RTreeException ("RTree.getSortedNode : " + e.getMessage());
     }
   }
@@ -138,6 +139,7 @@ public class RTree //the tree that would be made
       fileHdr.flush();
       chdNodes.flush();
     }catch(Exception e){
+      e.printStackTrace();
       throw new RTreeException(e.getMessage());
     }finally{
       fileHdr.unlock();
@@ -236,7 +238,7 @@ public class RTree //the tree that would be made
       adjustTree(newNodes, Node.NOT_DEFINED);
     }
     catch(Exception e){
-      //e.printStackTrace();
+      e.printStackTrace();
       throw new RTreeInsertException("RTree.insert: " + e.getMessage() + " for " +
                                      Thread.currentThread());
     }
@@ -281,6 +283,7 @@ public class RTree //the tree that would be made
       return node;
     }
     catch( IllegalValueException e){
+      e.printStackTrace();
       throw new  IllegalValueException("RTree.chooseLeaf: "+e.getMessage());
     }
     catch(Exception e){
@@ -358,6 +361,7 @@ public class RTree //the tree that would be made
     catch(Exception e){
       if(e instanceof ElementNotFoundException)
         throw (ElementNotFoundException)e;
+      e.printStackTrace();
       throw new  RTreeException("RTree.delete: "+e.getMessage());
     }
     finally{
@@ -454,6 +458,7 @@ public class RTree //the tree that would be made
       //return(getRPostOvrlap(chdNodes.getNode(fileHdr.getFile(),fileName,root, fileHdr), rect));
     }
     catch(Exception e){
+      e.printStackTrace();
       throw new RTreeException("RTree.overlaps: "+e.getMessage());
     }
     finally{
@@ -557,6 +562,7 @@ public class RTree //the tree that would be made
       return(getRPostIntsect(chdNodes.getReadNode(fileHdr.getFile(),fileName,root,fileHdr), rect));
     }
     catch(Exception e){
+      e.printStackTrace();
       throw new  RTreeException("RTree.nonDisjoint: "+e.getMessage());
     }
     finally{
@@ -609,6 +615,7 @@ public class RTree //the tree that would be made
       return(getRPostContBy(chdNodes.getReadNode(fileHdr.getFile(),fileName,root,fileHdr), rect));
     }
     catch(Exception e){
+      e.printStackTrace();
       throw new  RTreeException("RTree.containedBy: "+e.getMessage());
     }
     finally{
@@ -715,6 +722,7 @@ public class RTree //the tree that would be made
       return(getRPostMeet(chdNodes.getReadNode(fileHdr.getFile(),fileName,root,fileHdr),  rect));
     }
     catch(Exception e){
+      e.printStackTrace();
       throw new  RTreeException("RTree.meet: "+e.getMessage());
     }
     finally{
@@ -817,7 +825,7 @@ public class RTree //the tree that would be made
       return(trvsRPost(chdNodes.getReadNode(fileHdr.getFile(),fileName,root,fileHdr),false));
     }
     catch(Exception e){
-      //e.printStackTrace();
+      e.printStackTrace();
       throw new RTreeException("RTree.getAllElements: " +e.getMessage());
     }
     finally{
