@@ -386,7 +386,7 @@ public class CachedNodes
 	  fileNamesMap.clear();
   }
 
-  int calKey(String fileName,int idx)
+  synchronized int calKey(String fileName,int idx)
   {
     if(fileName != null) {
     	Integer i = fileNamesMap.get(fileName);

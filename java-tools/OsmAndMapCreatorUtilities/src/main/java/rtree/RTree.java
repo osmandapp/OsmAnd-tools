@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.concurrent.ConcurrentHashMap;
 
 import rtree.join.IntersectPred;
 import rtree.join.PairElmt;
@@ -53,10 +54,10 @@ public class RTree //the tree that would be made
      of the fact that this package was developed on a Linux(RH7.0) platform.
   */
   protected String fileName;
-  static Map fileList;//the no. of files open
+  static ConcurrentHashMap fileList = new ConcurrentHashMap();//the no. of files open
   // static for the other way
   protected FileHdr fileHdr;
-  public static CachedNodes chdNodes;
+  public static CachedNodes chdNodes = new CachedNodes();
   /**Inner class for the fileList vector - A List of files*/
   class Header
   {
@@ -70,7 +71,7 @@ public class RTree //the tree that would be made
   }
   public static void clearCache(){
 	  chdNodes = new CachedNodes();
-	  fileList = new HashMap();
+	  fileList = new ConcurrentHashMap();
 	  CachedNodes.clearFileNamesMap();
   }
 
@@ -79,9 +80,7 @@ public class RTree //the tree that would be made
   {
     try{
       this.fileName = fileName;
-      if(fileList == null)
-        fileList = new HashMap();
-      synchronized(fileList){//this may give problem
+      //this may give problem
         if(fileList.get(fileName) != null){
           fileHdr = ((Header)fileList.get(fileName)).flHdr;
           return;
@@ -90,11 +89,10 @@ public class RTree //the tree that would be made
         fileList.put(fileName, new Header(new FileHdr(Node.FREE_LIST_LIMIT, fileName),fileName));
         fileHdr = ((Header)fileList.get(fileName)).flHdr;
         //the cache of nodes - one cache for all the tree files.
-        if(chdNodes == null)
-          chdNodes = new CachedNodes();
-      }
-    }
-    catch(Exception e){
+//        if(chdNodes == null)
+//          chdNodes = new CachedNodes();
+    } catch(Exception e){
+      e.printStackTrace();
       throw new  RTreeException("RTree.RTree: " +e.getMessage());
     }
   }
