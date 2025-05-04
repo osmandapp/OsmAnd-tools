@@ -84,8 +84,11 @@ public class ObfChecker {
 			}
 		}
 		index.close();
-		ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
-		ok &= checkNull(bicycle, "Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
+		// ignore routing sections < 1 MB - example Praha file size 92 MB - routing 11,742,543 bytes
+		if (routeSectionSize > 1_000_000) {
+			ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
+			ok &= checkNull(bicycle, "Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
+		}
 		ok &= checkNull(mi, "Missing Map section");
 		ok &= checkNull(poi, "Missing Poi section");
 		ok &= checkNull(address, "Missing address section");
