@@ -211,7 +211,7 @@ public class CachedNodes
 {
   private static final int NODE = 0;
   private static final int SDNODE = 1;
-  private static final int MAX_CACHE_SHIFT = 14;
+  public static final int MAX_CACHE_SHIFT = 13;
   Hashtable cache;
   BufferHeader buffHeader;
   int size = Node.CACHE_SIZE;
@@ -250,8 +250,8 @@ public class CachedNodes
   private Node getNode(RandomAccessFile file,String fileName,long lndIndex,FileHdr flHdr, int type)
     throws IllegalValueException, NodeReadException, FileNotFoundException, IOException, NodeWriteException
   {
+    int key = calKey(fileName,lndIndex);
     int ndIndex = (int)lndIndex;
-    int key = calKey(fileName,ndIndex);
     NodeValue node = (NodeValue)(cache.get(new Integer(key)));
     Node nNode;
     if(node == null){//Node not in cache
@@ -286,7 +286,7 @@ public class CachedNodes
     }else{
       nNode = new SdNode(file,fileName,parentIndex, elmtType, flHdr);
     }
-    int key = calKey(fileName, (int)nNode.getNodeIndex());
+    int key = calKey(fileName, nNode.getNodeIndex());
     nNode.sweepSort();
     //cache not full
     if(cache.size() < Node.CACHE_SIZE)
@@ -370,7 +370,7 @@ public class CachedNodes
   synchronized void remove(String fileName,long ndIndex)
     throws NodeWriteException
   {
-    int key = calKey(fileName,(int)ndIndex);
+    int key = calKey(fileName,ndIndex);
     buffHeader.remove(key);
   }
 
@@ -387,9 +387,15 @@ public class CachedNodes
 	  fileNamesMap.clear();
   }
 
-  synchronized int calKey(String fileName,int idx)
+  synchronized int calKey(String fileName,long idx)
   {
     if(fileName != null) {
+		if (idx < 0) {
+			throw new IllegalArgumentException("Id underflow: " + idx);
+		}
+		if (idx > (1 << (31 - MAX_CACHE_SHIFT))) {
+			throw new IllegalArgumentException("Id overflow: " + idx);
+		}
     	Integer i = fileNamesMap.get(fileName);
     	if(i == null){
     		if(fileNamesMap.size() >= (1 << MAX_CACHE_SHIFT)){
@@ -399,7 +405,7 @@ public class CachedNodes
     		i = fileNamesMap.get(fileName);
     	}
 //      System.out.println(idx + " " + fileName + " " + ((idx << 5)+ fileName.toLowerCase().hashCode() % 32));
-      return ((idx << MAX_CACHE_SHIFT)+ i);
+      return ((((int)idx) << MAX_CACHE_SHIFT)+ i);
     } else{
       System.out.println("CachedNodes.calKey: fileName null");
       return 0;
