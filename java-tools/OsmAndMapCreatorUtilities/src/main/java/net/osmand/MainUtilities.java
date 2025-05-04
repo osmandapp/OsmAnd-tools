@@ -121,6 +121,8 @@ public class MainUtilities {
 				TestSharedLib.main(subArgsArray);
 			} else if (utl.equals("hh-routing-run")) {
 				TestHHRouting.main(subArgsArray);
+			} else if (utl.equals("obf-checker")) {
+				ObfChecker.main(subArgsArray);
 			} else if (utl.equals("random-route-tester")) {
 				RandomRouteTester.main(subArgsArray);
 			} else if (utl.equals("test-routing")) {
