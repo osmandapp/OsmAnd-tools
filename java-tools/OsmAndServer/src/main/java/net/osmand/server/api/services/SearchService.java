@@ -657,7 +657,8 @@ public class SearchService {
         POI_ICON_NAME("web_poi_iconName"),
         POI_TYPE("web_poi_type"),
         POI_SUBTYPE("web_poi_subType"),
-        POI_OSM_URL("web_poi_osmUrl");
+        POI_OSM_URL("web_poi_osmUrl"),
+        CITY("web_city");
 
         private final String fieldName;
 
@@ -725,6 +726,7 @@ public class SearchService {
             for (Map.Entry<String, String> entry : typeTags.entrySet()) {
                 feature.prop(entry.getKey(), entry.getValue());
             }
+            feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
         }
         return feature;
     }
