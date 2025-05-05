@@ -100,11 +100,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					tags.add("name");
 					tags.add(name);
 				}
-                String enName = city.getEnName(false);
-                if (!Algorithms.isEmpty(enName)) {
-                    tags.add("name:en");
-                    tags.add(enName);
-                }
+				String enName = city.getEnName(false);
+				if (!Algorithms.isEmpty(enName)) {
+					tags.add("name:en");
+					tags.add(enName);
+				}
 				Map<String, String> otherNames = city.getNamesMap(true);
 				for (Map.Entry<String, String> nameEntry : otherNames.entrySet()) {
 					if (allLanguages.contains(nameEntry.getKey())) {
