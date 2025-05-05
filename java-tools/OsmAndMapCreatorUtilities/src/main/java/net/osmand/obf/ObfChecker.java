@@ -8,21 +8,29 @@ import java.util.List;
 import java.util.Map;
 
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 
 public class ObfChecker {
 
+	private static int LIMIT_HH_POINTS_NEEDED = 100_000; 
 	public static void main(String[] args) {
 		// TODO
 //		OsmAndMapCreator/utilities.sh random-route-tester \
 //        --maps-dir="$OBF_FOLDER" --iterations=3 --obf-prefix="$FILE" \
 //        --profile="$PROFILE" --min-dist=1 --no-conditionals \
 //        --max-dist=50 2>&1
+		if (args.length == 1 && args[0].equals("--test")) {
+			args = new String[] { System.getProperty("maps.dir") + "Canada_nunavut_northamerica_2.obf" };
+		}
 		Map<String, String> argMap = new LinkedHashMap<String, String>();
 		List<String> files = new ArrayList<String>();
 		for (String a : args) {
@@ -40,6 +48,9 @@ public class ObfChecker {
 				if (!ok) {
 					failed++;
 				}
+			}
+			if (failed == 0) {
+				System.out.println("OK");
 			}
 			System.exit(failed);
 		} catch (Throwable e) {
@@ -83,17 +94,34 @@ public class ObfChecker {
 				routeSectionSize = p.getLength();
 			}
 		}
-		index.close();
-		// ignore routing sections < 2 MB - example Praha file size 92 MB - routing 11,742,543 bytes
-		if (routeSectionSize > 2_000_000) {
-			ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
-			ok &= checkNull(bicycle, "Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
+		
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null)) {
+			int cnt = 0;
+			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
+			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
+			for (RouteSubregion rs : regions) {
+				if (cnt > LIMIT_HH_POINTS_NEEDED) {
+					break;
+				}
+				List<RouteDataObject> ls = index.loadRouteIndexData(rs);
+				for (RouteDataObject rdo : ls) {
+					if (rdo.getHighway() != null) {
+						cnt += rdo.getPointsLength();
+					}
+				}
+			}
+			if (cnt > LIMIT_HH_POINTS_NEEDED) {
+				ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
+				ok &= checkNull(bicycle,
+						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
+			}
 		}
 		ok &= checkNull(mi, "Missing Map section");
 		ok &= checkNull(poi, "Missing Poi section");
 		ok &= checkNull(address, "Missing address section");
 		ok &= checkNull(routeRegion, "Missing routing section");
 
+		index.close();
 		return ok;
 	}
 
