@@ -473,8 +473,6 @@ public class SearchService {
         searchAmenityTypesAPI.setActivePoiFiltersByOrder(filterOrder);
         searchUICore.registerAPI(searchAmenityTypesAPI);
         
-        searchUICore.init();
-        
         List<SearchResult> results = searchUICore.immediateSearch(search, null).getCurrentSearchResults();
         
         results.forEach(res -> searchRes.put(res.localeName, getPoiTypeFields(res.object)));
