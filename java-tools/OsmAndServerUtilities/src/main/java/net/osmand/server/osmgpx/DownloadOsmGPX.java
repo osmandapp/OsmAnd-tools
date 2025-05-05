@@ -575,7 +575,9 @@ public class DownloadOsmGPX {
 			settings.indexPOI = true;
 			settings.indexTransport = false;
 			settings.indexRouting = false;
-			RTree.clearCache();
+			// reduce memory footprint for single thread generation
+			// Remove it if it is called in multithread
+//			RTree.clearCache();
 			File folder = new File(qp.obfFile.getParentFile(), "gen");
 			String fileName = qp.obfFile.getName();
 			File targetObf = qp.obfFile;

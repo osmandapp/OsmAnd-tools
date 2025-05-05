@@ -973,7 +973,8 @@ public class IndexBatchCreator {
 
 	protected void generateLocalIndex(File file, String regionName, String mapFileName, RegionSpecificData rdata, Set<String> alreadyGeneratedFiles) {
 		try {
-			// be independent of previous results
+			// reduce memory footprint for single thread generation
+			// Remove it if it is called in multithread
 			RTree.clearCache();
 
 			DBDialect osmDb = this.osmDbDialect;

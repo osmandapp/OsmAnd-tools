@@ -220,6 +220,8 @@ public class CombineSRTMIntoFile {
 			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
 					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(targetFile.getName()), log, true);
 			nodesDB.delete();
+			// reduce memory footprint for single thread generation
+			// Remove it if it is called in multithread
 			RTree.clearCache();
 		}
 		procFile.delete();

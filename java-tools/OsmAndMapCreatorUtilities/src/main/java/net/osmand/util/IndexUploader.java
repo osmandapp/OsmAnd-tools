@@ -510,7 +510,8 @@ public class IndexUploader {
 		}
 	}
 
-	public synchronized static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
+	// synchronized is not needed as R-tree now works fine in multithread 
+	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
 		final RandomAccessFile routf = new RandomAccessFile(roadOnlyFile, "rw");
@@ -606,7 +607,6 @@ public class IndexUploader {
 				}
 				nonpackRtree.delete();
 				packRtree.delete();
-				RTree.clearCache();
 			}
 		}
 		writer.endWriteMapIndex();

@@ -598,6 +598,8 @@ public class OsmGpxWriteContext {
 //			settings.indexRouting = true;
 //			settings.srtmDataFolderUrl = srtmDirectory;
 //		}
+		// reduce memory footprint for single thread generation
+		// Remove it if it is called in multithread
 		RTree.clearCache();
 		try {
 			tmpFolder.mkdirs();

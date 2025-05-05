@@ -353,8 +353,9 @@ public class WikipediaByCountryDivider {
 	}
 
 	private static void generateObf(File osmGz, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		// be independent of previous results
-		RTree.clearCache();
+		// reduce memory footprint for single thread generation
+		// Remove it if it is called in multithread
+//		RTree.clearCache();
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = false;
 		settings.indexAddress = false;

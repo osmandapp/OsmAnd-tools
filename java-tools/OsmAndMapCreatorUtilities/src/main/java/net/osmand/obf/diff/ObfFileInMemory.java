@@ -335,7 +335,6 @@ public class ObfFileInMemory {
 			}
 			nonpackRtree.delete();
 			packRtree.delete();
-			RTree.clearCache();
 		}
 	}
 
@@ -385,7 +384,6 @@ public class ObfFileInMemory {
 			}
 			nonpackRtree.delete();
 			packRtree.delete();
-			RTree.clearCache();
 		}
 
 	}
@@ -441,7 +439,6 @@ public class ObfFileInMemory {
 			}
 			nonpackRtree.delete();
 			packRtree.delete();
-			RTree.clearCache();
 		}
 
 	}
