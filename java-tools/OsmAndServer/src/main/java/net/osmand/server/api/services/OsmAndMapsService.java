@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -101,8 +100,8 @@ public class OsmAndMapsService {
 
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final long MAX_TIME_ROUTING_FILE = 4 * 60 * 60;
-	private static final int HINT_SAME_ROUTING_CONTEXT_OPEN = 5;
+	private static final long CACHE_MAX_ROUTING_CONTEXT_AGE = 4 * 60 * 60;
+	private static final int CACHE_MAX_OPEN_ROUTING_CONTEXTS = 5;
 	private static final int MAX_SAME_PROFILE_DF = 1;
 	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 8;
 	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
@@ -118,7 +117,7 @@ public class OsmAndMapsService {
 
 	CachedOsmandIndexes cacheFiles = null;
 
-	List<RoutingCacheContext> routingCaches = new ArrayList<>();
+	final List<RoutingCacheContext> routingCaches = new ArrayList<>();
 
 	NativeJavaRendering nativelib;
 
@@ -348,7 +347,10 @@ public class OsmAndMapsService {
 
 	@Scheduled(fixedRate = INTERVAL_TO_CLEANUP_ROUTING_CACHE)
 	public void cleanUpRoutingFiles() {
+		Runtime rt = Runtime.getRuntime();
 		List<RoutingCacheContext> removed = new ArrayList<>();
+		long usedBeforeCleanup = rt.totalMemory() - rt.freeMemory();
+
 		synchronized (routingCaches) {
 			Collections.sort(routingCaches, new Comparator<RoutingCacheContext>() {
 
@@ -357,23 +359,48 @@ public class OsmAndMapsService {
 					return Double.compare(o1.importance(), o2.importance());
 				}
 			});
+
 			System.out.println("Prepare to clean up global routing contexts " + routingCaches);
-			while (routingCaches.size() > HINT_SAME_ROUTING_CONTEXT_OPEN) {
-				RoutingCacheContext r = routingCaches.remove(0); // FIFO
-				removed.add(r);
+
+			// 1. Prepare to remove according to cache limits.
+			Iterator<RoutingCacheContext> it = routingCaches.iterator();
+			while (it.hasNext()) {
+				RoutingCacheContext check = it.next();
+				if (check.locked == 0 && (routingCaches.size() > CACHE_MAX_OPEN_ROUTING_CONTEXTS
+						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_AGE)) {
+					removed.add(check); // FIFO
+					it.remove();
+				}
 			}
-			for (int i = 0; i < routingCaches.size(); ) {
-				RoutingCacheContext check = routingCaches.get(i);
-				if ((System.currentTimeMillis() - check.created) / 1000l >= MAX_TIME_ROUTING_FILE) {
-					removed.add(routingCaches.remove(i));
-				} else {
-					i++;
-					if (check.locked == 0 && check.hCtx != null) {
-						check.hCtx.clearSegments();
+
+			// 2. Release unused segments and tiles.
+			boolean unloaded = false;
+			for (RoutingCacheContext survivor : routingCaches) {
+				if (survivor.locked == 0) {
+					unloaded = true;
+					if (survivor.hCtx != null) {
+						survivor.hCtx.clearSegments();
 					}
+					survivor.rCtx.unloadUnusedTiles(survivor.rCtx.config.memoryLimitation);
+				}
+			}
+
+			// 3. Reserve some bytes for BinaryRoutePlanner.
+			if (removed.isEmpty() && !routingCaches.isEmpty() &&
+					routingCaches.get(routingCaches.size() - 1).locked == 0) {
+				if (unloaded) {
+					System.gc();
+				}
+				long brpReservedBytes = routingCaches.size() * routingCaches.get(0).rCtx.config.memoryLimitation;
+				long futureFreeMemory = rt.maxMemory() - rt.totalMemory() + rt.freeMemory();
+				if (futureFreeMemory < brpReservedBytes) {
+					System.out.printf("Trigger brpReservedBytes (future free %d MB, need %d MB)\n",
+							futureFreeMemory >> 20, brpReservedBytes >> 20);
+					removed.add(routingCaches.remove(routingCaches.size() - 1)); // LIFO one-off
 				}
 			}
 		}
+
 		if (removed.size() > 0) {
 			for (RoutingCacheContext r : removed) {
 				BinaryMapIndexReader reader = r.rCtx.map.keySet().iterator().next();
@@ -384,12 +411,14 @@ public class OsmAndMapsService {
 				}
 			}
 			System.out.printf("Clean up %d global routing contexts, state - %s\n", removed.size(), routingCaches);
-			long MEMORY_BEFORE_GC = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
 			removed.clear();
 			System.gc();
-			long MEMORY_AFTER_GC = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) >> 20;
-			System.out.printf("***** GC: Memory used %d MB, released %d MB, cache size %d (contexts) *****\n",
-					MEMORY_AFTER_GC, MEMORY_BEFORE_GC - MEMORY_AFTER_GC, routingCaches.size());
+			long maxMemory = rt.maxMemory();
+			long totalMemory = rt.totalMemory();
+			long freeMemory = rt.freeMemory();
+			long bytesReleased = usedBeforeCleanup - (totalMemory - freeMemory);
+			System.out.printf("Cache-GC: [%d] released %d MB (max %d MB, total %d MB, free %d MB)\n",
+					routingCaches.size(), bytesReleased >> 20, maxMemory >> 20, totalMemory >> 20, freeMemory >> 20);
 		}
 	}
 
