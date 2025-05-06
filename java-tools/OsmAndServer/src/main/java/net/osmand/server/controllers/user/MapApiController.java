@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
@@ -605,6 +606,11 @@ public class MapApiController {
 
 		info.put(NICKNAME, pu.nickname);
 
+		boolean updated = updateOrderId(pu);
+		if (updated) {
+			LOG.info("Updated orderId for user " + pu.email);
+		}
+
 		String orderId = pu.orderid;
 		if (orderId == null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
@@ -665,6 +671,29 @@ public class MapApiController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
+	}
+
+	private boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
+		if (pu.orderid != null) {
+			return false;
+		}
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			Optional<DeviceSubscriptionsRepository.SupporterDeviceSubscription> latestValid = subscriptions.stream()
+					.filter(s -> s.valid)
+					.max(Comparator.comparing(
+							s -> s.starttime != null ? s.starttime : new Date(0)
+					));
+			if (latestValid.isPresent()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = latestValid.get();
+				if (subscription.orderId != null) {
+					pu.orderid = subscription.orderId;
+					usersRepository.saveAndFlush(pu);
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	@PostMapping(path = {"/auth/send-code"})
