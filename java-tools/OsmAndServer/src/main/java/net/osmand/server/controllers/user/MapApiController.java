@@ -679,13 +679,16 @@ public class MapApiController {
 		}
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
-			Optional<DeviceSubscriptionsRepository.SupporterDeviceSubscription> latestValid = subscriptions.stream()
+			Optional<DeviceSubscriptionsRepository.SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
 					.filter(s -> s.valid)
 					.max(Comparator.comparing(
+							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
+									s.expiretime != null ? s.expiretime : new Date(0)
+					).thenComparing(
 							s -> s.starttime != null ? s.starttime : new Date(0)
 					));
-			if (latestValid.isPresent()) {
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = latestValid.get();
+			if (maxExpiryValid.isPresent()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = maxExpiryValid.get();
 				if (subscription.orderId != null) {
 					pu.orderid = subscription.orderId;
 					usersRepository.saveAndFlush(pu);
