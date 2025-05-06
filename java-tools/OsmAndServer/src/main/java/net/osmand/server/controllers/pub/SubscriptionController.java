@@ -519,6 +519,9 @@ public class SubscriptionController {
                     dbSubscription.valid = null;
                     dbSubscription.kind = null;
                     dbSubscription.purchaseToken = subscr.purchaseToken;
+	                if (subscr.userId != null) {
+		                dbSubscription.userId = subscr.userId;
+	                }
 	                updateUserOrderId(subscr.userId, subscr.orderId);
                     if (subscr.supporterId != null) {
                         dbSubscription.supporterId = subscr.supporterId;
