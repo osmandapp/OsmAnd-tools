@@ -237,7 +237,9 @@ public class UserdataController {
 			pu.regTime = new Date();
 			pu.orderid = orderid;
 		}
-		// keep old order id
+		if (pu.orderid == null && orderid != null) {
+			pu.orderid = orderid;
+		}
 		pu.tokendevice = deviceId;
 		pu.tokenTime = new Date();
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
