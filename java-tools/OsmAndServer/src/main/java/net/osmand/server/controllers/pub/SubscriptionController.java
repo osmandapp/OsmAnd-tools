@@ -2,6 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.server.api.repo.*;
@@ -451,6 +452,7 @@ public class SubscriptionController {
     // [params setObject:transactionId forKey:@"purchaseToken"];
     // [params setObject:receiptStr forKey:@"payload"];
     // [params setObject:email forKey:@"email"];
+	@Transactional
     @PostMapping(path = {"/purchased", "/purchased.php"})
     public ResponseEntity<String> purchased(HttpServletRequest request,
                                             @RequestParam(name = "purchaseType", required = false, defaultValue = PURCHASE_TYPE_SUBSCRIPTION) String purchaseType
@@ -517,9 +519,10 @@ public class SubscriptionController {
                     dbSubscription.valid = null;
                     dbSubscription.kind = null;
                     dbSubscription.purchaseToken = subscr.purchaseToken;
-                    if (subscr.userId != null) {
-                        dbSubscription.userId = subscr.userId;
-                    }
+	                if (subscr.userId != null) {
+		                dbSubscription.userId = subscr.userId;
+	                }
+	                updateUserOrderId(subscr.userId, subscr.orderId);
                     if (subscr.supporterId != null) {
                         dbSubscription.supporterId = subscr.supporterId;
                     }
@@ -573,6 +576,16 @@ public class SubscriptionController {
             return error("Invalid purchaseType specified: " + purchaseType);
         }
     }
+
+	private void updateUserOrderId(Integer userId, String orderId) {
+		if (userId != null) {
+			PremiumUsersRepository.PremiumUser pu = premiumUsersRepository.findById(userId);
+			if (pu != null && pu.orderid == null) {
+				pu.orderid = orderId;
+				premiumUsersRepository.saveAndFlush(pu);
+			}
+		}
+	}
 
     private Integer resolvePremiumUserId(HttpServletRequest request, String premiumUserDeivceIdParam,
                                          String premiumUserDeivceAccessTokenParam) {
