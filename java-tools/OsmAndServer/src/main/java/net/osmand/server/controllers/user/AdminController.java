@@ -16,6 +16,7 @@ import jakarta.validation.constraints.NotNull;
 
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -209,11 +211,20 @@ public class AdminController {
 		return "redirect:info#audience";
 	}
 
-	@PostMapping(path = {"/search-purchases"})
-	public String searchUserPurchases(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
-		List<AdminService.Purchase> purchases = adminService.getUserPurchases(identifier);
-		redirectAttrs.addFlashAttribute("purchases", purchases);
-		return "redirect:info#audience";
+	@GetMapping("/order-management")
+	public String orderManagementPage() {
+		return "admin/order-management";
+	}
+
+	@GetMapping(value = "/orders", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public List<AdminService.Purchase> ordersAjax(
+			@RequestParam(name = "text", required = false) String text,
+			@RequestParam(name = "limit", defaultValue = "25") int limit) {
+		if (StringUtils.isBlank(text)) {
+			return Collections.emptyList();
+		}
+		return adminService.searchPurchases(text, limit);
 	}
 	
 	@Transactional

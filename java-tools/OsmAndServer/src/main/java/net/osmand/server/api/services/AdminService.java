@@ -2,14 +2,13 @@ package net.osmand.server.api.services;
 
 
 import com.google.gson.Gson;
-import lombok.Getter;
-import lombok.Setter;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.Serial;
@@ -30,6 +29,9 @@ public class AdminService {
 
 	@Autowired
 	private DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
 
     @Autowired
     UserdataService userdataService;
@@ -111,54 +113,76 @@ public class AdminService {
 				.orElse(Collections.emptyList());
 	}
 
-	public List<Purchase> getUserPurchases(String identifier) {
-		PremiumUsersRepository.PremiumUser pu;
-		if (emailSender.isEmail(identifier)) {
-			pu = usersRepository.findByEmailIgnoreCase(identifier);
-		} else {
-			pu = usersRepository.findById(Integer.parseInt(identifier));
-		}
-		if (pu == null) {
-			return Collections.emptyList();
-		}
-		List<Purchase> purchases = new ArrayList<>();
-		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : deviceInAppPurchasesRepository.findByUserId(pu.id)) {
-			Purchase purchase = new Purchase();
-			purchase.sku = iap.sku;
-			purchase.orderId = iap.orderId;
-			purchase.purchaseTime = iap.purchaseTime;
-			purchase.valid = Boolean.TRUE.equals(iap.valid);
-			purchases.add(purchase);
-		}
-		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subscriptionsRepository.findAllByUserId(pu.id)) {
-			Purchase purchase = new Purchase();
-			purchase.sku = sub.sku;
-			purchase.orderId = sub.orderId;
-			purchase.startTime = sub.starttime;
-			purchase.expireTime = sub.expiretime;
-			purchase.valid = Boolean.TRUE.equals(sub.valid);
-			purchase.isMainSub = sub.orderId != null && sub.orderId.equals(pu.orderid);
-			purchases.add(purchase);
-		}
-		purchases.sort(Comparator.comparing(
-				(Purchase p) -> p.purchaseTime != null ? p.purchaseTime : p.startTime
-		).reversed());
-		return purchases;
+	public List<Purchase> searchPurchases(String q, int limit) {
+		String like = "%" + q + "%";
+		String sql =
+				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
+						"       s.userid, s.timestamp, " +
+						"       s.starttime, s.expiretime, s.checktime, " +
+						"       s.autorenewing, s.paymentstate, s.valid, " +
+						"       (s.orderid = u.orderid) AS osmand_cloud, " +
+						"       NULL           AS platform, NULL           AS purchase_time " +
+						"  FROM supporters_device_sub s " +
+						"  JOIN user_accounts    u ON u.id = s.userid " +
+						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
+						"UNION ALL " +
+						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
+						"       i.userid, i.timestamp, " +
+						"       NULL           AS starttime, NULL           AS expiretime, i.checktime, " +
+						"       NULL           AS autorenewing, NULL           AS paymentstate, i.valid, " +
+						"       FALSE          AS osmand_cloud, " +
+						"       i.platform, i.purchase_time " +
+						"  FROM supporters_device_iap i " +
+						"  JOIN user_accounts    u ON u.id = i.userid " +
+						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
+						"ORDER BY timestamp DESC " +
+						"LIMIT ?";
+
+		return jdbcTemplate.query(
+				sql,
+				new Object[]{like, like, like, like, like, like, limit},
+				(rs, rowNum) -> {
+					Purchase p = new Purchase();
+					p.email = rs.getString("email");
+					p.sku = rs.getString("sku");
+					p.orderId = rs.getString("orderid");
+					p.purchaseToken = rs.getString("purchasetoken");
+					p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
+					p.timestamp = rs.getTimestamp("timestamp");
+					p.starttime = rs.getTimestamp("starttime");
+					p.expiretime = rs.getTimestamp("expiretime");
+					p.checktime = rs.getTimestamp("checktime");
+					p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
+					p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
+					p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
+					p.platform = rs.getString("platform");
+					p.purchaseTime = rs.getTimestamp("purchase_time");
+					p.osmandCloud = rs.getBoolean("osmand_cloud");
+					return p;
+				}
+		);
 	}
 
-	@Getter
-	@Setter
+
 	public static class Purchase implements Serializable {
 		@Serial
 		private static final long serialVersionUID = 1L;
 
-		private String sku;
-		private String orderId;
-		private Date startTime;
-		private Date expireTime;
-		private Date purchaseTime;
-		private boolean valid;
-		private boolean isMainSub;
+		public String email;
+		public String sku;
+		public String orderId;
+		public String purchaseToken;
+		public Integer userId;
+		public Date timestamp;
+		public Date starttime;
+		public Date expiretime;
+		public Date checktime;
+		public Boolean autorenewing;
+		public Integer paymentstate;
+		public Boolean valid;
+		public String platform;
+		public Date purchaseTime;
+		public Boolean osmandCloud;
 	}
 
 	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {
