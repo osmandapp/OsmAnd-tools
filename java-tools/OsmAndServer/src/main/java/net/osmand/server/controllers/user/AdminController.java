@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
@@ -25,7 +26,9 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -218,13 +221,57 @@ public class AdminController {
 
 	@GetMapping(value = "/orders", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public List<AdminService.Purchase> ordersAjax(
+	public List<AdminService.Purchase> orders(
 			@RequestParam(name = "text", required = false) String text,
 			@RequestParam(name = "limit", defaultValue = "25") int limit) {
 		if (StringUtils.isBlank(text)) {
 			return Collections.emptyList();
 		}
 		return adminService.searchPurchases(text, limit);
+	}
+
+	@GetMapping("/skus")
+	@ResponseBody
+	public List<String> topSkus() {
+		return adminService.getTopSkus(30);
+	}
+
+	@PostMapping("/orders/register")
+	@ResponseBody
+	public ResponseEntity<?> registerOrder(
+			@RequestParam String email,
+			@RequestParam String sku,
+			@RequestParam(required = false) Integer period,
+			@RequestParam(required = false) String interval,
+			@RequestParam String orderId,
+			@RequestParam String purchaseToken) {
+
+		if (usersRepository.findByEmailIgnoreCase(email) == null) {
+			return ResponseEntity
+					.status(HttpStatus.BAD_REQUEST)
+					.body("User with email “" + email + "” not found");
+		}
+
+		if (adminService.orderWithSkuExists(orderId, sku)) {
+			return ResponseEntity
+					.status(HttpStatus.BAD_REQUEST)
+					.body("Order ID “" + orderId + "” already exists");
+		}
+
+		try {
+			adminService.registerNewOrder(email, sku, period, interval, orderId, purchaseToken);
+			List<AdminService.Purchase> pList = adminService.findPurchaseByOrderAndSku(orderId, sku);
+			if (pList.isEmpty()) {
+				return ResponseEntity
+						.status(HttpStatus.BAD_REQUEST)
+						.body("Order ID “" + orderId + "” not found");
+			}
+			return ResponseEntity.ok(pList);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity
+					.status(HttpStatus.BAD_REQUEST)
+					.body(e.getMessage());
+		}
 	}
 	
 	@Transactional
@@ -1531,7 +1578,8 @@ public class AdminController {
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
-	
+
+
 	@PostMapping(path = {"/register-promo-campaign"})
 	public String registerPromoCampaign(@RequestParam String name,
 	                            @RequestParam int subActiveMonths,

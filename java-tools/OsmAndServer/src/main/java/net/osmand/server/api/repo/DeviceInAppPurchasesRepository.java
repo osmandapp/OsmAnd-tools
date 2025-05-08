@@ -19,6 +19,8 @@ public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterD
 
     List<SupporterDeviceInAppPurchase> findByOrderId(String orderId);
 
+    List<SupporterDeviceInAppPurchase> findByOrderIdAndSku(String orderId, String sku);
+
     List<SupporterDeviceInAppPurchase> findByUserIdAndValidTrue(Integer userId);
 
     List<SupporterDeviceInAppPurchase> findBySupporterId(Long supporterId);
