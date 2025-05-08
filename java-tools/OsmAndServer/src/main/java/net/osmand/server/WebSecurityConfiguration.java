@@ -24,11 +24,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.RequestEntity;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -78,6 +74,7 @@ public class WebSecurityConfiguration {
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
+	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
 	public static final String ROLE_USER = "ROLE_USER";
 	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
     
@@ -99,6 +96,9 @@ public class WebSecurityConfiguration {
 	
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	private WebAccessConfig webAccessConfig;
     
 
 	public static class OsmAndProUser extends User {
@@ -198,7 +198,9 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/actuator/**", "/admin/**").hasAuthority(ROLE_ADMIN)
+						.requestMatchers("/admin/order-management").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/**").hasAuthority(ROLE_USER)
+						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/mapapi/auth/**").permitAll()
 						.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
 						.anyRequest().permitAll()
@@ -243,9 +245,41 @@ public class WebSecurityConfiguration {
 					Map<String, Object> orgs = checkPermissionAccess(adminOauth2Url, userRequest, user);
 					// orgs.get("privacy").equals("closed");
 					if (orgs != null) {
-						authorities.add(new SimpleGrantedAuthority(ROLE_ADMIN));
+						authorities.add(new SimpleGrantedAuthority(ROLE_USER));
 					}
 				}
+				String email = user.getAttribute("email");
+				String token = userRequest.getAccessToken().getTokenValue();
+
+				if (email == null) {
+					RestTemplate rest = new RestTemplate();
+					HttpHeaders headers = new HttpHeaders();
+					headers.setBearerAuth(token);
+					headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+					HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+					ResponseEntity<List<Map<String, Object>>> resp = rest.exchange(
+							"https://api.github.com/user/emails",
+							HttpMethod.GET, entity,
+							new ParameterizedTypeReference<>() {}
+					);
+
+					email = resp.getBody().stream()
+							.filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
+							.map(e -> (String) e.get("email"))
+							.findFirst()
+							.orElse(null);
+				}
+
+				if (email != null) {
+					if (webAccessConfig.getAdmins().contains(email)) {
+						authorities.add(new SimpleGrantedAuthority(ROLE_ADMIN));
+					}
+					if (webAccessConfig.getSupport().contains(email)) {
+						authorities.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
+					}
+				}
+
 				String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails().
 						getUserInfoEndpoint().getUserNameAttributeName();
     			return new DefaultOAuth2User(authorities, user.getAttributes(), userNameAttributeName);
