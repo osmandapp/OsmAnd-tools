@@ -36,13 +36,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -272,6 +266,24 @@ public class AdminController {
 					.status(HttpStatus.BAD_REQUEST)
 					.body(e.getMessage());
 		}
+	}
+
+	@GetMapping("/orders/versions")
+	@ResponseBody
+	public List<OrderInfoRepository.OrderInfoDto> versions(@RequestParam String sku, @RequestParam String orderId) {
+		return adminService.listOrderVersions(sku, orderId);
+	}
+
+	@PostMapping("/orders/versions/create")
+	@ResponseBody
+	public ResponseEntity<String> create(@RequestParam String sku,
+	                                     @RequestParam String orderId,
+	                                     @RequestBody String info) {
+		boolean create = adminService.saveNewOrderVersion(sku, orderId, info);
+		if (!create) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Order version already exists");
+		}
+		return ResponseEntity.ok("Order version created");
 	}
 	
 	@Transactional

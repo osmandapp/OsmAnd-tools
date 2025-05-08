@@ -2,9 +2,12 @@ package net.osmand.server.api.services;
 
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
@@ -30,6 +33,12 @@ public class AdminService {
 
 	@Autowired
 	private DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
+
+	@Autowired
+	private OrderInfoRepository orderInfoRepository;
+
+	@Autowired
+	private HttpServletRequest request;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -310,6 +319,34 @@ public class AdminService {
 			});
 		}
 		return result;
+	}
+
+	public List<OrderInfoRepository.OrderInfoDto> listOrderVersions(String sku, String orderId) {
+		return orderInfoRepository
+				.findBySkuAndOrderIdOrderByUpdateTimeDesc(sku, orderId)
+				.stream()
+				.map(e -> new OrderInfoRepository.OrderInfoDto(
+						e.sku,
+						e.orderId,
+						e.updateTime,
+						e.editorId,
+						e.details.toString()
+				)).toList();
+	}
+
+
+	@Transactional
+	public boolean saveNewOrderVersion(String sku, String orderId, String details) {
+		OrderInfoRepository.OrderInfo oi = new OrderInfoRepository.OrderInfo();
+		JsonObject json = gson.fromJson(details, JsonObject.class);
+		oi.sku = sku;
+		oi.orderId = orderId;
+		oi.updateTime = new Date();
+		oi.editorId = request.getUserPrincipal().getName();
+		oi.details = json;
+		orderInfoRepository.saveAndFlush(oi);
+
+		return true;
 	}
 
 
