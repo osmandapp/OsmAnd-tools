@@ -82,6 +82,9 @@ CREATE UNIQUE INDEX user_share_files_ownerid_filepath_idx ON user_share_files(ow
 CREATE INDEX user_share_files_access_userid_idx ON user_share_files_access(user_id);
 CREATE INDEX user_share_files_access_file_id_idx ON user_share_files_access(file_id);
 
+CREATE TABLE order_info(id bigserial primary key, sku text not null,orderid text not null,updatetime timestamp not null,editorid text not null,details jsonb);
+CREATE INDEX order_info_sku_orderid_idx on order_info(sku,orderid);
+
 -- mail group
 CREATE TABLE email_free_users(aid text, email text, os text, updatetime timestamp);
 CREATE TABLE email_blocked(email text, reason text, timestamp timestamp);
