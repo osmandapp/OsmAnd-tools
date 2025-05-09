@@ -1,14 +1,7 @@
 package net.osmand.server;
 
-import java.io.IOException;
-import java.net.URI;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,20 +12,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.*;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.http.*;
-import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -41,31 +30,22 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.session.MapSessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
-import org.springframework.web.client.DefaultResponseErrorHandler;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
 import net.osmand.server.api.services.UserdataService;
-import net.osmand.util.Algorithms;
 
 @Configuration
 @EnableOAuth2Client
@@ -156,14 +136,25 @@ public class WebSecurityConfiguration {
 			PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
 			if (pu == null) throw new UsernameNotFoundException(username);
 
-			PremiumUserDevice pud = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(
-					pu.id, userdataService.TOKEN_DEVICE_WEB);
+			PremiumUserDevice pud = devicesRepository
+					.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id, UserdataService.TOKEN_DEVICE_WEB);
 			if (pud == null) throw new UsernameNotFoundException(username);
 
-			return new OsmAndProUser(username, pud.accesstoken, pud,
-					AuthorityUtils.createAuthorityList(ROLE_PRO_USER));
+			Set<GrantedAuthority> auths = new LinkedHashSet<>();
+			auths.add(new SimpleGrantedAuthority(ROLE_PRO_USER));
+
+			String email = pu.email;
+			if (webAccessConfig.getAdmins().contains(email)) {
+				auths.add(new SimpleGrantedAuthority(ROLE_ADMIN));
+			}
+			if (webAccessConfig.getSupport().contains(email)) {
+				auths.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
+			}
+
+			return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
 		};
 	}
+
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -199,109 +190,28 @@ public class WebSecurityConfiguration {
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/admin/order-management").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-						.requestMatchers("/admin/**").hasAuthority(ROLE_USER)
+						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/mapapi/auth/**").permitAll()
 						.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
 						.anyRequest().permitAll()
 				)
-				.oauth2Login(oauth -> oauth
-						.userInfoEndpoint(userInfo -> userInfo.userService(oauthGithubUserService())))
-						.exceptionHandling(ex -> ex
-								.defaultAuthenticationEntryPointFor(
-										new LoginUrlAuthenticationEntryPoint("/map/loginForm"),
-										new AntPathRequestMatcher("/mapapi/**"))
-						)
-						.rememberMe(remember -> remember.tokenValiditySeconds(3600 * 24 * 14))
-						.logout(logout -> logout
-								.deleteCookies("JSESSIONID")
-								.logoutSuccessUrl("/")
-								.logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
-								.permitAll()
-						);
+				.exceptionHandling(ex -> ex
+						.defaultAuthenticationEntryPointFor(
+								new LoginUrlAuthenticationEntryPoint("/map/account/"),
+								new AntPathRequestMatcher("/mapapi/**"))
+				)
+				.rememberMe(rm -> rm
+						.tokenValiditySeconds(3600 * 24 * 14)
+				)
+				.logout(logout -> logout
+						.deleteCookies("JSESSIONID")
+						.logoutSuccessUrl("/")
+						.logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
+						.permitAll()
+				);
 
 		return http.build();
-	}
-
-	private DefaultOAuth2UserService oauthGithubUserService() {
-		// authorize with admin for specific group
-		RestTemplate restTemplate = new RestTemplate();
-		restTemplate.setErrorHandler(new DefaultResponseErrorHandler() {
-			@Override
-			public void handleError(ClientHttpResponse response) throws IOException {
-			}
-		});
-		return new DefaultOAuth2UserService() {
-			@Override
-    		public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-				OAuth2User user = super.loadUser(userRequest);
-				if (user == null) {
-					return null;
-				}
-				Set<GrantedAuthority> authorities = new LinkedHashSet<>();
-				if (!Algorithms.isEmpty(adminOauth2Url) && 
-						user.getAttribute("url") != null
-						&& user.getAttribute("url").toString().contains("github.com")) {
-					Map<String, Object> orgs = checkPermissionAccess(adminOauth2Url, userRequest, user);
-					// orgs.get("privacy").equals("closed");
-					if (orgs != null) {
-						authorities.add(new SimpleGrantedAuthority(ROLE_USER));
-					}
-				}
-				String email = user.getAttribute("email");
-				String token = userRequest.getAccessToken().getTokenValue();
-
-				if (email == null) {
-					RestTemplate rest = new RestTemplate();
-					HttpHeaders headers = new HttpHeaders();
-					headers.setBearerAuth(token);
-					headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-					HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-					ResponseEntity<List<Map<String, Object>>> resp = rest.exchange(
-							"https://api.github.com/user/emails",
-							HttpMethod.GET, entity,
-							new ParameterizedTypeReference<>() {}
-					);
-
-					email = resp.getBody().stream()
-							.filter(e -> Boolean.TRUE.equals(e.get("primary")) && Boolean.TRUE.equals(e.get("verified")))
-							.map(e -> (String) e.get("email"))
-							.findFirst()
-							.orElse(null);
-				}
-
-				if (email != null) {
-					if (webAccessConfig.getAdmins().contains(email)) {
-						authorities.add(new SimpleGrantedAuthority(ROLE_ADMIN));
-					}
-					if (webAccessConfig.getSupport().contains(email)) {
-						authorities.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
-					}
-				}
-
-				String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails().
-						getUserInfoEndpoint().getUserNameAttributeName();
-    			return new DefaultOAuth2User(authorities, user.getAttributes(), userNameAttributeName);
-    		}
-
-			private Map<String, Object> checkPermissionAccess(Object orgUrl, OAuth2UserRequest userRequest, OAuth2User user) {
-				String organizationUrl = String.valueOf(orgUrl);
-				HttpHeaders headers = new HttpHeaders();
-				headers.setBearerAuth(userRequest.getAccessToken().getTokenValue());
-				headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-				URI uri = UriComponentsBuilder.fromUriString(organizationUrl).build().toUri();
-				RequestEntity<?> request = new RequestEntity<>(headers, HttpMethod.GET, uri);
-				ResponseEntity<Map<String, Object>> res = restTemplate.exchange(request, 
-						new ParameterizedTypeReference<Map<String, Object>>() {});
-				if (!res.getStatusCode().is2xxSuccessful()) {
-					LOG.warn("Result status code from github: " + res.getStatusCode() + " " + res.getBody());
-					return null;
-				}
-				return res.getBody();
-			}
-    		
-    	};
 	}
 
 	@Bean

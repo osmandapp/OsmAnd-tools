@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import static net.osmand.server.WebSecurityConfiguration.ROLE_ADMIN;
+import static net.osmand.server.WebSecurityConfiguration.ROLE_SUPPORT;
+
 @Component
 public class WebAccessConfig {
 	private Map<String, List<String>> roles;
@@ -26,18 +29,18 @@ public class WebAccessConfig {
 		JsonNode root = om.readTree(f);
 		JsonNode r = root.get("roles");
 		roles = Map.of(
-				"ROLE_ADMIN", om.convertValue(r.get("admin"), new TypeReference<>() {
+				ROLE_ADMIN, om.convertValue(r.get("admin"), new TypeReference<>() {
 				}),
-				"ROLE_SUPPORT", om.convertValue(r.get("support"), new TypeReference<>() {
+				ROLE_SUPPORT, om.convertValue(r.get("support"), new TypeReference<>() {
 				})
 		);
 	}
 
 	public List<String> getAdmins() {
-		return roles.getOrDefault("ROLE_ADMIN", List.of());
+		return roles.getOrDefault(ROLE_ADMIN, List.of());
 	}
 
 	public List<String> getSupport() {
-		return roles.getOrDefault("ROLE_SUPPORT", List.of());
+		return roles.getOrDefault(ROLE_SUPPORT, List.of());
 	}
 }
