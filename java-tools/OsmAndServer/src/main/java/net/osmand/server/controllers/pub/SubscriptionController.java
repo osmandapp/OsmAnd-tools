@@ -531,7 +531,14 @@ public class SubscriptionController {
                     subscriptionsRepository.save(dbSubscription);
                     LOG.info("Updated existing subscription: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
                 } else {
-                    LOG.info("Subscription already exists, no changes needed: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+	                if (dbSubscription.userId == null && subscr.userId != null) {
+		                dbSubscription.userId = subscr.userId;
+		                dbSubscription.timestamp = subscr.timestamp;
+		                subscriptionsRepository.save(dbSubscription);
+		                LOG.info("Updated existing subscription: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+	                } else {
+		                LOG.info("Subscription already exists, no changes needed: sku=" + subscr.sku + ", orderId=" + subscr.orderId);
+	                }
                 }
             } else { // Insert new subscription record
                 subscriptionsRepository.save(subscr);
