@@ -28,6 +28,7 @@ import javax.sql.DataSource;
 import net.osmand.server.api.repo.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -421,44 +422,52 @@ public class ApiController {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(orderId);
 			List<Object> res = new ArrayList<>();
 			for (SupporterDeviceSubscription sub : subscriptions) {
-				Map<String, String> subMap = new HashMap<>();
-				subMap.put("sku", sub.sku);
-				if (sub.valid != null) {
-					subMap.put("valid", sub.valid.toString());
+				Map<String, String> subMap = getSubscriptionInfo(sub);
+				if (!subMap.isEmpty()) {
+					res.add(subMap);
 				}
-				String state = "undefined";
-				if (sub.starttime != null) {
-					subMap.put("start_time", String.valueOf(sub.starttime.getTime()));
-				}
-				if (sub.expiretime != null) {
-					long expireTimeMs = sub.expiretime.getTime();
-					int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate.intValue();
-					boolean autoRenewing = sub.autorenewing == null ? false : sub.autorenewing.booleanValue();
-					if (expireTimeMs > System.currentTimeMillis()) {
-						if (paymentState == 1 && autoRenewing) {
-							state = "active";
-						} else if (paymentState == 1 && !autoRenewing) {
-							state = "cancelled";
-						} else if (paymentState == 0 && autoRenewing) {
-							state = "in_grace_period";
-						}
-					} else {
-						if (paymentState == 0 && autoRenewing) {
-							state = "on_hold";
-						} else if (paymentState == 1 && autoRenewing) {
-							state = "paused";
-						} else if (paymentState == 1 && !autoRenewing) {
-							state = "expired";
-						}
-					}
-					subMap.put("expire_time", String.valueOf(expireTimeMs));
-				}
-				subMap.put("state", state);
-				res.add(subMap);
 			}
 			return gson.toJson(res);
 		}
 		return "{}";
+	}
+
+	@NotNull
+	private static Map<String, String> getSubscriptionInfo(SupporterDeviceSubscription sub) {
+		Map<String, String> subMap = new HashMap<>();
+		subMap.put("sku", sub.sku);
+		if (sub.valid != null) {
+			subMap.put("valid", sub.valid.toString());
+		}
+		String state = "undefined";
+		if (sub.starttime != null) {
+			subMap.put("start_time", String.valueOf(sub.starttime.getTime()));
+		}
+		if (sub.expiretime != null) {
+			long expireTimeMs = sub.expiretime.getTime();
+			int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate.intValue();
+			boolean autoRenewing = sub.autorenewing == null ? false : sub.autorenewing.booleanValue();
+			if (expireTimeMs > System.currentTimeMillis()) {
+				if (paymentState == 1 && autoRenewing) {
+					state = "active";
+				} else if (paymentState == 1 && !autoRenewing) {
+					state = "cancelled";
+				} else if (paymentState == 0 && autoRenewing) {
+					state = "in_grace_period";
+				}
+			} else {
+				if (paymentState == 0 && autoRenewing) {
+					state = "on_hold";
+				} else if (paymentState == 1 && autoRenewing) {
+					state = "paused";
+				} else if (paymentState == 1 && !autoRenewing) {
+					state = "expired";
+				}
+			}
+			subMap.put("expire_time", String.valueOf(expireTimeMs));
+		}
+		subMap.put("state", state);
+		return subMap;
 	}
 
 	@GetMapping(path = {"/subscriptions/getAll"})
@@ -475,10 +484,18 @@ public class ApiController {
 		PremiumUser pu = resolvePremiumUser(deviceId, accessToken);
 		if (pu != null) {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(pu.id);
-			List<SupporterDeviceSubscription> res = new ArrayList<>();
+			List<SupporterDeviceSubscription> activeSubscriptions = new ArrayList<>();
 			subscriptions.stream()
 					.filter(s -> s.valid && s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis())
-					.forEach(res::add);
+					.forEach(activeSubscriptions::add);
+
+			List<Object> res = new ArrayList<>();
+			for (SupporterDeviceSubscription sub : activeSubscriptions) {
+				Map<String, String> subMap = getSubscriptionInfo(sub);
+				if (!subMap.isEmpty()) {
+					res.add(subMap);
+				}
+			}
 			return gson.toJson(res);
 		}
 		return "{}";
