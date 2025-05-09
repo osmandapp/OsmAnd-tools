@@ -461,6 +461,29 @@ public class ApiController {
 		return "{}";
 	}
 
+	@GetMapping(path = {"/subscriptions/getAll"})
+	@ResponseBody
+	public String getAllActiveSubscriptions(
+			@RequestParam(required = false) String deviceId,
+			@RequestParam(required = false) String accessToken,
+			@RequestHeader HttpHeaders headers, HttpServletRequest request) {
+		MessageParams params = new MessageParams();
+		params.hostAddress = request.getRemoteAddr();
+		if (headers.getFirst("X-Forwarded-For") != null) {
+			params.hostAddress = headers.getFirst("X-Forwarded-For");
+		}
+		PremiumUser pu = resolvePremiumUser(deviceId, accessToken);
+		if (pu != null) {
+			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(pu.id);
+			List<SupporterDeviceSubscription> res = new ArrayList<>();
+			subscriptions.stream()
+					.filter(s -> s.valid && s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis())
+					.forEach(res::add);
+			return gson.toJson(res);
+		}
+		return "{}";
+	}
+
     @GetMapping(path = { "/inapps/get" })
     @ResponseBody
     public String getInAppPurchases(
