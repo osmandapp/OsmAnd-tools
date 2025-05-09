@@ -505,6 +505,8 @@ public class SubscriptionController {
             subscr.supporterId = supporterUserId;
             subscr.timestamp = new Date(); // Record creation/update time
 
+	        updateUserOrderId(subscr.userId, subscr.orderId);
+
             Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
                     new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
             if (subscrOpt.isPresent()) { // Update existing subscription record
@@ -522,7 +524,6 @@ public class SubscriptionController {
 	                if (subscr.userId != null) {
 		                dbSubscription.userId = subscr.userId;
 	                }
-	                updateUserOrderId(subscr.userId, subscr.orderId);
                     if (subscr.supporterId != null) {
                         dbSubscription.supporterId = subscr.supporterId;
                     }
