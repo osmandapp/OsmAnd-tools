@@ -8,6 +8,7 @@ import okio.Buffer;
 
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.util.Algorithms.sanitizeFileName;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -290,6 +291,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
+		newName = sanitizeFileName(newName);
 		if (!oldName.equals(newName)) {
 			return webUserdataService.renameFile(oldName, newName, type, dev, saveCopy);
 		}
