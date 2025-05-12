@@ -3,15 +3,18 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Metadata;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.shared.io.KFile;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -21,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -29,9 +33,9 @@ import java.util.zip.GZIPInputStream;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 
 @Service
-public class MapUserFileService {
+public class WebUserdataService {
 
-	protected static final Log LOG = LogFactory.getLog(MapUserFileService.class);
+	protected static final Log LOG = LogFactory.getLog(WebUserdataService.class);
 
 	@Autowired
 	WebGpxParser webGpxParser;
@@ -339,5 +343,91 @@ public class MapUserFileService {
 			return res;
 		}
 		return Collections.emptyMap();
+	}
+
+	@Transactional
+	public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
+		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
+		if (file != null) {
+			String preparedName = newName.substring(0, newName.lastIndexOf('.'));
+			File updatedFile = renameGpxTrack(file, preparedName);
+			StorageService.InternalZipFile zipFile = null;
+			if (updatedFile != null) {
+				zipFile = StorageService.InternalZipFile.buildFromFile(updatedFile);
+			}
+			if (zipFile == null) {
+				zipFile = userdataService.getZipFile(file, newName);
+			}
+			if (zipFile != null) {
+				try {
+					userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+				} catch (OsmAndPublicApiException e) {
+					return ResponseEntity.badRequest().body(e.getMessage());
+				}
+				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+				if (res.getStatusCode().is2xxSuccessful()) {
+					if (!saveCopy) {
+						//delete file with old name
+						userdataService.deleteFile(oldName, type, null, null, dev);
+					}
+					return userdataService.ok();
+				}
+			} else {
+				// skip deleted files
+				return userdataService.ok();
+			}
+		}
+		return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
+	}
+
+	private File renameGpxTrack(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
+		if (isTrack) {
+			GpxFile gpxFile = null;
+			InputStream in = null;
+			try {
+				in = file.data != null ? new ByteArrayInputStream(file.data) : userdataService.getInputStream(file);
+			} catch (Exception e) {
+				String isError = String.format(
+						"renameFile error: input-stream-error %s id=%d userid=%d error (%s)",
+						file.name, file.id, file.userid, e.getMessage());
+				LOG.error(isError);
+			}
+			if (in != null) {
+				in = new GZIPInputStream(in);
+				try (Source source = new Buffer().readFrom(in)) {
+					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+				} catch (IOException e) {
+					String loadError = String.format(
+							"renameFile error: load-gpx-error %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, e.getMessage());
+					LOG.error(loadError);
+				}
+				if (gpxFile != null && gpxFile.getError() != null) {
+					String corruptedError = String.format(
+							"renameFile error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, gpxFile.getError().getMessage());
+					LOG.error(corruptedError);
+				}
+			} else {
+				String noIsError = String.format(
+						"renameFile error: no-input-stream %s id=%d userid=%d", file.name, file.id, file.userid);
+				LOG.error(noIsError);
+			}
+			if (gpxFile != null) {
+				gpxFile.renameTrack(newName);
+				File tmpGpx = File.createTempFile(newName, ".gpx");
+				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
+				if (exception != null) {
+					String isError = String.format(
+							"renameFile error: write-gpx-error %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, exception.getMessage());
+					LOG.error(isError);
+				} else  {
+					return tmpGpx;
+				}
+			}
+		}
+		return null;
 	}
 }
