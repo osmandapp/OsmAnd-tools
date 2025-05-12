@@ -2,8 +2,6 @@ package net.osmand.server.api.services;
 
 
 import com.google.gson.Gson;
-import lombok.Getter;
-import lombok.Setter;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
@@ -111,54 +109,25 @@ public class AdminService {
 				.orElse(Collections.emptyList());
 	}
 
-	public List<Purchase> getUserPurchases(String identifier) {
-		PremiumUsersRepository.PremiumUser pu;
-		if (emailSender.isEmail(identifier)) {
-			pu = usersRepository.findByEmailIgnoreCase(identifier);
-		} else {
-			pu = usersRepository.findById(Integer.parseInt(identifier));
-		}
-		if (pu == null) {
-			return Collections.emptyList();
-		}
-		List<Purchase> purchases = new ArrayList<>();
-		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : deviceInAppPurchasesRepository.findByUserId(pu.id)) {
-			Purchase purchase = new Purchase();
-			purchase.sku = iap.sku;
-			purchase.orderId = iap.orderId;
-			purchase.purchaseTime = iap.purchaseTime;
-			purchase.valid = Boolean.TRUE.equals(iap.valid);
-			purchases.add(purchase);
-		}
-		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subscriptionsRepository.findAllByUserId(pu.id)) {
-			Purchase purchase = new Purchase();
-			purchase.sku = sub.sku;
-			purchase.orderId = sub.orderId;
-			purchase.startTime = sub.starttime;
-			purchase.expireTime = sub.expiretime;
-			purchase.valid = Boolean.TRUE.equals(sub.valid);
-			purchase.isMainSub = sub.orderId != null && sub.orderId.equals(pu.orderid);
-			purchases.add(purchase);
-		}
-		purchases.sort(Comparator.comparing(
-				(Purchase p) -> p.purchaseTime != null ? p.purchaseTime : p.startTime
-		).reversed());
-		return purchases;
-	}
-
-	@Getter
-	@Setter
 	public static class Purchase implements Serializable {
 		@Serial
 		private static final long serialVersionUID = 1L;
 
-		private String sku;
-		private String orderId;
-		private Date startTime;
-		private Date expireTime;
-		private Date purchaseTime;
-		private boolean valid;
-		private boolean isMainSub;
+		public String email;
+		public String sku;
+		public String orderId;
+		public String purchaseToken;
+		public Integer userId;
+		public Date timestamp;
+		public Date starttime;
+		public Date expiretime;
+		public Date checktime;
+		public Boolean autorenewing;
+		public Integer paymentstate;
+		public Boolean valid;
+		public String platform;
+		public Date purchaseTime;
+		public Boolean osmandCloud;
 	}
 
 	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {

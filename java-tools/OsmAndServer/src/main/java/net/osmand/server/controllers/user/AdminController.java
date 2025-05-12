@@ -31,13 +31,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -209,13 +203,6 @@ public class AdminController {
 		return "redirect:info#audience";
 	}
 
-	@PostMapping(path = {"/search-purchases"})
-	public String searchUserPurchases(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
-		List<AdminService.Purchase> purchases = adminService.getUserPurchases(identifier);
-		redirectAttrs.addFlashAttribute("purchases", purchases);
-		return "redirect:info#audience";
-	}
-	
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
 	public ResponseEntity<String> downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
@@ -1520,7 +1507,8 @@ public class AdminController {
         headers.add(HttpHeaders.CONTENT_TYPE, "text/plain");
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
-	
+
+
 	@PostMapping(path = {"/register-promo-campaign"})
 	public String registerPromoCampaign(@RequestParam String name,
 	                            @RequestParam int subActiveMonths,
