@@ -415,7 +415,7 @@ public class WebUserdataService {
 				LOG.error(noIsError);
 			}
 			if (gpxFile != null) {
-				gpxFile.renameTrack(newName);
+				gpxFile.updateTrackName(newName);
 				File tmpGpx = File.createTempFile(newName, ".gpx");
 				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 				if (exception != null) {
