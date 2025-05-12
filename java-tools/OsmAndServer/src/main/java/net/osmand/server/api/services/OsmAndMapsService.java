@@ -1236,6 +1236,7 @@ public class OsmAndMapsService {
 			}
 		}
 		LOGGER.info(String.format("Preparing %d files for %s", files.size(), reason));
+		files.forEach(f -> LOGGER.info("File " + f.file.getName()));
 		return files;
 	}
 
