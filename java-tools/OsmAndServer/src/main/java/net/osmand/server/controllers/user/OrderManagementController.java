@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 
-import static net.osmand.server.WebSecurityConfiguration.ROLE_ADMIN;
 
 @Controller
 @RequestMapping("/admin/order-mgmt")
@@ -41,11 +40,10 @@ public class OrderManagementController {
 	public List<AdminService.Purchase> orders(
 			@RequestParam(name = "text", required = false) String text,
 			@RequestParam(name = "limit", defaultValue = "25") int limit) {
-		if (StringUtils.isBlank(text)) {
+		if (StringUtils.isBlank(text) || text.trim().length() < 4) {
 			return Collections.emptyList();
 		}
-		boolean fullMatch = request.isUserInRole(ROLE_ADMIN);
-		return orderManagementService.searchPurchases(text, limit, fullMatch);
+		return orderManagementService.searchPurchases(text, limit);
 	}
 
 	@GetMapping("/skus")

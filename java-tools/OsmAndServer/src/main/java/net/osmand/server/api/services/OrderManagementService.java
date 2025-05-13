@@ -39,39 +39,41 @@ public class OrderManagementService {
 
 	private final Gson gson = new Gson();
 
-	public List<AdminService.Purchase> searchPurchases(String q, int limit, boolean fullMatch) {
-		String skuPattern = q + "%";
-		String emailPattern = fullMatch ? "%" + q + "%" : q;
-		String orderPattern = fullMatch ? "%" + q + "%" : q;
-		String emailOp = fullMatch ? "ILIKE" : "=";
-		String orderOp = fullMatch ? "ILIKE" : "=";
+	public List<AdminService.Purchase> searchPurchases(String q, int limit) {
+		String email = q + "%";
+		String order = q + "%";
+		String sku = "%" + q + "%";
 
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
-						"       s.userid, s.timestamp, s.starttime, s.expiretime, s.checktime, " +
+						"       s.userid, s.timestamp, " +
+						"       s.starttime, s.expiretime, s.checktime, " +
 						"       s.autorenewing, s.paymentstate, s.valid, " +
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
 						"       NULL           AS platform, NULL           AS purchase_time " +
 						"  FROM supporters_device_sub s " +
 						"  JOIN user_accounts    u ON u.id = s.userid " +
-						" WHERE s.sku   ILIKE ? " +
-						"    OR u.email " + emailOp + " ? " +
-						"    OR s.orderid " + orderOp + " ? " +
+						" WHERE s.sku   ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
-						"       i.userid, i.timestamp, NULL, NULL, i.checktime, " +
-						"       NULL, NULL, i.valid, FALSE, i.platform, i.purchase_time " +
+						"       i.userid, i.timestamp, " +
+						"       NULL           AS starttime, NULL           AS expiretime, i.checktime, " +
+						"       NULL           AS autorenewing, NULL           AS paymentstate, i.valid, " +
+						"       FALSE          AS osmand_cloud, " +
+						"       i.platform, i.purchase_time " +
 						"  FROM supporters_device_iap i " +
 						"  JOIN user_accounts    u ON u.id = i.userid " +
-						" WHERE i.sku   ILIKE ? " +
-						"    OR u.email " + emailOp + " ? " +
-						"    OR i.orderid " + orderOp + " ? " +
+						" WHERE i.sku   ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
 						"ORDER BY timestamp DESC " +
 						"LIMIT ?";
 
 		Object[] params = new Object[]{
-				skuPattern, emailPattern, orderPattern,
-				skuPattern, emailPattern, orderPattern,
+				sku,    // first s.sku
+				email, // first u.email
+				order, // first s.orderid
+				sku,    // i.sku
+				email, // second u.email
+				order, // i.orderid
 				limit
 		};
 
