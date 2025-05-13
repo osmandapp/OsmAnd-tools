@@ -121,10 +121,12 @@ public class ObfChecker {
 			}
 		}
 		ok &= checkNull(mi, "Missing Map section");
-		ok &= checkNull(poi, "Missing Poi section");
-		ok &= checkNull(address, "Missing address section");
-		ok &= checkNull(routeRegion, "Missing routing section");
-
+		if (!oFile.getName().toLowerCase().startsWith("world")) {
+			ok &= checkNull(poi, "Missing Poi section");
+			ok &= checkNull(address, "Missing address section");
+			ok &= checkNull(routeRegion, "Missing routing section");
+		}
+		
 		index.close();
 		return ok;
 	}
