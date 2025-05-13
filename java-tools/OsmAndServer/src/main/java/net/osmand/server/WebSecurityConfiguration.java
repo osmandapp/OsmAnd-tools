@@ -1,11 +1,13 @@
 package net.osmand.server;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +21,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -36,6 +39,7 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -209,6 +213,7 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/order-mgmt").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
@@ -217,6 +222,15 @@ public class WebSecurityConfiguration {
 						.anyRequest().permitAll()
 				)
 				.exceptionHandling(ex -> ex
+						.accessDeniedHandler(new AccessDeniedHandler() {
+							@Override
+							public void handle(HttpServletRequest request,
+							                   HttpServletResponse response,
+							                   AccessDeniedException accessDeniedException) throws IOException, ServletException {
+								response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+								request.getRequestDispatcher(request.getContextPath() + "/admin/security-error").forward(request, response);
+							}
+						})
 						.defaultAuthenticationEntryPointFor(
 								adminEntryPoint,
 								new AntPathRequestMatcher("/mapapi/**"))
