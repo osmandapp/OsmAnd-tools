@@ -153,7 +153,14 @@ public class AdminController {
         //return index(model);
         return "redirect:info";
 	}
-	
+
+	@RequestMapping(value = "/**")
+	public String adminFallback(HttpServletResponse response,
+	                            Model model) {
+		response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+		model.addAttribute("status", 404);
+		return "admin/error";
+	}
 	
 	@RequestMapping(path = { "/update-btc-report" }, method = RequestMethod.POST)
 	public String publish(Model model, 
