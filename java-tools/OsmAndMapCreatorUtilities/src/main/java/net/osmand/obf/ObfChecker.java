@@ -100,7 +100,7 @@ public class ObfChecker {
 			}
 		}
 		
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null) && world) {
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null) && !world) {
 			int cnt = 0;
 			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
 			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
