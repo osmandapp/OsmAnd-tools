@@ -115,16 +115,16 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-				ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
-				ok &= checkNull(bicycle,
+				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
+				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 			}
 		}
-		ok &= checkNull(mi, "Missing Map section");
+		ok &= checkNull(oFile, mi, "Missing Map section");
 		if (!oFile.getName().toLowerCase().startsWith("world")) {
-			ok &= checkNull(poi, "Missing Poi section");
-			ok &= checkNull(address, "Missing address section");
-			ok &= checkNull(routeRegion, "Missing routing section");
+			ok &= checkNull(oFile, poi, "Missing Poi section");
+			ok &= checkNull(oFile, address, "Missing address section");
+			ok &= checkNull(oFile, routeRegion, "Missing routing section");
 		}
 		
 		index.close();
@@ -143,9 +143,9 @@ public class ObfChecker {
 		return ok;
 	}
 
-	private static boolean checkNull(Object o, String string) {
+	private static boolean checkNull(File f, Object o, String string) {
 		if (o == null) {
-			System.err.println(string);
+			System.err.println("[" + f.getName() + "] " + string);
 			return false;
 		}
 		return true;
