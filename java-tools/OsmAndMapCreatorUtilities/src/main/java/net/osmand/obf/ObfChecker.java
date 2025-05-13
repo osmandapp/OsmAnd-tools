@@ -109,7 +109,7 @@ public class ObfChecker {
 				}
 				List<RouteDataObject> ls = index.loadRouteIndexData(rs);
 				for (RouteDataObject rdo : ls) {
-					if (rdo.getHighway() != null) {
+					if (rdo != null && rdo.getHighway() != null) {
 						cnt += rdo.getPointsLength();
 					}
 				}
