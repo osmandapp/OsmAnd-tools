@@ -1,12 +1,14 @@
 package net.osmand.obf;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
@@ -18,6 +20,7 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 
 public class ObfChecker {
 
@@ -85,6 +88,7 @@ public class ObfChecker {
 				} else if (hr.profile.equals("bicycle")) {
 					bicycle = hr;
 				}
+				ok &= checkHHRegion(index, hr);
 			} else if (p instanceof PoiRegion) {
 				poi = (PoiRegion) p;
 			} else if (p instanceof AddressRegion) {
@@ -122,6 +126,18 @@ public class ObfChecker {
 		ok &= checkNull(routeRegion, "Missing routing section");
 
 		index.close();
+		return ok;
+	}
+
+	private static boolean checkHHRegion(BinaryMapIndexReader index, HHRouteRegion hr) throws IOException {
+		boolean ok = true;
+		TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(hr, (short) 0, NetworkDBPoint.class);
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+			if (pnt.dualPoint == null) {
+				System.err.printf("Error in map %s - %s missing dual point \n", pnt.toString());
+				ok = false;
+			}
+		}
 		return ok;
 	}
 
