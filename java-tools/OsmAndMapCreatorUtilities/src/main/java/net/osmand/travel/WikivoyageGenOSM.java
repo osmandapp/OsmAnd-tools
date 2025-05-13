@@ -422,6 +422,11 @@ public class WikivoyageGenOSM {
 			
 			tagValue(serializer, "route_source", "wikivoyage");
 			tagValue(serializer, "route_id", "Q" + article.tripId);
+			for (int i = 0; i < article.size(); i++) {
+				String lnga = article.langs.get(i);
+				String titleId = article.titles.get(i);
+				tagValue(serializer, "route_name:" + lnga, titleId);
+			}
 			serializer.endTag(null, "node");
 		}
 		
