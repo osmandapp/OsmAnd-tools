@@ -31,7 +31,7 @@ public class OrderManagementController {
 	@Autowired
 	private HttpServletRequest request;
 
-	@GetMapping("/")
+	@GetMapping(path = { "", "/" })
 	public String orderManagementPage() {
 		return "admin/order-management";
 	}
