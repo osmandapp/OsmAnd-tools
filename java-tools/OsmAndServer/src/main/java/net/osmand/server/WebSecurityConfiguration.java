@@ -1,11 +1,14 @@
 package net.osmand.server;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,7 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -158,6 +162,22 @@ public class WebSecurityConfiguration {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		LoginUrlAuthenticationEntryPoint adminEntryPoint =
+				new LoginUrlAuthenticationEntryPoint("/map/account/") {
+					@Override
+					protected String determineUrlToUseForThisRequest(
+							HttpServletRequest request,
+							HttpServletResponse response,
+							AuthenticationException exception) {
+
+						String target = request.getRequestURI()
+								+ (request.getQueryString() != null ? "?" + request.getQueryString() : "");
+						String loginUrl = super.determineUrlToUseForThisRequest(request, response, exception);
+						return loginUrl
+								+ "?redirect="
+								+ URLEncoder.encode(target, StandardCharsets.UTF_8);
+					}
+				};
 		http
 				.sessionManagement(session -> session
 						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -198,7 +218,7 @@ public class WebSecurityConfiguration {
 				)
 				.exceptionHandling(ex -> ex
 						.defaultAuthenticationEntryPointFor(
-								new LoginUrlAuthenticationEntryPoint("/map/account/"),
+								adminEntryPoint,
 								new AntPathRequestMatcher("/mapapi/**"))
 				)
 				.rememberMe(rm -> rm
