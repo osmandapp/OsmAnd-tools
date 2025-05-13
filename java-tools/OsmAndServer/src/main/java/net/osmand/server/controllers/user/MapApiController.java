@@ -2,20 +2,19 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
-import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
-import static net.osmand.server.api.services.MapUserFileService.*;
+import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.util.Algorithms.sanitizeFileName;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import jakarta.servlet.ServletException;
@@ -68,7 +67,7 @@ public class MapApiController {
 	AuthenticationManager authManager;
 
 	@Autowired
-	MapUserFileService mapUserFileService;
+	WebUserdataService webUserdataService;
 
 	@Autowired
 	PremiumUsersRepository usersRepository;
@@ -292,8 +291,9 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
+		newName = sanitizeFileName(newName);
 		if (!oldName.equals(newName)) {
-			return userdataService.renameFile(oldName, newName, type, dev, saveCopy);
+			return webUserdataService.renameFile(oldName, newName, type, dev, saveCopy);
 		}
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
@@ -340,14 +340,14 @@ public class MapApiController {
 
 			if (isGPZTrack) {
 				JsonObject details = nd.details != null ? nd.details : new JsonObject();
-				if (!mapUserFileService.detailsPresent(details)) {
+				if (!webUserdataService.detailsPresent(details)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
 				nd.details = details;
 			}
 
 			if (isGPZTrack || isFavorite) {
-				boolean isSharedFile = mapUserFileService.isShared(nd, sharedFilesMap);
+				boolean isSharedFile = webUserdataService.isShared(nd, sharedFilesMap);
 				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
 			}
 		});
@@ -355,7 +355,7 @@ public class MapApiController {
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
 			for (UserFileNoData nd : res.allFiles) {
-				mapUserFileService.addDeviceInformation(nd, devices);
+				webUserdataService.addDeviceInformation(nd, devices);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
@@ -367,7 +367,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return mapUserFileService.refreshListFiles(files, dev);
+		return webUserdataService.refreshListFiles(files, dev);
 	}
 
 	@GetMapping(value = "/download-file")
@@ -444,7 +444,7 @@ public class MapApiController {
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
-			if (mapUserFileService.analysisPresent(ANALYSIS, userFile)) {
+			if (webUserdataService.analysisPresent(ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
 			}
 			in = userdataService.getInputStream(dev, userFile);
@@ -458,9 +458,9 @@ public class MapApiController {
 			if (gpxFile.getError() != null) {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
-			GpxTrackAnalysis analysis = mapUserFileService.getAnalysis(userFile, gpxFile);
-			if (!mapUserFileService.analysisPresent(ANALYSIS, userFile)) {
-				mapUserFileService.saveAnalysis(ANALYSIS, userFile, analysis);
+			GpxTrackAnalysis analysis = webUserdataService.getAnalysis(userFile, gpxFile);
+			if (!webUserdataService.analysisPresent(ANALYSIS, userFile)) {
+				webUserdataService.saveAnalysis(ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
@@ -478,7 +478,7 @@ public class MapApiController {
 		InputStream in = null;
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
-			if (mapUserFileService.analysisPresent(SRTM_ANALYSIS, userFile)) {
+			if (webUserdataService.analysisPresent(SRTM_ANALYSIS, userFile)) {
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(SRTM_ANALYSIS))));
 			}
 			in = userdataService.getInputStream(dev, userFile);
@@ -493,9 +493,9 @@ public class MapApiController {
 				return ResponseEntity.badRequest().body(String.format("File %s not found", userFile.name));
 			}
 			GpxFile srtmGpx = gpxService.calculateSrtmAltitude(gpxFile, null);
-			GpxTrackAnalysis analysis = srtmGpx == null ? null : mapUserFileService.getAnalysis(userFile, srtmGpx);
-			if (!mapUserFileService.analysisPresent(SRTM_ANALYSIS, userFile)) {
-				mapUserFileService.saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
+			GpxTrackAnalysis analysis = srtmGpx == null ? null : webUserdataService.getAnalysis(userFile, srtmGpx);
+			if (!webUserdataService.analysisPresent(SRTM_ANALYSIS, userFile)) {
+				webUserdataService.saveAnalysis(SRTM_ANALYSIS, userFile, analysis);
 			}
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 		} finally {
