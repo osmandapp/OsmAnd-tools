@@ -134,7 +134,7 @@ public class ObfChecker {
 		TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(hr, (short) 0, NetworkDBPoint.class);
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			if (pnt.dualPoint == null) {
-				System.err.printf("Error in map %s - %s missing dual point \n", index.getRegionName(), pnt.toString());
+				System.err.printf("Error in map %s - %s missing dual point \n", index.getFile().getName(), pnt.toString());
 				ok = false;
 			}
 		}
