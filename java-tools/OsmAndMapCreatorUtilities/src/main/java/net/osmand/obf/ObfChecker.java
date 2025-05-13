@@ -78,6 +78,7 @@ public class ObfChecker {
 		RouteRegion routeRegion = null;
 		long routeSectionSize = 0;
 		AddressRegion address = null;
+		boolean world = oFile.getName().toLowerCase().startsWith("world");
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if (p instanceof MapIndex) {
 				mi = (MapIndex) p;
@@ -99,7 +100,7 @@ public class ObfChecker {
 			}
 		}
 		
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null)) {
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null) && world) {
 			int cnt = 0;
 			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
 			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
@@ -121,7 +122,7 @@ public class ObfChecker {
 			}
 		}
 		ok &= checkNull(oFile, mi, "Missing Map section");
-		if (!oFile.getName().toLowerCase().startsWith("world")) {
+		if (!world) {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
