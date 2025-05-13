@@ -9,6 +9,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -77,14 +78,13 @@ public class OrderManagementService {
 				limit
 		};
 
-		return jdbcTemplate.query(sql, params, (rs, rowNum) -> {
+		List<AdminService.Purchase> result = jdbcTemplate.query(sql, params, (rs, rowNum) -> {
 			AdminService.Purchase p = new AdminService.Purchase();
 			p.email = rs.getString("email");
 			p.sku = rs.getString("sku");
 			p.orderId = rs.getString("orderid");
 			p.purchaseToken = rs.getString("purchasetoken");
 			p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
-			p.timestamp = rs.getTimestamp("timestamp");
 			p.starttime = rs.getTimestamp("starttime");
 			p.expiretime = rs.getTimestamp("expiretime");
 			p.checktime = rs.getTimestamp("checktime");
@@ -96,6 +96,56 @@ public class OrderManagementService {
 			p.osmandCloud = rs.getBoolean("osmand_cloud");
 			return p;
 		});
+
+		if (result.isEmpty()) {
+			List<PremiumUsersRepository.PremiumUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
+			if (users != null) {
+				users.forEach(u -> {
+					if (u.orderid != null) {
+						List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> sList = subscriptionsRepository.findByOrderId(u.orderid);
+						if (sList != null && !sList.isEmpty()) {
+							sList.forEach(s -> {
+								AdminService.Purchase p = new AdminService.Purchase();
+								p.email = u.email;
+								p.sku = s.sku;
+								p.orderId = s.orderId;
+								p.purchaseToken = s.purchaseToken;
+								p.userId = u.id;
+								p.starttime = s.starttime;
+								p.expiretime = s.expiretime;
+								p.checktime = s.checktime;
+								p.autorenewing = s.autorenewing;
+								p.paymentstate = s.paymentstate;
+								p.valid = s.valid;
+								p.platform = null;
+								p.purchaseTime = null;
+								p.osmandCloud = true;
+								result.add(p);
+							});
+						} else {
+							AdminService.Purchase p = new AdminService.Purchase();
+							p.email = u.email;
+							p.sku = null;
+							p.orderId = u.orderid;
+							p.purchaseToken = null;
+							p.userId = u.id;
+							p.starttime = null;
+							p.expiretime = null;
+							p.checktime = null;
+							p.autorenewing = null;
+							p.paymentstate = null;
+							p.valid = null;
+							p.platform = null;
+							p.purchaseTime = null;
+							p.osmandCloud = true;
+							result.add(p);
+						}
+					}
+				});
+			}
+
+		}
+		return result;
 	}
 
 	public List<String> getTopSkus(int limit) {
