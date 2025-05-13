@@ -1,5 +1,6 @@
 package net.osmand.server.controllers.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.AdminService;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 
+import static net.osmand.server.WebSecurityConfiguration.ROLE_ADMIN;
+
 @Controller
 @RequestMapping("/admin/order-mgmt")
 public class OrderManagementController {
@@ -24,6 +27,9 @@ public class OrderManagementController {
 
 	@Autowired
 	private PremiumUsersRepository usersRepository;
+
+	@Autowired
+	private HttpServletRequest request;
 
 	@GetMapping("/")
 	public String orderManagementPage() {
@@ -38,7 +44,8 @@ public class OrderManagementController {
 		if (StringUtils.isBlank(text)) {
 			return Collections.emptyList();
 		}
-		return orderManagementService.searchPurchases(text, limit);
+		boolean fullMatch = request.isUserInRole(ROLE_ADMIN);
+		return orderManagementService.searchPurchases(text, limit, fullMatch);
 	}
 
 	@GetMapping("/skus")

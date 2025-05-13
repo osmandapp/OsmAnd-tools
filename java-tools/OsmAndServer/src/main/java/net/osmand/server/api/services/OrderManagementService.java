@@ -39,54 +39,61 @@ public class OrderManagementService {
 
 	private final Gson gson = new Gson();
 
-	public List<AdminService.Purchase> searchPurchases(String q, int limit) {
-		String like = "%" + q + "%";
+	public List<AdminService.Purchase> searchPurchases(String q, int limit, boolean fullMatch) {
+		String skuPattern = q + "%";
+		String emailPattern = fullMatch ? "%" + q + "%" : q;
+		String orderPattern = fullMatch ? "%" + q + "%" : q;
+		String emailOp = fullMatch ? "ILIKE" : "=";
+		String orderOp = fullMatch ? "ILIKE" : "=";
+
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
-						"       s.userid, s.timestamp, " +
-						"       s.starttime, s.expiretime, s.checktime, " +
+						"       s.userid, s.timestamp, s.starttime, s.expiretime, s.checktime, " +
 						"       s.autorenewing, s.paymentstate, s.valid, " +
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
 						"       NULL           AS platform, NULL           AS purchase_time " +
 						"  FROM supporters_device_sub s " +
 						"  JOIN user_accounts    u ON u.id = s.userid " +
-						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
+						" WHERE s.sku   ILIKE ? " +
+						"    OR u.email " + emailOp + " ? " +
+						"    OR s.orderid " + orderOp + " ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
-						"       i.userid, i.timestamp, " +
-						"       NULL           AS starttime, NULL           AS expiretime, i.checktime, " +
-						"       NULL           AS autorenewing, NULL           AS paymentstate, i.valid, " +
-						"       FALSE          AS osmand_cloud, " +
-						"       i.platform, i.purchase_time " +
+						"       i.userid, i.timestamp, NULL, NULL, i.checktime, " +
+						"       NULL, NULL, i.valid, FALSE, i.platform, i.purchase_time " +
 						"  FROM supporters_device_iap i " +
 						"  JOIN user_accounts    u ON u.id = i.userid " +
-						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
+						" WHERE i.sku   ILIKE ? " +
+						"    OR u.email " + emailOp + " ? " +
+						"    OR i.orderid " + orderOp + " ? " +
 						"ORDER BY timestamp DESC " +
 						"LIMIT ?";
 
-		return jdbcTemplate.query(
-				sql,
-				new Object[]{like, like, like, like, like, like, limit},
-				(rs, rowNum) -> {
-					AdminService.Purchase p = new AdminService.Purchase();
-					p.email = rs.getString("email");
-					p.sku = rs.getString("sku");
-					p.orderId = rs.getString("orderid");
-					p.purchaseToken = rs.getString("purchasetoken");
-					p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
-					p.timestamp = rs.getTimestamp("timestamp");
-					p.starttime = rs.getTimestamp("starttime");
-					p.expiretime = rs.getTimestamp("expiretime");
-					p.checktime = rs.getTimestamp("checktime");
-					p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
-					p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
-					p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
-					p.platform = rs.getString("platform");
-					p.purchaseTime = rs.getTimestamp("purchase_time");
-					p.osmandCloud = rs.getBoolean("osmand_cloud");
-					return p;
-				}
-		);
+		Object[] params = new Object[]{
+				skuPattern, emailPattern, orderPattern,
+				skuPattern, emailPattern, orderPattern,
+				limit
+		};
+
+		return jdbcTemplate.query(sql, params, (rs, rowNum) -> {
+			AdminService.Purchase p = new AdminService.Purchase();
+			p.email = rs.getString("email");
+			p.sku = rs.getString("sku");
+			p.orderId = rs.getString("orderid");
+			p.purchaseToken = rs.getString("purchasetoken");
+			p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
+			p.timestamp = rs.getTimestamp("timestamp");
+			p.starttime = rs.getTimestamp("starttime");
+			p.expiretime = rs.getTimestamp("expiretime");
+			p.checktime = rs.getTimestamp("checktime");
+			p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
+			p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
+			p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
+			p.platform = rs.getString("platform");
+			p.purchaseTime = rs.getTimestamp("purchase_time");
+			p.osmandCloud = rs.getBoolean("osmand_cloud");
+			return p;
+		});
 	}
 
 	public List<String> getTopSkus(int limit) {
