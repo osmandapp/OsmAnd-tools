@@ -220,6 +220,10 @@ public class WebSecurityConfiguration {
 						.defaultAuthenticationEntryPointFor(
 								adminEntryPoint,
 								new AntPathRequestMatcher("/mapapi/**"))
+						.defaultAuthenticationEntryPointFor(
+								adminEntryPoint,
+								new AntPathRequestMatcher("/admin/**")
+						)
 				)
 				.rememberMe(rm -> rm
 						.tokenValiditySeconds(3600 * 24 * 14)
