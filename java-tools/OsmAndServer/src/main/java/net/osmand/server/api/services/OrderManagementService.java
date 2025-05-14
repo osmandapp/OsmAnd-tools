@@ -36,7 +36,7 @@ public class OrderManagementService {
 	@Autowired
 	JdbcTemplate jdbcTemplate;
 
-	static final String SUPPORT_VALIDATED = "supportvalidated";
+	static final String MANUALLY_VALIDATED = "manually-validated";
 
 	private final Gson gson = new Gson();
 
@@ -221,8 +221,8 @@ public class OrderManagementService {
 					throw new IllegalArgumentException("Unknown interval: " + interval);
 			}
 			s.expiretime = cal.getTime();
-			s.valid = purchaseToken.equals(SUPPORT_VALIDATED);
-			s.checktime = purchaseToken.equals(SUPPORT_VALIDATED) ? new Date() : null;
+			s.valid = purchaseToken.equals(MANUALLY_VALIDATED);
+			s.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			subscriptionsRepository.saveAndFlush(s);
 		} else {
@@ -234,8 +234,8 @@ public class OrderManagementService {
 			i.purchaseToken = purchaseToken;
 			i.purchaseTime = new Date();
 			i.timestamp = new Date();
-			i.valid = purchaseToken.equals(SUPPORT_VALIDATED);
-			i.checktime = purchaseToken.equals(SUPPORT_VALIDATED) ? new Date() : null;
+			i.valid = purchaseToken.equals(MANUALLY_VALIDATED);
+			i.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			deviceInAppPurchasesRepository.saveAndFlush(i);
 		}
