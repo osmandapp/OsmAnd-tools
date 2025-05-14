@@ -388,9 +388,7 @@ public class WebUserdataService {
 
 	private File renameGpxTrack(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
 		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
-		if (preparedName.contains("/")) {
-			preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
-		}
+		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
 		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 		if (isTrack) {
 			GpxFile gpxFile = null;
