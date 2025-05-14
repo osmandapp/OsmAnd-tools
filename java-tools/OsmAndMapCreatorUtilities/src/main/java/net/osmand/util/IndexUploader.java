@@ -510,7 +510,7 @@ public class IndexUploader {
 		}
 	}
 
-	// synchronized is not needed as R-tree now works fine in multithread 
+	// synchronized is not needed as R-tree now works fine  
 	public static void extractRoadOnlyFile(File mainFile, File roadOnlyFile) throws IOException, RTreeException {
 		RandomAccessFile raf = new RandomAccessFile(mainFile, "r");
 		BinaryMapIndexReader index = new BinaryMapIndexReader(raf, mainFile);
@@ -562,8 +562,8 @@ public class IndexUploader {
 		writer.startWriteMapIndex(part.getName());
 		boolean first = true;
 		for (MapRoot r : rts) {
-			if(r.getMaxZoom() <= 10) {
-				if(first) {
+			if (r.getMaxZoom() <= 10) {
+				if (first) {
 					throw new UnsupportedOperationException("Can't write top level zoom");
 				}
 				ous.writeTag(OsmandOdb.OsmAndMapIndex.LEVELS_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -572,16 +572,15 @@ public class IndexUploader {
 				continue;
 			}
 			final TLongObjectHashMap<BinaryMapDataObject> objects = new TLongObjectHashMap<BinaryMapDataObject>();
-			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack" + r.getMinZoom() + "."
-					+ roadOnlyFile.getName() + ".rtree");
-			File packRtree = new File(roadOnlyFile.getParentFile(), "pack" + r.getMinZoom() + "."
-					+ roadOnlyFile.getName() + ".rtree");
+			String uniquefile = r.getMinZoom() + "." + roadOnlyFile.getName() + "." + part.getName() + ".rtree";
+			File nonpackRtree = new File(roadOnlyFile.getParentFile(), "nonpack" + uniquefile);
+			File packRtree = new File(roadOnlyFile.getParentFile(), "pack" + uniquefile);
 			RTree rtree = null;
 			try {
 				rtree = new RTree(nonpackRtree.getAbsolutePath());
 				final SearchRequest<BinaryMapDataObject> req = buildSearchRequest(r, objects, rtree);
 				index.searchMapIndex(req, part);
-				if(first) {
+				if (first) {
 					first = false;
 					writer.writeMapEncodingRules(part.decodingRules);
 				}
