@@ -291,7 +291,6 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		newName = sanitizeFileName(newName);
 		if (!oldName.equals(newName)) {
 			return webUserdataService.renameFile(oldName, newName, type, dev, saveCopy);
 		}

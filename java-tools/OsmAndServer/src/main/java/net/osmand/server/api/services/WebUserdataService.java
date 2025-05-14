@@ -1,5 +1,7 @@
 package net.osmand.server.api.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -23,10 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
@@ -68,6 +68,7 @@ public class WebUserdataService {
 
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
+	public static final String INFO_FILE_EXT = ".info";
 
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
@@ -349,8 +350,7 @@ public class WebUserdataService {
 	public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
 		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
 		if (file != null) {
-			String preparedName = newName.substring(0, newName.lastIndexOf('.'));
-			File updatedFile = renameGpxTrack(file, preparedName);
+			File updatedFile = renameGpxTrack(file, newName);
 			StorageService.InternalZipFile zipFile = null;
 			if (updatedFile != null) {
 				zipFile = StorageService.InternalZipFile.buildFromFile(updatedFile);
@@ -366,9 +366,15 @@ public class WebUserdataService {
 				}
 				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
 				if (res.getStatusCode().is2xxSuccessful()) {
+					boolean renamed = renameInfoFile(oldName, newName, dev);
+					if (!renamed) {
+						return ResponseEntity.badRequest().body("Error rename info file!");
+					}
 					if (!saveCopy) {
 						//delete file with old name
 						userdataService.deleteFile(oldName, type, null, null, dev);
+						//delete info file with old name
+						userdataService.deleteFile(oldName + INFO_FILE_EXT, type, null, null, dev);
 					}
 					return userdataService.ok();
 				}
@@ -381,6 +387,8 @@ public class WebUserdataService {
 	}
 
 	private File renameGpxTrack(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
+		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
 		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 		if (isTrack) {
 			GpxFile gpxFile = null;
@@ -415,8 +423,8 @@ public class WebUserdataService {
 				LOG.error(noIsError);
 			}
 			if (gpxFile != null) {
-				gpxFile.updateTrackName(newName);
-				File tmpGpx = File.createTempFile(newName, ".gpx");
+				gpxFile.updateTrackName(preparedName);
+				File tmpGpx = File.createTempFile(preparedName, ".gpx");
 				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 				if (exception != null) {
 					String isError = String.format(
@@ -429,5 +437,60 @@ public class WebUserdataService {
 			}
 		}
 		return null;
+	}
+
+	private boolean renameInfoFile(String oldName, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
+		if (file == null) {
+			return true;
+		}
+		InputStream in;
+		try {
+			in = file.data != null ? new ByteArrayInputStream(file.data) : userdataService.getInputStream(file);
+		} catch (Exception e) {
+			String isError = String.format(
+					"renameInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
+					file.name, file.id, file.userid, e.getMessage());
+			LOG.error(isError);
+			return false;
+		}
+		if (in == null) {
+			LOG.error(String.format(
+					"renameInfoFile error: no-input-stream %s id=%d userid=%d",
+					file.name, file.id, file.userid
+			));
+			return false;
+		}
+		try (GZIPInputStream gis = new GZIPInputStream(in)) {
+			// read json
+			ObjectMapper mapper = new ObjectMapper();
+
+			ObjectNode json = (ObjectNode) mapper.readTree(gis);
+			String oldPath = json.path("file").asText();
+			// save /tracks folder
+			int tracksFolderEndIndex = oldPath.indexOf('/', oldPath.startsWith("/") ? 1 : 0);
+			String folder = (tracksFolderEndIndex >= 0)
+					? oldPath.substring(0, tracksFolderEndIndex + 1)
+					: "";
+
+			// save new name
+			json.put("file", folder + newName);
+			// prepare new json
+			String jsonStr = mapper.writeValueAsString(json)
+					.replace("/", "\\/");
+			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
+			// create new file
+			File tmpInfo = File.createTempFile(newName + INFO_FILE_EXT, INFO_FILE_EXT);
+			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
+				fos.write(updated);
+			}
+			// upload new file
+			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFile(tmpInfo);
+			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			if (res.getStatusCode().is2xxSuccessful()) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
