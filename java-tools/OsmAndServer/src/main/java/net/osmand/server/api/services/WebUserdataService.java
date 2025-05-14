@@ -1,17 +1,22 @@
 package net.osmand.server.api.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.PremiumUserDevicesRepository;
 import net.osmand.server.api.repo.PremiumUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Metadata;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.shared.io.KFile;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -20,18 +25,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 
 @Service
-public class MapUserFileService {
+public class WebUserdataService {
 
-	protected static final Log LOG = LogFactory.getLog(MapUserFileService.class);
+	protected static final Log LOG = LogFactory.getLog(WebUserdataService.class);
 
 	@Autowired
 	WebGpxParser webGpxParser;
@@ -64,6 +68,7 @@ public class MapUserFileService {
 
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
+	public static final String INFO_FILE_EXT = ".info";
 
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
@@ -339,5 +344,153 @@ public class MapUserFileService {
 			return res;
 		}
 		return Collections.emptyMap();
+	}
+
+	@Transactional
+	public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
+		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
+		if (file != null) {
+			File updatedFile = renameGpxTrack(file, newName);
+			StorageService.InternalZipFile zipFile = null;
+			if (updatedFile != null) {
+				zipFile = StorageService.InternalZipFile.buildFromFile(updatedFile);
+			}
+			if (zipFile == null) {
+				zipFile = userdataService.getZipFile(file, newName);
+			}
+			if (zipFile != null) {
+				try {
+					userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+				} catch (OsmAndPublicApiException e) {
+					return ResponseEntity.badRequest().body(e.getMessage());
+				}
+				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+				if (res.getStatusCode().is2xxSuccessful()) {
+					boolean renamed = renameInfoFile(oldName, newName, dev);
+					if (!renamed) {
+						return ResponseEntity.badRequest().body("Error rename info file!");
+					}
+					if (!saveCopy) {
+						//delete file with old name
+						userdataService.deleteFile(oldName, type, null, null, dev);
+						//delete info file with old name
+						userdataService.deleteFile(oldName + INFO_FILE_EXT, type, null, null, dev);
+					}
+					return userdataService.ok();
+				}
+			} else {
+				// skip deleted files
+				return userdataService.ok();
+			}
+		}
+		return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
+	}
+
+	private File renameGpxTrack(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
+		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
+		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
+		if (isTrack) {
+			GpxFile gpxFile = null;
+			InputStream in = null;
+			try {
+				in = file.data != null ? new ByteArrayInputStream(file.data) : userdataService.getInputStream(file);
+			} catch (Exception e) {
+				String isError = String.format(
+						"renameFile error: input-stream-error %s id=%d userid=%d error (%s)",
+						file.name, file.id, file.userid, e.getMessage());
+				LOG.error(isError);
+			}
+			if (in != null) {
+				in = new GZIPInputStream(in);
+				try (Source source = new Buffer().readFrom(in)) {
+					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+				} catch (IOException e) {
+					String loadError = String.format(
+							"renameFile error: load-gpx-error %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, e.getMessage());
+					LOG.error(loadError);
+				}
+				if (gpxFile != null && gpxFile.getError() != null) {
+					String corruptedError = String.format(
+							"renameFile error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, gpxFile.getError().getMessage());
+					LOG.error(corruptedError);
+				}
+			} else {
+				String noIsError = String.format(
+						"renameFile error: no-input-stream %s id=%d userid=%d", file.name, file.id, file.userid);
+				LOG.error(noIsError);
+			}
+			if (gpxFile != null) {
+				gpxFile.updateTrackName(preparedName);
+				File tmpGpx = File.createTempFile(preparedName, ".gpx");
+				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
+				if (exception != null) {
+					String isError = String.format(
+							"renameFile error: write-gpx-error %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, exception.getMessage());
+					LOG.error(isError);
+				} else  {
+					return tmpGpx;
+				}
+			}
+		}
+		return null;
+	}
+
+	private boolean renameInfoFile(String oldName, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
+		if (file == null) {
+			return true;
+		}
+		InputStream in;
+		try {
+			in = file.data != null ? new ByteArrayInputStream(file.data) : userdataService.getInputStream(file);
+		} catch (Exception e) {
+			String isError = String.format(
+					"renameInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
+					file.name, file.id, file.userid, e.getMessage());
+			LOG.error(isError);
+			return false;
+		}
+		if (in == null) {
+			LOG.error(String.format(
+					"renameInfoFile error: no-input-stream %s id=%d userid=%d",
+					file.name, file.id, file.userid
+			));
+			return false;
+		}
+		try (GZIPInputStream gis = new GZIPInputStream(in)) {
+			// read json
+			ObjectMapper mapper = new ObjectMapper();
+
+			ObjectNode json = (ObjectNode) mapper.readTree(gis);
+			String oldPath = json.path("file").asText();
+			// save /tracks folder
+			int tracksFolderEndIndex = oldPath.indexOf('/', oldPath.startsWith("/") ? 1 : 0);
+			String folder = (tracksFolderEndIndex >= 0)
+					? oldPath.substring(0, tracksFolderEndIndex + 1)
+					: "";
+
+			// save new name
+			json.put("file", folder + newName);
+			// prepare new json
+			String jsonStr = mapper.writeValueAsString(json)
+					.replace("/", "\\/");
+			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
+			// create new file
+			File tmpInfo = File.createTempFile(newName + INFO_FILE_EXT, INFO_FILE_EXT);
+			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
+				fos.write(updated);
+			}
+			// upload new file
+			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFile(tmpInfo);
+			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			if (res.getStatusCode().is2xxSuccessful()) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

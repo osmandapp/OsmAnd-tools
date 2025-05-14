@@ -544,7 +544,7 @@ public class BinaryInspector {
 					if ((vInfo != null && vInfo.isVHHrouting())) {
 						TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(ri, (short) 0, NetworkDBPoint.class);
 						for (NetworkDBPoint pnt : pnts.valueCollection()) {
-							System.out.println(String.format("\t\t %s - cluster %d (duap point %d, %d) - %d,%d -> %d,%d", pnt,
+							System.out.println(String.format("\t\t %s - cluster %d (dual point %d, %d) - %d,%d -> %d,%d", pnt,
 									pnt.clusterId, pnt.dualPoint == null ? 0 : pnt.dualPoint.index,
 									pnt.dualPoint == null ? 0 : pnt.dualPoint.clusterId, pnt.startX, pnt.startY, pnt.endX, pnt.endY));
 						}
@@ -1519,7 +1519,7 @@ public class BinaryInspector {
 		}
 		System.out.println("Inspector is console utility for working with binary indexes of OsmAnd.");
 		System.out.println("It allows print info about file, extract parts and merge indexes.");
-		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
+		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
 		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*");

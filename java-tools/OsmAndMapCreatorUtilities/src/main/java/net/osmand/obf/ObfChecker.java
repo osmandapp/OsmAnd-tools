@@ -1,12 +1,14 @@
 package net.osmand.obf;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
@@ -18,6 +20,7 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 
 public class ObfChecker {
 
@@ -75,6 +78,7 @@ public class ObfChecker {
 		RouteRegion routeRegion = null;
 		long routeSectionSize = 0;
 		AddressRegion address = null;
+		boolean world = oFile.getName().toLowerCase().startsWith("world");
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if (p instanceof MapIndex) {
 				mi = (MapIndex) p;
@@ -85,6 +89,7 @@ public class ObfChecker {
 				} else if (hr.profile.equals("bicycle")) {
 					bicycle = hr;
 				}
+				ok &= checkHHRegion(index, hr);
 			} else if (p instanceof PoiRegion) {
 				poi = (PoiRegion) p;
 			} else if (p instanceof AddressRegion) {
@@ -95,7 +100,7 @@ public class ObfChecker {
 			}
 		}
 		
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null)) {
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null) && !world) {
 			int cnt = 0;
 			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
 			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
@@ -105,29 +110,43 @@ public class ObfChecker {
 				}
 				List<RouteDataObject> ls = index.loadRouteIndexData(rs);
 				for (RouteDataObject rdo : ls) {
-					if (rdo.getHighway() != null) {
+					if (rdo != null && rdo.getHighway() != null) {
 						cnt += rdo.getPointsLength();
 					}
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-				ok &= checkNull(car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
-				ok &= checkNull(bicycle,
+				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
+				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 			}
 		}
-		ok &= checkNull(mi, "Missing Map section");
-		ok &= checkNull(poi, "Missing Poi section");
-		ok &= checkNull(address, "Missing address section");
-		ok &= checkNull(routeRegion, "Missing routing section");
-
+		ok &= checkNull(oFile, mi, "Missing Map section");
+		if (!world) {
+			ok &= checkNull(oFile, poi, "Missing Poi section");
+			ok &= checkNull(oFile, address, "Missing address section");
+			ok &= checkNull(oFile, routeRegion, "Missing routing section");
+		}
+		
 		index.close();
 		return ok;
 	}
 
-	private static boolean checkNull(Object o, String string) {
+	private static boolean checkHHRegion(BinaryMapIndexReader index, HHRouteRegion hr) throws IOException {
+		boolean ok = true;
+		TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(hr, (short) 0, NetworkDBPoint.class);
+		for (NetworkDBPoint pnt : pnts.valueCollection()) {
+			if (pnt.dualPoint == null) {
+				System.err.printf("Error in map %s - %s missing dual point \n", index.getFile().getName(), pnt.toString());
+				ok = false;
+			}
+		}
+		return ok;
+	}
+
+	private static boolean checkNull(File f, Object o, String string) {
 		if (o == null) {
-			System.err.println(string);
+			System.err.println("[" + f.getName() + "] " + string);
 			return false;
 		}
 		return true;
