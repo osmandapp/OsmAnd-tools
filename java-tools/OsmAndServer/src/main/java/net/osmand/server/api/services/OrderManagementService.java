@@ -152,17 +152,15 @@ public class OrderManagementService {
 		return result;
 	}
 
-	public List<String> getTopSkus(int limit) {
-		String sql = ""
-				+ "SELECT sku FROM ("
-				+ "  SELECT sku, COUNT(*) AS cnt FROM supporters_device_sub GROUP BY sku "
-				+ "  UNION ALL "
-				+ "  SELECT sku, COUNT(*) AS cnt FROM supporters_device_iap GROUP BY sku "
-				+ ") t "
-				+ "GROUP BY sku "
-				+ "ORDER BY SUM(cnt) DESC "
-				+ "LIMIT ?";
-		return jdbcTemplate.queryForList(sql, new Object[]{limit}, String.class);
+	public List<String> getSkus(boolean isSub, boolean isInApp) {
+		if (isSub && !isInApp) {
+			String sql = "SELECT DISTINCT sku FROM supporters_device_sub ORDER BY sku ASC";
+			return jdbcTemplate.queryForList(sql, String.class);
+		} else if (!isSub && isInApp) {
+			String sql = "SELECT DISTINCT sku FROM supporters_device_iap ORDER BY sku ASC";
+			return jdbcTemplate.queryForList(sql, String.class);
+		}
+		return Collections.emptyList();
 	}
 
 	public boolean orderWithSkuExists(String sku, String orderId) {

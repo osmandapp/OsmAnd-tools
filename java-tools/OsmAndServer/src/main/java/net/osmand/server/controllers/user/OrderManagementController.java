@@ -48,8 +48,9 @@ public class OrderManagementController {
 
 	@GetMapping("/skus")
 	@ResponseBody
-	public List<String> topSkus() {
-		return orderManagementService.getTopSkus(30);
+	public List<String> getSkus(@RequestParam boolean isSub,
+	                            @RequestParam boolean isInApp) {
+		return orderManagementService.getSkus(isSub, isInApp);
 	}
 
 	@PostMapping("/orders/register")
