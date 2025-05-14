@@ -54,7 +54,7 @@ public class OrderManagementService {
 						"       NULL           AS platform, NULL           AS purchase_time " +
 						"  FROM supporters_device_sub s " +
 						"  JOIN user_accounts    u ON u.id = s.userid " +
-						" WHERE s.sku   ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
+						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
 						"       i.userid, i.timestamp, " +
@@ -64,7 +64,7 @@ public class OrderManagementService {
 						"       i.platform, i.purchase_time " +
 						"  FROM supporters_device_iap i " +
 						"  JOIN user_accounts    u ON u.id = i.userid " +
-						" WHERE i.sku   ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
+						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
 						"ORDER BY timestamp DESC " +
 						"LIMIT ?";
 
