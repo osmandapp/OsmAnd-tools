@@ -568,7 +568,7 @@ public class DownloadOsmGPX {
 
 	private void generateObfFile(QueryParams qp)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		if(qp.obfFile != null) {
+		if (qp.obfFile != null) {
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.indexAddress = false;
