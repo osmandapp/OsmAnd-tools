@@ -368,7 +368,7 @@ public class WebUserdataService {
 				if (res.getStatusCode().is2xxSuccessful()) {
 					boolean renamed = renameInfoFile(oldName, newName, dev);
 					if (!renamed) {
-						return ResponseEntity.badRequest().body("Error rename info file!");
+						LOG.error("renameFile error: failed to rename info file");
 					}
 					if (!saveCopy) {
 						//delete file with old name
