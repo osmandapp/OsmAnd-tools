@@ -349,7 +349,7 @@ public class WebUserdataService {
 	@Transactional
 	public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
 		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
-		if (file != null) {
+		if (file != null && file.filesize != -1) {
 			File updatedFile = renameGpxTrack(file, newName);
 			StorageService.InternalZipFile zipFile = null;
 			if (updatedFile != null) {
@@ -366,15 +366,13 @@ public class WebUserdataService {
 				}
 				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
 				if (res.getStatusCode().is2xxSuccessful()) {
-					boolean renamed = renameInfoFile(oldName, newName, dev);
+					boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy);
 					if (!renamed) {
 						return ResponseEntity.badRequest().body("Error rename info file!");
 					}
 					if (!saveCopy) {
 						//delete file with old name
 						userdataService.deleteFile(oldName, type, null, null, dev);
-						//delete info file with old name
-						userdataService.deleteFile(oldName + INFO_FILE_EXT, type, null, null, dev);
 					}
 					return userdataService.ok();
 				}
@@ -439,9 +437,9 @@ public class WebUserdataService {
 		return null;
 	}
 
-	private boolean renameInfoFile(String oldName, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+	private boolean renameInfoFile(String oldName, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
 		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (file == null) {
+		if (file == null || file.filesize == -1) {
 			return true;
 		}
 		InputStream in;
@@ -488,6 +486,9 @@ public class WebUserdataService {
 			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFile(tmpInfo);
 			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
 			if (res.getStatusCode().is2xxSuccessful()) {
+				if (!saveCopy) {
+					userdataService.deleteFile(oldName + INFO_FILE_EXT, FILE_TYPE_GPX, null, null, dev);
+				}
 				return true;
 			}
 		}
