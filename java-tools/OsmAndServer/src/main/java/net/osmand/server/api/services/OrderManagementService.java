@@ -9,6 +9,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,12 +36,15 @@ public class OrderManagementService {
 	@Autowired
 	JdbcTemplate jdbcTemplate;
 
-	static final String SUPPORT_VALIDATED = "supportvalidated";
+	static final String MANUALLY_VALIDATED = "manually-validated";
 
 	private final Gson gson = new Gson();
 
 	public List<AdminService.Purchase> searchPurchases(String q, int limit) {
-		String like = "%" + q + "%";
+		String email = q + "%";
+		String order = q + "%";
+		String sku = "%" + q + "%";
+
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
 						"       s.userid, s.timestamp, " +
@@ -49,7 +53,7 @@ public class OrderManagementService {
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
 						"       NULL           AS platform, NULL           AS purchase_time " +
 						"  FROM supporters_device_sub s " +
-						"  JOIN user_accounts    u ON u.id = s.userid " +
+						"  LEFT JOIN user_accounts    u ON u.id = s.userid " +
 						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
@@ -59,47 +63,104 @@ public class OrderManagementService {
 						"       FALSE          AS osmand_cloud, " +
 						"       i.platform, i.purchase_time " +
 						"  FROM supporters_device_iap i " +
-						"  JOIN user_accounts    u ON u.id = i.userid " +
+						"  LEFT JOIN user_accounts    u ON u.id = i.userid " +
 						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
 						"ORDER BY timestamp DESC " +
 						"LIMIT ?";
 
-		return jdbcTemplate.query(
-				sql,
-				new Object[]{like, like, like, like, like, like, limit},
-				(rs, rowNum) -> {
-					AdminService.Purchase p = new AdminService.Purchase();
-					p.email = rs.getString("email");
-					p.sku = rs.getString("sku");
-					p.orderId = rs.getString("orderid");
-					p.purchaseToken = rs.getString("purchasetoken");
-					p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
-					p.timestamp = rs.getTimestamp("timestamp");
-					p.starttime = rs.getTimestamp("starttime");
-					p.expiretime = rs.getTimestamp("expiretime");
-					p.checktime = rs.getTimestamp("checktime");
-					p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
-					p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
-					p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
-					p.platform = rs.getString("platform");
-					p.purchaseTime = rs.getTimestamp("purchase_time");
-					p.osmandCloud = rs.getBoolean("osmand_cloud");
-					return p;
-				}
-		);
+		Object[] params = new Object[]{
+				sku,    // first s.sku
+				email, // first u.email
+				order, // first s.orderid
+				sku,    // i.sku
+				email, // second u.email
+				order, // i.orderid
+				limit
+		};
+
+		List<AdminService.Purchase> result = jdbcTemplate.query(sql, params, (rs, rowNum) -> {
+			AdminService.Purchase p = new AdminService.Purchase();
+			p.email = rs.getString("email");
+			p.sku = rs.getString("sku");
+			p.orderId = rs.getString("orderid");
+			p.purchaseToken = rs.getString("purchasetoken");
+			p.userId = rs.getObject("userid") != null ? rs.getInt("userid") : null;
+			p.starttime = rs.getTimestamp("starttime");
+			p.expiretime = rs.getTimestamp("expiretime");
+			p.checktime = rs.getTimestamp("checktime");
+			p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
+			p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
+			p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
+			p.platform = rs.getString("platform");
+			p.purchaseTime = rs.getTimestamp("purchase_time");
+			p.osmandCloud = rs.getBoolean("osmand_cloud");
+			return p;
+		});
+
+		if (result.isEmpty()) {
+			List<PremiumUsersRepository.PremiumUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
+			if (users != null) {
+				users.forEach(u -> {
+					if (u.orderid != null) {
+						List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> sList = subscriptionsRepository.findByOrderId(u.orderid);
+						if (sList != null && !sList.isEmpty()) {
+							sList.forEach(s -> {
+								AdminService.Purchase p = new AdminService.Purchase();
+								p.email = u.email;
+								p.sku = s.sku;
+								p.orderId = s.orderId;
+								p.purchaseToken = s.purchaseToken;
+								p.userId = u.id;
+								p.starttime = s.starttime;
+								p.expiretime = s.expiretime;
+								p.checktime = s.checktime;
+								p.autorenewing = s.autorenewing;
+								p.paymentstate = s.paymentstate;
+								p.valid = s.valid;
+								p.platform = null;
+								p.purchaseTime = null;
+								p.osmandCloud = true;
+								result.add(p);
+							});
+						} else {
+							AdminService.Purchase p = new AdminService.Purchase();
+							p.email = u.email;
+							p.sku = null;
+							p.orderId = u.orderid;
+							p.purchaseToken = null;
+							p.userId = u.id;
+							p.starttime = null;
+							p.expiretime = null;
+							p.checktime = null;
+							p.autorenewing = null;
+							p.paymentstate = null;
+							p.valid = null;
+							p.platform = null;
+							p.purchaseTime = null;
+							p.osmandCloud = true;
+							result.add(p);
+						}
+					}
+				});
+			}
+
+		}
+		result.sort(Comparator.comparing(
+				(AdminService.Purchase p) -> p.starttime != null ? p.starttime : p.purchaseTime,
+				Comparator.nullsLast(Comparator.naturalOrder())
+		).reversed());
+		return result;
 	}
 
-	public List<String> getTopSkus(int limit) {
-		String sql = ""
-				+ "SELECT sku FROM ("
-				+ "  SELECT sku, COUNT(*) AS cnt FROM supporters_device_sub GROUP BY sku "
-				+ "  UNION ALL "
-				+ "  SELECT sku, COUNT(*) AS cnt FROM supporters_device_iap GROUP BY sku "
-				+ ") t "
-				+ "GROUP BY sku "
-				+ "ORDER BY SUM(cnt) DESC "
-				+ "LIMIT ?";
-		return jdbcTemplate.queryForList(sql, new Object[]{limit}, String.class);
+	public List<String> getSkus(boolean isSub, boolean isInApp) {
+		if (isSub && !isInApp) {
+			String sql = "SELECT DISTINCT sku FROM supporters_device_sub ORDER BY sku ASC";
+			return jdbcTemplate.queryForList(sql, String.class);
+		} else if (!isSub && isInApp) {
+			String sql = "SELECT DISTINCT sku FROM supporters_device_iap ORDER BY sku ASC";
+			return jdbcTemplate.queryForList(sql, String.class);
+		}
+		return Collections.emptyList();
 	}
 
 	public boolean orderWithSkuExists(String sku, String orderId) {
@@ -162,8 +223,8 @@ public class OrderManagementService {
 					throw new IllegalArgumentException("Unknown interval: " + interval);
 			}
 			s.expiretime = cal.getTime();
-			s.valid = purchaseToken.equals(SUPPORT_VALIDATED);
-			s.checktime = purchaseToken.equals(SUPPORT_VALIDATED) ? new Date() : null;
+			s.valid = purchaseToken.equals(MANUALLY_VALIDATED);
+			s.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			subscriptionsRepository.saveAndFlush(s);
 		} else {
@@ -175,8 +236,8 @@ public class OrderManagementService {
 			i.purchaseToken = purchaseToken;
 			i.purchaseTime = new Date();
 			i.timestamp = new Date();
-			i.valid = purchaseToken.equals(SUPPORT_VALIDATED);
-			i.checktime = purchaseToken.equals(SUPPORT_VALIDATED) ? new Date() : null;
+			i.valid = purchaseToken.equals(MANUALLY_VALIDATED);
+			i.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			deviceInAppPurchasesRepository.saveAndFlush(i);
 		}

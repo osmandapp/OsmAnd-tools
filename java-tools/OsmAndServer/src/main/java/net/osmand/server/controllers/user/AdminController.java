@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -153,7 +154,22 @@ public class AdminController {
         //return index(model);
         return "redirect:info";
 	}
-	
+
+	@RequestMapping(value = "/**")
+	public String adminFallback(HttpServletResponse response,
+	                            Model model) {
+		response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+		model.addAttribute("status", 404);
+		return "admin/error";
+	}
+
+	@RequestMapping(path = {"/security-error"})
+	public String handleSecurityErrors(HttpServletResponse response,
+	                            Model model) {
+		int status = response.getStatus();
+		model.addAttribute("status", status);
+		return "admin/error";
+	}
 	
 	@RequestMapping(path = { "/update-btc-report" }, method = RequestMethod.POST)
 	public String publish(Model model, 

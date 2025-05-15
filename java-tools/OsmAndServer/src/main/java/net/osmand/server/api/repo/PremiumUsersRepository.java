@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -28,6 +29,8 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
     int deleteByEmailIgnoreCase(String email);
 	
 	PremiumUser findByOrderid(String orderid);
+
+    List<PremiumUser> findByEmailStartingWith(String prefix, Pageable pageable);
     
     List<PremiumUser> findPremiumUsersByOrderidAndTokendevice(String orderid, String tokendevice);
 	
