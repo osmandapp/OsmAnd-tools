@@ -61,11 +61,13 @@ public class SearchController {
                                          @RequestParam double lon,
                                          @RequestParam String text,
                                          @RequestParam String locale,
+                                         @RequestParam (required = false) String northWest,
+                                         @RequestParam (required = false) String southEast,
                                          @RequestParam(required = false) Boolean baseSearch) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        List<Feature> features = searchService.search(lat, lon, text, locale, baseSearch != null && baseSearch);
+        List<Feature> features = searchService.search(lat, lon, text, locale, baseSearch != null && baseSearch, northWest, southEast);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     

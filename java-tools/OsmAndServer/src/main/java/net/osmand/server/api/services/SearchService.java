@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
@@ -121,7 +122,7 @@ public class SearchService {
         return bbox;
     }
     
-    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch) throws IOException {
+    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
@@ -155,6 +156,7 @@ public class SearchService {
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
                 if (!res.isEmpty()) {
+                    res = filterBrandsOutsideBBox(res, northWest, southEast);
                     res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
                     saveSearchResult(res, features);
                 }
@@ -167,6 +169,32 @@ public class SearchService {
         } else {
             return Collections.emptyList();
         }
+    }
+
+    private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast) throws IOException {
+        if (northWest != null && southEast != null) {
+            List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+            QuadRect searchBbox = getSearchBbox(bbox);
+            if (searchBbox != null) {
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
+                List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
+                if (!mapList.isEmpty()) {
+                    return res.stream()
+                            .filter(r -> {
+                                if (r.objectType != ObjectType.POI_TYPE) {
+                                    return true;
+                                }
+                                String targetName = r.file.getFile().getName();
+                                return readers.stream()
+                                        .map(BinaryMapIndexReader::getFile)
+                                        .map(java.io.File::getName)
+                                        .anyMatch(name -> name.equals(targetName));
+                            })
+                            .toList();
+                }
+            }
+        }
+        return res;
     }
 
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
