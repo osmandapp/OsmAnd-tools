@@ -180,7 +180,16 @@ public class SearchService {
                 List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
                 if (!mapList.isEmpty()) {
                     return res.stream()
-                            .filter(r -> !(r.objectType == ObjectType.POI_TYPE && !readers.contains(r.file)))
+                            .filter(r -> {
+                                if (r.objectType != ObjectType.POI_TYPE) {
+                                    return true;
+                                }
+                                String targetName = r.file.getFile().getName();
+                                return readers.stream()
+                                        .map(BinaryMapIndexReader::getFile)
+                                        .map(java.io.File::getName)
+                                        .anyMatch(name -> name.equals(targetName));
+                            })
                             .toList();
                 }
             }
