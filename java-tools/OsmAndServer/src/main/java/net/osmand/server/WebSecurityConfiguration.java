@@ -1,11 +1,16 @@
 package net.osmand.server;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +21,13 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -32,6 +39,7 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -158,6 +166,22 @@ public class WebSecurityConfiguration {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+		LoginUrlAuthenticationEntryPoint adminEntryPoint =
+				new LoginUrlAuthenticationEntryPoint("/map/account/") {
+					@Override
+					protected String determineUrlToUseForThisRequest(
+							HttpServletRequest request,
+							HttpServletResponse response,
+							AuthenticationException exception) {
+
+						String target = request.getRequestURI()
+								+ (request.getQueryString() != null ? "?" + request.getQueryString() : "");
+						String loginUrl = super.determineUrlToUseForThisRequest(request, response, exception);
+						return loginUrl
+								+ "?redirect="
+								+ URLEncoder.encode(target, StandardCharsets.UTF_8);
+					}
+				};
 		http
 				.sessionManagement(session -> session
 						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -189,7 +213,11 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/admin/order-mgmt").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/security-error").permitAll()
+						.requestMatchers(
+								"/admin/order-mgmt",
+								"/admin/order-mgmt/"
+						).hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/mapapi/auth/**").permitAll()
@@ -197,9 +225,22 @@ public class WebSecurityConfiguration {
 						.anyRequest().permitAll()
 				)
 				.exceptionHandling(ex -> ex
+						.accessDeniedHandler(new AccessDeniedHandler() {
+							@Override
+							public void handle(HttpServletRequest request,
+							                   HttpServletResponse response,
+							                   AccessDeniedException accessDeniedException) throws IOException, ServletException {
+								response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+								request.getRequestDispatcher(request.getContextPath() + "/admin/security-error").forward(request, response);
+							}
+						})
 						.defaultAuthenticationEntryPointFor(
-								new LoginUrlAuthenticationEntryPoint("/map/account/"),
+								adminEntryPoint,
 								new AntPathRequestMatcher("/mapapi/**"))
+						.defaultAuthenticationEntryPointFor(
+								adminEntryPoint,
+								new AntPathRequestMatcher("/admin/**")
+						)
 				)
 				.rememberMe(rm -> rm
 						.tokenValiditySeconds(3600 * 24 * 14)

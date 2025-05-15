@@ -1,5 +1,6 @@
 package net.osmand.server.controllers.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.AdminService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 
+
 @Controller
 @RequestMapping("/admin/order-mgmt")
 public class OrderManagementController {
@@ -25,7 +27,10 @@ public class OrderManagementController {
 	@Autowired
 	private PremiumUsersRepository usersRepository;
 
-	@GetMapping("/")
+	@Autowired
+	private HttpServletRequest request;
+
+	@GetMapping(path = { "", "/" })
 	public String orderManagementPage() {
 		return "admin/order-management";
 	}
@@ -35,7 +40,7 @@ public class OrderManagementController {
 	public List<AdminService.Purchase> orders(
 			@RequestParam(name = "text", required = false) String text,
 			@RequestParam(name = "limit", defaultValue = "25") int limit) {
-		if (StringUtils.isBlank(text)) {
+		if (StringUtils.isBlank(text) || text.trim().length() < 4) {
 			return Collections.emptyList();
 		}
 		return orderManagementService.searchPurchases(text, limit);
@@ -43,8 +48,9 @@ public class OrderManagementController {
 
 	@GetMapping("/skus")
 	@ResponseBody
-	public List<String> topSkus() {
-		return orderManagementService.getTopSkus(30);
+	public List<String> getSkus(@RequestParam boolean isSub,
+	                            @RequestParam boolean isInApp) {
+		return orderManagementService.getSkus(isSub, isInApp);
 	}
 
 	@PostMapping("/orders/register")
