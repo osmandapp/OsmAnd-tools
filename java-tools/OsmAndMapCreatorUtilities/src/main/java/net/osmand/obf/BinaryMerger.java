@@ -157,7 +157,7 @@ public class BinaryMerger {
 		}
 		System.out.println("Sign added to file:" + pathToFile + " . Sign name=" + name + ", resource=" + resource + ", pluginid=" + pluginid + ", description=" + description);
 	}
-	
+
 	public static void mergeStandardFiles(String[] args) throws IOException, SQLException, XmlPullParserException, RTreeException {
 		BinaryMerger in = new BinaryMerger();
 		String pathWithGeneratedMapZips = args[0];
@@ -531,7 +531,7 @@ public class BinaryMerger {
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
-		
+
 		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));
 		final Map<Long, List<Amenity>> amenityRelations = new HashMap<Long, List<Amenity>>();
@@ -569,12 +569,14 @@ public class BinaryMerger {
 									if (unique) {
 										amenity.setId(generatedRelationId[0]--);
 										amenityRelations.get(j).add(amenity);
+                                        indexPoiCreator.resetOrder(amenity);
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
 										writtenPoiCount[0]++;
 									}
 								} else {
 									if (!set.contains(amenity.getId())) {
 										file.add(amenity.getId());
+                                        indexPoiCreator.resetOrder(amenity);
 										indexPoiCreator.insertAmenityIntoPoi(amenity);
 										writtenPoiCount[0]++;
 									}

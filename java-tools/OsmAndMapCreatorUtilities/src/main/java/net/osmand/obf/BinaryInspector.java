@@ -1522,8 +1522,9 @@ public class BinaryInspector {
 		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
-		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )*");
+		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )* [--date=...]");
 		System.out.println("\tCreate new file of extracted parts from input file. [parts_to_extract] could be parts to include or exclude.");
+		System.out.println("\nUse optional argument --date=YYYY-MM-DDhh:mm to specify exact edition-date of the output file\n");
 		System.out.println("  Example : inspector -c output_file input_file +1,2,3\n\tExtracts 1, 2, 3 parts (could be find in print info)");
 		System.out.println("  Example : inspector -c output_file input_file -2,3\n\tExtracts all parts excluding 2, 3");
 		System.out.println("  Example : inspector -c output_file input_file1 input_file2 input_file3\n\tSimply combine 3 files");

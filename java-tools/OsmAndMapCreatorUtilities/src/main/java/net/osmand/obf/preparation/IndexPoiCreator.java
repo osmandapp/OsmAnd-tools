@@ -1261,4 +1261,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return tagGroupIds;
 	}
 
+    public void resetOrder(Amenity amenity) {
+        PoiCategory pc = amenity.getType();
+        String subtype = amenity.getSubType();
+        PoiType pt = pc.getPoiTypeByKeyName(subtype);
+        if (pt != null) {
+            amenity.setOrder(pt.getOrder());
+        }
+    }
+
 }
