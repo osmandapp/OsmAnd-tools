@@ -51,22 +51,25 @@ public class OrderManagementService {
 						"       s.starttime, s.expiretime, s.checktime, " +
 						"       s.autorenewing, s.paymentstate, s.valid, " +
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
-						"       NULL           AS platform, NULL           AS purchase_time " +
+						"       NULL AS platform, NULL AS purchase_time, " +
+						"       COALESCE(s.starttime, s.checktime) AS sort_key " +
 						"  FROM supporters_device_sub s " +
-						"  LEFT JOIN user_accounts    u ON u.id = s.userid " +
+						"  LEFT JOIN user_accounts u ON u.id = s.userid " +
 						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
 						"       i.userid, i.timestamp, " +
-						"       NULL           AS starttime, NULL           AS expiretime, i.checktime, " +
-						"       NULL           AS autorenewing, NULL           AS paymentstate, i.valid, " +
-						"       FALSE          AS osmand_cloud, " +
-						"       i.platform, i.purchase_time " +
+						"       NULL AS starttime, NULL AS expiretime, i.checktime, " +
+						"       NULL AS autorenewing, NULL AS paymentstate, i.valid, " +
+						"       FALSE AS osmand_cloud, " +
+						"       i.platform, i.purchase_time, " +
+						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
-						"  LEFT JOIN user_accounts    u ON u.id = i.userid " +
+						"  LEFT JOIN user_accounts u ON u.id = i.userid " +
 						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
-						"ORDER BY COALESCE(starttime, purchase_time) DESC " +
+						"ORDER BY sort_key DESC " +
 						"LIMIT ?";
+
 
 		Object[] params = new Object[]{
 				sku,    // first s.sku
