@@ -157,6 +157,12 @@ public class UserdataController {
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
 		if (errorMsg != null) {
+			boolean updated = userSubService.updateOrderId(pu);
+			if (updated) {
+				errorMsg = null;
+			}
+		}
+		if (errorMsg != null) {
 			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));

@@ -1,10 +1,10 @@
 package net.osmand.server.api.services;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 import net.osmand.purchases.*;
+import net.osmand.server.api.repo.PremiumUsersRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +44,9 @@ public class UserSubscriptionService {
 
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
+
+	@Autowired
+	protected PremiumUsersRepository usersRepository;
 
 	private AndroidPublisher androidPublisher;
 	private HuaweiIAPHelper huaweiIAPHelper;
@@ -223,6 +226,47 @@ public class UserSubscriptionService {
 			LOG.error(String.format("Error retrieving fastspring subscription %s - %s: %s", s.sku, s.orderId, e.getMessage()), e);
 		}
 		return s;
+	}
+
+	public boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
+		updateSubscriptionUserId(pu);
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
+					.filter(s -> s.valid)
+					.max(Comparator.comparing(
+							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
+									s.expiretime != null ? s.expiretime : new Date(0)
+					).thenComparing(
+							s -> s.starttime != null ? s.starttime : new Date(0)
+					));
+			if (maxExpiryValid.isPresent()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = maxExpiryValid.get();
+				if (subscription.orderId != null) {
+					pu.orderid = subscription.orderId;
+					usersRepository.saveAndFlush(pu);
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	public boolean updateSubscriptionUserId(PremiumUsersRepository.PremiumUser pu) {
+		if (pu.orderid == null) {
+			return false;
+		}
+		List<SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findByOrderId(pu.orderid);
+		if (subscriptionList != null && !subscriptionList.isEmpty()) {
+			subscriptionList.forEach(s -> {
+				if (s.userId == null) {
+					s.userId = pu.id;
+					subscriptionsRepo.saveAndFlush(s);
+				}
+			});
+			return true;
+		}
+		return false;
 	}
 
 }
