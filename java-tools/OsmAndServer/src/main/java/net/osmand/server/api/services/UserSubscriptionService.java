@@ -26,8 +26,8 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserSubscriptionService {
 
-	private static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
-	private static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
+	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
+	public static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 

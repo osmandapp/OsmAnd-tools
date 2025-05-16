@@ -34,6 +34,9 @@ public class OrderManagementService {
 	private HttpServletRequest request;
 
 	@Autowired
+	private UserSubscriptionService userSubService;
+
+	@Autowired
 	JdbcTemplate jdbcTemplate;
 
 	static final String MANUALLY_VALIDATED = "manually-validated";
@@ -230,6 +233,13 @@ public class OrderManagementService {
 			s.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			subscriptionsRepository.saveAndFlush(s);
+
+			if (sku.startsWith(UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION) || sku.startsWith(UserSubscriptionService.OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+				String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+				if (errorMsg != null) {
+					userSubService.updateOrderId(pu);
+				}
+			}
 		} else {
 			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase i =
 					new DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase();
