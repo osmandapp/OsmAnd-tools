@@ -58,6 +58,7 @@ public class UserSubscriptionService {
 		if (Algorithms.isEmpty(orderid)) {
 			return null;
 		}
+		// Potentially here we need to check in app with start time as well 
 		String errorMsg = "no subscription present";
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
@@ -229,6 +230,8 @@ public class UserSubscriptionService {
 	}
 
 	public boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
+		// TODO incorrect inapp could also activate PRO for 5 years
+		// For example IN-APP OsmAnd XV will activate for X years or indefenitely
 		updateSubscriptionUserId(pu);
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {

@@ -126,12 +126,16 @@ public class PromoService {
 				pu.orderid = deviceSub.orderId;
 				usersRepository.saveAndFlush(pu);
 				deviceSub.purchaseToken += " (email sent & registered)";
+				deviceSub.userId = pu.id; 
+				subscriptionsRepository.save(deviceSub);
 				emailSender.sendOsmAndCloudPromoEmail(email, deviceSub.orderId);
 			} else {
 				if (existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
 					existingUser.orderid = deviceSub.orderId;
-					usersRepository.saveAndFlush(existingUser);
+					deviceSub.userId = existingUser.id;
 					deviceSub.purchaseToken += " (new PRO subscription is updated)";
+					subscriptionsRepository.save(deviceSub);
+					usersRepository.saveAndFlush(existingUser);
 				} else {
 					error = true;
 					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
@@ -141,8 +145,13 @@ public class PromoService {
 			error = true;
 			deviceSub.purchaseToken += " (ERROR: please enter email only)";
 		}
+		// TODO this code should be used everywhere to update pro which could be inapp or sub
+//		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//		if (errorMsg != null) {
+//			userSubService.updateOrderId(pu);
+//		}
+
 		if (!error) {
-			subscriptionsRepository.save(deviceSub);
 			return new PromoResponse(deviceSub, false);
 		}
 		return new PromoResponse(deviceSub, true);

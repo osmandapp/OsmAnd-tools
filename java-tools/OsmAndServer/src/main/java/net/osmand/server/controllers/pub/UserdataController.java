@@ -295,6 +295,12 @@ public class UserdataController {
                         linkedCount++;
                     }
                 }
+        		// TODO this code should be used everywhere to update 
+//        		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//        		if (errorMsg != null) {
+//        			userSubService.updateOrderId(pu);
+//        		}
+
                 if (linkedCount > 0) {
                     LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
                 }

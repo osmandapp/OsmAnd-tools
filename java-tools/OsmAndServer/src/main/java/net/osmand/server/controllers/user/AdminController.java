@@ -236,6 +236,7 @@ public class AdminController {
 				subscription = subscriptions.get(0);
 			}
 			// downgrade only promo_website
+			// TODO review user eligible for pro or not
 			if (subscription != null && subscription.sku.equals(subscriptionType)) {
 				// update expiretime
 				Calendar c = Calendar.getInstance();
@@ -246,6 +247,12 @@ public class AdminController {
 				pu.orderid = null;
 				usersRepository.saveAndFlush(pu);
 			}
+			// TODO this code should be used everywhere to update 
+//			String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//			if (errorMsg != null) {
+//				userSubService.updateOrderId(pu);
+//			}
+
 		}
 		return ResponseEntity.ok("Downgrade successful");
 	}

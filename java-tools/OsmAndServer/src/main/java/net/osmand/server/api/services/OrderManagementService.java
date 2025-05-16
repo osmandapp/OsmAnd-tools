@@ -239,20 +239,7 @@ public class OrderManagementService {
 
 			subscriptionsRepository.saveAndFlush(s);
 
-			if (
-					sku.startsWith(UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_ANDROID_SUBSCRIPTION) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_AMAZON_SUBSCRIPTION) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_IOS_SUBSCRIPTION) ||
-							sku.startsWith(UserSubscriptionService.OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)
-			) {
-				String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-				if (errorMsg != null) {
-					userSubService.updateOrderId(pu);
-				}
-			}
+			
 		} else {
 			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase i =
 					new DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase();
@@ -266,6 +253,10 @@ public class OrderManagementService {
 			i.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
 
 			deviceInAppPurchasesRepository.saveAndFlush(i);
+		}
+		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+		if (errorMsg != null) {
+			userSubService.updateOrderId(pu);
 		}
 	}
 

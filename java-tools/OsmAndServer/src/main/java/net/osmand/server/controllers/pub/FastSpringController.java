@@ -81,7 +81,8 @@ public class FastSpringController {
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
 								subscription.valid = true;
-								updatePremiumUserOrderId(user.id, orderId, sku);
+								// TODO remove as non necessary
+//								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(subscription);
 							}
@@ -92,6 +93,11 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
+					// TODO this code should be used everywhere to update 
+//					String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//					if (errorMsg != null) {
+//						userSubService.updateOrderId(pu);
+//					}
 				}
 
 			}
@@ -100,6 +106,7 @@ public class FastSpringController {
 	}
 
 	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
+		// TODO this code should be deleted
 		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
 			return;
 		}
