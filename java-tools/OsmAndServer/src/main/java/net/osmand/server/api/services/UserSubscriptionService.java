@@ -229,9 +229,7 @@ public class UserSubscriptionService {
 	}
 
 	public boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
-		if (pu.orderid != null) {
-			return false;
-		}
+		updateUserIdSubscription(pu);
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
 			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
@@ -249,6 +247,26 @@ public class UserSubscriptionService {
 					usersRepository.saveAndFlush(pu);
 					return true;
 				}
+			}
+		}
+		return false;
+	}
+
+	public boolean updateUserIdSubscription(PremiumUsersRepository.PremiumUser pu) {
+		if (pu.orderid == null) {
+			return false;
+		}
+		List<SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findByOrderId(pu.orderid);
+		if (subscriptionList != null && !subscriptionList.isEmpty()) {
+			if (subscriptionList.size() > 1) {
+				LOG.error("More than one subscription found for orderId: " + pu.orderid);
+				return false;
+			}
+			SupporterDeviceSubscription subscription = subscriptionList.get(0);
+			if (subscription.userId == null) {
+				subscription.userId = pu.id;
+				subscriptionsRepo.saveAndFlush(subscription);
+				return true;
 			}
 		}
 		return false;
