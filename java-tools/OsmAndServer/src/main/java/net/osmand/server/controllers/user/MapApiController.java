@@ -91,6 +91,9 @@ public class MapApiController {
 	private EmailSenderService emailSender;
 
 	@Autowired
+	private UserSubscriptionService userSubService;
+
+	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
@@ -605,7 +608,7 @@ public class MapApiController {
 
 		info.put(NICKNAME, pu.nickname);
 
-		boolean updated = updateOrderId(pu);
+		boolean updated = userSubService.updateOrderId(pu);
 		if (updated) {
 			LOG.info("Updated orderId for user " + pu.email);
 		}
@@ -670,32 +673,6 @@ public class MapApiController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
-	}
-
-	private boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
-		if (pu.orderid != null) {
-			return false;
-		}
-		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
-		if (subscriptions != null && !subscriptions.isEmpty()) {
-			Optional<DeviceSubscriptionsRepository.SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
-					.filter(s -> s.valid)
-					.max(Comparator.comparing(
-							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
-									s.expiretime != null ? s.expiretime : new Date(0)
-					).thenComparing(
-							s -> s.starttime != null ? s.starttime : new Date(0)
-					));
-			if (maxExpiryValid.isPresent()) {
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = maxExpiryValid.get();
-				if (subscription.orderId != null) {
-					pu.orderid = subscription.orderId;
-					usersRepository.saveAndFlush(pu);
-					return true;
-				}
-			}
-		}
-		return false;
 	}
 
 	@PostMapping(path = {"/auth/send-code"})

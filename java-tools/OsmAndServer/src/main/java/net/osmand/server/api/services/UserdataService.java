@@ -196,6 +196,12 @@ public class UserdataService {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
         String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
+		if (errorMsg != null) {
+			boolean updated = userSubService.updateOrderId(user);
+			if (updated) {
+				errorMsg = null;
+			}
+		}
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
 			if (!FREE_TYPES.contains(type)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
