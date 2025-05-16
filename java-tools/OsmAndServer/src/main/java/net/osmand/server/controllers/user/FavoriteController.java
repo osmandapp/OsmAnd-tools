@@ -4,8 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.services.FavoriteService;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
@@ -51,7 +51,7 @@ public class FavoriteController {
     public ResponseEntity<String> deleteFav(@RequestBody String data,
                                             @RequestParam String fileName,
                                             @RequestParam Long updatetime) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.deleteWptPt(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
@@ -69,7 +69,7 @@ public class FavoriteController {
                                                      @RequestParam String groupName,
                                                      @RequestParam Long updatetime,
                                                      @RequestParam boolean updateTimestamp) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
@@ -92,7 +92,7 @@ public class FavoriteController {
             Date clienttime = null;
             
             if (!updateTimestamp) {
-                PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
+                CloudUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
                 if (userFile != null) {
                     clienttime = userFile.clienttime;
                 }
@@ -113,7 +113,7 @@ public class FavoriteController {
     public ResponseEntity<String> addFav(@RequestBody String data,
                                          @RequestParam String fileName,
                                          @RequestParam(required = false) Long updatetime) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
         if (file != null) {
             file.addPoint(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
@@ -121,7 +121,7 @@ public class FavoriteController {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         if (updatetime == null) {
-            PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
+            CloudUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, fileName, UserdataService.FILE_TYPE_FAVOURITES);
             updatetime = userGroupFile.updatetime.getTime();
         }
         return favoriteService.updateFavoriteFile(fileName, dev, updatetime, file);
@@ -136,7 +136,7 @@ public class FavoriteController {
                                             @RequestParam Long oldGroupUpdatetime,
                                             @RequestParam Long newGroupUpdatetime,
                                             @RequestParam int ind) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
         GpxFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime);
         if (newGpxFile != null) {
@@ -176,7 +176,7 @@ public class FavoriteController {
     @PostMapping(value = "/add-group")
     @ResponseBody
     public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
         return favoriteService.addNewGroup(trackData, groupName, dev);
     }
@@ -188,7 +188,7 @@ public class FavoriteController {
                                               @RequestParam String fullOldName,
                                               @RequestParam String fullNewName,
                                               @RequestParam Long oldUpdatetime) throws IOException {
-        PremiumUserDevicesRepository.PremiumUserDevice dev = favoriteService.getUserId();
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         GpxFile gpxFile = favoriteService.createGpxFile(fullOldName, dev, oldUpdatetime);
         if (gpxFile != null) {
             GpxUtilities.PointsGroup pointsGroup = gpxFile.getPointsGroups().get(oldName);

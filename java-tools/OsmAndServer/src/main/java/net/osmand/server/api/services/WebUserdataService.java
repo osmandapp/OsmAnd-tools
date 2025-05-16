@@ -6,8 +6,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import jakarta.transaction.Transactional;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
@@ -41,10 +41,10 @@ public class WebUserdataService {
 	WebGpxParser webGpxParser;
 
 	@Autowired
-	PremiumUserDevicesRepository userDevicesRepository;
+	CloudUserDevicesRepository userDevicesRepository;
 
 	@Autowired
-	PremiumUserFilesRepository userFilesRepository;
+	CloudUserFilesRepository userFilesRepository;
 
 	@Autowired
 	protected GpxService gpxService;
@@ -84,9 +84,9 @@ public class WebUserdataService {
 	}
 
 
-	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
-		List<PremiumUserFilesRepository.UserFileNoData> result = new ArrayList<>();
+		List<CloudUserFilesRepository.UserFileNoData> result = new ArrayList<>();
 		for (UserFileUpdate file : files) {
 			if (file.isError) {
 				if (file.time == null) {
@@ -109,14 +109,14 @@ public class WebUserdataService {
 				LOG.error(String.format("refreshListFiles error: expected a single file, but got %d files", res.uniqueFiles.size()));
 				continue;
 			}
-			PremiumUserFilesRepository.UserFileNoData nd = res.uniqueFiles.get(0);
-			Optional<PremiumUserFilesRepository.UserFile> of = userFilesRepository.findById(nd.id);
+			CloudUserFilesRepository.UserFileNoData nd = res.uniqueFiles.get(0);
+			Optional<CloudUserFilesRepository.UserFile> of = userFilesRepository.findById(nd.id);
 			boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 			if (of.isPresent()) {
 				GpxTrackAnalysis analysis = null;
 				GpxFile gpxFile;
 				List<WptPt> points = null;
-				PremiumUserFilesRepository.UserFile uf = of.get();
+				CloudUserFilesRepository.UserFile uf = of.get();
 				JsonObject details = uf.details;
 				InputStream in;
 				try {
@@ -220,15 +220,15 @@ public class WebUserdataService {
 				&& details.get(tag + DONE_SUFFIX).getAsLong() >= ANALYSIS_RERUN;
 	}
 
-	public boolean isShared(PremiumUserFilesRepository.UserFileNoData file, Map<String, Set<String>> sharedFilesMap) {
+	public boolean isShared(CloudUserFilesRepository.UserFileNoData file, Map<String, Set<String>> sharedFilesMap) {
 		Set<String> types = sharedFilesMap.get(file.name);
 		return types != null && types.contains(file.type);
 	}
 
-	public void addDeviceInformation(PremiumUserFilesRepository.UserFileNoData file, Map<Integer, String> devices) {
+	public void addDeviceInformation(CloudUserFilesRepository.UserFileNoData file, Map<Integer, String> devices) {
 		String deviceInfo = devices.get(file.deviceid);
 		if (deviceInfo == null) {
-			PremiumUserDevicesRepository.PremiumUserDevice device = userDevicesRepository.findById(file.deviceid);
+			CloudUserDevicesRepository.CloudUserDevice device = userDevicesRepository.findById(file.deviceid);
 			if (device != null && device.brand != null && device.model != null) {
 				deviceInfo = device.brand + "__model__" + device.model;
 				devices.put(file.deviceid, deviceInfo);
@@ -237,7 +237,7 @@ public class WebUserdataService {
 		file.setDeviceInfo(deviceInfo);
 	}
 
-	public boolean analysisPresent(String tag, PremiumUserFilesRepository.UserFile userFile) {
+	public boolean analysisPresent(String tag, CloudUserFilesRepository.UserFile userFile) {
 		if (userFile == null) {
 			return false;
 		}
@@ -245,7 +245,7 @@ public class WebUserdataService {
 		return analysisPresent(tag, details);
 	}
 
-	public void saveAnalysis(String tag, PremiumUserFilesRepository.UserFile file, GpxTrackAnalysis analysis) {
+	public void saveAnalysis(String tag, CloudUserFilesRepository.UserFile file, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			if (file.details == null) {
 				file.details = new JsonObject();
@@ -258,7 +258,7 @@ public class WebUserdataService {
 		saveDetails(file.details, tag, file, null);
 	}
 
-	public void saveDetails(JsonObject newDetails, String tag, PremiumUserFilesRepository.UserFile file, List<WptPt> points) {
+	public void saveDetails(JsonObject newDetails, String tag, CloudUserFilesRepository.UserFile file, List<WptPt> points) {
 		newDetails.addProperty(tag + DONE_SUFFIX, System.currentTimeMillis());
 		file.details = newDetails;
 
@@ -269,7 +269,7 @@ public class WebUserdataService {
 		userFilesRepository.save(file);
 	}
 
-	public GpxTrackAnalysis getAnalysis(PremiumUserFilesRepository.UserFile file, GpxFile gpxFile) {
+	public GpxTrackAnalysis getAnalysis(CloudUserFilesRepository.UserFile file, GpxFile gpxFile) {
 		gpxFile.setPath(file.name);
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0); // keep 0
 		gpxService.cleanupFromNan(analysis);
@@ -310,7 +310,7 @@ public class WebUserdataService {
 		}
 	}
 
-	private void saveError(JsonObject details, String error, PremiumUserFilesRepository.UserFile uf) {
+	private void saveError(JsonObject details, String error, CloudUserFilesRepository.UserFile uf) {
 		if (details == null) {
 			details = new JsonObject();
 		}
@@ -347,8 +347,8 @@ public class WebUserdataService {
 	}
 
 	@Transactional
-	public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
-		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
+	public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+		CloudUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
 		if (file != null && file.filesize != -1) {
 			File updatedFile = renameGpxTrack(file, newName);
 			StorageService.InternalZipFile zipFile = null;
@@ -384,7 +384,7 @@ public class WebUserdataService {
 		return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
 	}
 
-	private File renameGpxTrack(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+	private File renameGpxTrack(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
 		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
 		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
 		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
@@ -437,8 +437,8 @@ public class WebUserdataService {
 		return null;
 	}
 
-	private boolean renameInfoFile(String oldName, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
-		PremiumUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
+	private boolean renameInfoFile(String oldName, String newName, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+		CloudUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
 		if (file == null || file.filesize == -1) {
 			return true;
 		}

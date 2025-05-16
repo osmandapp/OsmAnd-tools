@@ -17,22 +17,22 @@ import jakarta.persistence.TemporalType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 
 @Repository
-public interface PremiumUserDevicesRepository extends JpaRepository<PremiumUserDevice, Long> {
-    PremiumUserDevice findById(int id);
+public interface CloudUserDevicesRepository extends JpaRepository<CloudUserDevice, Long> {
+    CloudUserDevice findById(int id);
 
-    PremiumUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
+    CloudUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
 
-    List<PremiumUserDevice> findByUserid(int userid);
-    List<PremiumUserDevice> findByUseridAndDeviceid(int userid, String deviceid);
+    List<CloudUserDevice> findByUserid(int userid);
+    List<CloudUserDevice> findByUseridAndDeviceid(int userid, String deviceid);
 
     int deleteByUserid(int userid);
 
     @Entity
     @Table(name = "user_account_devices")
-    class PremiumUserDevice implements Serializable {
+    class CloudUserDevice implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;
         @Id

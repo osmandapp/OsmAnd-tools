@@ -6,7 +6,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +23,7 @@ import java.util.*;
 public class FastSpringController {
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
@@ -40,7 +40,7 @@ public class FastSpringController {
 			if ("order.completed".equals(event.type)) {
 				FastSpringOrderCompletedRequest.Data data = event.data;
 				String email = data.customer.email;
-				PremiumUsersRepository.PremiumUser user = usersRepository.findByEmailIgnoreCase(email);
+				CloudUsersRepository.CloudUser user = usersRepository.findByEmailIgnoreCase(email);
 
 				if (user != null) {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
@@ -110,7 +110,7 @@ public class FastSpringController {
 		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
 			return;
 		}
-		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
+		CloudUsersRepository.CloudUser user = usersRepository.findById(userId);
 		if (user == null) {
 			return;
 		}

@@ -95,7 +95,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		@ManyToOne
 		@JoinColumn(name = "user_id", nullable = false)
-		private PremiumUsersRepository.PremiumUser user;
+		private CloudUsersRepository.CloudUser user;
 
 		@Column(nullable = false)
 		private String access;

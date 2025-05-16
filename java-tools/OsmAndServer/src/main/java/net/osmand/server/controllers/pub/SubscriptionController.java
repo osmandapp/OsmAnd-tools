@@ -42,7 +42,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchasePrimaryKey;
-import static net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
+import static net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
 
 @RestController
@@ -61,7 +61,7 @@ public class SubscriptionController {
     private PrivateKey subscriptionPrivateKey;
 
     @Autowired
-    private PremiumUserDevicesRepository premiumUserDevicesRepository;
+    private CloudUserDevicesRepository userDevicesRepository;
 
     @Autowired
     private SupportersRepository supportersRepository;
@@ -76,7 +76,7 @@ public class SubscriptionController {
     private DeviceInAppPurchasesRepository iapsRepository;
 
     @Autowired
-    private PremiumUsersRepository premiumUsersRepository; // Keep for potentially updating PremiumUser.orderId
+    private CloudUsersRepository usersRepository; // Keep for potentially updating User.orderId
 
     @Autowired
     private ReceiptValidationService validationService;
@@ -304,7 +304,7 @@ public class SubscriptionController {
 									s.purchaseToken = receipt;
 									subscriptionsRepository.saveAndFlush(s);
 									// TODO this code should be used everywhere to update 
-//									String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//									String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
 //									if (errorMsg != null) {
 //										userSubService.updateOrderId(pu);
 //									}
@@ -471,8 +471,8 @@ public class SubscriptionController {
         LOG.info(req);
 
         // --- Identify Credentials Provided ---
-        String premiumUserDeivceIdParam = request.getParameter("deviceid"); // PremiumUserDevice ID
-        String premiumUserDeivceAccessTokenParam = request.getParameter("accessToken");   // PremiumUserDevice Access Token
+        String userDeivceIdParam = request.getParameter("deviceid"); // UserDevice ID
+        String userDeivceAccessTokenParam = request.getParameter("accessToken");   // UserDevice Access Token
         String supporterUserIdParam = request.getParameter("userid"); // Supporter ID
         String supporterTokenParam = request.getParameter("token"); // Supporter Token
 
@@ -497,7 +497,7 @@ public class SubscriptionController {
             return error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
         }
 
-        Integer premiumUserId = resolvePremiumUserId(request, premiumUserDeivceIdParam, premiumUserDeivceAccessTokenParam);
+        Integer serId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
         Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
                 PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
 
@@ -507,7 +507,7 @@ public class SubscriptionController {
             subscr.purchaseToken = effectivePurchaseToken;
             subscr.orderId = effectiveOrderId;
             subscr.sku = skuParam;
-            subscr.userId = premiumUserId;
+            subscr.userId = serId;
             subscr.supporterId = supporterUserId;
             subscr.timestamp = new Date(); // Record creation/update time
 
@@ -560,7 +560,7 @@ public class SubscriptionController {
             iap.platform = platform;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
-            iap.userId = premiumUserId;
+            iap.userId = serId;
             iap.supporterId = supporterUserId;
 
             Optional<SupporterDeviceInAppPurchase> iapOpt = iapsRepository.findById(
@@ -593,27 +593,27 @@ public class SubscriptionController {
 
 	private void updateUserOrderId(Integer userId, String orderId) {
 		if (userId != null) {
-			PremiumUsersRepository.PremiumUser pu = premiumUsersRepository.findById(userId);
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
 			if (pu != null && pu.orderid == null) {
 				pu.orderid = orderId;
-				premiumUsersRepository.saveAndFlush(pu);
+				usersRepository.saveAndFlush(pu);
 			}
 		}
 	}
 
-    private Integer resolvePremiumUserId(HttpServletRequest request, String premiumUserDeivceIdParam,
-                                         String premiumUserDeivceAccessTokenParam) {
-        if (!isEmpty(premiumUserDeivceIdParam) && !isEmpty(premiumUserDeivceAccessTokenParam)) {
+    private Integer resolveUserId(HttpServletRequest request, String userDeviceIdParam,
+                                         String userDeviceAccessTokenParam) {
+        if (!isEmpty(userDeviceIdParam) && !isEmpty(userDeviceAccessTokenParam)) {
             try {
-                int premiumUserDeviceId = Integer.parseInt(premiumUserDeivceIdParam);
-                PremiumUserDevice premiumDevice = premiumUserDevicesRepository.findById(premiumUserDeviceId);
-                if (premiumDevice != null && premiumUserDeivceAccessTokenParam.equals(premiumDevice.accesstoken)) {
-                    return premiumDevice.userid;
+                int userDeviceId = Integer.parseInt(userDeviceIdParam);
+                CloudUserDevice userDevice = userDevicesRepository.findById(userDeviceId);
+                if (userDevice != null && userDeviceAccessTokenParam.equals(userDevice.accesstoken)) {
+                    return userDevice.userid;
                 } else {
-                    LOG.warn("PremiumUserDevice access token mismatch or device not found: " + toString(request.getParameterMap()));
+                    LOG.warn("UserDevice access token mismatch or device not found: " + toString(request.getParameterMap()));
                 }
             } catch (NumberFormatException e) {
-                LOG.error("Invalid premiumUserId format in /purchased: " + premiumUserDeivceIdParam);
+                LOG.error("Invalid userId format in /purchased: " + userDeviceIdParam);
             }
         }
         return null;

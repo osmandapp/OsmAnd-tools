@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.*;
 
 import net.osmand.purchases.*;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +46,7 @@ public class UserSubscriptionService {
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	private AndroidPublisher androidPublisher;
 	private HuaweiIAPHelper huaweiIAPHelper;
@@ -54,7 +54,8 @@ public class UserSubscriptionService {
 
 
 	// returns null if ok
-	public String checkOrderIdPremium(String orderid) {
+	public String checkOrderIdPro(String orderid) {
+		// TODO add check for PRO in app
 		if (Algorithms.isEmpty(orderid)) {
 			return null;
 		}
@@ -62,7 +63,7 @@ public class UserSubscriptionService {
 		String errorMsg = "no subscription present";
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
-			// s.sku could be checked for premium
+			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
 				if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
 					s = revalidateGoogleSubscription(s);
@@ -229,7 +230,7 @@ public class UserSubscriptionService {
 		return s;
 	}
 
-	public boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
+	public boolean updateOrderId(CloudUsersRepository.CloudUser pu) {
 		// TODO incorrect inapp could also activate PRO for 5 years
 		// For example IN-APP OsmAnd XV will activate for X years or indefenitely
 		updateSubscriptionUserId(pu);
@@ -255,7 +256,7 @@ public class UserSubscriptionService {
 		return false;
 	}
 
-	public boolean updateSubscriptionUserId(PremiumUsersRepository.PremiumUser pu) {
+	public boolean updateSubscriptionUserId(CloudUsersRepository.CloudUser pu) {
 		if (pu.orderid == null) {
 			return false;
 		}

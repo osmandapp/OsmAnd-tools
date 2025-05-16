@@ -7,7 +7,7 @@ import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,7 +19,7 @@ import java.util.*;
 public class OrderManagementService {
 
 	@Autowired
-	private PremiumUsersRepository usersRepository;
+	private CloudUsersRepository usersRepository;
 
 	@Autowired
 	private OrderInfoRepository orderInfoRepository;
@@ -104,7 +104,7 @@ public class OrderManagementService {
 		});
 
 		if (result.isEmpty()) {
-			List<PremiumUsersRepository.PremiumUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
+			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
 			if (users != null) {
 				users.forEach(u -> {
 					if (u.orderid != null) {
@@ -203,7 +203,7 @@ public class OrderManagementService {
 	                             String interval,
 	                             String orderId,
 	                             String purchaseToken) {
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			throw new IllegalArgumentException("User with email “" + email + "” not found");
 		}
@@ -254,7 +254,7 @@ public class OrderManagementService {
 
 			deviceInAppPurchasesRepository.saveAndFlush(i);
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+		String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
 		if (errorMsg != null) {
 			userSubService.updateOrderId(pu);
 		}
@@ -266,7 +266,7 @@ public class OrderManagementService {
 				subscriptionsRepository.findByOrderIdAndSku(orderId, sku);
 		if (subs != null) {
 			subs.forEach(s -> {
-				PremiumUsersRepository.PremiumUser user = usersRepository.findById(s.userId);
+				CloudUsersRepository.CloudUser user = usersRepository.findById(s.userId);
 				AdminService.Purchase p = new AdminService.Purchase();
 				p.email = user.email;
 				p.sku = s.sku;
@@ -290,7 +290,7 @@ public class OrderManagementService {
 				deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
 		if (iaps != null) {
 			iaps.forEach(i -> {
-				PremiumUsersRepository.PremiumUser user = usersRepository.findById(i.userId);
+				CloudUsersRepository.CloudUser user = usersRepository.findById(i.userId);
 				AdminService.Purchase p = new AdminService.Purchase();
 				p.email = user.email;
 				p.sku = i.sku;
