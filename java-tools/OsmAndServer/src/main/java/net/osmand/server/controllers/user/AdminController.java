@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import net.osmand.server.WebAccessConfig;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
@@ -131,6 +132,9 @@ public class AdminController {
 
 	@Autowired
 	private LogsAccessService logsAccessService;
+
+	@Autowired
+	private WebAccessConfig webAccessConfig;
 	
 	private Gson gson = new Gson();
 	
@@ -141,7 +145,7 @@ public class AdminController {
 	
 	
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
-	public String publish(Model model, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
+	public String publish(Model model, final RedirectAttributes redirectAttrs) throws IOException {
 		List<String> errors = publish();
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
@@ -151,7 +155,9 @@ public class AdminController {
 			redirectAttrs.addFlashAttribute("update_status", "FAILED");
 			redirectAttrs.addFlashAttribute("update_errors", "Errors: " + errors);
 		}
-        //return index(model);
+
+		webAccessConfig.reload();
+		
         return "redirect:info";
 	}
 

@@ -36,6 +36,10 @@ public class WebAccessConfig {
 		);
 	}
 
+	public void reload() throws IOException {
+		init();
+	}
+
 	public List<String> getAdmins() {
 		return roles.getOrDefault(ROLE_ADMIN, List.of());
 	}
