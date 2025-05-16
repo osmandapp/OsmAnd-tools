@@ -152,7 +152,12 @@ public class OrderManagementService {
 
 		}
 		result.sort(Comparator.comparing(
-				(AdminService.Purchase p) -> p.starttime != null ? p.starttime : p.purchaseTime,
+				(AdminService.Purchase p) ->
+						p.starttime != null
+								? p.starttime
+								: (p.purchaseTime != null
+								? p.purchaseTime
+								: p.checktime),
 				Comparator.nullsLast(Comparator.naturalOrder())
 		).reversed());
 		return result;
