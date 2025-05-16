@@ -65,7 +65,7 @@ public class OrderManagementService {
 						"  FROM supporters_device_iap i " +
 						"  LEFT JOIN user_accounts    u ON u.id = i.userid " +
 						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
-						"ORDER BY starttime DESC " +
+						"ORDER BY COALESCE(starttime, purchase_time) DESC " +
 						"LIMIT ?";
 
 		Object[] params = new Object[]{
