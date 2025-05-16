@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.PremiumUsersRepository;
 import net.osmand.server.api.services.AdminService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 
 @Controller
@@ -26,6 +28,10 @@ public class OrderManagementController {
 
 	@Autowired
 	private PremiumUsersRepository usersRepository;
+
+	@Autowired
+	private DeviceSubscriptionsRepository subscriptionsRepository;
+
 
 	@Autowired
 	private HttpServletRequest request;
@@ -107,5 +113,15 @@ public class OrderManagementController {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Order version already exists");
 		}
 		return ResponseEntity.ok("Order version created");
+	}
+
+	@GetMapping("/generate-order-id")
+	@ResponseBody
+	public String generateOrderId() {
+		String orderId;
+		do {
+			orderId = UUID.randomUUID().toString();
+		} while (!subscriptionsRepository.findByOrderId(orderId).isEmpty());
+		return orderId;
 	}
 }

@@ -156,7 +156,7 @@ public class UserdataController {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null) {
+		if (errorMsg != null || Algorithms.isEmpty(pu.orderid)) {
 			boolean updated = userSubService.updateOrderId(pu);
 			if (updated) {
 				errorMsg = null;
