@@ -56,8 +56,8 @@ public class OrderManagementService {
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
 						"       NULL AS platform, NULL AS purchase_time, " +
 						"       COALESCE(s.starttime, s.checktime) AS sort_key " +
-						"  FROM supporters_device_sub s " +
-						"  LEFT JOIN user_accounts u ON u.id = s.userid " +
+						"  FROM sss s " +
+						"  LEFT JOIN uuu u ON u.id = s.userid " +
 						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
@@ -68,7 +68,7 @@ public class OrderManagementService {
 						"       i.platform, i.purchase_time, " +
 						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
-						"  LEFT JOIN user_accounts u ON u.id = i.userid " +
+						"  LEFT JOIN uuu u ON u.id = i.userid " +
 						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
 						"ORDER BY sort_key DESC " +
 						"LIMIT ?";
@@ -165,7 +165,7 @@ public class OrderManagementService {
 
 	public List<String> getSkus(boolean isSub, boolean isInApp) {
 		if (isSub && !isInApp) {
-			String sql = "SELECT DISTINCT sku FROM supporters_device_sub ORDER BY sku ASC";
+			String sql = "SELECT DISTINCT sku FROM sss ORDER BY sku ASC";
 			return jdbcTemplate.queryForList(sql, String.class);
 		} else if (!isSub && isInApp) {
 			String sql = "SELECT DISTINCT sku FROM supporters_device_iap ORDER BY sku ASC";

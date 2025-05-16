@@ -37,7 +37,7 @@ public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long>
 	PremiumUser findById(int id);
 	
     @Entity
-    @Table(name = "user_accounts")
+    @Table(name = "uuu")
     class PremiumUser implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;

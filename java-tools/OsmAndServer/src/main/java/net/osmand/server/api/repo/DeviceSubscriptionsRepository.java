@@ -33,7 +33,7 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
 	@Entity
-    @Table(name = "supporters_device_sub")
+    @Table(name = "sss")
     @IdClass(SupporterDeviceSubscriptionPrimaryKey.class)
 	public class SupporterDeviceSubscription implements Serializable {
 		@Serial

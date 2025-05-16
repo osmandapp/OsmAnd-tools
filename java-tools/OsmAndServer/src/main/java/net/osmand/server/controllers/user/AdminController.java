@@ -620,7 +620,7 @@ public class AdminController {
 				+ "    count(*) FILTER (WHERE valid and     (autorenewing and now() - '8 days'::interval < expiretime)) \"active\",\n"
 				+ "    count(*) FILTER (WHERE valid and not (autorenewing and now() - '8 days'::interval < expiretime)) \"possiblygone\",\n"
 				+ "    count(*) FILTER (WHERE not valid) \"gone\"\n"
-				+ "    from supporters_device_sub \n"
+				+ "    from sss \n"
 				+ "    where sku like '%annual%' and extract(day from expiretime - starttime) > 180\n"
 				+ "    group by \"start\", \"years\", sku, introcycles\n"
 				+ "    order by 1 desc, 2, 3, 4;", new RowCallbackHandler() {
@@ -1011,7 +1011,7 @@ public class AdminController {
 		ExchangeRates rates = parseExchangeRates();
 		
 		jdbcTemplate.query(
-				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from supporters_device_sub",
+				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from sss",
 				new RowCallbackHandler() {
 
 					@Override

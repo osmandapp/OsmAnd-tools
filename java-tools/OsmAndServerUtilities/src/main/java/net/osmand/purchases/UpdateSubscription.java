@@ -142,36 +142,36 @@ public class UpdateSubscription {
 	public UpdateSubscription(AndroidPublisher publisher, SubscriptionType subType, boolean revalidateInvalid) {
 		this.subType = subType;
 		this.publisher = publisher;
-		delQuery = "UPDATE supporters_device_sub SET valid = false, kind = ?, checktime = ? "
+		delQuery = "UPDATE sss SET valid = false, kind = ?, checktime = ? "
 				+ "WHERE orderid = ? and sku = ?";
-		updCheckQuery = "UPDATE supporters_device_sub SET checktime = ? "
+		updCheckQuery = "UPDATE sss SET checktime = ? "
 				+ "WHERE orderid = ? and sku = ?";
 		String requestValid = "(valid is null or valid=true)";
 		if (revalidateInvalid) {
 			requestValid = "(valid=false)";
 		}
 		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
-				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
+				+ "FROM sss S where " + requestValid + " order by timestamp asc";
 		if (subType == SubscriptionType.IOS) {
-			updQuery = "UPDATE supporters_device_sub SET "
+			updQuery = "UPDATE sss SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " introcycles = ? , "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else if (subType == SubscriptionType.HUAWEI) {
-			updQuery = "UPDATE supporters_device_sub SET "
+			updQuery = "UPDATE sss SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " payload = ?, price = ?, pricecurrency = ?, "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else if (subType == SubscriptionType.AMAZON) {
-			updQuery = "UPDATE supporters_device_sub SET "
+			updQuery = "UPDATE sss SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else if (subType == SubscriptionType.FASTSPRING) {
-				updQuery = "UPDATE supporters_device_sub SET "
+				updQuery = "UPDATE sss SET "
 						+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 						+ " price = ?, pricecurrency = ?, valid = ?, kind = ?, prevvalidpurchasetoken = null " + " WHERE orderid = ? and sku = ?";
 		} else {
-			updQuery = "UPDATE supporters_device_sub SET "
+			updQuery = "UPDATE sss SET "
 					+ " checktime = ?, starttime = ?, expiretime = ?, autorenewing = ?, "
 					+ " paymentstate = ?, payload = ?, "
 					+ " price = ?, pricecurrency = ?, introprice = ?, intropricecurrency = ?, introcycles = ? , introcyclename = ?, "

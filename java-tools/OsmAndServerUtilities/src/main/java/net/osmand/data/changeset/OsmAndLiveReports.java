@@ -406,7 +406,7 @@ public class OsmAndLiveReports {
 		return "select s.userid uid, s.visiblename visiblename, s.preferred_region region, s.useremail email, "+
            " t.sku sku, t.orderid orderid, t.checktime checktime, t.starttime starttime, t.expiretime expiretime from supporters s " +
            " join (select orderid, sku, checktime, starttime, expiretime " +
-           "  from supporters_device_sub where expiretime is not null and " + cond +" ) t " +  
+           "  from sss where expiretime is not null and " + cond +" ) t " +
            " on s.orderid = t.orderid where s.preferred_region is not null and s.preferred_region <> 'none' order by s.userid;";
 	}
 
