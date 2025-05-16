@@ -853,14 +853,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			while (it.hasNext()) {
 				Entry<PoiAdditionalType, String> e = it.next();
 				String tag = e.getKey().getTag();
-				if ((tag.contains("name") || tag.equals("brand"))
+				if ((ObfConstants.isTagIndexedForSearchAsName(tag))
 						&& !"name:en".equals(tag)) {
 					if (otherNames == null) {
 						otherNames = new TreeSet<String>();
 					}
 					otherNames.add(e.getValue());
 				}
-				if (settings.charsToBuildPoiIdNameIndex > 0 && (tag.equals(Amenity.WIKIDATA) || tag.equals(Amenity.ROUTE_ID))) {
+				if (settings.charsToBuildPoiIdNameIndex > 0 && ObfConstants.isTagIndexedForSearchAsId(tag)) {
 					if (idNames == null) {
 						idNames = new TreeSet<String>();
 					}
