@@ -608,7 +608,7 @@ public class MapApiController {
 
 		info.put(NICKNAME, pu.nickname);
 		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null) {
+		if (errorMsg != null || Algorithms.isEmpty(pu.orderid)) {
 			boolean updated = userSubService.updateOrderId(pu);
 			if (updated) {
 				LOG.info("Updated orderId for user " + pu.email);
