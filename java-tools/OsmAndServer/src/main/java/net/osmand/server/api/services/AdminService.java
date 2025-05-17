@@ -4,7 +4,7 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ public class AdminService {
     private EmailSenderService emailSender;
 
     @Autowired
-    private PremiumUsersRepository usersRepository;
+    private CloudUsersRepository usersRepository;
 
     @Autowired
     private DeviceSubscriptionsRepository subscriptionsRepository;
@@ -34,7 +34,7 @@ public class AdminService {
 
     private final Gson gson = new Gson();
 
-	// by orderId from premium user or email
+	// by orderId from pro user or email
     public DeviceSubscriptionsRepository.SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {
         DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
         deviceSub.sku = "not found";
@@ -42,7 +42,7 @@ public class AdminService {
         deviceSub.valid = false;
 
         if (emailSender.isEmail(identifier)) {
-            PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
+            CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(identifier);
             if (pu != null) {
                 String suffix = pu.orderid != null ? " (pro email)" : " (osmand start)";
                 deviceSub.sku = identifier + suffix;
@@ -68,7 +68,7 @@ public class AdminService {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> result = Collections.emptyList();
 
 		if (emailSender.isEmail(identifier)) {
-			PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(identifier);
+			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(identifier);
 			if (pu != null) {
 				int userid = pu.id;
 				Map<String, DeviceSubscriptionsRepository.SupporterDeviceSubscription> map = new LinkedHashMap<>();
@@ -130,7 +130,7 @@ public class AdminService {
 		public Boolean osmandCloud;
 	}
 
-	private String createPayloadInfo(PremiumUsersRepository.PremiumUser pu) {
+	private String createPayloadInfo(CloudUsersRepository.CloudUser pu) {
 		UserdataController.UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
 		ufs.allFiles.clear();
 		ufs.uniqueFiles.clear();

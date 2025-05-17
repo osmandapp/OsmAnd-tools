@@ -3,7 +3,7 @@ package net.osmand.server.controllers.user;
 import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.AdminService;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
@@ -27,7 +27,7 @@ public class OrderManagementController {
 	OrderManagementService orderManagementService;
 
 	@Autowired
-	private PremiumUsersRepository usersRepository;
+	private CloudUsersRepository usersRepository;
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;

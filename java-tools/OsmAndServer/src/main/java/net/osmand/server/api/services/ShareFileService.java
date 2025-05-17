@@ -30,13 +30,13 @@ import static org.springframework.util.MimeTypeUtils.APPLICATION_OCTET_STREAM_VA
 public class ShareFileService {
 
 	@Autowired
-	protected PremiumUserFilesRepository filesRepository;
+	protected CloudUserFilesRepository filesRepository;
 
 	@Autowired
 	protected ShareFileRepository shareFileRepository;
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	@Autowired
 	protected OsmAndMapsService osmAndMapsService;
@@ -58,7 +58,7 @@ public class ShareFileService {
 	public static final String PUBLIC_SHARE_TYPE = "public";
 
 	@Transactional
-	public UUID generateSharedCode(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess) {
+	public UUID generateSharedCode(CloudUserFilesRepository.UserFile userFile, boolean publicAccess) {
 		UUID uniqueCode = generateUniqueCode();
 		// Update existing file with new code
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
@@ -81,7 +81,7 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public ShareFileRepository.ShareFile createShareFile(PremiumUserFilesRepository.UserFile userFile, boolean publicAccess, UUID uniqueCode) {
+	public ShareFileRepository.ShareFile createShareFile(CloudUserFilesRepository.UserFile userFile, boolean publicAccess, UUID uniqueCode) {
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
 		if (existingFile != null) {
 			throw new IllegalStateException("File already shared");
@@ -159,7 +159,7 @@ public class ShareFileService {
 		if (file.isPublicAccess()) {
 			return null;
 		} else {
-			PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+			CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {
 				return userdataService.tokenNotValidResponse();
 			}
@@ -181,7 +181,7 @@ public class ShareFileService {
 		return ResponseEntity.ok().body("request");
 	}
 
-	public ShareFileController.FileDownloadResult downloadFile(PremiumUserFilesRepository.UserFile userFile) throws IOException {
+	public ShareFileController.FileDownloadResult downloadFile(CloudUserFilesRepository.UserFile userFile) throws IOException {
 		if (userFile == null) {
 			return null;
 		}
@@ -203,9 +203,9 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public void requestAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String nickname) {
+	public void requestAccess(ShareFileRepository.ShareFile shareFile, CloudUserDevicesRepository.CloudUserDevice dev, String nickname) {
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
-		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
+		CloudUsersRepository.CloudUser user = userdataService.getUserById(dev.userid);
 		if (user.nickname == null) {
 			user.nickname = nickname;
 			user = usersRepository.saveAndFlush(user);
@@ -219,11 +219,11 @@ public class ShareFileService {
 		shareFileRepository.saveAndFlush(shareFile);
 	}
 
-	public PremiumUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {
+	public CloudUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {
 		return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
 	}
 
-	public GpxFile getFile(PremiumUserFilesRepository.UserFile file) throws IOException {
+	public GpxFile getFile(CloudUserFilesRepository.UserFile file) throws IOException {
 		if (file == null) {
 			return null;
 		}
@@ -265,26 +265,26 @@ public class ShareFileService {
 
 	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
-		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+		List<CloudUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
-			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			CloudUserFilesRepository.UserFile originalFile = getUserFile(file);
 			if (originalFile == null || !originalFile.type.equals(type)) {
 				continue;
 			}
-			PremiumUserFilesRepository.UserFileNoData userFile = new PremiumUserFilesRepository.UserFileNoData(originalFile);
+			CloudUserFilesRepository.UserFileNoData userFile = new CloudUserFilesRepository.UserFileNoData(originalFile);
 			userFile.details.add("shareFileName", gson.toJsonTree(file.name));
 			allFiles.add(userFile);
 		}
 		return userdataService.getUserFilesResults(allFiles, userid, false);
 	}
 
-	public List<PremiumUserFilesRepository.UserFile> getOriginalSharedWithMeFiles(PremiumUserDevicesRepository.PremiumUserDevice dev, String type) {
-		List<PremiumUserFilesRepository.UserFile> files = new ArrayList<>();
+	public List<CloudUserFilesRepository.UserFile> getOriginalSharedWithMeFiles(CloudUserDevicesRepository.CloudUserDevice dev, String type) {
+		List<CloudUserFilesRepository.UserFile> files = new ArrayList<>();
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
-			PremiumUserFilesRepository.UserFile originalFile = getUserFile(file);
+			CloudUserFilesRepository.UserFile originalFile = getUserFile(file);
 			if (originalFile == null || !originalFile.type.equals(type)) {
 				continue;
 			}
@@ -293,7 +293,7 @@ public class ShareFileService {
 		return files;
 	}
 
-	public PremiumUserFilesRepository.UserFile getSharedWithMeFile(String filepath, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+	public CloudUserFilesRepository.UserFile getSharedWithMeFile(String filepath, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
@@ -304,7 +304,7 @@ public class ShareFileService {
 		return null;
 	}
 
-	public boolean removeSharedWithMeFile(String name, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+	public boolean removeSharedWithMeFile(String name, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
@@ -316,12 +316,12 @@ public class ShareFileService {
 		return false;
 	}
 
-	public ResponseEntity<String> saveSharedFile(String name, String type, String newName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+	public ResponseEntity<String> saveSharedFile(String name, String type, String newName, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
 			ShareFileRepository.ShareFile file = access.getFile();
 			if (file.filepath.equals(name) && file.type.equals(type)) {
-				PremiumUserFilesRepository.UserFile userFile = getUserFile(file);
+				CloudUserFilesRepository.UserFile userFile = getUserFile(file);
 				if (userFile != null) {
 					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
 					if (zipFile != null) {
@@ -352,12 +352,12 @@ public class ShareFileService {
 	}
 
 	@Transactional
-	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+	public boolean createPublicReadAccess(ShareFileRepository.ShareFile shareFile, CloudUserDevicesRepository.CloudUserDevice dev) {
 		if (dev.userid == shareFile.ownerid) {
 			return false;
 		}
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
-		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(dev.userid);
+		CloudUsersRepository.CloudUser user = userdataService.getUserById(dev.userid);
 		access.setUser(user);
 		access.setAccess(PermissionType.READ.name());
 		access.setRequestDate(new Date());

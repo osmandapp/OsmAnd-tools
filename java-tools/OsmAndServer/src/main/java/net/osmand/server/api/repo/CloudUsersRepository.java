@@ -18,27 +18,27 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 
 @Repository
-public interface PremiumUsersRepository extends JpaRepository<PremiumUser, Long> {
+public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
 	
 	
-	PremiumUser findByEmailIgnoreCase(String email);
+	CloudUser findByEmailIgnoreCase(String email);
     
     int deleteByEmailIgnoreCase(String email);
 	
-	PremiumUser findByOrderid(String orderid);
+	CloudUser findByOrderid(String orderid);
 
-    List<PremiumUser> findByEmailStartingWith(String prefix, Pageable pageable);
+    List<CloudUser> findByEmailStartingWith(String prefix, Pageable pageable);
     
-    List<PremiumUser> findPremiumUsersByOrderidAndTokendevice(String orderid, String tokendevice);
+    List<CloudUser> findUsersByOrderidAndTokendevice(String orderid, String tokendevice);
 	
-	PremiumUser findById(int id);
+	CloudUser findById(int id);
 	
     @Entity
     @Table(name = "user_accounts")
-    class PremiumUser implements Serializable {
+    class CloudUser implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;
 

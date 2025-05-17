@@ -23,10 +23,10 @@ import org.springframework.stereotype.Repository;
 
 import com.google.gson.JsonObject;
 
-import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 
 @Repository
-public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long> {
+public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> {
 	
 	UserFile findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 	
@@ -132,7 +132,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 
     
     // COALESCE(length(u.data), -1))
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+	@Query("select new net.osmand.server.api.repo.CloudUserFilesRepository$UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
@@ -140,7 +140,7 @@ public interface PremiumUserFilesRepository extends JpaRepository<UserFile, Long
 	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
 			@Param(value = "name") String name, @Param(value = "type") String type);
 	
-	@Query("select new net.osmand.server.api.repo.PremiumUserFilesRepository$UserFileNoData("
+	@Query("select new net.osmand.server.api.repo.CloudUserFilesRepository$UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "

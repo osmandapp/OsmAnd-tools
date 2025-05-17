@@ -6,7 +6,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +23,7 @@ import java.util.*;
 public class FastSpringController {
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
@@ -40,7 +40,7 @@ public class FastSpringController {
 			if ("order.completed".equals(event.type)) {
 				FastSpringOrderCompletedRequest.Data data = event.data;
 				String email = data.customer.email;
-				PremiumUsersRepository.PremiumUser user = usersRepository.findByEmailIgnoreCase(email);
+				CloudUsersRepository.CloudUser user = usersRepository.findByEmailIgnoreCase(email);
 
 				if (user != null) {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
@@ -81,7 +81,8 @@ public class FastSpringController {
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
 								subscription.valid = true;
-								updatePremiumUserOrderId(user.id, orderId, sku);
+								// TODO remove as non necessary
+//								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(subscription);
 							}
@@ -92,6 +93,11 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
+					// TODO this code should be used everywhere to update 
+//					String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
+//					if (errorMsg != null) {
+//						userSubService.updateOrderId(pu);
+//					}
 				}
 
 			}
@@ -100,10 +106,11 @@ public class FastSpringController {
 	}
 
 	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
+		// TODO this code should be deleted
 		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
 			return;
 		}
-		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
+		CloudUsersRepository.CloudUser user = usersRepository.findById(userId);
 		if (user == null) {
 			return;
 		}

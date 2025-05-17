@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 
 import net.osmand.router.*;
 import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.VectorMetatile;
 import net.osmand.server.utils.TimezoneMapper;
@@ -134,7 +134,7 @@ public class OsmAndMapsService {
 	@Value("${tile-server.routeObf.location}")
 	String routeObfLocation;
 
-	public PremiumUserDevicesRepository.PremiumUserDevice checkUser() {
+	public CloudUserDevicesRepository.CloudUserDevice checkUser() {
 		Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 		if (user instanceof WebSecurityConfiguration.OsmAndProUser osmAndProUser) {
 			return osmAndProUser.getUserDevice();
