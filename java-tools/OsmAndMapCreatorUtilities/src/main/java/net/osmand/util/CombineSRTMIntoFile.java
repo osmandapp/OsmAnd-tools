@@ -169,8 +169,7 @@ public class CombineSRTMIntoFile {
 			// Remove it if it is called in multithread
 			RTree.clearCache();
 
-			
-			genFile.renameTo(targetFile);
+			Algorithms.fileCopy(genFile, targetFile);
 		} finally {
 			procFile.delete();
 		}
