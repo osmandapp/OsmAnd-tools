@@ -63,6 +63,7 @@ public class CombineSRTMIntoFile {
 				limit = Integer.parseInt(args[i].substring("--limit=".length())); 
 			}
 		}
+		System.out.println("CURRENT PID PROCESS: " + ProcessHandle.current().pid());
 		OsmandRegions or = new OsmandRegions();
 		BinaryMapIndexReader fl = or.prepareFile();
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
@@ -72,31 +73,31 @@ public class CombineSRTMIntoFile {
 		int boundary = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1;
 		Set<String> failedCountries = new HashSet<String>();
-		for(String fullName : allCountries.keySet()) {
+		for (String fullName : allCountries.keySet()) {
 			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
 			if (fullName == null || (filter != null && !fullName.contains(filter))) {
 				continue;
 			}
 			BinaryMapDataObject rc = null;
-			for(BinaryMapDataObject r : lst) {
-				if(!r.containsType(boundary)) {
+			for (BinaryMapDataObject r : lst) {
+				if (!r.containsType(boundary)) {
 					rc = r;
 					break;
 				}
 			}
 			System.out.println(fullName);
-			if(rc != null && rc.containsAdditionalType(srtm)) {
+			if (rc != null && rc.containsAdditionalType(srtm)) {
 				String dw = rc.getNameByType(downloadName);
 				System.out.println("Region " + fullName + " " + cnt++ + " out of " + allCountries.size());
 				try {
 					process(rc, lst, dw, directoryWithSRTMFiles, directoryWithTargetFiles, dryRun, limit, feet);
-				} catch(Exception e) {
+				} catch (Exception e) {
 					failedCountries.add(fullName);
 					e.printStackTrace();
 				}
 			}
 		}
-		if(!failedCountries.isEmpty()) {
+		if (!failedCountries.isEmpty()) {
 			throw new IllegalStateException("Failed countries " + failedCountries);
 		}
 	}
@@ -171,10 +172,10 @@ public class CombineSRTMIntoFile {
 		System.out.println("-----------------------------");
 		System.out.println("PROCESSING "+name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - " + topLat
 				+ "] TOTAL " + srtmFileNames.size() + " files " + srtmFileNames);
-		if(dryRun) {
+		if (dryRun) {
 			return;
 		}
-		if(srtmFileNames.size() > limit) {
+		if (srtmFileNames.size() > limit) {
 			System.out.println("\n\n!!!!!!!! WARNING BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
 			return;
 		}
@@ -200,7 +201,7 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		writePidToFile(procFile);
-		
+
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
 		List<File> files = new ArrayList<File>();
