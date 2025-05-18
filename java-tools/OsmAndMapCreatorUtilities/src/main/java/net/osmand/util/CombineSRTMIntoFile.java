@@ -116,6 +116,93 @@ public class CombineSRTMIntoFile {
 		}
 
 		Set<String> srtmFileNames = new TreeSet<String>();
+		Multipolygon polygon = collectFiles(country, boundaries, name, srtmFileNames);
+		if (dryRun) {
+			return;
+		}
+		if (srtmFileNames.size() > limit) {
+			System.out.println("\n\n!!!!!!!! WARNING BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
+			return;
+		}
+		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
+		boolean ok = lockFile(procFile);
+		if (!ok) {
+			return;
+		}
+		List<File> files = new ArrayList<File>();
+		for (String file : srtmFileNames) {
+			final File fl = new File(directoryWithSRTMFiles, file + ".osm.bz2");
+			if (!fl.exists()) {
+				System.err.println("!! Missing " + name + " because " + file + " doesn't exist");
+			} else {
+				files.add(fl);
+			}
+		}
+		try {
+			if (files.isEmpty()) {
+				System.err.println("!!! WARNING " + name + " because no files are present to index !!!");
+				return;
+			}
+			// speedup processing by using fast disk
+			File genFile = new File(".", targetFile.getName()).getAbsoluteFile();
+			IndexCreatorSettings settings = new IndexCreatorSettings();
+			settings.indexMap = true;
+			settings.zoomWaySmoothness = 2;
+			settings.boundary = polygon;
+			IndexCreator ic = new IndexCreator(genFile.getParentFile(), settings);
+
+//			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
+//				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+//				System.out.println("SQLITE on disk is used.");
+//			} else {
+			ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
+//				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
+//			}
+			ic.setRegionName(name + " contour lines");
+			ic.setMapFileName(genFile.getName());
+			File nodesDB = new File(genFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
+			ic.setNodesDBFile(nodesDB);
+			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
+					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(genFile.getName()), log, true);
+			nodesDB.delete();
+			// reduce memory footprint for single thread generation
+			// Remove it if it is called in multithread
+			RTree.clearCache();
+
+			
+			genFile.renameTo(targetFile);
+		} finally {
+			procFile.delete();
+		}
+	}
+
+	private static boolean lockFile(File procFile) throws IOException {
+		boolean created = procFile.createNewFile();
+		if (!created) {
+			// Lock file exists; check if the process is still alive
+			long existingPid = readPidFromFile(procFile);
+			if (existingPid != -1 && isProcessAlive(existingPid)) {
+				System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+				return false;
+			} else {
+				// Stale lock file found; delete and retry
+				if (!procFile.delete()) {
+					System.out.println("Failed to delete stale lock file.");
+					return false;
+				}
+				created = procFile.createNewFile();
+				if (!created) {
+					System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+					return false;
+				}
+			}
+		}
+		writePidToFile(procFile);
+		return true;
+	}
+
+	private static Multipolygon collectFiles(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
+			String name, Set<String> srtmFileNames) {
 		QuadRect qr = new QuadRect(180, -90, -180, 90);
 		MultipolygonBuilder bld = new MultipolygonBuilder();
 		if(boundaries != null) {
@@ -172,90 +259,7 @@ public class CombineSRTMIntoFile {
 		System.out.println("-----------------------------");
 		System.out.println("PROCESSING "+name + " lon [" + leftLon + " - " + rightLon + "] lat [" + bottomLat + " - " + topLat
 				+ "] TOTAL " + srtmFileNames.size() + " files " + srtmFileNames);
-		if (dryRun) {
-			return;
-		}
-		if (srtmFileNames.size() > limit) {
-			System.out.println("\n\n!!!!!!!! WARNING BECAUSE LIMIT OF FILES EXCEEDED !!!!!!!!!\n\n");
-			return;
-		}
-		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
-		boolean created = procFile.createNewFile();
-		if (!created) {
-			// Lock file exists; check if the process is still alive
-			long existingPid = readPidFromFile(procFile);
-			if (existingPid != -1 && isProcessAlive(existingPid)) {
-				System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
-				return;
-			} else {
-				// Stale lock file found; delete and retry
-				if (!procFile.delete()) {
-					System.out.println("Failed to delete stale lock file.");
-					return;
-				}
-				created = procFile.createNewFile();
-				if (!created) {
-					System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
-					return;
-				}
-			}
-		}
-		writePidToFile(procFile);
-
-//		final File work = new File(directoryWithTargetFiles, "work");
-//		Map<File, String> mp = new HashMap<File, String>();
-		List<File> files = new ArrayList<File>();
-		for(String file : srtmFileNames) {
-			final File fl = new File(directoryWithSRTMFiles, file + ".osm.bz2");
-			if(!fl.exists()) {
-				System.err.println("!! Missing " + name + " because " + file + " doesn't exist");
-			} else {
-				files.add(fl);
-//				File ttf = new File(fl.getParentFile(), Algorithms.capitalizeFirstLetterAndLowercase(file) + "_"+ name + ".obf");
-//				mp.put(ttf, null);
-			}
-		}
-		if (files.isEmpty()) {
-			System.err.println("!!! WARNING " + name + " because no files are present to index !!!");
-		} else {
-			// speedup processing by using fast disk
-			File genFile = new File(targetFile.getName());
-			IndexCreatorSettings settings = new IndexCreatorSettings();
-			settings.indexMap = true;
-			settings.zoomWaySmoothness = 2;
-			settings.boundary = polygon;
-			IndexCreator ic = new IndexCreator(genFile.getParentFile(), settings);
-
-//			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
-//				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
-//				System.out.println("SQLITE on disk is used.");
-//			} else {
-				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE_IN_MEMORY);
-//				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
-//			}
-			ic.setRegionName(name + " contour lines");
-			ic.setMapFileName(genFile.getName());
-			File nodesDB = new File(genFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
-			ic.setNodesDBFile(nodesDB);
-			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
-					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(genFile.getName()), log, true);
-			nodesDB.delete();
-			// reduce memory footprint for single thread generation
-			// Remove it if it is called in multithread
-			RTree.clearCache();
-			
-			genFile.renameTo(targetFile);
-		}
-		procFile.delete();
-//		if(length > Integer.MAX_VALUE) {
-//			System.err.println("!! Can't process " + name + " because too big");
-//		} else {
-//			BinaryInspector.combineParts(targetFile, mp);
-//		}
-//		for(String file : srtmFileNames) {
-//			final File fl = new File(work, file);
-//			fl.delete();
-//		}
+		return polygon;
 	}
 	
 	private static long readPidFromFile(File procFile) {
