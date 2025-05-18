@@ -45,22 +45,22 @@ public class GpxService {
     public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, File originalSourceGpx, GpxTrackAnalysis analysis) throws IOException {
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
-        gpxData.setMetaData(new WebGpxParser.WebMetaData(gpxFile.getMetadata()));
-        gpxData.setWpts(webGpxParser.getWpts(gpxFile));
+        gpxData.metaData = (new WebGpxParser.WebMetaData(gpxFile.getMetadata()));
+        gpxData.wpts = (webGpxParser.getWpts(gpxFile));
 
         Pair<List<WebGpxParser.WebTrack>, List<GpxUtilities.RouteType>> tracksResult = webGpxParser.getTracks(gpxFile);
-        gpxData.setTracks(tracksResult.getFirst());
-        gpxData.setRouteTypes(tracksResult.getSecond());
+        gpxData.tracks = (tracksResult.getFirst());
+        gpxData.routeTypes = (tracksResult.getSecond());
 
         Map<String, String> extensions = gpxFile.getExtensions();
-        gpxData.setExt(extensions);
-        gpxData.setTrackAppearance(new WebGpxParser.WebTrackAppearance(extensions));
+        gpxData.ext = (extensions);
+        gpxData.trackAppearance = (new WebGpxParser.WebTrackAppearance(extensions));
 
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
         addAnalysis(gpxData, originalSourceGpx, analysis);
-        gpxData.setPointsGroups(webGpxParser.getPointsGroups(gpxFile));
+        gpxData.pointsGroups = (webGpxParser.getPointsGroups(gpxFile));
 
         return gpxData;
     }
@@ -74,10 +74,10 @@ public class GpxService {
             }
         }
         if (gpxAnalysis != null) {
-            gpxData.setAnalysis(webGpxParser.getTrackAnalysis(gpxAnalysis, null));
-            if (!gpxData.getTracks().isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
+            gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
+            if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
                 boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
-                webGpxParser.addAdditionalInfo(gpxData.getTracks(), gpxAnalysis, addSpeed);
+                webGpxParser.addAdditionalInfo(gpxData.tracks, gpxAnalysis, addSpeed);
             }
         }
     }
@@ -86,17 +86,17 @@ public class GpxService {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         GpxTrackAnalysis srtmAnalysis = getAnalysis(gpxFile, true);
         if (srtmAnalysis != null) {
-            if (trackData.getAnalysis() == null) {
-                trackData.setAnalysis(new LinkedHashMap<>());
+            if (trackData.analysis == null) {
+            	trackData.analysis = new LinkedHashMap<>();
             }
-            Map<String, Object> analysis = trackData.getAnalysis();
+            Map<String, Object> analysis = trackData.analysis;
             analysis.put("srtmAnalysis", true);
             analysis.put("minElevationSrtm", srtmAnalysis.getMinElevation());
             analysis.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
             analysis.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
-            webGpxParser.addSrtmEle(trackData.getTracks(), srtmAnalysis);
+            webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
             if (analysis.get("elevationData") == null) {
-                webGpxParser.addAdditionalInfo(trackData.getTracks(), srtmAnalysis, false);
+                webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
             }
         }
         return trackData;
@@ -106,11 +106,10 @@ public class GpxService {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         GpxTrackAnalysis gpxTrackAnalysis = getAnalysis(gpxFile, false);
         if (gpxTrackAnalysis != null) {
-            Map<String, Object> analysis = webGpxParser.getTrackAnalysis(gpxTrackAnalysis, null);
-            trackData.setAnalysis(analysis);
-            boolean addSpeed = analysis.get("avgSpeed") != null && analysis.get("hasSpeedInTrack") == "false";
-            if (addSpeed || analysis.get("elevationData") != null) {
-                webGpxParser.addAdditionalInfo(trackData.getTracks(), gpxTrackAnalysis, addSpeed);
+        	trackData.analysis = webGpxParser.getTrackAnalysis(gpxTrackAnalysis, null);
+            boolean addSpeed = trackData.analysis.get("avgSpeed") != null && trackData.analysis.get("hasSpeedInTrack") == "false";
+            if (addSpeed || trackData.analysis.get("elevationData") != null) {
+                webGpxParser.addAdditionalInfo(trackData.tracks, gpxTrackAnalysis, addSpeed);
             }
         }
         return trackData;
