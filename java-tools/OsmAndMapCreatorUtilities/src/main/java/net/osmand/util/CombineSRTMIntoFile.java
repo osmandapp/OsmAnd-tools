@@ -1,18 +1,20 @@
 package net.osmand.util;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -99,15 +101,16 @@ public class CombineSRTMIntoFile {
 		}
 	}
 
-	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries,
-			String downloadName, File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit, boolean feet) throws IOException, SQLException, InterruptedException, IllegalArgumentException, XmlPullParserException {
+	private static void process(BinaryMapDataObject country, List<BinaryMapDataObject> boundaries, String downloadName,
+			File directoryWithSRTMFiles, File directoryWithTargetFiles, boolean dryRun, int limit, boolean feet)
+			throws Exception {
 		final String suffix = "_" + IndexConstants.BINARY_MAP_VERSION + 
 				(feet ? IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT : IndexConstants.BINARY_SRTM_MAP_INDEX_EXT);
 		String name = country.getName();
 		String dwName = Algorithms.capitalizeFirstLetterAndLowercase(downloadName + suffix);
 		final File targetFile = new File(directoryWithTargetFiles, dwName);
-		if(targetFile.exists()) {
-			System.out.println("Already processed "+ name);
+		if (targetFile.exists()) {
+			System.out.println("Already processed " + name);
 			return;
 		}
 
@@ -176,35 +179,51 @@ public class CombineSRTMIntoFile {
 			return;
 		}
 		File procFile = new File(directoryWithTargetFiles, dwName + ".proc");
-		boolean locked = !procFile.createNewFile();
-		if (locked) {
-			System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
-			return;
+		boolean created = procFile.createNewFile();
+		if (!created) {
+			// Lock file exists; check if the process is still alive
+			long existingPid = readPidFromFile(procFile);
+			if (existingPid != -1 && isProcessAlive(existingPid)) {
+				System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+				return;
+			} else {
+				// Stale lock file found; delete and retry
+				if (!procFile.delete()) {
+					System.out.println("Failed to delete stale lock file.");
+					return;
+				}
+				created = procFile.createNewFile();
+				if (!created) {
+					System.out.println("\n\n!!!!!!!! WARNING FILE IS BEING PROCESSED !!!!!!!!!\n\n");
+					return;
+				}
+			}
 		}
+		writePidToFile(procFile);
 		
 //		final File work = new File(directoryWithTargetFiles, "work");
 //		Map<File, String> mp = new HashMap<File, String>();
-		long length = 0;
 		List<File> files = new ArrayList<File>();
 		for(String file : srtmFileNames) {
 			final File fl = new File(directoryWithSRTMFiles, file + ".osm.bz2");
 			if(!fl.exists()) {
 				System.err.println("!! Missing " + name + " because " + file + " doesn't exist");
 			} else {
-				length += fl.length(); 
 				files.add(fl);
 //				File ttf = new File(fl.getParentFile(), Algorithms.capitalizeFirstLetterAndLowercase(file) + "_"+ name + ".obf");
 //				mp.put(ttf, null);
 			}
 		}
-		if(files.isEmpty()) {
+		if (files.isEmpty()) {
 			System.err.println("!!! WARNING " + name + " because no files are present to index !!!");
 		} else {
+			// speedup processing by using fast disk
+			File genFile = new File(targetFile.getName());
 			IndexCreatorSettings settings = new IndexCreatorSettings();
 			settings.indexMap = true;
 			settings.zoomWaySmoothness = 2;
 			settings.boundary = polygon;
-			IndexCreator ic = new IndexCreator(targetFile.getParentFile(), settings);
+			IndexCreator ic = new IndexCreator(genFile.getParentFile(), settings);
 
 //			if (srtmFileNames.size() > NUMBER_OF_FILES_TO_PROCESS_ON_DISK || length > SIZE_GB_TO_COMBINE_INRAM) {
 //				ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
@@ -214,15 +233,17 @@ public class CombineSRTMIntoFile {
 //				System.out.println("SQLITE in memory used: be aware whole database is stored in memory.");
 //			}
 			ic.setRegionName(name + " contour lines");
-			ic.setMapFileName(targetFile.getName());
-			File nodesDB = new File(targetFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
+			ic.setMapFileName(genFile.getName());
+			File nodesDB = new File(genFile.getParentFile(), dwName + "." + IndexCreator.TEMP_NODES_DB);
 			ic.setNodesDBFile(nodesDB);
 			ic.generateIndexes(files.toArray(new File[files.size()]), new ConsoleProgressImplementation(1), null,
-					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(targetFile.getName()), log, true);
+					MapZooms.parseZooms("11-12;13-"), new MapRenderingTypesEncoder(genFile.getName()), log, true);
 			nodesDB.delete();
 			// reduce memory footprint for single thread generation
 			// Remove it if it is called in multithread
 			RTree.clearCache();
+			
+			genFile.renameTo(targetFile);
 		}
 		procFile.delete();
 //		if(length > Integer.MAX_VALUE) {
@@ -234,6 +255,27 @@ public class CombineSRTMIntoFile {
 //			final File fl = new File(work, file);
 //			fl.delete();
 //		}
+	}
+	
+	private static long readPidFromFile(File procFile) {
+		try (BufferedReader reader = new BufferedReader(new FileReader(procFile))) {
+			String line = reader.readLine();
+			return line != null ? Long.parseLong(line.trim()) : -1;
+		} catch (IOException | NumberFormatException e) {
+			return -1;
+		}
+	}
+
+	private static boolean isProcessAlive(long pid) {
+		Optional<ProcessHandle> handle = ProcessHandle.of(pid);
+		return handle.map(ProcessHandle::isAlive).orElse(false);
+	}
+
+	private static void writePidToFile(File procFile) throws IOException {
+		try (FileWriter writer = new FileWriter(procFile)) {
+			long pid = ProcessHandle.current().pid();
+			writer.write(Long.toString(pid));
+		}
 	}
 
 	private static Way convertToWay(BinaryMapDataObject o) {
