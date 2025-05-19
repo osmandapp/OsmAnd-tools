@@ -62,7 +62,7 @@ public class OrderManagementService {
 						"       COALESCE(s.starttime, s.checktime) AS sort_key " +
 						"  FROM supporters_device_sub s " +
 						"  LEFT JOIN user_accounts u ON u.id = s.userid " +
-						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? " +
+						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? ESCAPE '\\'" +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
 						"       i.userid, i.timestamp, " +
@@ -73,7 +73,7 @@ public class OrderManagementService {
 						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
 						"  LEFT JOIN user_accounts u ON u.id = i.userid " +
-						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? " +
+						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? ESCAPE '\\'" +
 						"ORDER BY sort_key DESC " +
 						"LIMIT ?";
 
