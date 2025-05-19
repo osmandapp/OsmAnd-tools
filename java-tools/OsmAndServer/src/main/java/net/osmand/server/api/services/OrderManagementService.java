@@ -254,10 +254,7 @@ public class OrderManagementService {
 
 			deviceInAppPurchasesRepository.saveAndFlush(i);
 		}
-		String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
-		if (errorMsg != null) {
-			userSubService.updateOrderId(pu);
-		}
+		userSubService.verifyAndRefreshProOrderId(pu);
 	}
 
 	public List<AdminService.Purchase> findPurchaseByOrderAndSku(String orderId, String sku) {

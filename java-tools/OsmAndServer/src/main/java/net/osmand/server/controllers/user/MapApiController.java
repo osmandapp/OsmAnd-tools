@@ -607,12 +607,11 @@ public class MapApiController {
 		Map<String, String> info = new HashMap<>();
 
 		info.put(NICKNAME, pu.nickname);
-		String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
-		if (errorMsg != null || Algorithms.isEmpty(pu.orderid)) {
-			boolean updated = userSubService.updateOrderId(pu);
-			if (updated) {
-				LOG.info("Updated orderId for user " + pu.email);
-			}
+		String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
+		if (errorMsg == null) {
+			LOG.info("Updated orderId for user " + pu.email);
+		} else {
+			LOG.error("Error updating orderId for user " + pu.email + ": " + errorMsg);
 		}
 
 		String orderId = pu.orderid;

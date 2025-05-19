@@ -7,6 +7,7 @@ import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,9 @@ public class FastSpringController {
 
 	@Autowired
 	DeviceSubscriptionsRepository deviceSubscriptionsRepository;
+
+	@Autowired
+	protected UserSubscriptionService userSubService;
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
@@ -81,8 +85,6 @@ public class FastSpringController {
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
 								subscription.valid = true;
-								// TODO remove as non necessary
-//								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(subscription);
 							}
@@ -93,39 +95,12 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
-					// TODO this code should be used everywhere to update 
-//					String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-//					if (errorMsg != null) {
-//						userSubService.updateOrderId(pu);
-//					}
-				}
 
+					userSubService.verifyAndRefreshProOrderId(user);
+				}
 			}
 		}
 		return ResponseEntity.ok("OK");
-	}
-
-	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
-		// TODO this code should be deleted
-		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
-			return;
-		}
-		CloudUsersRepository.CloudUser user = usersRepository.findById(userId);
-		if (user == null) {
-			return;
-		}
-		if (user.orderid != null && !user.orderid.isEmpty()) {
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = deviceSubscriptionsRepository.findByOrderId(user.orderid);
-			if (subscriptions != null && !subscriptions.isEmpty()) {
-				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
-					if (s.sku.equals(sku) && Boolean.TRUE.equals(s.valid)) {
-						return;
-					}
-				}
-			}
-		}
-		user.orderid = orderId;
-		usersRepository.saveAndFlush(user);
 	}
 
 

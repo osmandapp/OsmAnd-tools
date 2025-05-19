@@ -136,6 +136,7 @@ public class PromoService {
 					deviceSub.purchaseToken += " (new PRO subscription is updated)";
 					subscriptionsRepository.save(deviceSub);
 					usersRepository.saveAndFlush(existingUser);
+					userSubService.verifyAndRefreshProOrderId(existingUser);
 				} else {
 					error = true;
 					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
@@ -145,11 +146,6 @@ public class PromoService {
 			error = true;
 			deviceSub.purchaseToken += " (ERROR: please enter email only)";
 		}
-		// TODO this code should be used everywhere to update pro which could be inapp or sub
-//		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-//		if (errorMsg != null) {
-//			userSubService.updateOrderId(pu);
-//		}
 
 		if (!error) {
 			return new PromoResponse(deviceSub, false);

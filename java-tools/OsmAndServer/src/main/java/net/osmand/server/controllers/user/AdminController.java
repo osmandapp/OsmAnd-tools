@@ -57,6 +57,8 @@ import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
 import net.osmand.server.controllers.pub.WebController;
 
+import static net.osmand.server.api.services.UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION;
+
 @Controller
 @RequestMapping("/admin")
 @PropertySource("classpath:git.properties")
@@ -236,8 +238,7 @@ public class AdminController {
 				subscription = subscriptions.get(0);
 			}
 			// downgrade only promo_website
-			// TODO review user eligible for pro or not
-			if (subscription != null && subscription.sku.equals(subscriptionType)) {
+			if (subscription != null && subscription.sku.equals(subscriptionType) && subscription.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
 				// update expiretime
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(System.currentTimeMillis());
@@ -247,11 +248,7 @@ public class AdminController {
 				pu.orderid = null;
 				usersRepository.saveAndFlush(pu);
 			}
-			// TODO this code should be used everywhere to update 
-//			String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
-//			if (errorMsg != null) {
-//				userSubService.updateOrderId(pu);
-//			}
+			userSubService.verifyAndRefreshProOrderId(pu);
 
 		}
 		return ResponseEntity.ok("Downgrade successful");

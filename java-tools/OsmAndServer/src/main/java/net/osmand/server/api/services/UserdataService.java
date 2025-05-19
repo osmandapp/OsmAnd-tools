@@ -195,13 +195,9 @@ public class UserdataService {
         if (user == null) {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
-        String errorMsg = userSubService.checkOrderIdPro(user.orderid);
-		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			boolean updated = userSubService.updateOrderId(user);
-			if (updated) {
-				errorMsg = null;
-			}
-		}
+
+        String errorMsg = userSubService.verifyAndRefreshProOrderId(user);
+
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
 			if (!FREE_TYPES.contains(type)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
@@ -421,6 +417,7 @@ public class UserdataService {
             if (pu != null) {
                 List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(pu.id);
                 if (devices != null && !devices.isEmpty()) {
+	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
             } else {
@@ -534,6 +531,9 @@ public class UserdataService {
         device.udpatetime = new Date();
         device.accesstoken = accessToken;
         usersRepository.saveAndFlush(pu);
+
+	    userSubService.verifyAndRefreshProOrderId(pu);
+
         devicesRepository.saveAndFlush(device);
         LOG.info("device-register: success (" + email + ")");
         return ResponseEntity.ok(gson.toJson(device));
@@ -1147,6 +1147,8 @@ public class UserdataService {
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
 
+	    userSubService.verifyAndRefreshProOrderId(pu);
+
         return ok();
     }
 
@@ -1229,6 +1231,9 @@ public class UserdataService {
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
+
+	    userSubService.verifyAndRefreshProOrderId(currentUser);
+
         request.logout();
 
         return ok();

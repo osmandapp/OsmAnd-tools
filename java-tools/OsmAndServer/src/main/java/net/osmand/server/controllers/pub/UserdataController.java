@@ -155,13 +155,7 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
-		if (errorMsg != null || Algorithms.isEmpty(pu.orderid)) {
-			boolean updated = userSubService.updateOrderId(pu);
-			if (updated) {
-				errorMsg = null;
-			}
-		}
+		String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
 		if (errorMsg != null) {
 			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
@@ -193,6 +187,9 @@ public class UserdataController {
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
+
+		userSubService.verifyAndRefreshProOrderId(pu);
+
 		return userdataService.ok();
 	}
 
@@ -295,12 +292,6 @@ public class UserdataController {
                         linkedCount++;
                     }
                 }
-        		// TODO this code should be used everywhere to update 
-//        		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-//        		if (errorMsg != null) {
-//        			userSubService.updateOrderId(pu);
-//        		}
-
                 if (linkedCount > 0) {
                     LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
                 }
@@ -311,6 +302,10 @@ public class UserdataController {
             LOG.info("No supporter context provided during cloud registration for email: " + email);
         }
         // --- End Linking Logic ---
+
+	    if (pu != null) {
+		    userSubService.verifyAndRefreshProOrderId(pu);
+	    }
 
 		return userdataService.ok();
 	}
