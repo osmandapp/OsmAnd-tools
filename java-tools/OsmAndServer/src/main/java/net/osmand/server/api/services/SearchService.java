@@ -181,7 +181,7 @@ public class SearchService {
                 if (!mapList.isEmpty()) {
                     return res.stream()
                             .filter(r -> {
-                                if (r.objectType != ObjectType.POI_TYPE) {
+                                if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
                                     return true;
                                 }
                                 String targetName = r.file.getFile().getName();
