@@ -63,7 +63,7 @@ public class ShareFileService {
 		// Update existing file with new code
 		ShareFileRepository.ShareFile existingFile = getFileByOwnerAndFilepath(userFile.userid, userFile.name);
 		if (existingFile != null) {
-			existingFile.setUuid(uniqueCode);
+			existingFile.uuid = (uniqueCode);
 			shareFileRepository.saveAndFlush(existingFile);
 			return uniqueCode;
 		}
@@ -90,12 +90,12 @@ public class ShareFileService {
 
 		String name = userFile.name.substring(userFile.name.lastIndexOf("/") + 1);
 
-		shareFile.setUuid(uniqueCode);
-		shareFile.setName(name);
-		shareFile.setFilepath(userFile.name);
-		shareFile.setType(userFile.type);
-		shareFile.setOwnerid(userFile.userid);
-		shareFile.setPublicAccess(publicAccess);
+		shareFile.uuid = (uniqueCode);
+		shareFile.name = (name);
+		shareFile.filepath = (userFile.name);
+		shareFile.type = (userFile.type);
+		shareFile.ownerid = (userFile.userid);
+		shareFile.publicAccess = (publicAccess);
 
 		shareFileRepository.saveAndFlush(shareFile);
 		return shareFile;
@@ -120,17 +120,17 @@ public class ShareFileService {
 
 	@Transactional
 	public boolean editAccessList(ShareFileRepository.ShareFile shareFile, Map<Integer, String> accessMap) {
-		List<ShareFileRepository.ShareFilesAccess> accessList = shareFile.getAccessRecords();
+		List<ShareFileRepository.ShareFilesAccess> accessList = shareFile.accessRecords;
 		if (accessList == null) {
 			accessList = new ArrayList<>();
 		}
 		accessList.forEach(access -> {
 			String accessType = accessMap.get(access.getUser().id);
 			if (accessType != null) {
-				access.setAccess(accessType);
+				access.access = (accessType);
 			}
 		});
-		shareFile.setAccessRecords(accessList);
+		shareFile.accessRecords = (accessList);
 		shareFileRepository.saveAndFlush(shareFile);
 		return true;
 	}
@@ -140,7 +140,7 @@ public class ShareFileService {
 		if (shareType.equals(PRIVATE_SHARE_TYPE)) {
 			shareFileRepository.delete(shareFile);
 		} else {
-			shareFile.setPublicAccess(shareType.equals(PUBLIC_SHARE_TYPE));
+			shareFile.publicAccess = (shareType.equals(PUBLIC_SHARE_TYPE));
 			shareFileRepository.saveAndFlush(shareFile);
 		}
 		return true;
@@ -156,7 +156,7 @@ public class ShareFileService {
 	}
 
 	public ResponseEntity<String> checkAccessAndReturnError(ShareFileRepository.ShareFile file) {
-		if (file.isPublicAccess()) {
+		if (file.publicAccess) {
 			return null;
 		} else {
 			CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -166,7 +166,7 @@ public class ShareFileService {
 			if (file.ownerid == dev.userid) {
 				return null;
 			}
-			List<ShareFileRepository.ShareFilesAccess> accessList = file.getAccessRecords();
+			List<ShareFileRepository.ShareFilesAccess> accessList = file.accessRecords;
 			for (ShareFileRepository.ShareFilesAccess access : accessList) {
 				if (access.getUser().id == dev.userid) {
 					if (access.getAccess().equals(ShareFileService.PermissionType.PENDING.name())) {
@@ -210,9 +210,9 @@ public class ShareFileService {
 			user.nickname = nickname;
 			user = usersRepository.saveAndFlush(user);
 		}
-		access.setUser(user);
-		access.setAccess(ShareFileService.PermissionType.PENDING.name());
-		access.setRequestDate(new Date());
+		access.user = (user);
+		access.access = (ShareFileService.PermissionType.PENDING.name());
+		access.requestDate = (new Date());
 
 		shareFile.addAccessRecord(access);
 
@@ -256,7 +256,7 @@ public class ShareFileService {
 			}
 			ShareFileRepository.ShareFilesAccess access = shareFileRepository.findShareFilesAccessById(id);
 			if (access != null) {
-				access.setAccess(accessType);
+				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
 			}
 		}
@@ -267,7 +267,7 @@ public class ShareFileService {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
 		List<CloudUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
 		for (ShareFileRepository.ShareFilesAccess access : list) {
-			ShareFileRepository.ShareFile file = access.getFile();
+			ShareFileRepository.ShareFile file = access.file;
 			CloudUserFilesRepository.UserFile originalFile = getUserFile(file);
 			if (originalFile == null || !originalFile.type.equals(type)) {
 				continue;
@@ -283,7 +283,7 @@ public class ShareFileService {
 		List<CloudUserFilesRepository.UserFile> files = new ArrayList<>();
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
-			ShareFileRepository.ShareFile file = access.getFile();
+			ShareFileRepository.ShareFile file = access.file;
 			CloudUserFilesRepository.UserFile originalFile = getUserFile(file);
 			if (originalFile == null || !originalFile.type.equals(type)) {
 				continue;
@@ -296,7 +296,7 @@ public class ShareFileService {
 	public CloudUserFilesRepository.UserFile getSharedWithMeFile(String filepath, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
-			ShareFileRepository.ShareFile file = access.getFile();
+			ShareFileRepository.ShareFile file = access.file;
 			if (file.filepath.equals(filepath) && file.type.equals(type)) {
 				return getUserFile(file);
 			}
@@ -307,9 +307,9 @@ public class ShareFileService {
 	public boolean removeSharedWithMeFile(String name, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
-			ShareFileRepository.ShareFile file = access.getFile();
+			ShareFileRepository.ShareFile file = access.file;
 			if (file.filepath.equals(name) && file.type.equals(type)) {
-				shareFileRepository.removeShareFilesAccessById(file.getId(), dev.userid);
+				shareFileRepository.removeShareFilesAccessById(file.id, dev.userid);
 				return true;
 			}
 		}
@@ -319,7 +319,7 @@ public class ShareFileService {
 	public ResponseEntity<String> saveSharedFile(String name, String type, String newName, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(dev.userid);
 		for (ShareFileRepository.ShareFilesAccess access : list) {
-			ShareFileRepository.ShareFile file = access.getFile();
+			ShareFileRepository.ShareFile file = access.file;
 			if (file.filepath.equals(name) && file.type.equals(type)) {
 				CloudUserFilesRepository.UserFile userFile = getUserFile(file);
 				if (userFile != null) {
@@ -342,7 +342,7 @@ public class ShareFileService {
 	}
 
 	public boolean hasUserAccessToSharedFile(ShareFileRepository.ShareFile shareFile, int userId) {
-		List<ShareFileRepository.ShareFilesAccess> accessList = shareFile.getAccessRecords();
+		List<ShareFileRepository.ShareFilesAccess> accessList = shareFile.accessRecords;
 		for (ShareFileRepository.ShareFilesAccess access : accessList) {
 			if (access.getUser().id == userId) {
 				return true;
@@ -358,9 +358,9 @@ public class ShareFileService {
 		}
 		ShareFileRepository.ShareFilesAccess access = new ShareFileRepository.ShareFilesAccess();
 		CloudUsersRepository.CloudUser user = userdataService.getUserById(dev.userid);
-		access.setUser(user);
-		access.setAccess(PermissionType.READ.name());
-		access.setRequestDate(new Date());
+		access.user = (user);
+		access.access = (PermissionType.READ.name());
+		access.requestDate = (new Date());
 
 		shareFile.addAccessRecord(access);
 

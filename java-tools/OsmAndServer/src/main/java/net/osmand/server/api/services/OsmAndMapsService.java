@@ -635,7 +635,7 @@ public class OsmAndMapsService {
 	public List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
 		List<WptPt> waypoints = new ArrayList<>();
 		for (WebGpxParser.Point p : points) {
-			waypoints.add(new WptPt(p.getLat(), p.getLng()));
+			waypoints.add(new WptPt(p.lat, p.lng));
 		}
 		Map<String, Object> props = new HashMap<>();
 		return approximateByWaypoints(waypoints, routeMode, props);

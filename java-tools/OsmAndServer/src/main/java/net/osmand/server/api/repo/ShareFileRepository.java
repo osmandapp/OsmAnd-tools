@@ -1,21 +1,31 @@
 package net.osmand.server.api.repo;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.transaction.annotation.Transactional;
-
-import jakarta.persistence.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 
 @Repository
 public interface ShareFileRepository extends JpaRepository<ShareFileRepository.ShareFile, Long> {
@@ -39,8 +49,6 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 	<S extends ShareFilesAccess> S saveAndFlush(S entity);
 
-	@Setter
-	@Getter
 	@Entity(name = "ShareFile")
 	@Table(name = "user_share_files")
 	class ShareFile implements Serializable {
@@ -57,7 +65,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 		public int ownerid;
 
 		@Column(unique = true)
-		private UUID uuid;
+		public UUID uuid;
 
 		@Column(nullable = false)
 		public String filepath;
@@ -72,16 +80,22 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 		public boolean publicAccess;
 
 		@OneToMany(mappedBy = "file", cascade = CascadeType.ALL, orphanRemoval = true)
-		private List<ShareFilesAccess> accessRecords;
+		public List<ShareFilesAccess> accessRecords;
 
 		public void addAccessRecord(ShareFilesAccess access) {
 			accessRecords.add(access);
-			access.setFile(this);
+			access.file = (this);
+		}
+
+		public String getType() {
+			return type;
+		}
+
+		public String getFilepath() {
+			return filepath;
 		}
 	}
 
-	@Setter
-	@Getter
 	@Entity(name = "ShareFilesAccess")
 	@Table(name = "user_share_files_access")
 	class ShareFilesAccess implements Serializable {
@@ -91,14 +105,14 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		@Id
 		@GeneratedValue(strategy = GenerationType.IDENTITY)
-		private long id;
+		public long id;
 
 		@ManyToOne
 		@JoinColumn(name = "user_id", nullable = false)
-		private CloudUsersRepository.CloudUser user;
+		public CloudUsersRepository.CloudUser user;
 
 		@Column(nullable = false)
-		private String access;
+		public String access;
 
 		@Column(name = "date")
 		@Temporal(TemporalType.TIMESTAMP)
@@ -106,54 +120,62 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		@ManyToOne
 		@JoinColumn(name = "file_id", nullable = false)
-		private ShareFile file;
+		public ShareFile file;
+
+		public CloudUsersRepository.CloudUser getUser() {
+			return user;
+		}
+
+		public long getId() {
+			return id;
+		}
+
+		public String getAccess() {
+			return access;
+		}
 	}
 
-	@Getter
-	@Setter
 	public class ShareFileDTO {
 
-		private long id;
-		private int ownerid;
-		private String uuid;
-		private String filepath;
-		private String name;
-		private String type;
-		private boolean publicAccess;
-		private List<ShareFilesAccessDTO> accessRecords;
+		public long id;
+		public int ownerid;
+		public String uuid;
+		public String filepath;
+		public String name;
+		public String type;
+		public boolean publicAccess;
+		public List<ShareFilesAccessDTO> accessRecords;
 
 		public ShareFileDTO(ShareFile shareFile, boolean includeAccessRecords) {
-			this.id = shareFile.getId();
-			this.ownerid = shareFile.getOwnerid();
-			this.uuid = shareFile.getUuid() != null ? shareFile.getUuid().toString() : null;
-			this.filepath = shareFile.getFilepath();
-			this.name = shareFile.getName();
-			this.type = shareFile.getType();
-			this.publicAccess = shareFile.isPublicAccess();
-			if (includeAccessRecords && shareFile.getAccessRecords() != null) {
-				this.accessRecords = shareFile.getAccessRecords().stream()
+			this.id = shareFile.id;
+			this.ownerid = shareFile.ownerid;
+			this.uuid = shareFile.uuid != null ? shareFile.uuid.toString() : null;
+			this.filepath = shareFile.filepath;
+			this.name = shareFile.name;
+			this.type = shareFile.type;
+			this.publicAccess = shareFile.publicAccess;
+			if (includeAccessRecords && shareFile.accessRecords != null) {
+				this.accessRecords = shareFile.accessRecords.stream()
 						.map((ShareFilesAccess access) -> new ShareFilesAccessDTO(access, false))
 						.collect(Collectors.toList());
 			}
 		}
 	}
 
-	@Getter
-	@Setter
 	class ShareFilesAccessDTO {
 
-		private long id;
-		private String name;
-		private String access;
-		private Date requestDate;
+		public long id;
+		public String name;
+		public String access;
+		public Date requestDate;
 
 		public ShareFilesAccessDTO(ShareFilesAccess access, boolean includeFile) {
 			this.id = access.getId();
 			this.name = access.getUser().nickname;
 			this.access = access.getAccess();
-			this.requestDate = access.getRequestDate();
+			this.requestDate = access.requestDate;
 			if (includeFile) {
-				this.id = access.getFile().getId();
+				this.id = access.file.id;
 			}
 		}
 	}

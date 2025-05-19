@@ -148,8 +148,6 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 	List<UserFileNoData> listFilesByUseridWithDetails(@Param(value = "userid") int userid, 
 			@Param(value = "name") String name, @Param(value = "type") String type);
 
-	@Setter
-	@Getter
 	// file used to be transmitted to client as is
 	class UserFileNoData {
 		public int userid;
@@ -165,7 +163,7 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 		public long zipSize;
 		public String storage;
 		public JsonObject details;
-		private String deviceInfo;
+		public String deviceInfo;
 		
 		public UserFileNoData(UserFile c) {
 			this.userid = c.userid;
