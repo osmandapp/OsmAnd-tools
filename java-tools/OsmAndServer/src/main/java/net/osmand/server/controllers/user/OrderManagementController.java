@@ -46,7 +46,12 @@ public class OrderManagementController {
 	public List<AdminService.Purchase> orders(
 			@RequestParam(name = "text", required = false) String text,
 			@RequestParam(name = "limit", defaultValue = "25") int limit) {
-		if (StringUtils.isBlank(text) || text.trim().length() < 4) {
+		if (StringUtils.isBlank(text)) {
+			return Collections.emptyList();
+		}
+		String trimmed = text.trim();
+		String stripped = trimmed.replace("%", "").replace("_", "");
+		if (stripped.length() < 4) {
 			return Collections.emptyList();
 		}
 		return orderManagementService.searchPurchases(text, limit);
