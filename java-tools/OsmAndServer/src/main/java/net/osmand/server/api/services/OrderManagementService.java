@@ -44,6 +44,10 @@ public class OrderManagementService {
 	private final Gson gson = new Gson();
 
 	public List<AdminService.Purchase> searchPurchases(String q, int limit) {
+		q = q
+				.replace("\\", "\\\\")
+				.replace("_",  "\\_")
+				.replace("%",  "\\%");
 		String email = q + "%";
 		String order = q + "%";
 		String sku = "%" + q + "%";
