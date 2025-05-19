@@ -303,12 +303,6 @@ public class SubscriptionController {
 								if (!Algorithms.objectEquals(s.purchaseToken, receipt)) {
 									s.purchaseToken = receipt;
 									subscriptionsRepository.saveAndFlush(s);
-									// TODO this code should be used everywhere to update 
-//									String errorMsg = userSubService.checkOrderIdPro(pu.orderid);
-//									if (errorMsg != null) {
-//										userSubService.updateOrderId(pu);
-//									}
-
 								}
 							}
 						}
