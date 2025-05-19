@@ -2,8 +2,8 @@ package net.osmand.server.api.services;
 
 import lombok.Getter;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -36,7 +36,7 @@ public class TrackAnalyzerService {
 	UserdataService userdataService;
 
 	@Autowired
-	protected PremiumUserFilesRepository filesRepository;
+	protected CloudUserFilesRepository filesRepository;
 
 	private static final int ZOOM = 12;
 	private static final int SHORT_LINK_ZOOM = ZOOM - 8;
@@ -64,7 +64,7 @@ public class TrackAnalyzerService {
 	public static class TrackAnalyzerResponse {
 		final Map<String, List<TrkSegment>> segments;
 		final Map<String, List<Map<String, String>>> trackAnalysis;
-		final Set<PremiumUserFilesRepository.UserFileNoData> files;
+		final Set<CloudUserFilesRepository.UserFileNoData> files;
 
 		public TrackAnalyzerResponse() {
 			this.segments = new HashMap<>();
@@ -73,7 +73,7 @@ public class TrackAnalyzerService {
 		}
 	}
 
-	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+	public TrackAnalyzerResponse getTracksBySegment(TrackAnalyzerRequest analyzerRequest, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
 		TrackAnalyzerResponse analysisResponse = new TrackAnalyzerResponse();
 
 		List<WptPt> wptPoints = analyzerRequest.points.stream()
@@ -86,16 +86,16 @@ public class TrackAnalyzerService {
 
 		//get files for analysis
 		UserdataController.UserFilesResults userFiles = userdataService.generateGpxFilesByQuadTiles(dev.userid, false,  tiles);
-		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
+		List<CloudUserFilesRepository.UserFileNoData> filesForAnalysis = getFilesForAnalysis(userFiles, analyzerRequest.folders);
 
 		if (Algorithms.isEmpty(analyzerRequest.points)) {
 			return null;
 		}
-		for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
+		for (CloudUserFilesRepository.UserFileNoData file : filesForAnalysis) {
 			processFileForSegments(file, useOnePoint, wptPoints, MIN_DIST_THRESHOLD, analysisResponse);
 		}
 		if (analysisResponse.segments.isEmpty()) {
-			for (PremiumUserFilesRepository.UserFileNoData file : filesForAnalysis) {
+			for (CloudUserFilesRepository.UserFileNoData file : filesForAnalysis) {
 				processFileForSegments(file, useOnePoint, wptPoints, MAX_DIST_THRESHOLD, analysisResponse);
 			}
 		}
@@ -103,18 +103,18 @@ public class TrackAnalyzerService {
 	}
 
 	private void processFileForSegments(
-			PremiumUserFilesRepository.UserFileNoData file,
+			CloudUserFilesRepository.UserFileNoData file,
 			boolean useOnePoint,
 			List<WptPt> wptPoints,
 			double distThreshold,
 			TrackAnalyzerResponse analysisResponse) throws IOException {
 
-		Optional<PremiumUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
+		Optional<CloudUserFilesRepository.UserFile> of = filesRepository.findById(file.id);
 		if (of.isEmpty()) {
 			return;
 		}
 
-		PremiumUserFilesRepository.UserFile uf = of.get();
+		CloudUserFilesRepository.UserFile uf = of.get();
 		GpxFile gpxFile = getGpxFile(uf);
 		if (gpxFile == null) {
 			return;
@@ -198,15 +198,15 @@ public class TrackAnalyzerService {
 		return trackAnalysisData;
 	}
 
-	private List<PremiumUserFilesRepository.UserFileNoData> getFilesForAnalysis(UserdataController.UserFilesResults userFiles, List<String> folders) {
-		List<PremiumUserFilesRepository.UserFileNoData> filesForAnalysis = new ArrayList<>();
+	private List<CloudUserFilesRepository.UserFileNoData> getFilesForAnalysis(UserdataController.UserFilesResults userFiles, List<String> folders) {
+		List<CloudUserFilesRepository.UserFileNoData> filesForAnalysis = new ArrayList<>();
 
 		if (Algorithms.isEmpty(folders)) {
 			filesForAnalysis.addAll(userFiles.uniqueFiles);
 			return filesForAnalysis;
 		}
 
-		for (PremiumUserFilesRepository.UserFileNoData file : userFiles.uniqueFiles) {
+		for (CloudUserFilesRepository.UserFileNoData file : userFiles.uniqueFiles) {
 
 			boolean shouldAdd = folders.stream().anyMatch(folderName ->
 					file.name.startsWith(folderName + "/") || (folderName.equals("_default_") && file.name.indexOf('/') == -1)
@@ -219,7 +219,7 @@ public class TrackAnalyzerService {
 		return filesForAnalysis;
 	}
 
-	private GpxFile getGpxFile(PremiumUserFilesRepository.UserFile uf) throws IOException {
+	private GpxFile getGpxFile(CloudUserFilesRepository.UserFile uf) throws IOException {
 		InputStream in;
 		try {
 			in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);

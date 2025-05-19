@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
 
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.utils.MultiPlatform;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
@@ -46,10 +46,10 @@ public class SearchController {
     SearchService searchService;
     
     @Autowired
-    protected PremiumUserDevicesRepository devicesRepository;
+    protected CloudUserDevicesRepository devicesRepository;
     
-    private PremiumUserDevicesRepository.PremiumUserDevice checkToken(int deviceId, String accessToken) {
-        PremiumUserDevicesRepository.PremiumUserDevice d = devicesRepository.findById(deviceId);
+    private CloudUserDevicesRepository.CloudUserDevice checkToken(int deviceId, String accessToken) {
+        CloudUserDevicesRepository.CloudUserDevice d = devicesRepository.findById(deviceId);
         if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
             return d;
         }
@@ -219,7 +219,7 @@ public class SearchController {
 
     private boolean validateUser(Integer deviceId, String accessToken) {
         if (deviceId != null && accessToken != null) {
-            PremiumUserDevicesRepository.PremiumUserDevice dev = checkToken(deviceId, accessToken);
+            CloudUserDevicesRepository.CloudUserDevice dev = checkToken(deviceId, accessToken);
 	        return dev != null;
         }
         return false;

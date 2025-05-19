@@ -59,12 +59,12 @@ import com.google.gson.JsonObject;
 
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
-import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.controllers.pub.UserdataController;
@@ -83,7 +83,7 @@ public class UserdataService {
     protected DownloadIndexesService downloadService;
 
     @Autowired
-    protected PremiumUserFilesRepository filesRepository;
+    protected CloudUserFilesRepository filesRepository;
 
 	@Lazy
 	@Autowired
@@ -97,13 +97,13 @@ public class UserdataService {
     PasswordEncoder encoder;
 
     @Autowired
-    protected PremiumUsersRepository usersRepository;
+    protected CloudUsersRepository usersRepository;
 
     @Autowired
     EmailSenderService emailSender;
 
     @Autowired
-    protected PremiumUserDevicesRepository devicesRepository;
+    protected CloudUserDevicesRepository devicesRepository;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -120,25 +120,25 @@ public class UserdataService {
     public static final String BRAND_DEVICE_WEB = "OsmAnd";
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
-    public static final int ERROR_CODE_PREMIUM_USERS = 100;
+    public static final int ERROR_CODE_PRO_USERS = 100;
     private static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
-    public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - premium)
+    public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
-    private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
-    public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED = 4 + ERROR_CODE_PREMIUM_USERS;
-    public static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PREMIUM_USERS;
-    public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PREMIUM_USERS;
-    public static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PREMIUM_USERS;
-//    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PREMIUM_USERS;
-    private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PREMIUM_USERS;
+    private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PRO_USERS;
+    private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
+    public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PRO_USERS;
+    private static final int ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED = 4 + ERROR_CODE_PRO_USERS;
+    public static final int ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID = 5 + ERROR_CODE_PRO_USERS;
+    public static final int ERROR_CODE_FILE_NOT_AVAILABLE = 6 + ERROR_CODE_PRO_USERS;
+    public static final int ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD = 7 + ERROR_CODE_PRO_USERS;
+    private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PRO_USERS;
+//    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PRO_USERS;
+    private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PRO_USERS;
 
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
@@ -190,18 +190,14 @@ public class UserdataService {
         return null;
     }
 
-    public void validateUserForUpload(PremiumUserDevicesRepository.PremiumUserDevice dev, String type, long fileSize) {
-    	PremiumUser user = usersRepository.findById(dev.userid);
+    public void validateUserForUpload(CloudUserDevicesRepository.CloudUserDevice dev, String type, long fileSize) {
+    	CloudUser user = usersRepository.findById(dev.userid);
         if (user == null) {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "Unexpected error: user is not registered.");
         }
-        String errorMsg = userSubService.checkOrderIdPremium(user.orderid);
-		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-			boolean updated = userSubService.updateOrderId(user);
-			if (updated) {
-				errorMsg = null;
-			}
-		}
+
+        String errorMsg = userSubService.verifyAndRefreshProOrderId(user);
+
 		if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
 			if (!FREE_TYPES.contains(type)) {
 				throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION,
@@ -235,7 +231,7 @@ public class UserdataService {
     }
 
 	public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
-		List<PremiumUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
+		List<CloudUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
 		List<UserFileNoData> fl;
 		if (types != null) {
 			for (String t : types) {
@@ -271,8 +267,8 @@ public class UserdataService {
 		return name.replace(CR_SANITIZE, "\r").replace(LF_SANITIZE, "\n");
 	}
 
-	public UserdataController.UserFilesResults getUserFilesResults(List<PremiumUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
-        PremiumUser user = usersRepository.findById(userId);
+	public UserdataController.UserFilesResults getUserFilesResults(List<CloudUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
+        CloudUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
         res.uniqueFiles = new ArrayList<>();
@@ -281,7 +277,7 @@ public class UserdataService {
         }
         res.userid = userId;
         Set<String> fileIds = new TreeSet<String>();
-        for (PremiumUserFilesRepository.UserFileNoData sf : files) {
+        for (CloudUserFilesRepository.UserFileNoData sf : files) {
             String fileId = sf.type + "____" + sf.name;
             if (sf.filesize >= 0) {
                 res.totalFileVersions++;
@@ -336,7 +332,7 @@ public class UserdataService {
         }
     }
 
-    public ResponseEntity<String> uploadMultipartFile(MultipartFile file, PremiumUserDevicesRepository.PremiumUserDevice dev,
+    public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
@@ -355,9 +351,9 @@ public class UserdataService {
 
 
 
-	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, PremiumUserDevicesRepository.PremiumUserDevice dev,
+	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
-		PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+		CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
 		usf.name = name;
 		usf.type = type;
 		usf.updatetime = new Date();
@@ -416,15 +412,16 @@ public class UserdataService {
 		if (!emailSender.isEmail(email)) {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (isNew) {
             if (pu != null) {
-                List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(pu.id);
+                List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(pu.id);
                 if (devices != null && !devices.isEmpty()) {
+	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
             } else {
-                pu = new PremiumUsersRepository.PremiumUser();
+                pu = new CloudUsersRepository.CloudUser();
                 pu.email = email;
                 pu.regTime = new Date();
             }
@@ -445,7 +442,7 @@ public class UserdataService {
 	}
     
     public ResponseEntity<String> validateToken(String email, String token) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -458,7 +455,7 @@ public class UserdataService {
     }
     
     public ResponseEntity<String> checkUserEmail(String email) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -496,7 +493,7 @@ public class UserdataService {
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+        CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             LOG.error("device-register: email is not found (" + email + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
@@ -515,8 +512,8 @@ public class UserdataService {
         	pu.token = null;
         }
         pu.tokenTime = null;
-        PremiumUserDevicesRepository.PremiumUserDevice device = new PremiumUserDevicesRepository.PremiumUserDevice();
-        PremiumUserDevicesRepository.PremiumUserDevice sameDevice;
+        CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
+        CloudUserDevicesRepository.CloudUserDevice sameDevice;
 	    if (Algorithms.isEmpty(deviceId)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
 	    } else {
@@ -534,6 +531,9 @@ public class UserdataService {
         device.udpatetime = new Date();
         device.accesstoken = accessToken;
         usersRepository.saveAndFlush(pu);
+
+	    userSubService.verifyAndRefreshProOrderId(pu);
+
         devicesRepository.saveAndFlush(device);
         LOG.info("device-register: success (" + email + ")");
         return ResponseEntity.ok(gson.toJson(device));
@@ -541,9 +541,9 @@ public class UserdataService {
 
     private boolean validateWithWebPassword(int userId, String password) {
         if (userId > 0 && !Algorithms.isEmpty(password)) {
-            List<PremiumUserDevicesRepository.PremiumUserDevice> webDevices =
+            List<CloudUserDevicesRepository.CloudUserDevice> webDevices =
                     devicesRepository.findByUseridAndDeviceid(userId, TOKEN_DEVICE_WEB);
-            for (PremiumUserDevicesRepository.PremiumUserDevice device : webDevices) {
+            for (CloudUserDevicesRepository.CloudUserDevice device : webDevices) {
                 if (!Algorithms.isEmpty(device.accesstoken) && encoder.matches(password, device.accesstoken)) {
                     return true;
                 }
@@ -552,14 +552,14 @@ public class UserdataService {
         return false;
     }
 
-    public String oldStorageFileName(PremiumUserFilesRepository.UserFile usf) {
+    public String oldStorageFileName(CloudUserFilesRepository.UserFile usf) {
         String fldName = usf.type;
         String name = usf.name;
         return fldName + "/" + usf.updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
 
-    public void getFile(PremiumUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
-                        PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
+                        CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -622,8 +622,8 @@ public class UserdataService {
 		}
     }
     
-    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
-        PremiumUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
+    public ResponseEntity<String> restoreFile(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+        CloudUserFilesRepository.UserFile userFile = getUserFile(name, type, updatetime, dev);
         if (userFile == null) {
             return ResponseEntity.badRequest().body("File not found");
         }
@@ -637,7 +637,7 @@ public class UserdataService {
         if (prevFile == null || prevFile.zipfilesize <= 0) {
             return ResponseEntity.badRequest().body("Previous version of file not found");
         }
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+        CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
         InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
         if (zipFile == null) {
             return ResponseEntity.badRequest().body("Error restore file");
@@ -663,13 +663,13 @@ public class UserdataService {
         return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
     }
     
-    public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
         UserFile file = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(dev.userid, name, type, new Date(updatetime));
         return file != null;
     }
     
     @Transactional
-    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, CloudUserDevicesRepository.CloudUserDevice dev) {
         for (MapApiController.FileData file : files) {
             deleteFileAllVersions(dev.userid, file.name, file.type, file.updatetime, true);
         }
@@ -691,7 +691,7 @@ public class UserdataService {
     }
 
 
-    public InputStream getInputStream(PremiumUserDevicesRepository.PremiumUserDevice dev, PremiumUserFilesRepository.UserFile userFile) {
+    public InputStream getInputStream(CloudUserDevicesRepository.CloudUserDevice dev, CloudUserFilesRepository.UserFile userFile) {
         InputStream bin = null;
         if (dev == null) {
 	        tokenNotValidError();
@@ -710,7 +710,7 @@ public class UserdataService {
         return bin;
     }
 
-    public PremiumUserFilesRepository.UserFile getUserFile(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public CloudUserFilesRepository.UserFile getUserFile(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
         if (dev == null) {
             return null;
         }
@@ -723,7 +723,7 @@ public class UserdataService {
         }
     }
 
-    public PremiumUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public CloudUserFilesRepository.UserFile getFilePrevVersion(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
         if (dev == null) {
             return null;
         }
@@ -731,14 +731,14 @@ public class UserdataService {
                 new Date(updatetime));
     }
     
-    public InputStream getInputStream(PremiumUserFilesRepository.UserFile userFile) {
+    public InputStream getInputStream(CloudUserFilesRepository.UserFile userFile) {
 		if (userFile.storage.equals("local")) {
 			return new ByteArrayInputStream(userFile.data);
 		}
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
 
-    public InputStream getInputStream(PremiumUserFilesRepository.UserFileNoData userFile) {
+    public InputStream getInputStream(CloudUserFilesRepository.UserFileNoData userFile) {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
 
@@ -751,8 +751,8 @@ public class UserdataService {
 	}
 
 	@Transactional
-    public void deleteFile(String name, String type, Integer deviceId, Long clienttime, PremiumUserDevicesRepository.PremiumUserDevice dev) {
-        PremiumUserFilesRepository.UserFile usf = new PremiumUserFilesRepository.UserFile();
+    public void deleteFile(String name, String type, Integer deviceId, Long clienttime, CloudUserDevicesRepository.CloudUserDevice dev) {
+        CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
         usf.name = name;
         usf.type = type;
         usf.updatetime = new Date();
@@ -803,8 +803,8 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> renameFile(String oldName, String newName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev, boolean saveCopy) throws IOException {
-        PremiumUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
+    public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+        CloudUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
         if (file != null) {
             InternalZipFile zipFile = getZipFile(file, newName);
             if (zipFile != null) {
@@ -830,7 +830,7 @@ public class UserdataService {
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
     }
 
-    public InternalZipFile getZipFile(PremiumUserFilesRepository.UserFile file, String newName) throws IOException {
+    public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(newName, ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
@@ -853,7 +853,7 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
         for (UserFile file : files) {
             String newName = file.name.replaceFirst(folderName, newFolderName);
@@ -866,7 +866,7 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> deleteFolder(String folderName, String type, PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    public ResponseEntity<String> deleteFolder(String folderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
         for (UserFile file : files) {
             if (file.filesize != -1) {
@@ -876,7 +876,7 @@ public class UserdataService {
         return ok();
     }
 
-    public PremiumUsersRepository.PremiumUser getUserById(int id) {
+    public CloudUsersRepository.CloudUser getUserById(int id) {
         return usersRepository.findById(id);
     }
 
@@ -901,7 +901,7 @@ public class UserdataService {
 	}
 
 
-    private boolean isSelectedType(Set<String> filterTypes, PremiumUserFilesRepository.UserFileNoData sf) {
+    private boolean isSelectedType(Set<String> filterTypes, CloudUserFilesRepository.UserFileNoData sf) {
         final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
         final String FILE_TYPE_OTHER = "FILE_OTHER";
@@ -956,7 +956,7 @@ public class UserdataService {
     }
 
 
-    public void getBackup(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
+    public void getBackup(HttpServletResponse response, CloudUserDevicesRepository.CloudUserDevice dev,
 			Set<String> filterTypes, boolean includeDeleted, String format) throws IOException {
 		List<UserFileNoData> files = filesRepository.listFilesByUserid(dev.userid, null, null);
 		Set<String> fileIds = new TreeSet<>();
@@ -969,7 +969,7 @@ public class UserdataService {
 		try {
             JSONArray itemsJson = new JSONArray();
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
-			for (PremiumUserFilesRepository.UserFileNoData sf : files) {
+			for (CloudUserFilesRepository.UserFileNoData sf : files) {
 				String fileId = sf.type + "____" + sf.name;
                 if (shouldSkipFile(filterTypes, sf, null)) {
                     continue;
@@ -980,7 +980,7 @@ public class UserdataService {
                         InputStream s3is = getInputStream(sf);
                         InputStream is;
                         if (s3is == null) {
-                            PremiumUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
+                            CloudUserFilesRepository.UserFile userFile = getUserFile(sf.name, sf.type, null, dev);
                             if (userFile != null) {
                                 is = new GZIPInputStream(getInputStream(dev, userFile));
                             } else {
@@ -1053,8 +1053,8 @@ public class UserdataService {
     }
 
     @Transactional
-    public void getBackupFolder(HttpServletResponse response, PremiumUserDevicesRepository.PremiumUserDevice dev,
-                                String folderName, String format, String type, List<PremiumUserFilesRepository.UserFile> selectedFiles) throws IOException {
+    public void getBackupFolder(HttpServletResponse response, CloudUserDevicesRepository.CloudUserDevice dev,
+                                String folderName, String format, String type, List<CloudUserFilesRepository.UserFile> selectedFiles) throws IOException {
         List<UserFile> files = folderName != null
 		        ? filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type)
 		        : selectedFiles;
@@ -1096,8 +1096,8 @@ public class UserdataService {
 
 
     @Transactional
-    public ResponseEntity<String> deleteAccount(String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+    public ResponseEntity<String> deleteAccount(String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
+        CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
             boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
             boolean validToken = pu.token.equals(token) && !tokenExpired;
@@ -1122,7 +1122,7 @@ public class UserdataService {
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
 
-    private boolean deleteAllFiles(PremiumUserDevicesRepository.PremiumUserDevice dev) {
+    private boolean deleteAllFiles(CloudUserDevicesRepository.CloudUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findAllByUserid(dev.userid);
         files.forEach(file -> {
             storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
@@ -1134,7 +1134,7 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, PremiumUsersRepository.PremiumUser pu) {
+    public ResponseEntity<String> sendCode(String action, String lang, CloudUsersRepository.CloudUser pu) {
         if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
             return ok();
         }
@@ -1147,11 +1147,13 @@ public class UserdataService {
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
 
+	    userSubService.verifyAndRefreshProOrderId(pu);
+
         return ok();
     }
 
-    public ResponseEntity<String> confirmCode(String code, PremiumUserDevicesRepository.PremiumUserDevice dev) {
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+    public ResponseEntity<String> confirmCode(String code, CloudUserDevicesRepository.CloudUserDevice dev) {
+        CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
@@ -1168,7 +1170,7 @@ public class UserdataService {
         if (token == null) {
             return ResponseEntity.badRequest().body("Token is not valid");
         }
-        PremiumUsersRepository.PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
+        CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(username);
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
@@ -1181,7 +1183,7 @@ public class UserdataService {
         }
     }
 
-    public void wearOutToken(PremiumUsersRepository.PremiumUser pu) {
+    public void wearOutToken(CloudUsersRepository.CloudUser pu) {
         if (pu == null || pu.tokenTime == null) {
             return;
         }
@@ -1194,24 +1196,24 @@ public class UserdataService {
     }
 
 
-    public ResponseEntity<String> changeEmail(String username, String token, PremiumUserDevicesRepository.PremiumUserDevice dev, HttpServletRequest request) throws ServletException {
+    public ResponseEntity<String> changeEmail(String username, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         // validate new email
-        PremiumUsersRepository.PremiumUser tempUser = usersRepository.findByEmailIgnoreCase(username);
+        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(username);
         if (tempUser == null) {
             return ResponseEntity.badRequest().body("Something went wrong with your new email");
         }
         if (tempUser.orderid != null) {
-            String errorMsg = userSubService.checkOrderIdPremium(tempUser.orderid);
+            String errorMsg = userSubService.checkOrderIdPro(tempUser.orderid);
             if (errorMsg != null) {
                 return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
             }
         } else {
-            List<PremiumUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
+            List<CloudUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
             if (!allFiles.isEmpty()) {
                 return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
             }
         }
-        List<PremiumUserDevicesRepository.PremiumUserDevice> devices = devicesRepository.findByUserid(tempUser.id);
+        List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(tempUser.id);
         if (!devices.isEmpty()) {
             return ResponseEntity.badRequest().body("You can't change email, because you have devices in account on new email");
         }
@@ -1221,7 +1223,7 @@ public class UserdataService {
             return response;
         }
         // validate current user
-        PremiumUsersRepository.PremiumUser currentUser = usersRepository.findById(dev.userid);
+        CloudUsersRepository.CloudUser currentUser = usersRepository.findById(dev.userid);
         if (currentUser == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
@@ -1229,12 +1231,15 @@ public class UserdataService {
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
+
+	    userSubService.verifyAndRefreshProOrderId(currentUser);
+
         request.logout();
 
         return ok();
     }
 
-    public void updateDeviceLangInfo(PremiumUserDevicesRepository.PremiumUserDevice dev, String lang, String brand, String model) {
+    public void updateDeviceLangInfo(CloudUserDevicesRepository.CloudUserDevice dev, String lang, String brand, String model) {
         if (dev != null) {
             dev.lang = (lang == null) ? dev.lang : lang;
             dev.brand = (brand == null) ? dev.brand : brand;
@@ -1243,7 +1248,7 @@ public class UserdataService {
         }
     }
 
-	public Map<String, GpxFile> getGpxFilesMap(PremiumUserDevicesRepository.PremiumUserDevice dev,
+	public Map<String, GpxFile> getGpxFilesMap(CloudUserDevicesRepository.CloudUserDevice dev,
 	                                           List<String> names, List<UserFile> selectedFiles) throws IOException {
 		Map<String, GpxFile> files = new HashMap<>();
 		if (names != null && !names.isEmpty()) {
@@ -1297,7 +1302,7 @@ public class UserdataService {
 		return getUserFilesResults(userFileNoDataList, userId, allVersions);
 	}
 
-	private void processGpxFile(PremiumUserDevicesRepository.PremiumUserDevice dev, UserFile userFile,
+	private void processGpxFile(CloudUserDevicesRepository.CloudUserDevice dev, UserFile userFile,
 	                            Map<String, GpxFile> files) throws IOException {
 		try (InputStream is = getInputStream(dev, userFile)) {
 			GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);

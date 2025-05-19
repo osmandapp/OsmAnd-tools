@@ -4,8 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -55,7 +55,7 @@ public class FavoriteService {
     Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
     
     @Transactional
-    public ResponseEntity<String> renameFavFolder(String oldName, String newName, StorageService.InternalZipFile fl, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public ResponseEntity<String> renameFavFolder(String oldName, String newName, StorageService.InternalZipFile fl, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
         userdataService.uploadFile(fl, dev, newName, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
         userdataService.deleteFile(oldName, FILE_TYPE_FAVOURITES, null, null, dev);
@@ -63,11 +63,11 @@ public class FavoriteService {
         return userdataService.ok();
     }
     
-    public void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime) throws IOException {
+    public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime) throws IOException {
         uploadFavoriteFile(tmpFile, dev, name, updatetime, null);
     }
     
-    public void uploadFavoriteFile(File tmpFile, PremiumUserDevicesRepository.PremiumUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
+    public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
         StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFile(tmpFile);
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
         userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
@@ -76,7 +76,7 @@ public class FavoriteService {
         }
     }
     
-    public ResponseEntity<String> updateFavoriteFile(String fileName, PremiumUserDevicesRepository.PremiumUserDevice dev,
+    public ResponseEntity<String> updateFavoriteFile(String fileName, CloudUserDevicesRepository.CloudUserDevice dev,
                                                      Long updatetime, GpxFile file) throws IOException {
         File tmpGpx = createTmpGpxFile(file, fileName);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
@@ -85,11 +85,11 @@ public class FavoriteService {
         return ResponseEntity.ok(gson.toJson(resp));
     }
     
-    public UserdataService.ResponseFileStatus createResponse(PremiumUserDevicesRepository.PremiumUserDevice dev,
+    public UserdataService.ResponseFileStatus createResponse(CloudUserDevicesRepository.CloudUserDevice dev,
                                                              String groupName, GpxFile file, File tmpFile) throws IOException {
         UserdataService.ResponseFileStatus resp = null;
         if (file != null && tmpFile != null) {
-            PremiumUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
+            CloudUserFilesRepository.UserFile userFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
             if (userFile.details == null) {
                 userFile.details = new JsonObject();
             }
@@ -110,8 +110,8 @@ public class FavoriteService {
     }
 
     @Nullable
-    public GpxFile createGpxFile(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
-        PremiumUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
+    public GpxFile createGpxFile(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
+        CloudUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
         if (userGroupFile == null || userGroupFile.filesize == -1) {
             if (groupName.equals(DEFAULT_GROUP_FILE_NAME)) {
                 userGroupFile = createDefaultGroup(groupName, dev, updatetime);
@@ -140,7 +140,7 @@ public class FavoriteService {
         return null;
     }
     
-    private PremiumUserFilesRepository.UserFile createDefaultGroup(String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev, Long updatetime) throws IOException {
+    private CloudUserFilesRepository.UserFile createDefaultGroup(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
         GpxFile file = new GpxFile(OSMAND_ROUTER_V2);
         file.getMetadata().setName(DEFAULT_GROUP_NAME);
         File tmpGpx = createTmpGpxFile(file, groupName);
@@ -148,7 +148,7 @@ public class FavoriteService {
         return userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
     }
     
-    public ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, PremiumUserDevicesRepository.PremiumUserDevice dev) throws IOException {
+    public ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         gpxFile.getMetadata().setName(groupName);
         String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
@@ -163,9 +163,9 @@ public class FavoriteService {
         return ResponseEntity.ok(gson.toJson(resp));
     }
     
-    public PremiumUserDevicesRepository.PremiumUserDevice getUserId() {
+    public CloudUserDevicesRepository.CloudUserDevice getUserId() {
         Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        PremiumUserDevicesRepository.PremiumUserDevice dev = null;
+        CloudUserDevicesRepository.CloudUserDevice dev = null;
         if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
             dev = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
         }

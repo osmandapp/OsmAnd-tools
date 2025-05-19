@@ -2,9 +2,9 @@ package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserFilesRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -62,11 +62,11 @@ public class ShareFileController {
 	public ResponseEntity<String> generateLink(@RequestParam String fileName,
 	                                           @RequestParam String fileType,
 	                                           @RequestParam Boolean publicAccess) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
+		CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
@@ -88,7 +88,7 @@ public class ShareFileController {
 		if (errorAccess != null) {
 			return errorAccess;
 		}
-		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
+		CloudUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
 		FileDownloadResult fileResult = shareFileService.downloadFile(userFile);
 		if (fileResult == null) {
 			return ResponseEntity.badRequest().body("Error downloading file");
@@ -106,7 +106,7 @@ public class ShareFileController {
 		if (shareFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		}
-		PremiumUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
+		CloudUserFilesRepository.UserFile userFile = shareFileService.getUserFile(shareFile);
 		if (userFile == null) {
 			return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 		} else if (userFile.filesize == -1) {
@@ -117,7 +117,7 @@ public class ShareFileController {
 			return errorAccess;
 		}
 		if (shareFile.publicAccess) {
-			PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+			CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev != null && dev.userid != shareFile.ownerid) {
 				boolean hasAccess = shareFileService.hasUserAccessToSharedFile(shareFile, dev.userid);
 				if (!hasAccess) {
@@ -151,7 +151,7 @@ public class ShareFileController {
 	@GetMapping(path = {"/request-access"}, produces = "application/json")
 	@Transactional
 	public ResponseEntity<?> requestAccess(@RequestParam String uuid, @RequestParam String nickname) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
@@ -170,14 +170,14 @@ public class ShareFileController {
 	public ResponseEntity<String> getFileInfo(@RequestParam String fileName,
 	                                          @RequestParam String fileType,
 	                                          @RequestParam boolean createIfNotExists) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, fileName);
 		if (shareFile == null) {
 			if (createIfNotExists) {
-				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
+				CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(fileName, fileType, null, dev);
 				if (userFile == null) {
 					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 				}
@@ -186,7 +186,7 @@ public class ShareFileController {
 				return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 			}
 		}
-		PremiumUsersRepository.PremiumUser user = userdataService.getUserById(shareFile.ownerid);
+		CloudUsersRepository.CloudUser user = userdataService.getUserById(shareFile.ownerid);
 		if (user == null) {
 			return ResponseEntity.badRequest().body("Error getting user info");
 		}
@@ -198,7 +198,7 @@ public class ShareFileController {
 	@GetMapping(path = {"/edit-access-list"}, produces = "application/json")
 	public ResponseEntity<String> editWhitelist(@RequestBody Map<Integer, String> accessMap,
 	                                            @RequestParam String fileName) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
@@ -216,7 +216,7 @@ public class ShareFileController {
 	@PostMapping(path = {"/update-requests"}, produces = "application/json")
 	public ResponseEntity<String> updateRequests(@RequestBody Map<Integer, String> requests,
 	                                             @RequestParam long fileId) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
@@ -242,14 +242,14 @@ public class ShareFileController {
 	                                              @RequestParam String fileType,
 	                                              @RequestParam String shareType,
 	                                              @RequestParam boolean createIfNotExists) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		ShareFileRepository.ShareFile shareFile = shareFileService.getFileByOwnerAndFilepath(dev.userid, filePath);
 		if (shareFile == null) {
 			if (createIfNotExists) {
-				PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(filePath, fileType, null, dev);
+				CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(filePath, fileType, null, dev);
 				if (userFile == null) {
 					return ResponseEntity.badRequest().body(FILE_NOT_FOUND);
 				}
@@ -273,7 +273,7 @@ public class ShareFileController {
 
 	@GetMapping(path = {"/get-shared-with-me"}, produces = "application/json")
 	public ResponseEntity<String> getSharedWithMe(@RequestParam String type) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
@@ -284,7 +284,7 @@ public class ShareFileController {
 	@PostMapping(path = {"/remove-shared-with-me-file"}, produces = "application/json")
 	public ResponseEntity<String> removeSharedWithMeFile(@RequestBody String name,
 	                                                     @RequestParam String type) {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
@@ -298,7 +298,7 @@ public class ShareFileController {
 	@PostMapping(path = {"/save-shared-file"}, produces = "application/json")
 	public ResponseEntity<String> saveSharedFile(@RequestBody List<String> names,
 	                                             @RequestParam String type) throws IOException {
-		PremiumUserDevicesRepository.PremiumUserDevice dev = osmAndMapsService.checkUser();
+		CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}

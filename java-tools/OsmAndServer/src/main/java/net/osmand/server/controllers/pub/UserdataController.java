@@ -33,20 +33,20 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
-import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
-import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFile;
-import net.osmand.server.api.repo.PremiumUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.util.Algorithms;
 
 @RestController
 @RequestMapping("/userdata")
 public class UserdataController {
-	private static final int ERROR_CODE_PREMIUM_USERS = 100;
-	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PREMIUM_USERS;
-	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PREMIUM_USERS;
-	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PREMIUM_USERS;
-	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PREMIUM_USERS;
+	private static final int ERROR_CODE_PRO_USERS = 100;
+	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PRO_USERS;
+	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
+	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PRO_USERS;
+	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PRO_USERS;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -60,13 +60,13 @@ public class UserdataController {
 	PasswordEncoder encoder;
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	@Autowired
-	protected PremiumUserFilesRepository filesRepository;
+	protected CloudUserFilesRepository filesRepository;
 
 	@Autowired
-	protected PremiumUserDevicesRepository devicesRepository;
+	protected CloudUserDevicesRepository devicesRepository;
 
 	@Autowired
 	protected StorageService storageService;
@@ -90,7 +90,7 @@ public class UserdataController {
     DeviceSubscriptionsRepository subscriptionsRepository;
 
     @Autowired
-    PremiumUsersRepository premiumUsersRepository;
+    CloudUsersRepository premiumUsersRepository;
 
     @Autowired
     SupportersRepository supportersRepository;
@@ -104,8 +104,8 @@ public class UserdataController {
 		public String lang;
 	}
 
-	private PremiumUserDevice checkToken(int deviceId, String accessToken) {
-		PremiumUserDevice d = devicesRepository.findById(deviceId);
+	private CloudUserDevice checkToken(int deviceId, String accessToken) {
+		CloudUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
 			return d;
 		}
@@ -147,21 +147,15 @@ public class UserdataController {
 	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken,
 			HttpServletRequest request) throws IOException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		PremiumUser pu = usersRepository.findById(dev.userid);
+		CloudUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		String errorMsg = userSubService.checkOrderIdPremium(pu.orderid);
-		if (errorMsg != null || Algorithms.isEmpty(pu.orderid)) {
-			boolean updated = userSubService.updateOrderId(pu);
-			if (updated) {
-				errorMsg = null;
-			}
-		}
+		String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
 		if (errorMsg != null) {
 			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
@@ -174,17 +168,17 @@ public class UserdataController {
 			@RequestParam(name = "orderid", required = false) String orderid,
 			HttpServletRequest request) throws IOException {
 		email = email.toLowerCase().trim();
-		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
 		// we allow to reset order id to null
 		if (orderid != null) {
-			String errorMsg = userSubService.checkOrderIdPremium(orderid);
+			String errorMsg = userSubService.checkOrderIdPro(orderid);
 			if (errorMsg != null) {
 				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 			}
-			PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+			CloudUser otherUser = usersRepository.findByOrderid(orderid);
 			if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
 				String hideEmail = userdataService.hideEmail(otherUser.email);
 				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
@@ -193,6 +187,9 @@ public class UserdataController {
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
+
+		userSubService.verifyAndRefreshProOrderId(pu);
+
 		return userdataService.ok();
 	}
 
@@ -209,7 +206,7 @@ public class UserdataController {
             HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
-		PremiumUser pu = usersRepository.findByEmailIgnoreCase(email);
+		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (!email.contains("@")) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
@@ -225,10 +222,10 @@ public class UserdataController {
 //				if (error != null) {
 //					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
 //				}
-				PremiumUser otherUser = usersRepository.findByOrderid(orderid);
+				CloudUser otherUser = usersRepository.findByOrderid(orderid);
 				if (otherUser != null) {
 					String hideEmail = userdataService.hideEmail(otherUser.email);
-					List<PremiumUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
+					List<CloudUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
 					// check that user already registered at least 1 device (avoid typos in email)
 					if (pud != null && !pud.isEmpty()) {
 						logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
@@ -238,7 +235,7 @@ public class UserdataController {
 					}
 				}
 			}
-			pu = new PremiumUsersRepository.PremiumUser();
+			pu = new CloudUsersRepository.CloudUser();
 			pu.email = email;
 			pu.regTime = new Date();
 			pu.orderid = orderid;
@@ -306,6 +303,10 @@ public class UserdataController {
         }
         // --- End Linking Logic ---
 
+	    if (pu != null) {
+		    userSubService.verifyAndRefreshProOrderId(pu);
+	    }
+
 		return userdataService.ok();
 	}
 
@@ -328,7 +329,7 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken,
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -343,7 +344,7 @@ public class UserdataController {
 	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
 	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
 	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		} else {
@@ -360,7 +361,7 @@ public class UserdataController {
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -380,7 +381,7 @@ public class UserdataController {
 	@PostMapping(value = "/remap-filenames")
 	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -401,7 +402,7 @@ public class UserdataController {
 		if (!storageService.hasStorageProviderById(storageId)) {
 			throw new OsmAndPublicApiException(400, "Storage id is not configured");
 		}
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -426,9 +427,9 @@ public class UserdataController {
 	                    @RequestParam(required = false) Long updatetime,
 	                    @RequestParam(name = "deviceid") int deviceId,
 	                    @RequestParam String accessToken) throws IOException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev != null) {
-			PremiumUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
+			CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (userFile != null) {
 				userdataService.getFile(userFile, response, request, name, type, dev);
 			}
@@ -442,7 +443,7 @@ public class UserdataController {
 			@RequestParam(name = "type", required = false) String type,
 			@RequestParam(name = "allVersions", required = false, defaultValue = "false") boolean allVersions)
 			throws IOException, SQLException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -456,7 +457,7 @@ public class UserdataController {
 	                                            @RequestParam(name = "deviceid") int deviceId,
 	                                            @RequestParam String accessToken,
 			HttpServletRequest request) throws ServletException {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -467,11 +468,11 @@ public class UserdataController {
 	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data,
 	                                       @RequestParam(name = "deviceid") int deviceId,
 			@RequestParam String accessToken) {
-		PremiumUserDevice dev = checkToken(deviceId, accessToken);
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		PremiumUsersRepository.PremiumUser pu = usersRepository.findById(dev.userid);
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}

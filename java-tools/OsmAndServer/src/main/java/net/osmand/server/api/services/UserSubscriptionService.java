@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.util.*;
 
 import net.osmand.purchases.*;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,7 @@ public class UserSubscriptionService {
 
 	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
 	public static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
+	public static final String OSMAND_CLOUD_INAPP = "osmand_cloud_inapp_";
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 
@@ -46,7 +49,10 @@ public class UserSubscriptionService {
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
+
+	@Autowired
+	protected CloudUsersRepository usersRepository;
 
 	private AndroidPublisher androidPublisher;
 	private HuaweiIAPHelper huaweiIAPHelper;
@@ -54,14 +60,27 @@ public class UserSubscriptionService {
 
 
 	// returns null if ok
-	public String checkOrderIdPremium(String orderid) {
+	public String checkOrderIdPro(String orderid) {
 		if (Algorithms.isEmpty(orderid)) {
 			return null;
 		}
-		String errorMsg = "no subscription present";
+		String errorMsg;
+		String subErr = checkProSubscription(orderid);
+		if (subErr == null) {
+			return null;
+		}
+		errorMsg = subErr;
+		String inappErr = checkProInapp(orderid);
+		if (inappErr != null) {
+			errorMsg += "; " + inappErr;
+		}
+		return errorMsg;
+	}
+
+	private String checkProSubscription(String orderid) {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
-			// s.sku could be checked for premium
+			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
 				if (s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
 					s = revalidateGoogleSubscription(s);
@@ -76,7 +95,7 @@ public class UserSubscriptionService {
 				}
 			}
 			if (s.valid == null || !s.valid) {
-				errorMsg = "no valid subscription present";
+				return "no valid subscription present";
 			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
 					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
@@ -84,13 +103,64 @@ public class UserSubscriptionService {
 					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION) &&
 					!s.sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
-				errorMsg = "subscription is not eligible for OsmAnd Cloud";
+				return "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
 					return null;
 				} else {
-					errorMsg = "subscription is expired or not validated yet";
+					return "subscription is expired or not validated yet";
 				}
+			}
+		}
+		return "no subscription present";
+	}
+
+	private String checkProInapp(String orderid) {
+		List<SupporterDeviceInAppPurchase> lst = inAppPurchasesRepo.findByOrderId(orderid);
+		for (SupporterDeviceInAppPurchase p : lst) {
+			if (!p.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+				return "inapp is not eligible for OsmAnd Cloud";
+			}
+			if (p.valid == null || !p.valid) {
+				return "no valid inapp purchase present";
+			} else {
+				int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
+				Calendar calendar = Calendar.getInstance();
+				calendar.setTime(p.getPurchaseTime());
+				calendar.add(Calendar.YEAR, years);
+				Date expireTime = getExpireTimeInAppCloudPurchase(p);
+				if (expireTime != null && expireTime.getTime() > System.currentTimeMillis()) {
+					return null;
+				} else {
+					return "inapp purchase is expired or not validated yet";
+				}
+			}
+		}
+		return "no inapp purchase present";
+	}
+
+	private Date getExpireTimeInAppCloudPurchase(SupporterDeviceInAppPurchase p) {
+		if (p == null || p.sku == null || !p.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+			return null;
+		}
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(p.getPurchaseTime());
+		int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
+		calendar.add(Calendar.YEAR, years);
+
+		return calendar.getTime();
+	}
+
+	public String verifyAndRefreshProOrderId(CloudUsersRepository.CloudUser pu) {
+		String errorMsg = checkOrderIdPro(pu.orderid);
+		if (errorMsg != null) {
+			boolean updated = updateSubscriptionUserId(pu);
+			if (!updated) {
+				updateInAppPurchaseUserId(pu);
+			}
+			updated = updateOrderId(pu);
+			if (updated) {
+				return null;
 			}
 		}
 		return errorMsg;
@@ -228,8 +298,10 @@ public class UserSubscriptionService {
 		return s;
 	}
 
-	public boolean updateOrderId(PremiumUsersRepository.PremiumUser pu) {
-		updateSubscriptionUserId(pu);
+	public boolean updateOrderId(CloudUsersRepository.CloudUser pu) {
+		// get the latest subscription
+		Date subExpire = new Date(0);
+		String subOrderId = null;
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
 			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
@@ -243,16 +315,42 @@ public class UserSubscriptionService {
 			if (maxExpiryValid.isPresent()) {
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = maxExpiryValid.get();
 				if (subscription.orderId != null) {
-					pu.orderid = subscription.orderId;
-					usersRepository.saveAndFlush(pu);
-					return true;
+					subExpire = subscription.expiretime;
+					subOrderId = subscription.orderId;
 				}
 			}
+		}
+		// get the latest inapp purchase
+		Date inappExpire = new Date(0);
+		String inappOrderId = null;
+		List<SupporterDeviceInAppPurchase> inApps = inAppPurchasesRepo.findByOrderId(pu.orderid);
+		if (inApps != null && !inApps.isEmpty()) {
+			for (SupporterDeviceInAppPurchase p : inApps) {
+				if (Boolean.TRUE.equals(p.valid)
+						&& p.sku.startsWith(OSMAND_CLOUD_INAPP)
+						&& p.getPurchaseTime() != null) {
+					Date expire = getExpireTimeInAppCloudPurchase(p);
+					if (expire.after(inappExpire)) {
+						inappExpire = expire;
+						inappOrderId = p.orderId;
+					}
+				}
+			}
+		}
+
+		if (subOrderId != null || inappOrderId != null) {
+			if (inappOrderId != null && inappExpire.after(subExpire)) {
+				pu.orderid = inappOrderId;
+			} else {
+				pu.orderid = subOrderId;
+			}
+			usersRepository.saveAndFlush(pu);
+			return true;
 		}
 		return false;
 	}
 
-	public boolean updateSubscriptionUserId(PremiumUsersRepository.PremiumUser pu) {
+	public boolean updateSubscriptionUserId(CloudUsersRepository.CloudUser pu) {
 		if (pu.orderid == null) {
 			return false;
 		}
@@ -262,6 +360,23 @@ public class UserSubscriptionService {
 				if (s.userId == null) {
 					s.userId = pu.id;
 					subscriptionsRepo.saveAndFlush(s);
+				}
+			});
+			return true;
+		}
+		return false;
+	}
+
+	public boolean updateInAppPurchaseUserId(CloudUsersRepository.CloudUser pu) {
+		if (pu.orderid == null) {
+			return false;
+		}
+		List<SupporterDeviceInAppPurchase> inAppPurchases = inAppPurchasesRepo.findByOrderId(pu.orderid);
+		if (inAppPurchases != null && !inAppPurchases.isEmpty()) {
+			inAppPurchases.forEach(s -> {
+				if (s.userId == null && !s.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+					s.userId = pu.id;
+					inAppPurchasesRepo.saveAndFlush(s);
 				}
 			});
 			return true;

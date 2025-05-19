@@ -86,11 +86,11 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 			accessRecords.add(access);
 			access.file = (this);
 		}
-		
+
 		public String getType() {
 			return type;
 		}
-		
+
 		public String getFilepath() {
 			return filepath;
 		}
@@ -109,7 +109,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 
 		@ManyToOne
 		@JoinColumn(name = "user_id", nullable = false)
-		public PremiumUsersRepository.PremiumUser user;
+		public CloudUsersRepository.CloudUser user;
 
 		@Column(nullable = false)
 		public String access;
@@ -122,7 +122,7 @@ public interface ShareFileRepository extends JpaRepository<ShareFileRepository.S
 		@JoinColumn(name = "file_id", nullable = false)
 		public ShareFile file;
 
-		public PremiumUsersRepository.PremiumUser getUser() {
+		public CloudUsersRepository.CloudUser getUser() {
 			return user;
 		}
 

@@ -1,7 +1,7 @@
 package net.osmand.server.api.services;
 
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.PromoCampaignRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +22,7 @@ public class PromoService {
 	private EmailSenderService emailSender;
 
 	@Autowired
-	private PremiumUsersRepository usersRepository;
+	private CloudUsersRepository usersRepository;
 
 	@Autowired
 	protected UserSubscriptionService userSubService;
@@ -46,7 +46,7 @@ public class PromoService {
 			String key = "promo_" + promoCampaign.name;
 			Date expireTime = getExpirationDate(promoCampaign);
 			PromoResponse resp = createPromoSubscription(email, key, expireTime);
-			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmailIgnoreCase(email);
+			CloudUsersRepository.CloudUser existingUser = usersRepository.findByEmailIgnoreCase(email);
 			if (existingUser != null && !resp.error) {
 				promoCampaign.used++;
 				promoCampaign.lastUsers = getLastUsers(promoCampaign);
@@ -89,7 +89,7 @@ public class PromoService {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository
 				.findFirst5BySkuOrderByStarttimeDesc("promo_" + promoCampaign.name);
 		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptions) {
-			PremiumUsersRepository.PremiumUser user = usersRepository.findByOrderid(subscription.orderId);
+			CloudUsersRepository.CloudUser user = usersRepository.findByOrderid(subscription.orderId);
 			if (user != null) {
 				res.append(user.email).append(" | ");
 			}
@@ -118,20 +118,25 @@ public class PromoService {
 		}
 		boolean error = false;
 		if (emailSender.isEmail(email)) {
-			PremiumUsersRepository.PremiumUser existingUser = usersRepository.findByEmailIgnoreCase(email);
+			CloudUsersRepository.CloudUser existingUser = usersRepository.findByEmailIgnoreCase(email);
 			if (existingUser == null) {
-				PremiumUsersRepository.PremiumUser pu = new PremiumUsersRepository.PremiumUser();
+				CloudUsersRepository.CloudUser pu = new CloudUsersRepository.CloudUser();
 				pu.email = email;
 				pu.regTime = new Date();
 				pu.orderid = deviceSub.orderId;
 				usersRepository.saveAndFlush(pu);
 				deviceSub.purchaseToken += " (email sent & registered)";
+				deviceSub.userId = pu.id; 
+				subscriptionsRepository.save(deviceSub);
 				emailSender.sendOsmAndCloudPromoEmail(email, deviceSub.orderId);
 			} else {
-				if (existingUser.orderid == null || userSubService.checkOrderIdPremium(existingUser.orderid) != null) {
+				if (existingUser.orderid == null || userSubService.checkOrderIdPro(existingUser.orderid) != null) {
 					existingUser.orderid = deviceSub.orderId;
-					usersRepository.saveAndFlush(existingUser);
+					deviceSub.userId = existingUser.id;
 					deviceSub.purchaseToken += " (new PRO subscription is updated)";
+					subscriptionsRepository.save(deviceSub);
+					usersRepository.saveAndFlush(existingUser);
+					userSubService.verifyAndRefreshProOrderId(existingUser);
 				} else {
 					error = true;
 					deviceSub.purchaseToken += " (ERROR: user already has PRO subscription)";
@@ -141,8 +146,8 @@ public class PromoService {
 			error = true;
 			deviceSub.purchaseToken += " (ERROR: please enter email only)";
 		}
+
 		if (!error) {
-			subscriptionsRepository.save(deviceSub);
 			return new PromoResponse(deviceSub, false);
 		}
 		return new PromoResponse(deviceSub, true);

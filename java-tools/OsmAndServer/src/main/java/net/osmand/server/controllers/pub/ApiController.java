@@ -72,8 +72,8 @@ import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 import net.osmand.util.Algorithms;
 
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
-import static net.osmand.server.api.repo.PremiumUserDevicesRepository.*;
-import static net.osmand.server.api.repo.PremiumUsersRepository.*;
+import static net.osmand.server.api.repo.CloudUserDevicesRepository.*;
+import static net.osmand.server.api.repo.CloudUsersRepository.*;
 
 @Controller
 @RequestMapping("/api")
@@ -123,10 +123,10 @@ public class ApiController {
     private DeviceInAppPurchasesRepository iapsRepository;
 
     @Autowired
-    private PremiumUsersRepository premiumUsersRepository;
+    private CloudUsersRepository usersRepository;
 
     @Autowired
-    private PremiumUserDevicesRepository premiumUserDevicesRepository;
+    private CloudUserDevicesRepository userDevicesRepository;
 
     @Autowired
 	OsmAndServerMonitorTasks monitoring;
@@ -413,7 +413,7 @@ public class ApiController {
 			}
 		}
 		if (!Algorithms.isEmpty(deviceId) && !Algorithms.isEmpty(accessToken) && Algorithms.isEmpty(orderId)) {
-            PremiumUser pu = resolvePremiumUser(deviceId, accessToken);
+            CloudUser pu = resolveUser(deviceId, accessToken);
 			if (pu != null) {
                 orderId = pu.orderid;
 			}
@@ -481,7 +481,7 @@ public class ApiController {
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
 		}
-		PremiumUser pu = resolvePremiumUser(deviceId, accessToken);
+		CloudUser pu = resolveUser(deviceId, accessToken);
 		if (pu != null) {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(pu.id);
 			List<SupporterDeviceSubscription> activeSubscriptions = new ArrayList<>();
@@ -510,7 +510,7 @@ public class ApiController {
             @RequestParam(required = false) String accessToken,
             @RequestHeader HttpHeaders headers, HttpServletRequest request) {
 
-        PremiumUser pu = resolvePremiumUser(deviceId, accessToken);
+        CloudUser pu = resolveUser(deviceId, accessToken);
         Supporter sup = resolveSupporter(userId, userToken);
         if (pu == null && sup == null) {
             return "{}";
@@ -546,7 +546,7 @@ public class ApiController {
         return null;
     }
 
-    private PremiumUser resolvePremiumUser(String deviceId, String accessToken) {
+    private CloudUser resolveUser(String deviceId, String accessToken) {
         if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(accessToken)) {
             return null;
         }
@@ -556,9 +556,9 @@ public class ApiController {
         } catch (NumberFormatException e) {
             return null;
         }
-        PremiumUserDevice device = premiumUserDevicesRepository.findById(devId);
+        CloudUserDevice device = userDevicesRepository.findById(devId);
         if (device != null && Algorithms.stringsEqual(device.accesstoken, accessToken)) {
-            return premiumUsersRepository.findById(device.userid);
+            return usersRepository.findById(device.userid);
         }
         return null;
     }

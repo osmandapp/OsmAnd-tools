@@ -49,10 +49,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import net.osmand.server.api.repo.PremiumUserDevicesRepository;
-import net.osmand.server.api.repo.PremiumUserDevicesRepository.PremiumUserDevice;
-import net.osmand.server.api.repo.PremiumUsersRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.UserdataService;
 
 @Configuration
@@ -77,10 +77,10 @@ public class WebSecurityConfiguration {
 
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
     
     @Autowired
-	protected PremiumUserDevicesRepository devicesRepository;
+	protected CloudUserDevicesRepository devicesRepository;
 	
 	@Autowired
 	UserdataService userdataService;
@@ -92,15 +92,15 @@ public class WebSecurityConfiguration {
 	public static class OsmAndProUser extends User {
 
 		private static final long serialVersionUID = -881322456618342435L;
-		PremiumUserDevice userDevice;
+		CloudUserDevice userDevice;
 
-		public OsmAndProUser(String username, String password, PremiumUserDevice pud,
+		public OsmAndProUser(String username, String password, CloudUserDevice pud,
 				List<GrantedAuthority> authorities) {
 			super(username, password, authorities);
 			this.userDevice = pud;
 		}
 
-		public PremiumUserDevice getUserDevice() {
+		public CloudUserDevice getUserDevice() {
 			return userDevice;
 		}
 	}
@@ -141,10 +141,10 @@ public class WebSecurityConfiguration {
 	@Bean
 	public UserDetailsService userDetailsService() {
 		return username -> {
-			PremiumUser pu = usersRepository.findByEmailIgnoreCase(username);
+			CloudUser pu = usersRepository.findByEmailIgnoreCase(username);
 			if (pu == null) throw new UsernameNotFoundException(username);
 
-			PremiumUserDevice pud = devicesRepository
+			CloudUserDevice pud = devicesRepository
 					.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id, UserdataService.TOKEN_DEVICE_WEB);
 			if (pud == null) throw new UsernameNotFoundException(username);
 

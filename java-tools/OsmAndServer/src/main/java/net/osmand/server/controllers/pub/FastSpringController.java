@@ -6,7 +6,8 @@ import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.api.repo.PremiumUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +24,16 @@ import java.util.*;
 public class FastSpringController {
 
 	@Autowired
-	protected PremiumUsersRepository usersRepository;
+	protected CloudUsersRepository usersRepository;
 
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 
 	@Autowired
 	DeviceSubscriptionsRepository deviceSubscriptionsRepository;
+
+	@Autowired
+	protected UserSubscriptionService userSubService;
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
@@ -40,7 +44,7 @@ public class FastSpringController {
 			if ("order.completed".equals(event.type)) {
 				FastSpringOrderCompletedRequest.Data data = event.data;
 				String email = data.customer.email;
-				PremiumUsersRepository.PremiumUser user = usersRepository.findByEmailIgnoreCase(email);
+				CloudUsersRepository.CloudUser user = usersRepository.findByEmailIgnoreCase(email);
 
 				if (user != null) {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
@@ -81,7 +85,6 @@ public class FastSpringController {
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
 								subscription.valid = true;
-								updatePremiumUserOrderId(user.id, orderId, sku);
 
 								subscriptions.add(subscription);
 							}
@@ -92,33 +95,12 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
-				}
 
+					userSubService.verifyAndRefreshProOrderId(user);
+				}
 			}
 		}
 		return ResponseEntity.ok("OK");
-	}
-
-	private void updatePremiumUserOrderId(int userId, String orderId, String sku) {
-		if (orderId == null || !FastSpringHelper.proSubscriptionSkuMap.contains(sku)) {
-			return;
-		}
-		PremiumUsersRepository.PremiumUser user = usersRepository.findById(userId);
-		if (user == null) {
-			return;
-		}
-		if (user.orderid != null && !user.orderid.isEmpty()) {
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = deviceSubscriptionsRepository.findByOrderId(user.orderid);
-			if (subscriptions != null && !subscriptions.isEmpty()) {
-				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription s : subscriptions) {
-					if (s.sku.equals(sku) && Boolean.TRUE.equals(s.valid)) {
-						return;
-					}
-				}
-			}
-		}
-		user.orderid = orderId;
-		usersRepository.saveAndFlush(user);
 	}
 
 

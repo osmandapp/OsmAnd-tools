@@ -46,7 +46,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceS
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotterySeries;
 import net.osmand.server.api.repo.LotterySeriesRepository.LotteryStatus;
-import net.osmand.server.api.repo.PremiumUsersRepository.PremiumUser;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerRegion;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerType;
@@ -56,6 +56,8 @@ import net.osmand.server.controllers.pub.ReportsController;
 import net.osmand.server.controllers.pub.ReportsController.BtcTransactionReport;
 import net.osmand.server.controllers.pub.ReportsController.PayoutResult;
 import net.osmand.server.controllers.pub.WebController;
+
+import static net.osmand.server.api.services.UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION;
 
 @Controller
 @RequestMapping("/admin")
@@ -86,7 +88,7 @@ public class AdminController {
 	private DeviceSubscriptionsRepository subscriptionsRepository;
 
 	@Autowired
-	private PremiumUsersRepository usersRepository;
+	private CloudUsersRepository usersRepository;
 
 	@Autowired
 	private EmailRegistryService emailService;
@@ -228,7 +230,7 @@ public class AdminController {
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
 	public ResponseEntity<String> downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
-		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		CloudUser pu = usersRepository.findByOrderid(orderId);
 		if (pu != null) {
 			SupporterDeviceSubscription subscription = new SupporterDeviceSubscription();
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(pu.orderid);
@@ -236,7 +238,7 @@ public class AdminController {
 				subscription = subscriptions.get(0);
 			}
 			// downgrade only promo_website
-			if (subscription != null && subscription.sku.equals(subscriptionType)) {
+			if (subscription != null && subscription.sku.equals(subscriptionType) && subscription.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
 				// update expiretime
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(System.currentTimeMillis());
@@ -246,6 +248,8 @@ public class AdminController {
 				pu.orderid = null;
 				usersRepository.saveAndFlush(pu);
 			}
+			userSubService.verifyAndRefreshProOrderId(pu);
+
 		}
 		return ResponseEntity.ok("Downgrade successful");
 	}
@@ -260,7 +264,7 @@ public class AdminController {
 	@PostMapping("/get-email-by-orderId")
 	@ResponseBody
 	public ResponseEntity<String> getEmailByOrderId(@RequestParam String orderId) {
-		PremiumUser pu = usersRepository.findByOrderid(orderId);
+		CloudUser pu = usersRepository.findByOrderid(orderId);
 		if (pu != null) {
 			return ResponseEntity.ok().body(pu.email);
 		}
