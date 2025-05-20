@@ -217,6 +217,7 @@ public class AdminController {
 	public String searchSubscription(@RequestParam String identifier, final RedirectAttributes redirectAttrs) {
 		List<SupporterDeviceSubscription> deviceSubList = adminService.getSubscriptionsByIdentifier(identifier);
 		redirectAttrs.addFlashAttribute("subscriptions", deviceSubList);
+		redirectAttrs.addFlashAttribute("identifier", identifier);
 		return "redirect:info#audience";
 	}
 
@@ -230,34 +231,29 @@ public class AdminController {
 	@Transactional
 	@PostMapping(path = {"/downgrade-subscription"})
 	public ResponseEntity<String> downgradeSubscription(@RequestParam String orderId, @RequestParam String subscriptionType) {
-		CloudUser pu = usersRepository.findByOrderid(orderId);
-		if (pu != null) {
-			SupporterDeviceSubscription subscription = new SupporterDeviceSubscription();
-			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(pu.orderid);
-			if (subscriptions != null && !subscriptions.isEmpty()) {
-				subscription = subscriptions.get(0);
-			}
-			// downgrade only promo_website
-			if (subscription != null && subscription.sku.equals(subscriptionType) && subscription.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
-				// update expiretime
-				Calendar c = Calendar.getInstance();
-				c.setTimeInMillis(System.currentTimeMillis());
-				subscription.expiretime = c.getTime();
-				subscriptionsRepository.save(subscription);
-				// remove user orderid
-				pu.orderid = null;
-				usersRepository.saveAndFlush(pu);
-			}
-			userSubService.verifyAndRefreshProOrderId(pu);
-
+		List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(orderId);
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			subscriptions.forEach(s -> {
+				// downgrade only promo_website
+				if (s.sku.equals(subscriptionType) && s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
+					Calendar c = Calendar.getInstance();
+					c.setTimeInMillis(System.currentTimeMillis());
+					s.expiretime = c.getTime();
+					subscriptionsRepository.save(s);
+					CloudUser pu = usersRepository.findByOrderid(s.orderId);
+					if (pu != null) {
+						userSubService.verifyAndRefreshProOrderId(pu);
+					}
+				}
+			});
 		}
 		return ResponseEntity.ok("Downgrade successful");
 	}
 	
 	@GetMapping(path = {"/get-subscription-details"})
 	@ResponseBody
-	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String email) {
-		SupporterDeviceSubscription deviceSub = adminService.getSubscriptionDetailsByIdentifier(email);
+	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String identifier) {
+		SupporterDeviceSubscription deviceSub = adminService.getSubscriptionDetailsByIdentifier(identifier);
 		return ResponseEntity.ok(deviceSub);
 	}
 
