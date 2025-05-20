@@ -1,8 +1,6 @@
 package net.osmand.server.api.repo;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.io.Serial;
@@ -27,8 +25,6 @@ public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterD
 
     List<SupporterDeviceInAppPurchase> findBySupporterIdAndValidTrue(Long supporterId);
 
-    @Getter
-    @Setter
     @Entity
     @Table(name = "supporters_device_iap")
     @IdClass(SupporterDeviceInAppPurchasePrimaryKey.class)

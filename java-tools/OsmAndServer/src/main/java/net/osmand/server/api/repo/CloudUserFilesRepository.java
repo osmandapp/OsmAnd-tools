@@ -11,8 +11,6 @@ import jakarta.persistence.*;
 import com.vladmihalcea.hibernate.type.array.StringArrayType;
 
 import com.google.gson.Gson;
-import lombok.Getter;
-import lombok.Setter;
 import net.osmand.data.QuadRect;
 import net.osmand.server.assist.data.JsonbType;
 import org.hibernate.annotations.Type;

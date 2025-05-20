@@ -10,8 +10,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import kotlin.Pair;
-import lombok.Getter;
-import lombok.Setter;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -187,8 +185,6 @@ public class WebGpxParser {
         }
     }
 
-    @Getter
-    @Setter
     public class WebTrack {
         private List<Point> points;
 

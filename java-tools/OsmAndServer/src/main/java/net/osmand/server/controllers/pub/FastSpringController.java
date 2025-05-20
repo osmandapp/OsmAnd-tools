@@ -1,7 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import lombok.Getter;
-import lombok.Setter;
 import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
@@ -104,38 +102,28 @@ public class FastSpringController {
 	}
 
 
-	@Setter
-	@Getter
 	public static class FastSpringOrderCompletedRequest {
 
 		private List<Event> events;
 
-		@Getter
-		@Setter
 		public static class Event {
-			private String type;
-			private Long created; // purchaseTime
-			private Data data;
+			public String type;
+			public Long created; // purchaseTime
+			public Data data;
 		}
 
-		@Getter
-		@Setter
 		private static class Data {
-			private String order; // orderId
-			private Customer customer;
-			private List<Item> items;
+			public String order; // orderId
+			public Customer customer;
+			public List<Item> items;
 		}
 
-		@Getter
-		@Setter
 		private static class Customer {
-			private String email;
+			public String email;
 		}
 
-		@Getter
-		@Setter
 		private static class Item {
-			private String sku;
+			public String sku;
 		}
 	}
 

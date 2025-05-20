@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import lombok.Getter;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
@@ -50,7 +49,6 @@ public class TrackAnalyzerService {
 			"elevation", 99999.0
 	);
 
-	@Getter
 	public static class TrackAnalyzerRequest {
 		final List<Map<String, Double>> points;
 		final List<String> folders;

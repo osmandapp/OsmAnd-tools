@@ -126,7 +126,7 @@ public class UserSubscriptionService {
 			} else {
 				int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
 				Calendar calendar = Calendar.getInstance();
-				calendar.setTime(p.getPurchaseTime());
+				calendar.setTime(p.purchaseTime);
 				calendar.add(Calendar.YEAR, years);
 				Date expireTime = getExpireTimeInAppCloudPurchase(p);
 				if (expireTime != null && expireTime.getTime() > System.currentTimeMillis()) {
@@ -144,7 +144,7 @@ public class UserSubscriptionService {
 			return null;
 		}
 		Calendar calendar = Calendar.getInstance();
-		calendar.setTime(p.getPurchaseTime());
+		calendar.setTime(p.purchaseTime);
 		int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
 		calendar.add(Calendar.YEAR, years);
 
@@ -328,7 +328,7 @@ public class UserSubscriptionService {
 			for (SupporterDeviceInAppPurchase p : inApps) {
 				if (Boolean.TRUE.equals(p.valid)
 						&& p.sku.startsWith(OSMAND_CLOUD_INAPP)
-						&& p.getPurchaseTime() != null) {
+						&& p.purchaseTime != null) {
 					Date expire = getExpireTimeInAppCloudPurchase(p);
 					if (expire.after(inappExpire)) {
 						inappExpire = expire;
