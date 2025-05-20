@@ -82,7 +82,7 @@ dependencies {
 
     implementation "org.telegram:telegrambots:5.7.1"
 
-    implementation "org.springframework.security.oauth:spring-security-oauth2:2.2.2.RELEASE"
+    implementation 'org.springframework.security.oauth:spring-security-oauth2:2.5.2.RELEASE'
     implementation "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.0.1.RELEASE"
 
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
@@ -92,7 +92,7 @@ dependencies {
 
     implementation "org.apache.commons:commons-collections4:4.1"
     implementation "com.j256.simplecsv:simplecsv:2.3"
-    implementation "com.google.code.gson:gson:2.8.2"
+    implementation 'com.google.code.gson:gson:2.8.9'
     implementation "org.apache.commons:commons-math3:3.6.1"
 
     implementation 'org.apache.commons:commons-email:1.5'
@@ -102,8 +102,8 @@ dependencies {
 	
 
     // frontend
-    implementation "org.webjars:jquery:3.3.1"
-    implementation "org.webjars:bootstrap:3.3.7"
+    implementation 'org.webjars:jquery:3.5.0'
+    implementation 'org.webjars:bootstrap:5.0.0'
     implementation "org.webjars:vue:2.5.13"
     implementation "org.webjars:webjars-locator-core"
 
