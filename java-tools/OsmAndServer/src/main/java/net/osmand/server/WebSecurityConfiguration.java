@@ -214,6 +214,7 @@ public class WebSecurityConfiguration {
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/admin/security-error").permitAll()
+						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
