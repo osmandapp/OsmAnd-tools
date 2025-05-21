@@ -40,6 +40,7 @@ public class SearchService {
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
+    private static final double SEARCH_BRAND_RADIUS_DEGREE = 0.5;
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
@@ -156,7 +157,7 @@ public class SearchService {
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
                 if (!res.isEmpty()) {
-                    res = filterBrandsOutsideBBox(res, northWest, southEast);
+                    res = filterBrandsOutsideBBox(res, lat, lon, baseSearch);
                     res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
                     saveSearchResult(res, features);
                 }
@@ -171,28 +172,24 @@ public class SearchService {
         }
     }
 
-    private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast) throws IOException {
-        if (northWest != null && southEast != null) {
-            List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
-            QuadRect searchBbox = getSearchBbox(bbox);
-            if (searchBbox != null) {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
-                List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
-                if (!mapList.isEmpty()) {
-                    return res.stream()
-                            .filter(r -> {
-                                if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
-                                    return true;
-                                }
-                                String targetName = r.file.getFile().getName();
-                                return readers.stream()
-                                        .map(BinaryMapIndexReader::getFile)
-                                        .map(java.io.File::getName)
-                                        .anyMatch(name -> name.equals(targetName));
-                            })
-                            .toList();
-                }
-            }
+    private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, double lat, double lon, boolean baseSearch) throws IOException {
+        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_BRAND_RADIUS_DEGREE, lon - SEARCH_BRAND_RADIUS_DEGREE),
+                new LatLon(lat - SEARCH_BRAND_RADIUS_DEGREE, lon + SEARCH_BRAND_RADIUS_DEGREE));
+        List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(points, baseSearch);
+        List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
+        if (!mapList.isEmpty()) {
+            return res.stream()
+                    .filter(r -> {
+                        if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
+                            return true;
+                        }
+                        String targetName = r.file.getFile().getName();
+                        return readers.stream()
+                                .map(BinaryMapIndexReader::getFile)
+                                .map(java.io.File::getName)
+                                .anyMatch(name -> name.equals(targetName));
+                    })
+                    .toList();
         }
         return res;
     }
