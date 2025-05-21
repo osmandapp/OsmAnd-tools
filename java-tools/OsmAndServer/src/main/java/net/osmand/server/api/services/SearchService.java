@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
@@ -156,7 +155,7 @@ public class SearchService {
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
                 if (!res.isEmpty()) {
-                    res = filterBrandsOutsideBBox(res, northWest, southEast);
+                    res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon);
                     res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
                     saveSearchResult(res, features);
                 }
@@ -171,30 +170,68 @@ public class SearchService {
         }
     }
 
-    private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast) throws IOException {
+    private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast, String locale, double lat, double lon) throws IOException {
         if (northWest != null && southEast != null) {
             List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             QuadRect searchBbox = getSearchBbox(bbox);
-            if (searchBbox != null) {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
-                List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
-                if (!mapList.isEmpty()) {
-                    return res.stream()
-                            .filter(r -> {
-                                if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
+            List<BinaryMapIndexReader> readers = new ArrayList<>();
+            try {
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
+                readers = osmAndMapsService.getReaders(mapList, null);
+                if (readers.isEmpty()) {
+                    return res.stream().filter(r-> r.objectType != ObjectType.POI_TYPE || r.file == null).toList();
+                }
+                SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(readers, searchBbox, locale, lat, lon);
+                return res.stream()
+                        .filter(r -> {
+                            if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
+                                return true;
+                            }
+                            Map<String, String> tags = getPoiTypeFields(r.object);
+                            if (tags.isEmpty()) {
+                                return true;
+                            }
+                            if (tags.get(PoiTypeField.CATEGORY_KEY_NAME.getFieldName()).startsWith("brand")) {
+                                SearchUICore.SearchResultCollection resultCollection;
+                                try {
+                                    String brand = tags.get(PoiTypeField.NAME.getFieldName());
+                                    SearchResult prevResult = new SearchResult();
+                                    prevResult.object = r.object;
+                                    prevResult.localeName = brand;
+                                    prevResult.objectType = ObjectType.POI_TYPE;
+                                    searchUICore.resetPhrase(prevResult);
+                                    resultCollection = searchPoiByCategory(searchUICore, brand, 2);
+                                } catch (IOException e) {
                                     return true;
                                 }
-                                String targetName = r.file.getFile().getName();
-                                return readers.stream()
-                                        .map(BinaryMapIndexReader::getFile)
-                                        .map(java.io.File::getName)
-                                        .anyMatch(name -> name.equals(targetName));
-                            })
-                            .toList();
-                }
+                                return resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty();
+                            }
+                            return true;
+                        })
+                        .toList();
+            } finally {
+                osmAndMapsService.unlockReaders(readers);
             }
         }
         return res;
+    }
+
+    private SearchUICore prepareSearchUICoreForSearchByPoiType(List<BinaryMapIndexReader> readers, QuadRect searchBbox, String locale, double lat, double lon)  {
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
+
+        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
+
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
+        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
+        searchUICore.registerAPI(searchAmenityByTypesAPI);
+        SearchSettings settings = searchUICore.getSearchSettings().setSearchTypes(ObjectType.POI);
+        settings = settings.setOriginalLocation(new LatLon(lat, lon));
+        settings.setRegions(osmandRegions);
+
+        settings.setOfflineIndexes(readers);
+        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+
+        return searchUICore;
     }
 
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
@@ -227,7 +264,7 @@ public class SearchService {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
@@ -365,7 +402,7 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         SearchResult res = null;
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
             if (!mapList.isEmpty()) {
                 usedMapList = osmAndMapsService.getReaders(mapList, null);
                 for (BinaryMapIndexReader map : usedMapList) {
@@ -398,10 +435,10 @@ public class SearchService {
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
-    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox) throws IOException {
+    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox, int limit) throws IOException {
         if (searchBbox != null) {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, MAX_NUMBER_OF_MAP_SEARCH_POI, "search");
-            if (list.size() < MAX_NUMBER_OF_MAP_SEARCH_POI) {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, limit, "search");
+            if (list.size() < limit || limit == 0) {
                 return list;
             }
         }
