@@ -176,10 +176,10 @@ public class SearchService {
             QuadRect searchBbox = getSearchBbox(bbox);
             List<BinaryMapIndexReader> readers = new ArrayList<>();
             try {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, 0);
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
                 readers = osmAndMapsService.getReaders(mapList, null);
                 if (readers.isEmpty()) {
-                    return res;
+                    return res.stream().filter(r-> r.objectType != ObjectType.POI_TYPE || r.file == null).toList();
                 }
                 SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(readers, searchBbox, locale, lat, lon);
                 return res.stream()
