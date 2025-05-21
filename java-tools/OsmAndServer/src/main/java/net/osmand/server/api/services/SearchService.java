@@ -173,43 +173,50 @@ public class SearchService {
     private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast, String locale, double lat, double lon) throws IOException {
         if (northWest != null && southEast != null) {
             List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
-            if (bbox != null) {
-                SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(bbox, locale, lat, lon);
-                if (searchUICore != null) {
-                    return res.stream()
-                            .filter(r -> {
-                                if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
-                                    return true;
-                                }
-                                Map<String, String> tags = getPoiTypeFields(r.object);
-                                if (tags.isEmpty()) {
-                                    return true;
-                                }
-                                if (tags.get(PoiTypeField.CATEGORY_KEY_NAME.getFieldName()).startsWith("brand")) {
-                                    SearchUICore.SearchResultCollection resultCollection;
-                                    try {
-                                        String brand = tags.get(PoiTypeField.NAME.getFieldName());
-                                        SearchResult prevResult = new SearchResult();
-                                        prevResult.object = r.object;
-                                        prevResult.localeName = brand;
-                                        prevResult.objectType = ObjectType.POI_TYPE;
-                                        searchUICore.resetPhrase(prevResult);
-                                        resultCollection = searchPoiByCategory(searchUICore, brand, 2);
-                                    } catch (IOException e) {
-                                        return true;
-                                    }
-                                    return resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty();
-                                }
-                                return true;
-                            })
-                            .toList();
+            QuadRect searchBbox = getSearchBbox(bbox);
+            List<BinaryMapIndexReader> readers = new ArrayList<>();
+            try {
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
+                readers = osmAndMapsService.getReaders(mapList, null);
+                if (readers.isEmpty()) {
+                    return res;
                 }
+                SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(readers, searchBbox, locale, lat, lon);
+                return res.stream()
+                        .filter(r -> {
+                            if (r.objectType != ObjectType.POI_TYPE || r.file == null) {
+                                return true;
+                            }
+                            Map<String, String> tags = getPoiTypeFields(r.object);
+                            if (tags.isEmpty()) {
+                                return true;
+                            }
+                            if (tags.get(PoiTypeField.CATEGORY_KEY_NAME.getFieldName()).startsWith("brand")) {
+                                SearchUICore.SearchResultCollection resultCollection;
+                                try {
+                                    String brand = tags.get(PoiTypeField.NAME.getFieldName());
+                                    SearchResult prevResult = new SearchResult();
+                                    prevResult.object = r.object;
+                                    prevResult.localeName = brand;
+                                    prevResult.objectType = ObjectType.POI_TYPE;
+                                    searchUICore.resetPhrase(prevResult);
+                                    resultCollection = searchPoiByCategory(searchUICore, brand, 2);
+                                } catch (IOException e) {
+                                    return true;
+                                }
+                                return resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty();
+                            }
+                            return true;
+                        })
+                        .toList();
+            } finally {
+                osmAndMapsService.unlockReaders(readers);
             }
         }
         return res;
     }
 
-    private SearchUICore prepareSearchUICoreForSearchByPoiType(List<LatLon> bbox, String locale, double lat, double lon) throws IOException {
+    private SearchUICore prepareSearchUICoreForSearchByPoiType(List<BinaryMapIndexReader> readers, QuadRect searchBbox, String locale, double lat, double lon)  {
         MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
 
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
@@ -221,12 +228,6 @@ public class SearchService {
         settings = settings.setOriginalLocation(new LatLon(lat, lon));
         settings.setRegions(osmandRegions);
 
-        QuadRect searchBbox = getSearchBbox(bbox);
-        List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox);
-        if (mapList.isEmpty()) {
-            return null;
-        }
-        List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
         settings.setOfflineIndexes(readers);
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
 
