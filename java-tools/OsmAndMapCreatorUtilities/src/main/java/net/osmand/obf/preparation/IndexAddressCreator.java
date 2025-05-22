@@ -32,6 +32,7 @@ import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
+import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
@@ -989,10 +990,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private Map<String, String> getOtherNames(Entity e) {
 		Map<String, String> m = null;
+        List<String> languages = Arrays.asList(MapRenderingTypes.langs);
 		for (String t : e.getTagKeySet()) {
 			String prefix =  null;
 			if(t.startsWith("name:")) {
-				prefix = "name:";
+                String lang = t.substring(5);
+                if (languages.contains(lang)) {
+                    prefix = "name:";
+                }
 			} else if(t.startsWith("old_name")){
 				prefix = "";
 			} else if(t.startsWith("alt_name")){
