@@ -43,4 +43,5 @@ dependencies {
 	// email sender
 	implementation 'com.sendgrid:sendgrid-java:4.2.1'
 	implementation 'org.apache.commons:commons-email:1.5'
+	implementation 'org.apache.commons:commons-csv:1.10.0'
 }
