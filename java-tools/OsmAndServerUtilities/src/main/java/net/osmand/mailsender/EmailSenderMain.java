@@ -447,6 +447,13 @@ public class EmailSenderMain {
 				.name("OsmAnd")
 				.to(mailTo);
 
+		String logMailTo = sender.concealEmail(mailTo);
+
+		if (sender.hasEmptyToList()) {
+			LOGGER.info("Skip mail to: " + logMailTo + " due to EXCLUDE_DOMAINS");
+			return;
+		}
+
 		if (p.subject != null) {
 			sender.subject(p.subject);
 		}
@@ -457,8 +464,8 @@ public class EmailSenderMain {
 
 		if (p.skipFirstEmails > 0 && p.sentSuccess < p.skipFirstEmails) {
 			p.sentSuccess++;
-			LOGGER.info(String.format("Skip mail to: %s due to skipFirstEmails [%d/%d]",
-					mailTo.replaceFirst(".....", "....."), p.sentSuccess, p.skipFirstEmails));
+			LOGGER.info(String.format(
+					"Skip mail to: %s due to skipFirstEmails [%d/%d]", logMailTo, p.sentSuccess, p.skipFirstEmails));
 			return;
 		}
 
@@ -470,7 +477,7 @@ public class EmailSenderMain {
 			p.sentFailed++;
 		}
 
-		LOGGER.info("Sending mail to: " + mailTo.replaceFirst(".....", ".....") + " (" + ok + ") " +
-				String.format("[%d success, %d failed]", p.sentSuccess, p.sentFailed));
+		LOGGER.info(String.format(
+				"Sending mail to: %s (%b) [%d success, %d failed]", logMailTo, ok, p.sentSuccess, p.sentFailed));
 	}
 }

@@ -26,6 +26,9 @@ Environment:
 	EMAIL_DELAY - optional delay before each send (in seconds)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
+	EXCLUDE_DOMAINS - exclude from mailing (comma-separated substrings to match email)
+	SENDGRID_DOMAINS - send directly via SendGrid (comma-separated substrings to match email)
+
 Template files structure:
 
 	Check load() to see which common templates may be included.
@@ -133,7 +136,7 @@ public class EmailSenderTemplate {
 		final String seconds = System.getenv("EMAIL_DELAY");
 		if (seconds != null) {
 			try {
-				Thread.sleep(Integer.parseInt(seconds) * 1000);
+				Thread.sleep(Integer.parseInt(seconds) * 1000L);
 			} catch (InterruptedException e) {
 				throw new RuntimeException(e);
 			}
@@ -156,7 +159,7 @@ public class EmailSenderTemplate {
 
 			try {
 				Response response = sender.send(mailObject);
-				LOG.info(to.replaceFirst(".....", ".....") + ": sender response code: " + response.getStatusCode());
+				LOG.info(concealEmail(to) + ": sender response code: " + response.getStatusCode());
 				if (response.getStatusCode() == sender.STATUS_CODE_SENT) {
 					sentEmails++;
 				}
@@ -208,16 +211,22 @@ public class EmailSenderTemplate {
 
 	public EmailSenderTemplate to(String email) {
 		setVarsByTo(email);
-		toList.add(email);
-		totalEmails++;
+		if (isDomainAllowed(email)) {
+			toList.add(email);
+			totalEmails++;
+		}
 		addTestEmail();
 		return this;
 	}
 
 	public EmailSenderTemplate to(List<String> emails) {
 		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
-		totalEmails += emails.size();
-		toList.addAll(emails);
+		for (String email : emails) {
+			if (isDomainAllowed(email)) {
+				toList.add(email);
+				totalEmails++;
+			}
+		}
 		addTestEmail();
 		return this;
 	}
@@ -237,6 +246,10 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
+	public boolean hasEmptyToList() {
+		return toList.isEmpty();
+	}
+
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
@@ -251,6 +264,18 @@ public class EmailSenderTemplate {
 			}
 		}
 		return filled;
+	}
+
+	private boolean isDomainAllowed(String email) {
+		String excludedDomains = System.getenv("EXCLUDE_DOMAINS");
+		if (excludedDomains != null) {
+			for (String domain : excludedDomains.split("[,|]")) {
+				if (email.toLowerCase().contains(domain.trim().toLowerCase())) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	// should be called with distinct To before each send() iteration
@@ -404,6 +429,10 @@ public class EmailSenderTemplate {
 		body = body == null ? joined : body + joined; // concat bodies from all included templates
 	}
 
+	public String concealEmail(String email) {
+		return email.replaceFirst(".....", "....."); // do not discover email in logs
+	}
+
 	// compatible with SendGrid
 	// derived from EmailSenderService
 	private class SmtpSendGridSender {
@@ -481,7 +510,7 @@ public class EmailSenderTemplate {
 			String to = getTo();
 
 			if (enforceViaSendGrid(to)) {
-				LOG.warn(to.replaceFirst(".....", ".....") + ": send via SendGrid");
+				LOG.warn(concealEmail(to) + ": send via SendGrid");
 				return error();
 			}
 
