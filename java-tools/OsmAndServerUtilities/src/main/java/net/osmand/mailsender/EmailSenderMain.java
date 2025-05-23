@@ -1,8 +1,6 @@
 package net.osmand.mailsender;
 
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -11,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.logging.Logger;
+import org.apache.commons.csv.*;
 
 import javax.annotation.Nullable;
 
@@ -42,13 +41,13 @@ public class EmailSenderMain {
         int sentFailed = 0;
         int daySince = 0;
 		String giveawaySeries;
+		boolean updateBlockList = false;
+		String unsubscribeFileName = null;
     }
 
     public static void main(String[] args) throws SQLException, IOException {
     	System.out.println("Send email utility");
         EmailParams p = new EmailParams();
-        boolean updateBlockList = false;
-	    boolean updatePostfixBounced = false;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
             if (arg.startsWith("--id=")) {
@@ -72,9 +71,9 @@ public class EmailSenderMain {
             } else if (arg.startsWith("--skip-first-emails=")) {
                 p.skipFirstEmails = Algorithms.parseIntSilently(val, 0);
             } else if (arg.equals("--update_block_list")) {
-                updateBlockList = true;
-            } else if (arg.equals("--update_postfix_bounced")) {
-              updatePostfixBounced = true;
+                p.updateBlockList = true;
+            } else if (arg.startsWith("--unsubscribe-from=")) {
+	            p.unsubscribeFileName = val;
             }
         }
 
@@ -85,12 +84,12 @@ public class EmailSenderMain {
 		if (conn == null) {
 			throw new RuntimeException("Please setup DB connection");
 		}
-	    if (updatePostfixBounced) {
-			updatePostfixBounced(conn);
+		if (p.unsubscribeFileName != null) {
+			parseFileAndUnsubscribe(p.unsubscribeFileName, conn);
 		    conn.close();
 			return;
-	    }
-        if (updateBlockList) {
+		}
+        if (p.updateBlockList) {
             updateUnsubscribed(conn);
             updateBlockList(conn);
             conn.close();
@@ -118,50 +117,37 @@ public class EmailSenderMain {
         conn.close();
     }
 
-	private static void updatePostfixBounced(Connection conn) throws IOException, SQLException {
-		String url = System.getenv("URL_POSTFIX_BOUNCED_CSV");
-		String file = System.getenv("FILE_POSTFIX_BOUNCED_CSV");
+	private static void parseFileAndUnsubscribe(String fileName, Connection conn) throws IOException, SQLException {
 		HashMap<String, String> bouncedEmailReason = new HashMap<>();
-		List<String> csvLines = new ArrayList<>();
-
-		if (url != null) {
-			HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
-			if (http.getResponseCode() == HttpURLConnection.HTTP_OK) {
-				BufferedReader in = new BufferedReader(new InputStreamReader(http.getInputStream()));
-				String line;
-				while ((line = in.readLine()) != null) {
-					csvLines.add(line);
+		String emailMatch = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+		InputStream is = (fileName.isEmpty() || "-".equals(fileName)) ? System.in : new FileInputStream(fileName);
+		Scanner sc = new Scanner(is);
+		while (sc.hasNextLine()) {
+			String line = sc.nextLine();
+			try {
+				Iterable<CSVRecord> records = CSVFormat.DEFAULT.parse(new StringReader(line));
+				for (CSVRecord record : records) {
+					String email = null;
+					List<String> reasons = new ArrayList<>();
+					for (String field : record) {
+						if (field.matches(emailMatch) && email == null) {
+							email = field; // first field with valid email as a key
+						} else {
+							reasons.add(field);
+						}
+					}
+					if (email != null) {
+						bouncedEmailReason.put(email, String.join(", ", reasons));
+					}
 				}
-				in.close();
-			}
-			http.disconnect();
-		}
-
-		if (file != null) {
-			Scanner reader = new Scanner(new File(file));
-			while (reader.hasNextLine()) {
-				csvLines.add(reader.nextLine());
-			}
-			reader.close();
-		}
-
-		if (!csvLines.isEmpty()) {
-			for (String line : csvLines) {
-				String[] split = line.split("\",\""); // the format is: "email","reason"
-				if (split.length == 2) {
-					String email = split[0].replaceFirst("^\"", "");
-					String reason = split[1].replaceFirst("\"$", "");
-					bouncedEmailReason.put(email, reason);
-				}
+			} catch (Exception e) {
+				System.err.printf("WARN: invalid input (%s)\n", line);
 			}
 		}
-
-		if (!bouncedEmailReason.isEmpty()) {
-			updateBlockDbWithEmailReason(conn, bouncedEmailReason);
-			return; // success
+		if (bouncedEmailReason.isEmpty()) {
+			throw new RuntimeException("No valid e-mails read. Please specify as plain text or CSV format.");
 		}
-
-		throw new RuntimeException("Empty CSV or no URL_POSTFIX_BOUNCED_CSV/FILE_POSTFIX_BOUNCED_CSV specified");
+		updateBlockDbWithEmailReason(conn, bouncedEmailReason);
 	}
 
 	private static void updateBlockDbWithEmailReason(Connection conn, HashMap<String, String> bouncedEmailReason) throws SQLException {
@@ -179,7 +165,7 @@ public class EmailSenderMain {
 		int[] batch = ps.executeBatch();
 		ps.close();
 
-		LOGGER.info(String.format("Got bounced logs from postfix: inserted %d of %d emails",
+		LOGGER.info(String.format("Got bounced emails with reasons: inserted %d of %d emails",
 				sumBatch(batch), bouncedEmailReason.size()));
 	}
 
