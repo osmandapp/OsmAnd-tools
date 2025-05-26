@@ -485,13 +485,13 @@ public class UserSubscriptionService {
 		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
 			return "Google Play";
 		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
-			return "iOS App Store";
+			return "Apple App Store";
 		} else if (sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) || sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2)) {
-			return "Huawei";
+			return "Huawei AppGallery";
 		} else if (sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
 			return "Amazon";
 		} else if (sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
-			return "FastSpring";
+			return "OsmAnd Web (FastSpring)";
 		}
 		return "Other";
 	}
