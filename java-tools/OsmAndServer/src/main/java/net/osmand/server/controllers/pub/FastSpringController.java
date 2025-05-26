@@ -104,7 +104,7 @@ public class FastSpringController {
 
 	public static class FastSpringOrderCompletedRequest {
 
-		private List<Event> events;
+		public List<Event> events;
 
 		public static class Event {
 			public String type;
@@ -112,17 +112,17 @@ public class FastSpringController {
 			public Data data;
 		}
 
-		private static class Data {
+		public static class Data {
 			public String order; // orderId
 			public Customer customer;
 			public List<Item> items;
 		}
 
-		private static class Customer {
+		public static class Customer {
 			public String email;
 		}
 
-		private static class Item {
+		public static class Item {
 			public String sku;
 		}
 	}
