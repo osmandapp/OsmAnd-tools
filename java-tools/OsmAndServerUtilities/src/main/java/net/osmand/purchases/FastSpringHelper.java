@@ -18,10 +18,11 @@ public class FastSpringHelper {
 
 	public static final String FASTSPRING_PLATFORM = "fastspring";
 
-	public static final List<String> productSkuMap = List.of("net.osmand.fastspring.inapp.maps.plus");
+	public static final List<String> productSkuMap = List.of("net.osmand.fastspring.inapp.maps.plus",
+			"net.osmand.fastspring.test.inapp.maps.plus");
 
-	public static final List<String> subscriptionSkuMap = List.of("net.osmand.fastspring.subscription.pro.annual");
-	public static final List<String> proSubscriptionSkuMap = List.of("net.osmand.fastspring.subscription.pro.annual");
+	public static final List<String> subscriptionSkuMap = List.of("net.osmand.fastspring.subscription.pro.annual",
+			"net.osmand.fastspring.test.subscription.pro.annual");
 
 	private static final String API_BASE = "https://api.fastspring.com";
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
