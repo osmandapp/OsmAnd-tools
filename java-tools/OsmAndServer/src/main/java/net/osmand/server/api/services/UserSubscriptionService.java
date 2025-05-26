@@ -483,17 +483,17 @@ public class UserSubscriptionService {
 			return null;
 		}
 		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
-			return "google";
+			return "Google Play";
 		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
-			return "ios";
+			return "iOS App Store";
 		} else if (sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) || sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2)) {
-			return "huawei";
+			return "Huawei";
 		} else if (sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION)) {
-			return "amazon";
+			return "Amazon";
 		} else if (sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
-			return "fastspring";
+			return "FastSpring";
 		}
-		return null;
+		return "Other";
 	}
 
 	@NotNull
