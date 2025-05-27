@@ -62,6 +62,10 @@ public class UserSubscriptionService {
 	private static final String START_TIME_KEY = "start_time";
 	private static final String EXPIRE_TIME_KEY = "expire_time";
 	private static final String VALID_KEY = "valid";
+	private static final String STATE_KEY = "state";
+	private static final String PURCHASE_TIME_KEY = "purchaseTime";
+	private static final String SUBSCRIPTIONS_KEY = "subscriptions";
+	private static final String IN_APP_PURCHASES_KEY = "inAppPurchases";
 
 	private static final Log LOG = LogFactory.getLog(UserSubscriptionService.class);
 
@@ -447,7 +451,7 @@ public class UserSubscriptionService {
 			}
 			subMap.put(EXPIRE_TIME_KEY, String.valueOf(expireTimeMs));
 		}
-		subMap.put("state", state);
+		subMap.put(STATE_KEY, state);
 		return subMap;
 	}
 
@@ -519,7 +523,7 @@ public class UserSubscriptionService {
 			inAppMap.put(VALID_KEY, inAppPurchase.valid.toString());
 		}
 		if (inAppPurchase.purchaseTime != null) {
-			inAppMap.put("purchaseTime", String.valueOf(inAppPurchase.purchaseTime.getTime()));
+			inAppMap.put(PURCHASE_TIME_KEY, String.valueOf(inAppPurchase.purchaseTime.getTime()));
 		}
 		return inAppMap;
 	}
@@ -576,8 +580,8 @@ public class UserSubscriptionService {
 				info.put(PURCHASE_STORE_KEY, getSubscriptionStore(subscription));
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
-			info.put("subscriptions", gson.toJson(getAllSubscriptionsInfo(pu)));
-			info.put("inAppPurchases", gson.toJson(getAllInAppsInfo(pu)));
+			info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu)));
+			info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu)));
 		}
 		return info;
 	}
