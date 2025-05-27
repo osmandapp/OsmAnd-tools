@@ -43,7 +43,6 @@ public class SearchService {
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
     
-    private static final int MAX_NUMBER_OF_MAP_SEARCH_POI = 5;
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
     
@@ -176,7 +175,7 @@ public class SearchService {
             QuadRect searchBbox = getSearchBbox(bbox);
             List<BinaryMapIndexReader> readers = new ArrayList<>();
             try {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, 0);
                 readers = osmAndMapsService.getReaders(mapList, null);
                 if (readers.isEmpty()) {
                     return res.stream().filter(r-> r.objectType != ObjectType.POI_TYPE || r.file == null).toList();
@@ -264,7 +263,7 @@ public class SearchService {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox,0);
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
@@ -402,7 +401,7 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         SearchResult res = null;
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, MAX_NUMBER_OF_MAP_SEARCH_POI);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, 0);
             if (!mapList.isEmpty()) {
                 usedMapList = osmAndMapsService.getReaders(mapList, null);
                 for (BinaryMapIndexReader map : usedMapList) {
