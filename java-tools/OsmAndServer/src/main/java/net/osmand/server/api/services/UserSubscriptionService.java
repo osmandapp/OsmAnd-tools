@@ -29,6 +29,7 @@ import net.osmand.util.Algorithms;
 
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
+import static net.osmand.server.controllers.pub.SubscriptionController.*;
 
 @Service
 public class UserSubscriptionService {
@@ -45,11 +46,18 @@ public class UserSubscriptionService {
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
 	public static final String OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX;
 
+	private static final String PLATFORM_WEB_NAME_FASTSPRING = "OsmAnd Web (FastSpring)";
+	private static final String PLATFORM_WEB_NAME_GOOGLE = "Google Play";
+	private static final String PLATFORM_WEB_NAME_APPLE = "Apple App Store";
+	private static final String PLATFORM_WEB_NAME_HUAWEI = "Huawei AppGallery";
+	private static final String PLATFORM_WEB_NAME_AMAZON = "Amazon";
+
 	private static final String ACCOUNT_KEY = "account";
 	private static final String FREE_ACCOUNT = "Free";
 	private static final String MAX_ACCOUNT_SIZE = "maxAccSize";
 	private static final String PURCHASE_NAME_KEY = "name";
 	private static final String PURCHASE_STORE_KEY = "store";
+	private static final String BILLING_DATE_KEY = "billingDate";
 	private static final String PURCHASE_TYPE_KEY = "type";
 	private static final String START_TIME_KEY = "start_time";
 	private static final String EXPIRE_TIME_KEY = "expire_time";
@@ -483,17 +491,24 @@ public class UserSubscriptionService {
 			return null;
 		}
 		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
-			return "Google Play";
+			return PLATFORM_WEB_NAME_GOOGLE;
 		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
-			return "Apple App Store";
-		} else if (sku.contains("huawei")) {
-			return "Huawei AppGallery";
-		} else if (sku.contains("amazon")) {
-			return "Amazon";
-		} else if (sku.contains("fastspring")) {
-			return "OsmAnd Web (FastSpring)";
+			return PLATFORM_WEB_NAME_APPLE;
+		} else if (sku.contains(PLATFORM_HUAWEI)) {
+			return PLATFORM_WEB_NAME_HUAWEI;
+		} else if (sku.contains(PLATFORM_AMAZON)) {
+			return PLATFORM_WEB_NAME_AMAZON;
+		} else if (sku.contains(PLATFORM_FASTSPRING)) {
+			return PLATFORM_WEB_NAME_FASTSPRING;
 		}
 		return "Other";
+	}
+
+	public String getSubscriptionBillingDate(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
+		if (Boolean.TRUE.equals(s.autorenewing) && s.expiretime != null) {
+			return String.valueOf(s.expiretime.getTime());
+		}
+		return null;
 	}
 
 	@NotNull
@@ -524,14 +539,18 @@ public class UserSubscriptionService {
 	}
 
 	public String getInAppStore(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
-		String sku = inAppPurchase.sku;
-		if (sku == null) {
+		String platform = inAppPurchase.platform;
+		if (platform == null) {
 			return null;
 		}
-		if (sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
-			return "fastspring";
-		}
-		return "Other";
+		return switch (platform) {
+			case PLATFORM_GOOGLE -> PLATFORM_WEB_NAME_GOOGLE;
+			case PLATFORM_APPLE -> PLATFORM_WEB_NAME_APPLE;
+			case PLATFORM_HUAWEI -> PLATFORM_WEB_NAME_HUAWEI;
+			case PLATFORM_AMAZON -> PLATFORM_WEB_NAME_AMAZON;
+			case PLATFORM_FASTSPRING -> PLATFORM_WEB_NAME_FASTSPRING;
+			default -> "Other";
+		};
 	}
 
 	public Map<String, String> getUserAccountInfo(CloudUsersRepository.CloudUser pu) {
@@ -578,6 +597,7 @@ public class UserSubscriptionService {
 				subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
 				subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
 				subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
+				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
 				subsInfo.add(subInfo);
 			});
 		}
