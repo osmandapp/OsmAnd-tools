@@ -5,6 +5,7 @@ import java.util.*;
 
 import com.google.gson.Gson;
 import net.osmand.purchases.*;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
@@ -80,6 +81,9 @@ public class UserSubscriptionService {
 
 	@Autowired
 	protected CloudUsersRepository usersRepository;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
 
 	Gson gson = new Gson();
 
@@ -558,6 +562,8 @@ public class UserSubscriptionService {
 	}
 
 	public Map<String, String> getUserAccountInfo(CloudUsersRepository.CloudUser pu) {
+		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		Map<String, String> info = new HashMap<>();
 		String orderId = pu.orderid;
 		if (orderId == null) {
@@ -566,6 +572,7 @@ public class UserSubscriptionService {
 		} else {
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
 			if (!subscriptions.isEmpty()) {
+				// get main pro subscription
 				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
 				if (subscriptions.size() > 1) {
 					subscription = subscriptions.stream()
@@ -573,20 +580,27 @@ public class UserSubscriptionService {
 							.findFirst()
 							.orElse(subscription);
 				}
+
 				Map<String, String> subInfo = getSubscriptionInfo(subscription);
 				info.putAll(subInfo);
-				info.put(PURCHASE_NAME_KEY, getSubscriptionName(subscription));
-				info.put(PURCHASE_TYPE_KEY, getSubscriptionType(subscription));
-				info.put(PURCHASE_STORE_KEY, getSubscriptionStore(subscription));
+
+				PurchasesDataLoader.Subscription subBaseData = subMap.get(subscription.sku);
+				if (subBaseData == null) {
+					LOG.info("No subscription data found for sku: " + subscription.sku);
+					info.put(PURCHASE_NAME_KEY, getSubscriptionName(subscription));
+				} else {
+					info.put(PURCHASE_NAME_KEY, subBaseData.name());
+				}
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
-			info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu)));
-			info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu)));
+			// get other purchases
+			info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu, subMap)));
+			info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu, inappMap)));
 		}
 		return info;
 	}
 
-	private List<Map<String, String>> getAllSubscriptionsInfo(CloudUsersRepository.CloudUser pu) {
+	private List<Map<String, String>> getAllSubscriptionsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.Subscription> subMap) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(pu.id);
 		List<Map<String, String>> subsInfo = new ArrayList<>();
 		if (subscriptionList != null && !subscriptionList.isEmpty()) {
@@ -597,10 +611,21 @@ public class UserSubscriptionService {
 				return b.starttime.compareTo(a.starttime);
 			});
 			subscriptionList.forEach(s -> {
+				PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
+				if (subBaseData != null && subBaseData.crossPlatform().equals("false")) {
+					return; // skip non-cross-platform subscriptions
+				}
 				Map<String, String> subInfo = getSubscriptionInfo(s);
-				subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
-				subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
-				subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
+				if (subBaseData == null) {
+					LOG.info("No subscription data found for sku: " + s.sku);
+					subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
+					subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
+					subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
+				} else {
+					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
+					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.type());
+					subInfo.put(PURCHASE_STORE_KEY, subBaseData.platform());
+				}
 				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
 				subsInfo.add(subInfo);
 			});
@@ -608,7 +633,7 @@ public class UserSubscriptionService {
 		return subsInfo;
 	}
 
-	private List<Map<String, String>> getAllInAppsInfo(CloudUsersRepository.CloudUser pu) {
+	private List<Map<String, String>> getAllInAppsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.InApp> inappMap) {
 		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserId(pu.id);
 		List<Map<String, String>> inAppPurchasesInfo = new ArrayList<>();
 		if (purchases != null && !purchases.isEmpty()) {
@@ -619,9 +644,19 @@ public class UserSubscriptionService {
 				return b.purchaseTime.compareTo(a.purchaseTime);
 			});
 			purchases.forEach(p -> {
+				PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
+				if (inAppBaseData != null && inAppBaseData.crossPlatform().equals("false")) {
+					return; // skip non-cross-platform in-app purchases
+				}
 				Map<String, String> pInfo = getInAppInfo(p);
-				pInfo.put(PURCHASE_NAME_KEY, getInAppName(p));
-				pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
+				if (inAppBaseData == null) {
+					LOG.info("No in-app purchase data found for sku: " + p.sku);
+					pInfo.put(PURCHASE_NAME_KEY, getInAppName(p));
+					pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
+				} else {
+					pInfo.put(PURCHASE_NAME_KEY, inAppBaseData.name());
+					pInfo.put(PURCHASE_STORE_KEY, inAppBaseData.platform());
+				}
 				inAppPurchasesInfo.add(pInfo);
 			});
 		}

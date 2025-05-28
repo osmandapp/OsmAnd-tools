@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.WebAccessConfig;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -144,8 +145,10 @@ public class AdminController {
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
 	
 	public static final String PROMO_WEBSITE = "promo_website";
-	
-	
+	@Autowired
+	private PurchasesDataLoader purchasesDataLoader;
+
+
 	@RequestMapping(path = { "/publish" }, method = RequestMethod.POST)
 	public String publish(Model model, final RedirectAttributes redirectAttrs) throws IOException {
 		List<String> errors = publish();
@@ -159,6 +162,7 @@ public class AdminController {
 		}
 
 		webAccessConfig.reload();
+		purchasesDataLoader.reload();
 		
         return "redirect:info";
 	}
