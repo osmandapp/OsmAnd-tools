@@ -7,11 +7,8 @@ import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Way;
+import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.osm.edit.Relation;
 import net.osmand.util.Algorithms;
 import net.osmand.util.translit.ChineseTranslitHelper;
 import net.osmand.util.translit.JapaneseTranslitHelper;
@@ -22,12 +19,7 @@ import org.apache.commons.logging.LogFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
@@ -41,6 +33,7 @@ public class IndexCreationContext {
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private IndexCreator indexCreator;
+    private QuadRect regionQuadRect = null;
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
@@ -50,17 +43,22 @@ public class IndexCreationContext {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+            WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
+            if (region != null) {
+                regionQuadRect = region.getBoundingBox();
+                regionQuadRect.smartOffset(0.2d, 0.2d);
+            }
 		}
 	}
-	
+
 	IndexPoiCreator getIndexPoiCreator() {
 		return indexCreator.indexPoiCreator;
 	}
-	
+
 	IndexVectorMapCreator getIndexMapCreator() {
 		return indexCreator.indexMapCreator;
 	}
-	
+
 	IndexHeightData getIndexHeightData() {
 		return indexCreator.heightData;
 	}
@@ -101,14 +99,14 @@ public class IndexCreationContext {
         }
         return false;
     }
-	
+
 	public void translitJapaneseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
 			e.putTag(OSMTagKey.NAME_EN.getValue(),
 					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
 		}
 	}
-	
+
 	public void translitChineseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINA)) {
 			try {
@@ -124,7 +122,7 @@ public class IndexCreationContext {
 			}
 		}
 	}
-	
+
 	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String region) {
 		if (!Algorithms.isEmpty(etags.get(OSMTagKey.NAME_EN.getValue()))
 				|| Algorithms.isEmpty(etags.get(OSMTagKey.NAME.getValue()))) {
@@ -137,7 +135,7 @@ public class IndexCreationContext {
 		}
 		return false;
 	}
-	
+
 	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
 		boolean upd = false;
 		if (decryptAbbreviations) {
@@ -157,7 +155,7 @@ public class IndexCreationContext {
 		}
 		return name;
 	}
-	
+
 	public Set<String> calcRegionTag(Entity entity, boolean add) {
 		OsmandRegions or = allRegions;
 		QuadRect qr = null;
@@ -200,10 +198,10 @@ public class IndexCreationContext {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-		} 
+		}
 		return Collections.emptySet();
 	}
-	
+
 	private static String serialize(TreeSet<String> lst) {
 		StringBuilder bld = new StringBuilder();
 		Iterator<String> it = lst.iterator();
@@ -217,5 +215,39 @@ public class IndexCreationContext {
 		return bld.toString();
 	}
 
-	
+    public boolean isInsideRegionBBox(Entity entity) {
+        if (regionQuadRect == null) {
+            return true;
+        }
+        if (entity instanceof Node node) {
+            double lon = node.getLongitude();
+            double lat = node.getLatitude();
+            return regionQuadRect.contains(lon, lat, lon, lat);
+        }
+        if (entity instanceof Way way && way.getFirstNode() != null) {
+            List<LatLon> latLons = new ArrayList<>();
+            latLons.add(way.getFirstNode().getLatLon());
+            latLons.add(way.getLastNode().getLatLon());
+            if (way.getNodes().size() > 2) {
+                latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
+            }
+            for (LatLon l : latLons) {
+                if (regionQuadRect.contains(l.getLongitude(), l.getLatitude(), l.getLongitude(), l.getLatitude())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (entity instanceof Relation relation) {
+            for (Relation.RelationMember member : relation.getMembers()) {
+                if (isInsideRegionBBox(member.getEntity())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+
 }

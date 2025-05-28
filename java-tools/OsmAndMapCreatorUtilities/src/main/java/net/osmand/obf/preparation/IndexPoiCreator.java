@@ -159,6 +159,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
 			return;
 		}
+        if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
+            System.out.println("XXX " + e.getOsmUrl() + " " + e.toString());
+            return;
+        }
 		if (!settings.keepOnlyRouteRelationObjects) {
 			iterateEntityInternal(e, ctx, icc);
 		}
