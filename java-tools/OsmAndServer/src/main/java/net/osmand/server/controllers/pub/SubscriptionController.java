@@ -57,6 +57,7 @@ public class SubscriptionController {
     public static final String PLATFORM_APPLE = "apple";
     public static final String PLATFORM_AMAZON = "amazon";
     public static final String PLATFORM_HUAWEI = "huawei";
+	public static final String PLATFORM_FASTSPRING = "fastspring";
 
     private PrivateKey subscriptionPrivateKey;
 

@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 import net.osmand.server.api.repo.*;
+import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.NotNull;
@@ -56,18 +57,9 @@ import net.osmand.server.api.repo.EmailSupportSurveyRepository.EmailSupportSurve
 import net.osmand.server.api.repo.EmailUnsubscribedRepository.EmailUnsubscribed;
 import net.osmand.server.api.repo.LotteryUsersRepository.LotteryUser;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.CameraPlace;
-import net.osmand.server.api.services.IpLocationService;
-import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.LotteryPlayService.LotteryResult;
-import net.osmand.server.api.services.MotdService;
 import net.osmand.server.api.services.MotdService.MessageParams;
-import net.osmand.server.api.services.PlacesService;
-import net.osmand.server.api.services.PluginsService;
-import net.osmand.server.api.services.PollsService;
 import net.osmand.server.api.services.PollsService.PollQuestion;
-import net.osmand.server.api.services.PromoService;
-import net.osmand.server.api.services.WikiService;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 import net.osmand.util.Algorithms;
 
@@ -127,6 +119,9 @@ public class ApiController {
 
     @Autowired
     private CloudUserDevicesRepository userDevicesRepository;
+
+	@Autowired
+	private UserSubscriptionService userSubscriptionService;
 
     @Autowired
 	OsmAndServerMonitorTasks monitoring;
@@ -422,7 +417,7 @@ public class ApiController {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findByOrderId(orderId);
 			List<Object> res = new ArrayList<>();
 			for (SupporterDeviceSubscription sub : subscriptions) {
-				Map<String, String> subMap = getSubscriptionInfo(sub);
+				Map<String, String> subMap = userSubscriptionService.getSubscriptionInfo(sub);
 				if (!subMap.isEmpty()) {
 					res.add(subMap);
 				}
@@ -430,44 +425,6 @@ public class ApiController {
 			return gson.toJson(res);
 		}
 		return "{}";
-	}
-
-	@NotNull
-	private static Map<String, String> getSubscriptionInfo(SupporterDeviceSubscription sub) {
-		Map<String, String> subMap = new HashMap<>();
-		subMap.put("sku", sub.sku);
-		if (sub.valid != null) {
-			subMap.put("valid", sub.valid.toString());
-		}
-		String state = "undefined";
-		if (sub.starttime != null) {
-			subMap.put("start_time", String.valueOf(sub.starttime.getTime()));
-		}
-		if (sub.expiretime != null) {
-			long expireTimeMs = sub.expiretime.getTime();
-			int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate.intValue();
-			boolean autoRenewing = sub.autorenewing == null ? false : sub.autorenewing.booleanValue();
-			if (expireTimeMs > System.currentTimeMillis()) {
-				if (paymentState == 1 && autoRenewing) {
-					state = "active";
-				} else if (paymentState == 1 && !autoRenewing) {
-					state = "cancelled";
-				} else if (paymentState == 0 && autoRenewing) {
-					state = "in_grace_period";
-				}
-			} else {
-				if (paymentState == 0 && autoRenewing) {
-					state = "on_hold";
-				} else if (paymentState == 1 && autoRenewing) {
-					state = "paused";
-				} else if (paymentState == 1 && !autoRenewing) {
-					state = "expired";
-				}
-			}
-			subMap.put("expire_time", String.valueOf(expireTimeMs));
-		}
-		subMap.put("state", state);
-		return subMap;
 	}
 
 	@GetMapping(path = {"/subscriptions/getAll"})
@@ -491,7 +448,7 @@ public class ApiController {
 
 			List<Object> res = new ArrayList<>();
 			for (SupporterDeviceSubscription sub : activeSubscriptions) {
-				Map<String, String> subMap = getSubscriptionInfo(sub);
+				Map<String, String> subMap = userSubscriptionService.getSubscriptionInfo(sub);
 				if (!subMap.isEmpty()) {
 					res.add(subMap);
 				}

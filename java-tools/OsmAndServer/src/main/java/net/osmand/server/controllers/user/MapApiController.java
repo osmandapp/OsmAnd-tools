@@ -8,7 +8,6 @@ import okio.Buffer;
 
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
-import static net.osmand.util.Algorithms.sanitizeFileName;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -590,89 +589,18 @@ public class MapApiController {
 
 	@GetMapping(path = {"/get-account-info"})
 	public ResponseEntity<String> getAccountInfo() {
-		final String ACCOUNT_KEY = "account";
-		final String FREE_ACCOUNT = "Free";
-		final String PRO_ACCOUNT = "Osmand Pro";
-		final String TYPE_SUB = "type";
-		final String START_TIME_KEY = "startTime";
-		final String EXPIRE_TIME_KEY = "expireTime";
-		final String VALID_KEY = "valid";
-		final String SKU_KEY = "sku";
-		final String PURCHASE_TIME_KEY = "purchaseTime";
-		final String MAX_ACCOUNT_SIZE = "maxAccSize";
-		final String NICKNAME = "nickname";
-
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
-		Map<String, String> info = new HashMap<>();
-
-		info.put(NICKNAME, pu.nickname);
+		Map<String, String> info;
 		String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
 		if (errorMsg == null) {
 			LOG.info("Updated orderId for user " + pu.email);
 		} else {
 			LOG.error("Error updating orderId for user " + pu.email + ": " + errorMsg);
 		}
+		info = userSubService.getUserAccountInfo(pu);
+		info.put("nickname", pu.nickname);
 
-		String orderId = pu.orderid;
-		if (orderId == null) {
-			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
-			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
-		} else {
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
-			if (!subscriptions.isEmpty()) {
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
-				if (subscriptions.size() > 1) {
-					subscription = subscriptions.stream()
-							.filter(s -> Boolean.TRUE.equals(s.valid))
-							.findFirst()
-							.orElse(subscription);
-				}
-				info.put(ACCOUNT_KEY, PRO_ACCOUNT);
-				info.put(TYPE_SUB, subscription.sku);
-				info.put(VALID_KEY, Boolean.TRUE.equals(subscription.valid) ? "true" : "false");
-				info.put(START_TIME_KEY, subscription.starttime != null ? DateUtils.truncate(subscription.starttime, Calendar.SECOND).toString() : null);
-				info.put(EXPIRE_TIME_KEY, subscription.expiretime != null ? DateUtils.truncate(subscription.expiretime, Calendar.SECOND).toString() : null);
-				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
-			}
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(dev.userid);
-			if (subscriptionList != null && !subscriptionList.isEmpty()) {
-				List<Map<String, Object>> subsInfo = new ArrayList<>();
-				subscriptionList.sort((a, b) -> {
-					if (a.starttime == null && b.starttime == null) return 0;
-					if (a.starttime == null) return 1;
-					if (b.starttime == null) return -1;
-					return b.starttime.compareTo(a.starttime);
-				});
-				subscriptionList.forEach(s -> {
-					Map<String, Object> sub = new HashMap<>();
-					sub.put(SKU_KEY, s.sku);
-					sub.put(VALID_KEY, s.valid);
-					sub.put(START_TIME_KEY, s.starttime != null ? DateUtils.truncate(s.starttime, Calendar.SECOND).toString() : null);
-					sub.put(EXPIRE_TIME_KEY, s.expiretime != null ? DateUtils.truncate(s.expiretime, Calendar.SECOND).toString() : null);
-					subsInfo.add(sub);
-				});
-				info.put("subscriptions", gson.toJson(subsInfo));
-			}
-			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = deviceInAppPurchasesRepository.findByUserId(dev.userid);
-			if (purchases != null && !purchases.isEmpty()) {
-				List<Map<String, Object>> inAppPurchasesInfo = new ArrayList<>();
-				purchases.sort((a, b) -> {
-					if (a.purchaseTime == null && b.purchaseTime == null) return 0;
-					if (a.purchaseTime == null) return 1;
-					if (b.purchaseTime == null) return -1;
-					return b.purchaseTime.compareTo(a.purchaseTime);
-				});
-				purchases.forEach(p -> {
-					Map<String, Object> purchase = new HashMap<>();
-					purchase.put(SKU_KEY, p.sku);
-					purchase.put(PURCHASE_TIME_KEY, p.purchaseTime != null ? DateUtils.truncate(p.purchaseTime, Calendar.SECOND).toString() : null);
-					purchase.put(VALID_KEY, p.valid);
-					inAppPurchasesInfo.add(purchase);
-				});
-				info.put("inAppPurchases", gson.toJson(inAppPurchasesInfo));
-			}
-		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
 

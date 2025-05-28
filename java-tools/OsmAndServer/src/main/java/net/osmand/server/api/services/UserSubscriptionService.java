@@ -3,12 +3,15 @@ package net.osmand.server.api.services;
 import java.io.IOException;
 import java.util.*;
 
+import com.google.gson.Gson;
 import net.osmand.purchases.*;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,10 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
+import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
+import static net.osmand.server.controllers.pub.SubscriptionController.*;
+
 @Service
 public class UserSubscriptionService {
 
@@ -40,6 +47,27 @@ public class UserSubscriptionService {
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
 	public static final String OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX;
 
+	private static final String PLATFORM_WEB_NAME_FASTSPRING = "OsmAnd Web (FastSpring)";
+	private static final String PLATFORM_WEB_NAME_GOOGLE = "Google Play";
+	private static final String PLATFORM_WEB_NAME_APPLE = "Apple App Store";
+	private static final String PLATFORM_WEB_NAME_HUAWEI = "Huawei AppGallery";
+	private static final String PLATFORM_WEB_NAME_AMAZON = "Amazon";
+
+	private static final String ACCOUNT_KEY = "account";
+	private static final String FREE_ACCOUNT = "Free";
+	private static final String MAX_ACCOUNT_SIZE = "maxAccSize";
+	private static final String PURCHASE_NAME_KEY = "name";
+	private static final String PURCHASE_STORE_KEY = "store";
+	private static final String BILLING_DATE_KEY = "billingDate";
+	private static final String PURCHASE_TYPE_KEY = "type";
+	private static final String START_TIME_KEY = "start_time";
+	private static final String EXPIRE_TIME_KEY = "expire_time";
+	private static final String VALID_KEY = "valid";
+	private static final String STATE_KEY = "state";
+	private static final String PURCHASE_TIME_KEY = "purchaseTime";
+	private static final String SUBSCRIPTIONS_KEY = "subscriptions";
+	private static final String IN_APP_PURCHASES_KEY = "inAppPurchases";
+
 	private static final Log LOG = LogFactory.getLog(UserSubscriptionService.class);
 
 	@Value("${google.androidPublisher.clientSecret}")
@@ -53,6 +81,11 @@ public class UserSubscriptionService {
 
 	@Autowired
 	protected CloudUsersRepository usersRepository;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
+
+	Gson gson = new Gson();
 
 	private AndroidPublisher androidPublisher;
 	private HuaweiIAPHelper huaweiIAPHelper;
@@ -96,13 +129,7 @@ public class UserSubscriptionService {
 			}
 			if (s.valid == null || !s.valid) {
 				return "no valid subscription present";
-			} else if (!s.sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) &&
-					!s.sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) &&
-					!s.sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) &&
-					!s.sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION) &&
-					!s.sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION)) {
+			} else if (!isProSubscription(s.sku)) {
 				return "subscription is not eligible for OsmAnd Cloud";
 			} else {
 				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
@@ -113,6 +140,16 @@ public class UserSubscriptionService {
 			}
 		}
 		return "no subscription present";
+	}
+
+	private boolean isProSubscription(String sku) {
+		return sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION) ||
+				sku.startsWith(OSMAND_PROMO_SUBSCRIPTION) ||
+				sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_1) ||
+				sku.contains(OSMAND_PRO_HUAWEI_SUBSCRIPTION_2) ||
+				sku.contains(OSMAND_PRO_AMAZON_SUBSCRIPTION) ||
+				sku.contains(OSMAND_PRO_IOS_SUBSCRIPTION) ||
+				sku.contains(OSMAND_PRO_FAST_SPRINGS_SUBSCRIPTION);
 	}
 
 	private String checkProInapp(String orderid) {
@@ -382,6 +419,255 @@ public class UserSubscriptionService {
 			return true;
 		}
 		return false;
+	}
+
+	@NotNull
+	public Map<String, String> getSubscriptionInfo(DeviceSubscriptionsRepository.SupporterDeviceSubscription sub) {
+		Map<String, String> subMap = new HashMap<>();
+		subMap.put("sku", sub.sku);
+		if (sub.valid != null) {
+			subMap.put(VALID_KEY, sub.valid.toString());
+		}
+		String state = "undefined";
+		if (sub.starttime != null) {
+			subMap.put(START_TIME_KEY, String.valueOf(sub.starttime.getTime()));
+		}
+		if (sub.expiretime != null) {
+			long expireTimeMs = sub.expiretime.getTime();
+			int paymentState = sub.paymentstate == null ? 1 : sub.paymentstate;
+			boolean autoRenewing = sub.autorenewing != null && sub.autorenewing;
+			if (expireTimeMs > System.currentTimeMillis()) {
+				if (paymentState == 1 && autoRenewing) {
+					state = "active";
+				} else if (paymentState == 1) {
+					state = "cancelled";
+				} else if (paymentState == 0 && autoRenewing) {
+					state = "in_grace_period";
+				}
+			} else {
+				if (paymentState == 0 && autoRenewing) {
+					state = "on_hold";
+				} else if (paymentState == 1 && autoRenewing) {
+					state = "paused";
+				} else if (paymentState == 1) {
+					state = "expired";
+				}
+			}
+			subMap.put(EXPIRE_TIME_KEY, String.valueOf(expireTimeMs));
+		}
+		subMap.put(STATE_KEY, state);
+		return subMap;
+	}
+
+	public String getSubscriptionName(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
+		String sku = s.sku;
+		if (sku == null) {
+			return null;
+		}
+		if (sku.contains("_live_")) {
+			return "OsmAnd Live";
+		}
+		if (sku.contains("promo")) {
+			return "OsmAnd Promo";
+		}
+		if (sku.contains("maps")) {
+			return "OsmAnd+";
+		}
+		if (isProSubscription(sku)) {
+			return "OsmAnd Pro";
+		}
+		return "Other";
+
+	}
+
+	public String getSubscriptionType(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
+		String sku = s.sku;
+		if (sku == null) {
+			return null;
+		}
+		if (sku.contains(".annual")) {
+			return "annual";
+		} else if (sku.contains(".monthly")) {
+			return "monthly";
+		}
+		return null;
+	}
+
+	public String getSubscriptionStore(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
+		String sku = s.sku;
+		if (sku == null) {
+			return null;
+		}
+		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
+			return PLATFORM_WEB_NAME_GOOGLE;
+		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
+			return PLATFORM_WEB_NAME_APPLE;
+		} else if (sku.contains(PLATFORM_HUAWEI)) {
+			return PLATFORM_WEB_NAME_HUAWEI;
+		} else if (sku.contains(PLATFORM_AMAZON)) {
+			return PLATFORM_WEB_NAME_AMAZON;
+		} else if (sku.contains(PLATFORM_FASTSPRING)) {
+			return PLATFORM_WEB_NAME_FASTSPRING;
+		}
+		return "Other";
+	}
+
+	public String getSubscriptionBillingDate(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
+		if (Boolean.TRUE.equals(s.autorenewing) && s.expiretime != null) {
+			return String.valueOf(s.expiretime.getTime());
+		}
+		return null;
+	}
+
+	@NotNull
+	public Map<String, String> getInAppInfo(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
+		Map<String, String> inAppMap = new HashMap<>();
+		inAppMap.put("sku", inAppPurchase.sku);
+		if (inAppPurchase.valid != null) {
+			inAppMap.put(VALID_KEY, inAppPurchase.valid.toString());
+		}
+		if (inAppPurchase.purchaseTime != null) {
+			inAppMap.put(PURCHASE_TIME_KEY, String.valueOf(inAppPurchase.purchaseTime.getTime()));
+		}
+		return inAppMap;
+	}
+
+	public String getInAppName(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
+		String sku = inAppPurchase.sku;
+		if (sku == null) {
+			return null;
+		}
+		if (sku.contains("maps")) {
+			return "Maps+";
+		}
+		if (sku.contains("osmand_premium")) {
+			return "OsmAnd Premium";
+		}
+		return "Other";
+	}
+
+	public String getInAppStore(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
+		String platform = inAppPurchase.platform;
+		if (platform == null) {
+			return null;
+		}
+		return parsePlatform(platform);
+	}
+
+	private String parsePlatform(String platform) {
+		if (platform == null) {
+			return "Other";
+		}
+		return switch (platform) {
+			case PLATFORM_GOOGLE -> PLATFORM_WEB_NAME_GOOGLE;
+			case PLATFORM_APPLE -> PLATFORM_WEB_NAME_APPLE;
+			case PLATFORM_HUAWEI -> PLATFORM_WEB_NAME_HUAWEI;
+			case PLATFORM_AMAZON -> PLATFORM_WEB_NAME_AMAZON;
+			case PLATFORM_FASTSPRING -> PLATFORM_WEB_NAME_FASTSPRING;
+			default -> "Other";
+		};
+	}
+
+	public Map<String, String> getUserAccountInfo(CloudUsersRepository.CloudUser pu) {
+		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+		Map<String, String> info = new HashMap<>();
+		String orderId = pu.orderid;
+		if (orderId == null) {
+			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
+			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
+		} else {
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
+			if (!subscriptions.isEmpty()) {
+				// get main pro subscription
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = subscriptions.get(0);
+				if (subscriptions.size() > 1) {
+					subscription = subscriptions.stream()
+							.filter(s -> Boolean.TRUE.equals(s.valid))
+							.findFirst()
+							.orElse(subscription);
+				}
+
+				Map<String, String> subInfo = getSubscriptionInfo(subscription);
+				info.putAll(subInfo);
+
+				PurchasesDataLoader.Subscription subBaseData = subMap.get(subscription.sku);
+				if (subBaseData == null) {
+					LOG.info("No subscription data found for sku: " + subscription.sku);
+					info.put(PURCHASE_NAME_KEY, getSubscriptionName(subscription));
+				} else {
+					info.put(PURCHASE_NAME_KEY, subBaseData.name());
+				}
+				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
+			}
+			// get other purchases
+			info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu, subMap)));
+			info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu, inappMap)));
+		}
+		return info;
+	}
+
+	private List<Map<String, String>> getAllSubscriptionsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.Subscription> subMap) {
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(pu.id);
+		List<Map<String, String>> subsInfo = new ArrayList<>();
+		if (subscriptionList != null && !subscriptionList.isEmpty()) {
+			subscriptionList.sort((a, b) -> {
+				if (a.starttime == null && b.starttime == null) return 0;
+				if (a.starttime == null) return 1;
+				if (b.starttime == null) return -1;
+				return b.starttime.compareTo(a.starttime);
+			});
+			subscriptionList.forEach(s -> {
+				PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
+				if (subBaseData != null && subBaseData.crossPlatform().equals("false")) {
+					return; // skip non-cross-platform subscriptions
+				}
+				Map<String, String> subInfo = getSubscriptionInfo(s);
+				if (subBaseData == null) {
+					LOG.info("No subscription data found for sku: " + s.sku);
+					subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
+					subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
+					subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
+				} else {
+					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
+					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.type());
+					subInfo.put(PURCHASE_STORE_KEY, parsePlatform(subBaseData.platform()));
+				}
+				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
+				subsInfo.add(subInfo);
+			});
+		}
+		return subsInfo;
+	}
+
+	private List<Map<String, String>> getAllInAppsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.InApp> inappMap) {
+		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserId(pu.id);
+		List<Map<String, String>> inAppPurchasesInfo = new ArrayList<>();
+		if (purchases != null && !purchases.isEmpty()) {
+			purchases.sort((a, b) -> {
+				if (a.purchaseTime == null && b.purchaseTime == null) return 0;
+				if (a.purchaseTime == null) return 1;
+				if (b.purchaseTime == null) return -1;
+				return b.purchaseTime.compareTo(a.purchaseTime);
+			});
+			purchases.forEach(p -> {
+				PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
+				if (inAppBaseData != null && inAppBaseData.crossPlatform().equals("false")) {
+					return; // skip non-cross-platform in-app purchases
+				}
+				Map<String, String> pInfo = getInAppInfo(p);
+				if (inAppBaseData == null) {
+					LOG.info("No in-app purchase data found for sku: " + p.sku);
+					pInfo.put(PURCHASE_NAME_KEY, getInAppName(p));
+					pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
+				} else {
+					pInfo.put(PURCHASE_NAME_KEY, inAppBaseData.name());
+					pInfo.put(PURCHASE_STORE_KEY, parsePlatform(inAppBaseData.platform()));
+				}
+				inAppPurchasesInfo.add(pInfo);
+			});
+		}
+		return inAppPurchasesInfo;
 	}
 
 }
