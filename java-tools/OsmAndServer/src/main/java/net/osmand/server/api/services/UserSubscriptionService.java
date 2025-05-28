@@ -551,6 +551,13 @@ public class UserSubscriptionService {
 		if (platform == null) {
 			return null;
 		}
+		return parsePlatform(platform);
+	}
+
+	private String parsePlatform(String platform) {
+		if (platform == null) {
+			return "Other";
+		}
 		return switch (platform) {
 			case PLATFORM_GOOGLE -> PLATFORM_WEB_NAME_GOOGLE;
 			case PLATFORM_APPLE -> PLATFORM_WEB_NAME_APPLE;
@@ -624,7 +631,7 @@ public class UserSubscriptionService {
 				} else {
 					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
 					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.type());
-					subInfo.put(PURCHASE_STORE_KEY, subBaseData.platform());
+					subInfo.put(PURCHASE_STORE_KEY, parsePlatform(subBaseData.platform()));
 				}
 				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
 				subsInfo.add(subInfo);
@@ -655,7 +662,7 @@ public class UserSubscriptionService {
 					pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
 				} else {
 					pInfo.put(PURCHASE_NAME_KEY, inAppBaseData.name());
-					pInfo.put(PURCHASE_STORE_KEY, inAppBaseData.platform());
+					pInfo.put(PURCHASE_STORE_KEY, parsePlatform(inAppBaseData.platform()));
 				}
 				inAppPurchasesInfo.add(pInfo);
 			});
