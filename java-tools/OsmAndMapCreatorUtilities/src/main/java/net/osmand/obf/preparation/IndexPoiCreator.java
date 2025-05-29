@@ -170,10 +170,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-			if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
-				System.out.println("Excluded out-of-bbox: " + e.getOsmUrl() + " " + e);
-				return;
-			}
+			if (isOutOfRegionBbox(e, icc)) {
+                return;
+            }
 			List<LatLon> centers = Collections.singletonList(null);
 			String memberIds = "";
 			if (e instanceof Relation relation) {
@@ -1272,6 +1271,23 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         if (pt != null) {
             amenity.setOrder(pt.getOrder());
         }
+    }
+
+    private boolean isOutOfRegionBbox(Entity e, IndexCreationContext icc) {
+        if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
+            Amenity a = tempAmenityList.get(0);
+            String type = a.getType().getKeyName();
+            String subtype = a.getSubType();
+            String name = a.getName();
+            LatLon l = e.getLatLon();
+            if (e instanceof Way way && way.getNodes().size() > 0) {
+                Node node = way.getFirstNode();
+                l = node.getLatLon();
+            }
+            log.warn(String.format("POI out-of-bbox: %s %s %s %.4f %.4f %s", type, subtype, name, l.getLatitude(), l.getLongitude(), e.getOsmUrl()));
+            return true;
+        }
+        return false;
     }
 
 }
