@@ -171,7 +171,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
-				System.out.println("Excluded (outside of bbox): " + e.getOsmUrl() + " " + e);
+				System.out.println("Excluded out-of-bbox: " + e.getOsmUrl() + " " + e);
 				return;
 			}
 			List<LatLon> centers = Collections.singletonList(null);
