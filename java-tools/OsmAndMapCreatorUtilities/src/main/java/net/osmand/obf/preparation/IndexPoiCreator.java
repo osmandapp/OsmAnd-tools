@@ -159,10 +159,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
 			return;
 		}
-        if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
-            System.out.println("XXX " + e.getOsmUrl() + " " + e.toString());
-            return;
-        }
 		if (!settings.keepOnlyRouteRelationObjects) {
 			iterateEntityInternal(e, ctx, icc);
 		}
@@ -174,6 +170,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
+			if (!(e instanceof Relation) && !icc.isInsideRegionBBox(e)) {
+				System.out.println("Excluded (outside of bbox): " + e.getOsmUrl() + " " + e);
+				return;
+			}
 			List<LatLon> centers = Collections.singletonList(null);
 			String memberIds = "";
 			if (e instanceof Relation relation) {
