@@ -34,7 +34,8 @@ public class IndexCreationContext {
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private IndexCreator indexCreator;
-    private QuadRect inflatedRegionQuadRect = null;
+
+	private List<QuadRect> inflatedRegionQuads = null;
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
@@ -46,9 +47,11 @@ public class IndexCreationContext {
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
-                inflatedRegionQuadRect = region.getBoundingBox();
+				inflatedRegionQuads = region.getAllPolygonsBounds();
 				double inflate = INFLATE_REGION_BBOX_KM * 1000 / 111320; // approx
-				MapUtils.inflateBBoxLatLon(inflatedRegionQuadRect, inflate, inflate);
+	            for (QuadRect rect : inflatedRegionQuads) {
+		            MapUtils.inflateBBoxLatLon(rect, inflate, inflate);
+	            }
             }
 		}
 	}
@@ -217,39 +220,45 @@ public class IndexCreationContext {
 		return bld.toString();
 	}
 
-    public boolean isInsideRegionBBox(Entity entity) {
-        if (inflatedRegionQuadRect == null) {
-            return true; // some regions do not have bbox
-        } else if (entity instanceof Node node) {
-            double lon = node.getLongitude();
-            double lat = node.getLatitude();
-            return inflatedRegionQuadRect.contains(lon, lat, lon, lat);
-        } else if (entity instanceof Way way && way.getFirstNode() != null) {
-            List<LatLon> latLons = new ArrayList<>();
-            latLons.add(way.getFirstNode().getLatLon());
-            latLons.add(way.getLastNode().getLatLon());
-            if (way.getNodes().size() > 2) {
-                latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
-            }
-            for (LatLon l : latLons) {
-	            double lon = l.getLongitude();
-	            double lat = l.getLatitude();
-                if (inflatedRegionQuadRect.contains(lon, lat, lon, lat)) {
-                    return true;
-                }
-            }
-            return false; // outside
-        } else if (entity instanceof Relation relation) {
-            for (Relation.RelationMember member : relation.getMembers()) {
-                if (isInsideRegionBBox(member.getEntity())) {
-                    return true;
-                }
-            }
-            return false; // outside
-        } else {
-	        return true; // pass others
-        }
-    }
-
+	public boolean isInsideRegionBBox(Entity entity) {
+		if (inflatedRegionQuads == null) {
+			return true; // region might have no bbox
+		} else if (entity instanceof Node node) {
+			double lon = node.getLongitude();
+			double lat = node.getLatitude();
+			for (QuadRect quad : inflatedRegionQuads) {
+				if (quad.contains(lon, lat, lon, lat)) {
+					return true;
+				}
+			}
+			return false; // Node is outside
+		} else if (entity instanceof Way way && way.getFirstNode() != null) {
+			List<LatLon> latLons = new ArrayList<>();
+			latLons.add(way.getFirstNode().getLatLon());
+			latLons.add(way.getLastNode().getLatLon());
+			if (way.getNodes().size() > 2) {
+				latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
+			}
+			for (LatLon l : latLons) {
+				double lon = l.getLongitude();
+				double lat = l.getLatitude();
+				for (QuadRect quad : inflatedRegionQuads) {
+					if (quad.contains(lon, lat, lon, lat)) {
+						return true;
+					}
+				}
+			}
+			return false; // Way is outside
+		} else if (entity instanceof Relation relation) {
+			for (Relation.RelationMember member : relation.getMembers()) {
+				if (isInsideRegionBBox(member.getEntity())) {
+					return true; // recursive
+				}
+			}
+			return false; // Relation is outside
+		} else {
+			return true; // default
+		}
+	}
 
 }

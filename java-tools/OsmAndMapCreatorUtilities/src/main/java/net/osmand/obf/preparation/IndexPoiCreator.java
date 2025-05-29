@@ -1280,11 +1280,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             String subtype = a.getSubType();
             String name = a.getName();
             LatLon l = e.getLatLon();
-            if (e instanceof Way way && way.getNodes().size() > 0) {
+            if (e instanceof Way way && !way.getNodes().isEmpty()) {
                 Node node = way.getFirstNode();
                 l = node.getLatLon();
             }
-            log.warn(String.format("POI out-of-bbox: %s %s %s %.4f %.4f %s", type, subtype, name, l.getLatitude(), l.getLongitude(), e.getOsmUrl()));
+            log.warn(String.format("POI out-of-bbox: %s %.4f %.4f %s %s %s",
+		            e.getOsmUrl(), l.getLatitude(), l.getLongitude(), type, subtype, name));
             return true;
         }
         return false;
