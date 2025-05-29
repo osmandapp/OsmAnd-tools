@@ -25,6 +25,7 @@ public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
     private static final String JAPAN = "japan";
 	private static final String CHINA = "china";
+	private static final double INFLATE_REGION_BBOX_KM = 20;
 
     public OsmandRegions allRegions;
     public boolean basemap;
@@ -33,7 +34,7 @@ public class IndexCreationContext {
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private IndexCreator indexCreator;
-    private QuadRect regionQuadRect = null;
+    private QuadRect inflatedRegionQuadRect = null;
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
@@ -45,8 +46,9 @@ public class IndexCreationContext {
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
-                regionQuadRect = region.getBoundingBox();
-                regionQuadRect.smartOffset(0.2d, 0.2d);
+                inflatedRegionQuadRect = region.getBoundingBox();
+				double inflate = INFLATE_REGION_BBOX_KM * 1000 / 111320; // approx
+				MapUtils.inflateBBoxLatLon(inflatedRegionQuadRect, inflate, inflate);
             }
 		}
 	}
@@ -216,15 +218,13 @@ public class IndexCreationContext {
 	}
 
     public boolean isInsideRegionBBox(Entity entity) {
-        if (regionQuadRect == null) {
-            return true;
-        }
-        if (entity instanceof Node node) {
+        if (inflatedRegionQuadRect == null) {
+            return true; // some regions do not have bbox
+        } else if (entity instanceof Node node) {
             double lon = node.getLongitude();
             double lat = node.getLatitude();
-            return regionQuadRect.contains(lon, lat, lon, lat);
-        }
-        if (entity instanceof Way way && way.getFirstNode() != null) {
+            return inflatedRegionQuadRect.contains(lon, lat, lon, lat);
+        } else if (entity instanceof Way way && way.getFirstNode() != null) {
             List<LatLon> latLons = new ArrayList<>();
             latLons.add(way.getFirstNode().getLatLon());
             latLons.add(way.getLastNode().getLatLon());
@@ -232,21 +232,23 @@ public class IndexCreationContext {
                 latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
             }
             for (LatLon l : latLons) {
-                if (regionQuadRect.contains(l.getLongitude(), l.getLatitude(), l.getLongitude(), l.getLatitude())) {
+	            double lon = l.getLongitude();
+	            double lat = l.getLatitude();
+                if (inflatedRegionQuadRect.contains(lon, lat, lon, lat)) {
                     return true;
                 }
             }
-            return false;
-        }
-        if (entity instanceof Relation relation) {
+            return false; // outside
+        } else if (entity instanceof Relation relation) {
             for (Relation.RelationMember member : relation.getMembers()) {
                 if (isInsideRegionBBox(member.getEntity())) {
                     return true;
                 }
             }
-            return false;
+            return false; // outside
+        } else {
+	        return true; // pass others
         }
-        return true;
     }
 
 
