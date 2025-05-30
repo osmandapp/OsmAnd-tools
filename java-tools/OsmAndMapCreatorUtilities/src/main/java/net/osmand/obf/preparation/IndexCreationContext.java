@@ -48,7 +48,7 @@ public class IndexCreationContext {
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				inflatedRegionQuads = region.getAllPolygonsBounds();
-				double inflate = INFLATE_REGION_BBOX_KM * 1000 / 111320; // approx
+				double inflate = INFLATE_REGION_BBOX_KM * 1000 / MapUtils.METERS_IN_DEGREE;
 	            for (QuadRect rect : inflatedRegionQuads) {
 		            MapUtils.inflateBBoxLatLon(rect, inflate, inflate);
 	            }
