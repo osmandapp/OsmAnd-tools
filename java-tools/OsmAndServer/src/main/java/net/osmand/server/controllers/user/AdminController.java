@@ -1369,6 +1369,7 @@ public class AdminController {
 		public void buildUp(Date time, int period, ExchangeRates rts) {
 			this.startPeriodTime = time.getTime();
 			this.startPeriodDay = dayFormat.format(time.getTime());
+			LOGGER.info("Formatting date: " + time);
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.startPeriodYear = yearFormat.format(time.getTime());
 			this.currentPeriod = period;
