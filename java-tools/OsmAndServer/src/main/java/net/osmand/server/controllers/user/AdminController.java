@@ -1335,8 +1335,9 @@ public class AdminController {
 		public void calculateLTVValue(Map<String, TDoubleArrayList> retentionRates) {
 			priceTotalPaidEurMillis = introPriceEurMillis;
 			if (introCycles > 1) {
-				LOGGER.info("Subscription has intro cycles > 1, which is not supported for LTV calculation, sku: " + getSku());
-				throw new UnsupportedOperationException();
+				LOGGER.error("Subscription has intro cycles > 1, which is not supported for LTV calculation, sku: " + sku);
+				// TODO: fix this
+				// throw new UnsupportedOperationException();
 			}
 			for (int i = 1; i < totalPeriods; i++) {
 				priceTotalPaidEurMillis += fullPriceEurMillis;
