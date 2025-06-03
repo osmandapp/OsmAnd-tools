@@ -112,9 +112,9 @@ public class FastSpringController {
 	}
 
 	@GetMapping("/products/price")
-	public ResponseEntity<String> getPrices(@RequestParam String currency) {
+	public ResponseEntity<String> getPrices(@RequestParam String country) {
 		try {
-			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?currency=" + currency);
+			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?country=" + country);
 			connection.setRequestMethod("GET");
 			connection.setRequestProperty("Accept", "application/json");
 
@@ -132,22 +132,25 @@ public class FastSpringController {
 					for (JsonNode productNode : productsNode) {
 						String name = productNode.path("product").asText();
 						JsonNode pricingNode = productNode.path("pricing");
-						JsonNode regionNode = pricingNode.path(currency);
+						JsonNode regionNode = pricingNode.path(country);
 						if (regionNode.isMissingNode()) {
-							continue;
+							LOGGER.error("FastSpring: No pricing information available for country " + country);
+							country = "UA"; // Fallback to US pricing
+							regionNode = pricingNode.path(country);
 						}
 
 						String oldPrice = regionNode.path("price").asText();
 						String newPrice = oldPrice;
+
 						String display = regionNode.path("display").asText();
-						String currencySymbol = display.replace(oldPrice, "");
+						String oldPriceDisplay = display;
 
 						JsonNode discountNode = regionNode.path("quantityDiscount");
-
 						if (discountNode.fieldNames().hasNext()) {
 							JsonNode firstTier = discountNode.elements().next();
-							if (firstTier.has("discountValue")) {
-								newPrice = firstTier.path("discountValue").asText();
+							if (firstTier.has("unitPrice")) {
+								newPrice = firstTier.path("unitPrice").asText();
+								oldPriceDisplay = firstTier.path("unitPriceDisplay").asText();
 							}
 						}
 
@@ -155,11 +158,11 @@ public class FastSpringController {
 								"fsName", name,
 								"oldPrice", oldPrice,
 								"newPrice", newPrice,
-								"currency", currencySymbol
+								"display", display,
+								"oldPriceDisplay", oldPriceDisplay
 						));
 					}
 				}
-
 				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("prices", result)));
 			}
 
