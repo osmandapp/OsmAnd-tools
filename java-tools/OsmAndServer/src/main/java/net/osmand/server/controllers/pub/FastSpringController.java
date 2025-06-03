@@ -1,5 +1,8 @@
 package net.osmand.server.controllers.pub;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
@@ -8,13 +11,14 @@ import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.*;
 
 @Controller
@@ -32,6 +36,12 @@ public class FastSpringController {
 
 	@Autowired
 	protected UserSubscriptionService userSubService;
+
+	@Autowired
+	protected ObjectMapper objectMapper;
+
+	@Autowired
+	protected Gson gson;
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
@@ -99,6 +109,63 @@ public class FastSpringController {
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	@GetMapping("/products/price")
+	public ResponseEntity<String> getPrices(@RequestParam String currency) {
+		try {
+			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?currency=" + currency);
+			connection.setRequestMethod("GET");
+			connection.setRequestProperty("Accept", "application/json");
+
+			int status = connection.getResponseCode();
+			if (status != HttpURLConnection.HTTP_OK) {
+				return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+			}
+
+			try (InputStream is = connection.getInputStream()) {
+				JsonNode root = objectMapper.readTree(is);
+				JsonNode productsNode = root.path("products");
+				List<Map<String, String>> result = new ArrayList<>();
+
+				if (productsNode.isArray()) {
+					for (JsonNode productNode : productsNode) {
+						String name = productNode.path("product").asText();
+						JsonNode pricingNode = productNode.path("pricing");
+						JsonNode regionNode = pricingNode.path(currency);
+						if (regionNode.isMissingNode()) {
+							continue;
+						}
+
+						String oldPrice = regionNode.path("price").asText();
+						String newPrice = oldPrice;
+						String display = regionNode.path("display").asText();
+						String currencySymbol = display.replace(oldPrice, "");
+
+						JsonNode discountNode = regionNode.path("quantityDiscount");
+
+						if (discountNode.fieldNames().hasNext()) {
+							JsonNode firstTier = discountNode.elements().next();
+							if (firstTier.has("discountValue")) {
+								newPrice = firstTier.path("discountValue").asText();
+							}
+						}
+
+						result.add(Map.of(
+								"fsName", name,
+								"oldPrice", oldPrice,
+								"newPrice", newPrice,
+								"currency", currencySymbol
+						));
+					}
+				}
+
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("prices", result)));
+			}
+
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
 	}
 
 

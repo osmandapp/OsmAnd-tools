@@ -126,7 +126,7 @@ public class FastSpringHelper {
 	}
 
 
-	private static HttpURLConnection openConnection(String path) throws IOException {
+	public static HttpURLConnection openConnection(String path) throws IOException {
 		String username = System.getenv("FASTSPRING_USERNAME");
 		String password = System.getenv("FASTSPRING_PASSWORD");
 
