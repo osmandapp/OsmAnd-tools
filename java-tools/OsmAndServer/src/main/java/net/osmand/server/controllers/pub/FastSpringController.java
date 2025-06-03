@@ -135,7 +135,7 @@ public class FastSpringController {
 						JsonNode regionNode = pricingNode.path(country);
 						if (regionNode.isMissingNode()) {
 							LOGGER.error("FastSpring: No pricing information available for country " + country);
-							country = "UA"; // Fallback to US pricing
+							country = "UA";
 							regionNode = pricingNode.path(country);
 						}
 
