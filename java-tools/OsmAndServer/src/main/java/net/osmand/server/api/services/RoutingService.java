@@ -256,8 +256,10 @@ public class RoutingService {
         approximator.approximate();
         final double[] distances = approximator.getDistances();
         final double[] elevations = approximator.getElevations();
-        if (distances != null && elevations != null) {
-            ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations);
+        final int[] indexes = approximator.getSurvivedIndexes();
+        
+        if (distances != null && elevations != null && indexes != null) {
+            ElevationDiffsCalculator elevationDiffsCalc = getElevationDiffsCalculator(distances, elevations, indexes);
             elevationDiffsCalc.calculateElevationDiffs();
             double diffElevationUp = elevationDiffsCalc.getDiffElevationUp();
             double diffElevationDown = elevationDiffsCalc.getDiffElevationDown();
@@ -266,7 +268,7 @@ public class RoutingService {
         return Collections.emptyList();
     }
     
-    private ElevationDiffsCalculator getElevationDiffsCalculator(final double[] distances, final double[] elevations) {
+    private ElevationDiffsCalculator getElevationDiffsCalculator(final double[] distances, final double[] elevations, final int[] indexes) {
         return new ElevationDiffsCalculator() {
             @Override
             public double getPointDistance(int index) {
@@ -278,6 +280,11 @@ public class RoutingService {
                 return elevations[index];
             }
             
+            @Override
+            public int getPointIndex(int index) {
+                return indexes[index];
+            }
+
             @Override
             public int getPointsCount() {
                 return distances.length;
