@@ -45,6 +45,8 @@ public class FastSpringController {
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
+	private static final String DEFAULT_COUNTRY = "UA"; // Default country for pricing if not specified
+
 	@Transactional
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
@@ -113,6 +115,11 @@ public class FastSpringController {
 
 	@GetMapping("/products/price")
 	public ResponseEntity<String> getPrices(@RequestParam String country) {
+		if (!country.matches("^[A-Z]+$")) {
+			return ResponseEntity
+					.status(HttpStatus.BAD_REQUEST)
+					.body("Invalid country code format. Use uppercase letters only.");
+		}
 		try {
 			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?country=" + country);
 			connection.setRequestMethod("GET");
@@ -135,7 +142,7 @@ public class FastSpringController {
 						JsonNode regionNode = pricingNode.path(country);
 						if (regionNode.isMissingNode()) {
 							LOGGER.error("FastSpring: No pricing information available for country " + country);
-							country = "UA";
+							country = DEFAULT_COUNTRY;
 							regionNode = pricingNode.path(country);
 						}
 
@@ -167,7 +174,7 @@ public class FastSpringController {
 			}
 
 		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching prices: " + e.getMessage());
 		}
 	}
 
