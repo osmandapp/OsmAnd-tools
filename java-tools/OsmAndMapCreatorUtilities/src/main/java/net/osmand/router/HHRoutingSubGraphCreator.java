@@ -1509,11 +1509,12 @@ public class HHRoutingSubGraphCreator {
 					}
 					continue;
 				}
-                if (clusters.size() == 2 && singlePointClusters.size() == 2 && f.fileDbId != s.fileDbId) {
-                    //meeting two point from different regions (China-shandong)
-                    simpleMerge(ctx, f, s.clusterDbId, s);
-                    continue;
-                }
+				if (clusters.size() == 2 && singlePointClusters.size() == 2 && f.fileDbId != s.fileDbId) {
+					// meeting two point from different regions (China-shandong)
+					System.err.println("Merge two singlePointClusters from different regions: " + lstMerge);
+					simpleMerge(ctx, f, s.clusterDbId, s);
+					continue;
+				}
 				String msg = String.format("Can't merge points %s", lstMerge);
 				throw new IllegalArgumentException(msg);
 			}
