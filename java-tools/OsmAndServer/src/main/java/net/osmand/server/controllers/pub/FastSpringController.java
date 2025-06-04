@@ -1,5 +1,8 @@
 package net.osmand.server.controllers.pub;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
@@ -8,13 +11,14 @@ import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.*;
 
 @Controller
@@ -33,7 +37,15 @@ public class FastSpringController {
 	@Autowired
 	protected UserSubscriptionService userSubService;
 
+	@Autowired
+	protected ObjectMapper objectMapper;
+
+	@Autowired
+	protected Gson gson;
+
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
+
+	private static final String DEFAULT_COUNTRY = "UA"; // Default country for pricing if not specified
 
 	@Transactional
 	@PostMapping("/order-completed")
@@ -99,6 +111,71 @@ public class FastSpringController {
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	@GetMapping("/products/price")
+	public ResponseEntity<String> getPrices(@RequestParam String country) {
+		if (!country.matches("^[A-Z]+$")) {
+			return ResponseEntity
+					.status(HttpStatus.BAD_REQUEST)
+					.body("Invalid country code format. Use uppercase letters only.");
+		}
+		try {
+			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?country=" + country);
+			connection.setRequestMethod("GET");
+			connection.setRequestProperty("Accept", "application/json");
+
+			int status = connection.getResponseCode();
+			if (status != HttpURLConnection.HTTP_OK) {
+				return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
+			}
+
+			try (InputStream is = connection.getInputStream()) {
+				JsonNode root = objectMapper.readTree(is);
+				JsonNode productsNode = root.path("products");
+				List<Map<String, String>> result = new ArrayList<>();
+
+				if (productsNode.isArray()) {
+					for (JsonNode productNode : productsNode) {
+						String name = productNode.path("product").asText();
+						JsonNode pricingNode = productNode.path("pricing");
+						JsonNode regionNode = pricingNode.path(country);
+						if (regionNode.isMissingNode()) {
+							LOGGER.error("FastSpring: No pricing information available for country " + country);
+							country = DEFAULT_COUNTRY;
+							regionNode = pricingNode.path(country);
+						}
+
+						String oldPrice = regionNode.path("price").asText();
+						String newPrice = oldPrice;
+
+						String display = regionNode.path("display").asText();
+						String oldPriceDisplay = display;
+
+						JsonNode discountNode = regionNode.path("quantityDiscount");
+						if (discountNode.fieldNames().hasNext()) {
+							JsonNode firstTier = discountNode.elements().next();
+							if (firstTier.has("unitPrice")) {
+								newPrice = firstTier.path("unitPrice").asText();
+								oldPriceDisplay = firstTier.path("unitPriceDisplay").asText();
+							}
+						}
+
+						result.add(Map.of(
+								"fsName", name,
+								"oldPrice", oldPrice,
+								"newPrice", newPrice,
+								"display", display,
+								"oldPriceDisplay", oldPriceDisplay
+						));
+					}
+				}
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("prices", result)));
+			}
+
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching prices: " + e.getMessage());
+		}
 	}
 
 
