@@ -242,18 +242,21 @@ public class ObfRegionSplitter {
 		}
 
 		Way simpleWay = new Way(obj.getId(), nodes);
-		Way restoredWay = simpleWay;
+		List<String> removeAfterSrtm = new ArrayList<>();
 		for (int t : obj.getTypes()) {
 			BinaryMapRouteReaderAdapter.RouteTypeRule type = obj.region.routeEncodingRules.get(t);
 			String tag = type.getTag();
 			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
-				// already processed tags
-				return ;
+				// already has SRTM tags
+				return;
 			}
-			// can put same tag with different values
-			restoredWay.putTag(tag, type.getValue());
+			// simpleWay requires original tags for SRTM processing
+			simpleWay.putTag(tag, type.getValue());
+			removeAfterSrtm.add(tag);
 		}
+
 		heightData.proccess(simpleWay);
+		simpleWay.removeTags(removeAfterSrtm.toArray(new String[0]));
 
 		// Write result to RouteDataObject
 		if (simpleWay.getTags().size() > 0) {
