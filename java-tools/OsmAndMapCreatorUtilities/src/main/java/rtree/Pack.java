@@ -96,7 +96,7 @@ public class Pack
       }
       /*the following is required as we may pack an existing tree.. until we find a way to remove nodes of
         a particular rtree*/
-      RTree.chdNodes.removeAll();
+//      RTree.chdNodes.removeAll();
       //rtree.getFileHdr().getFile().getFD().sync();
       if(elmts.length <= Node.MAX)//change this for the first method
         return(1);
