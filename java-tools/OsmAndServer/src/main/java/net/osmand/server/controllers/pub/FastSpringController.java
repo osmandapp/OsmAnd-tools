@@ -150,14 +150,14 @@ public class FastSpringController {
 						String newPrice = oldPrice;
 
 						String display = regionNode.path("display").asText();
-						String oldPriceDisplay = display;
+						String newPriceDisplay = display;
 
 						JsonNode discountNode = regionNode.path("quantityDiscount");
 						if (discountNode.fieldNames().hasNext()) {
 							JsonNode firstTier = discountNode.elements().next();
 							if (firstTier.has("unitPrice")) {
 								newPrice = firstTier.path("unitPrice").asText();
-								oldPriceDisplay = firstTier.path("unitPriceDisplay").asText();
+								newPriceDisplay = firstTier.path("unitPriceDisplay").asText();
 							}
 						}
 
@@ -166,7 +166,7 @@ public class FastSpringController {
 								"oldPrice", oldPrice,
 								"newPrice", newPrice,
 								"display", display,
-								"oldPriceDisplay", oldPriceDisplay
+								"newPriceDisplay", newPriceDisplay
 						));
 					}
 				}
