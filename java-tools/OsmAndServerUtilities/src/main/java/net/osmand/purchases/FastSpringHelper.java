@@ -20,7 +20,8 @@ public class FastSpringHelper {
 
 	public static final List<String> productSkuMap = List.of(
 			"net.osmand.fastspring.inapp.maps.plus",
-			"net.osmand.fastspring.inapp.maps.plus.test");
+			"net.osmand.fastspring.inapp.maps.plus.test",
+			"net.osmand.fastspring.inapp.pro.15y");
 
 	public static final List<String> subscriptionSkuMap = List.of(
 			"net.osmand.fastspring.subscription.pro.monthly",
