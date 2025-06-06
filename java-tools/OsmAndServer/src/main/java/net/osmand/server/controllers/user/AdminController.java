@@ -1240,6 +1240,7 @@ public class AdminController {
 		case "net.osmand.fastspring.subscription.pro.annual": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "net.osmand.fastspring.test.subscription.pro.annual": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
 		case "net.osmand.fastspring.subscription.pro.annual.test": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
+		case "net.osmand.fastspring.subscription.pro.monthly": s.app = SubAppType.FASTSPRING; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
 		
 
 		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
