@@ -37,7 +37,7 @@ public class UserSubscriptionService {
 
 	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
 	public static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
-	public static final String OSMAND_CLOUD_INAPP = "osmand_cloud_inapp_";
+	public static final String OSMAND_CLOUD_INAPP = "inapp.pro.";
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 
@@ -155,16 +155,12 @@ public class UserSubscriptionService {
 	private String checkProInapp(String orderid) {
 		List<SupporterDeviceInAppPurchase> lst = inAppPurchasesRepo.findByOrderId(orderid);
 		for (SupporterDeviceInAppPurchase p : lst) {
-			if (!p.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+			if (!p.sku.contains(OSMAND_CLOUD_INAPP)) {
 				return "inapp is not eligible for OsmAnd Cloud";
 			}
 			if (p.valid == null || !p.valid) {
 				return "no valid inapp purchase present";
 			} else {
-				int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
-				Calendar calendar = Calendar.getInstance();
-				calendar.setTime(p.purchaseTime);
-				calendar.add(Calendar.YEAR, years);
 				Date expireTime = getExpireTimeInAppCloudPurchase(p);
 				if (expireTime != null && expireTime.getTime() > System.currentTimeMillis()) {
 					return null;
@@ -177,12 +173,20 @@ public class UserSubscriptionService {
 	}
 
 	private Date getExpireTimeInAppCloudPurchase(SupporterDeviceInAppPurchase p) {
-		if (p == null || p.sku == null || !p.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+		if (p == null || p.sku == null || !p.sku.contains(OSMAND_CLOUD_INAPP)) {
 			return null;
 		}
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(p.purchaseTime);
-		int years = Integer.parseInt(p.sku.substring(OSMAND_CLOUD_INAPP.length()));
+
+		String suffix = p.sku.substring(OSMAND_CLOUD_INAPP.length());
+		int years = -1;
+		if (suffix.endsWith("y")) {
+			years = Integer.parseInt(suffix.substring(0, suffix.length() - 1));
+		}
+		if (years <= 0) {
+			return null; // not a valid inapp purchase for OsmAnd Cloud
+		}
 		calendar.add(Calendar.YEAR, years);
 
 		return calendar.getTime();
@@ -364,7 +368,7 @@ public class UserSubscriptionService {
 		if (inApps != null && !inApps.isEmpty()) {
 			for (SupporterDeviceInAppPurchase p : inApps) {
 				if (Boolean.TRUE.equals(p.valid)
-						&& p.sku.startsWith(OSMAND_CLOUD_INAPP)
+						&& p.sku.contains(OSMAND_CLOUD_INAPP)
 						&& p.purchaseTime != null) {
 					Date expire = getExpireTimeInAppCloudPurchase(p);
 					if (expire.after(inappExpire)) {
@@ -411,7 +415,7 @@ public class UserSubscriptionService {
 		List<SupporterDeviceInAppPurchase> inAppPurchases = inAppPurchasesRepo.findByOrderId(pu.orderid);
 		if (inAppPurchases != null && !inAppPurchases.isEmpty()) {
 			inAppPurchases.forEach(s -> {
-				if (s.userId == null && !s.sku.startsWith(OSMAND_CLOUD_INAPP)) {
+				if (s.userId == null && !s.sku.contains(OSMAND_CLOUD_INAPP)) {
 					s.userId = pu.id;
 					inAppPurchasesRepo.saveAndFlush(s);
 				}
