@@ -1195,6 +1195,7 @@ public class AdminController {
 	
 	private void setDefaultSkuValues(Subscription s) {
 		switch(s.sku) {
+		// TODO move these constants to json file with all subsriptions possibly in apps and maintain names, price, retention, duration,  for UI there
 		// retention values need to be adjusted and should be equal to average of the last periods (not first) 
 		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
 		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
