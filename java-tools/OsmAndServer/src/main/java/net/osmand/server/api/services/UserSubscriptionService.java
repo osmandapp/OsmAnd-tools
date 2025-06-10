@@ -619,7 +619,7 @@ public class UserSubscriptionService {
 			});
 			subscriptionList.forEach(s -> {
 				PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
-				if (subBaseData != null && subBaseData.crossPlatform().equals("false")) {
+				if (subBaseData != null && subBaseData.crossPlatform().equals("no")) {
 					return; // skip non-cross-platform subscriptions
 				}
 				Map<String, String> subInfo = getSubscriptionInfo(s);
