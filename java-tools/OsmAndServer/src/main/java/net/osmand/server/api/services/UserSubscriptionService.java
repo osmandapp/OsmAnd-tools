@@ -652,7 +652,7 @@ public class UserSubscriptionService {
 			});
 			purchases.forEach(p -> {
 				PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
-				if (inAppBaseData != null && inAppBaseData.crossPlatform().equals("false")) {
+				if (inAppBaseData != null && inAppBaseData.crossPlatform().equals("no")) {
 					return; // skip non-cross-platform in-app purchases
 				}
 				Map<String, String> pInfo = getInAppInfo(p);
