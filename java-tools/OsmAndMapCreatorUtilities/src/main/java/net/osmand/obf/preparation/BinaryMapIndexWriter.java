@@ -768,14 +768,14 @@ public class BinaryMapIndexWriter {
 		long sumLabelX = 0;
 		long sumLabelY = 0;
 		int sumLabelCount = 0;
-        boolean symplify = true;
+        boolean simplify = true;
 		for (int i = 0; i < len; i += delta) {
 			int x = Algorithms.parseIntFromBytes(coordinates, i * 8);
 			int y = Algorithms.parseIntFromBytes(coordinates, i * 8 + 4);
 			int tx = (x >> SHIFT_COORDINATES) - pcalcx;
 			int ty = (y >> SHIFT_COORDINATES) - pcalcy;
-            if (tx > 0 || ty > 0) {
-                symplify = false;
+            if (tx != 0 || ty != 0) {
+                simplify = false;
             }
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(tx));
 			writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(ty));
@@ -791,7 +791,7 @@ public class BinaryMapIndexWriter {
 		}
 		COORDINATES_SIZE += CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 				+ CodedOutputStream.computeTagSize(MapData.COORDINATES_FIELD_NUMBER) + mapDataBuf.size();
-        if (area && symplify) {
+        if (area && simplify) {
             // change to point for very small area
             mapDataBuf.clear();
             writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(0));
