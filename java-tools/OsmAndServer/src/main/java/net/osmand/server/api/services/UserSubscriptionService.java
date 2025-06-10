@@ -568,12 +568,12 @@ public class UserSubscriptionService {
 		};
 	}
 
-	public Map<String, String> getUserAccountInfo(CloudUsersRepository.CloudUser pu) {
+	public Map<String, String> getUserAccountInfo(CloudUsersRepository.CloudUser pu, String errorMsgOrderId) {
 		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		Map<String, String> info = new HashMap<>();
 		String orderId = pu.orderid;
-		if (orderId == null) {
+		if (orderId == null || errorMsgOrderId != null) {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
 			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {

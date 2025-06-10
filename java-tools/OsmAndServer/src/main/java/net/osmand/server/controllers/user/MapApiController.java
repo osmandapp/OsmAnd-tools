@@ -598,7 +598,7 @@ public class MapApiController {
 		} else {
 			LOG.error("Error updating orderId for user " + pu.email + ": " + errorMsg);
 		}
-		info = userSubService.getUserAccountInfo(pu);
+		info = userSubService.getUserAccountInfo(pu, errorMsg);
 		info.put("nickname", pu.nickname);
 
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
