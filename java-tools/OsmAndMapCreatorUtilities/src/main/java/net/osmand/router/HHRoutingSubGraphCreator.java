@@ -1476,7 +1476,8 @@ public class HHRoutingSubGraphCreator {
 			} else {
 				RouteSegmentBorderPoint f = lstMerge.get(0);
 				RouteSegmentBorderPoint s = lstMerge.get(1);
-				if (lstMerge.size() == 2 && f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd) {
+				// && f.roadId == s.roadId && f.isPositive() == !s.isPositive() && f.segmentEnd == s.segmentEnd - no need to check same road id - 2 points is a simple merge
+				if (lstMerge.size() == 2) {
 					// simple merge scenario
 					simpleMerge(ctx, f, s.clusterDbId, s);
 					continue;
@@ -1485,34 +1486,35 @@ public class HHRoutingSubGraphCreator {
 				for (RouteSegmentBorderPoint p : lstMerge) {
 					clusters.adjustOrPutValue(p.clusterDbId, 1, 1);
 				}
-				if (clusters.size() == 1) {
-					// ignoring points that belong to same cluster is ok cause it doesn't change connectivity between clusters
-					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
-					continue;
-				}
-				List<RouteSegmentBorderPoint> singlePointClusters = new ArrayList<>();
+				// Potentially creates points without dual point that actually is a problem later (if it crashes we can revert it)
+//				if (clusters.size() == 1) {
+//					// ignoring points that belong to same cluster is ok cause it doesn't change connectivity between clusters
+//					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
+//					continue;
+//				}
+				List<RouteSegmentBorderPoint> multiplePointClusters = new ArrayList<>();
+				int multiClusterId = -1;
 				for (RouteSegmentBorderPoint p : lstMerge) {
-					if (clusters.get(p.clusterDbId) == 1) {
-						singlePointClusters.add(p);
+					if (clusters.get(p.clusterDbId) > 1) {
+						multiplePointClusters.add(p);
+						if(multiClusterId == -1) {
+							multiClusterId = p.clusterDbId;
+						} else if(multiClusterId != p.clusterDbId){
+							// there are multiple clusters with multiple points
+							multiClusterId = -1;
+							break;
+						}
 					}
 				}
-				if (clusters.size() >= 2 && singlePointClusters.size() == clusters.size() - 1) {
-					for (RouteSegmentBorderPoint singlePointCluster : singlePointClusters) {
-						lstMerge.remove(singlePointCluster);
-					}
-					for (RouteSegmentBorderPoint singlePointCluster : singlePointClusters) {
+				if (multiClusterId != -1) {
+					lstMerge.removeAll(multiplePointClusters);
+					RouteSegmentBorderPoint[] arr = multiplePointClusters.toArray(new RouteSegmentBorderPoint[multiplePointClusters.size()]);
+					for (RouteSegmentBorderPoint singlePointCluster : lstMerge) {
 						System.out.printf(
-								"Complex scenario with [%d] clusters (%s) and [%d] main points (%s) merging with lstMerge [%d] (%s)\n",
-								clusters.size(), clusters, singlePointClusters.size(), singlePointCluster, lstMerge.size(), lstMerge);
-						simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId,
-								lstMerge.toArray(new RouteSegmentBorderPoint[lstMerge.size()]));
+								"Complex scenario with [%d] clusters (%s): main point (of %d) (%s) merging with lstMerge [%d] (%s)\n",
+								clusters.size(), clusters, lstMerge.size(), singlePointCluster, lstMerge.size(), lstMerge);
+						simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId, arr);
 					}
-					continue;
-				}
-				if (clusters.size() == 2 && singlePointClusters.size() == 2 && f.fileDbId != s.fileDbId) {
-					// meeting two point from different regions (China-shandong)
-					System.err.println("Merge two singlePointClusters from different regions: " + lstMerge);
-					simpleMerge(ctx, f, s.clusterDbId, s);
 					continue;
 				}
 				String msg = String.format("Can't merge points %s", lstMerge);
