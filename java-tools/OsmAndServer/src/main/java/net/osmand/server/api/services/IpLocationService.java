@@ -1,81 +1,77 @@
 package net.osmand.server.api.services;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.HashMap;
+import net.osmand.util.Algorithms;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.maxmind.geoip.Location;
+import com.maxmind.geoip.LookupService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
 
 @Service
 public class IpLocationService {
+	public static final String LAT = "lat"; // used by Web
+	public static final String LON = "lon"; // used by Web
+	public static final String LATITUDE = "latitude"; // used by Android and iOS
+	public static final String LONGITUDE = "longitude"; // used by Android and iOS
+	public static final String COUNTRY_CODE = "country_code"; // used by OsmAnd-telegram (NL)
+	public static final String COUNTRY_NAME = "country_name"; // used by tools (Netherlands)
+	public static final String CITY = "city"; // used by tools (Amstelveen)
 
-    private static final Log LOGGER = LogFactory.getLog(IpLocationService.class);
+	@Value("${geoip.city.dat.v4}")
+	private String GeoIPCityV4;
 
-    
-    @Value("${geoip.url}")
-    private String geoipURL;
-    
-    private ObjectMapper jsonMapper;
-    
-    public static final String COUNTRY_CODE = "country_code"; // NL
-    public static final String COUNTRY_NAME = "country_name"; // Netherlands
-    public static final String REGION_NAME = "region_name"; // North Holland
-    public static final String REGION_CODE = "region_code"; // NH
-    public static final String CITY = "city"; // Amstelveen
-    public static final String ZIP_CODE = "zip_code"; // 1157
-    public static final String TIME_ZONE = "time_zone"; // Europe/Amsterdam
-    public static final String LATITUDE = "latitude"; // 
-    public static final String LONGITUDE = "longitude"; // 
-    
-    private IpLocationService() {
-    	ObjectMapper mapper = new ObjectMapper();
-    	this.jsonMapper = mapper;
-    }
-	
-	public String getLocationAsJson(String remoteAddr) throws IOException {
-		HashMap<String, Object> value = getRawData(remoteAddr);
-		if (value.containsKey("lat") && !value.containsKey("latitude")) {
-			value.put("latitude", value.get("lat"));
-		} else if (!value.containsKey("lat") && value.containsKey("latitude")) {
-			value.put("lat", value.get("latitude"));
-		}
-		if (value.containsKey("lon") && !value.containsKey("longitude")) {
-			value.put("longitude", value.get("lon"));
-		} else if (!value.containsKey("lon") && value.containsKey("longitude")) {
-			value.put("lon", value.get("longitude"));
-		}
-		return jsonMapper.writeValueAsString(value);
+	@Value("${geoip.city.dat.v6}")
+	private String GeoIPCityV6;
+
+	private final ObjectMapper jsonMapper = new ObjectMapper();
+	private static final Log LOG = LogFactory.getLog(IpLocationService.class);
+
+	public String getLocationAsJson(String ip) throws JsonProcessingException {
+		return jsonMapper.writeValueAsString(getAllFields(ip));
 	}
 
-	private HashMap<String, Object> getRawData(String remoteAddr) throws IOException, MalformedURLException,
-			JsonParseException, JsonMappingException {
-		URLConnection conn = new URL(geoipURL + remoteAddr).openConnection();
-		TypeReference<HashMap<String, Object>> typeRef = new TypeReference<HashMap<String, Object>>() {
-		};
-		HashMap<String, Object> value = jsonMapper.readValue(conn.getInputStream(), typeRef);
-		conn.getInputStream().close();
-		return value;
+	public String getField(String ip, String field) {
+		String value = getAllFields(ip).get(field);
+		return value == null ? "" : value;
 	}
 
-	public String getField(String hostAddress, String field) {
-		try {
-			HashMap<String, Object> mp = getRawData(hostAddress);
-			if(mp.containsKey(field)) {
-				return mp.get(field).toString();
+	private Map<String, String> getAllFields(String ip) {
+		Map<String, String> fields = new HashMap<>();
+		if (!Algorithms.isEmpty(ip)) {
+			boolean ipv6 = ip.contains(":");
+			File db = new File(ipv6 ? GeoIPCityV6 : GeoIPCityV4);
+			try {
+				LookupService lookup = new LookupService(db);
+				Location location = ipv6 ? lookup.getLocationV6(ip) : lookup.getLocation(ip);
+				if (!Algorithms.isEmpty(location.countryCode)) {
+					fields.put(COUNTRY_CODE, location.countryCode);
+				}
+				if (!Algorithms.isEmpty(location.countryName)) {
+					fields.put(COUNTRY_NAME, location.countryName);
+				}
+				if (!Algorithms.isEmpty(location.city)) {
+					fields.put(CITY, location.city);
+				}
+				if (location.latitude != 0 || location.longitude != 0) {
+					fields.put(LAT, String.valueOf(location.latitude));
+					fields.put(LON, String.valueOf(location.longitude));
+					fields.put(LATITUDE, String.valueOf(location.latitude));
+					fields.put(LONGITUDE, String.valueOf(location.longitude));
+				}
+			} catch (Exception e) {
+				LOG.warn(String.format("geoiplookup failed for %s", ip));
+				LOG.info(e);
 			}
-		} catch (Exception ex) {
-			LOGGER.warn(ex.getMessage(), ex);
 		}
-		return "";
+		return fields;
 	}
 }
