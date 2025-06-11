@@ -190,6 +190,9 @@ public class UserSubscriptionService {
 	}
 
 	public String verifyAndRefreshProOrderId(CloudUsersRepository.CloudUser pu) {
+		if (Algorithms.isEmpty(pu.orderid)) {
+			updateOrderId(pu);
+		}
 		String errorMsg = checkOrderIdPro(pu.orderid);
 		if (errorMsg != null) {
 			boolean updated = updateSubscriptionUserId(pu);
