@@ -359,7 +359,6 @@ public class UserSubscriptionService {
 				}
 			}
 		}
-		String inappOrderId = null;
 		List<SupporterDeviceInAppPurchase> inApps = inAppPurchasesRepo.findByOrderId(pu.orderid);
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		if (inApps != null && !inApps.isEmpty()) {
@@ -370,7 +369,7 @@ public class UserSubscriptionService {
 			}
 		}
 		if (subOrderId != null) {
-			pu.orderid = inappOrderId;
+			pu.orderid = subOrderId;
 			usersRepository.saveAndFlush(pu);
 			return true;
 		}
