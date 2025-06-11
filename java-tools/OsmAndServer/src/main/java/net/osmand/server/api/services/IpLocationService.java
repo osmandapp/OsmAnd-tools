@@ -9,10 +9,12 @@ import com.maxmind.geoip.LookupService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+
 
 @Service
 public class IpLocationService {
@@ -24,8 +26,11 @@ public class IpLocationService {
 	public static final String COUNTRY_NAME = "country_name"; // used by tools (Netherlands)
 	public static final String CITY = "city"; // used by tools (Amstelveen)
 
-	public static final String GeoIPCityV4 = "/usr/share/GeoIP/GeoIPCity.dat";
-	public static final String GeoIPCityV6 = "/usr/share/GeoIP/GeoIPCityv6.dat";
+	@Value("${geoip.city.dat.v4}")
+	private String GeoIPCityV4;
+
+	@Value("${geoip.city.dat.v6}")
+	private String GeoIPCityV6;
 
 	private final ObjectMapper jsonMapper = new ObjectMapper();
 	private static final Log LOG = LogFactory.getLog(IpLocationService.class);

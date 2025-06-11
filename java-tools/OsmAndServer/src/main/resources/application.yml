@@ -135,7 +135,8 @@ monitoring:
   project.db:
   project.token:
 
-geoip.url: "http://localhost:8081/json/"
+geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
+geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
