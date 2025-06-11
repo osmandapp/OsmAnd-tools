@@ -1013,6 +1013,7 @@ public class AdminController {
 		Calendar c = Calendar.getInstance();
 		List<Subscription> subs = new ArrayList<AdminController.Subscription>();
 		ExchangeRates rates = parseExchangeRates();
+		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 		
 		jdbcTemplate.query(
 				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from supporters_device_sub",
@@ -1055,7 +1056,7 @@ public class AdminController {
 						s.autorenewing = rs.getBoolean(7);
 						s.valid = rs.getBoolean(8);
 						s.introCycles = rs.getInt(9);
-						setDefaultSkuValues(s);
+						setDefaultSkuValues(s, subMap);
 						c.setTimeInMillis(s.startTime);
 						while (c.getTimeInMillis() < s.endTime) {
 							c.add(Calendar.MONTH, 1);
@@ -1192,59 +1193,16 @@ public class AdminController {
 		});
 		return rates;
 	}
-	
-	private void setDefaultSkuValues(Subscription s) {
-		switch(s.sku) {
-		// retention values need to be adjusted and should be equal to average of the last periods (not first) 
-		case "osm_free_live_subscription_2": s.app = SubAppType.OSMAND; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1800; break;
-		case "osm_live_subscription_2": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1200; break;
-		
-		case "osm_live_subscription_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
-		case "osm_live_subscription_annual_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 6000;  break;
-		case "osm_live_subscription_annual_free_v2": s.app = SubAppType.OSMAND; s.retention = 0.8; s.durationMonth = 12; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_annual_full_v2": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.58; s.durationMonth = 12; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_3_months_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "osm_live_subscription_3_months_full_v1": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.85; s.durationMonth = 3; s.defPriceEurMillis = 3000; break;
-		case "osm_live_subscription_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "osm_live_subscription_monthly_full_v1": s.app = SubAppType.OSMAND_PLUS;  s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 1500;  break;
 
-		case "osmand_pro_monthly_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "osmand_pro_monthly_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "osmand_maps_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
-		case "osmand_pro_annual_free_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_annual_full_v1": s.app = SubAppType.OSMAND; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "osmand_pro_test": s.app = SubAppType.OSMAND_PLUS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-
-		case "net.osmand.maps.subscription.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.95; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-		case "net.osmand.maps.subscription.3months_v1": s.app = SubAppType.IOS; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.maps.subscription.annual_v1": s.app = SubAppType.IOS; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 8000; s.maps = true; break;
-		
-		case "net.osmand.maps.subscription.pro.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 29000; s.pro = true; break;
-		case "net.osmand.maps.subscription.pro.monthly_v1": s.app = SubAppType.IOS; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.maps.subscription.plus.annual_v1": s.app = SubAppType.IOS; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
-
-		case "net.osmand.huawei.annual_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 12; s.defPriceEurMillis = 8000; break;
-		case "net.osmand.huawei.3months_v1": s.app = SubAppType.HUAWEI; s.retention = 0.75; s.durationMonth = 3; s.defPriceEurMillis = 4000; break;
-		case "net.osmand.huawei.monthly_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 2000; break;
-
-		case "net.osmand.huawei.monthly.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.huawei.annual.pro_v1": s.app = SubAppType.HUAWEI; s.retention = 0.6; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.huawei.annual.maps_v1": s.app = SubAppType.HUAWEI; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
-		
-		case "net.osmand.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.amazon.maps.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 10000; s.maps = true; break;
-		case "net.osmand.plus.amazon.pro.monthly": s.app = SubAppType.AMAZON; s.retention = 0.9; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		case "net.osmand.plus.amazon.pro.annual": s.app = SubAppType.AMAZON; s.retention = 0.7; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-
-		case "net.osmand.fastspring.subscription.pro.annual": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.fastspring.test.subscription.pro.annual": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.fastspring.subscription.pro.annual.test": s.app = SubAppType.FASTSPRING; s.retention = 0.5; s.durationMonth = 12; s.defPriceEurMillis = 30000; s.pro = true; break;
-		case "net.osmand.fastspring.subscription.pro.monthly": s.app = SubAppType.FASTSPRING; s.retention = 0.85; s.durationMonth = 1; s.defPriceEurMillis = 3000; s.pro = true; break;
-		
-
-		default: throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
-		};
+	private void setDefaultSkuValues(Subscription s, Map<String, PurchasesDataLoader.Subscription> subMap) {
+		PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
+		if (subBaseData == null) {
+			throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
+		}
+		s.app = SubAppType.fromString(subBaseData.app());
+		s.retention = subBaseData.retention();
+		s.durationMonth = subBaseData.duration();
+		s.defPriceEurMillis = subBaseData.defaultPriceEurMillis();
 	}
 	
 	
@@ -1252,13 +1210,25 @@ public class AdminController {
 		public String date;
 	}
 	
-	public static enum SubAppType {
+	public enum SubAppType {
 		OSMAND_PLUS,
 		IOS,
 		OSMAND,
 		AMAZON,
 		HUAWEI,
-		FASTSPRING,
+		FASTSPRING;
+
+		public static SubAppType fromString(String app) {
+			return switch (app.toLowerCase()) {
+				case "osmand+" -> OSMAND_PLUS;
+				case "osmand" -> OSMAND;
+				case "ios" -> IOS;
+				case "amazon" -> AMAZON;
+				case "huawei" -> HUAWEI;
+				case "fastspring" -> FASTSPRING;
+				default -> throw new IllegalArgumentException("Unknown app type: " + app);
+			};
+		}
 	}
 	public static class Subscription {
 		

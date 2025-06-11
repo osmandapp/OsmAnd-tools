@@ -1,7 +1,9 @@
 package net.osmand.server;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,16 +57,43 @@ public class PurchasesDataLoader {
 		return inapps;
 	}
 
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			String name,
 			String platform,
-			@JsonProperty("cross-platform") String crossPlatform,
-			String type
-	) {}
+			@JsonProperty("feature_pro") boolean hasPro,
+			@JsonProperty("cross-platform") boolean isCrossPlatform,
+			int duration,
+			@JsonProperty("duration_unit") String durationUnit,
+			double retention,
+			@JsonProperty("defPriceEurMillis") int defaultPriceEurMillis,
+			String app
+	) {
+	}
 
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record InApp(
 			String name,
 			String platform,
-			@JsonProperty("cross-platform") String crossPlatform
-	) {}
+			@JsonProperty("cross-platform") boolean isCrossPlatform,
+			@JsonProperty("feature_pro") JsonNode pro
+	) {
+
+		public record InAppProFeatures(
+				String expire
+		) {
+		}
+
+		public boolean isPro() {
+			return !pro.isBoolean() || pro.booleanValue();
+		}
+
+		public InAppProFeatures getProFeatures() {
+			if (pro.isObject()) {
+				return new InAppProFeatures(pro.path("expire").asText(null));
+			} else {
+				return null;
+			}
+		}
+	}
 }
