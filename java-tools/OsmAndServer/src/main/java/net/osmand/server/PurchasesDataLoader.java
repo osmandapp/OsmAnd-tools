@@ -1,5 +1,6 @@
 package net.osmand.server;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -56,11 +57,11 @@ public class PurchasesDataLoader {
 		return inapps;
 	}
 
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			String name,
 			String platform,
 			@JsonProperty("feature_pro") boolean hasPro,
-			@JsonProperty("feature_maps") boolean hasMaps,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			int duration,
 			@JsonProperty("duration_unit") String durationUnit,
@@ -70,17 +71,18 @@ public class PurchasesDataLoader {
 	) {
 	}
 
+	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record InApp(
 			String name,
 			String platform,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
-			@JsonProperty("feature_pro") JsonNode pro,
-			@JsonProperty("feature_maps") JsonNode maps
+			@JsonProperty("feature_pro") JsonNode pro
 	) {
 
 		public record InAppProFeatures(
 				String expire
-		) {}
+		) {
+		}
 
 		public boolean isPro() {
 			return !pro.isBoolean() || pro.booleanValue();
