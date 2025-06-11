@@ -342,7 +342,7 @@ public class UserSubscriptionService {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
 			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
-					.filter(s -> s.valid)
+					.filter(s -> s.valid != null && s.valid)
 					.max(Comparator.comparing(
 							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
 									s.expiretime != null ? s.expiretime : new Date(0)
