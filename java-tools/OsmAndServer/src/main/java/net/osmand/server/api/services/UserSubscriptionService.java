@@ -117,25 +117,22 @@ public class UserSubscriptionService {
 					LOG.info("No subscription data found for sku: " + s.sku);
 					return "subscription data not found";
 				}
-				if (!subBaseData.hasPro()) {
-					return "subscription is not eligible for OsmAnd Cloud";
-				}
 				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION)) {
 					// no need to revalidate
+				} else if (!subBaseData.hasPro()) {
+					return "subscription is not eligible for OsmAnd Cloud";
+				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
+					s = revalidateGoogleSubscription(s);
+				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_HUAWEI)) {
+					s = revalidateHuaweiSubscription(s);
+				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_AMAZON)) {
+					s = revalidateAmazonSubscription(s);
+				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_APPLE)) {
+					s = revalidateiOSSubscription(s);
+				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_FASTSPRING)) {
+					s = revalidateFastSpringSubscription(s);
 				} else {
-					if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
-						s = revalidateGoogleSubscription(s);
-					} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_HUAWEI)) {
-						s = revalidateHuaweiSubscription(s);
-					} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_AMAZON)) {
-						s = revalidateAmazonSubscription(s);
-					} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_APPLE)) {
-						s = revalidateiOSSubscription(s);
-					} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_FASTSPRING)) {
-						s = revalidateFastSpringSubscription(s);
-					} else {
-						return "subscription is not eligible for OsmAnd Cloud";
-					}
+					return "subscription is not eligible for OsmAnd Cloud";
 				}
 			}
 			if (s.valid == null || !s.valid) {
