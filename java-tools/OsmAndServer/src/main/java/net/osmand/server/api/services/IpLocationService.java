@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -45,7 +45,7 @@ public class IpLocationService {
 	}
 
 	private Map<String, String> getAllFields(String ip) {
-		Map<String, String> fields = new HashMap<>();
+		Map<String, String> fields = new LinkedHashMap<>();
 		if (!Algorithms.isEmpty(ip)) {
 			boolean ipv6 = ip.contains(":");
 			File db = new File(ipv6 ? GeoIPCityV6 : GeoIPCityV4);
