@@ -613,6 +613,14 @@ public class SubscriptionController {
 			if (pu == null) {
 				return error("User not found. To purchase Maps+ in-app features, please register first.");
 			}
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = iapsRepository.findByUserId(pu.id);
+			if (purchases != null && !purchases.isEmpty()) {
+				for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase purchase : purchases) {
+					if (purchase.sku.equals(sku) && purchase.platform.equals(platform)) {
+						return error("OsmAnd+ App purchase already exists for user: " + pu.id + ", sku: " + sku + ", platform: " + platform);
+					}
+				}
+			}
 			return null;
 		}
 		return null;
