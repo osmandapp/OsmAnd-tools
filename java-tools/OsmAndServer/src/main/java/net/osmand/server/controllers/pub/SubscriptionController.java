@@ -598,8 +598,8 @@ public class SubscriptionController {
 
 	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
 		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
-			if (Algorithms.isEmpty(sku) || !sku.equals("net.osmand.huawei.full")) {
-				return error("Invalid SKU for OsmAnd+ App purchase: " + sku);
+			if (Algorithms.isEmpty(sku)) {
+				return error("SKU is not provided for OsmAnd+ App purchase.");
 			}
 			Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 			PurchasesDataLoader.InApp inApp = inappMap.get(sku);
