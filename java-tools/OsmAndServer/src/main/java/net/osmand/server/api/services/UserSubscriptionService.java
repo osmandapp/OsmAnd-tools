@@ -113,12 +113,10 @@ public class UserSubscriptionService {
 			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
 				PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
-				if (subBaseData == null) {
-					LOG.info("No subscription data found for sku: " + s.sku);
-					return "subscription data not found";
-				}
 				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION)) {
 					// no need to revalidate
+				} else if (subBaseData == null) {
+					return "subscription data not found";
 				} else if (!subBaseData.hasPro()) {
 					return "subscription is not eligible for OsmAnd Cloud";
 				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
