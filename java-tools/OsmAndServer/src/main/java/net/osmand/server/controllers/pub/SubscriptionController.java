@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -58,6 +59,8 @@ public class SubscriptionController {
     public static final String PLATFORM_AMAZON = "amazon";
     public static final String PLATFORM_HUAWEI = "huawei";
 	public static final String PLATFORM_FASTSPRING = "fastspring";
+
+	private static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
 
     private PrivateKey subscriptionPrivateKey;
 
@@ -492,7 +495,7 @@ public class SubscriptionController {
             return error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
         }
 
-        Integer serId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
+        Integer userId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
         Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
                 PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
 
@@ -502,7 +505,7 @@ public class SubscriptionController {
             subscr.purchaseToken = effectivePurchaseToken;
             subscr.orderId = effectiveOrderId;
             subscr.sku = skuParam;
-            subscr.userId = serId;
+            subscr.userId = userId;
             subscr.supporterId = supporterUserId;
             subscr.timestamp = new Date(); // Record creation/update time
 
@@ -548,6 +551,10 @@ public class SubscriptionController {
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
 
         } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
+	        ResponseEntity<String> error = processOsmandPlusAppPurchase(userId, effectiveOrderId, skuParam, platform);
+			if (error != null) {
+				return error;
+			}
             SupporterDeviceInAppPurchase iap = new SupporterDeviceInAppPurchase();
             iap.purchaseToken = effectivePurchaseToken;
             iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
@@ -555,7 +562,7 @@ public class SubscriptionController {
             iap.platform = platform;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
-            iap.userId = serId;
+            iap.userId = userId;
             iap.supporterId = supporterUserId;
 
             Optional<SupporterDeviceInAppPurchase> iapOpt = iapsRepository.findById(
@@ -585,6 +592,30 @@ public class SubscriptionController {
             return error("Invalid purchaseType specified: " + purchaseType);
         }
     }
+
+	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
+		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
+			if (Algorithms.isEmpty(sku)) {
+				return error("SKU is not provided for OsmAnd+ App purchase.");
+			}
+			if (Algorithms.isEmpty(platform)) {
+				return error("Platform is not provided for OsmAnd+ App purchase.");
+			}
+			if ((!sku.equals("net.osmand.huawei.full") && !platform.equals(PLATFORM_HUAWEI))
+					|| (!sku.equals("net.osmand.amazon.maps.inapp") && !platform.equals(PLATFORM_AMAZON))) {
+				return error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
+			}
+			if (userId == null) {
+				return error("User ID is not provided for OsmAnd+ App purchase.");
+			}
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+			if (pu == null) {
+				return error("User not found. To purchase Maps+ in-app features, please register first.");
+			}
+			return null;
+		}
+		return null;
+	}
 
 	private void updateUserOrderId(Integer userId, String orderId) {
 		if (userId != null) {

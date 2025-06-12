@@ -76,7 +76,8 @@ public class PurchasesDataLoader {
 			String name,
 			String platform,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
-			@JsonProperty("feature_pro") JsonNode pro
+			@JsonProperty("feature_pro") JsonNode pro,
+			@JsonProperty("feature_maps") JsonNode maps
 	) {
 
 		public record InAppProFeatures(
@@ -86,6 +87,10 @@ public class PurchasesDataLoader {
 
 		public boolean isPro() {
 			return !pro.isBoolean() || pro.booleanValue();
+		}
+
+		public boolean isMaps() {
+			return !maps.isBoolean() || maps.booleanValue();
 		}
 
 		public InAppProFeatures getProFeatures() {
