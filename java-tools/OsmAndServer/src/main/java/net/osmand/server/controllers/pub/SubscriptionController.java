@@ -494,7 +494,7 @@ public class SubscriptionController {
             return error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
         }
 
-        Integer serId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
+        Integer userId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
         Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
                 PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
 
@@ -504,7 +504,7 @@ public class SubscriptionController {
             subscr.purchaseToken = effectivePurchaseToken;
             subscr.orderId = effectiveOrderId;
             subscr.sku = skuParam;
-            subscr.userId = serId;
+            subscr.userId = userId;
             subscr.supporterId = supporterUserId;
             subscr.timestamp = new Date(); // Record creation/update time
 
@@ -550,7 +550,7 @@ public class SubscriptionController {
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
 
         } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
-	        ResponseEntity<String> error = processOsmandPlusAppPurchase(serId, effectiveOrderId);
+	        ResponseEntity<String> error = processOsmandPlusAppPurchase(userId, effectiveOrderId, skuParam);
 			if (error != null) {
 				return error;
 			}
@@ -561,7 +561,7 @@ public class SubscriptionController {
             iap.platform = platform;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
-            iap.userId = serId;
+            iap.userId = userId;
             iap.supporterId = supporterUserId;
 
             Optional<SupporterDeviceInAppPurchase> iapOpt = iapsRepository.findById(
@@ -592,8 +592,8 @@ public class SubscriptionController {
         }
     }
 
-	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId) {
-		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
+	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku) {
+		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP) && !Algorithms.isEmpty(sku) && sku.equals("osmand_full_version_price")) {
 			if (userId == null) {
 				return error("User ID is not provided for OsmAnd+ App purchase.");
 			}
