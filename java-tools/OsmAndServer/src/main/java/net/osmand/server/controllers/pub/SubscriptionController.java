@@ -79,9 +79,6 @@ public class SubscriptionController {
     @Autowired
     private DeviceInAppPurchasesRepository iapsRepository;
 
-	@Autowired
-	protected PurchasesDataLoader purchasesDataLoader;
-
     @Autowired
     private CloudUsersRepository usersRepository; // Keep for potentially updating User.orderId
 
@@ -601,13 +598,12 @@ public class SubscriptionController {
 			if (Algorithms.isEmpty(sku)) {
 				return error("SKU is not provided for OsmAnd+ App purchase.");
 			}
-			Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
-			PurchasesDataLoader.InApp inApp = inappMap.get(sku);
-			if (inApp == null) {
-				return error("In-app purchase not found for sku: " + sku);
+			if (Algorithms.isEmpty(platform)) {
+				return error("Platform is not provided for OsmAnd+ App purchase.");
 			}
-			if (!inApp.platform().equals(platform) || !inApp.isMaps()) {
-				return error("In-app purchase platform mismatch or not a Maps+ feature: " + platform);
+			if ((!sku.equals("net.osmand.huawei.full") && !platform.equals(PLATFORM_HUAWEI))
+					|| (!sku.equals("net.osmand.amazon.maps.inapp") && !platform.equals(PLATFORM_AMAZON))) {
+				return error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
 			}
 			if (userId == null) {
 				return error("User ID is not provided for OsmAnd+ App purchase.");
