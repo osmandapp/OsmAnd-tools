@@ -601,7 +601,7 @@ public class SubscriptionController {
 			if (Algorithms.isEmpty(platform)) {
 				return error("Platform is not provided for OsmAnd+ App purchase.");
 			}
-			if ((!sku.equals("net.osmand.huawei.full") && !platform.equals(PLATFORM_HUAWEI))
+			if ((!sku.equals("osmand_full_version_price") && !platform.equals(PLATFORM_GOOGLE))
 					|| (!sku.equals("net.osmand.amazon.maps.inapp") && !platform.equals(PLATFORM_AMAZON))) {
 				return error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
 			}
