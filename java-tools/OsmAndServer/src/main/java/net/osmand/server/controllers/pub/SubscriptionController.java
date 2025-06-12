@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -77,6 +78,9 @@ public class SubscriptionController {
 
     @Autowired
     private DeviceInAppPurchasesRepository iapsRepository;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
 
     @Autowired
     private CloudUsersRepository usersRepository; // Keep for potentially updating User.orderId
@@ -550,7 +554,7 @@ public class SubscriptionController {
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
 
         } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
-	        ResponseEntity<String> error = processOsmandPlusAppPurchase(userId, effectiveOrderId, skuParam);
+	        ResponseEntity<String> error = processOsmandPlusAppPurchase(userId, effectiveOrderId, skuParam, platform);
 			if (error != null) {
 				return error;
 			}
@@ -592,8 +596,19 @@ public class SubscriptionController {
         }
     }
 
-	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku) {
-		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP) && !Algorithms.isEmpty(sku) && sku.equals("osmand_full_version_price")) {
+	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
+		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
+			if (Algorithms.isEmpty(sku) || !sku.equals("net.osmand.huawei.full")) {
+				return error("Invalid SKU for OsmAnd+ App purchase: " + sku);
+			}
+			Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+			PurchasesDataLoader.InApp inApp = inappMap.get(sku);
+			if (inApp == null) {
+				return error("In-app purchase not found for sku: " + sku);
+			}
+			if (!inApp.platform().equals(platform) || !inApp.isMaps()) {
+				return error("In-app purchase platform mismatch or not a Maps+ feature: " + platform);
+			}
 			if (userId == null) {
 				return error("User ID is not provided for OsmAnd+ App purchase.");
 			}
