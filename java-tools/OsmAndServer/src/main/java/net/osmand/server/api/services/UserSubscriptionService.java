@@ -344,8 +344,10 @@ public class UserSubscriptionService {
 		String subOrderId = null;
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(pu.id);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
+			Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
 					.filter(s -> s.valid != null && s.valid)
+					.filter(s -> s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (subMap.get(s.sku) != null && subMap.get(s.sku).hasPro()))
 					.max(Comparator.comparing(
 							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
 									s.expiretime != null ? s.expiretime : new Date(0)
