@@ -59,6 +59,8 @@ public class SubscriptionController {
     public static final String PLATFORM_HUAWEI = "huawei";
 	public static final String PLATFORM_FASTSPRING = "fastspring";
 
+	private static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
+
     private PrivateKey subscriptionPrivateKey;
 
     @Autowired
@@ -548,6 +550,10 @@ public class SubscriptionController {
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
 
         } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
+	        ResponseEntity<String> error = processOsmandPlusAppPurchase(serId, effectiveOrderId);
+			if (error != null) {
+				return error;
+			}
             SupporterDeviceInAppPurchase iap = new SupporterDeviceInAppPurchase();
             iap.purchaseToken = effectivePurchaseToken;
             iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
@@ -585,6 +591,20 @@ public class SubscriptionController {
             return error("Invalid purchaseType specified: " + purchaseType);
         }
     }
+
+	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId) {
+		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
+			if (userId == null) {
+				return error("User ID is not provided for OsmAnd+ App purchase.");
+			}
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+			if (pu == null) {
+				return error("User not found. To purchase Maps+ in-app features, please register first.");
+			}
+			return null;
+		}
+		return null;
+	}
 
 	private void updateUserOrderId(Integer userId, String orderId) {
 		if (userId != null) {
