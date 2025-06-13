@@ -40,6 +40,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -124,11 +125,15 @@ public class MapApiController {
 		}
 		if (user instanceof Authentication) {
 			Object obj = ((Authentication) user).getPrincipal();
-			// hide device accesscceToekn
 			if (obj instanceof OsmAndProUser) {
 				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
-				obj = Collections.singletonMap("username", pu.getUsername());
-
+				List<String> roles = pu.getAuthorities().stream()
+						.map(GrantedAuthority::getAuthority)
+						.toList();
+				Map<String, Object> result = new HashMap<>();
+				result.put("username", pu.getUsername());
+				result.put("roles", roles);
+				return gson.toJson(result);
 			}
 			return gson.toJson(obj);
 		}
