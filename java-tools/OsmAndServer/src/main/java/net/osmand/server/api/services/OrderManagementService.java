@@ -51,6 +51,7 @@ public class OrderManagementService {
 		String email = q + "%";
 		String order = q + "%";
 		String sku = "%" + q + "%";
+		String purchaseToken = q;
 
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
@@ -62,7 +63,10 @@ public class OrderManagementService {
 						"       COALESCE(s.starttime, s.checktime) AS sort_key " +
 						"  FROM supporters_device_sub s " +
 						"  LEFT JOIN user_accounts u ON u.id = s.userid " +
-						" WHERE s.sku ILIKE ? OR u.email ILIKE ? OR s.orderid ILIKE ? ESCAPE '\\'" +
+						" WHERE s.sku ILIKE ? " +
+						"    OR u.email ILIKE ? " +
+						"    OR s.orderid ILIKE ? ESCAPE '\\' " +
+						"    OR s.purchasetoken = ? " +
 						"UNION ALL " +
 						"SELECT u.email, i.sku, i.orderid, i.purchasetoken, " +
 						"       i.userid, i.timestamp, " +
@@ -73,7 +77,10 @@ public class OrderManagementService {
 						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
 						"  LEFT JOIN user_accounts u ON u.id = i.userid " +
-						" WHERE i.sku ILIKE ? OR u.email ILIKE ? OR i.orderid ILIKE ? ESCAPE '\\'" +
+						" WHERE i.sku ILIKE ? " +
+						"    OR u.email ILIKE ? " +
+						"    OR i.orderid ILIKE ? ESCAPE '\\' " +
+						"    OR i.purchasetoken = ? " +
 						"ORDER BY sort_key DESC " +
 						"LIMIT ?";
 
@@ -82,9 +89,11 @@ public class OrderManagementService {
 				sku,    // first s.sku
 				email, // first u.email
 				order, // first s.orderid
+				purchaseToken,
 				sku,    // i.sku
 				email, // second u.email
 				order, // i.orderid
+				purchaseToken,
 				limit
 		};
 
