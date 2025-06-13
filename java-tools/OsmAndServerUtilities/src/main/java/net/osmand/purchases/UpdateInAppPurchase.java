@@ -35,6 +35,8 @@ public class UpdateInAppPurchase {
     public static final String PLATFORM_HUAWEI = "huawei";
     public static final String PLATFORM_FASTSPRING = "fastspring";
 
+    public static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
+
     private static final int BATCH_SIZE = 200;
     private static final long HOUR = 1000L * 60 * 60;
 
@@ -208,6 +210,12 @@ public class UpdateInAppPurchase {
 
                 if (validBool != null && validBool && !pms.verifyAll) {
                     continue; // Skip check if already valid
+                }
+
+                boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
+                boolean isAmazonApp = sku.equals("net.osmand.amazon.maps.inapp") && platform.equals(PLATFORM_AMAZON);
+                if (orderId.equals(OSMAND_PLUS_APP) && (isGoogleApp || isAmazonApp)) {
+                    continue; // Skip OsmAnd Plus app purchases
                 }
 
                 String hiddenOrderId = getHiddenOrderId(orderId);
