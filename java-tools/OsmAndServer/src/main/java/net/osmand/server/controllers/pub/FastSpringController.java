@@ -76,6 +76,7 @@ public class FastSpringController {
 							iap.orderId = orderId;
 							iap.sku = sku;
 							iap.platform = FastSpringHelper.FASTSPRING_PLATFORM;
+							iap.purchaseToken = data.reference;
 							iap.purchaseTime = new Date(event.created);
 							iap.timestamp = new Date();
 							iap.userId = userId;
@@ -191,6 +192,7 @@ public class FastSpringController {
 
 		public static class Data {
 			public String order; // orderId
+			public String reference; // purchaseToken
 			public Customer customer;
 			public List<Item> items;
 		}
