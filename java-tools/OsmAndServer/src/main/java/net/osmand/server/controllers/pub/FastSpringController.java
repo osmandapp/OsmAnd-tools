@@ -93,6 +93,7 @@ public class FastSpringController {
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 								subscription.orderId = orderId;
 								subscription.sku = sku;
+								subscription.purchaseToken = data.reference;
 								subscription.timestamp = new Date();
 								subscription.userId = userId;
 								subscription.valid = true;
