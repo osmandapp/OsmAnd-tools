@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
@@ -131,6 +132,9 @@ public class ApiController {
 
 	@Autowired
 	PluginsService pluginsService;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
 
 	@Autowired
 	PromoService promoService;
@@ -487,6 +491,12 @@ public class ApiController {
             if (iap.purchaseTime != null) {
                 iapMap.put("purchaseTime", String.valueOf(iap.purchaseTime.getTime()));
             }
+	        Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+			PurchasesDataLoader.InApp inapp = inappMap.get(iap.sku);
+	        if (inapp != null) {
+		        iapMap.put("info", new Gson().toJson(inapp));
+	        }
+
             iapResults.add(iapMap);
         }
         return gson.toJson(iapResults);

@@ -111,7 +111,7 @@ public class UserSubscriptionService {
 		List<SupporterDeviceSubscription> lst = subscriptionsRepo.findByOrderId(orderid);
 		for (SupporterDeviceSubscription s : lst) {
 			PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
-			boolean isProSku = subBaseData != null && subBaseData.hasPro();
+			boolean isProSku = subBaseData != null && subBaseData.isPro();
 			if (!s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) && !isProSku) {
 				LOG.info("Subscription sku is not pro: " + s.sku);
 				return "subscription is not pro: " + s.sku;
@@ -346,7 +346,7 @@ public class UserSubscriptionService {
 			Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 			Optional<SupporterDeviceSubscription> maxExpiryValid = subscriptions.stream()
 					.filter(s -> s.valid != null && s.valid)
-					.filter(s -> s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (subMap.get(s.sku) != null && subMap.get(s.sku).hasPro()))
+					.filter(s -> s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (subMap.get(s.sku) != null && subMap.get(s.sku).isPro()))
 					.max(Comparator.comparing(
 							(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) ->
 									s.expiretime != null ? s.expiretime : new Date(0)
@@ -447,6 +447,11 @@ public class UserSubscriptionService {
 			subMap.put(EXPIRE_TIME_KEY, String.valueOf(expireTimeMs));
 		}
 		subMap.put(STATE_KEY, state);
+		Map<String, PurchasesDataLoader.Subscription> subBaseMap = purchasesDataLoader.getSubscriptions();
+		PurchasesDataLoader.Subscription subBaseData = subBaseMap.get(sub.sku);
+		if (subBaseData != null) {
+			subMap.put("info", new Gson().toJson(subBaseData));
+		}
 		return subMap;
 	}
 
