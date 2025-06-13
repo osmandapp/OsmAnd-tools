@@ -61,7 +61,12 @@ public class PurchasesDataLoader {
 	public record Subscription(
 			String name,
 			String platform,
-			@JsonProperty("feature_pro") boolean hasPro,
+			@JsonProperty("feature_pro") JsonNode pro,
+			@JsonProperty("feature_maps") JsonNode maps,
+			@JsonProperty("feature_contours") JsonNode contours,
+			@JsonProperty("feature_nautical") JsonNode nautical,
+			@JsonProperty("feature_pro_no_cloud") JsonNode proNoCloud,
+			@JsonProperty("feature_live_maps") JsonNode liveMaps,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			int duration,
 			@JsonProperty("duration_unit") String durationUnit,
@@ -69,6 +74,9 @@ public class PurchasesDataLoader {
 			@JsonProperty("defPriceEurMillis") int defaultPriceEurMillis,
 			String app
 	) {
+		public boolean isPro() {
+			return !pro.isBoolean() || pro.booleanValue();
+		}
 	}
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
@@ -77,7 +85,11 @@ public class PurchasesDataLoader {
 			String platform,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			@JsonProperty("feature_pro") JsonNode pro,
-			@JsonProperty("feature_maps") JsonNode maps
+			@JsonProperty("feature_maps") JsonNode maps,
+			@JsonProperty("feature_contours") JsonNode contours,
+			@JsonProperty("feature_nautical") JsonNode nautical,
+			@JsonProperty("feature_pro_no_cloud") JsonNode proNoCloud,
+			@JsonProperty("feature_live_maps") JsonNode liveMaps
 	) {
 
 		public record InAppProFeatures(
