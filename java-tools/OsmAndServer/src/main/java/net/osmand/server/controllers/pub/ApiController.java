@@ -456,6 +456,7 @@ public class ApiController {
 				if (!subMap.isEmpty()) {
 					res.add(subMap);
 				}
+				promoService.processFastSpringPromo(sub.sku, pu.id);
 			}
 			return gson.toJson(res);
 		}
@@ -476,16 +477,19 @@ public class ApiController {
         if (pu == null && sup == null) {
             return "{}";
         }
-
-        List<SupporterDeviceInAppPurchase> validIaps = pu != null
+        List<SupporterDeviceInAppPurchase> validInapps = pu != null
                 ? iapsRepository.findByUserIdAndValidTrue(pu.id)
                 : iapsRepository.findBySupporterIdAndValidTrue(sup.userId);
 
         List<Map<String, String>> iapResults = new ArrayList<>();
-        for (SupporterDeviceInAppPurchase iap : validIaps) {
+        for (SupporterDeviceInAppPurchase iap : validInapps) {
             Map<String, String> iapMap = new HashMap<>();
             iapMap.put("sku", iap.sku);
-            if (iap.platform != null) {
+
+	        long id = pu != null ? pu.id : sup.userId;
+	        promoService.processFastSpringPromo(iap.sku, (int) id);
+
+	        if (iap.platform != null) {
                 iapMap.put("platform", iap.platform);
             }
             if (iap.purchaseTime != null) {

@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
-import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -13,6 +12,7 @@ import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.PromoService;
 import net.osmand.server.api.services.ReceiptValidationService;
+import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.utils.BTCAddrValidator;
 import net.osmand.util.Algorithms;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -64,8 +64,6 @@ public class SubscriptionController {
     public static final String PLATFORM_HUAWEI = "huawei";
 	public static final String PLATFORM_FASTSPRING = "fastspring";
 
-	private static final String FASTSPRING_PROMO = "promo_user";
-
 	private static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
 
     private PrivateKey subscriptionPrivateKey;
@@ -84,6 +82,9 @@ public class SubscriptionController {
 
     @Autowired
     private DeviceInAppPurchasesRepository iapsRepository;
+
+	@Autowired
+	private UserSubscriptionService userSubService;
 
     @Autowired
     private CloudUsersRepository usersRepository; // Keep for potentially updating User.orderId
@@ -154,11 +155,6 @@ public class SubscriptionController {
 		return ResponseEntity.ok().body(String.format(body, args));
 	}
 
-    private ResponseEntity<String> error(String txt) {
-    	// clients don't accept error requests (neither mobile, neither http)
-    	return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
-	}
-
     @PostMapping(path = {"/register_email", "/register_email.php"},
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -224,19 +220,19 @@ public class SubscriptionController {
     public ResponseEntity<String> update(HttpServletRequest request) {
     	String userId = request.getParameter("userid");
     	if (isEmpty(userId)) {
-        	return error("Please validate user id.");
+        	return userSubService.error("Please validate user id.");
         }
     	String token = request.getParameter("token");
     	if (isEmpty(token)) {
-        	return error("Token is not present: fix will be in OsmAnd 3.2");
+        	return userSubService.error("Token is not present: fix will be in OsmAnd 3.2");
         }
         Optional<Supporter> sup = supportersRepository.findById(Long.parseLong(userId));
         if(!sup.isPresent() ) {
-        	return error("Couldn't find your user id: " + userId);
+        	return userSubService.error("Couldn't find your user id: " + userId);
         }
         Supporter supporter = sup.get();
         if(!token.equals(supporter.token)) {
-        	return error("Couldn't validate the token: " + token);
+        	return userSubService.error("Couldn't validate the token: " + token);
         }
         supporter.visibleName = request.getParameter("visibleName");
         supporter.userEmail = request.getParameter("email");
@@ -253,26 +249,26 @@ public class SubscriptionController {
         // empty means deleted (keep it)
         if (bitcoinAddress != null && bitcoinAddress.length() > 0 &&
         		!BTCAddrValidator.validate(bitcoinAddress) ) {
-        	return error("Please validate bitcoin address.");
+        	return userSubService.error("Please validate bitcoin address.");
         }
         String osmUser = request.getParameter("osm_usr");
         if (isEmpty(osmUser)) {
-        	return error("Please validate osm user.");
+        	return userSubService.error("Please validate osm user.");
         }
         String osmPassword = request.getParameter("osm_pwd");
         if (isEmpty(osmPassword)) {
-        	return error("Please validate osm pwd.");
+        	return userSubService.error("Please validate osm pwd.");
         }
         String email = request.getParameter("email");
         if (isEmpty(email) || !email.contains("@")) {
-        	return error("Please validate your email address.");
+        	return userSubService.error("Please validate your email address.");
         }
         String username = processOsmUsername(osmUser);
         String credentials = encodeCredentialsToBase64(username, osmPassword);
         try {
             authenticateUser(credentials);
         } catch (Exception ex) {
-            return error("Please validate osm user/pwd (couldn't authenticate): " + ex.getMessage());
+            return userSubService.error("Please validate osm user/pwd (couldn't authenticate): " + ex.getMessage());
         }
         throw new UnsupportedOperationException();
 //        OsmRecipient recipient = new OsmRecipient();
@@ -339,7 +335,7 @@ public class SubscriptionController {
 			}
 			return ResponseEntity.ok(gson.toJson(result));
 		}
-		return error("Cannot load receipt.");
+		return userSubService.error("Cannot load receipt.");
 	}
 
 
@@ -389,7 +385,7 @@ public class SubscriptionController {
 			result.put("status", 0);
 			return ResponseEntity.ok(gson.toJson(result));
 		}
-		return error("Product identifiers are not defined.");
+		return userSubService.error("Product identifiers are not defined.");
 	}
 
 	@Nullable
@@ -469,7 +465,7 @@ public class SubscriptionController {
     @PostMapping(path = {"/purchased", "/purchased.php"})
     public ResponseEntity<String> purchased(HttpServletRequest request,
                                             @RequestParam(name = "purchaseType", required = false, defaultValue = PURCHASE_TYPE_SUBSCRIPTION) String purchaseType
-    ) throws ParseException {
+    ) {
 
         StringBuilder req = new StringBuilder("Purchase info: ");
         for (Entry<String, String[]> s : request.getParameterMap().entrySet()) {
@@ -501,21 +497,12 @@ public class SubscriptionController {
 
         // Validation of purchase details
         if (isEmpty(effectiveOrderId) || isEmpty(effectivePurchaseToken) || isEmpty(skuParam)) {
-            return error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
+            return userSubService.error("Purchase details (orderId/transactionId, purchaseToken/payload, sku) are incomplete.");
         }
 
         Integer userId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
         Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
                 PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
-
-		ResponseEntity<String> promoResp = addFastSpringPromo(skuParam, userId);
-		if (promoResp != null) {
-			if (promoResp.getStatusCode() == HttpStatus.OK) {
-				LOG.info(promoResp.getBody());
-			} else {
-				LOG.error(promoResp.getBody());
-			}
-		}
 
         // --- Process Purchase ---
         if (PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType)) {
@@ -607,59 +594,29 @@ public class SubscriptionController {
             }
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"inapp\" }");
         } else {
-            return error("Invalid purchaseType specified: " + purchaseType);
+            return userSubService.error("Invalid purchaseType specified: " + purchaseType);
         }
     }
-
-	private ResponseEntity<String> addFastSpringPromo(String sku, Integer userId) throws ParseException {
-		if (!Algorithms.isEmpty(sku) && sku.contains(PLATFORM_FASTSPRING)) {
-			String expireDateStr = "01.09.2025";
-			DateFormat df = new SimpleDateFormat("dd.MM.yyyy");
-			Date expireTime = df.parse(expireDateStr);
-			Date now = new Date();
-			if (now.after(expireTime)) {
-				return ResponseEntity.ok("Promo FastSpring subscription is not available after " + expireDateStr);
-			}
-			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
-			if (pu == null) {
-				return error("User not found. FastSpring promo subscription requires a registered user.");
-			}
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(userId);
-			if (subscriptions != null && !subscriptions.isEmpty()) {
-				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subscriptions) {
-					if (sub.sku != null && sub.sku.contains(FASTSPRING_PROMO)) {
-						return error("FastSpring promo subscription already exists for userId: " + userId);
-					}
-				}
-			}
-			PromoService.PromoResponse resp = promoService.createPromoSubscription(pu.email, FASTSPRING_PROMO, expireTime);
-			if (resp != null && resp.error) {
-				return error("Failed to create FastSpring promo subscription, userId = " + userId);
-			}
-			return ResponseEntity.ok("Promo FastSpring subscription created successfully for userId: " + userId);
-		}
-		return null;
-	}
 
 	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
 		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
 			if (Algorithms.isEmpty(sku)) {
-				return error("SKU is not provided for OsmAnd+ App purchase.");
+				return userSubService.error("SKU is not provided for OsmAnd+ App purchase.");
 			}
 			if (Algorithms.isEmpty(platform)) {
-				return error("Platform is not provided for OsmAnd+ App purchase.");
+				return userSubService.error("Platform is not provided for OsmAnd+ App purchase.");
 			}
 			boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
 			boolean isAmazonApp = sku.equals("net.osmand.amazon.maps.inapp") && platform.equals(PLATFORM_AMAZON);
 			if (!isGoogleApp && !isAmazonApp) {
-				return error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
+				return userSubService.error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
 			}
 			if (userId == null) {
-				return error("User ID is not provided for OsmAnd+ App purchase.");
+				return userSubService.error("User ID is not provided for OsmAnd+ App purchase.");
 			}
 			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
 			if (pu == null) {
-				return error("User not found. To purchase Maps+ in-app features, please register first.");
+				return userSubService.error("User not found. To purchase Maps+ in-app features, please register first.");
 			}
 			return null;
 		}
