@@ -212,7 +212,7 @@ public class AdminController {
 	
 	@PostMapping(path = {"/register-promo"})
 	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
-		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null);
+		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null, false);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
 		return "redirect:info#audience";
 	}

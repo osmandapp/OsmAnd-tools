@@ -3,14 +3,22 @@ package net.osmand.server.api.services;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.PromoCampaignRepository;
+import net.osmand.util.Algorithms;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import jakarta.transaction.Transactional;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+
+import static net.osmand.server.controllers.pub.SubscriptionController.PLATFORM_FASTSPRING;
 
 @Service
 public class PromoService {
@@ -25,10 +33,15 @@ public class PromoService {
 	private CloudUsersRepository usersRepository;
 
 	@Autowired
+	@Lazy
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
+
+	private static final String FASTSPRING_PROMO = "promo_fastspring_user";
+
+	private static final Log LOG = LogFactory.getLog(PromoService.class);
 
 	public void register(PromoCampaignRepository.Promo promo) {
 		if (promoCampaignRepository.existsById(promo.name)) {
@@ -45,7 +58,7 @@ public class PromoService {
 		if (error == null) {
 			String key = "promo_" + promoCampaign.name;
 			Date expireTime = getExpirationDate(promoCampaign);
-			PromoResponse resp = createPromoSubscription(email, key, expireTime);
+			PromoResponse resp = createPromoSubscription(email, key, expireTime, false);
 			CloudUsersRepository.CloudUser existingUser = usersRepository.findByEmailIgnoreCase(email);
 			if (existingUser != null && !resp.error) {
 				promoCampaign.used++;
@@ -98,7 +111,7 @@ public class PromoService {
 		return emails.substring(0, emails.length() - 3);
 	}
 
-	public PromoResponse createPromoSubscription(String email, String key, Date expireTime) {
+	public PromoResponse createPromoSubscription(String email, String key, Date expireTime, boolean skipExistingPro) {
 		email = email.toLowerCase().trim();
 		DeviceSubscriptionsRepository.SupporterDeviceSubscription deviceSub = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 		deviceSub.sku = key;
@@ -130,7 +143,7 @@ public class PromoService {
 				subscriptionsRepository.save(deviceSub);
 				emailSender.sendOsmAndCloudPromoEmail(email, deviceSub.orderId);
 			} else {
-				if (existingUser.orderid == null || userSubService.checkOrderIdPro(existingUser.orderid) != null) {
+				if (skipExistingPro || (existingUser.orderid == null || userSubService.checkOrderIdPro(existingUser.orderid) != null)) {
 					existingUser.orderid = deviceSub.orderId;
 					deviceSub.userId = existingUser.id;
 					deviceSub.purchaseToken += " (new PRO subscription is updated)";
@@ -169,6 +182,47 @@ public class PromoService {
 		instance.add(Calendar.MONTH, promo.subActiveMonths);
 
 		return instance.getTime();
+	}
+
+	private ResponseEntity<String> addFastSpringPromo(String sku, Integer userId) {
+		if (!Algorithms.isEmpty(sku) && sku.contains(PLATFORM_FASTSPRING)) {
+			Calendar cal = Calendar.getInstance();
+			cal.set(2025, Calendar.SEPTEMBER, 1, 0, 0, 0);
+			Date expireTime = cal.getTime();
+			Date now = new Date();
+			if (now.after(expireTime)) {
+				return ResponseEntity.ok("Promo FastSpring subscription is not available after " + expireTime);
+			}
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+			if (pu == null) {
+				return userSubService.error("User not found. FastSpring promo subscription requires a registered user.");
+			}
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(userId);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subscriptions) {
+					if (sub.sku != null && sub.sku.contains(FASTSPRING_PROMO)) {
+						return userSubService.error("FastSpring promo subscription already exists for userId: " + userId);
+					}
+				}
+			}
+			PromoService.PromoResponse resp = createPromoSubscription(pu.email, FASTSPRING_PROMO, expireTime, true);
+			if (resp != null && resp.error) {
+				return userSubService.error("Failed to create FastSpring promo subscription, userId = " + userId);
+			}
+			return ResponseEntity.ok("Promo FastSpring subscription created successfully for userId: " + userId);
+		}
+		return null;
+	}
+
+	public void processFastSpringPromo(String sku, Integer userId) {
+		ResponseEntity<String> promoResp = addFastSpringPromo(sku, userId);
+		if (promoResp != null) {
+			if (promoResp.getStatusCode() == HttpStatus.OK) {
+				LOG.info(promoResp.getBody());
+			} else {
+				LOG.error(promoResp.getBody());
+			}
+		}
 	}
 
 }

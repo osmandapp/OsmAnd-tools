@@ -16,6 +16,7 @@ import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.google.api.services.androidpublisher.AndroidPublisher;
@@ -81,6 +82,9 @@ public class UserSubscriptionService {
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
+
+	@Autowired
+	private PromoService promoService;
 
 	Gson gson = new Gson();
 
@@ -624,6 +628,7 @@ public class UserSubscriptionService {
 				return b.starttime.compareTo(a.starttime);
 			});
 			subscriptionList.forEach(s -> {
+				promoService.processFastSpringPromo(s.sku, pu.id);
 				PurchasesDataLoader.Subscription subBaseData = subMap.get(s.sku);
 				if (subBaseData != null && !subBaseData.isCrossPlatform()) {
 					return; // skip non-cross-platform subscriptions
@@ -657,6 +662,7 @@ public class UserSubscriptionService {
 				return b.purchaseTime.compareTo(a.purchaseTime);
 			});
 			purchases.forEach(p -> {
+				promoService.processFastSpringPromo(p.sku, pu.id);
 				PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
 				if (inAppBaseData != null && !inAppBaseData.isCrossPlatform()) {
 					return; // skip non-cross-platform in-app purchases
@@ -674,6 +680,11 @@ public class UserSubscriptionService {
 			});
 		}
 		return inAppPurchasesInfo;
+	}
+
+	public ResponseEntity<String> error(String txt) {
+		// clients don't accept error requests (neither mobile, neither http)
+		return ResponseEntity.badRequest().body(String.format("{\"error\": \"%s.\"}", txt.replace('"', '\'')));
 	}
 
 }
