@@ -11,6 +11,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceS
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
 import net.osmand.server.api.services.LotteryPlayService;
+import net.osmand.server.api.services.PromoService;
 import net.osmand.server.api.services.ReceiptValidationService;
 import net.osmand.server.utils.BTCAddrValidator;
 import net.osmand.util.Algorithms;
@@ -36,6 +37,9 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
@@ -59,6 +63,8 @@ public class SubscriptionController {
     public static final String PLATFORM_AMAZON = "amazon";
     public static final String PLATFORM_HUAWEI = "huawei";
 	public static final String PLATFORM_FASTSPRING = "fastspring";
+
+	private static final String FASTSPRING_PROMO = "promo_user";
 
 	private static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
 
@@ -84,6 +90,9 @@ public class SubscriptionController {
 
     @Autowired
     private ReceiptValidationService validationService;
+
+	@Autowired
+	private PromoService promoService;
 
     private Gson gson = new Gson();
 
@@ -431,7 +440,7 @@ public class SubscriptionController {
 
 
 	@PostMapping(path = {"/restore-purchased"})
-	public ResponseEntity<String> restorePurchased(HttpServletRequest request) {
+	public ResponseEntity<String> restorePurchased(HttpServletRequest request) throws ParseException {
         // Assume restore only applies to subscriptions for now, but could be extended
         return purchased(request, PURCHASE_TYPE_SUBSCRIPTION);
 	}
@@ -460,7 +469,7 @@ public class SubscriptionController {
     @PostMapping(path = {"/purchased", "/purchased.php"})
     public ResponseEntity<String> purchased(HttpServletRequest request,
                                             @RequestParam(name = "purchaseType", required = false, defaultValue = PURCHASE_TYPE_SUBSCRIPTION) String purchaseType
-    ) {
+    ) throws ParseException {
 
         StringBuilder req = new StringBuilder("Purchase info: ");
         for (Entry<String, String[]> s : request.getParameterMap().entrySet()) {
@@ -498,6 +507,15 @@ public class SubscriptionController {
         Integer userId = resolveUserId(request, userDeivceIdParam, userDeivceAccessTokenParam);
         Long supporterUserId = resolveSupporterId(request, supporterUserIdParam, supporterTokenParam, effectiveOrderId,
                 PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType));
+
+		ResponseEntity<String> promoResp = addFastSpringPromo(skuParam, userId);
+		if (promoResp != null) {
+			if (promoResp.getStatusCode() == HttpStatus.OK) {
+				LOG.info(promoResp.getBody());
+			} else {
+				LOG.error(promoResp.getBody());
+			}
+		}
 
         // --- Process Purchase ---
         if (PURCHASE_TYPE_SUBSCRIPTION.equalsIgnoreCase(purchaseType)) {
@@ -592,6 +610,36 @@ public class SubscriptionController {
             return error("Invalid purchaseType specified: " + purchaseType);
         }
     }
+
+	private ResponseEntity<String> addFastSpringPromo(String sku, Integer userId) throws ParseException {
+		if (!Algorithms.isEmpty(sku) && sku.contains(PLATFORM_FASTSPRING)) {
+			String expireDateStr = "01.09.2025";
+			DateFormat df = new SimpleDateFormat("dd.MM.yyyy");
+			Date expireTime = df.parse(expireDateStr);
+			Date now = new Date();
+			if (now.after(expireTime)) {
+				return ResponseEntity.ok("Promo FastSpring subscription is not available after " + expireDateStr);
+			}
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+			if (pu == null) {
+				return error("User not found. FastSpring promo subscription requires a registered user.");
+			}
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(userId);
+			if (subscriptions != null && !subscriptions.isEmpty()) {
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subscriptions) {
+					if (sub.sku != null && sub.sku.contains(FASTSPRING_PROMO)) {
+						return error("FastSpring promo subscription already exists for userId: " + userId);
+					}
+				}
+			}
+			PromoService.PromoResponse resp = promoService.createPromoSubscription(pu.email, FASTSPRING_PROMO, expireTime);
+			if (resp != null && resp.error) {
+				return error("Failed to create FastSpring promo subscription, userId = " + userId);
+			}
+			return ResponseEntity.ok("Promo FastSpring subscription created successfully for userId: " + userId);
+		}
+		return null;
+	}
 
 	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
 		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
