@@ -39,7 +39,7 @@ public class PromoService {
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
 
-	private static final String FASTSPRING_PROMO = "promo_user";
+	private static final String FASTSPRING_PROMO = "promo_fastspring_user";
 
 	private static final Log LOG = LogFactory.getLog(PromoService.class);
 
