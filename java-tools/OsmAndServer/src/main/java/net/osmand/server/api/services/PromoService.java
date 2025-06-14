@@ -184,14 +184,14 @@ public class PromoService {
 		return instance.getTime();
 	}
 
-	private ResponseEntity<String> addFastSpringPromo(String sku, Integer userId) throws ParseException {
+	private ResponseEntity<String> addFastSpringPromo(String sku, Integer userId) {
 		if (!Algorithms.isEmpty(sku) && sku.contains(PLATFORM_FASTSPRING)) {
-			String expireDateStr = "01.09.2025";
-			DateFormat df = new SimpleDateFormat("dd.MM.yyyy");
-			Date expireTime = df.parse(expireDateStr);
+			Calendar cal = Calendar.getInstance();
+			cal.set(2025, Calendar.SEPTEMBER, 1, 0, 0, 0);
+			Date expireTime = cal.getTime();
 			Date now = new Date();
 			if (now.after(expireTime)) {
-				return ResponseEntity.ok("Promo FastSpring subscription is not available after " + expireDateStr);
+				return ResponseEntity.ok("Promo FastSpring subscription is not available after " + expireTime);
 			}
 			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
 			if (pu == null) {
@@ -215,12 +215,7 @@ public class PromoService {
 	}
 
 	public void processFastSpringPromo(String sku, Integer userId) {
-		ResponseEntity<String> promoResp = null;
-		try {
-			promoResp = addFastSpringPromo(sku, userId);
-		} catch (ParseException e) {
-			LOG.error("Failed to add FastSpring promo for subscription " + sku, e);
-		}
+		ResponseEntity<String> promoResp = addFastSpringPromo(sku, userId);
 		if (promoResp != null) {
 			if (promoResp.getStatusCode() == HttpStatus.OK) {
 				LOG.info(promoResp.getBody());

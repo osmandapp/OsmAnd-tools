@@ -487,8 +487,9 @@ public class ApiController {
             Map<String, String> iapMap = new HashMap<>();
             iapMap.put("sku", iap.sku);
 
-	        long id = pu != null ? pu.id : sup.userId;
-	        promoService.processFastSpringPromo(iap.sku, (int) id);
+			if (pu != null) {
+				promoService.processFastSpringPromo(iap.sku, pu.id);
+			}
 
 	        if (iap.platform != null) {
                 iapMap.put("platform", iap.platform);
