@@ -45,7 +45,6 @@ public class FastSpringController {
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
-	private static final String DEFAULT_COUNTRY = "UA"; // Default country for pricing if not specified
 
 	@Transactional
 	@PostMapping("/order-completed")
@@ -53,9 +52,8 @@ public class FastSpringController {
 		for (FastSpringOrderCompletedRequest.Event event : request.events) {
 			if ("order.completed".equals(event.type)) {
 				FastSpringOrderCompletedRequest.Data data = event.data;
-				String email = data.customer.email;
+				String email = data.tags.userEmail;
 				CloudUsersRepository.CloudUser user = usersRepository.findByEmailIgnoreCase(email);
-
 				if (user != null) {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = new ArrayList<>();
@@ -83,6 +81,7 @@ public class FastSpringController {
 							iap.valid = true;
 
 							purchases.add(iap);
+							LOGGER.info("FastSpring: InApp recorded for user " + email + " with orderId: " + orderId + ", sku: " + sku + ", purchaseToken: " + data.reference);
 						} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
 							// Handle subscription purchase
 							List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
@@ -99,6 +98,7 @@ public class FastSpringController {
 								subscription.valid = true;
 
 								subscriptions.add(subscription);
+								LOGGER.info("FastSpring: Subscription recorded for user " + email + " with orderId: " + orderId + ", sku: " + sku + ", purchaseToken: " + data.reference);
 							}
 						} else {
 							LOGGER.error("FastSpring: Unknown product " + sku);
@@ -109,77 +109,13 @@ public class FastSpringController {
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
 
 					userSubService.verifyAndRefreshProOrderId(user);
+				} else {
+					LOGGER.error("FastSpring: User not found for email " + email + " orderId: " + data.order + ", purchaseToken: " + data.reference);
 				}
 			}
 		}
 		return ResponseEntity.ok("OK");
 	}
-
-	@GetMapping("/products/price")
-	public ResponseEntity<String> getPrices(@RequestParam String country) {
-		if (!country.matches("^[A-Z]+$")) {
-			return ResponseEntity
-					.status(HttpStatus.BAD_REQUEST)
-					.body("Invalid country code format. Use uppercase letters only.");
-		}
-		try {
-			HttpURLConnection connection = FastSpringHelper.openConnection("/products/price?country=" + country);
-			connection.setRequestMethod("GET");
-			connection.setRequestProperty("Accept", "application/json");
-
-			int status = connection.getResponseCode();
-			if (status != HttpURLConnection.HTTP_OK) {
-				return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
-			}
-
-			try (InputStream is = connection.getInputStream()) {
-				JsonNode root = objectMapper.readTree(is);
-				JsonNode productsNode = root.path("products");
-				List<Map<String, String>> result = new ArrayList<>();
-
-				if (productsNode.isArray()) {
-					for (JsonNode productNode : productsNode) {
-						String name = productNode.path("product").asText();
-						JsonNode pricingNode = productNode.path("pricing");
-						JsonNode regionNode = pricingNode.path(country);
-						if (regionNode.isMissingNode()) {
-							LOGGER.error("FastSpring: No pricing information available for country " + country);
-							country = DEFAULT_COUNTRY;
-							regionNode = pricingNode.path(country);
-						}
-
-						String oldPrice = regionNode.path("price").asText();
-						String newPrice = oldPrice;
-
-						String display = regionNode.path("display").asText();
-						String newPriceDisplay = display;
-
-						JsonNode discountNode = regionNode.path("quantityDiscount");
-						if (discountNode.fieldNames().hasNext()) {
-							JsonNode firstTier = discountNode.elements().next();
-							if (firstTier.has("unitPrice")) {
-								newPrice = firstTier.path("unitPrice").asText();
-								newPriceDisplay = firstTier.path("unitPriceDisplay").asText();
-							}
-						}
-
-						result.add(Map.of(
-								"fsName", name,
-								"oldPrice", oldPrice,
-								"newPrice", newPrice,
-								"display", display,
-								"newPriceDisplay", newPriceDisplay
-						));
-					}
-				}
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap("prices", result)));
-			}
-
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching prices: " + e.getMessage());
-		}
-	}
-
 
 	public static class FastSpringOrderCompletedRequest {
 
@@ -195,11 +131,16 @@ public class FastSpringController {
 			public String order; // orderId
 			public String reference; // purchaseToken
 			public Customer customer;
+			public Tags tags;
 			public List<Item> items;
 		}
 
 		public static class Customer {
 			public String email;
+		}
+
+		public static class Tags {
+			public String userEmail;
 		}
 
 		public static class Item {
