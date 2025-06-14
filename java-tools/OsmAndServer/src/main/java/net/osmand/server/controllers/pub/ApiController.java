@@ -21,6 +21,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
@@ -498,7 +499,16 @@ public class ApiController {
 	        Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 			PurchasesDataLoader.InApp inapp = inappMap.get(iap.sku);
 	        if (inapp != null) {
-		        iapMap.put("info", new Gson().toJson(inapp));
+				ObjectMapper objectMapper = new ObjectMapper();
+				@SuppressWarnings("unchecked")
+				Map<String, Object> subBaseDataMap = objectMapper.convertValue(inapp, Map.class);
+				for (Entry<String, Object> entry : subBaseDataMap.entrySet()) {
+					String name = entry.getKey();
+					Object object = entry.getValue();
+					if (object != null && !iapMap.containsKey(name)) {
+						iapMap.put(name, object.toString());
+					}
+				}
 	        }
 
             iapResults.add(iapMap);

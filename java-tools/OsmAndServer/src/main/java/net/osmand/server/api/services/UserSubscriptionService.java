@@ -2,7 +2,9 @@ package net.osmand.server.api.services;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.Map.Entry;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import net.osmand.purchases.*;
 import net.osmand.server.PurchasesDataLoader;
@@ -454,7 +456,16 @@ public class UserSubscriptionService {
 		Map<String, PurchasesDataLoader.Subscription> subBaseMap = purchasesDataLoader.getSubscriptions();
 		PurchasesDataLoader.Subscription subBaseData = subBaseMap.get(sub.sku);
 		if (subBaseData != null) {
-			subMap.put("info", new Gson().toJson(subBaseData));
+			ObjectMapper objectMapper = new ObjectMapper();
+			@SuppressWarnings("unchecked")
+			Map<String, Object> subBaseDataMap = objectMapper.convertValue(subBaseData, Map.class);
+			for (Entry<String, Object> entry : subBaseDataMap.entrySet()) {
+				String name = entry.getKey();
+				Object object = entry.getValue();
+				if (object != null && !subMap.containsKey(name)) {
+					subMap.put(name, object.toString());
+				}
+			}
 		}
 		return subMap;
 	}
