@@ -72,7 +72,7 @@ public class IndexCreationContext {
     private OsmandRegions prepareRegions() {
         OsmandRegions or = new OsmandRegions();
         try {
-            or.prepareFile();
+            or.prepareFileAtomic();
             or.cacheAllCountries();
         } catch (IOException e) {
             log.error("Error preparing regions", e);
