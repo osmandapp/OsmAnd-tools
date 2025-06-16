@@ -18,7 +18,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import javax.annotation.Nullable;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class IndexCreationContext {
@@ -72,7 +77,8 @@ public class IndexCreationContext {
     private OsmandRegions prepareRegions() {
         OsmandRegions or = new OsmandRegions();
         try {
-            or.prepareFile();
+            File loadedRegionsFile = refreshRegionsFileFromResources();
+            or.prepareFile(loadedRegionsFile.getAbsolutePath());
             or.cacheAllCountries();
         } catch (IOException e) {
             log.error("Error preparing regions", e);
@@ -80,6 +86,25 @@ public class IndexCreationContext {
         }
         return or;
     }
+
+	private File refreshRegionsFileFromResources() throws IOException {
+		final String REGIONS_OCBF = "regions.ocbf";
+
+		long pid = ProcessHandle.current().pid();
+		long threadId = Thread.currentThread().getId();
+		File regionsTmpFile = new File(String.format("%s.%d.%d.tmp", REGIONS_OCBF, pid, threadId));
+
+		InputStream is = OsmandRegions.class.getResourceAsStream(REGIONS_OCBF);
+		FileOutputStream fos = new FileOutputStream(regionsTmpFile);
+		Algorithms.streamCopy(is, fos);
+		fos.close();
+		is.close();
+
+		File regionsFinalFile = new File(REGIONS_OCBF);
+		Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+
+		return regionsFinalFile;
+	}
 
     private static String getRegionLang(OsmandRegions osmandRegions, String regionName) {
 		if (osmandRegions == null) {
