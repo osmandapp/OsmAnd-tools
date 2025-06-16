@@ -71,12 +71,12 @@ public class RouteRelationExtractor {
 	int countNodes;
 	DBDialect osmDBdialect = DBDialect.SQLITE;
 
-	private static final String[] customStyles = {
+	public static final String[] customStyles = {
 			"default.render.xml",
 			"routes.addon.render.xml"
 			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
 	};
-	private static final Map<String, String> customProperties = Map.of(
+	public static final Map<String, String> customProperties = Map.of(
 			// default.render.xml:
 			"whiteWaterSports", "true",
 			// routes.addon.render.xml:
