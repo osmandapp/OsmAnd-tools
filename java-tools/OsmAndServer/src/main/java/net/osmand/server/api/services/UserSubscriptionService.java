@@ -167,31 +167,29 @@ public class UserSubscriptionService {
 			LOG.info("No in-app purchase data found for sku: " + p.sku);
 			return "inapp purchase data not found";
 		}
-
-		int years;
-		if (inAppBaseData.getProFeatures() != null && inAppBaseData.getProFeatures().expire() != null) {
-			String exp = inAppBaseData.getProFeatures().expire();
-			if (exp.endsWith("y")) {
-				years = Integer.parseInt(exp.substring(0, exp.length() - 1));
-			} else {
-				years = Integer.parseInt(exp);
-			}
-		} else {
+		PurchasesDataLoader.InApp.InAppProFeatures proFeatures = inAppBaseData.getProFeatures();
+		if (proFeatures == null || proFeatures.expire() == null) {
 			return "inapp is not eligible for OsmAnd Cloud";
 		}
 		if (p.valid == null || !p.valid) {
 			return "no valid inapp purchase present";
 		} else {
-			Calendar calendar = Calendar.getInstance();
-			calendar.setTime(p.purchaseTime);
-			calendar.add(Calendar.YEAR, years);
-			Date expireTime = calendar.getTime();
-			if (expireTime.getTime() > System.currentTimeMillis()) {
+			Date expireTime = inAppBaseData.getExpireDate(p.purchaseTime);
+			if (expireTime != null && expireTime.getTime() > System.currentTimeMillis()) {
 				return null;
 			} else {
 				return "inapp purchase is expired or not validated yet";
 			}
 		}
+	}
+
+	public Date getInappExpireTime(SupporterDeviceInAppPurchase p, Map<String, PurchasesDataLoader.InApp> inappMap) {
+		PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
+		if (inAppBaseData == null) {
+			LOG.info("No in-app purchase data found for sku: " + p.sku);
+			return null;
+		}
+		return inAppBaseData.getExpireDate(p.purchaseTime);
 	}
 
 	public String verifyAndRefreshProOrderId(CloudUsersRepository.CloudUser pu) {

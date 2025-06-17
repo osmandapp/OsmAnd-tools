@@ -498,6 +498,11 @@ public class ApiController {
                 iapMap.put("purchaseTime", String.valueOf(iap.purchaseTime.getTime()));
             }
 	        Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+			Date expireTime = userSubscriptionService.getInappExpireTime(iap, inappMap);
+			if (expireTime != null) {
+				iapMap.put("expireTime", String.valueOf(expireTime.getTime()));
+			}
+
 			PurchasesDataLoader.InApp inapp = inappMap.get(iap.sku);
 	        if (inapp != null) {
 				ObjectMapper objectMapper = new ObjectMapper();
@@ -507,7 +512,12 @@ public class ApiController {
 					String name = entry.getKey();
 					Object object = entry.getValue();
 					if (object != null && !iapMap.containsKey(name)) {
-						iapMap.put(name, object.toString());
+						if (name.equals("feature_pro")) {
+							boolean pro = userSubscriptionService.isProInappValid(iap, inappMap) == null;
+							iapMap.put(name, (pro ? "true" : "false"));
+						} else {
+							iapMap.put(name, object.toString());
+						}
 					}
 				}
 	        }
