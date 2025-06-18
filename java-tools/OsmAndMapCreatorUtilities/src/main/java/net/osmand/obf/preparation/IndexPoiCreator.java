@@ -203,7 +203,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							// don't index this
 							continue;
 						}
-						centers.add(OsmMapUtils.getCenter(out.getBorderWay()));
+                        List<List<Node>> innerWays = new ArrayList<>();
+                        for (Ring r : m.getInnerRings()) {
+                            innerWays.add(r.getBorder());
+                        }
+                        LatLon l = OsmMapUtils.getComplexPolyCenter(out.getBorder(), innerWays);
+                        centers.add(l);
 					}
 				} else if (OsmMapUtils.isSuperRoute(tags)) {
 					for (RelationMember members : relation.getMembers()) {
