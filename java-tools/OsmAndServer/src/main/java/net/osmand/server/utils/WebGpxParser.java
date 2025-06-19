@@ -783,8 +783,8 @@ public class WebGpxParser {
                 if (startInd < points.size()) {
                     points.get(startInd).segment = segment;
                 } else {
-                    log.warn("Route segment index out of bounds: startInd={}, length={}, points.size()={}, segmentCount={}",
-                            startInd, length, points.size(), seg.getRouteSegments().size());
+                    log.warn(String.format("Route segment index out of bounds: startInd=%d, length=%d, points.size()=%d, segmentCount=%d",
+                            startInd, length, points.size(), seg.getRouteSegments().size()));
                     break;
                 }
                 startInd += length - 1;
