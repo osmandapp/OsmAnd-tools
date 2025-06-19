@@ -196,24 +196,6 @@ public class RandomClickGenerator {
 		return ll + offset; // returns ll +- maxShiftMeters in degrees
 	}
 
-//	private void readPoiSection(BinaryMapIndexReader reader, PoiRegion poi) throws IOException {
-//		BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-//				0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, zoom,
-//				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER,
-//				new ResultMatcher<>() {
-//					@Override
-//					public boolean publish(Amenity amenity) {
-//						return false;
-//					}
-//
-//					@Override
-//					public boolean isCancelled() {
-//						return false;
-//					}
-//				});
-//		reader.searchPoi(poi, req);
-//	}
-
 	private void applyCommandLineOpts(MainUtilities.CommandLineOpts opts) {
 		if (opts.getOpt("--help") != null) {
 			printHelpAndExit();
