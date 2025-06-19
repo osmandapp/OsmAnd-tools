@@ -34,7 +34,7 @@ public class WebGpxParser {
     public static final String GPX_EXT_SHOW_START_FINISH = "show_start_finish";
     public static final String GPX_EXT_COLOR = "color";
     public static final String GPX_EXT_WIDTH = "width";
-    private static final Log log = LogFactory.getLog((WebGpxParser.class);
+    private static final Log log = LogFactory.getLog((WebGpxParser.class));
 
     public static class TrackData {
     	public WebMetaData metaData;
