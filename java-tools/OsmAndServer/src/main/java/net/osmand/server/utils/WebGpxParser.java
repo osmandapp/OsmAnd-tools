@@ -14,6 +14,8 @@ import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import net.osmand.util.MapUtils;
@@ -32,6 +34,7 @@ public class WebGpxParser {
     public static final String GPX_EXT_SHOW_START_FINISH = "show_start_finish";
     public static final String GPX_EXT_COLOR = "color";
     public static final String GPX_EXT_WIDTH = "width";
+    private static final Logger log = LoggerFactory.getLogger(WebGpxParser.class);
 
     public static class TrackData {
     	public WebMetaData metaData;
@@ -435,16 +438,21 @@ public class WebGpxParser {
     
     public void addSrtmEle(List<WebTrack> tracks, GpxTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null && tracks != null) {
+            int globalIndex = 0;
             for (WebTrack track : tracks) {
-                int pointsSize = 0;
                 for (Point point : track.points) {
                     if (point.geometry != null) {
                         for (Point p : point.geometry) {
-                            p.srtmEle = srtmAnalysis.getPointAttributes().get(point.geometry.indexOf(p) + pointsSize).getElevation();
+                            if (globalIndex < srtmAnalysis.getPointAttributes().size()) {
+                                p.srtmEle = srtmAnalysis.getPointAttributes().get(globalIndex).getElevation();
+                            }
+                            globalIndex++;
                         }
-                        pointsSize += point.geometry.size();
                     } else {
-                        track.points.forEach(p -> p.srtmEle = srtmAnalysis.getPointAttributes().get(track.points.indexOf(p)).getElevation());
+                        if (globalIndex < srtmAnalysis.getPointAttributes().size()) {
+                            point.srtmEle = srtmAnalysis.getPointAttributes().get(globalIndex).getElevation();
+                        }
+                        globalIndex++;
                     }
                 }
             }
@@ -772,8 +780,14 @@ public class WebGpxParser {
                     segment.routeTypes = seg.getRouteTypes();
                 }
                 int length = Integer.parseInt(rs.getLength());
-                points.get(startInd).segment = segment;
-                startInd = startInd + (length - 1);
+                if (startInd < points.size()) {
+                    points.get(startInd).segment = segment;
+                } else {
+                    log.warn("Route segment index out of bounds: startInd={}, length={}, points.size()={}, segmentCount={}",
+                            startInd, length, points.size(), seg.getRouteSegments().size());
+                    break;
+                }
+                startInd += length - 1;
             }
         }
     }
