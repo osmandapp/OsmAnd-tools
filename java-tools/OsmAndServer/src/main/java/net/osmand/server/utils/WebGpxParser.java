@@ -14,8 +14,8 @@ import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Component;
 
 import net.osmand.util.MapUtils;
@@ -34,7 +34,7 @@ public class WebGpxParser {
     public static final String GPX_EXT_SHOW_START_FINISH = "show_start_finish";
     public static final String GPX_EXT_COLOR = "color";
     public static final String GPX_EXT_WIDTH = "width";
-    private static final Logger log = LoggerFactory.getLogger(WebGpxParser.class);
+    private static final Log log = LogFactory.getLog((WebGpxParser.class);
 
     public static class TrackData {
     	public WebMetaData metaData;
