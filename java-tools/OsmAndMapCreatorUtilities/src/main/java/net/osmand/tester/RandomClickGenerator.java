@@ -205,8 +205,8 @@ public class RandomClickGenerator {
 		maxClicks = Algorithms.parseIntSilently(opts.getOpt("--max-clicks"), maxClicks);
 		maxShiftMeters = Algorithms.parseIntSilently(opts.getOpt("--max-shift"), maxShiftMeters);
 
-		String optRandomSeed = Objects.requireNonNullElse(opts.getOpt("--random-seed"), "month");
-		switch (optRandomSeed) {
+		String rs = Objects.requireNonNullElse(opts.getOpt("--random-seed"), pseudoRandom.name().toLowerCase());
+		switch (rs) {
 			case "random" -> pseudoRandom = PseudoRandom.RANDOM;
 			case "month" -> pseudoRandom = PseudoRandom.MONTH;
 			case "week" -> pseudoRandom = PseudoRandom.WEEK;
