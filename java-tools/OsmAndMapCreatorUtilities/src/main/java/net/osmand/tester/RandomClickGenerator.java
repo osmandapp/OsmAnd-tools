@@ -39,15 +39,19 @@ public class RandomClickGenerator {
 
 	public static void main(String[] args) throws IOException {
 		long started = System.currentTimeMillis();
-		List<ClickableObject> result = new RandomClickGenerator(args).generate();
+
+		RandomClickGenerator generator = new RandomClickGenerator(args);
+		List<ClickableObject> clicks = generator.generate();
 
 		System.out.println(new ObjectMapper()
 				.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
 				.writerWithDefaultPrettyPrinter()
-				.writeValueAsString(Map.of("clicks", result)));
+				.writeValueAsString(Map.of("clicks", clicks)));
 
-		System.err.printf("Finished in %.2f seconds\n", (System.currentTimeMillis() - started) / 1000.0);
-		System.exit(result.isEmpty() ? EXIT_FAILED : EXIT_SUCCESS);
+		System.err.printf("Finished in %.2f seconds (%d types found, %d clicks generated)\n",
+				(System.currentTimeMillis() - started) / 1000.0, generator.allObjectsMap.size(), clicks.size());
+
+		System.exit(clicks.isEmpty() ? EXIT_FAILED : EXIT_SUCCESS);
 	}
 
 	private RandomClickGenerator(String[] args) {
