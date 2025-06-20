@@ -8,6 +8,7 @@ import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +39,7 @@ public class FastSpringController {
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
-	protected ObjectMapper objectMapper;
+	EmailSenderService emailSender;
 
 	@Autowired
 	protected Gson gson;
@@ -59,6 +60,7 @@ public class FastSpringController {
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = new ArrayList<>();
 					String orderId = data.order;
 					int userId = user.id;
+					boolean sendOsmAndAndSpecialGiftEmail = false;
 					for (FastSpringOrderCompletedRequest.Item item : data.items) {
 						String sku = item.sku;
 						if (FastSpringHelper.productSkuMap.contains(sku)) {
@@ -68,6 +70,10 @@ public class FastSpringController {
 							if (existingInApps != null && !existingInApps.isEmpty()) {
 								LOGGER.error("FastSpring: Purchase already recorded");
 								return ResponseEntity.badRequest().body("FastSpring: Purchase already recorded");
+							}
+
+							if (sku.contains("osmand_pro_xv")) {
+								sendOsmAndAndSpecialGiftEmail = true;
 							}
 
 							DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = new DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase();
@@ -109,6 +115,11 @@ public class FastSpringController {
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
 
 					userSubService.verifyAndRefreshProOrderId(user);
+
+					if (sendOsmAndAndSpecialGiftEmail) {
+						LOGGER.info("FastSpring: Sending special gift email to " + email + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
+						emailSender.sendOsmAndSpecialGiftEmail(email);
+					}
 				} else {
 					LOGGER.error("FastSpring: User not found for email " + email + " orderId: " + data.order + ", purchaseToken: " + data.reference);
 				}
