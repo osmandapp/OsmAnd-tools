@@ -74,24 +74,14 @@ public class EmailSenderService {
     }
 
 	public void sendOsmAndSpecialGiftEmail(String email) {
-		String subject = "Thank you for purchasing Special Limited OsmAnd XV";
-		String body =
-				"Thank you for purchasing Special Limited OsmAnd XV.<br><br>" +
-						"We would like to give a special branded gift, please feel the form(<a href=\"https://docs.google.com/forms/d/e/1FAIpQLSfYUM0qSsitLHwnjfYZA_PzpR9Xoij6Z1t5pJfTkGrKat9zfA/viewform\">link</a>) in order to receive it.<br><br>" +
-						"Best Regards,<br>" +
-						"OsmAnd Team";
-
 		boolean ok = new EmailSenderTemplate()
-				.template("Subject: " + subject + "\n" + body)
+				.load("birthday/XV")
 				.to(email)
 				.send()
 				.isSuccess();
 
 		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shorten(email) + " (" + ok + ")");
 	}
-
-
-
 
 	public boolean isEmail(String comment) {
 		if (comment.contains(" ")) {
