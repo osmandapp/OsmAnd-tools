@@ -72,7 +72,16 @@ public class EmailSenderService {
 	    LOGGER.info("sendPromocodesEmails to: " + shorten(mailTo) + " (" + ok + ")");
 		return ok;
     }
-	
+
+	public void sendOsmAndSpecialGiftEmail(String email) {
+		boolean ok = new EmailSenderTemplate()
+				.load("birthday/XV")
+				.to(email)
+				.send()
+				.isSuccess();
+
+		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shorten(email) + " (" + ok + ")");
+	}
 
 	public boolean isEmail(String comment) {
 		if (comment.contains(" ")) {
