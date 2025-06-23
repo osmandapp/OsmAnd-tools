@@ -185,6 +185,10 @@ public class UpdateInAppPurchase {
                     continue;
                 }
 
+                if (purchaseToken.equals("manually-validated")) {
+                    continue;
+                }
+
                 // Determine platform enum
                 PurchasePlatform purchasePlatform = PurchasePlatform.UNKNOWN;
                 if (PLATFORM_GOOGLE.equalsIgnoreCase(platform)) {
