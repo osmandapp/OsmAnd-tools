@@ -106,6 +106,7 @@ public class UpdateSubscription {
 		ANDROID,
 //		ANDROID_LEGACY,
 		PROMO,
+		MANUALLY_VALIDATED,
 		FASTSPRING,
 		UNKNOWN;
 
@@ -137,6 +138,12 @@ public class UpdateSubscription {
 			return UNKNOWN;
 		}
 
+		public static SubscriptionType getSubType(String purchaseToken, String sku) {
+			if (purchaseToken.equals("manually-validated")) {
+				return MANUALLY_VALIDATED;
+			}
+			return SubscriptionType.fromSku(sku);
+		}
 	}
 
 	public UpdateSubscription(AndroidPublisher publisher, SubscriptionType subType, boolean revalidateInvalid) {
@@ -259,8 +266,8 @@ public class UpdateSubscription {
 			int introcycles = rs.getInt("introcycles");
 			boolean valid = rs.getBoolean("valid");
 			long currentTime = System.currentTimeMillis();
-			SubscriptionType fromSku = SubscriptionType.fromSku(sku);
-			if (this.subType != fromSku) {
+			SubscriptionType type = SubscriptionType.getSubType(purchaseToken, sku);
+			if (this.subType != type) {
 				continue;
 			}
 			long delayBetweenChecks = checkTime == null ? MINIMUM_WAIT_TO_REVALIDATE : (currentTime - checkTime.getTime());
