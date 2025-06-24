@@ -605,7 +605,7 @@ public class MapApiController {
 		}
 		info = userSubService.getUserAccountInfo(pu, errorMsg);
 		info.put("nickname", pu.nickname);
-		info.put("regtime", pu.regTime != null ? String.valueOf(pu.regTime) : "");
+		info.put("regtime", pu.regTime != null ? String.valueOf(pu.regTime.getTime()) : "");
 
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
 	}
