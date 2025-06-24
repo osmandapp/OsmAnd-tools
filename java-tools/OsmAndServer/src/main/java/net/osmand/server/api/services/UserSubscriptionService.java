@@ -31,6 +31,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.server.api.services.OrderManagementService.MANUALLY_VALIDATED;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
 import static net.osmand.server.controllers.pub.SubscriptionController.*;
@@ -124,7 +125,7 @@ public class UserSubscriptionService {
 			}
 			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
-				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION)) {
+				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || s.purchaseToken.equals(MANUALLY_VALIDATED)) {
 					// no need to revalidate
 				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
 					s = revalidateGoogleSubscription(s);
