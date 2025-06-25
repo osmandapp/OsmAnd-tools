@@ -185,7 +185,7 @@ public class UpdateInAppPurchase {
                     continue;
                 }
 
-                if (purchaseToken.equals("manually-validated")) {
+                if (purchaseToken != null && purchaseToken.equals("manually-validated")) {
                     continue;
                 }
 
