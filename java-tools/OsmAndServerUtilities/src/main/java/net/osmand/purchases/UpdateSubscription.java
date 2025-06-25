@@ -139,7 +139,7 @@ public class UpdateSubscription {
 		}
 
 		public static SubscriptionType getSubType(String purchaseToken, String sku) {
-			if (purchaseToken.equals("manually-validated")) {
+			if (purchaseToken != null && purchaseToken.equals("manually-validated")) {
 				return MANUALLY_VALIDATED;
 			}
 			return SubscriptionType.fromSku(sku);
