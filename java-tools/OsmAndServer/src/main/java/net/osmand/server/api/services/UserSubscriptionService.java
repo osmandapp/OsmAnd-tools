@@ -365,9 +365,19 @@ public class UserSubscriptionService {
 				}
 			}
 		}
-		List<SupporterDeviceInAppPurchase> inApps = inAppPurchasesRepo.findByOrderId(pu.orderid);
+
+		List<SupporterDeviceInAppPurchase> inAppsByUserId = inAppPurchasesRepo.findByUserId(pu.id);
+		List<SupporterDeviceInAppPurchase> inAppsByOrderId = inAppPurchasesRepo.findByOrderId(pu.orderid);
+		List<SupporterDeviceInAppPurchase> inApps = new ArrayList<>();
+		if (inAppsByUserId != null) {
+			inApps.addAll(inAppsByUserId);
+		}
+		if (inAppsByOrderId != null) {
+			inApps.addAll(inAppsByOrderId);
+		}
+
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
-		if (inApps != null && !inApps.isEmpty()) {
+		if (!inApps.isEmpty()) {
 			for (SupporterDeviceInAppPurchase p : inApps) {
 				if (isProInappValid(p, inappMap) == null) {
 					subOrderId = p.orderId;
