@@ -365,7 +365,7 @@ public class UserSubscriptionService {
 				}
 			}
 		}
-		List<SupporterDeviceInAppPurchase> inApps = inAppPurchasesRepo.findByOrderId(pu.orderid);
+		List<SupporterDeviceInAppPurchase> inApps = inAppPurchasesRepo.findByUserId(pu.id);
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		if (inApps != null && !inApps.isEmpty()) {
 			for (SupporterDeviceInAppPurchase p : inApps) {
