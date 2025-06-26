@@ -457,7 +457,6 @@ public class ApiController {
 				if (!subMap.isEmpty()) {
 					res.add(subMap);
 				}
-				promoService.processFastSpringPromo(sub.sku, pu.id);
 			}
 			return gson.toJson(res);
 		}
@@ -486,11 +485,6 @@ public class ApiController {
         for (SupporterDeviceInAppPurchase iap : validInapps) {
             Map<String, String> iapMap = new HashMap<>();
             iapMap.put("sku", iap.sku);
-
-			if (pu != null) {
-				promoService.processFastSpringPromo(iap.sku, pu.id);
-			}
-
 	        if (iap.platform != null) {
                 iapMap.put("platform", iap.platform);
             }
