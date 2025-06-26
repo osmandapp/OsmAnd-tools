@@ -598,11 +598,6 @@ public class MapApiController {
 		CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
 		Map<String, String> info;
 		String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
-		if (errorMsg == null) {
-			LOG.info("Updated orderId for user " + pu.email);
-		} else {
-			LOG.error("Error updating orderId for user " + pu.email + ": " + errorMsg);
-		}
 		info = userSubService.getUserAccountInfo(pu, errorMsg);
 		info.put("nickname", pu.nickname);
 		info.put("regtime", pu.regTime != null ? String.valueOf(pu.regTime.getTime()) : "");
