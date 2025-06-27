@@ -67,6 +67,7 @@ public class FastSpringController {
 					boolean sendOsmAndAndSpecialGiftEmail = false;
 					for (FastSpringOrderCompletedRequest.Item item : data.items) {
 						String sku = item.sku;
+						LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", email, userId, orderId, sku, data.reference));
 						if (FastSpringHelper.productSkuMap.contains(sku)) {
 							// Handle product purchase
 							List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
@@ -91,12 +92,13 @@ public class FastSpringController {
 							iap.valid = true;
 
 							purchases.add(iap);
-							LOGGER.info("FastSpring: InApp recorded for user " + email + " with orderId: " + orderId + ", sku: " + sku + ", purchaseToken: " + data.reference);
+							LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", email, data.reference));
 						} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
 							// Handle subscription purchase
 							List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
 
 							if (existingSubscriptions != null && !existingSubscriptions.isEmpty()) {
+								LOGGER.error("FastSpring: Subscription already recorded");
 								return ResponseEntity.badRequest().body("FastSpring: Subscription already recorded " + orderId + " " + sku);
 							} else {
 								DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
@@ -108,7 +110,7 @@ public class FastSpringController {
 								subscription.valid = true;
 
 								subscriptions.add(subscription);
-								LOGGER.info("FastSpring: Subscription recorded for user " + email + " with orderId: " + orderId + ", sku: " + sku + ", purchaseToken: " + data.reference);
+								LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", email, data.reference));
 							}
 						} else {
 							LOGGER.error("FastSpring: Unknown product " + sku);
