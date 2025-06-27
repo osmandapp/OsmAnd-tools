@@ -123,7 +123,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 		});
 		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
-		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = false;
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION_TO_TEST = true;
 		RouteResultPreparation.PRINT_TO_GPX_FILE = DataExtractionSettings.getSettings().getDefaultWorkingDir().getAbsolutePath() + "/route.gpx";
         MAIN_APP = new OsmExtractionUI();
         MAIN_APP.frame.setBounds(DataExtractionSettings.getSettings().getWindowBounds());
