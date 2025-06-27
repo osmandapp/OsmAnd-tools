@@ -907,6 +907,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		listeners.remove(l);
 	}
 
+	public void fireMapLocationListeners(double lat, double lon) {
+		for (IMapLocationListener l : listeners) {
+			l.locationChanged(lat, lon, this);
+		}
+	}
 
 	protected void fireMapLocationListeners(){
 		for(IMapLocationListener l : listeners){
@@ -1039,6 +1044,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		@Override
 		public void mouseClicked(MouseEvent e) {
 			requestFocus();
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				double lon = getLongitudeFromX(e.getX());
+				double lat = getLatitudeFromY(e.getY());
+				fireMapLocationListeners(lat, lon);
+			}
 		}
 
 		public void dragTo(Point p){
@@ -1069,8 +1079,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void mouseWheelMoved(MouseWheelEvent e) {
 			double dy = e.getPoint().y - getCenterPointY();
 			double dx = e.getPoint().x - getCenterPointX();
-			double lat = MapUtils.getLatitudeFromTile(zoom, getYTile() + dy / getTileSize());
-			double lon = MapUtils.getLongitudeFromTile(zoom, getXTile() + dx / getTileSize());
+			double lat = MapUtils.getLatitudeFromTile((float) (zoom + Math.log(mapDensity) / Math.log(2)), getYTile()-dy/getTileSize());
+			double lon = MapUtils.getLongitudeFromTile(zoom + Math.log(mapDensity) / Math.log(2), getXTile() + dx / getTileSize());
 			setLatLon(lat, lon);
 			if(e.getWheelRotation() < 0){
 				setZoom(getZoom() + 1);
@@ -1127,6 +1137,15 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	}
 
+	public double getLongitudeFromX(int x) {
+		double tileX = getXTile() + (x - getCenterPointX()) / getTileSize();
+		return MapUtils.getLongitudeFromTile(zoom, tileX);
+	}
+
+	public double getLatitudeFromY(int y) {
+		double tileY = getYTile() + (y - getCenterPointY()) / getTileSize();
+		return MapUtils.getLatitudeFromTile(zoom, tileY);
+	}
 
 	class NativeRendererRunnable implements Runnable {
 		int sleft;

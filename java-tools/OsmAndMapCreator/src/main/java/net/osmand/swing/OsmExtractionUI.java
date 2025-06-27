@@ -83,7 +83,6 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import rtree.RTree;
 
-
 public class OsmExtractionUI implements IMapLocationListener {
 
 	private static final Log log = LogFactory.getLog(OsmExtractionUI.class);
@@ -323,7 +322,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				mapPanel.setStatusField(statusField);
+				mapPanel.setStatusField(null);
 				String txt = statusField.getText();
 				int i = txt.indexOf("#map=");
 				if(i != -1) {
@@ -870,11 +869,14 @@ public class OsmExtractionUI implements IMapLocationListener {
 
 	@Override
 	public void locationChanged(final double newLatitude, final double newLongitude, Object source){
-//		recalculateAmenities(newLatitude, newLongitude);
+		if (source instanceof MapPanel) {
+			try {
+				MapDataSearcher.searchAndPrintObjects(newLatitude, newLongitude, 10, DataExtractionSettings.getSettings().getObfReaders(), log);
+			} catch (IOException e) {
+				log.error("Error getting OBF readers", e);
+			}
+		}
 	}
-
-
-
 
 	public class ExitListener extends WindowAdapter {
 		@Override
