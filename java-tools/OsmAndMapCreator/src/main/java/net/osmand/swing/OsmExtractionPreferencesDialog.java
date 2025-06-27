@@ -26,7 +26,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 
 	private static final long serialVersionUID = -4862884032977071296L;
 
-	private static final int MAX_WIDTH = 700;
+	private static final int MAX_WIDTH = 1100;
 
 	private JButton okButton;
 	private JButton cancelButton;
@@ -84,11 +84,11 @@ public class OsmExtractionPreferencesDialog extends JDialog {
         createMapCreationSection(innerPane );
         createSearchSection(innerPane );
         createAddressSection(innerPane );
-        
+
         Dimension d = innerPane.getPreferredSize();
         d.width = MAX_WIDTH;
         innerPane.setPreferredSize(d);
-		JScrollPane spanel = new JScrollPane(innerPane, 
+		JScrollPane spanel = new JScrollPane(innerPane,
 				ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
 			    ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 //		spanel.setSize(new Dimension(MAX_WIDTH+100, 1000));
@@ -262,7 +262,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		l.setConstraints(checkBox, constr);
 		return checkBox;
 	}
-	
+
 	private void createSearchSection(JPanel root) {
 		JPanel panel = new JPanel();
 		GridBagLayout l = new GridBagLayout();
@@ -297,10 +297,10 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		GridBagLayout l = new GridBagLayout();
 		panel.setLayout(l);
 		panel.setBorder(BorderFactory.createTitledBorder("Map creation parameters"));
-		
-		
+
+
 //		root.add(panel);
-		
+
 		JLabel label = new JLabel("Map zooms (specify zoom levels in binary map):");
 		panel.add(label);
 		GridBagConstraints constr = new GridBagConstraints();
@@ -349,7 +349,7 @@ public class OsmExtractionPreferencesDialog extends JDialog {
 		constr.gridy = 4;
 		constr.anchor = GridBagConstraints.WEST;
 		l.setConstraints(label, constr);
-		
+
 		poiTypesFile = new JTextField();
 		poiTypesFile.setText(DataExtractionSettings.getSettings().getPoiTypesFile());
 		panel.add(poiTypesFile);
