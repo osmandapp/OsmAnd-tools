@@ -135,7 +135,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.ipadx = 5;
 		constr.gridx = 1;
 		constr.gridy = 1;
-		constr.gridwidth = 3;
+		constr.gridwidth = 4;
 		l.setConstraints(nativeFilesDirectory, constr);
 
 		renderingStyleFile = addTextField(panel, l, "Rendering style file : ", 3, DataExtractionSettings.getSettings()
@@ -169,7 +169,7 @@ public class NativePreferencesDialog extends JDialog {
 			JCheckBox box = addCheckBox(panel, l, name, boolRowId, boolColId, value);
 			checks.put(name, box);
 			boolColId++;
-			if (boolColId == 3) {
+			if (boolColId == 4) {
 				boolColId = 0;
 				boolRowId++;
 			}
@@ -204,7 +204,7 @@ public class NativePreferencesDialog extends JDialog {
 		check.setSelected(value);
 		panel.add(check);
 		constr = new GridBagConstraints();
-		constr.weightx = 0;
+		constr.weightx = 1;
 		constr.fill = GridBagConstraints.HORIZONTAL;
 		constr.ipadx = 5;
 		constr.gridx = colId;
@@ -225,6 +225,8 @@ public class NativePreferencesDialog extends JDialog {
 		constr.gridx = baseColId;
 		constr.gridy = rowId;
 		constr.anchor = GridBagConstraints.WEST;
+		constr.weightx = 1;
+		constr.fill = GridBagConstraints.HORIZONTAL;
 		l.setConstraints(label, constr);
 
 		JComboBox<String> textField = new JComboBox<String>(otherValues);
@@ -262,7 +264,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.ipadx = 5;
 		constr.gridx = 1;
 		constr.gridy = rowId;
-		constr.gridwidth = 3;
+		constr.gridwidth = 4;
 		l.setConstraints(textField, constr);
 		return textField;
 	}
