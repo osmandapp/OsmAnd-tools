@@ -78,7 +78,7 @@ public class NativePreferencesDialog extends JDialog {
 	}
 
 	public void showDialog() {
-		setSize(800, 768);
+		setSize(1200, 768);
 		double x = getParent().getBounds().getCenterX();
 		double y = getParent().getBounds().getCenterY();
 		setLocation((int) x - getWidth() / 2, (int) y - getHeight() / 2);
@@ -135,6 +135,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.ipadx = 5;
 		constr.gridx = 1;
 		constr.gridy = 1;
+		constr.gridwidth = 4;
 		l.setConstraints(nativeFilesDirectory, constr);
 
 		renderingStyleFile = addTextField(panel, l, "Rendering style file : ", 3, DataExtractionSettings.getSettings()
@@ -143,10 +144,10 @@ public class NativePreferencesDialog extends JDialog {
 				.getRenderGenXmlPath());
 		String prps = DataExtractionSettings.getSettings().getRenderingProperties();
 		renderingPropertiesTxt = addTextField(panel, l, "Rendering properties : ", 5, prps);
-		String cutPrps = "";
+
+		Map<String, String> stringProps = new TreeMap<>();
+		Map<String, Boolean> boolProps = new TreeMap<>();
 		String[] vls = prps.split(",");
-		int rowId = 5;
-		int colId = 1;
 		for (String v : vls) {
 			String[] spl = v.split("=");
 			if (spl.length < 2) {
@@ -155,26 +156,43 @@ public class NativePreferencesDialog extends JDialog {
 			String name = spl[0].trim();
 			String vl = spl[1].trim();
 			if (vl.toLowerCase().equals("true") || vl.toLowerCase().equals("false")) {
-				boolean value = Boolean.parseBoolean(vl);
-				if(colId == 0) {
-					colId ++;
-				} else {
-					colId = 0;
-					rowId ++;
-				}
-				JCheckBox box = addCheckBox(panel, l, name, rowId, colId, value);
-				checks.put(name, box);
+				boolProps.put(name, Boolean.parseBoolean(vl));
 			} else {
-				String[] vs = vl.split(";");
-				if (vs.length > 0) {
-					rowId++;
-					JComboBox<String> cb = addComboBox(panel, l, name, rowId, vs[0], vs);
-					combos.put(name, cb);
+				stringProps.put(name, vl);
+			}
+		}
+
+		int boolRowId = 6, boolColId = 0;
+		for (Map.Entry<String, Boolean> entry : boolProps.entrySet()) {
+			String name = entry.getKey();
+			boolean value = entry.getValue();
+			JCheckBox box = addCheckBox(panel, l, name, boolRowId, boolColId, value);
+			checks.put(name, box);
+			boolColId++;
+			if (boolColId == 4) {
+				boolColId = 0;
+				boolRowId++;
+			}
+		}
+
+		int stringRowId = boolColId == 0 ? boolRowId : boolRowId + 1;
+		int stringColId = 0;
+		for (Map.Entry<String, String> entry : stringProps.entrySet()) {
+			String name = entry.getKey();
+			String vl = entry.getValue();
+			String[] vs = vl.split(";");
+			if (vs.length > 0) {
+				JComboBox<String> cb = addComboBox(panel, l, name, stringRowId, stringColId * 2, vs[0], vs);
+				combos.put(name, cb);
+				stringColId++;
+				if (stringColId == 2) {
+					stringColId = 0;
+					stringRowId++;
 				}
 			}
 		}
 
-		renderingPropertiesTxt.setText(cutPrps);
+		renderingPropertiesTxt.setText("");
 
 		panel.setMaximumSize(new Dimension(Short.MAX_VALUE, panel.getPreferredSize().height));
 	}
@@ -186,7 +204,7 @@ public class NativePreferencesDialog extends JDialog {
 		check.setSelected(value);
 		panel.add(check);
 		constr = new GridBagConstraints();
-		constr.weightx = 0;
+		constr.weightx = 1;
 		constr.fill = GridBagConstraints.HORIZONTAL;
 		constr.ipadx = 5;
 		constr.gridx = colId;
@@ -196,7 +214,7 @@ public class NativePreferencesDialog extends JDialog {
 		return check;
 	}
 
-	protected JComboBox<String> addComboBox(JPanel panel, GridBagLayout l, String labelText, int rowId, String value,
+	protected JComboBox<String> addComboBox(JPanel panel, GridBagLayout l, String labelText, int rowId, int baseColId, String value,
 			String[] otherValues) {
 		JLabel label;
 		GridBagConstraints constr;
@@ -204,9 +222,11 @@ public class NativePreferencesDialog extends JDialog {
 		panel.add(label);
 		constr = new GridBagConstraints();
 		constr.ipadx = 5;
-		constr.gridx = 0;
+		constr.gridx = baseColId;
 		constr.gridy = rowId;
 		constr.anchor = GridBagConstraints.WEST;
+		constr.weightx = 1;
+		constr.fill = GridBagConstraints.HORIZONTAL;
 		l.setConstraints(label, constr);
 
 		JComboBox<String> textField = new JComboBox<String>(otherValues);
@@ -217,7 +237,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.weightx = 1;
 		constr.fill = GridBagConstraints.HORIZONTAL;
 		constr.ipadx = 5;
-		constr.gridx = 1;
+		constr.gridx = baseColId + 1;
 		constr.gridy = rowId;
 		l.setConstraints(textField, constr);
 		return textField;
@@ -244,6 +264,7 @@ public class NativePreferencesDialog extends JDialog {
 		constr.ipadx = 5;
 		constr.gridx = 1;
 		constr.gridy = rowId;
+		constr.gridwidth = 4;
 		l.setConstraints(textField, constr);
 		return textField;
 	}
