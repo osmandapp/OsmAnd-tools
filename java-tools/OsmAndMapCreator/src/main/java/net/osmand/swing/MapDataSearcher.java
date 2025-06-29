@@ -13,6 +13,7 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.util.MapUtils;
 
 import gnu.trove.iterator.TLongIterator;
@@ -57,7 +58,10 @@ public class MapDataSearcher {
                 SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(left, right, top, bottom, zoom, filter, new ResultMatcher<BinaryMapDataObject>() {
                     @Override
                     public boolean publish(BinaryMapDataObject object) {
-                        LatLon point = new LatLon(MapUtils.get31LatitudeY(object.getLabelY()), MapUtils.get31LongitudeX(object.getLabelX()));
+                        LatLon point = getObjectCenter(object);
+                        if (point == null) {
+                            return false;
+                        }
                         double distance = MapUtils.getDistance(center, point);
                         if (distance <= radius) {
                             objects.add(object);
@@ -104,120 +108,52 @@ public class MapDataSearcher {
         }
     }
 
-    public static final int SHIFT_ID = 6;
-    private static int OSM_ID = 1;
-
-    private static String printOsmMapDetails(BinaryMapDataObject obj) {
-        StringBuilder b = new StringBuilder();
-        boolean multipolygon = obj.getPolygonInnerCoordinates() != null && obj.getPolygonInnerCoordinates().length > 0;
-        boolean point = obj.getPointsLength() == 1;
-        StringBuilder tags = new StringBuilder();
-        int[] types = obj.getTypes();
-        for (int j = 0; j < types.length; j++) {
-            BinaryMapIndexReader.TagValuePair pair = obj.getMapIndex().decodeType(types[j]);
-            if (pair == null) {
-                throw new NullPointerException("Type " + types[j] + "was not found");
-            }
-            tags.append("\t<tag k='").append(pair.tag).append("' v='").append(quoteName(pair.value)).append("' />\n");
-        }
-
-        if (obj.getAdditionalTypes() != null && obj.getAdditionalTypes().length > 0) {
-            for (int j = 0; j < obj.getAdditionalTypes().length; j++) {
-                int addtype = obj.getAdditionalTypes()[j];
-                BinaryMapIndexReader.TagValuePair pair = obj.getMapIndex().decodeType(addtype);
-                if (pair == null) {
-                    throw new NullPointerException("Type " + obj.getAdditionalTypes()[j] + "was not found");
-                }
-                tags.append("\t<tag k='").append(pair.tag).append("' v='").append(quoteName(pair.value)).append("' />\n");
-            }
-        }
-        TIntObjectHashMap<String> names = obj.getObjectNames();
-        if (names != null && !names.isEmpty()) {
-            int[] keys = names.keys();
-            for (int j = 0; j < keys.length; j++) {
-                BinaryMapIndexReader.TagValuePair pair = obj.getMapIndex().decodeType(keys[j]);
-                if (pair == null) {
-                    throw new NullPointerException("Type " + keys[j] + "was not found");
-                }
-                String name = names.get(keys[j]);
-                name = quoteName(name);
-                tags.append("\t<tag k='").append(pair.tag).append("' v='").append(name).append("' />\n");
-            }
-        }
-
-        tags.append("\t<tag k=\'").append("original_id").append("' v='").append(obj.getId() >> (SHIFT_ID + 1)).append("'/>\n");
-        tags.append("\t<tag k=\'").append("osmand_id").append("' v='").append(obj.getId()).append("'/>\n");
-
-        if(point) {
-            float lon= (float) MapUtils.get31LongitudeX(obj.getPoint31XTile(0));
-            float lat = (float) MapUtils.get31LatitudeY(obj.getPoint31YTile(0));
-            b.append("<node id = '" + OSM_ID++ + "' version='1' lat='" + lat + "' lon='" + lon + "' >\n");
-            b.append(tags);
-            b.append("</node>\n");
-        } else {
-            TLongArrayList innerIds = new TLongArrayList();
-            TLongArrayList ids = new TLongArrayList();
+    public static LatLon getObjectCenter(BinaryMapDataObject obj) {
+        if (obj.isArea()) {
+            return getPolygonCenter(obj);
+        } else if (obj.getPointsLength() > 0) {
+            List<LatLon> points = new ArrayList<>();
             for (int i = 0; i < obj.getPointsLength(); i++) {
-                float lon = (float) MapUtils.get31LongitudeX(obj.getPoint31XTile(i));
-                float lat = (float) MapUtils.get31LatitudeY(obj.getPoint31YTile(i));
-                int id = OSM_ID++;
-                b.append("\t<node id = '" + id + "' version='1' lat='" + lat + "' lon='" + lon + "' />\n");
-                ids.add(id);
+                double lat = MapUtils.get31LatitudeY(obj.getPoint31YTile(i));
+                double lon = MapUtils.get31LongitudeX(obj.getPoint31XTile(i));
+                points.add(new LatLon(lat, lon));
             }
-
-            long outerId = printWay(ids, b, multipolygon ? null : tags);
-            if (multipolygon) {
-                int[][] polygonInnerCoordinates = obj.getPolygonInnerCoordinates();
-                for (int j = 0; j < polygonInnerCoordinates.length; j++) {
-                    ids.clear();
-                    for (int i = 0; i < polygonInnerCoordinates[j].length; i += 2) {
-                        float lon = (float) MapUtils.get31LongitudeX(polygonInnerCoordinates[j][i]);
-                        float lat = (float) MapUtils.get31LatitudeY(polygonInnerCoordinates[j][i + 1]);
-                        int id = OSM_ID++;
-                        b.append("<node id = '" + id + "' version='1' lat='" + lat + "' lon='" + lon + "' />\n");
-                        ids.add(id);
-                    }
-                    innerIds.add(printWay(ids, b, null));
-                }
-                int id = OSM_ID++;
-                b.append("<relation id = '" + id + "' version='1'>\n");
-                b.append(tags);
-                b.append("\t<member type='way' role='outer' ref= '" + outerId + "'/>\n");
-                TLongIterator it = innerIds.iterator();
-                while (it.hasNext()) {
-                    long ref = it.next();
-                    b.append("<member type='way' role='inner' ref= '" + ref + "'/>\n");
-                }
-                b.append("</relation>\n");
-            }
+            return OsmMapUtils.getWeightCenter(points);
         }
-
-        return b.toString();
+        return null;
     }
 
-    private static String quoteName(String name) {
-        if(name == null || name.length() == 0) {
-            return "EMPTY";
+    public static LatLon getPolygonCenter(BinaryMapDataObject obj) {
+        if (obj == null || !obj.isArea() || obj.getPointsLength() == 0) {
+            return null;
         }
-        name = name.replace("'", "&apos;");
-        name = name.replace("<", "&lt;");
-        name = name.replace(">", "&gt;");
-        name = name.replace("&", "&amp;");
-        return name;
-    }
 
-    private static long printWay(TLongArrayList ids, StringBuilder b, StringBuilder tags) {
-        int id = OSM_ID++;
-        b.append("<way id = '" + id + "' version='1'>\n");
-        if (tags != null) {
-            b.append(tags);
+        List<List<LatLon>> rings = new ArrayList<>();
+
+        // Process outer ring
+        List<LatLon> outerRing = new ArrayList<>();
+        for (int i = 0; i < obj.getPointsLength(); i++) {
+            double lat = MapUtils.get31LatitudeY(obj.getPoint31YTile(i));
+            double lon = MapUtils.get31LongitudeX(obj.getPoint31XTile(i));
+            outerRing.add(new LatLon(lat, lon));
         }
-        TLongIterator it = ids.iterator();
-        while (it.hasNext()) {
-            long ref = it.next();
-            b.append("\t<nd ref = '" + ref + "'/>\n");
+        rings.add(outerRing);
+
+        // Process inner rings
+        if (obj.getPolygonInnerCoordinates() != null) {
+            for (int[] innerCoords : obj.getPolygonInnerCoordinates()) {
+                List<LatLon> innerRing = new ArrayList<>();
+                for (int i = 0; i < innerCoords.length; i += 2) {
+                    double lon = MapUtils.get31LongitudeX(innerCoords[i]);
+                    double lat = MapUtils.get31LatitudeY(innerCoords[i + 1]);
+                    innerRing.add(new LatLon(lat, lon));
+                }
+                if (!innerRing.isEmpty()) {
+                    rings.add(innerRing);
+                }
+            }
         }
-        b.append("</way>\n");
-        return id;
+
+        return OsmMapUtils.getPolylabelPoint(rings);
     }
 }
