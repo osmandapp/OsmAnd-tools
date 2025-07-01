@@ -29,14 +29,17 @@ public class MapDataSearcher {
         final int right = MapUtils.get31TileNumberX(bbox.right);
         final int top = MapUtils.get31TileNumberY(bbox.top);
         final int bottom = MapUtils.get31TileNumberY(bbox.bottom);
-
-        System.out.printf("%d. Searching for objects in box %s around center (%s) within %d meters...\n", NUM++, bbox, new LatLon(lat, lon), radius);
+        final LatLon center = new LatLon(lat, lon);
+        System.out.printf("%d. Searching for objects in box %s around center (%s) within %d meters...\n", NUM++, bbox, center, radius);
 
         for (BinaryMapIndexReader reader : readers) {
             SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(left, right, top, bottom, panel.getZoom(), null, new ResultMatcher<>() {
                 @Override
                 public boolean publish(BinaryMapDataObject object) {
-                    print(object);
+                    double distance = withinRadius(object, center, radius);
+                    if (distance <= radius) {
+                        print(object);
+                    }
                     return false;
                 }
 
@@ -88,5 +91,31 @@ public class MapDataSearcher {
         StringBuilder s = new StringBuilder();
         BinaryInspector.printMapDetails(object, s, false);
         System.out.println(s);
+    }
+
+    /**
+     * Checks whether any point of the given {@link BinaryMapDataObject} lies within the specified radius (in meters)
+     * from the provided {@link LatLon} center.
+     */
+    private static double withinRadius(BinaryMapDataObject object, LatLon center, int radiusMeters) {
+        int points = object.getPointsLength();
+        double minDistance = Double.MAX_VALUE;
+        if (points == 0) {
+            return minDistance;
+        }
+        double clat = center.getLatitude();
+        double clon = center.getLongitude();
+        for (int i = 0; i < points; i++) {
+            double plat = MapUtils.get31LatitudeY(object.getPoint31YTile(i));
+            double plon = MapUtils.get31LongitudeX(object.getPoint31XTile(i));
+            double distance = MapUtils.getDistance(clat, clon, plat, plon);
+            if (distance <= radiusMeters) {
+                return distance;
+            }
+            if (minDistance > distance) {
+                minDistance = distance;
+            }
+        }
+        return minDistance;
     }
 }
