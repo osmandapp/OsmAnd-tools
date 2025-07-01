@@ -43,9 +43,6 @@ public interface DeviceInAppPurchasesRepository extends JpaRepository<SupporterD
         @Column(name = "purchasetoken")
         public String purchaseToken;
 
-        @Column(name = "platform")
-        public String platform; // "google", "apple"
-
         @Column(name = "purchase_time")
         @Temporal(TemporalType.TIMESTAMP)
         public Date purchaseTime;

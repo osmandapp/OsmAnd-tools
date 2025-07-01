@@ -24,7 +24,7 @@ logging:
 osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
-  files.location: ${user.dir}/../../../
+  files.location: ${user.dir}/../../
   gen.location: ${osmand.files.location}/gen
   web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}

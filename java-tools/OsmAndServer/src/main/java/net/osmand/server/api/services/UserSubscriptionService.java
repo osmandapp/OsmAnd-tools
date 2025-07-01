@@ -558,7 +558,7 @@ public class UserSubscriptionService {
 	}
 
 	public String getInAppStore(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
-		String platform = inAppPurchase.platform;
+		String platform = purchasesDataLoader.getPlatformBySku(inAppPurchase.sku);
 		if (platform == null) {
 			return null;
 		}

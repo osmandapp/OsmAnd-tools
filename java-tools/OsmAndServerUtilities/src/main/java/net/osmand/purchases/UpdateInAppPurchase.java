@@ -171,7 +171,7 @@ public class UpdateInAppPurchase {
                 String sku = rs.getString("sku");
                 String purchaseToken = rs.getString("purchaseToken"); // Might be purchaseToken, userId, or receipt data depending on platform
                 String orderId = rs.getString("orderid"); // Might be orderId, transaction_id, or receiptId depending on platform
-                String platform = rs.getString("platform");
+                String platform = getPlatformByPrefixSku(sku);
                 Timestamp purchaseTimeTs = rs.getTimestamp("purchase_time");
                 Timestamp checkTimeTs = rs.getTimestamp("checktime");
                 Boolean validBool = rs.getObject("valid", Boolean.class);
@@ -776,6 +776,32 @@ public class UpdateInAppPurchase {
             updCheckStat.executeBatch();
             checkChanges = 0;
         }
+    }
+
+    public String getPlatformByPrefixSku(String sku) {
+        if (sku == null || sku.isEmpty()) {
+            return null;
+        }
+        if (sku.startsWith("osm_live_subscription_monthly_")
+                || sku.startsWith("osmand_pro_monthly_")
+                || sku.startsWith("osmand_pro_annual_")
+                || sku.startsWith("osmand_maps_annual_")
+                || sku.startsWith("osmand_full_version_price")){
+            return PLATFORM_GOOGLE;
+        }
+        if (sku.startsWith("net.osmand.maps.")) {
+            return PLATFORM_APPLE;
+        }
+        if (sku.contains(".huawei.")) {
+            return PLATFORM_HUAWEI;
+        }
+        if (sku.contains(".amazon.")) {
+            return PLATFORM_AMAZON;
+        }
+        if (sku.contains(".fastspring.")) {
+            return PLATFORM_FASTSPRING;
+        }
+        return null;
     }
 
 

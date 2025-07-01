@@ -16,8 +16,6 @@ import java.util.List;
 
 public class FastSpringHelper {
 
-	public static final String FASTSPRING_PLATFORM = "fastspring";
-
 	public static final List<String> productSkuMap = List.of(
 			"net.osmand.fastspring.inapp.maps.plus",
 			"net.osmand.fastspring.inapp.maps.plus.test",
