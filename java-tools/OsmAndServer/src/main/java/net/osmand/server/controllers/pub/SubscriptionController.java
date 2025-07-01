@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import com.google.gson.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import net.osmand.purchases.PurchaseHelper;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
 import net.osmand.server.PurchasesDataLoader;
@@ -92,9 +93,6 @@ public class SubscriptionController {
 
     @Autowired
     private ReceiptValidationService validationService;
-
-	@Autowired
-	protected PurchasesDataLoader purchasesDataLoader;
 
 	@Autowired
 	private PromoService promoService;
@@ -490,7 +488,7 @@ public class SubscriptionController {
         String skuParam = request.getParameter("sku");
 
         // Platform and Effective IDs
-        String platform = purchasesDataLoader.getPlatformBySku(skuParam);
+        String platform = PurchaseHelper.getPlatformBySku(skuParam);
         boolean ios = PLATFORM_APPLE.equals(platform) || Algorithms.isEmpty(orderIdParam);
         String effectivePurchaseToken = ios ? payloadParam : purchaseTokenParam;
         String effectiveOrderId = ios ? purchaseTokenParam : orderIdParam;

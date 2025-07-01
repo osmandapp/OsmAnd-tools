@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
-import net.osmand.server.PurchasesDataLoader;
+import net.osmand.purchases.PurchaseHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
@@ -36,9 +36,6 @@ public class OrderManagementService {
 
 	@Autowired
 	private UserSubscriptionService userSubService;
-
-	@Autowired
-	protected PurchasesDataLoader purchasesDataLoader;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -114,7 +111,7 @@ public class OrderManagementService {
 			p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
 			p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
 			p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
-			p.platform = purchasesDataLoader.getPlatformBySku(p.sku);
+			p.platform = PurchaseHelper.getPlatformBySku(p.sku);
 			p.purchaseTime = rs.getTimestamp("purchase_time");
 			p.osmandCloud = rs.getBoolean("osmand_cloud");
 			return p;
@@ -318,7 +315,7 @@ public class OrderManagementService {
 				p.autorenewing = null;
 				p.paymentstate = null;
 				p.valid = i.valid;
-				p.platform = purchasesDataLoader.getPlatformBySku(i.sku);
+				p.platform = PurchaseHelper.getPlatformBySku(i.sku);
 				p.purchaseTime = i.purchaseTime;
 				p.osmandCloud = false;
 				result.add(p);

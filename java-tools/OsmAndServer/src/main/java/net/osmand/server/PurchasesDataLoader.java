@@ -15,8 +15,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Map;
 
-import static net.osmand.server.controllers.pub.SubscriptionController.*;
-
 
 @Component
 public class PurchasesDataLoader {
@@ -64,7 +62,6 @@ public class PurchasesDataLoader {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			String name,
-			String platform,
 			String icon,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,
@@ -87,7 +84,6 @@ public class PurchasesDataLoader {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record InApp(
 			String name,
-			String platform,
 			String icon,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			@JsonProperty("feature_pro") JsonNode pro,
@@ -143,47 +139,5 @@ public class PurchasesDataLoader {
 				return null;
 			}
 		}
-	}
-
-	public String getPlatformBySku(String sku) {
-		if (sku == null || sku.isEmpty()) {
-			return null;
-		}
-		Subscription subscription = subscriptions.get(sku);
-		if (subscription != null && subscription.platform != null && !subscription.platform.isEmpty()) {
-			return subscription.platform;
-		} else {
-			InApp inApp = inapps.get(sku);
-			if (inApp != null && inApp.platform != null && !inApp.platform.isEmpty()) {
-				return inApp.platform;
-			}
-		}
-		return getPlatformByPrefixSku(sku);
-	}
-
-	public String getPlatformByPrefixSku(String sku) {
-		if (sku == null || sku.isEmpty()) {
-			return null;
-		}
-		if (sku.startsWith("osm_live_subscription_monthly_")
-				|| sku.startsWith("osmand_pro_monthly_")
-				|| sku.startsWith("osmand_pro_annual_")
-				|| sku.startsWith("osmand_maps_annual_")
-				|| sku.startsWith("osmand_full_version_price")){
-			return PLATFORM_GOOGLE;
-		}
-		if (sku.startsWith("net.osmand.maps.")) {
-			return PLATFORM_APPLE;
-		}
-		if (sku.contains(".huawei.")) {
-			return PLATFORM_HUAWEI;
-		}
-		if (sku.contains(".amazon.")) {
-			return PLATFORM_AMAZON;
-		}
-		if (sku.contains(".fastspring.")) {
-			return PLATFORM_FASTSPRING;
-		}
-		return null;
 	}
 }
