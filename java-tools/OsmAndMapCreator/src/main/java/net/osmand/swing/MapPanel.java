@@ -1,5 +1,32 @@
 package net.osmand.swing;
 
+import net.osmand.MapCreatorVersion;
+import net.osmand.NativeJavaRendering;
+import net.osmand.NativeJavaRendering.MapDiff;
+import net.osmand.NativeJavaRendering.RenderingImageContext;
+import net.osmand.PlatformUtil;
+import net.osmand.data.DataTileManager;
+import net.osmand.data.LatLon;
+import net.osmand.data.QuadRect;
+import net.osmand.data.RotatedTileBox;
+import net.osmand.map.IMapLocationListener;
+import net.osmand.map.ITileSource;
+import net.osmand.map.MapTileDownloader;
+import net.osmand.map.MapTileDownloader.DownloadRequest;
+import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
+import net.osmand.map.TileSourceManager;
+import net.osmand.map.TileSourceManager.TileSourceTemplate;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.io.NetworkUtils;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.routing.RouteColorize.ColorizationType;
+import net.osmand.swing.MapPanelSelector.MapSelectionArea;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParser;
+
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -60,33 +87,6 @@ import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
-
-import net.osmand.shared.gpx.GpxFile;
-import net.osmand.shared.routing.RouteColorize.ColorizationType;
-import org.apache.commons.logging.Log;
-import org.xmlpull.v1.XmlPullParser;
-
-import net.osmand.MapCreatorVersion;
-import net.osmand.NativeJavaRendering;
-import net.osmand.NativeJavaRendering.MapDiff;
-import net.osmand.NativeJavaRendering.RenderingImageContext;
-import net.osmand.PlatformUtil;
-import net.osmand.data.DataTileManager;
-import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
-import net.osmand.data.RotatedTileBox;
-import net.osmand.map.IMapLocationListener;
-import net.osmand.map.ITileSource;
-import net.osmand.map.MapTileDownloader;
-import net.osmand.map.MapTileDownloader.DownloadRequest;
-import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
-import net.osmand.map.TileSourceManager;
-import net.osmand.map.TileSourceManager.TileSourceTemplate;
-import net.osmand.osm.edit.Entity;
-import net.osmand.osm.io.NetworkUtils;
-import net.osmand.swing.MapPanelSelector.MapSelectionArea;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
 
 public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
@@ -426,7 +426,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 //		return (map == null ?  256 : map.getTileSize()) * mapDensity;
 		return 256 * mapDensity;
 	}
-	
+
 	public QuadRect getLatLonBBox() {
 		double xTileLeft = getXTile() - getCenterPointX() / getTileSize();
 		double xTileRight = getXTile() + getCenterPointX() / getTileSize();
@@ -872,7 +872,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	public int getZoom() {
 		return zoom;
 	}
-	
+
 	public float getMapDensity() {
 		return mapDensity;
 	}
@@ -1030,7 +1030,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 	}
 
 
-	
+
 
 	public class MapMouseAdapter extends MouseAdapter {
 		private Point startDragging = null;
@@ -1039,6 +1039,11 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		@Override
 		public void mouseClicked(MouseEvent e) {
 			requestFocus();
+            try {
+                MapDataSearcher.searchAndPrintObjects(latitude, longitude, MapPanel.this);
+            } catch (IOException ex) {
+                log.error("Error searching for map objects", ex);
+            }
 		}
 
 		public void dragTo(Point p){
