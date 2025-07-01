@@ -36,7 +36,7 @@ public class MapDataSearcher {
             SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(left, right, top, bottom, panel.getZoom(), null, new ResultMatcher<>() {
                 @Override
                 public boolean publish(BinaryMapDataObject object) {
-                    double distance = withinRadius(object, center, radius);
+                    double distance = getMinDistance(object, center, radius);
                     if (distance <= radius) {
                         print(object);
                     }
@@ -94,21 +94,20 @@ public class MapDataSearcher {
     }
 
     /**
-     * Checks whether any point of the given {@link BinaryMapDataObject} lies within the specified radius (in meters)
+     * Calculate min distance from any point of the given {@link BinaryMapDataObject} lies within the specified radius (in meters)
      * from the provided {@link LatLon} center.
      */
-    private static double withinRadius(BinaryMapDataObject object, LatLon center, int radiusMeters) {
+    private static double getMinDistance(BinaryMapDataObject object, LatLon center, int radiusMeters) {
         int points = object.getPointsLength();
         double minDistance = Double.MAX_VALUE;
         if (points == 0) {
             return minDistance;
         }
-        double clat = center.getLatitude();
-        double clon = center.getLongitude();
+
         for (int i = 0; i < points; i++) {
             double plat = MapUtils.get31LatitudeY(object.getPoint31YTile(i));
             double plon = MapUtils.get31LongitudeX(object.getPoint31XTile(i));
-            double distance = MapUtils.getDistance(clat, clon, plat, plon);
+            double distance = MapUtils.getDistance(center.getLatitude(), center.getLongitude(), plat, plon);
             if (distance <= radiusMeters) {
                 return distance;
             }
