@@ -125,7 +125,7 @@ public class UserSubscriptionService {
 			}
 			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
-				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || s.purchaseToken.equals(MANUALLY_VALIDATED)) {
+				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (s.purchaseToken != null && s.purchaseToken.equals(MANUALLY_VALIDATED))) {
 					// no need to revalidate
 				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
 					s = revalidateGoogleSubscription(s);
