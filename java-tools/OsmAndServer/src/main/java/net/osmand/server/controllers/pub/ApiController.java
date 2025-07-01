@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import net.osmand.purchases.PurchaseHelper;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -65,6 +66,7 @@ import net.osmand.server.api.services.PollsService.PollQuestion;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.purchases.PurchaseHelper.PLATFORM_KEY;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
 import static net.osmand.server.api.repo.CloudUserDevicesRepository.*;
 import static net.osmand.server.api.repo.CloudUsersRepository.*;
@@ -511,8 +513,8 @@ public class ApiController {
 						}
 					}
 				}
+				iapMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(iap.sku));
 	        }
-
             iapResults.add(iapMap);
         }
         return gson.toJson(iapResults);

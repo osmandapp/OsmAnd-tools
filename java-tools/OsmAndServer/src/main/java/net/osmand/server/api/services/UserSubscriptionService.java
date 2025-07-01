@@ -31,6 +31,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.purchases.PurchaseHelper.PLATFORM_KEY;
 import static net.osmand.server.api.services.OrderManagementService.MANUALLY_VALIDATED;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
@@ -468,6 +469,7 @@ public class UserSubscriptionService {
 					subMap.put(name, object.toString());
 				}
 			}
+			subMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(sub.sku));
 		}
 		return subMap;
 	}

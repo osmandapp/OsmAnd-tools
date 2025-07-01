@@ -8,6 +8,8 @@ public class PurchaseHelper {
 	public static final String PLATFORM_HUAWEI = "huawei";
 	public static final String PLATFORM_FASTSPRING = "fastspring";
 
+	public static final String PLATFORM_KEY = "platform";
+
 	public static String getPlatformBySku(String sku) {
 		if (sku == null || sku.isEmpty()) {
 			return null;
