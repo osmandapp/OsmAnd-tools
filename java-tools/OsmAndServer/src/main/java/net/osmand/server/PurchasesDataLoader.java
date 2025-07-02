@@ -63,6 +63,7 @@ public class PurchasesDataLoader {
 	public record Subscription(
 			String name,
 			String platform,
+			String icon,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,
 			@JsonProperty("feature_contours") JsonNode contours,
@@ -85,6 +86,7 @@ public class PurchasesDataLoader {
 	public record InApp(
 			String name,
 			String platform,
+			String icon,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,
