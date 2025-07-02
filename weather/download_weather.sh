@@ -475,6 +475,11 @@ get_raw_ecmwf_files() {
             for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
                 # Parse from index file start and end byte offset for needed band
                 local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
+                if [[ -z "$CHANNEL_LINE" ]]; then 
+                    cat $DOWNLOAD_FOLDER/$FILETIME.index
+                    echo "Missing for ${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]} - $FILETIME - index url $INDEX_FILE_URL"
+                    exit 1
+                fi
                 local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
                 local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
