@@ -128,6 +128,17 @@ public class AdminService {
 		public String platform;
 		public Date purchaseTime;
 		public Boolean osmandCloud;
+		public CloudUserInfo cloudUserInfo;
+	}
+
+	public static class CloudUserInfo implements Serializable {
+		@Serial
+		private static final long serialVersionUID = 1L;
+
+		public String nickname;
+		public Date tokenTime;
+		public Date regTime;
+		public Integer filesCount;
 	}
 
 	private String createPayloadInfo(CloudUsersRepository.CloudUser pu) {

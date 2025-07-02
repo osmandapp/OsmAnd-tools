@@ -8,6 +8,7 @@ import net.osmand.server.api.services.AdminService;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +55,32 @@ public class OrderManagementController {
 		if (stripped.length() < 4) {
 			return Collections.emptyList();
 		}
-		return orderManagementService.searchPurchases(text, limit);
+		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(stripped, limit);
+		if (purchases.isEmpty()) {
+			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(text, PageRequest.of(0, limit));
+			if (!users.isEmpty()) {
+				users.forEach(u -> {
+					AdminService.Purchase p = new AdminService.Purchase();
+					p.email = u.email;
+					p.sku = null;
+					p.orderId = u.orderid;
+					p.purchaseToken = null;
+					p.userId = u.id;
+					p.starttime = null;
+					p.expiretime = null;
+					p.checktime = null;
+					p.autorenewing = null;
+					p.paymentstate = null;
+					p.valid = null;
+					p.platform = null;
+					p.purchaseTime = null;
+					p.osmandCloud = false;
+					p.cloudUserInfo = orderManagementService.getCloudInfo(u);
+					purchases.add(p);
+				});
+			}
+		}
+		return purchases;
 	}
 
 	@GetMapping("/skus")
