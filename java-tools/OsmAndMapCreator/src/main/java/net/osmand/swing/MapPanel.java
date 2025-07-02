@@ -1039,12 +1039,9 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		@Override
 		public void mouseClicked(MouseEvent e) {
 			requestFocus();
-            try {
-                MapDataSearcher.searchAndPrintObjects(latitude, longitude, MapPanel.this);
-            } catch (IOException ex) {
-                log.error("Error searching for map objects", ex);
-            }
-		}
+
+            MapDataSearcher.searchAndPrintObjects(e, MapPanel.this, log);
+        }
 
 		public void dragTo(Point p){
 			double dx = (startDragging.x - (double) p.x) / getTileSize();
