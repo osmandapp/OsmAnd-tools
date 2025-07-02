@@ -507,25 +507,6 @@ public class UserSubscriptionService {
 		return null;
 	}
 
-	public String getSubscriptionStore(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
-		String sku = s.sku;
-		if (sku == null) {
-			return null;
-		}
-		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
-			return PLATFORM_WEB_NAME_GOOGLE;
-		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
-			return PLATFORM_WEB_NAME_APPLE;
-		} else if (sku.contains(PLATFORM_HUAWEI)) {
-			return PLATFORM_WEB_NAME_HUAWEI;
-		} else if (sku.contains(PLATFORM_AMAZON)) {
-			return PLATFORM_WEB_NAME_AMAZON;
-		} else if (sku.contains(PLATFORM_FASTSPRING)) {
-			return PLATFORM_WEB_NAME_FASTSPRING;
-		}
-		return "Other";
-	}
-
 	public String getSubscriptionBillingDate(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
 		if (Boolean.TRUE.equals(s.autorenewing) && s.expiretime != null) {
 			return String.valueOf(s.expiretime.getTime());
@@ -641,12 +622,11 @@ public class UserSubscriptionService {
 					LOG.info("No subscription data found for sku: " + s.sku);
 					subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
 					subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
-					subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
 				} else {
 					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
 					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.duration() >= 12 ? "annual" : "monthly");
-					subInfo.put(PURCHASE_STORE_KEY, parsePlatform(PurchaseHelper.getPlatformBySku(s.sku)));
 				}
+				subInfo.put(PURCHASE_STORE_KEY, parsePlatform(PurchaseHelper.getPlatformBySku(s.sku)));
 				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
 				subsInfo.add(subInfo);
 			});
@@ -677,6 +657,7 @@ public class UserSubscriptionService {
 					pInfo.put(PURCHASE_NAME_KEY, inAppBaseData.name());
 				}
 				pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
+				pInfo.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(p.sku));
 				inAppPurchasesInfo.add(pInfo);
 			});
 		}
