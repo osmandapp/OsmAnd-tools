@@ -55,7 +55,7 @@ public class OrderManagementController {
 		if (stripped.length() < 4) {
 			return Collections.emptyList();
 		}
-		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(stripped, limit);
+		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(trimmed, limit);
 		if (purchases.isEmpty()) {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(text, PageRequest.of(0, limit));
 			if (!users.isEmpty()) {
