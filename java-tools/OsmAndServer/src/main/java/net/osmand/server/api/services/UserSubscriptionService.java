@@ -31,6 +31,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
 
+import static net.osmand.purchases.PurchaseHelper.PLATFORM_KEY;
 import static net.osmand.server.api.services.OrderManagementService.MANUALLY_VALIDATED;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_ACCOUNT_SIZE;
 import static net.osmand.server.api.services.UserdataService.MAXIMUM_FREE_ACCOUNT_SIZE;
@@ -123,19 +124,20 @@ public class UserSubscriptionService {
 				LOG.info("Subscription sku is not pro: " + s.sku);
 				return "subscription is not pro: " + s.sku;
 			}
+			String platform = PurchaseHelper.getPlatformBySku(s.sku);
 			// s.sku could be checked for pro
 			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
 				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (s.purchaseToken != null && s.purchaseToken.equals(MANUALLY_VALIDATED))) {
 					// no need to revalidate
-				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_GOOGLE)) {
+				} else if (platform.equalsIgnoreCase(PLATFORM_GOOGLE)) {
 					s = revalidateGoogleSubscription(s);
-				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_HUAWEI)) {
+				} else if (platform.equalsIgnoreCase(PLATFORM_HUAWEI)) {
 					s = revalidateHuaweiSubscription(s);
-				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_AMAZON)) {
+				} else if (platform.equalsIgnoreCase(PLATFORM_AMAZON)) {
 					s = revalidateAmazonSubscription(s);
-				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_APPLE)) {
+				} else if (platform.equalsIgnoreCase(PLATFORM_APPLE)) {
 					s = revalidateiOSSubscription(s);
-				} else if (subBaseData.platform().equalsIgnoreCase(PLATFORM_FASTSPRING)) {
+				} else if (platform.equalsIgnoreCase(PLATFORM_FASTSPRING)) {
 					s = revalidateFastSpringSubscription(s);
 				} else {
 					return "subscription is not eligible for OsmAnd Cloud";
@@ -423,6 +425,7 @@ public class UserSubscriptionService {
 	public Map<String, String> getSubscriptionInfo(DeviceSubscriptionsRepository.SupporterDeviceSubscription sub) {
 		Map<String, String> subMap = new HashMap<>();
 		subMap.put("sku", sub.sku);
+		subMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(sub.sku));
 		if (sub.valid != null) {
 			subMap.put(VALID_KEY, sub.valid.toString());
 		}
@@ -504,25 +507,6 @@ public class UserSubscriptionService {
 		return null;
 	}
 
-	public String getSubscriptionStore(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
-		String sku = s.sku;
-		if (sku == null) {
-			return null;
-		}
-		if (sku.startsWith(OSMAND_PRO_ANDROID_SUBSCRIPTION)) {
-			return PLATFORM_WEB_NAME_GOOGLE;
-		} else if (sku.startsWith(OSMAND_PRO_IOS_SUBSCRIPTION)) {
-			return PLATFORM_WEB_NAME_APPLE;
-		} else if (sku.contains(PLATFORM_HUAWEI)) {
-			return PLATFORM_WEB_NAME_HUAWEI;
-		} else if (sku.contains(PLATFORM_AMAZON)) {
-			return PLATFORM_WEB_NAME_AMAZON;
-		} else if (sku.contains(PLATFORM_FASTSPRING)) {
-			return PLATFORM_WEB_NAME_FASTSPRING;
-		}
-		return "Other";
-	}
-
 	public String getSubscriptionBillingDate(DeviceSubscriptionsRepository.SupporterDeviceSubscription s) {
 		if (Boolean.TRUE.equals(s.autorenewing) && s.expiretime != null) {
 			return String.valueOf(s.expiretime.getTime());
@@ -558,7 +542,7 @@ public class UserSubscriptionService {
 	}
 
 	public String getInAppStore(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase) {
-		String platform = inAppPurchase.platform;
+		String platform = PurchaseHelper.getPlatformBySku(inAppPurchase.sku);
 		if (platform == null) {
 			return null;
 		}
@@ -638,12 +622,11 @@ public class UserSubscriptionService {
 					LOG.info("No subscription data found for sku: " + s.sku);
 					subInfo.put(PURCHASE_NAME_KEY, getSubscriptionName(s));
 					subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
-					subInfo.put(PURCHASE_STORE_KEY, getSubscriptionStore(s));
 				} else {
 					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
 					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.duration() >= 12 ? "annual" : "monthly");
-					subInfo.put(PURCHASE_STORE_KEY, parsePlatform(subBaseData.platform()));
 				}
+				subInfo.put(PURCHASE_STORE_KEY, parsePlatform(PurchaseHelper.getPlatformBySku(s.sku)));
 				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
 				subsInfo.add(subInfo);
 			});
@@ -670,11 +653,11 @@ public class UserSubscriptionService {
 				if (inAppBaseData == null) {
 					LOG.info("No in-app purchase data found for sku: " + p.sku);
 					pInfo.put(PURCHASE_NAME_KEY, getInAppName(p));
-					pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
 				} else {
 					pInfo.put(PURCHASE_NAME_KEY, inAppBaseData.name());
-					pInfo.put(PURCHASE_STORE_KEY, parsePlatform(inAppBaseData.platform()));
 				}
+				pInfo.put(PURCHASE_STORE_KEY, getInAppStore(p));
+				pInfo.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(p.sku));
 				inAppPurchasesInfo.add(pInfo);
 			});
 		}

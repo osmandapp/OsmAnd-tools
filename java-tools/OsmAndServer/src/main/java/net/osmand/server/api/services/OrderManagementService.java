@@ -4,10 +4,12 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import net.osmand.purchases.PurchaseHelper;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.controllers.pub.UserdataController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +37,9 @@ public class OrderManagementService {
 
 	@Autowired
 	private UserSubscriptionService userSubService;
+
+	@Autowired
+	private UserdataService userdataService;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -110,9 +115,11 @@ public class OrderManagementService {
 			p.autorenewing = rs.getObject("autorenewing") != null ? rs.getBoolean("autorenewing") : null;
 			p.paymentstate = rs.getObject("paymentstate") != null ? rs.getInt("paymentstate") : null;
 			p.valid = rs.getObject("valid") != null ? rs.getBoolean("valid") : null;
-			p.platform = rs.getString("platform");
+			p.platform = PurchaseHelper.getPlatformBySku(p.sku);
 			p.purchaseTime = rs.getTimestamp("purchase_time");
 			p.osmandCloud = rs.getBoolean("osmand_cloud");
+			CloudUsersRepository.CloudUser pu = p.userId != null ? usersRepository.findById(p.userId) : null;
+			p.cloudUserInfo = pu != null ? getCloudInfo(pu) : null;
 			return p;
 		});
 
@@ -120,6 +127,7 @@ public class OrderManagementService {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
 			if (users != null) {
 				users.forEach(u -> {
+					AdminService.CloudUserInfo cloudInfo = getCloudInfo(u);
 					if (u.orderid != null) {
 						List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> sList = subscriptionsRepository.findByOrderId(u.orderid);
 						if (sList != null && !sList.isEmpty()) {
@@ -139,6 +147,7 @@ public class OrderManagementService {
 								p.platform = null;
 								p.purchaseTime = null;
 								p.osmandCloud = true;
+								p.cloudUserInfo = cloudInfo;
 								result.add(p);
 							});
 						} else {
@@ -157,6 +166,7 @@ public class OrderManagementService {
 							p.platform = null;
 							p.purchaseTime = null;
 							p.osmandCloud = true;
+							p.cloudUserInfo = cloudInfo;
 							result.add(p);
 						}
 					}
@@ -174,6 +184,16 @@ public class OrderManagementService {
 				Comparator.nullsLast(Comparator.naturalOrder())
 		).reversed());
 		return result;
+	}
+
+	public AdminService.CloudUserInfo getCloudInfo(CloudUsersRepository.CloudUser user) {
+		AdminService.CloudUserInfo info = new AdminService.CloudUserInfo();
+		info.nickname = user.nickname;
+		info.tokenTime = user.tokenTime;
+		info.regTime = user.regTime;
+		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, null);
+		info.filesCount = res.totalFiles;
+		return info;
 	}
 
 	public List<String> getSkus(boolean isSub, boolean isInApp) {
@@ -314,7 +334,7 @@ public class OrderManagementService {
 				p.autorenewing = null;
 				p.paymentstate = null;
 				p.valid = i.valid;
-				p.platform = i.platform;
+				p.platform = PurchaseHelper.getPlatformBySku(i.sku);
 				p.purchaseTime = i.purchaseTime;
 				p.osmandCloud = false;
 				result.add(p);

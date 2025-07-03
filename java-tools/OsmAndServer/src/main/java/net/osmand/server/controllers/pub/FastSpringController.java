@@ -84,7 +84,6 @@ public class FastSpringController {
 							DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = new DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase();
 							iap.orderId = orderId;
 							iap.sku = sku;
-							iap.platform = FastSpringHelper.FASTSPRING_PLATFORM;
 							iap.purchaseToken = data.reference;
 							iap.purchaseTime = new Date(event.created);
 							iap.timestamp = new Date();

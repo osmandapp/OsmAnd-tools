@@ -23,17 +23,13 @@ import java.util.concurrent.TimeUnit;
 
 import static net.osmand.purchases.AmazonIAPHelper.*;
 import static net.osmand.purchases.HuaweiIAPHelper.*;
+import static net.osmand.purchases.PurchaseHelper.*;
 
 public class UpdateInAppPurchase {
 
     // Constants specific to IAP verification
     public static final String GOOGLE_PACKAGE_NAME = "net.osmand.plus";
     public static final String GOOGLE_PACKAGE_NAME_FREE = "net.osmand";
-    public static final String PLATFORM_GOOGLE = "google";
-    public static final String PLATFORM_APPLE = "apple";
-    public static final String PLATFORM_AMAZON = "amazon";
-    public static final String PLATFORM_HUAWEI = "huawei";
-    public static final String PLATFORM_FASTSPRING = "fastspring";
 
     public static final String OSMAND_PLUS_APP = "OSMAND_PLUS_APP";
 
@@ -171,7 +167,7 @@ public class UpdateInAppPurchase {
                 String sku = rs.getString("sku");
                 String purchaseToken = rs.getString("purchaseToken"); // Might be purchaseToken, userId, or receipt data depending on platform
                 String orderId = rs.getString("orderid"); // Might be orderId, transaction_id, or receiptId depending on platform
-                String platform = rs.getString("platform");
+                String platform = PurchaseHelper.getPlatformBySku(sku);
                 Timestamp purchaseTimeTs = rs.getTimestamp("purchase_time");
                 Timestamp checkTimeTs = rs.getTimestamp("checktime");
                 Boolean validBool = rs.getObject("valid", Boolean.class);
@@ -777,7 +773,6 @@ public class UpdateInAppPurchase {
             checkChanges = 0;
         }
     }
-
 
     // --- Static methods for API setup (copied from UpdateSubscription) ---
     private static HttpRequestInitializer setHttpTimeout(final HttpRequestInitializer requestInitializer) {

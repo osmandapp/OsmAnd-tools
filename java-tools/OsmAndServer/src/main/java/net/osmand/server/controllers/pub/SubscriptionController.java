@@ -3,8 +3,10 @@ package net.osmand.server.controllers.pub;
 import com.google.gson.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import net.osmand.purchases.PurchaseHelper;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
@@ -486,12 +488,8 @@ public class SubscriptionController {
         String skuParam = request.getParameter("sku");
 
         // Platform and Effective IDs
-        String platformParam = request.getParameter("platform");
-        if (!Algorithms.isEmpty(platformParam)) {
-            platformParam = platformParam.toLowerCase().trim();
-        }
-        boolean ios = PLATFORM_APPLE.equals(platformParam) || Algorithms.isEmpty(orderIdParam);
-        String platform = ios ? PLATFORM_APPLE : platformParam;
+        String platform = PurchaseHelper.getPlatformBySku(skuParam);
+        boolean ios = PLATFORM_APPLE.equals(platform) || Algorithms.isEmpty(orderIdParam);
         String effectivePurchaseToken = ios ? payloadParam : purchaseTokenParam;
         String effectiveOrderId = ios ? purchaseTokenParam : orderIdParam;
 
@@ -564,7 +562,6 @@ public class SubscriptionController {
             iap.purchaseToken = effectivePurchaseToken;
             iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
             iap.sku = skuParam;
-            iap.platform = platform;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
             iap.userId = userId;

@@ -26,7 +26,7 @@ CREATE INDEX supporters_device_sub_userid_idx on supporters_device_sub(userid);
 CREATE INDEX supporters_device_sub_supporterid_idx on supporters_device_sub(supporterid);
 ALTER TABLE supporters_device_sub add primary key (sku, orderid);
 
-CREATE TABLE supporters_device_iap(sku text not null, orderid text not null, purchasetoken text, platform text, price int, pricecurrency text,
+CREATE TABLE supporters_device_iap(sku text not null, orderid text not null, purchasetoken text, price int, pricecurrency text,
         purchase_time timestamp, checktime timestamp, valid boolean, userid int, supporterid bigint, timestamp timestamp);
 CREATE INDEX supporters_device_iap_orderid_idx on supporters_device_iap(orderid);
 CREATE INDEX supporters_device_iap_userid_idx on supporters_device_iap(userid);

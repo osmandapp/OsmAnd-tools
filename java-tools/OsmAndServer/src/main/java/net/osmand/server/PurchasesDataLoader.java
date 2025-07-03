@@ -62,7 +62,6 @@ public class PurchasesDataLoader {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			String name,
-			String platform,
 			String icon,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,
@@ -85,7 +84,6 @@ public class PurchasesDataLoader {
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record InApp(
 			String name,
-			String platform,
 			String icon,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			@JsonProperty("feature_pro") JsonNode pro,
