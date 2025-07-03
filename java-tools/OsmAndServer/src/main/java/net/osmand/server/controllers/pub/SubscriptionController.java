@@ -51,6 +51,7 @@ import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.Supporte
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchasePrimaryKey;
 import static net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
+import static net.osmand.server.api.services.UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION;
 
 @RestController
 @RequestMapping("/subscription")
@@ -93,6 +94,9 @@ public class SubscriptionController {
 
     @Autowired
     private ReceiptValidationService validationService;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
 
 	@Autowired
 	private PromoService promoService;
@@ -512,7 +516,7 @@ public class SubscriptionController {
             subscr.supporterId = supporterUserId;
             subscr.timestamp = new Date(); // Record creation/update time
 
-	        updateUserOrderId(subscr.userId, subscr.orderId);
+	        updateUserOrderId(subscr.userId, subscr.orderId, subscr.sku);
 
             Optional<SupporterDeviceSubscription> subscrOpt = subscriptionsRepository.findById(
                     new SupporterDeviceSubscriptionPrimaryKey(subscr.sku, subscr.orderId));
@@ -620,12 +624,15 @@ public class SubscriptionController {
 		return null;
 	}
 
-	private void updateUserOrderId(Integer userId, String orderId) {
+	private void updateUserOrderId(Integer userId, String orderId, String sku) {
 		if (userId != null) {
-			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
-			if (pu != null && pu.orderid == null) {
-				pu.orderid = orderId;
-				usersRepository.saveAndFlush(pu);
+			Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+			if (subMap.get(sku).isPro() || sku.startsWith(OSMAND_PROMO_SUBSCRIPTION)) {
+				CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+				if (pu != null && pu.orderid == null) {
+					pu.orderid = orderId;
+					usersRepository.saveAndFlush(pu);
+				}
 			}
 		}
 	}

@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
+import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.io.KFile;
@@ -59,11 +60,8 @@ import com.google.gson.JsonObject;
 
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
-import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
@@ -104,6 +102,12 @@ public class UserdataService {
 
     @Autowired
     protected CloudUserDevicesRepository devicesRepository;
+
+	@Autowired
+	protected DeviceSubscriptionsRepository subscriptionsRepo;
+
+	@Autowired
+	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -1107,6 +1111,7 @@ public class UserdataService {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
+						removeUserIdFromPurchases(pu.id);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
@@ -1123,6 +1128,25 @@ public class UserdataService {
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
+
+	private void removeUserIdFromPurchases(int userId) {
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(userId);
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptions) {
+				subscription.userId = null;
+				subscriptionsRepo.save(subscription);
+			}
+			LOG.info("Removed userid from subscriptions for user with id " + userId);
+		}
+		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> inAppPurchases = inAppPurchasesRepo.findByUserId(userId);
+		if (inAppPurchases != null && !inAppPurchases.isEmpty()) {
+			for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase : inAppPurchases) {
+				inAppPurchase.userId = null;
+				inAppPurchasesRepo.save(inAppPurchase);
+			}
+			LOG.info("Removed userid from in-app purchases for user with id " + userId);
+		}
+	}
 
     private boolean deleteAllFiles(CloudUserDevicesRepository.CloudUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findAllByUserid(dev.userid);
