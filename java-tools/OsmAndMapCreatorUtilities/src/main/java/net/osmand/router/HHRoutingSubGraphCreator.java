@@ -1509,11 +1509,15 @@ public class HHRoutingSubGraphCreator {
 				if (multiClusterId != -1) {
 					lstMerge.removeAll(multiplePointClusters);
 					RouteSegmentBorderPoint[] arr = multiplePointClusters.toArray(new RouteSegmentBorderPoint[multiplePointClusters.size()]);
+					int ind = 0;
 					for (RouteSegmentBorderPoint singlePointCluster : lstMerge) {
+						ind++;
 						System.out.printf(
-								"Complex scenario with [%d] clusters (%s): main point (of %d) (%s) merging with lstMerge [%d] (%s)\n",
-								clusters.size(), clusters, lstMerge.size(), singlePointCluster, lstMerge.size(), lstMerge);
-						simpleMerge(ctx, singlePointCluster, lstMerge.get(0).clusterDbId, arr);
+								"Complex scenario with [%d] clusters (%s): main point (%d of %d) (%s) merging with lstMerge [%d] (%s)\n",
+								clusters.size(), clusters, 
+								ind, lstMerge.size(), 
+								singlePointCluster, arr.length, Arrays.toString(arr));
+						simpleMerge(ctx, singlePointCluster, multiClusterId, arr);
 					}
 					continue;
 				}
