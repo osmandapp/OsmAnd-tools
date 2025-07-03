@@ -10,6 +10,8 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.controllers.pub.UserdataController;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,6 +45,8 @@ public class OrderManagementService {
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
+
+	protected static final Log LOG = LogFactory.getLog(OrderManagementService.class);
 
 	static final String MANUALLY_VALIDATED = "manually-validated";
 
@@ -269,7 +273,7 @@ public class OrderManagementService {
 			s.expiretime = cal.getTime();
 			s.valid = purchaseToken.equals(MANUALLY_VALIDATED);
 			s.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
-
+			LOG.info("Registering (/orders/register) new subscription for user " + email + ", sku: " + sku + ", orderId: " + orderId);
 			subscriptionsRepository.saveAndFlush(s);
 
 			
@@ -284,7 +288,7 @@ public class OrderManagementService {
 			i.timestamp = new Date();
 			i.valid = purchaseToken.equals(MANUALLY_VALIDATED);
 			i.checktime = purchaseToken.equals(MANUALLY_VALIDATED) ? new Date() : null;
-
+			LOG.info("Registering (/orders/register) new in-app purchase for user " + email + ", sku: " + sku + ", orderId: " + orderId);
 			deviceInAppPurchasesRepository.saveAndFlush(i);
 		}
 		userSubService.verifyAndRefreshProOrderId(pu);

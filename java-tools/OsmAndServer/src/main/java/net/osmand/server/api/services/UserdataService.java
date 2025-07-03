@@ -1106,8 +1106,10 @@ public class UserdataService {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
+						LOG.info("Deleted (/delete-account) users with email " + pu.email);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
+							LOG.info("Deleted (/delete-account) user devices for user " + pu.email);
                             request.logout();
                             return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", pu.email));
                         }
@@ -1231,6 +1233,7 @@ public class UserdataService {
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
+	    LOG.info("User email changed (/auth/change-email) from " + tempUser.email + " to " + currentUser.email);
 
 	    userSubService.verifyAndRefreshProOrderId(currentUser);
 
