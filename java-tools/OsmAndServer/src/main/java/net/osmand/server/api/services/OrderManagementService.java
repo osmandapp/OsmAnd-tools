@@ -64,7 +64,7 @@ public class OrderManagementService {
 						"       s.starttime, s.expiretime, s.checktime, " +
 						"       s.autorenewing, s.paymentstate, s.valid, " +
 						"       (s.orderid = u.orderid) AS osmand_cloud, " +
-						"       NULL AS platform, NULL AS purchase_time, " +
+						"       NULL AS purchase_time, " +
 						"       COALESCE(s.starttime, s.checktime) AS sort_key " +
 						"  FROM supporters_device_sub s " +
 						"  LEFT JOIN user_accounts u ON u.id = s.userid " +
@@ -78,7 +78,7 @@ public class OrderManagementService {
 						"       NULL AS starttime, NULL AS expiretime, i.checktime, " +
 						"       NULL AS autorenewing, NULL AS paymentstate, i.valid, " +
 						"       FALSE AS osmand_cloud, " +
-						"       i.platform, i.purchase_time, " +
+						"       i.purchase_time, " +
 						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
 						"  LEFT JOIN user_accounts u ON u.id = i.userid " +
