@@ -77,7 +77,7 @@ public class UpdateInAppPurchase {
 
         // --- Define SQL Queries for the `supporters_device_iap` table ---
         // Select purchases that are pending validation or haven't been checked recently
-        selQuery = "SELECT sku, purchaseToken, orderid, platform, purchase_time, checktime, valid, userid, supporterid, timestamp "
+        selQuery = "SELECT sku, purchaseToken, orderid, purchase_time, checktime, valid, userid, supporterid, timestamp "
                 + "FROM supporters_device_iap "
                 + "WHERE valid IS NULL OR valid = TRUE " // Focus on potentially valid ones first
                 // Add condition based on checktime later in the loop
