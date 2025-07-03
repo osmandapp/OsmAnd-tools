@@ -297,8 +297,8 @@ public class OsmAndServerMonitorTasks {
 				}
 				buildServer.lastCheckTimestamp = System.currentTimeMillis();
 			} catch (Exception e) {
-				sendBroadcastMessage("Exception while checking the build server status.");
-				LOG.error(e.getMessage(), e);
+				sendBroadcastMessage("Exception while checking the build server status: " + buildServer.serverUrl);
+				LOG.error(buildServer.serverUrl + "\n" + e.getMessage(), e);
 			}
 		}
 	}
