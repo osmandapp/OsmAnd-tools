@@ -487,6 +487,7 @@ public class ApiController {
         for (SupporterDeviceInAppPurchase iap : validInapps) {
             Map<String, String> iapMap = new HashMap<>();
             iapMap.put("sku", iap.sku);
+	        iapMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(iap.sku));
             if (iap.purchaseTime != null) {
                 iapMap.put("purchaseTime", String.valueOf(iap.purchaseTime.getTime()));
             }
@@ -513,7 +514,6 @@ public class ApiController {
 						}
 					}
 				}
-				iapMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(iap.sku));
 	        }
             iapResults.add(iapMap);
         }

@@ -425,6 +425,7 @@ public class UserSubscriptionService {
 	public Map<String, String> getSubscriptionInfo(DeviceSubscriptionsRepository.SupporterDeviceSubscription sub) {
 		Map<String, String> subMap = new HashMap<>();
 		subMap.put("sku", sub.sku);
+		subMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(sub.sku));
 		if (sub.valid != null) {
 			subMap.put(VALID_KEY, sub.valid.toString());
 		}
@@ -469,7 +470,6 @@ public class UserSubscriptionService {
 					subMap.put(name, object.toString());
 				}
 			}
-			subMap.put(PLATFORM_KEY, PurchaseHelper.getPlatformBySku(sub.sku));
 		}
 		return subMap;
 	}

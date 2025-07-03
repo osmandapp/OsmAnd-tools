@@ -24,8 +24,7 @@ public class PurchaseHelper {
 				|| sku.startsWith("net.osmand.seadepth")) {
 			return PLATFORM_GOOGLE;
 		}
-		if (sku.startsWith("net.osmand.maps.")
-				|| sku.startsWith("net.osmand.maps.inapp.addon.srtm")) {
+		if (sku.startsWith("net.osmand.maps.")) {
 			return PLATFORM_APPLE;
 		}
 		if (sku.contains(".huawei.")) {
