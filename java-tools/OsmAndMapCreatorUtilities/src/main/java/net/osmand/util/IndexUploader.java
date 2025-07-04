@@ -18,10 +18,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -86,6 +88,8 @@ public class IndexUploader {
 
 	private final static int BUFFER_SIZE = 1 << 15;
 	private final static int MB = 1 << 20;
+	
+	public static final int MAX_FILES_BEFORE_CLEANUP = 200; 
 
 	/**
 	 * Something bad have happened
@@ -332,14 +336,16 @@ public class IndexUploader {
 			uploadCredentials.connect();
 			File[] listFiles = directory.listFiles();
 			ExecutorService service = Executors.newFixedThreadPool(numberOfThreads);
+			List<Future<?>> futuresToWait = new ArrayList<>();
 			for (File f : listFiles) {
 				if (checkFileNeedToBeUploaded(f)) {
-					service.submit(new Runnable() {
+					Future<?> task = service.submit(new Runnable() {
 						@Override
 						public void run() {
 							processFile(f);
 						}
 					});
+					submitTaskAndWaitIfNeeded(futuresToWait, task);
 				}
 			}
 			log.error("Stopping the tasks queue...");
@@ -354,6 +360,25 @@ public class IndexUploader {
 			log.error("Await failed: " + e.getMessage(), e);
 		} finally {
 			uploadCredentials.disconnect();
+		}
+	}
+
+	private void submitTaskAndWaitIfNeeded(List<Future<?>> futuresToWait, Future<?> task) {
+		futuresToWait.add(task);
+		if (futuresToWait.size() > MAX_FILES_BEFORE_CLEANUP) {
+			while (!futuresToWait.isEmpty()) {
+				Iterator<Future<?>> it = futuresToWait.iterator();
+				while(it.hasNext()) {
+					Future<?> future = it.next();
+					try {
+						future.get();
+					} catch (Exception e) {
+						log.error("Await failed: " + e.getMessage(), e);
+					}
+					it.remove();
+				}
+			}
+			RTree.clearCache();
 		}
 	}
 
