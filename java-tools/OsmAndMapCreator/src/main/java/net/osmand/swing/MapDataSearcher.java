@@ -8,6 +8,9 @@ import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.obf.BinaryInspector;
+import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -21,6 +24,11 @@ import java.util.Map;
 public class MapDataSearcher {
     private static int NUM = 1;
 
+    private static int getRadius(MapPanel panel, double latitude, int partSize) {
+        double tileWidthInMeters = MapUtils.getTileDistanceWidth(latitude, panel.getZoom());
+        double metersPerPixel = tileWidthInMeters / panel.getTileSize();
+        return (int) ((double) panel.getWidth() / partSize * metersPerPixel);
+    }
     public static void searchAndPrintObjects(MouseEvent e, MapPanel panel, Log log) {
         double dx = e.getX() - panel.getCenterPointX();
         double dy = e.getY() - panel.getCenterPointY();
@@ -30,9 +38,7 @@ public class MapDataSearcher {
         double latitude = MapUtils.getLatitudeFromTile(panel.getZoom(), panel.getYTile() + tileOffsetY);
         final LatLon center = new LatLon(latitude, longitude);
 
-        double tileWidthInMeters = MapUtils.getTileDistanceWidth(latitude, panel.getZoom());
-        double metersPerPixel = tileWidthInMeters / panel.getTileSize();
-        int radius = (int) ((panel.getWidth() / 100.0) * metersPerPixel);
+        int radius = getRadius(panel, latitude, 100);
         final QuadRect bbox = MapUtils.calculateLatLonBbox(latitude, longitude, radius);
         final int left = MapUtils.get31TileNumberX(bbox.left);
         final int right = MapUtils.get31TileNumberX(bbox.right);
@@ -65,9 +71,11 @@ public class MapDataSearcher {
                 SearchRequest<Amenity> reqAmenity = BinaryMapIndexReader.buildSearchPoiRequest(left, right, top, bottom, panel.getZoom(), null, new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity object) {
-                        objects.add(object);
-                        double distance = MapUtils.getDistance(object.getLocation(), center);
-                        distances.add(distance);
+                        double distance = MapUtils.getDistance(center, object.getLocation());
+                        if (distance <= radius) {
+                            objects.add(object);
+                            distances.add(distance);
+                        }
                         return false;
                     }
 
@@ -83,9 +91,9 @@ public class MapDataSearcher {
             for (int i = 0; i < objects.size(); i++) {
                 Object o = objects.get(i);
                 if (o instanceof BinaryMapDataObject) {
-                    print((BinaryMapDataObject) o, (Double) distances.get(i));
+                    print((BinaryMapDataObject) o, distances.get(i));
                 } else if (o instanceof Amenity) {
-                    print((Amenity) o, (Double) distances.get(i));
+                    print((Amenity) o, distances.get(i));
                 }
             }
         } catch (IOException ex) {
@@ -112,6 +120,50 @@ public class MapDataSearcher {
         }
         System.out.println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
                 " " + amenity.getLocation() + " osmid=" + id + " " + s + " distance=" + String.format("%.2f", distance));
+    }
+
+    public static List<Entity> searchPOIs(double latitude, double longitude, MapPanel panel, Log log) throws IOException {
+        final LatLon center = new LatLon(latitude, longitude);
+        int radius = getRadius(panel, latitude, 2);
+        final QuadRect bbox = MapUtils.calculateLatLonBbox(latitude, longitude, radius);
+        final int left = MapUtils.get31TileNumberX(bbox.left);
+        final int right = MapUtils.get31TileNumberX(bbox.right);
+        final int top = MapUtils.get31TileNumberY(bbox.top);
+        final int bottom = MapUtils.get31TileNumberY(bbox.bottom);
+
+        List<Amenity> objects = new ArrayList<>();
+        try {
+            BinaryMapIndexReader[] readers = DataExtractionSettings.getSettings().getObfReaders();
+            for (BinaryMapIndexReader reader : readers) {
+                SearchRequest<Amenity> reqAmenity = BinaryMapIndexReader.buildSearchPoiRequest(left, right, top, bottom, panel.getZoom(), null, new ResultMatcher<>() {
+                    @Override
+                    public boolean publish(Amenity object) {
+                        double distance = MapUtils.getDistance(center, object.getLocation());
+                        if (distance <= radius) {
+                            objects.add(object);
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                });
+                reader.searchPoi(reqAmenity);
+            }
+        } catch (IOException ex) {
+            log.error("Error searching for POI objects", ex);
+        }
+
+        List<Entity> results = new ArrayList<>();
+        for (Amenity poi : objects) {
+            LatLon loc = poi.getLocation();
+            Node n = new Node(loc.getLatitude(), loc.getLongitude(), poi.getId());
+            n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), poi.getName());
+            results.add(n);
+        }
+        return results;
     }
 
     private static void print(BinaryMapDataObject object, Double distance) {
