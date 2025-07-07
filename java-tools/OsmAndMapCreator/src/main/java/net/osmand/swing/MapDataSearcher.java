@@ -169,24 +169,11 @@ public class MapDataSearcher {
     }
 
     public static String toString(Amenity amenity) {
-        StringBuilder s = new StringBuilder(String.valueOf(amenity.printNamesAndAdditional()));
         long id = (amenity.getId());
         if(id > 0) {
             id = id >> 1;
         }
-        Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
-        if (tagGroups != null) {
-            s.append(" cities:");
-            for (Map.Entry<Integer, List<BinaryMapIndexReader.TagValuePair>> entry : tagGroups.entrySet()) {
-                s.append("[");
-                for (BinaryMapIndexReader.TagValuePair p : entry.getValue()) {
-                    s.append(p.tag).append("=").append(p.value).append(" ");
-                }
-                s.append("]");
-            }
-        }
-
-        return amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() + " osmid=" + id + " " + s;
+        return amenity.getType().getKeyName() + ":\n" + amenity.getName() + "\nosmid=" + id;
     }
 
     private static void print(BinaryMapDataObject object, Double distance) {
