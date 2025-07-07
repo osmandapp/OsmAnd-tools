@@ -160,7 +160,7 @@ public class MapDataSearcher {
         for (Amenity poi : objects) {
             LatLon loc = poi.getLocation();
             Node n = new Node(loc.getLatitude(), loc.getLongitude(), poi.getId());
-            n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), poi.getName());
+            n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), poi.getName() + "\n" + poi.getType());
             results.add(n);
         }
         return results;
