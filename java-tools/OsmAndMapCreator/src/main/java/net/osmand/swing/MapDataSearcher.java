@@ -107,6 +107,7 @@ public class MapDataSearcher {
         if (id > 0) {
             id = id >> 1;
         }
+
         Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
         if (tagGroups != null) {
             s.append(" cities:");
@@ -160,10 +161,32 @@ public class MapDataSearcher {
         for (Amenity poi : objects) {
             LatLon loc = poi.getLocation();
             Node n = new Node(loc.getLatitude(), loc.getLongitude(), poi.getId());
-            n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), poi.getName() + "\n" + poi.getType());
+            n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), toString(poi));
+
             results.add(n);
         }
         return results;
+    }
+
+    public static String toString(Amenity amenity) {
+        StringBuilder s = new StringBuilder(String.valueOf(amenity.printNamesAndAdditional()));
+        long id = (amenity.getId());
+        if(id > 0) {
+            id = id >> 1;
+        }
+        Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
+        if (tagGroups != null) {
+            s.append(" cities:");
+            for (Map.Entry<Integer, List<BinaryMapIndexReader.TagValuePair>> entry : tagGroups.entrySet()) {
+                s.append("[");
+                for (BinaryMapIndexReader.TagValuePair p : entry.getValue()) {
+                    s.append(p.tag).append("=").append(p.value).append(" ");
+                }
+                s.append("]");
+            }
+        }
+
+        return amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() + " osmid=" + id + " " + s;
     }
 
     private static void print(BinaryMapDataObject object, Double distance) {
