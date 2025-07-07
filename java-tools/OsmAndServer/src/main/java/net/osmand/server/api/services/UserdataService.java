@@ -736,7 +736,7 @@ public class UserdataService {
     }
     
     public InputStream getInputStream(CloudUserFilesRepository.UserFile userFile) {
-		if (userFile.storage.equals("local")) {
+		if (!Algorithms.isEmpty(userFile.storage) && userFile.storage.equals("local")) {
 			return new ByteArrayInputStream(userFile.data);
 		}
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile), storageFileName(userFile));
