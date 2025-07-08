@@ -173,7 +173,7 @@ public class MapDataSearcher {
         if(id > 0) {
             id = id >> 1;
         }
-        return amenity.getType().getKeyName() + ":\n" + amenity.getName() + "\nosmid=" + id;
+        return amenity.getSubType() + ":\n" + amenity.getName() + "\nosmid=" + id;
     }
 
     private static void print(BinaryMapDataObject object, Double distance) {
