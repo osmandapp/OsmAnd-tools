@@ -124,6 +124,10 @@ public class MapDataSearcher {
     }
 
     public static List<Entity> searchPOIs(double latitude, double longitude, MapPanel panel, Log log) throws IOException {
+        List<Entity> results = new ArrayList<>();
+        if (panel.getZoom() < 16)
+            return results;
+
         final LatLon center = new LatLon(latitude, longitude);
         int radius = Math.min(getRadius(panel, latitude, 2), 10000);
         final QuadRect bbox = MapUtils.calculateLatLonBbox(latitude, longitude, radius);
@@ -157,7 +161,6 @@ public class MapDataSearcher {
             log.error("Error searching for POI objects", ex);
         }
 
-        List<Entity> results = new ArrayList<>();
         for (Amenity poi : objects) {
             LatLon loc = poi.getLocation();
             Node n = new Node(loc.getLatitude(), loc.getLongitude(), poi.getId());
@@ -174,7 +177,7 @@ public class MapDataSearcher {
         if(id > 0) {
             id = id >> 1;
         }
-        return amenity.getSubType() + ":\n" + amenity.getName() + "\nosmid=" + id;
+        return amenity.getSubType() + ":" + (amenity.getName() != null && !amenity.getName().trim().isEmpty() ? "\n" + amenity.getName() : "") + "\nosmid=" + id;
     }
 
     public static void print(Amenity amenity) {
@@ -183,17 +186,7 @@ public class MapDataSearcher {
         if(id > 0) {
             id = id >> 1;
         }
-        Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
-        if (tagGroups != null) {
-            s.append(" cities:");
-            for (Map.Entry<Integer, List<BinaryMapIndexReader.TagValuePair>> entry : tagGroups.entrySet()) {
-                s.append("[");
-                for (BinaryMapIndexReader.TagValuePair p : entry.getValue()) {
-                    s.append(p.tag).append("=").append(p.value).append(" ");
-                }
-                s.append("]");
-            }
-        }
+
         System.out.println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
                 " " + amenity.getLocation() + " osmid=" + id + " " + s);
     }
