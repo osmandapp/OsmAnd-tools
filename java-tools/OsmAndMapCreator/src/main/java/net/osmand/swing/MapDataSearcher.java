@@ -125,7 +125,7 @@ public class MapDataSearcher {
 
     public static List<Entity> searchPOIs(double latitude, double longitude, MapPanel panel, Log log) throws IOException {
         final LatLon center = new LatLon(latitude, longitude);
-        int radius = getRadius(panel, latitude, 2);
+        int radius = Math.min(getRadius(panel, latitude, 2), 10000);
         final QuadRect bbox = MapUtils.calculateLatLonBbox(latitude, longitude, radius);
         final int left = MapUtils.get31TileNumberX(bbox.left);
         final int right = MapUtils.get31TileNumberX(bbox.right);
@@ -164,6 +164,7 @@ public class MapDataSearcher {
             n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), toString(poi));
 
             results.add(n);
+            print(poi);
         }
         return results;
     }
@@ -174,6 +175,27 @@ public class MapDataSearcher {
             id = id >> 1;
         }
         return amenity.getSubType() + ":\n" + amenity.getName() + "\nosmid=" + id;
+    }
+
+    public static void print(Amenity amenity) {
+        StringBuilder s = new StringBuilder(String.valueOf(amenity.printNamesAndAdditional()));
+        long id = (amenity.getId());
+        if(id > 0) {
+            id = id >> 1;
+        }
+        Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
+        if (tagGroups != null) {
+            s.append(" cities:");
+            for (Map.Entry<Integer, List<BinaryMapIndexReader.TagValuePair>> entry : tagGroups.entrySet()) {
+                s.append("[");
+                for (BinaryMapIndexReader.TagValuePair p : entry.getValue()) {
+                    s.append(p.tag).append("=").append(p.value).append(" ");
+                }
+                s.append("]");
+            }
+        }
+        System.out.println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
+                " " + amenity.getLocation() + " osmid=" + id + " " + s);
     }
 
     private static void print(BinaryMapDataObject object, Double distance) {
