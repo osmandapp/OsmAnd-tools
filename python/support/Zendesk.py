@@ -16,9 +16,11 @@ domain = os.getenv('ZENDESK_DOMAIN', 'osmandhelp')
 view = os.getenv('ZENDESK_VIEW', '150931385')
 
 user = os.getenv('ZENDESK_USER', 'osmand.help@gmail.com')
-token = os.getenv('ZENDESK_TOKEN', '5GljHGvBhsqevOSpd2Fx1MS1sEiNrnNl4Id7qPvv')
+token = os.getenv('ZENDESK_TOKEN')
 encoded_auth = base64.b64encode(f"{user}/token:{token}".encode()).decode()
 
+if not all([token]):
+    raise ValueError("Missing required environment variables (ZENDESK_TOKEN)")
 
 # A Zendesk client to fetch tickets, load comments and send auto‐replies.
 class Zendesk:

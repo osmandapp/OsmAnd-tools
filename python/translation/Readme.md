@@ -39,7 +39,8 @@ Below are all environment variables, arguments, and their roles:
 | **INPUT_PATTERN (argument #2)** | No       | Optional file pattern to filter which files are translated.                     | `'topic/*.md'`          |
 | **API_KEY (argument #3)**       | Yes      | API key for the LLM.                                                            | `sk-abc123xyz`          |
 | **MODEL**                       | No       | Model to use for translation. Defaults to `or@google/gemini-2.5-flash-preview`. |                         |
-| **WEB_SERVER_CONFIG_PATH**      | No       | Path to web-server-config project. Should be clone or pull preliminary.         | `/opt/projects/website` |
+| **TOOLS_PATH**                  | No       | Path to tools project. Should be clone or pull preliminary.                     | `/opt/projects/tools`   |
+| **WEB_SERVER_CONFIG_PATH**      | No       | Path to web-server-config project.                                              | `/opt/projects/website` |
 | **WEB_DIR**                     | No       | Name of documentation git repo. Default is `web`.                               | `web`                   |
 
 > **Note:**
@@ -62,7 +63,7 @@ cd web && git checkout main && git reset --hard && git pull # Optional if you wa
 ### 2. Set Required Variables and Run script (example for French translation).
 
 ```bash
-export API_KEY="your_LLM_api_key_here"                  # LLM api key 
+export API_KEY="your_LLM_api_key_here"                  # LLM api key
 export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config  # Optional, path to web-server-config
 export WEB_REPO=$(pwd)/web                              # Optional, path to web
 

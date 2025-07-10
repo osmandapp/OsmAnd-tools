@@ -14,13 +14,13 @@ MODEL = os.getenv('MODEL')
 API_URL = os.getenv('API_URL', 'http://localhost:11434/v1')
 API_KEY = os.getenv('API_KEY')
 MAX_PHOTOS_PER_REQUEST = int(os.getenv('MAX_PHOTOS_PER_REQUEST', '15'))
+WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
 
 # Check for required environment variables
-if not all([MODEL, API_KEY]):
-    raise ValueError("Missing required environment variables (MODEL, API_KEY)")
+if not all([MODEL, API_KEY, WEB_SERVER_CONFIG_PATH]):
+    raise ValueError("Missing required environment variables (MODEL, API_KEY, WEB_SERVER_CONFIG_PATH)")
 
-script_dir = Path(__file__).parent
-with open(script_dir / 'prompts.yaml', 'r', encoding='utf-8') as f:
+with open(Path(WEB_SERVER_CONFIG_PATH) / 'llm/scoring_prompts.yaml', 'r', encoding='utf-8') as f:
     prompts = yaml.safe_load(f)
 
 

@@ -10,12 +10,11 @@ import LLM
 import Zendesk
 
 knowedge_id = os.getenv('KNOWLEDGE', 'none')
-
+WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
 
 class Report:
     def __init__(self):
-        script_dir = Path(__file__).parent
-        with open(script_dir / 'prompts.yaml', 'r') as f:
+        with open(Path(WEB_SERVER_CONFIG_PATH) / 'llm/support_prompts.yaml', 'r') as f:
             prompts = yaml.safe_load(f)
 
         self.prompts = prompts

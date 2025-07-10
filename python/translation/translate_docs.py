@@ -18,6 +18,7 @@ INPUT_DIR = os.getenv('INPUT_DIR', '')
 INPUT_PATTERN = os.getenv('INPUT_PATTERN', '')
 LANG = os.getenv('LANG')
 IMAGES_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".svg"]
+WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
 
 # Validate INPUT_PATTERN
 if INPUT_PATTERN:
@@ -27,8 +28,8 @@ if INPUT_PATTERN:
         raise ValueError(f"INPUT_PATTERN '{INPUT_PATTERN}' is not a valid file/directory pattern: {e}")
 
 print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}", flush=True)
-if not all([MODEL, INPUT_DIR]):
-    raise ValueError("Missing required environment variables (MODEL, INPUT_DIR)")
+if not all([MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
+    raise ValueError("Missing required environment variables (MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
 if INPUT_PATTERN and not (INPUT_PATTERN.endswith('.json') or '.md' in INPUT_PATTERN):
     raise ValueError("Incorrect INPUT_PATTERN variable. Should be a glob pattern for '*.json' or '*.md*' files.")
 
@@ -39,7 +40,7 @@ with open(script_dir / 'iso_639-1.json', 'r', encoding='utf-8') as f:
 if LANG == "en" or (LANG != "all" and LANG not in langs):
     raise ValueError(f"Input language '{LANG}' is not 'all' and not in {langs.keys()}")
 
-with open(script_dir / 'prompts.yaml', 'r', encoding='utf-8') as f:
+with open(Path(WEB_SERVER_CONFIG_PATH) / 'llm/translation_prompts.yaml', 'r', encoding='utf-8') as f:
     prompts = yaml.safe_load(f)
 
 llm = OpenAIClient(MODEL, API_KEY)
