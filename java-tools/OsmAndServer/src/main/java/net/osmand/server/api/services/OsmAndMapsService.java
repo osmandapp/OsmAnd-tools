@@ -576,7 +576,8 @@ public class OsmAndMapsService {
 				fous.close();
 				ios.close();
 			}
-			nativelib = NativeJavaRendering.getDefault(null, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
+			String nativeLibraryPath = System.getenv("NATIVE_LIBRARY_PATH"); // use native library from file, optional
+			nativelib = NativeJavaRendering.getDefault(nativeLibraryPath, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
 		}
 		return tileConfig.initErrorMessage == null;
 	}
