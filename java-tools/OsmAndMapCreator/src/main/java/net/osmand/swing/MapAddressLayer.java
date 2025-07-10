@@ -1,24 +1,10 @@
 package net.osmand.swing;
 
-import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.swing.AbstractAction;
-import javax.swing.Action;
-import javax.swing.JPopupMenu;
+import static net.osmand.router.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
+import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.City;
@@ -37,7 +23,21 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import static net.osmand.router.RoutingConfiguration.*;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.swing.AbstractAction;
+import javax.swing.Action;
+import javax.swing.JPopupMenu;
 
 
 public class MapAddressLayer implements MapPanelLayer {
@@ -76,10 +76,17 @@ public class MapAddressLayer implements MapPanelLayer {
 			public void actionPerformed(ActionEvent e) {
 				showCurrentCityActions();
 			}
-
-
 		};
 		menu.add(add);
+        Action poi = new AbstractAction("Show POIs") {
+            private static final long serialVersionUID = 7477484340246483239L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showCurrentPOIs();
+            }
+        };
+        menu.add(poi);
 	}
 
 
@@ -135,6 +142,14 @@ public class MapAddressLayer implements MapPanelLayer {
 		}).start();
 	}
 
+    private void showCurrentPOIs() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                map.getPrinter().searchPOIs(true);
+            }
+        }).start();
+    }
 	private List<Entity> searchAddress(double lat, double lon,
 			final DataTileManager<Entity> points ) throws IOException{
 		List<Entity> results = new ArrayList<Entity>();
