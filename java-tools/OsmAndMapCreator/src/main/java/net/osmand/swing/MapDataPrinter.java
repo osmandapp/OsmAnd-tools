@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 public class MapDataPrinter {
+    private static final int SHIFT_CONSTANT = 1;
     private int NUM_SEARCH_ATTEMPTS = 1;
     private final MapPanel panel;
     private final Log log;
@@ -100,7 +101,7 @@ public class MapDataPrinter {
             for (int i = 0; i < objects.size(); i++) {
                 Object o = objects.get(i);
                 if (o instanceof BinaryMapDataObject) {
-                    printAmenity((BinaryMapDataObject) o, distances.get(i));
+                    printDataObject((BinaryMapDataObject) o, distances.get(i));
                 } else if (o instanceof Amenity) {
                     printAmenity((Amenity) o, distances.get(i));
                 }
@@ -187,7 +188,7 @@ public class MapDataPrinter {
         String s = object.printNamesAndAdditional().toString();
         long id = (object.getId());
         if(id > 0) {
-            id = id >> 1;
+            id = id >> SHIFT_CONSTANT;
         }
 
         System.out.println(object.getType().getKeyName() + ": " + object.getSubType() + " " + object.getName() +
@@ -202,9 +203,9 @@ public class MapDataPrinter {
 
     private static void printAmenity(Amenity amenity, Double distance) {
         StringBuilder s = new StringBuilder(String.valueOf(amenity.printNamesAndAdditional()));
-        long id = (amenity.getId());
+        long id = amenity.getId();
         if (id > 0) {
-            id = id >> 1;
+            id = id >> SHIFT_CONSTANT;
         }
 
         Map<Integer, List<BinaryMapIndexReader.TagValuePair>> tagGroups = amenity.getTagGroups();
@@ -222,7 +223,7 @@ public class MapDataPrinter {
                 " " + amenity.getLocation() + " osmid=" + id + " " + s + " distance=" + String.format("%.2f", distance));
     }
 
-    private static void printAmenity(BinaryMapDataObject object, Double distance) {
+    private static void printDataObject(BinaryMapDataObject object, Double distance) {
         StringBuilder s = new StringBuilder();
         BinaryInspector.printMapDetails(object, s, false);
         s.append(" distance=").append(String.format("%.2f", distance));
@@ -236,14 +237,10 @@ public class MapDataPrinter {
     private static double getMinDistance(BinaryMapDataObject object, LatLon center, int radiusMeters) {
         int pointsCount = object.getPointsLength();
         double minDistance = Double.MAX_VALUE;
-        if (pointsCount == 0) {
-            return minDistance;
-        }
-
         for (int i = 0; i < pointsCount; i++) {
-            double plat = MapUtils.get31LatitudeY(object.getPoint31YTile(i));
-            double plon = MapUtils.get31LongitudeX(object.getPoint31XTile(i));
-            double distance = MapUtils.getDistance(center.getLatitude(), center.getLongitude(), plat, plon);
+            double lat = MapUtils.get31LatitudeY(object.getPoint31YTile(i));
+            double lon = MapUtils.get31LongitudeX(object.getPoint31XTile(i));
+            double distance = MapUtils.getDistance(center.getLatitude(), center.getLongitude(), lat, lon);
             if (distance <= radiusMeters) {
                 return distance;
             }
