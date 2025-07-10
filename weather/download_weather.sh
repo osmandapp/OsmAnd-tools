@@ -1,5 +1,6 @@
 #!/bin/bash -xe
 SCRIPT_PROVIDER_MODE=$1
+DOWNLOAD_MODE=$2
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_FOLDER=$(pwd)
 GFS="gfs"
@@ -39,11 +40,14 @@ setup_folders_on_start() {
     mkdir -p "$TIFF_FOLDER/"
     mkdir -p "$TIFF_TEMP_FOLDER/"
 
-    rm -rf $DOWNLOAD_FOLDER/* || true
-    rm -rf $TIFF_TEMP_FOLDER/* || true
+    if [[ -z "$DOWNLOAD_MODE" || "$DOWNLOAD_MODE" == "recreate" ]]; then
+        echo "Clear raw data from $DOWNLOAD_FOLDER"
+        rm -rf $DOWNLOAD_FOLDER || true
+    fi
+    rm -rf $TIFF_TEMP_FOLDER || true
     if [[ $DEBUG_M0DE == 1 ]]; then
-        rm -rf $TIFF_FOLDER/* || true 
-    fi  
+        rm -rf $TIFF_FOLDER || true
+    fi
 }
 
 
@@ -56,58 +60,6 @@ clean_temp_files_on_finish() {
     sleep 5
     find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete  || echo "Error: Temp file is already deleted"
     find . -type d -empty -delete  || echo "Error: Temp file is already deleted"
-}
-
-
-should_download_file() {
-    local FILENAME=$1
-    local URL=$2
-
-    sleep $SLEEP_BEFORE_CURL
-
-    if [[ -f $FILENAME ]]; then
-
-        # File is already dowlnloaded
-        local DISK_FILE_MODIFIED_TIME="$(TZ=GMT date -r ${FILENAME} +'%a, %d %b %Y %H:%M:%S GMT')"
-        local SERVER_RESPONSE=$(curl -s -I -L --header "If-Modified-Since: $DISK_FILE_MODIFIED_TIME" $URL | head -1)
-
-        if [[ $SERVER_RESPONSE =~ "302" ]]; then
-            # Maybe server is blocking us and redirectding to Error Html page. Like this:
-            # https://www.weather.gov/abusive-user-block
-            sleep 300
-            echo 0
-            return
-        elif [[ $SERVER_RESPONSE =~ "304" ]]; then
-            # Server don't have update for this file. Don't need to download it.
-            echo 0
-            return
-        elif [[ $SERVER_RESPONSE =~ "429" ]]; then
-            # HTTP/1.1 429 Too Many Requests (ecmwf) - retry
-            sleep 60
-        elif [[ $SERVER_RESPONSE =~ "403" ]]; then   
-            # We're blocked by server. Wait a bit and continue download
-            sleep 60
-        elif [[ $SERVER_RESPONSE =~ "401" ]]; then
-            # HTTP/1.1 401 Unauthorized from data.ecmwf.int (sleep and try again)
-            sleep 300
-        elif [[ $SERVER_RESPONSE =~ "404" ]]; then   
-            echo 0
-            return
-        fi  
-    elif [[ $(curl -s -I -L $URL | head -1) =~ "404"  ]]; then   
-        # File not found. Skip 
-        echo 0
-        return    
-    elif [[ $(curl -s -I -L $URL | head -1) =~ "302"  ]]; then   
-        # Maybe server is blocking us and redirectding to Error Html page. Like this:
-        # https://www.weather.gov/abusive-user-block 
-        # Try to wait a bit and download again.
-        sleep 300
-        echo 1
-        return
-    fi    
-
-    echo 1
 }
 
 
@@ -137,58 +89,25 @@ download_with_retry() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download try 1: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Skip downloading: ${FILENAME}"   
-        return
-    fi
+    echo "Download try 1: ${FILENAME}"
+    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
 
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-        echo "Download Error: ${FILENAME} not downloaded! Wait 1 min and retry."
+    if [[ -f $FILENAME ]]; then
+        echo "Downloading success with try 1: ${FILENAME}"
+        return
+    else
         sleep 60
         echo "Download try 2: ${FILENAME}"
         download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    else 
-        echo "Downloading success with try 1: ${FILENAME}"   
-        return    
     fi
 
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 5 min and retry."
-    #     sleep 300
-    #     echo "Download try 3: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 2: ${FILENAME}"   
-    #     return    
-    # fi
-
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 10 min and retry."
-    #     sleep 600
-    #     echo "Download try 4: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 3: ${FILENAME}"   
-    #     return    
-    # fi
-
-    # if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
-    #     echo "Download Error: ${FILENAME} not downloaded! Wait 1 hour and retry."
-    #     sleep 600
-    #     echo "Download try 5: ${FILENAME}"
-    #     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    # else 
-    #     echo "Downloading success with try 4: ${FILENAME}"   
-    #     return    
-    # fi
-    
-    if [[ $( should_download_file "$FILENAME" "$URL" ) -eq 1 ]]; then
+    if [[ -f $FILENAME ]]; then
+        echo "Downloading success with try 2: ${FILENAME}"
+        return
+    else
         echo "Fatal Download Error: ${FILENAME} still not downloaded!"
+        exit 1
     fi
-
     return
 }
 
@@ -197,7 +116,7 @@ is_file_content_with_html() {
     if grep -q "<!doctype html>" "$FILENAME"; then
         echo 0
     else
-        echo 1    
+        echo 1
     fi
 }
 
@@ -244,24 +163,24 @@ get_raw_gfs_files() {
 
 
         # Download index file
-        cd $DOWNLOAD_FOLDER; 
+        cd $DOWNLOAD_FOLDER;
         sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
-        if [[ -f "$FILETIME.index" ]]; then   
+        if [[ -f "$FILETIME.index" ]]; then
             for i in ${!GFS_BANDS_FULL_NAMES[@]}; do
                 # Parse from index file start and end byte offset for needed band
                 local CHANNEL_INDEX_LINES=$( cat ${FILETIME}.index | grep -A 1 "${GFS_BANDS_FULL_NAMES[$i]}" | awk -F ":" '{print $2}' )
                 local START_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $1}' )
-                local END_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $2}' ) 
+                local END_BYTE_OFFSET=$( echo $CHANNEL_INDEX_LINES | awk -F " " '{print $2}' )
 
-                # Make partial download for needed band data only  
+                # Make partial download for needed band data only
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
                 sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
-                if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then  
+                if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then
                     if [[ $( is_file_content_with_html "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ) -eq 1 ]]; then
                         # File is downloaded and is of correct type.
                         # Generate tiff for downloaded band
@@ -282,12 +201,12 @@ get_raw_gfs_files() {
             done
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
-        fi    
+        fi
         cd ..;
 
         if [[ $DEBUG_M0DE == 1 ]]; then
             return
-        fi    
+        fi
     done
 }
 
@@ -298,11 +217,11 @@ join_tiff_files() {
     local BANDS_SHORT_NAMES=()
     local BANDS_DESCRIPTIONS=()
     if [[ $MODE == "$GFS" ]]; then
-        BANDS_SHORT_NAMES=("${GFS_BANDS_SHORT_NAMES[@]}")  
-        BANDS_DESCRIPTIONS=("${GFS_BANDS_FULL_NAMES[@]}")  
+        BANDS_SHORT_NAMES=("${GFS_BANDS_SHORT_NAMES[@]}")
+        BANDS_DESCRIPTIONS=("${GFS_BANDS_FULL_NAMES[@]}")
     elif [[ $MODE == "$ECMWF" ]]; then
-        BANDS_SHORT_NAMES=("${ECMWF_BANDS_SHORT_NAMES_SAVING[@]}")  
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS_FULL_NAMES[@]}")  
+        BANDS_SHORT_NAMES=("${ECMWF_BANDS_SHORT_NAMES_SAVING[@]}")
+        BANDS_DESCRIPTIONS=("${ECMWF_BANDS_FULL_NAMES[@]}")
     fi
 
     mkdir -p $TIFF_FOLDER/
@@ -339,7 +258,7 @@ join_tiff_files() {
         # Create joined tiff from "Virtual Tiff"
         local TARGET_FILE=../../${TIFF_FOLDER}/${DATE_FOLDER}.tiff
         gdal_translate bigtiff.vrt $TARGET_FILE -ot Float32 -stats  || echo "Error of gdal_translate"
-        
+
         # # Write tiff layers names
         local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py $TARGET_FILE '
         for i in ${!BANDS_DESCRIPTIONS[@]}; do
@@ -377,13 +296,13 @@ split_tiles() {
 
         mkdir -p ${JOINED_TIFF_NAME}
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
- 
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/  
+
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
-        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec touch -r ${JOINED_TIFF_NAME}.tiff "{}" \;    
-        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;    
+        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec touch -r ${JOINED_TIFF_NAME}.tiff "{}" \;
+        find ${JOINED_TIFF_NAME}/ -maxdepth 1 -type f ! -name '*.gz' -exec gzip "{}" \;
 
         rm ${JOINED_TIFF_NAME}.tiff.gz || true
         gzip --keep ${JOINED_TIFF_NAME}.tiff
@@ -414,7 +333,7 @@ find_latest_ecmwf_forecat_date() {
         local SEARCHING_RND_HOURS="00"
         if [[ $SEARCHING_HOURS -gt 11 ]]; then
             SEARCHING_RND_HOURS="12"
-        fi 
+        fi
 
         local CHECKING_FORECAST_TIME="0"
         if [[ $SEARCH_MODE =~ $FULL_MODE ]]; then
@@ -439,7 +358,22 @@ find_latest_ecmwf_forecat_date() {
     fi
 
     echo "$FORECAST_DATE $FORECAST_RND_TIME"
-    return 
+    return
+}
+
+file_in_array() {
+    set +x
+    local target="$1"
+    shift
+    local array=("$@")
+
+    for item in "${array[@]}"; do
+        if [[ "$item" == "$target" ]]; then
+            return 0  # exists
+        fi
+    done
+    set -x
+    return 1  # doesn't exist
 }
 
 
@@ -449,8 +383,11 @@ get_raw_ecmwf_files() {
     if [[ $1 == "Error" ]]; then
         return
     fi
-    local FORECAST_DATE=$1
-    local FORECAST_RND_TIME=$2
+    local FORECAST_DATE=$1 # yyyymmdd - 20250709
+    local FORECAST_RND_TIME=$2 # 00 or 12
+
+    local BASE_URL="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/ifs/0p25/oper/"
+    local FILE_ARRAY=($(curl -s $BASE_URL | grep -o '>[^<]*</a>' | sed -e 's/^>//' -e 's/<\/a>$//' | grep -v -E '^\.|/$'))
 
     # Download forecast files
     local MAX_FORECAST_HOURS=240
@@ -464,30 +401,50 @@ get_raw_ecmwf_files() {
         else
             FILETIME=$(TZ=GMT date -d "${FORECAST_DATE} ${FORECAST_RND_TIME}00 +${FORECAST_HOUR} hours" '+%Y%m%d_%H%M')
         fi
-        local FORECAST_URL_BASE="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/ifs/0p25/oper/"$FORECAST_DATE"000000-"$FORECAST_HOUR"h-oper-fc"
 
-        # Download index file
+        local FORECAST_FILE_PREFIX=$FORECAST_DATE$FORECAST_RND_TIME"0000-"$FORECAST_HOUR"h-oper-fc"
+        local FORECAST_URL_BASE=$BASE_URL$FORECAST_FILE_PREFIX
+
         local INDEX_FILE_URL="$FORECAST_URL_BASE.index"
-        download_with_retry "$DOWNLOAD_FOLDER/$FILETIME.index" "$INDEX_FILE_URL"
+        set +x # Disable command echoing
+        echo "-----------------------------------------------------------------"
+        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
+            echo "File $DOWNLOAD_FOLDER/$FILETIME.index already exist! Skip downloading. URL:$INDEX_FILE_URL"
+        else
+            if file_in_array "$FORECAST_FILE_PREFIX.index" "${FILE_ARRAY[@]}"; then
+                # Download index file
+                echo "Try to download: $INDEX_FILE_URL"
+                set -x
+                download_with_retry "$DOWNLOAD_FOLDER/$FILETIME.index" "$INDEX_FILE_URL"
+            else
+                echo "File doesn't exist: $INDEX_FILE_URL"
+                continue
+            fi
+        fi
 
+        set -x # Re-enable command echoing
         # Download needed bands forecast data
-        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then   
+        if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
             for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
                 # Parse from index file start and end byte offset for needed band
                 local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
-                if [[ -z "$CHANNEL_LINE" ]]; then 
+                if [[ -z "$CHANNEL_LINE" ]]; then
                     cat $DOWNLOAD_FOLDER/$FILETIME.index
                     echo "Missing for ${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]} - $FILETIME - index url $INDEX_FILE_URL"
                     exit 1
                 fi
-                local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
-                local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' ) 
-                local BYTE_END=$(($BYTE_START + $BYTE_LENGTH)) 
+                local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' )
+                local BYTE_LENGTH=$( echo $CHANNEL_LINE | awk -F "length" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' )
+                local BYTE_END=$(($BYTE_START + $BYTE_LENGTH))
 
                 # Make partial download for needed band data only
                 # https://data.ecmwf.int/forecasts/20220909/00z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.grib2
                 local SAVING_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$FILETIME"
-                download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
+                if [[ -f "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" ]]; then
+                    echo "File $DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2 already exist! Skip downloading. URL:$FORECAST_URL_BASE.grib2"
+                else
+                    download_with_retry "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$FORECAST_URL_BASE.grib2" $BYTE_START $BYTE_END
+                fi
                 if [ ! -f "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" ]; then
                     echo "File $SAVING_FILENAME.grib2 not found, skipping"
                     continue
@@ -498,7 +455,9 @@ get_raw_ecmwf_files() {
                     continue
                 fi
                 cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
-                rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
+                if [[ -z "$DOWNLOAD_MODE" || "$DOWNLOAD_MODE" == "recreate" ]]; then
+                    rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
+                fi
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
                 local PREV_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$PREV_FILETIME"
@@ -514,14 +473,14 @@ get_raw_ecmwf_files() {
                 fi
                 TZ=UTC touch -t "${FORECAST_DATE}${FORECAST_RND_TIME}00" "$TIFF_TEMP_FOLDER/$FILETIME/$SAVING_FILENAME.tiff"
             done
-            PREV_FILETIME=$FILETIME 
+            PREV_FILETIME=$FILETIME
         else
             echo "Error: Index file not downloaded. Skip downloading weather data."
         fi
 
         if [[ $DEBUG_M0DE == 1 ]]; then
             return
-        fi    
+        fi
     done
 }
 
@@ -530,10 +489,10 @@ get_raw_ecmwf_files() {
 # # Uncomment for fast debug mode
 # DEBUG_M0DE=1
 
-
+export LC_ALL=en_US.UTF-8
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     cd "$ROOT_FOLDER/$GFS"
-    setup_folders_on_start
+    setup_folders_on_start $DOWNLOAD_MODE
     get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
     get_raw_gfs_files $HOURS_1H_TO_DOWNLOAD $HOURS_3H_TO_DOWNLOAD 3
     join_tiff_files $GFS
@@ -541,13 +500,13 @@ if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     clean_temp_files_on_finish
 elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     cd "$ROOT_FOLDER/$ECMWF"
-    setup_folders_on_start
+    setup_folders_on_start $DOWNLOAD_MODE
 
     # Find and download latest full forecast (from 0h to 240h)
     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
 
-    # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example). 
+    # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example).
     # Overrite yesterday's full forecasts with all existing today's files. If it needed.
     LATEST_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $LATEST_MODE)
     if [[ $LATEST_FORECAST_SEARCH_RESULT != $FULL_FORECAST_SEARCH_RESULT ]]; then
