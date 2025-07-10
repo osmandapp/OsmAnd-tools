@@ -1,0 +1,108 @@
+#!/bin/bash -e
+
+#1. Environment ($1 - LANG)
+if [ -z "$API_KEY" ]; then
+  echo "Error: Missing required argument API_KEY."
+  exit 1
+fi
+
+if [ ! -z "$1" ]; then
+  export LANG="$1"
+fi
+if [ -z "$LANG" ]; then
+  echo "Error: Missing required argument LANG."
+  exit 1
+fi
+
+if [ ! -z "$2" ]; then
+  export INPUT_PATTERN="$2"
+fi
+
+if [ -z "$WEB_SERVER_CONFIG_PATH" ]; then
+  echo "Warning: Missing argument WEB_SERVER_CONFIG_PATH set to 'web-server-config'."
+  export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config
+fi
+
+if [ -z "$WEB_REPO" ];  then
+  WEB_REPO=web
+fi
+
+WEB_DIR="$(pwd)/$WEB_REPO"
+if [ -z "$WEB_BRANCH" ];  then
+  WEB_BRANCH=main
+fi
+
+TODAY="$(date +'%Y-%m-%d-%H-%M')"
+NOW="$(date +'%Y-%m-%d %H:%M:%S')"
+WORKING_BRANCH="test-${LANG}-translate-${TODAY}"
+if [ "$WEB_BRANCH" != "main" ];  then
+  WORKING_BRANCH="$WEB_BRANCH"
+fi
+
+echo ">> Working language : $LANG"
+echo ">> Docs dir         : $WEB_DIR"
+echo ">> Docs branch      : $WEB_BRANCH"
+echo ">> Config dir       : $WEB_SERVER_CONFIG_PATH"
+echo ">> Working branch   : $WORKING_BRANCH"
+echo ">> Selective pattern: $INPUT_PATTERN"
+echo ">> Auto push flag   : $AUTO_GIT_PUSH"
+echo ">> Today (ISO)      : $NOW"
+echo "---------------------------------------------------------------------------"
+
+#2. Cloning of the main branches
+if [ ! -d "$WEB_DIR" ]; then
+  echo ">> Cloning of the branches"
+  git clone ssh://git@github.com/osmandapp/$WEB_REPO $WEB_DIR
+  (cd $WEB_DIR && git fetch origin && git checkout $WEB_BRANCH && git reset --hard && git pull)
+fi
+
+#3. Checkout / create working branch
+echo ">> Checkout working branch '$WORKING_BRANCH'"
+(cd $WEB_DIR && git checkout -B "$WORKING_BRANCH" "$WEB_BRANCH") # recreate from $WORKING_BRANCH each run
+
+PYTHON_DIR=$WEB_SERVER_CONFIG_PATH
+
+#4. Run translation (job must stop if this fails)
+echo ">> Running translation script"
+export MODEL=or@google/gemini-2.5-flash-preview
+export MODEL_TEMPERATURE=0.5
+export INPUT_DIR=$WEB_DIR/main
+python3 "$PYTHON_DIR/support/translation/translate_docs.py"
+
+#5. Trigger Docusaurus build (best-effort)
+echo ">> Triggering Docusaurus build"
+set +e                                              # temporarily allow failure
+cd $INPUT_DIR
+export IGNORE_BROKEN_ANCHORS=true
+if [ "$LANG" == "all" ]; then
+  npx docusaurus build
+else
+  npx docusaurus build --locale $LANG
+fi
+BUILD_STATUS=$?
+set -e                                              # restore fail-fast
+
+if [ $BUILD_STATUS -ne 0 ]; then
+  echo "!! Docs build failed (exit code $BUILD_STATUS)."
+else
+  echo ">> Docs build succeeded."
+fi
+
+#6. Stage & commit changes
+git add -A
+if [! git diff --cached --quiet ]; then
+  echo ">> Commiting branch '$WORKING_BRANCH'"
+  COMMIT_MSG="Auto translate ($LANG) $NOW"
+  git commit -m "$COMMIT_MSG"
+
+  #7. Push working branch (force)
+  if [ ! -z "$AUTO_GIT_PUSH" ];  then
+    echo ">> Pushing branch '$WORKING_BRANCH' to origin with message: $COMMIT_MSG"
+    git push --force origin "$WORKING_BRANCH"
+  fi
+else
+  echo ">> No changes to commit."
+fi
+
+echo "---------------------------------------------------------------------------"
+echo "Job completed."
