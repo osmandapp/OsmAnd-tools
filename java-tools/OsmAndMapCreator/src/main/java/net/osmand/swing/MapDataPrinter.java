@@ -25,7 +25,7 @@ import java.util.Map;
 
 public class MapDataPrinter {
     private static final int SHIFT_CONSTANT = 1;
-    private int NUM_SEARCH_ATTEMPTS = 1;
+    private int numSearchAttempts = 1;
     private final MapPanel panel;
     private final Log log;
     private List<Amenity> amenities = new ArrayList<>();
@@ -97,7 +97,7 @@ public class MapDataPrinter {
                 reader.searchPoi(reqAmenity);
             }
 
-            System.out.printf("%d. Found %d objects in %s around center (%s) within %d meters.\n", NUM_SEARCH_ATTEMPTS++, objects.size(), bbox, center, radius);
+            System.out.printf("%d. Found %d objects in %s around center (%s) within %d meters.\n", numSearchAttempts++, objects.size(), bbox, center, radius);
             for (int i = 0; i < objects.size(); i++) {
                 Object o = objects.get(i);
                 if (o instanceof BinaryMapDataObject) {
@@ -153,7 +153,7 @@ public class MapDataPrinter {
                 log.error("Error searching for POI objects", ex);
             }
 
-            System.out.printf("%d. Found %d POIs in %s around center (%s) within %d meters.\n", NUM_SEARCH_ATTEMPTS++, objects.size(), bbox, center, radius);
+            System.out.printf("%d. Found %d POIs in %s around center (%s) within %d meters.\n", numSearchAttempts++, objects.size(), bbox, center, radius);
             for (Amenity object : objects) {
                 printAmenity(object);
             }
