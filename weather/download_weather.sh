@@ -36,9 +36,6 @@ SLEEP_BEFORE_CURL=0.5
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
     mkdir -p "$ROOT_FOLDER/$ECMWF"
-    mkdir -p "$DOWNLOAD_FOLDER/"
-    mkdir -p "$TIFF_FOLDER/"
-    mkdir -p "$TIFF_TEMP_FOLDER/"
 
     if [[ -z "$DOWNLOAD_MODE" || "$DOWNLOAD_MODE" == "recreate" ]]; then
         echo "Clear raw data from $DOWNLOAD_FOLDER"
@@ -48,6 +45,9 @@ setup_folders_on_start() {
     if [[ $DEBUG_M0DE == 1 ]]; then
         rm -rf $TIFF_FOLDER || true
     fi
+    mkdir -p "$DOWNLOAD_FOLDER/"
+    mkdir -p "$TIFF_FOLDER/"
+    mkdir -p "$TIFF_TEMP_FOLDER/"
 }
 
 
