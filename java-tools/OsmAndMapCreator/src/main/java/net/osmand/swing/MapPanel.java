@@ -190,6 +190,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	private MapPanelSelector mapPanelSelector;
 
+    private final MapDataPrinter printer = new MapDataPrinter(this, log);
+
 	public MapPanel(File fileWithTiles) {
 		mapPanelSelector = new MapPanelSelector(this);
 		ImageIO.setUseCache(false);
@@ -261,6 +263,8 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 
 	public void refresh() {
+        printer.searchPOIs(false);
+
 		prepareImage();
 		fireMapLocationListeners();
 	}
@@ -1040,7 +1044,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		public void mouseClicked(MouseEvent e) {
 			requestFocus();
 
-            MapDataSearcher.searchAndPrintObjects(e, MapPanel.this, log);
+            printer.searchAndPrintObjects(e);
         }
 
 		public void dragTo(Point p){
@@ -1208,4 +1212,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		this.buttonOnlineRendering = buttonOnlineRendering;
 	}
 
+    public MapDataPrinter getPrinter() {
+        return printer;
+    }
 }

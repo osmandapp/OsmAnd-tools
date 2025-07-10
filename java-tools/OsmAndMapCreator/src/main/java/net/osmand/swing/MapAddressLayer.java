@@ -143,26 +143,10 @@ public class MapAddressLayer implements MapPanelLayer {
 	}
 
     private void showCurrentPOIs() {
-        Point popupMenuPoint = map.getPopupMenuPoint();
-        double fy = (popupMenuPoint.y - map.getCenterPointY()) / map.getTileSize();
-        double fx = (popupMenuPoint.x - map.getCenterPointX()) / map.getTileSize();
-        final double latitude = MapUtils.getLatitudeFromTile(map.getZoom(), map.getYTile() + fy);
-        final double longitude = MapUtils.getLongitudeFromTile(map.getZoom(), map.getXTile() + fx);
         new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    List<Entity> os = MapDataSearcher.searchPOIs(latitude, longitude, map, log);
-                    DataTileManager<Entity> points = new DataTileManager<>(15);
-                    for (Entity w : os) {
-                        LatLon n = w.getLatLon();
-                        points.registerObject(n.getLatitude(), n.getLongitude(), w);
-                    }
-                    map.setPoints(points);
-                    map.repaint();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                map.getPrinter().searchPOIs(true);
             }
         }).start();
     }
