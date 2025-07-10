@@ -362,7 +362,7 @@ find_latest_ecmwf_forecat_date() {
 }
 
 file_in_array() {
-    set +x  # Disable command echoing
+    set +x
     local target="$1"
     shift
     local array=("$@")
@@ -372,7 +372,7 @@ file_in_array() {
             return 0  # exists
         fi
     done
-    set -x  # Re-enable command echoing
+    set -x
     return 1  # doesn't exist
 }
 
@@ -406,7 +406,7 @@ get_raw_ecmwf_files() {
         local FORECAST_URL_BASE=$BASE_URL$FORECAST_FILE_PREFIX
 
         local INDEX_FILE_URL="$FORECAST_URL_BASE.index"
-        set +x
+        set +x # Disable command echoing
         echo "-----------------------------------------------------------------"
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
             echo "File $DOWNLOAD_FOLDER/$FILETIME.index already exist! Skip downloading. URL:$INDEX_FILE_URL"
@@ -422,7 +422,7 @@ get_raw_ecmwf_files() {
             fi
         fi
 
-        set -x
+        set -x # Re-enable command echoing
         # Download needed bands forecast data
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
             for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
@@ -458,7 +458,6 @@ get_raw_ecmwf_files() {
                 if [[ -z "$DOWNLOAD_MODE" || "$DOWNLOAD_MODE" == "recreate" ]]; then
                     rm "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2"
                 fi
-                continue
                 # Generate tiff for downloaded band
                 mkdir -p "$TIFF_TEMP_FOLDER/$FILETIME"
                 local PREV_FILENAME="${ECMWF_BANDS_SHORT_NAMES_SAVING[$i]}_$PREV_FILETIME"
@@ -506,8 +505,6 @@ elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
     # Find and download latest full forecast (from 0h to 240h)
     FULL_FORECAST_SEARCH_RESULT=$(find_latest_ecmwf_forecat_date $FULL_MODE)
     get_raw_ecmwf_files $FULL_FORECAST_SEARCH_RESULT
-
-    exit 0
 
     # Find the most latest forecast folder. (But it can be not full yet. From 0h to 9h, by example).
     # Overrite yesterday's full forecasts with all existing today's files. If it needed.
