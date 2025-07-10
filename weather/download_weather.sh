@@ -42,11 +42,11 @@ setup_folders_on_start() {
 
     if [[ -z "$DOWNLOAD_MODE" || "$DOWNLOAD_MODE" == "recreate" ]]; then
         echo "Clear raw data from $DOWNLOAD_FOLDER"
-        rm -rf $DOWNLOAD_FOLDER/* || true
+        rm -rf $DOWNLOAD_FOLDER || true
     fi
-    rm -rf $TIFF_TEMP_FOLDER/* || true
+    rm -rf $TIFF_TEMP_FOLDER || true
     if [[ $DEBUG_M0DE == 1 ]]; then
-        rm -rf $TIFF_FOLDER/* || true
+        rm -rf $TIFF_FOLDER || true
     fi
 }
 
