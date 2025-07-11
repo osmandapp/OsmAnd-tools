@@ -15,4 +15,4 @@ fi
 export MODEL_TEMPERATURE=0.5
 export MODEL=or@google/gemini-2.5-flash-preview
 export INPUT_DIR=$WEB_DIR
-python3 "$TOOLS_PATH/python/translation/translate_docs.py"
+python3 -m python.translation.translate_docs

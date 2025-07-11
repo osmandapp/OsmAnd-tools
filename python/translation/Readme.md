@@ -53,6 +53,8 @@ Below are all environment variables, arguments, and their roles:
 ### 1. Clone the web-server-config/ and web/ repositories.
 
 ```bash
+git clone ssh://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
+
 git clone ssh://git@github.com/osmandapp/web-server-config                      # Clone web-server-config
 cd web-server-config && git checkout main && git pull       # Optional if you want to use a different branch
 
@@ -67,8 +69,9 @@ export API_KEY="your_LLM_api_key_here"                  # LLM api key
 export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config  # Optional, path to web-server-config
 export WEB_REPO=$(pwd)/web                              # Optional, path to web
 
-web-server-config/support/translation/translate_docs.sh fr                       # Example to translate all files to French
-web-server-config/support/translation/translate_docs.sh all web-translation.json # Example to translate only web-translation.json to all current languages
+cd tools                                                      # Set tools as current dir
+python/translation/translate_docs.sh fr                       # Example to translate all files to French
+python/translation/translate_docs.sh all web-translation.json # Example to translate only web-translation.json to all current languages
 ```
 
 ### 3. Commit & push changes
