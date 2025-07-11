@@ -10,6 +10,7 @@ TIFF_FOLDER="tiff"
 TIFF_TEMP_FOLDER="tiff_temp"
 FULL_MODE='full_mode'
 LATEST_MODE='latest_mode'
+BROKEN_RAW_FILES='broken_raw_files'
 
 GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
@@ -48,6 +49,7 @@ setup_folders_on_start() {
     mkdir -p "$DOWNLOAD_FOLDER/"
     mkdir -p "$TIFF_FOLDER/"
     mkdir -p "$TIFF_TEMP_FOLDER/"
+    mkdir -p "$BROKEN_RAW_FILES"
 }
 
 
@@ -431,6 +433,7 @@ get_raw_ecmwf_files() {
                 if [[ -z "$CHANNEL_LINE" ]]; then
                     cat $DOWNLOAD_FOLDER/$FILETIME.index
                     echo "Missing for ${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]} - $FILETIME - index url $INDEX_FILE_URL"
+                    cp $DOWNLOAD_FOLDER/"$FILETIME".index $BROKEN_RAW_FILES/
                     exit 1
                 fi
                 local BYTE_START=$( echo $CHANNEL_LINE | awk -F "offset" '{print $2}' | awk '{print $2}' | awk -F "," '{print $1}' | awk -F "}" '{print $1}' )
@@ -452,6 +455,7 @@ get_raw_ecmwf_files() {
                 GRIB_SIZE=$(wc -c "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" | awk '{print $1}')
                 if (( $GRIB_SIZE < 5000 )); then
                     echo "Warning! Looks like $SAVING_FILENAME.grib2 is empty or contains invalid data"
+                    cp $DOWNLOAD_FOLDER/"$SAVING_FILENAME".grib2 $BROKEN_RAW_FILES/
                     continue
                 fi
                 cnvgrib2to1 "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib2" "$DOWNLOAD_FOLDER/$SAVING_FILENAME.grib1" || echo "cnvgrib2to1 error"
