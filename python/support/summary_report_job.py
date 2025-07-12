@@ -5,9 +5,7 @@ from pathlib import Path
 
 import yaml
 
-import Knowledge
-import LLM
-import Zendesk
+from . import Knowledge, LLM, Zendesk
 
 knowedge_id = os.getenv('KNOWLEDGE', 'none')
 WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
