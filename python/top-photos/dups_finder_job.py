@@ -14,10 +14,10 @@ import requests
 import torch
 from transformers import CLIPModel, CLIPImageProcessor
 
-from .QueueThreadPoolExecutor import BoundedThreadPoolExecutor
-from python.lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, MIN_ELO, MIN_ELO_SUBTYPE, \
+from python.lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, MIN_ELO, MIN_ELO_SUBTYPE, POI_SUBTYPE, \
     get_image_dups, QUAD, process_quad, get_places_per_quad, SAVE_SCORE_ENV, get_places, ImageItem, get_unscored_places_dups
 from python.lib.download_utils import download_pil_image
+from .QueueThreadPoolExecutor import BoundedThreadPoolExecutor
 
 PARALLEL = int(os.getenv('PARALLEL', '10'))
 SELECTED_PLACE_IDS = os.getenv('SELECTED_PLACE_IDS', '')
@@ -42,7 +42,9 @@ else:
 if not any([QUAD, SELECTED_PLACE_IDS]):
     raise ValueError("Missing required environment variables: QUAD or SELECTED_PLACE_IDS is required.")
 
-print(f"Using device: {device}, PARALLEL: {PARALLEL}, QUAD: {QUAD}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, MIN_ELO={MIN_ELO}, MIN_ELO_SUBTYPE={MIN_ELO_SUBTYPE}")
+print(
+    f"Using device: {device}, PARALLEL: {PARALLEL}, QUAD: {QUAD}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, POI_SUBTYPE={POI_SUBTYPE}, \
+        MIN_ELO={MIN_ELO}, MIN_ELO_SUBTYPE={MIN_ELO_SUBTYPE}")
 model.to(device)
 
 
@@ -119,7 +121,9 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
             print(f"#{current_thread().name}. Place {place_id} is up to date. Time: {(time.time() - start_time):.0f}s", flush=True)
             return False, place_id
 
-        print(f"#{current_thread().name}. Place {place_id} with {len(paths)}/{len(new_paths)} images are going to be loaded. Expected time: {(len(paths) / 60 * 0.55):.1f}min", flush=True)
+        print(
+            f"#{current_thread().name}. Place {place_id} with {len(paths)}/{len(new_paths)} images are going to be loaded. Expected time: {(len(paths) / 60 * 0.55):.1f}min",
+            flush=True)
         images, image_paths, sizes = _get_images(paths)
         if len(images) == 0:
             print(f"#{current_thread().name}. Warning: Place Q{place_id} with {len(images)} images is skipped.")
@@ -139,8 +143,9 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
         sim_maps = {k: v for k, v in sim_maps.items() if len(v) > 0}
 
         insert_dups(run_id, place_id, {image_paths[i]: s for i, s in enumerate(sizes)}, sim_maps, started, time.time() - start_time, '', SAVE_SCORE_ENV)
-        print(f"#{current_thread().name}. Place {place_id} with {len(images)}/{len(sim_maps)} image's similarity are saved. Time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
-              flush=True)
+        print(
+            f"#{current_thread().name}. Place {place_id} with {len(images)}/{len(sim_maps)} image's similarity are saved. Time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
+            flush=True)
     except (
             requests.exceptions.ConnectionError,
             clickhouse_connect.driver.exceptions.DatabaseError,
@@ -191,13 +196,16 @@ def find_duplicates():
                 if stop_immediately:
                     break
 
-            print(f"Run #{run_id} processed {total_place_count} places totally. Time:{(time.time() - sub_start_time):.0f}s (Total: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()})",
-                  flush=True)
+            print(
+                f"Run #{run_id} processed {total_place_count} places totally. Time:{(time.time() - sub_start_time):.0f}s (Total: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()})",
+                flush=True)
     except Exception as e:
         traceback.print_exc()
         print(f"Error processing batch: {e}")
 
-    print(f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}", flush=True)
+    print(
+        f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
+        flush=True)
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
