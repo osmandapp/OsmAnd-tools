@@ -2,7 +2,7 @@ import os
 import re
 import time
 
-from ..lib.OpenAIClient import OpenAIClient
+from python.lib.OpenAIClient import OpenAIClient
 
 MODEL_FULL_NAME = os.getenv('MODEL_FULL_NAME', "")
 MODEL_NAME = os.getenv('MODEL_NAME', "")

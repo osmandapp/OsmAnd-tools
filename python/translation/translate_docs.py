@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 import yaml
 
-from ..lib.OpenAIClient import OpenAIClient
+from python.lib.OpenAIClient import OpenAIClient
 
 MODEL = os.getenv('MODEL')
 API_KEY = os.getenv('API_KEY')

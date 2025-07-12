@@ -1,7 +1,7 @@
 import os
 from typing import List, Tuple
 
-from ..lib.database_api import ch_query, ch_insert
+from python.lib.database_api import ch_query, ch_insert
 
 # Global Constants (from environment variables)
 # PARALLEL = int(os.getenv('PARALLEL', '10'))

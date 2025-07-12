@@ -7,8 +7,8 @@ from typing import List, Callable, Dict, Tuple
 import json5
 import yaml
 
-from ..lib.OpenAIClient import OpenAIClient
-from ..lib.block_images_utils import block_images, BLOCK_PROHIBITED
+from python.lib.OpenAIClient import OpenAIClient
+from python.lib.block_images_utils import block_images, BLOCK_PROHIBITED
 
 MODEL = os.getenv('MODEL')
 API_URL = os.getenv('API_URL', 'http://localhost:11434/v1')

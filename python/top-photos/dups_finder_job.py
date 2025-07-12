@@ -15,9 +15,9 @@ import torch
 from transformers import CLIPModel, CLIPImageProcessor
 
 from QueueThreadPoolExecutor import BoundedThreadPoolExecutor
-from ..lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, \
+from python.lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, MIN_ELO, MIN_ELO_SUBTYPE, \
     get_image_dups, QUAD, process_quad, get_places_per_quad, SAVE_SCORE_ENV, get_places, ImageItem, get_unscored_places_dups
-from ..lib.download_utils import download_pil_image
+from python.lib.download_utils import download_pil_image
 
 PARALLEL = int(os.getenv('PARALLEL', '10'))
 SELECTED_PLACE_IDS = os.getenv('SELECTED_PLACE_IDS', '')
@@ -42,7 +42,7 @@ else:
 if not any([QUAD, SELECTED_PLACE_IDS]):
     raise ValueError("Missing required environment variables: QUAD or SELECTED_PLACE_IDS is required.")
 
-print(f"Using device: {device}, PARALLEL: {PARALLEL}, QUAD: {QUAD}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}")
+print(f"Using device: {device}, PARALLEL: {PARALLEL}, QUAD: {QUAD}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, MIN_ELO={MIN_ELO}, MIN_ELO_SUBTYPE={MIN_ELO_SUBTYPE}")
 model.to(device)
 
 
