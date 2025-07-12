@@ -6,6 +6,8 @@ from typing import List, Tuple
 import httpx
 import openai
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 base_urls = {"ollama": "http://localhost:11434/v1", "or": "https://openrouter.ai/api/v1",
              "dp": "https://api.deepseek.com/v1", "veles": "https://veles.osmand.net:8081/api"}
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))

@@ -20,12 +20,12 @@ MAX_PLACES_PER_QUAD = int(os.getenv('MAX_PLACES_PER_QUAD', '999999'))
 SCORING_WEIGHTS = [float(w) for w in os.getenv('SCORING_WEIGHTS', '0.20, 0.20, 0.30, 0.30').split(",")]
 QUAD = os.getenv('QUAD', '**')
 MIN_ELO = int(os.getenv('MIN_ELO', '1750'))
-MIN_ELO_SUBTYPE = int(os.getenv('MIN_ELO', '1000'))
+MIN_ELO_SUBTYPE = int(os.getenv('MIN_ELO_SUBTYPE', '1000'))
 SAVE_SCORE_ENV = int(os.getenv('SAVE_SCORE_ENV', '0'))  # Environment: 0 - Production, 1 - Test
 VALID_EXTENSIONS_LOWERCASE = set(ext.lower() for ext in os.getenv('VALID_EXTENSIONS', 'png|jpg|jpeg').split('|'))
 QUAD_ALPHABET = os.getenv('QUAD_ALPHABET', "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~")
 MAX_EXECUTION_TIME = int(os.getenv('DB_TIMEOUT', '900'))
-POI_SUBTYPE = ",".join([f"'{w.strip()}'" for w in os.getenv('POI_SUBTYPE', '').split(",")])
+POI_SUBTYPE = ",".join([f"'{w.strip()}'" if w else '' for w in os.getenv('POI_SUBTYPE', '').split(",")])
 
 if not all([CLICKHOUSE_HOST, CLICKHOUSE_PWD]):
     raise ValueError("Missing required environment variables (CLICKHOUSE_HOST, CLICKHOUSE_PWD)")
@@ -299,7 +299,7 @@ def get_unscored_places_dups(place_ids: List[int]) -> List[int]:
         return []
     query = f"""
         SELECT DISTINCT id FROM wikiimages
-        INNER JOIN (SELECT name FROM wiki_images_downloaded 
+        INNER JOIN (SELECT name FROM wiki_images_downloaded
             WHERE name IN (SELECT imageTitle FROM wikiimages WHERE id IN %(ids)s)) AS d ON d.name = wikiimages.imageTitle
         LEFT JOIN (SELECT 1 as is_processed, imageTitle, wikidata_id FROM top_images_dups
             WHERE wikidata_id IN %(ids)s) AS i ON i.imageTitle = wikiimages.imageTitle AND i.wikidata_id = wikiimages.id
@@ -314,7 +314,7 @@ def get_unscored_places_images(place_ids: List[int]) -> List[int]:
 
     query: str = """
         SELECT DISTINCT id FROM wikiimages
-        INNER JOIN (SELECT name FROM wiki_images_downloaded 
+        INNER JOIN (SELECT name FROM wiki_images_downloaded
             WHERE name IN (SELECT imageTitle FROM wikiimages WHERE id IN %(ids)s)) AS d ON d.name = wikiimages.imageTitle
         LEFT JOIN (SELECT 1 as is_processed, imageTitle, proc_id as wikidata_id FROM top_images_score
             WHERE wikidata_id IN %(ids)s) AS i ON i.imageTitle = wikiimages.imageTitle AND i.wikidata_id = wikiimages.id
@@ -326,9 +326,9 @@ def get_unscored_places_images(place_ids: List[int]) -> List[int]:
 def get_image_dups(place_id, limit: int = -1) -> List[ImageItem]:
     q = f"""
 SELECT -if(type = 'P18', 1000000, views) as score, id, w.imageTitle as imageTitle, w.mediaId as mediaId, d.filesize as filesize, is_processed FROM wikiimages as w
-    INNER JOIN (SELECT name, filesize FROM wiki_images_downloaded WHERE 
-        name IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id})) AS d ON d.name = w.imageTitle 
-    LEFT JOIN (SELECT 1 as is_processed, imageTitle, wikidata_id FROM top_images_dups WHERE imageTitle IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id}) AND version = {SAVE_SCORE_ENV}) 
+    INNER JOIN (SELECT name, filesize FROM wiki_images_downloaded WHERE
+        name IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id})) AS d ON d.name = w.imageTitle
+    LEFT JOIN (SELECT 1 as is_processed, imageTitle, wikidata_id FROM top_images_dups WHERE imageTitle IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id}) AND version = {SAVE_SCORE_ENV})
     as i ON i.imageTitle = w.imageTitle AND i.wikidata_id = w.id
 WHERE id = {place_id} AND w.imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
 """
@@ -345,9 +345,9 @@ WHERE id = {place_id} AND w.imageTitle NOT IN (SELECT imageTitle FROM blocked_im
 def get_image_scores(place_id: int, limit: int = -1) -> List[ImageItem]:
     q = f"""
 SELECT -if(type = 'P18', 1000000, views) as score, id, w.imageTitle as imageTitle, w.mediaId as mediaId, d.filesize as filesize, is_processed FROM wikiimages as w
-    INNER JOIN (SELECT name, filesize FROM wiki_images_downloaded WHERE 
-        name IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id})) AS d ON d.name = w.imageTitle 
-    LEFT JOIN (SELECT 1 as is_processed, imageTitle, proc_id FROM top_images_score WHERE imageTitle IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id}) AND version = {SAVE_SCORE_ENV}) 
+    INNER JOIN (SELECT name, filesize FROM wiki_images_downloaded WHERE
+        name IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id})) AS d ON d.name = w.imageTitle
+    LEFT JOIN (SELECT 1 as is_processed, imageTitle, proc_id FROM top_images_score WHERE imageTitle IN (SELECT imageTitle FROM wikiimages WHERE id = {place_id}) AND version = {SAVE_SCORE_ENV})
     as i ON i.imageTitle = w.imageTitle AND i.proc_id = w.id
 WHERE id = {place_id} AND w.imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
 """
@@ -365,8 +365,8 @@ WHERE id = {place_id} AND w.imageTitle NOT IN (SELECT imageTitle FROM blocked_im
 def get_places(numeric_ids_str):
     query = f"""
         SELECT id, wikiTitle, lat, lon, poitype, poisubtype, categories, shortlink, elo FROM elo_rating
-        WHERE id IN ({numeric_ids_str}) 
-        ORDER BY elo DESC, id 
+        WHERE id IN ({numeric_ids_str})
+        ORDER BY elo DESC, id
         LIMIT {PROCESS_PLACES}
     """
 
@@ -376,10 +376,10 @@ def get_places(numeric_ids_str):
 def get_places_per_quad(quad: str, skip_table: str = None) -> List:
     poi_sub_query = f"(poisubtype IN({POI_SUBTYPE}) AND elo >= {MIN_ELO_SUBTYPE} OR elo >= {MIN_ELO})" if POI_SUBTYPE else f"elo >= {MIN_ELO}"
     query = f"""
-        SELECT id, wikiTitle, lat, lon, poitype, poisubtype, categories, shortlink, elo FROM elo_rating 
-            WHERE startsWith(shortlink, '{quad}') AND {poi_sub_query} 
+        SELECT id, wikiTitle, lat, lon, poitype, poisubtype, categories, shortlink, elo FROM elo_rating
+            WHERE startsWith(shortlink, '{quad}') AND {poi_sub_query}
                 {(' AND id NOT IN (SELECT wikidata_id FROM ' + skip_table + ')' if skip_table else '')}
-            ORDER BY elo DESC, shortlink, id 
+            ORDER BY elo DESC, shortlink, id
             LIMIT {min(PROCESS_PLACES, MAX_PLACES_PER_QUAD)}
     """
     return ch_query(query)
@@ -394,9 +394,9 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
     SELECT id, groupArray({PHOTOS_PER_PLACE})((imageTitle, mediaId, namespace, score))
     FROM (
         SELECT DISTINCT id, imageTitle, mediaId, namespace, if(type = 'P18', 1000000, views) as score
-        FROM wikiimages 
-        WHERE id in (SELECT w.id FROM wikidata w 
-                LEFT JOIN elo_rating e ON e.id = w.id 
+        FROM wikiimages
+        WHERE id in (SELECT w.id FROM wikidata w
+                LEFT JOIN elo_rating e ON e.id = w.id
                 ORDER BY e.elo DESC, w.id
                 LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE})
             AND namespace = 6
