@@ -9,7 +9,7 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from Ranker import RerankingRetriever
+from .Ranker import RerankingRetriever
 
 is_rag = os.getenv('KNOWLEDGE_RAG', 'false').lower() == 'true'
 base_dir = os.getenv('KNOWLEDGE_BASE_DIR', '')
