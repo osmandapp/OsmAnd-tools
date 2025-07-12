@@ -6,6 +6,7 @@ import time
 from FlagEmbedding import FlagReranker
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -54,6 +55,7 @@ class Knowledge:
     def _create_vector_db(self):
         loader = DirectoryLoader(
             path=base_dir,
+            loader_cls=UnstructuredFileLoader,
             glob="**/*.md",
             recursive=True,
             show_progress=True,
