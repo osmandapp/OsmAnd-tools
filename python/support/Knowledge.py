@@ -22,17 +22,6 @@ rag_top_k = int(os.getenv('RAG_TOP_K', 32))
 knowledge_size = int(os.getenv('KNOWLEDGE_SIZE', 2 * 1024))
 
 
-def safe_lazy_load_file(loader, path, pbar):
-    try:
-        return list(loader.lazy_load())
-    except UnicodeDecodeError as e:
-        print(f"Skipping {path}: {e}")
-        return []
-
-
-DirectoryLoader._lazy_load_file = safe_lazy_load_file
-
-
 def knowledge_type():
     if not is_rag and not fixed:
         return 'none'
