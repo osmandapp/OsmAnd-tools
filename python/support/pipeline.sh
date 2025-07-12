@@ -6,7 +6,7 @@ export MODEL_NAME=$MODEL
 if [[ "$MODEL" == "gemini2flash-\$" ]]; then
 	MODEL="or@google/gemini-2.0-flash-001"
 elif [[ "$MODEL" == "qwen-plus-\$" ]]; then
-	MODEL="or@qwen/qwen-plus"	
+	MODEL="or@qwen/qwen-plus"
 elif [[ "$MODEL" != *"@"* ]]; then
 	MODEL="ollama@$MODEL"
 	if [[ "$MODEL" != *"-32k" ]]; then
@@ -35,7 +35,7 @@ elif [[ "$TICKETS" == "solved" ]]; then
 	export ZENDESK_VIEW=62871229
 elif [[ "$TICKETS" == "validate" ]]; then
     export ZENDESK_VIEW=24862591609885
-else 
+else
     export ZENDESK_VIEW=150931385
 fi
 export ZENDESK_DOMAIN=osmandhelp
@@ -54,5 +54,5 @@ rm $WEB_PATH/latest || true
 ln -s $WEB_PATH/reports/$DATA_FOLDER $WEB_PATH/latest
 
 cd $WEB_PATH/reports/$DATA_FOLDER
-python3 $SCRIPT_DIR/support/SummaryReport.py
+python3 -m python.support.summary_report_job
 cp $SCRIPT_DIR/support/_report.html .
