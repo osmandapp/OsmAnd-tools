@@ -40,11 +40,12 @@ else
 fi
 export ZENDESK_DOMAIN=osmandhelp
 export ZENDESK_USER=osmand.help@gmail.com
+: "${CLEAN_LOCAL_KNOWLEDGE:=true}"
 export VECTOR_DB_DIR=$WEB_PATH/rag/vector-db
 
-if $CLEAN_LOCAL_KNOWLEDGE; then
-	rm -rf $VECTOR_DB_DIR/ || true
-	echo "Vector DB is deleted: ${CLEAN_LOCAL_KNOWLEDGE}!"
+if [[ "$CLEAN_LOCAL_KNOWLEDGE" == "true" ]]; then
+    rm -rf "$VECTOR_DB_DIR" || true
+    echo "Vector DB is deleted!"
 fi
 
 ### Generate report
