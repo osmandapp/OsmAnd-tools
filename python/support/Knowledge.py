@@ -19,7 +19,18 @@ vector_db_dir = os.getenv('VECTOR_DB_DIR', '')
 rag_reranker_model = os.getenv('RAG_RERANKER_MODEL', "BAAI/bge-reranker-v2-m3")
 rag_embeddings_model = os.getenv('RAG_EMBEDDINGS_MODEL', "sentence-transformers/all-MiniLM-L6-v2")
 rag_top_k = int(os.getenv('RAG_TOP_K', 32))
-knowledge_size = int(os.getenv('KNOWLEDGE_SIZE', 32 * 1024))
+knowledge_size = int(os.getenv('KNOWLEDGE_SIZE', 2 * 1024))
+
+
+def safe_lazy_load_file(loader, path, pbar):
+    try:
+        return list(loader.lazy_load())
+    except UnicodeDecodeError as e:
+        print(f"Skipping {path}: {e}")
+        return []
+
+
+DirectoryLoader._lazy_load_file = safe_lazy_load_file
 
 
 def knowledge_type():
