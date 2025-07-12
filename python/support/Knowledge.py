@@ -59,7 +59,12 @@ class Knowledge:
             glob="**/*.md",
             recursive=True,
             show_progress=True,
-            use_multithreading=True
+            use_multithreading=True,
+            loader_kwargs={
+                "unstructured_kwargs": {
+                    "encoding": "utf-8"
+                }
+            }
         )
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=knowledge_size, chunk_overlap=0,
