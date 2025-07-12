@@ -11,7 +11,7 @@ import openai
 import requests
 
 from QueueThreadPoolExecutor import BoundedThreadPoolExecutor
-from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, \
+from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
     get_score, QUAD, PHOTOS_PER_PLACE, PROCESS_PLACES, MIN_ELO, SAVE_SCORE_ENV, MAX_PLACES_PER_QUAD, process_quad, get_places, ImageItem, get_unscored_places_images
 from python.lib.download_utils import download_image_as_base64
 from llm_scoring import prompts, MODEL, MAX_PHOTOS_PER_REQUEST, call_llm
@@ -26,7 +26,8 @@ if not any([QUAD, SELECTED_PLACE_IDS]):
     raise ValueError("Missing required environment variables: QUAD or SELECTED_PLACE_IDS is required.")
 
 print(
-    f"LLM: {MODEL}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, ENV: {SAVE_SCORE_ENV}, PHOTOS_PER_REQUEST: {MAX_PHOTOS_PER_REQUEST}, QUAD={QUAD}, PHOTOS_PER_PLACE={PHOTOS_PER_PLACE}, PLACES_PER_QUAD={MAX_PLACES_PER_QUAD}, MIN_ELO={MIN_ELO}",
+    f"LLM: {MODEL}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, ENV: {SAVE_SCORE_ENV}, PHOTOS_PER_REQUEST: {MAX_PHOTOS_PER_REQUEST}, QUAD={QUAD}, \
+    PHOTOS_PER_PLACE={PHOTOS_PER_PLACE}, PLACES_PER_QUAD={MAX_PLACES_PER_QUAD}, MIN_ELO={MIN_ELO}, MIN_ELO_SUBTYPE={MIN_ELO_SUBTYPE}",
     flush=True)
 
 stop_immediately = False
