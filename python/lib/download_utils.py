@@ -14,8 +14,7 @@ from PIL import Image
 
 downloaded_files_cache: set = set()
 
-from database_api import (get_images_per_page, populate_cache_from_db, scan_and_populate_db, insert_downloaded_image,
-                                     is_valid_image_file_name)
+from .database_api import get_images_per_page, populate_cache_from_db, scan_and_populate_db, insert_downloaded_image, is_valid_image_file_name
 
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
 MAX_IMG_DIMENSION = int(os.getenv('MAX_IMG_DIMENSION', 720))
