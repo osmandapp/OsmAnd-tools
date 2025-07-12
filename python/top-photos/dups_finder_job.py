@@ -14,7 +14,7 @@ import requests
 import torch
 from transformers import CLIPModel, CLIPImageProcessor
 
-from QueueThreadPoolExecutor import BoundedThreadPoolExecutor
+from .QueueThreadPoolExecutor import BoundedThreadPoolExecutor
 from python.lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, MIN_ELO, MIN_ELO_SUBTYPE, \
     get_image_dups, QUAD, process_quad, get_places_per_quad, SAVE_SCORE_ENV, get_places, ImageItem, get_unscored_places_dups
 from python.lib.download_utils import download_pil_image
