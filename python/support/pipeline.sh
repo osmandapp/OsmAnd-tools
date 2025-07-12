@@ -53,6 +53,7 @@ mkdir -p $WEB_PATH/reports/$DATA_FOLDER
 rm $WEB_PATH/latest || true
 ln -s $WEB_PATH/reports/$DATA_FOLDER $WEB_PATH/latest
 
-cd $WEB_PATH/reports/$DATA_FOLDER
+export DATA_DIR=$WEB_PATH/reports/$DATA_FOLDER
 python3 -m python.support.summary_report_job
+cd $DATA_DIR
 cp $SCRIPT_DIR/support/_report.html .

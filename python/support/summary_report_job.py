@@ -11,6 +11,8 @@ import Zendesk
 
 knowedge_id = os.getenv('KNOWLEDGE', 'none')
 WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
+DATA_DIR = os.getenv('DATA_DIR')
+
 
 class Report:
     def __init__(self):
@@ -33,7 +35,7 @@ class Report:
         self.processed_tickets = []
         if self.is_exclude_processed:
             try:
-                with open("runs.json", "r") as f:
+                with open(Path(DATA_DIR) / "runs.json", "r") as f:
                     runs_data = json.load(f)
                     for run in runs_data:
                         if run["model"] == LLM.MODEL_NAME and run["knowledge"] == knowedge_id:
@@ -135,15 +137,15 @@ class Report:
             "categories": categories_json_object,
         }
         try:
-            with open("runs.json", "r") as f:
+            with open(Path(DATA_DIR) / "runs.json", "r") as f:
                 runs_data = json.load(f)
         except FileNotFoundError:
             runs_data = []
 
         runs_data.append(run_data)
-        with open("runs.json", "w") as f:
+        with open(Path(DATA_DIR) / "runs.json", "w") as f:
             json.dump(runs_data, f, indent=4)
-        with open(report_name + ".json", "w", encoding="utf-8") as f:
+        with open(Path(DATA_DIR) / (report_name + ".json"), "w", encoding="utf-8") as f:
             json.dump(self.all_tickets, f)
 
 
