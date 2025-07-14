@@ -960,7 +960,7 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("All"));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>GPlay").app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>IOS").app(SubAppType.IOS));
-		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING));
 		
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>Maps A").maps(true));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO A").pro(true).duration(12));
@@ -1200,6 +1200,8 @@ public class AdminController {
 			throw new UnsupportedOperationException("Unsupported subscription " + s.sku);
 		}
 		s.app = SubAppType.fromString(subBaseData.app());
+		s.pro = subBaseData.isPro();
+		s.maps = subBaseData.isMaps();
 		s.retention = subBaseData.retention();
 		s.durationMonth = subBaseData.duration();
 		s.defPriceEurMillis = subBaseData.defaultPriceEurMillis();

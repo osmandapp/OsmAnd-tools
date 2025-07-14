@@ -79,6 +79,10 @@ public class PurchasesDataLoader {
 		public boolean isPro() {
 			return !pro.isBoolean() || pro.booleanValue();
 		}
+		
+		public boolean isMaps() {
+			return maps != null && maps.isBoolean() && maps.booleanValue();
+		}
 	}
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
