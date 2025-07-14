@@ -182,15 +182,6 @@ public class MapDataPrinter {
 		}
 	}
 
-	public void clearPOIs() {
-		amenities.clear();
-		DataTileManager<Entity> points = new DataTileManager<>(15);
-
-		zoom = panel.getZoom();
-		panel.setPoints(points);
-		panel.repaint();
-	}
-
 	private static String displayString(Amenity object) {
 		long id = (object.getId());
 		if (id > 0) {
