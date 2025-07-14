@@ -1045,6 +1045,7 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			requestFocus();
 
             printer.searchAndPrintObjects(e);
+			printer.clearPOIs();
         }
 
 		public void dragTo(Point p){
