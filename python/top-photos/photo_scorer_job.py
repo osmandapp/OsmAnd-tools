@@ -10,11 +10,12 @@ import clickhouse_connect
 import openai
 import requests
 
-from QueueThreadPoolExecutor import BoundedThreadPoolExecutor
-from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
-    get_score, QUAD, PHOTOS_PER_PLACE, PROCESS_PLACES, MIN_ELO, SAVE_SCORE_ENV, MAX_PLACES_PER_QUAD, process_quad, get_places, ImageItem, get_unscored_places_images
-from python.lib.download_utils import download_image_as_base64
 from llm_scoring import prompts, MODEL, MAX_PHOTOS_PER_REQUEST, call_llm
+from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor  # Relative import when running as module
+from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
+    get_score, QUAD, PHOTOS_PER_PLACE, PROCESS_PLACES, MIN_ELO, SAVE_SCORE_ENV, MAX_PLACES_PER_QUAD, process_quad, get_places, ImageItem, \
+    get_unscored_places_images
+from python.lib.download_utils import download_image_as_base64
 
 # Global Constants (from environment variables)
 PARALLEL = int(os.getenv('PARALLEL', '10'))
@@ -68,12 +69,15 @@ def score_places():
                 if place[0] in place_ids:
                     executor.submit(run_id, place, is_selected, media_ids)
 
-            print(f"Run #{run_id} processed {len(places)} places from quad {quad}. Time:{(time.time() - sub_start_time):.2f}s (Total: {total_place_count} / {(time.time() - start_time):.2f}s)",
-                  flush=True)
+            print(
+                f"Run #{run_id} processed {len(places)} places from quad {quad}. Time:{(time.time() - sub_start_time):.2f}s (Total: {total_place_count} / {(time.time() - start_time):.2f}s)",
+                flush=True)
     except Exception as e:
         print(f"Error processing batch: {e}")
 
-    print(f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}", flush=True)
+    print(
+        f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
+        flush=True)
 
 
 PROMPT = prompts['TAG_PROMPT']
