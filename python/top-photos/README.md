@@ -5,37 +5,38 @@ User Instructions
 
 Below is a listing of all global parameters. Each parameter is accompanied by its purpose, default value, type, and any dependencies.
 
-| Parameter              | Type        | Default               | Purpose & Dependencies                                                       |
-|------------------------|-------------|-----------------------|------------------------------------------------------------------------------|
-| CLICKHOUSE_HOST        | str         | 'localhost'           | Hostname for ClickHouse connections. Required alongside `CLICKHOUSE_PWD`.    |
-| CLICKHOUSE_PORT        | int         | 9000                  | Port for ClickHouse connections.                                             |
-| CLICKHOUSE_PWD         | str         |                       | Password for ClickHouse. **Required**.                                       |
-| DB_TIMEOUT             | int         | 30                    | Max execution time (seconds) for ClickHouse queries.                         |
-|                        |             |                       |                                                                              |
-| MODEL                  | str         |                       | LLM model name/ID. **Required**.                                             |
-| API_URL                | str         | ''                    | Base URL for the LLM API.                                                    |
-| API_KEY                | str         |                       | API key for accessing the LLM. **Required**.                                 |
-|                        |             |                       |                                                                              |
-| PHOTOS_PER_PLACE       | int         | 40                    | Number of images to request/download per place.                              |
-| PROCESS_PLACES         | int         | 500                   | Maximum number of places to process per run.                                 |
-| CHUNK_SIZE             | int         | 100                   | Batch size for paginated queries/inserts.                                    |
-| MAX_PLACES_PER_QUAD    | int         | 500                   | Upper bound on places fetched per quad (should be less then PROCESS_PLACES). |
-| MAX_PHOTOS_PER_REQUEST | int         | 15                    | Maximum number of images to include in a single LLM call.                    |
-| SCORING_WEIGHTS        | List[float] | [0.20,0.20,0.30,0.30] | Weights for component scores: value, technical, overview, reality.           |
-| QUAD                   | str         | '**'                  | Template string for quad search patterns.                                    |
-| MIN_ELO                | int         | 200                   | Minimum ELO rating to include a place in queries.                            |
-| SAVE_SCORE_ENV         | int         | 0                     | Environment: 0 - Production, 1 - Test.                                       |
-| PARALLEL               | int         | 10                    | Number of threads in `ThreadPoolExecutor`.                                   |
-| SELECTED_PLACE_IDS     | str         | ''                    | Comma-separated list of place IDs. Either this or `QUAD` must be set.        |
-| SELECTED_MEDIA_IDS     | str         | ''                    | Comma-separated list of media IDs to make image selection.                   |
-| MAX_IMG_DIMENSION      | int         | 720                   | Upper bound for width/height when resizing images before LLM upload.         |
-| DOWNLOAD_IF_EXISTS     | bool        | false                 | If `true`, force re-download even when a cached file already exists.         |
-| CACHE_DIR              | str         | './wiki'              | Root directory for on-disk image cache.                                      |
-| USE_PROXY_FILE         | str         | 'proxy-test.list'     | Path to a proxy list file (one proxy per line) utilised by the downloader.   |
-| OFFSET_BATCH           | int         | 0                     | Starting page offset when downloading images in chunks.                      |
-| ERROR_LIMIT            | int         | 20                    | Abort the current batch after this many consecutive download errors.         |
-| QUAD_ALPHABET          | str         | see code              | Character set expanded when `*` wildcards are present in `QUAD`.             |
-| STATUS_TIME_OUT        | int         | 60                    | Number of seconds as interval to check status of undone tasks.               |
+| Parameter              | Type | Default           | Purpose & Dependencies                                                       |
+|------------------------|------|-------------------|------------------------------------------------------------------------------|
+| CLICKHOUSE_HOST        | str  | 'localhost'       | Hostname for ClickHouse connections. Required alongside `CLICKHOUSE_PWD`.    |
+| CLICKHOUSE_PORT        | int  | 9000              | Port for ClickHouse connections.                                             |
+| CLICKHOUSE_PWD         | str  |                   | Password for ClickHouse. **Required**.                                       |
+| DB_TIMEOUT             | int  | 30                | Max execution time (seconds) for ClickHouse queries.                         |
+|                        |      |                   |                                                                              |
+| MODEL                  | str  |                   | LLM model name/ID. **Required**.                                             |
+| API_URL                | str  | ''                | Base URL for the LLM API.                                                    |
+| API_KEY                | str  |                   | API key for accessing the LLM. **Required**.                                 |
+|                        |      |                   |                                                                              |
+| PHOTOS_PER_PLACE       | int  | 40                | Number of images to request/download per place.                              |
+| PROCESS_PLACES         | int  | 500               | Maximum number of places to process per run.                                 |
+| CHUNK_SIZE             | int  | 100               | Batch size for paginated queries/inserts.                                    |
+| MAX_PLACES_PER_QUAD    | int  | 500               | Upper bound on places fetched per quad (should be less then PROCESS_PLACES). |
+| MAX_PHOTOS_PER_REQUEST | int  | 15                | Maximum number of images to include in a single LLM call.                    |
+| QUAD                   | str  | '**'              | Template string for quad search patterns.                                    |
+| MIN_ELO                | int  | 200               | Minimum ELO rating to include a place in queries.                            |
+| SAVE_SCORE_ENV         | int  | 0                 | Environment: 0 - Production, 1 - Test.                                       |
+| PARALLEL               | int  | 10                | Number of threads in `ThreadPoolExecutor`.                                   |
+| SELECTED_PLACE_IDS     | str  | ''                | Comma-separated list of place IDs. Either this or `QUAD` must be set.        |
+| SELECTED_MEDIA_IDS     | str  | ''                | Comma-separated list of media IDs to make image selection.                   |
+| MAX_IMG_DIMENSION      | int  | 720               | Upper bound for width/height when resizing images before LLM upload.         |
+| DOWNLOAD_IF_EXISTS     | bool | false             | If `true`, force re-download even when a cached file already exists.         |
+| CACHE_DIR              | str  | './wiki'          | Root directory for on-disk image cache.                                      |
+| USE_PROXY_FILE         | str  | 'proxy-test.list' | Path to a proxy list file (one proxy per line) utilised by the downloader.   |
+| OFFSET_BATCH           | int  | 0                 | Starting page offset when downloading images in chunks.                      |
+| ERROR_LIMIT            | int  | 20                | Abort the current batch after this many consecutive download errors.         |
+| QUAD_ALPHABET          | str  | see code          | Character set expanded when `*` wildcards are present in `QUAD`.             |
+| STATUS_TIME_OUT        | int  | 60                | Number of seconds as interval to check status of undone tasks.               |
+| MIN_ELO_SUBTYPE        | int  | 800               | Minimum ELO rating to include a place which are in POI sub types.            |
+| POI_SUBTYPE            | str  |                   | Comma separated list of POI sub types (e.g. "city, town").                   |
 
 ### Threading Model
 
@@ -54,8 +55,7 @@ to destroy job hanging illusion.
 ## To score new images only in mix mode for all places.
 
 - set QUAD string for quad search patterns which should includes one or more '*' symbol only. QUAD string pattern is number of '*' symbol to represent prefix
-  symbols  
-  which built from "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~" alfabet symbols. For example, QUAD="*" will go though A to ~.
+  symbols which built from "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~" alfabet symbols. For example, QUAD="*" will go though A to ~.
 
 ## To "restore" photo to Safe photo setup SELECTED_MEDIA_IDS and its corresponding SELECTED_PLACE_IDS:
 
@@ -85,5 +85,5 @@ to destroy job hanging illusion.
 
 - Jenkins job URL: https://maptile.osmand.net:8080/view/Wiki/job/Wiki_TopPhotos_GenFinal
 - Be sure all required photos are scored by using TopPlaces job in SAVE_SCORE_ENV=0 (Production)
-- Be sure all required duplication are processed by using TopPlaces_Duplicates job
+- Be sure all required duplications are processed by using TopPlaces_Duplicates job
 - Run Wiki_TopPhotos_GenFinal job
