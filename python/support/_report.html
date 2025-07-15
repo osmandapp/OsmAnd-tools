@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+
+            border: 1px solid black;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            max-width: 800px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        #modelFilter {
+            margin-left: 10px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .toggle-button {
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .toggle-button:hover {
+            background-color: #0056b3;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .hidden-ids {
+            display: none;
+            /* Hide the expanded list by default */
+        }
+
+        .more-button {
+            color: #007bff;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .more-button:hover {
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Daily Summary</h1>
+    <button class="toggle-button" onclick="toggleView()">View by Tickets</button>
+    <label for="modelFilter">By Model:</label>
+    <select id="modelFilter">
+        <option value="">All</option>
+    </select>
+    <label for="ragFilter">By Rag:</label>
+    <select id="ragFilter">
+        <option value="all">All</option>
+    </select>
+    <label for="ticketsFilter">By Tickets:</label>
+    <select id="ticketsFilter">
+        <option value="">All</option>
+    </select>
+    <label for="categoryFilter">By Category:</label>
+    <select id="categoryFilter">
+        <option value="">All</option>
+    </select>
+
+    <table id="runsTable">
+        <thead>
+            <tr>
+                <th>Tickets</th>
+                <th>Model</th>
+                <th>RAG</th>
+                <th>Tickets Size</th>
+                <th>Start Time</th>
+                <th>Tickets per Hour</th>
+                <th>Categories</th>
+                <th class="ticket-ids-column">Ticket IDs</th>
+                <th>Filename</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <table id="ticketsTable" class="hidden">
+        <thead>
+            <tr>
+                <th>Ticket Number</th>
+                <th>Tags</th>
+                <th>Model</th>
+                <th>RAG</th>
+                <th>Category</th>
+                <th>Action</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        let currentView = 'runs'; // Default view is 'runs'
+        let runs = []; // Global variable to store runs data
+        // const modelFilter = document.getElementById('modelFilter');
+        // const ticketsFilter = document.getElementById('ticketsFilter');
+        // const ragFilter = document.getElementById('ragFilter');
+
+        // Function to toggle between views
+        function toggleView() {
+            const runsTable = document.getElementById('runsTable');
+            const ticketsTable = document.getElementById('ticketsTable');
+            const toggleButton = document.querySelector('.toggle-button');
+
+            if (currentView === 'runs') {
+                currentView = 'tickets';
+                runsTable.classList.add('hidden');
+                ticketsTable.classList.remove('hidden');
+                toggleButton.textContent = 'View Runs';
+                filterAndDisplayRuns();
+            } else {
+                currentView = 'runs';
+                runsTable.classList.remove('hidden');
+                ticketsTable.classList.add('hidden');
+                toggleButton.textContent = 'View by Tickets';
+                filterAndDisplayRuns()
+            }
+        }
+
+        function filterAndDisplayRuns() {
+            const selectedModel = modelFilter.value;
+            const selectedRag = ragFilter.value;
+            const selectedTicketGroup = ticketsFilter.value;
+            const selectedCategory = categoryFilter.value;
+            let fruns = runs;
+            fruns = selectedModel ? fruns.filter(run => run.model === selectedModel) : fruns;
+            fruns = selectedTicketGroup ? fruns.filter(run => run.tickets === selectedTicketGroup) : fruns;
+            fruns = selectedRag !== 'all' ? fruns.filter(run => run.knowledge === selectedRag) : fruns;
+            fruns = selectedCategory ? fruns.filter(run => selectedCategory in run.categories) : fruns;
+            if (currentView === 'runs') {
+                displayRuns(fruns);
+            } else {
+                displayTickets(fruns);
+            }
+        }
+        
+
+        // Function to calculate tickets per hour
+        function calculateTicketsPerHour(startTime, endTime, ticketsSize) {
+            const start = new Date(startTime).getTime();
+            const end = new Date(endTime).getTime();
+            const timeDiff = (end - start) / (1000 * 60 * 60); // Convert to hours
+            return (ticketsSize / timeDiff).toFixed(2);
+        }
+
+        // Function to display runs
+        function displayRuns(filteredRuns) {
+            const runsTableBody = document.querySelector('#runsTable tbody');
+            runsTableBody.innerHTML = '';
+            filteredRuns.forEach(run => {
+                const row = document.createElement('tr');
+                const categoriesTxt = Object.entries(run.categories)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([key, value]) => `${key.replace('#', '')}: ${value}`).join('<br>');
+                // Handle ticket IDs
+                const ticketIds = run.ticketIds.join(', ');
+                const maxIdsToShow = 80; // Maximum number of IDs to show initially
+                let ticketIdsHtml = ticketIds;
+                let moreButtonHtml = '';
+                if (run.ticketIds.length > maxIdsToShow) {
+                    // Truncate the list and add a "More" button
+                    const truncatedIds = run.ticketIds.slice(0, maxIdsToShow).join(', ');
+                    const hiddenIds = run.ticketIds.slice(maxIdsToShow).join(', ');
+                    ticketIdsHtml = `
+                        <span class="visible-ids">${truncatedIds}</span>
+                        <span class="hidden-ids">, ${hiddenIds}</span>
+                        <span class="more-button" onclick="toggleMore(this)">More</span>
+                    `;
+                }
+                row.innerHTML = `
+                    <td>${run.tickets}</td>
+                    <td>${run.model}</td>
+                    <td>${run.knowledge}</td>
+                    <td>${run.ticketsSize}</td>
+                    <td>${run.startTime}</td>
+                    <td>${calculateTicketsPerHour(run.startTime, run.endTime, run.ticketsSize)}</td>
+                    <td>${categoriesTxt}</td>
+                    <td class="ticket-ids-column">${ticketIdsHtml}</td>
+                    <td><a href="#" onclick="viewReport('${run.filename}')">${run.filename}</a></td>
+                `;
+                runsTableBody.appendChild(row);
+            });
+        }
+
+        // Function to display tickets
+        function displayTickets(filteredRuns) {
+            const ticketsTableBody = document.querySelector('#ticketsTable tbody');
+            ticketsTableBody.innerHTML = '';
+
+            // Create a map to store ticket details
+            const ticketMap = new Map();
+            const ticketTags = new Map();
+
+            // Load ticket data from each run's JSON file
+            Promise.all(filteredRuns.map(run => fetch(run.filename).then(response => response.json())))
+                .then(ticketDataArray => {
+                    ticketDataArray.forEach((ticketData, index) => {
+                        const run = filteredRuns[index];
+                        ticketData.forEach(ticket => {
+                            if (categoryFilter.value && categoryFilter.value != ticket.category) {
+                                return;
+                            }
+                            if (!ticketMap.has(ticket.id)) {
+                                ticketMap.set(ticket.id, {
+                                    models: [],
+                                    categories: [],
+                                    actions: [],
+                                    knowGroups: [],
+                                    summaries: [],
+                                    answers: []
+                                });
+                            }
+                            if (ticket.tags && ticket.tags.length > 0) {
+                                ticketTags.set(ticket.id, ticket.tags);
+                            }
+                            const ticketInfo = ticketMap.get(ticket.id);
+                            ticketInfo.models.push(run.model);
+                            ticketInfo.categories.push(ticket.category);
+                            ticketInfo.actions.push(ticket.action);
+                            ticketInfo.knowGroups.push(run.knowledge);
+                            ticketInfo.summaries.push(ticket.summary);
+                            ticketInfo.answers.push(ticket.answer);
+                        });
+                    });
+
+                    // Display tickets in the table
+                    Array.from(ticketMap.entries()).sort((a, b) => a[0] - b[0]).forEach(([ticketId, ticketInfo]) => {
+                        const maxLength = Math.max(
+                            ticketInfo.models.length,
+                            ticketInfo.categories.length,
+                            ticketInfo.actions.length,
+                            ticketInfo.knowGroups.length,
+                            ticketInfo.summaries.length,
+                            ticketInfo.answers.length
+                        );
+
+                        // Iterate up to the maxLength, creating a row for each index
+                        for (let i = 0; i < maxLength; i++) {
+                            const row = document.createElement('tr');
+                            if (i == 0) {
+                                row.innerHTML = `<td><a href="https://osmandhelp.zendesk.com/agent/tickets/${ticketId}">${ticketId}</a>
+                                     <a href="https://osmandhelp.zendesk.com/api/v2/tickets/${ticketId}">📋</a></td>`;
+                                row.innerHTML += `<td>${ticketTags.get(ticketId) || ''}</td>`;    
+                            } else {
+                                row.innerHTML = `<td>---</td><td/>`
+                            }
+                            row.innerHTML += `
+                                    <td>${ticketInfo.models[i] || ''}</td>
+                                    <td>${ticketInfo.knowGroups[i] || ''}</td>
+                                    <td>${ticketInfo.categories[i] || ''}</td>
+                                    <td>${ticketInfo.actions[i] || ''}</td>
+                                    <td>${ticketInfo.summaries[i] || ''} <button onclick="toggleAnswer(this)">Show Answer</button>
+                                        <p  class="hidden">${ticketInfo.answers[i] || ''}</p></td>
+                                `;
+                            ticketsTableBody.appendChild(row);
+                        }
+                    });
+                })
+                .catch(error => console.error('Error loading ticket data:', error));
+        }
+
+        // Function to toggle answer visibility
+        function toggleAnswer(button) {
+            const answerDiv = button.nextElementSibling;
+            answerDiv.classList.toggle('hidden');
+            button.textContent = answerDiv.classList.contains('hidden') ? 'Show Answer' : 'Hide Answer';
+        }
+
+        // Fetch and parse runs.json
+        fetch('runs.json')
+            .then(response => response.json())
+            .then(data => {
+                runs = data; // Store runs data globally
+                runs.reverse()
+               
+
+                // Populate model filter dropdown
+                const models = [...new Set(runs.map(run => run.model))];
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelFilter.appendChild(option);
+                });
+
+                const ticketsGroup = [...new Set(runs.map(run => run.tickets))];
+                ticketsGroup.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group;
+                    option.textContent = group;
+                    ticketsFilter.appendChild(option);
+                });
+
+                const knowGroup = [...new Set(runs.map(run => run.knowledge))];
+                knowGroup.forEach(group => {
+                    if (group || group === '') {
+                        const option = document.createElement('option');
+                        option.value = group;
+                        option.textContent = group;
+                        ragFilter.appendChild(option);
+                    }
+                });
+
+                const uniqueCategories = new Set();
+                for (const run of runs) {
+                    for (const category in run.categories) {
+                        uniqueCategories.add(category);
+                    }
+                }
+                uniqueCategories.forEach(group => {
+                    if (group || group === '') {
+                        const option = document.createElement('option');
+                        option.value = group;
+                        option.textContent = group;
+                        categoryFilter.appendChild(option);
+                    }
+                });
+
+               
+                // Initial display of all runs
+                displayRuns(runs);
+
+                // Filter runs by model
+                modelFilter.addEventListener('change', () => {
+                    filterAndDisplayRuns();
+                });
+                ticketsFilter.addEventListener('change', () => {
+                    filterAndDisplayRuns();
+                });
+                categoryFilter.addEventListener('change', () => {
+                    filterAndDisplayRuns();
+                });
+                ragFilter.addEventListener('change', () => {
+                    filterAndDisplayRuns();
+                });
+            })
+            .catch(error => console.error('Error loading runs.json:', error));
+
+        // Function to view detailed report
+        function viewReport(filename) {
+            const origin = window.location.origin;
+            const pathname = window.location.pathname;
+            const directory = pathname.substring(0, pathname.lastIndexOf('/'));
+            const fullUrl = origin + directory + '/' + filename;
+            fetch(filename)
+                .then(response => response.json())
+                .then(data => {
+                    // Open a new window or modal to display the report
+                    const reportWindow = window.open('', '_blank');
+                    reportWindow.document.write(`
+                        <html>
+                            <head>
+                                <title>Report: ${filename}</title>
+                                <style>
+                                    body {
+                                        font-family: Arial, sans-serif;
+                                        margin: 20px;
+                                    }
+                                    table {
+                                        width: 100%;
+                                        border-collapse: collapse;
+                                        margin-top: 20px;
+                                    }
+                                    table, th, td {
+                                        border: 1px solid black;
+                                    }
+                                    th, td {
+                                        padding: 8px;
+                                        text-align: left;
+                                    }
+                                    th {
+                                        background-color: #f2f2f2;
+                                    }
+                                    a {
+                                        color: #007bff;
+                                        text-decoration: none;
+                                    }
+                                    a:hover {
+                                        text-decoration: underline;
+                                    }
+                                    button {
+                                        margin-top: 20px;
+                                        padding: 10px 20px;
+                                        background-color: #007bff;
+                                        color: white;
+                                        border: none;
+                                        cursor: pointer;
+                                    }
+                                    button:hover {
+                                        background-color: #0056b3;
+                                    }
+                                </style>
+                            </head>
+                            <body>
+                                <h1>Report: ${filename}</h1>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ID + URL</th>
+                                            <th>Tags</th>
+                                            <th>Category</th>
+                                            <th>Sentiment</th>
+                                            <th>Summary</th>
+                                            <th>Answer</th>
+                                            <th>Rating</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.filter(ticket => {  
+                                            if (categoryFilter.value) {
+                                                return categoryFilter.value === ticket.category; 
+                                            }
+                                            return true;
+                                        }).map(ticket => `
+                                            <tr>
+                                                
+                                                <td><a href="https://osmandhelp.zendesk.com/agent/tickets/${ticket.id}" target="_blank">${ticket.id}</a>
+                                                    <a href="https://osmandhelp.zendesk.com/api/v2/tickets/${ticket.id}" target="_blank">📋</a></td>
+                                                <td>${ticket.tags}</td>
+                                                <td>${ticket.category}</td>
+                                                <td>${ticket.sentiment}</td>
+                                                <td>${ticket.summary}</td>
+                                                <td>${ticket.answer}</td>
+                                                <td>${ticket.rating}</td>
+                                                <td>${ticket.action}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                                <button onclick="window.open('${fullUrl}', '_blank')">View Raw JSON</button>
+                            </body>
+                        </html>
+                    `);
+                    reportWindow.document.close();
+                })
+                .catch(error => console.error('Error loading report:', error));
+        }
+        function toggleMore(button) {
+            const hiddenIds = button.previousElementSibling; // The hidden IDs span
+            hiddenIds.classList.toggle('hidden-ids'); // Toggle visibility
+            button.textContent = hiddenIds.classList.contains('hidden-ids') ? 'More' : 'Less'; // Toggle button text
+        }
+    </script>
+</body>
+
+</html>
