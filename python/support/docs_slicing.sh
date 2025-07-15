@@ -3,11 +3,9 @@
 INPUT_DIR=$WEB_PATH/docs/web/main/docs/user
 OUTPUT_DIR=$WEB_PATH/rag/documents/docs
 VECTOR_DB_DIR=$WEB_PATH/rag/vector-db
-cd $INPUT_DIR
-git pull origin main
 
 # Define the base directory
-BASE_DIR=$SCRIPT_DIR/support
+BASE_DIR=$SCRIPT_DIR/python/support
 
 # Define the Java source file
 JAVA_SOURCE_FILE=$BASE_DIR/net/osmand/support/MarkdownSlicer.java
@@ -30,9 +28,9 @@ if [ $? -eq 0 ]; then
     # Run Java class
     java -cp $CLASS_DIR net.osmand.support.MarkdownSlicer $INPUT_DIR $OUTPUT_DIR
     rm -r $CLASS_DIR
-    if [ "$DELETE_VECTOR_DB" ]; then
-      if [ -d $VECTOR_DB_DIR ]; then
-        rm -r $VECTOR_DB_DIR
+    if [[ "$DELETE_VECTOR_DB" == "true" ]]; then
+      if [ -d "$VECTOR_DB_DIR" ]; then
+        rm -r "$VECTOR_DB_DIR"
       fi
       echo "Vector DB is deleted!"
     fi
