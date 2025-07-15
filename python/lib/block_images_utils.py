@@ -3,7 +3,7 @@ import time
 import hashlib
 from typing import Any
 
-from database_api import ch_insert, ch_query, ch_query_params
+from .database_api import ch_insert, ch_query, ch_query_params
 
 PRODUCTION_MODE = True
 
