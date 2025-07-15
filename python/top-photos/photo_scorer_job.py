@@ -10,12 +10,12 @@ import clickhouse_connect
 import openai
 import requests
 
-from llm_scoring import prompts, MODEL, MAX_PHOTOS_PER_REQUEST, call_llm
 from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor  # Relative import when running as module
 from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
     get_score, QUAD, PHOTOS_PER_PLACE, PROCESS_PLACES, MIN_ELO, SAVE_SCORE_ENV, MAX_PLACES_PER_QUAD, process_quad, get_places, ImageItem, \
     get_unscored_places_images
 from python.lib.download_utils import download_image_as_base64
+from .llm_scoring import prompts, MODEL, MAX_PHOTOS_PER_REQUEST, call_llm
 
 # Global Constants (from environment variables)
 PARALLEL = int(os.getenv('PARALLEL', '10'))
