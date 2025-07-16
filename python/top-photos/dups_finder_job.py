@@ -14,10 +14,10 @@ import requests
 import torch
 from transformers import CLIPModel, CLIPImageProcessor
 
+from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor
 from python.lib.database_api import get_dups_run_max_id, PROCESS_PLACES, insert_dups, MIN_ELO, MIN_ELO_SUBTYPE, POI_SUBTYPE, \
     get_image_dups, QUAD, process_quad, get_places_per_quad, SAVE_SCORE_ENV, get_places, ImageItem, get_unscored_places_dups
 from python.lib.download_utils import download_pil_image
-from .QueueThreadPoolExecutor import BoundedThreadPoolExecutor
 
 PARALLEL = int(os.getenv('PARALLEL', '10'))
 SELECTED_PLACE_IDS = os.getenv('SELECTED_PLACE_IDS', '')
