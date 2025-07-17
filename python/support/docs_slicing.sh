@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 INPUT_DIR=$WEB_PATH/docs/web/main/docs/user
 OUTPUT_DIR=$WEB_PATH/rag/documents/docs

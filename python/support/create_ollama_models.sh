@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # Script to make all Ollama models ready for context length 32K
 # Get the list of models from 'ollama list'
