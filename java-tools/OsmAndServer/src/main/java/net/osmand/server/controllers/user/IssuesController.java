@@ -74,7 +74,7 @@ public class IssuesController {
 
 	public static class IssueDto {
 		public long id;
-		public String repository;
+		public String repo;
 		public long number;
 		public String title;
 		public List<String> labels = new ArrayList<>();
@@ -179,7 +179,7 @@ public class IssuesController {
 				return; // Skip if no ID
 
 			issue.id = id;
-			issue.repository = getString(group, "repository");
+			issue.repo = getString(group, "repo");
 			issue.number = getLong(group, "number");
 			issue.title = getString(group, "title");
 			issue.labels = getStringList(group, "labels");
