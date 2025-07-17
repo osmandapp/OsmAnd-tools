@@ -13,6 +13,6 @@ if [ -z "$WEB_DIR" ]; then
 fi
 
 export MODEL_TEMPERATURE=0.5
-export MODEL=or@google/gemini-2.5-flash-preview
+export MODEL=or@google/gemini-2.5-flash
 export INPUT_DIR=$WEB_DIR
 python3 -m python.translation.translate_docs
