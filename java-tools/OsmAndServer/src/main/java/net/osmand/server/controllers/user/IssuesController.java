@@ -271,11 +271,10 @@ public class IssuesController {
         List<String> list = new ArrayList<>();
         if (hasField(group, fieldName) && group.getFieldRepetitionCount(fieldName) > 0) {
             Group listGroup = group.getGroup(fieldName, 0);
-            if (hasField(listGroup, "list") && listGroup.getFieldRepetitionCount("list") > 0) {
-                 Group innerList = listGroup.getGroup("list", 0);
-                 int count = innerList.getFieldRepetitionCount("element");
+            if (hasField(listGroup, "list") ) {
+                 int count = listGroup.getFieldRepetitionCount("list");
                  for (int i = 0; i < count; i++) {
-                     list.add(innerList.getString("element", i));
+                     list.add(listGroup.getGroup("list", i).getString("element", 0));
                  }
             }
         }
