@@ -84,6 +84,8 @@ public class IssuesController {
 		public Date createdAt;
 		public String user;
 		public String body;
+		public String milestone;
+		public List<String> assignees = new ArrayList<>();
 		public List<CommentDto> comments = new ArrayList<>();
 	}
 
@@ -142,6 +144,8 @@ public class IssuesController {
 		issuesDetailData.forEach((id, detail) -> categoriesData.merge(id, detail, (cat, det) -> {
 			cat.body = det.body;
 			cat.comments = det.comments;
+			cat.milestone = det.milestone;
+			cat.assignees = det.assignees;
 			return cat;
 		}));
 		issuesCache = new ArrayList<>(categoriesData.values());
@@ -214,6 +218,8 @@ public class IssuesController {
 
 			issue.id = id;
 			issue.body = getString(group, "body");
+			issue.milestone = getString(group, "milestone");
+			issue.assignees = getStringList(group, "assignees");
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
@@ -335,6 +341,10 @@ public class IssuesController {
 				searchableContent.append(String.join(" ", issue.labels)).append(" ");
 			if (fields.contains("llm_categories") && issue.llmCategories != null)
 				searchableContent.append(String.join(" ", issue.llmCategories)).append(" ");
+			if (fields.contains("assignees") && issue.assignees != null)
+				searchableContent.append(String.join(" ", issue.assignees)).append(" ");
+			if (fields.contains("milestone") && issue.milestone != null)
+				searchableContent.append(String.join(" ", issue.milestone)).append(" ");
 			if (includeExtended) {
 				if (issue.body != null)
 					searchableContent.append(issue.body).append(" ");
