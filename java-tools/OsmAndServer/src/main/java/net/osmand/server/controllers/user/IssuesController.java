@@ -46,7 +46,7 @@ public class IssuesController {
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
 	private static final String CATEGORIES_FILE = "categories.parquet";
 	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
-	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5);
+	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(1);
 
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
@@ -191,8 +191,6 @@ public class IssuesController {
 			issue.shortSummary = getString(group, "short_summary");
 			issue.state = getString(group, "state");
 			issue.user = getString(group, "user");
-			issue.milestone = getString(group, "milestone");
-			issue.assignees = getStringList(group, "assignees");
 
 			// Handle timestamp (stored as INT64 NANOS)
 			long nanoTimestamp = getLong(group, "created_at");
@@ -220,6 +218,8 @@ public class IssuesController {
 
 			issue.id = id;
 			issue.body = getString(group, "body");
+			issue.milestone = getString(group, "milestone");
+			issue.assignees = getStringList(group, "assignees");
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
