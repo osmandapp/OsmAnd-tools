@@ -1,5 +1,35 @@
 package net.osmand.server.controllers.user;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.column.page.PageReadStore;
@@ -14,27 +44,25 @@ import org.apache.parquet.schema.MessageType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Controller to serve GitHub issue data to the frontend UI. This
- * controller reads data from Parquet files and provides endpoints for
- * searching, filtering, and retrieving issue details.
+ * Controller to serve GitHub issue data to the frontend UI. This controller
+ * reads data from Parquet files and provides endpoints for searching,
+ * filtering, retrieving issue details, and analyzing issues with LLMs.
  */
 @Controller
 @RequestMapping("/admin/issues/")
@@ -47,10 +75,16 @@ public class IssuesController {
 	private static final String CATEGORIES_FILE = "categories.parquet";
 	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
 	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(1);
+	private static final long MODEL_PRICING_CACHE_TTL_MS = TimeUnit.HOURS.toMillis(1);
+	private static final int MAX_CONTEXT_BYTES = 100_000;
 
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
 
+	private final HttpClient httpClient = HttpClient.newHttpClient();
+	private final ObjectMapper objectMapper = new ObjectMapper();
+	private static final Map<String, ModelPricing> modelPricingCache = new ConcurrentHashMap<>();
+	private static volatile long lastPricingRefresh = 0;
 
 	// --- Data Transfer Objects (DTOs) ---
 	public static class IssueFileDto {
@@ -89,6 +123,28 @@ public class IssuesController {
 		public List<String> assignees = new ArrayList<>();
 	}
 
+	public static class ChatMessage {
+		public String role;
+		public String content;
+	}
+
+	public static class AnalyzeRequest {
+		public List<Long> issueIds;
+		public String model;
+		public String prompt;
+		public List<ChatMessage> history;
+	}
+
+	public static class ModelPricing {
+		public double inputCost; // per 1M tokens
+		public double outputCost; // per 1M tokens
+
+		public ModelPricing(double inputCost, double outputCost) {
+			this.inputCost = inputCost;
+			this.outputCost = outputCost;
+		}
+	}
+
 	@GetMapping("/files")
 	public ResponseEntity<List<IssueFileDto>> listAvailableFiles() {
 		File folder = new File(websiteLocation, ISSUES_FOLDER);
@@ -98,11 +154,11 @@ public class IssuesController {
 		List<IssueFileDto> fileList = Arrays
 				.stream(Objects.requireNonNull(
 						folder.listFiles((dir, name) -> name.endsWith(".parquet") || name.endsWith(".csv"))))
-				.map(file -> new IssueFileDto(file.getName(), file.length(), new Date(file.lastModified())))
+				.map(fsr -> new IssueFileDto(fsr.getName(), fsr.length(), new Date(fsr.lastModified())))
 				.collect(Collectors.toList());
 		return ResponseEntity.ok(fileList);
 	}
-	
+
 	@GetMapping
 	public String index(Model model) throws IOException {
 		File[] files = new File(websiteLocation, ISSUES_FOLDER).listFiles();
@@ -152,13 +208,12 @@ public class IssuesController {
 		lastCacheRefresh = System.currentTimeMillis();
 	}
 
-
 	@GetMapping("/search")
 	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
-													@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees") List<String> fields,
-													@RequestParam(defaultValue = "100") int limit,
-													@RequestParam(defaultValue = "false") boolean includeExtended,
-													@RequestParam(required = false, defaultValue = "all") String state) {
+			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees") List<String> fields,
+			@RequestParam(defaultValue = "100") int limit,
+			@RequestParam(defaultValue = "false") boolean includeExtended,
+			@RequestParam(required = false, defaultValue = "all") String state) {
 		try {
 			refreshCache();
 			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state);
@@ -167,6 +222,180 @@ public class IssuesController {
 			e.printStackTrace();
 			return ResponseEntity.status(500).build();
 		}
+	}
+
+	@PostMapping("/analyze")
+	public ResponseEntity<StreamingResponseBody> analyzeIssues(@RequestBody AnalyzeRequest request) throws IOException, InterruptedException {
+		String apiKey = System.getenv("ISSUE_OPENROUTER_TOKEN");
+		if (apiKey == null || apiKey.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
+		}
+
+		refreshCache();
+
+		List<ChatMessage> messages = new ArrayList<>();
+		if (request.history == null || request.history.isEmpty()) {
+			String context = buildContextFromIssues(request.issueIds);
+			if (context.getBytes(StandardCharsets.UTF_8).length > MAX_CONTEXT_BYTES) {
+				return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(writer -> writer.write(
+						"Error: Selected issues exceed the 100,000-byte context limit. Please select fewer issues.".getBytes()));
+			}
+			messages.add(createMessage("system",
+					"You are a helpful assistant. The user has provided details for one or more GitHub issues. Analyze them based on the user's prompt and provide a concise, well-structured answer in Markdown format."));
+			messages.add(createMessage("user",
+					"Here is the issue data:\n\n" + context + "\n\nMy prompt is: " + request.prompt));
+		} else {
+			messages.addAll(request.history);
+			messages.add(createMessage("user", request.prompt));
+		}
+
+		refreshModelPricingCache();
+		ModelPricing pricing = modelPricingCache.get(request.model);
+
+		StreamingResponseBody stream = out -> {
+			PrintWriter writer = new PrintWriter(out);
+			try {
+				HttpRequest openRouterRequest = HttpRequest.newBuilder()
+						.uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
+						.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
+						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
+								Map.of("model", request.model, "messages", messages, "stream", true))))
+						.build();
+
+				HttpResponse<Stream<String>> response = httpClient.send(openRouterRequest,
+						HttpResponse.BodyHandlers.ofLines());
+
+				if (response.statusCode() != 200) {
+					String errorBody = response.body().collect(Collectors.joining("\n"));
+					writer.write("Error: LLM API request failed with status " + response.statusCode() + ". Response: "
+							+ errorBody);
+					return;
+				}
+
+				final int[] inputTokens = { 0 };
+				final int[] outputTokens = { 0 };
+
+				response.body().forEach(line -> {
+					if (line.startsWith("data: ")) {
+						String json = line.substring(6);
+						if ("[DONE]".equals(json))
+							return;
+
+						try {
+							JsonNode node = objectMapper.readTree(json);
+
+							// Extract token usage from the 'x-openrouter' extension
+							if (node.has("usage")) {
+								JsonNode usageNode = node.get("usage");
+								inputTokens[0] = usageNode.get("prompt_tokens").asInt();
+								outputTokens[0] = usageNode.get("completion_tokens").asInt();
+							}
+
+							if (node.has("choices")) {
+								JsonNode choices = node.get("choices");
+								if (choices.isArray() && !choices.isEmpty()) {
+									JsonNode delta = choices.get(0).get("delta");
+									if (delta != null && delta.has("content")) {
+										String content = delta.get("content").asText();
+										if (!content.isEmpty()) {
+											writer.write(content);
+											writer.flush();
+										}
+									}
+								}
+							}
+						} catch (IOException e) {
+							// Ignore parsing errors for now
+						}
+					}
+				});
+
+				if (pricing != null) {
+					double cost = ((double) inputTokens[0] / 1_000_000 * pricing.inputCost)
+							+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
+					DecimalFormat df = new DecimalFormat("#.######");
+					String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
+							+ " output. **Cost:** $" + df.format(cost);
+					writer.write(costInfo);
+					writer.flush();
+				}
+
+			} catch (Exception e) {
+				e.printStackTrace();
+				writer.write("\n\nError processing LLM stream: " + e.getMessage());
+			} finally {
+				writer.close();
+			}
+		};
+
+		return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(stream);
+	}
+
+	private void refreshModelPricingCache() throws IOException, InterruptedException {
+		if ((System.currentTimeMillis() - lastPricingRefresh) < MODEL_PRICING_CACHE_TTL_MS) {
+			return;
+		}
+		System.out.println("Refreshing OpenRouter model pricing cache...");
+		HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://openrouter.ai/api/v1/models")).GET()
+				.build();
+
+		HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+		if (response.statusCode() == 200) {
+			JsonNode modelsNode = objectMapper.readTree(response.body());
+			if (modelsNode.has("data")) {
+				for (JsonNode modelNode : modelsNode.get("data")) {
+					String id = modelNode.get("id").asText();
+					double inputCost = modelNode.get("pricing").get("prompt").asDouble(0.0);
+					double outputCost = modelNode.get("pricing").get("completion").asDouble(0.0);
+					modelPricingCache.put(id, new ModelPricing(inputCost * 1_000_000, outputCost * 1_000_000));
+				}
+				lastPricingRefresh = System.currentTimeMillis();
+				System.out.println(
+						"Successfully refreshed model pricing cache. Loaded " + modelPricingCache.size() + " models.");
+			}
+		} else {
+			System.err.println("Failed to refresh model pricing. Status: " + response.statusCode());
+		}
+	}
+
+	private String buildContextFromIssues(List<Long> issueIds) {
+		if (issuesCache == null)
+			return "";
+		Set<Long> idSet = new HashSet<>(issueIds);
+		StringBuilder sb = new StringBuilder();
+		List<IssueDto> selectedIssues = issuesCache.stream().filter(issue -> idSet.contains(issue.id))
+				.collect(Collectors.toList());
+
+		for (IssueDto issue : selectedIssues) {
+			sb.append("---------------------------------\n");
+			sb.append("Issue ID: ").append(issue.id).append("\n");
+			sb.append("Repo: ").append(issue.repo).append("#").append(issue.number).append("\n");
+			sb.append("Title: ").append(issue.title).append("\n");
+			sb.append("Author: ").append(issue.user).append(" | Created: ").append(issue.createdAt).append("\n");
+			sb.append("State: ").append(issue.state).append(" | Milestone: ").append(issue.milestone).append("\n");
+			sb.append("Labels: ").append(String.join(", ", issue.labels)).append("\n");
+			sb.append("Assignees: ").append(String.join(", ", issue.assignees)).append("\n\n");
+			sb.append("BODY:\n").append(issue.body).append("\n\n");
+
+			if (issue.comments != null && !issue.comments.isEmpty()) {
+				sb.append("COMMENTS:\n");
+				for (CommentDto comment : issue.comments) {
+					sb.append("  Comment by ").append(comment.user).append(" at ").append(comment.createdAt)
+							.append(":\n");
+					sb.append("  > ").append(comment.body.replaceAll("\n", "\n  > ")).append("\n");
+				}
+			}
+			sb.append("\n");
+		}
+		return sb.toString();
+	}
+
+	private ChatMessage createMessage(String role, String content) {
+		ChatMessage msg = new ChatMessage();
+		msg.role = role;
+		msg.content = content;
+		return msg;
 	}
 
 	/**
@@ -289,31 +518,30 @@ public class IssuesController {
 		return 0L;
 	}
 
-    private List<String> getStringList(Group group, String fieldName) {
-        List<String> list = new ArrayList<>();
-        if (hasField(group, fieldName) && group.getFieldRepetitionCount(fieldName) > 0) {
-            Group listGroup = group.getGroup(fieldName, 0);
-            if (hasField(listGroup, "list") ) {
-                 int count = listGroup.getFieldRepetitionCount("list");
-                 for (int i = 0; i < count; i++) {
-                     list.add(listGroup.getGroup("list", i).getString("element", 0));
-                 }
-            }
-        }
-        return list;
-    }
+	private List<String> getStringList(Group group, String fieldName) {
+		List<String> list = new ArrayList<>();
+		if (hasField(group, fieldName) && group.getFieldRepetitionCount(fieldName) > 0) {
+			Group listGroup = group.getGroup(fieldName, 0);
+			if (hasField(listGroup, "list")) {
+				int count = listGroup.getFieldRepetitionCount("list");
+				for (int i = 0; i < count; i++) {
+					list.add(listGroup.getGroup("list", i).getString("element", 0));
+				}
+			}
+		}
+		return list;
+	}
 
 	/**
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-											   boolean includeExtended, String state) {
+			boolean includeExtended, String state) {
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
 
 		final List<IssueDto> stateFilteredIssues;
 		if (state != null && !state.equalsIgnoreCase("all") && !state.isEmpty()) {
-			stateFilteredIssues = allIssues.stream()
-					.filter(issue -> state.equalsIgnoreCase(issue.state))
+			stateFilteredIssues = allIssues.stream().filter(issue -> state.equalsIgnoreCase(issue.state))
 					.collect(Collectors.toList());
 		} else {
 			stateFilteredIssues = allIssues;
