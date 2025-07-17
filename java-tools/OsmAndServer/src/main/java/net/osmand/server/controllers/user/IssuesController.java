@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.column.page.PageReadStore;
@@ -70,6 +72,9 @@ public class IssuesController {
 
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
+	
+	private static final Log LOGGER = LogFactory.getLog(IssuesController.class);
+
 
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
 	private static final String CATEGORIES_FILE = "categories.parquet";
@@ -84,6 +89,8 @@ public class IssuesController {
 	private final HttpClient httpClient = HttpClient.newHttpClient();
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	private static final Map<String, ModelPricing> modelPricingCache = new ConcurrentHashMap<>();
+
+	private static final double COST_MULTIPLIER = 100;
 	private static volatile long lastPricingRefresh = 0;
 
 	// --- Data Transfer Objects (DTOs) ---
@@ -316,7 +323,8 @@ public class IssuesController {
 							+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
 					DecimalFormat df = new DecimalFormat("#.######");
 					String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
-							+ " output. **Cost:** $" + df.format(cost);
+							+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
+					LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " " + costInfo.replace("\n", " "));
 					writer.write(costInfo);
 					writer.flush();
 				}
@@ -336,7 +344,7 @@ public class IssuesController {
 		if ((System.currentTimeMillis() - lastPricingRefresh) < MODEL_PRICING_CACHE_TTL_MS) {
 			return;
 		}
-		System.out.println("Refreshing OpenRouter model pricing cache...");
+		LOGGER.info("Refreshing OpenRouter model pricing cache...");
 		HttpRequest request = HttpRequest.newBuilder().uri(URI.create("https://openrouter.ai/api/v1/models")).GET()
 				.build();
 
@@ -351,11 +359,11 @@ public class IssuesController {
 					modelPricingCache.put(id, new ModelPricing(inputCost * 1_000_000, outputCost * 1_000_000));
 				}
 				lastPricingRefresh = System.currentTimeMillis();
-				System.out.println(
+				LOGGER.info(
 						"Successfully refreshed model pricing cache. Loaded " + modelPricingCache.size() + " models.");
 			}
 		} else {
-			System.err.println("Failed to refresh model pricing. Status: " + response.statusCode());
+			LOGGER.info("Failed to refresh model pricing. Status: " + response.statusCode());
 		}
 	}
 
@@ -478,7 +486,7 @@ public class IssuesController {
 	private void readParquetFile(Path path, BiConsumer<Group, MessageType> recordConsumer) throws IOException {
 		File file = path.toFile();
 		if (!file.exists()) {
-			System.err.println("File not found: " + path);
+			LOGGER.error("File not found: " + path);
 			return;
 		}
 
