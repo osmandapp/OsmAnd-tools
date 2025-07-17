@@ -96,7 +96,7 @@ def download_image_as_base64(file_name):
     response = requests.get(url, timeout=(30, 30))
     if response.status_code == 200:
         tmp_file_name = "tmp." + os.path.splitext(file_name)[1].lower().lstrip('.')
-        base_path = os.path.join(tempfile.mkdtemp(dir='../top-photos/'), tmp_file_name)
+        base_path = os.path.join(tempfile.mkdtemp(), tmp_file_name)
         os.makedirs(os.path.dirname(base_path), exist_ok=True)
         with open(base_path, "wb") as image_file:
             image_file.write(response.content)
