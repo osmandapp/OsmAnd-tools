@@ -202,11 +202,11 @@ public class IssuesController {
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
 				Group commentsList = group.getGroup("comments", 0);
-				if (hasField(commentsList, "list") && commentsList.getFieldRepetitionCount("list") > 0) {
-					Group list = commentsList.getGroup("list", 0);
-					int commentCount = list.getFieldRepetitionCount("element");
+				if (hasField(commentsList, "list")) {
+					int commentCount = commentsList.getFieldRepetitionCount("list");
 					for (int i = 0; i < commentCount; i++) {
-						Group commentGroup = list.getGroup("element", i);
+						Group list = commentsList.getGroup("list", i);
+						Group commentGroup = list.getGroup("element", 0);
 						CommentDto comment = new CommentDto();
 						comment.id = getLong(commentGroup, "id");
 						comment.user = getString(commentGroup, "user");
