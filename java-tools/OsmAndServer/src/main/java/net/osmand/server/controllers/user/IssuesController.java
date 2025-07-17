@@ -84,9 +84,9 @@ public class IssuesController {
 		public Date createdAt;
 		public String user;
 		public String body;
+		public List<CommentDto> comments = new ArrayList<>();
 		public String milestone;
 		public List<String> assignees = new ArrayList<>();
-		public List<CommentDto> comments = new ArrayList<>();
 	}
 
 	@GetMapping("/files")
@@ -155,13 +155,13 @@ public class IssuesController {
 
 	@GetMapping("/search")
 	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
-													@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user") List<String> fields,
+													@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees") List<String> fields,
 													@RequestParam(defaultValue = "100") int limit,
-													@RequestParam(defaultValue = "false") boolean includeExtended) {
+													@RequestParam(defaultValue = "false") boolean includeExtended,
+													@RequestParam(required = false, defaultValue = "all") String state) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields,
-					includeExtended);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -191,6 +191,8 @@ public class IssuesController {
 			issue.shortSummary = getString(group, "short_summary");
 			issue.state = getString(group, "state");
 			issue.user = getString(group, "user");
+			issue.milestone = getString(group, "milestone");
+			issue.assignees = getStringList(group, "assignees");
 
 			// Handle timestamp (stored as INT64 NANOS)
 			long nanoTimestamp = getLong(group, "created_at");
@@ -218,8 +220,6 @@ public class IssuesController {
 
 			issue.id = id;
 			issue.body = getString(group, "body");
-			issue.milestone = getString(group, "milestone");
-			issue.assignees = getStringList(group, "assignees");
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
@@ -307,10 +307,20 @@ public class IssuesController {
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-											   boolean includeExtended) {
+											   boolean includeExtended, String state) {
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
+		final List<IssueDto> stateFilteredIssues;
+		if (state != null && !state.equalsIgnoreCase("all") && !state.isEmpty()) {
+			stateFilteredIssues = allIssues.stream()
+					.filter(issue -> state.equalsIgnoreCase(issue.state))
+					.collect(Collectors.toList());
+		} else {
+			stateFilteredIssues = allIssues;
+		}
+
 		if (query == null || query.trim().isEmpty()) {
-			return allIssues;
+			return stateFilteredIssues;
 		}
 
 		List<String> quotedTerms = new ArrayList<>();
@@ -326,10 +336,10 @@ public class IssuesController {
 				.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
 
 		if (quotedTerms.isEmpty() && regularTerms.isEmpty()) {
-			return allIssues;
+			return stateFilteredIssues;
 		}
 
-		return allIssues.stream().filter(issue -> {
+		return stateFilteredIssues.stream().filter(issue -> {
 			StringBuilder searchableContent = new StringBuilder();
 			if (fields.contains("title") && issue.title != null)
 				searchableContent.append(issue.title).append(" ");
@@ -341,10 +351,10 @@ public class IssuesController {
 				searchableContent.append(String.join(" ", issue.labels)).append(" ");
 			if (fields.contains("llm_categories") && issue.llmCategories != null)
 				searchableContent.append(String.join(" ", issue.llmCategories)).append(" ");
+			if (fields.contains("milestone") && issue.milestone != null)
+				searchableContent.append(issue.milestone).append(" ");
 			if (fields.contains("assignees") && issue.assignees != null)
 				searchableContent.append(String.join(" ", issue.assignees)).append(" ");
-			if (fields.contains("milestone") && issue.milestone != null)
-				searchableContent.append(String.join(" ", issue.milestone)).append(" ");
 			if (includeExtended) {
 				if (issue.body != null)
 					searchableContent.append(issue.body).append(" ");
