@@ -26,6 +26,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,6 +46,11 @@ public class IssuesController {
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
 	private static final String CATEGORIES_FILE = "categories.parquet";
 	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
+	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(5);
+
+	private volatile List<IssueDto> issuesCache;
+	private volatile long lastCacheRefresh = 0;
+
 
 	// --- Data Transfer Objects (DTOs) ---
 	public static class IssueFileDto {
@@ -125,22 +132,31 @@ public class IssuesController {
 		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(file));
 	}
 
+	private void refreshCache() throws IOException {
+		if (issuesCache != null && (System.currentTimeMillis() - lastCacheRefresh) < CACHE_TTL_MS) {
+			return;
+		}
+		Map<Long, IssueDto> categoriesData = readCategoriesParquet();
+		Map<Long, IssueDto> issuesDetailData = readIssuesDetailParquet();
+
+		issuesDetailData.forEach((id, detail) -> categoriesData.merge(id, detail, (cat, det) -> {
+			cat.body = det.body;
+			cat.comments = det.comments;
+			return cat;
+		}));
+		issuesCache = new ArrayList<>(categoriesData.values());
+		lastCacheRefresh = System.currentTimeMillis();
+	}
+
+
 	@GetMapping("/search")
 	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
-			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user") List<String> fields,
-			@RequestParam(defaultValue = "100") int limit,
-			@RequestParam(defaultValue = "false") boolean includeExtended) {
+													@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user") List<String> fields,
+													@RequestParam(defaultValue = "100") int limit,
+													@RequestParam(defaultValue = "false") boolean includeExtended) {
 		try {
-			Map<Long, IssueDto> categoriesData = readCategoriesParquet();
-			Map<Long, IssueDto> issuesDetailData = readIssuesDetailParquet();
-
-			issuesDetailData.forEach((id, detail) -> categoriesData.merge(id, detail, (cat, det) -> {
-				cat.body = det.body;
-				cat.comments = det.comments;
-				return cat;
-			}));
-
-			List<IssueDto> filteredIssues = filterAndSortIssues(new ArrayList<>(categoriesData.values()), query, fields,
+			refreshCache();
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields,
 					includeExtended);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
@@ -285,17 +301,27 @@ public class IssuesController {
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-			boolean includeExtended) {
+											   boolean includeExtended) {
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
 		if (query == null || query.trim().isEmpty()) {
 			return allIssues;
 		}
-		final String lowerCaseQuery = query.toLowerCase();
-		final boolean isOrLogic = lowerCaseQuery.contains(",");
-		final List<String> terms = Stream.of(isOrLogic ? lowerCaseQuery.split(",") : lowerCaseQuery.split("\\s+"))
+
+		List<String> quotedTerms = new ArrayList<>();
+		Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+		Matcher matcher = pattern.matcher(query);
+		while (matcher.find()) {
+			quotedTerms.add(matcher.group(1).toLowerCase());
+		}
+
+		String unquotedQuery = matcher.replaceAll("").toLowerCase();
+		final boolean isOrLogic = unquotedQuery.contains(",");
+		List<String> regularTerms = Stream.of(isOrLogic ? unquotedQuery.split(",") : unquotedQuery.split("\\s+"))
 				.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
-		if (terms.isEmpty())
+
+		if (quotedTerms.isEmpty() && regularTerms.isEmpty()) {
 			return allIssues;
+		}
 
 		return allIssues.stream().filter(issue -> {
 			StringBuilder searchableContent = new StringBuilder();
@@ -318,10 +344,21 @@ public class IssuesController {
 				}
 			}
 			String finalContent = searchableContent.toString().toLowerCase();
-			if (isOrLogic)
-				return terms.stream().anyMatch(finalContent::contains);
-			else
-				return terms.stream().allMatch(finalContent::contains);
+
+			boolean matchesQuoted = quotedTerms.stream().allMatch(finalContent::contains);
+			if (!matchesQuoted) {
+				return false;
+			}
+
+			if (regularTerms.isEmpty()) {
+				return true;
+			}
+
+			if (isOrLogic) {
+				return regularTerms.stream().anyMatch(finalContent::contains);
+			} else {
+				return regularTerms.stream().allMatch(finalContent::contains);
+			}
 		}).collect(Collectors.toList());
 	}
 }
