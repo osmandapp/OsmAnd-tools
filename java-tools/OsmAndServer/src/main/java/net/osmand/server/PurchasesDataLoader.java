@@ -61,8 +61,8 @@ public class PurchasesDataLoader {
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
-			String name,
-			String icon,
+			@JsonProperty String name,
+			@JsonProperty String icon,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,
 			@JsonProperty("feature_contours") JsonNode contours,
@@ -70,11 +70,11 @@ public class PurchasesDataLoader {
 			@JsonProperty("feature_pro_no_cloud") JsonNode proNoCloud,
 			@JsonProperty("feature_live_maps") JsonNode liveMaps,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
-			int duration,
+			@JsonProperty int duration,
 			@JsonProperty("duration_unit") String durationUnit,
-			double retention,
+			@JsonProperty double retention,
 			@JsonProperty("defPriceEurMillis") int defaultPriceEurMillis,
-			String app
+			@JsonProperty String app
 	) {
 		public boolean isPro() {
 			return !pro.isBoolean() || pro.booleanValue();
@@ -87,8 +87,8 @@ public class PurchasesDataLoader {
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record InApp(
-			String name,
-			String icon,
+			@JsonProperty String name,
+			@JsonProperty String icon,
 			@JsonProperty("cross-platform") boolean isCrossPlatform,
 			@JsonProperty("feature_pro") JsonNode pro,
 			@JsonProperty("feature_maps") JsonNode maps,

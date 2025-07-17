@@ -116,7 +116,8 @@ public class Application  {
 
 		try (InputStream zipStream = Application.class.getResourceAsStream(resourceFolderPath)) {
 			if (zipStream == null) {
-				throw new FileNotFoundException("Resource not found: " + resourceFolderPath);
+				System.err.println("Resource not found: " + resourceFolderPath);
+				return;
 			}
 
 			try (ZipInputStream zis = new ZipInputStream(zipStream)) {
