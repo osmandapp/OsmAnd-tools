@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -81,7 +83,7 @@ public class IssuesController {
 	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
 	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(1);
 	private static final long MODEL_PRICING_CACHE_TTL_MS = TimeUnit.HOURS.toMillis(1);
-	private static final int MAX_CONTEXT_BYTES = 100_000;
+	private static final int MAX_CONTEXT_BYTES = 1_000_000;
 
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
@@ -266,6 +268,7 @@ public class IssuesController {
 				HttpRequest openRouterRequest = HttpRequest.newBuilder()
 						.uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
 						.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
+				        .timeout(Duration.of(5, ChronoUnit.MINUTES))
 						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
 								Map.of("model", request.model, "messages", messages, "stream", true))))
 						.build();
