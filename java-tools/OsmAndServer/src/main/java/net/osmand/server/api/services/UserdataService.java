@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -860,7 +861,7 @@ public class UserdataService {
     public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
         for (UserFile file : files) {
-            String newName = file.name.replaceFirst(folderName, newFolderName);
+            String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
             ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false);
             if (!response.getStatusCode().is2xxSuccessful()) {
                 return response;
