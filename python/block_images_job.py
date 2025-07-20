@@ -5,9 +5,9 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib')))
 
-from lib.utils import parse_command_line_into_dict
-from lib.block_images_utils import BLOCK_BANNED, BLOCK_INVALID, BLOCK_PROHIBITED, block_images
-from lib.block_images_utils import cleanup_files, cleanup_tables, list_blocked, unblock_reason, unblock_title
+from python.lib.utils import parse_command_line_into_dict
+from python.lib.block_images_utils import BLOCK_BANNED, BLOCK_INVALID, BLOCK_PROHIBITED, block_images
+from python.lib.block_images_utils import cleanup_files, cleanup_tables, list_blocked, unblock_reason, unblock_title
 
 
 def main():
