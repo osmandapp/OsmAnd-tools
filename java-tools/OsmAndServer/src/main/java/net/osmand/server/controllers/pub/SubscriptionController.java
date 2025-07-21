@@ -491,6 +491,8 @@ public class SubscriptionController {
         String payloadParam = request.getParameter("payload");
         String skuParam = request.getParameter("sku");
 
+		String aidParam = request.getParameter("aid");
+
         // Platform and Effective IDs
         String platform = PurchaseHelper.getPlatformBySku(skuParam);
         boolean ios = PLATFORM_APPLE.equals(platform) || Algorithms.isEmpty(orderIdParam);
@@ -564,7 +566,7 @@ public class SubscriptionController {
 			}
             SupporterDeviceInAppPurchase iap = new SupporterDeviceInAppPurchase();
             iap.purchaseToken = effectivePurchaseToken;
-            iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
+            iap.orderId = processingOrderId(effectiveOrderId, aidParam); // Google orderId or Apple transaction_id
             iap.sku = skuParam;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
@@ -598,6 +600,13 @@ public class SubscriptionController {
             return userSubService.error("Invalid purchaseType specified: " + purchaseType);
         }
     }
+
+	private String processingOrderId(String effectiveOrderId, String aid) {
+		if (effectiveOrderId.equals(OSMAND_PLUS_APP) && aid != null) {
+			return OSMAND_PLUS_APP + "-" + aid;
+		}
+		return effectiveOrderId;
+	}
 
 	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
 		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
