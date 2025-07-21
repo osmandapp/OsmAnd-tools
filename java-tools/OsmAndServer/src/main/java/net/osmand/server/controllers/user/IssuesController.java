@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -81,9 +82,11 @@ public class IssuesController {
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
 	private static final String CATEGORIES_FILE = "categories.parquet";
 	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
+	private static final String PROJECT_BACKLOG_FILE = "project_backlog.parquet";
 	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(1);
 	private static final long MODEL_PRICING_CACHE_TTL_MS = TimeUnit.HOURS.toMillis(1);
 	private static final int MAX_CONTEXT_BYTES = 1_000_000;
+	
 
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
@@ -130,6 +133,12 @@ public class IssuesController {
 		public List<CommentDto> comments = new ArrayList<>();
 		public String milestone;
 		public List<String> assignees = new ArrayList<>();
+		public String project_status;
+	}
+	
+	private static class ProjectBacklogDto {
+	    String projectStatus;
+	    String milestone;
 	}
 
 	public static class ChatMessage {
@@ -205,6 +214,7 @@ public class IssuesController {
 		}
 		Map<Long, IssueDto> categoriesData = readCategoriesParquet();
 		Map<Long, IssueDto> issuesDetailData = readIssuesDetailParquet();
+		Map<String, ProjectBacklogDto> backlogData = readProjectBacklogParquet();
 
 		issuesDetailData.forEach((id, detail) -> categoriesData.merge(id, detail, (cat, det) -> {
 			cat.body = det.body;
@@ -213,7 +223,24 @@ public class IssuesController {
 			cat.assignees = det.assignees;
 			return cat;
 		}));
-		issuesCache = new ArrayList<>(categoriesData.values());
+		
+		List<IssueDto> mergedIssues = new ArrayList<>(categoriesData.values());
+
+		// Second merge with backlog data
+		for (IssueDto issue : mergedIssues) {
+			if (issue.repo != null && issue.number > 0) {
+				String key = (issue.repo + "/" + issue.number).substring("osmandapp/".length()).toLowerCase();
+				ProjectBacklogDto backlogInfo = backlogData.get(key);
+				if (backlogInfo != null) {
+					issue.project_status = backlogInfo.projectStatus;
+					if (issue.milestone == null || issue.milestone.trim().isEmpty()) {
+						issue.milestone = backlogInfo.milestone;
+					}
+				}
+			}
+		}
+		
+		issuesCache = mergedIssues;
 		lastCacheRefresh = System.currentTimeMillis();
 	}
 
@@ -232,14 +259,16 @@ public class IssuesController {
 
 	@GetMapping("/search")
 	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
-			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees") List<String> fields,
+			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees,project_status") List<String> fields,
 			@RequestParam(defaultValue = "100") int limit,
 			@RequestParam(defaultValue = "false") boolean includeExtended,
 			@RequestParam(required = false, defaultValue = "all") String state,
-			@RequestParam(required = false) List<String> repos) {
+			@RequestParam(required = false) List<String> repos,
+			@RequestParam(required = false) List<String> project_statuses,
+			@RequestParam(required = false) List<String> exclude_project_statuses) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -399,6 +428,7 @@ public class IssuesController {
 			sb.append("Title: ").append(issue.title).append("\n");
 			sb.append("Author: ").append(issue.user).append(" | Created: ").append(issue.createdAt).append("\n");
 			sb.append("State: ").append(issue.state).append(" | Milestone: ").append(issue.milestone).append("\n");
+			sb.append("Project Status: ").append(issue.project_status).append("\n");
 			sb.append("Labels: ").append(String.join(", ", issue.labels)).append("\n");
 			sb.append("Assignees: ").append(String.join(", ", issue.assignees)).append("\n\n");
 			sb.append("BODY:\n").append(issue.body).append("\n\n");
@@ -454,6 +484,27 @@ public class IssuesController {
 			data.put(issue.id, issue);
 		});
 		return data;
+	}
+	
+	private Map<String, ProjectBacklogDto> readProjectBacklogParquet() throws IOException {
+	    Map<String, ProjectBacklogDto> data = new HashMap<>();
+	    Path path = Paths.get(websiteLocation, ISSUES_FOLDER, PROJECT_BACKLOG_FILE);
+	    if (!path.toFile().exists()) {
+	        LOGGER.warn(PROJECT_BACKLOG_FILE + " not found. Skipping.");
+	        return data;
+	    }
+
+	    readParquetFile(path, (group, schema) -> {
+	        String id = getString(group, "id"); // e.g., "OsmAnd-Issues/2995"
+	        if (id == null || id.isEmpty()) return;
+
+	        ProjectBacklogDto backlogInfo = new ProjectBacklogDto();
+	        backlogInfo.projectStatus = getString(group, "project_status");
+	        backlogInfo.milestone = getString(group, "milestone");
+	        
+	        data.put(id.toLowerCase(), backlogInfo);
+	    });
+	    return data;
 	}
 
 	/**
@@ -561,9 +612,8 @@ public class IssuesController {
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-			boolean includeExtended, String state, List<String> repos) {
+			boolean includeExtended, String state, List<String> repos, List<String> project_statuses, List<String> exclude_project_statuses) {
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
-
 		final List<IssueDto> repoFilteredIssues;
 		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
 			Set<String> repoSet = new HashSet<>(repos);
@@ -582,8 +632,26 @@ public class IssuesController {
 			stateFilteredIssues = repoFilteredIssues;
 		}
 
+		final List<IssueDto> statusFilteredIssues;
+		final boolean hasInclusionFilter = project_statuses != null && !project_statuses.isEmpty();
+		final boolean hasExclusionFilter = exclude_project_statuses != null && !exclude_project_statuses.isEmpty();
+
+		if (hasInclusionFilter || hasExclusionFilter) {
+			final Set<String> includeSet = hasInclusionFilter ? new HashSet<>(project_statuses) : Collections.emptySet();
+			final Set<String> excludeSet = hasExclusionFilter ? new HashSet<>(exclude_project_statuses) : Collections.emptySet();
+
+			statusFilteredIssues = stateFilteredIssues.stream().filter(issue -> {
+				boolean passesInclude = !hasInclusionFilter || (issue.project_status != null && includeSet.contains(issue.project_status));
+				boolean passesExclude = !hasExclusionFilter || (issue.project_status == null || !excludeSet.contains(issue.project_status));
+				return passesInclude && passesExclude;
+			}).collect(Collectors.toList());
+		} else {
+			statusFilteredIssues = stateFilteredIssues;
+		}
+
+
 		if (query == null || query.trim().isEmpty()) {
-			return stateFilteredIssues;
+			return statusFilteredIssues;
 		}
 
 		List<String> quotedTerms = new ArrayList<>();
@@ -599,10 +667,10 @@ public class IssuesController {
 				.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
 
 		if (quotedTerms.isEmpty() && regularTerms.isEmpty()) {
-			return stateFilteredIssues;
+			return statusFilteredIssues;
 		}
 
-		return stateFilteredIssues.stream().filter(issue -> {
+		return statusFilteredIssues.stream().filter(issue -> {
 			StringBuilder searchableContent = new StringBuilder();
 			if (fields.contains("title") && issue.title != null)
 				searchableContent.append(issue.title).append(" ");
@@ -618,6 +686,8 @@ public class IssuesController {
 				searchableContent.append(issue.milestone).append(" ");
 			if (fields.contains("assignees") && issue.assignees != null)
 				searchableContent.append(String.join(" ", issue.assignees)).append(" ");
+			if (fields.contains("project_status") && issue.project_status != null)
+				searchableContent.append(issue.project_status).append(" ");
 			if (includeExtended) {
 				if (issue.body != null)
 					searchableContent.append(issue.body).append(" ");

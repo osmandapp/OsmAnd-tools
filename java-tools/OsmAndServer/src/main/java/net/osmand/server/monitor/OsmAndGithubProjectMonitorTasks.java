@@ -165,7 +165,6 @@ public class OsmAndGithubProjectMonitorTasks {
 		insertIntoProject(toUpd);
 		List<ProjectItem> toArch = new ArrayList<>();
 		for (ProjectItem it : dbItems.values()) {
-			System.out.println("Archive -  " + it);
 			it.setCurrentDate();
 			it.archived = true;
 			arch++;
