@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.file.Files;
@@ -327,9 +326,18 @@ public class OsmAndGithubProjectMonitorTasks {
 			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("created_at")
 			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("closed_at")
 
-			// Lists (assignees and labels)
-			.optionalList().optionalElement(PrimitiveTypeName.BINARY, LogicalTypeAnnotation.stringType()).named("assignees")
-			.optionalList().optionalElement(PrimitiveTypeName.BINARY, LogicalTypeAnnotation.stringType()).named("labels")
+			// Lists (assignees and labels) - Defined using the standard 3-level structure
+			.optionalGroup().as(LogicalTypeAnnotation.listType())
+				.repeatedGroup()
+					.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("element")
+				.named("list")
+			.named("assignees")
+
+			.optionalGroup().as(LogicalTypeAnnotation.listType())
+				.repeatedGroup()
+					.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("element")
+				.named("list")
+			.named("labels")
 
 			.named("issue");
 	}
