@@ -1,6 +1,7 @@
 package net.osmand.server.monitor;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringReader;
@@ -8,18 +9,41 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.parquet.ParquetReadOptions;
+import org.apache.parquet.column.page.PageReadStore;
+import org.apache.parquet.example.data.Group;
+import org.apache.parquet.example.data.simple.SimpleGroup;
+import org.apache.parquet.example.data.simple.SimpleGroupFactory;
+import org.apache.parquet.example.data.simple.convert.GroupRecordConverter;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.example.ExampleParquetWriter;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.ColumnIOFactory;
+import org.apache.parquet.io.MessageColumnIO;
+import org.apache.parquet.io.RecordReader;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
+import org.apache.parquet.schema.Types;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -38,6 +62,8 @@ public class OsmAndGithubProjectMonitorTasks {
 	// DB SCHEMA BELOW
 	
 	protected static final Log LOG = LogFactory.getLog(OsmAndGithubProjectMonitorTasks.class);
+	private static final Log LOGGER = LogFactory.getLog(OsmAndGithubProjectMonitorTasks.class);
+
 
 	private static final int MAX_PAGES = 100;
 	private static final int BATCH_SIZE = 100; 
@@ -55,6 +81,13 @@ public class OsmAndGithubProjectMonitorTasks {
 	
 	@Value("${monitoring.project.token}")
 	private String loginToken;
+
+	@Value("${osmand.web.location}")
+	private String websiteLocation;
+
+	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
+	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
+	private static final String BACKLOG_FILE = "project_backlog.parquet";
 	
 	Gson gson = new GsonBuilder().serializeNulls().create();
 
@@ -155,6 +188,171 @@ public class OsmAndGithubProjectMonitorTasks {
 		insertIntoProject(toArch);
 		LOG.info(String.format("SYNC Github project (%d items, %d updated, %d archived) - DONE in %.1f s", items.size(),
 				upd, arch, (System.currentTimeMillis() - time) / 1.0e3));
+		updateProjectBacklogParquet();
+	}
+
+
+	public void updateProjectBacklogParquet() throws IOException {
+		if (Algorithms.isEmpty(websiteLocation)) {
+			LOGGER.error("osmand.web.location is not configured. Parquet file will not be updated.");
+			return;
+		}
+
+		File folder = new File(websiteLocation, ISSUES_FOLDER);
+		if (!folder.exists() && !folder.mkdirs()) {
+			LOGGER.error("Failed to create directory: " + folder.getAbsolutePath());
+			return;
+		}
+	
+		Path sourceParquetPath = Paths.get(folder.getAbsolutePath(), ISSUES_FILE);
+		Path destinationParquetPath = Paths.get(folder.getAbsolutePath(), BACKLOG_FILE);
+
+		if (!Files.exists(sourceParquetPath)) {
+			LOGGER.warn("Source issues file not found, skipping update: " + sourceParquetPath);
+			return;
+		}
+
+		// 1. Load project items from DB
+		Map<String, ProjectItem> dbItems = loadItemsFromSQLQuery();
+
+		// 2. Read source parquet, update records and add new ones
+		List<Group> updatedRecords = processParquetIssues(sourceParquetPath, dbItems);
+
+		// 3. Write the updated records to the new parquet file
+		if (updatedRecords != null && !updatedRecords.isEmpty()) {
+			MessageType schema = getProjectBacklogSchema();
+			writeToParquet(destinationParquetPath, updatedRecords, schema);
+		}
+	}
+
+	private List<Group> processParquetIssues(Path sourcePath, Map<String, ProjectItem> dbItems) throws IOException {
+		List<Group> updatedRecords = new ArrayList<>();
+		Set<String> processedIssueIds = new HashSet<>();
+		Configuration conf = new Configuration();
+
+		MessageType targetSchema = getProjectBacklogSchema();
+		SimpleGroupFactory groupFactory = new SimpleGroupFactory(targetSchema);
+		
+		HadoopInputFile inputFile = HadoopInputFile.fromPath(new org.apache.hadoop.fs.Path(sourcePath.toUri()), conf);
+		
+		try (ParquetFileReader reader = ParquetFileReader.open(inputFile, ParquetReadOptions.builder().build())) {
+			MessageType sourceSchema = reader.getFileMetaData().getSchema();
+
+			PageReadStore pages;
+			while ((pages = reader.readNextRowGroup()) != null) {
+				long rows = pages.getRowCount();
+				MessageColumnIO columnIO = new ColumnIOFactory().getColumnIO(sourceSchema);
+				RecordReader<Group> recordReader = columnIO.getRecordReader(pages, new GroupRecordConverter(sourceSchema));
+
+				for (int i = 0; i < rows; i++) {
+					Group sourceGroup = recordReader.read();
+					SimpleGroup targetGroup = (SimpleGroup) groupFactory.newGroup();
+
+					// Copy data from source group to target group
+					copyGroupData(sourceGroup, targetGroup, "id", "number", "title", "body", "state", "created_at",
+							"updated_at", "closed_at", "user", "repo", "milestone");
+					
+					String repo = sourceGroup.getFieldRepetitionCount("repo") > 0 ? sourceGroup.getString("repo", 0) : null;
+					Long number = sourceGroup.getFieldRepetitionCount("number") > 0 ? sourceGroup.getLong("number", 0) : null;
+					
+					if (repo != null && number != null) {
+						String issueId = repo + "/" + number;
+						processedIssueIds.add(issueId);
+
+						ProjectItem dbItem = dbItems.get(issueId);
+						if (dbItem != null) {
+							targetGroup.add("project_status", dbItem.statusName);
+						}
+					}
+					updatedRecords.add(targetGroup);
+				}
+			}
+			
+			// Add new issues from the database that were not in the source parquet file
+			for (ProjectItem dbItem : dbItems.values()) {
+				if (!processedIssueIds.contains(dbItem.id)) {
+					SimpleGroup newRecord = (SimpleGroup) groupFactory.newGroup();
+					newRecord.add("number", Long.parseLong(dbItem.num));
+					newRecord.add("repo", dbItem.repo);
+					newRecord.add("title", dbItem.title);
+					newRecord.add("state", dbItem.closed ? "closed" : "open");
+					if (dbItem.publishedAt != null) newRecord.add("created_at", dbItem.publishedAt);
+					if (dbItem.closedAt != null) newRecord.add("closed_at", dbItem.closedAt);
+					if (dbItem.author != null) newRecord.add("user", dbItem.author);
+					if (dbItem.milestoneName != null) newRecord.add("milestone", dbItem.milestoneName);
+					if (dbItem.statusName != null) newRecord.add("project_status", dbItem.statusName);
+					updatedRecords.add(newRecord);
+				}
+			}
+
+		} catch (Exception e) {
+			LOGGER.error("Error reading parquet file: " + sourcePath, e);
+			return null;
+		}
+
+		return updatedRecords;
+	}
+
+	private void copyGroupData(Group source, SimpleGroup target, String... fields) {
+		for(String fieldName : fields) {
+			try {
+				if(source.getType().containsField(fieldName) && source.getFieldRepetitionCount(fieldName) > 0) {
+					// This is a simplification. A full implementation would need to check field types.
+					switch(target.getType().getType(fieldName).asPrimitiveType().getPrimitiveTypeName()) {
+						case INT64:
+							target.add(fieldName, source.getLong(fieldName, 0));
+							break;
+						case BINARY:
+							target.add(fieldName, source.getString(fieldName, 0));
+							break;
+						// Add other types as needed
+						default:
+							break;
+					}
+				}
+			} catch(Exception e) {
+				// Ignore if field doesn't exist or type mismatch
+			}
+		}
+	}
+
+
+	private void writeToParquet(Path destinationPath, List<Group> records, MessageType schema) throws IOException {
+		Configuration conf = new Configuration();
+		// To overwrite the file if it exists
+		if (Files.exists(destinationPath)) {
+			Files.delete(destinationPath);
+		}
+		
+		org.apache.hadoop.fs.Path hadoopPath = new org.apache.hadoop.fs.Path(destinationPath.toUri());
+
+		try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(hadoopPath)
+				.withType(schema)
+				.withConf(conf)
+				.build()) {
+			for (Group record : records) {
+				writer.write(record);
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error writing to parquet file: " + destinationPath, e);
+		}
+	}
+
+	private MessageType getProjectBacklogSchema() {
+		return Types.buildMessage()
+			.optional(PrimitiveTypeName.INT64).named("id")
+			.optional(PrimitiveTypeName.INT64).named("number")
+			.optional(PrimitiveTypeName.BINARY).named("title")
+			.optional(PrimitiveTypeName.BINARY).named("body")
+			.optional(PrimitiveTypeName.BINARY).named("state")
+			.optional(PrimitiveTypeName.BINARY).named("created_at")
+			.optional(PrimitiveTypeName.BINARY).named("updated_at")
+			.optional(PrimitiveTypeName.BINARY).named("closed_at")
+			.optional(PrimitiveTypeName.BINARY).named("user")
+			.optional(PrimitiveTypeName.BINARY).named("repo")
+			.optional(PrimitiveTypeName.BINARY).named("milestone")
+			.optional(PrimitiveTypeName.BINARY).named("project_status")
+			.named("issue");
 	}
 
 
