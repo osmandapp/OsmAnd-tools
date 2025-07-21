@@ -74,6 +74,8 @@ management:
     web:
       exposure:
         include: "*"
+
+spring.mvc.async.request-timeout: 600000
 spring:
   session:
     redisPort: ${REDIS_PORT:}
