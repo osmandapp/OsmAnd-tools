@@ -217,15 +217,29 @@ public class IssuesController {
 		lastCacheRefresh = System.currentTimeMillis();
 	}
 
+	@GetMapping("/repos")
+	public ResponseEntity<Set<String>> getRepositories() throws IOException {
+		refreshCache();
+		if (issuesCache == null || issuesCache.isEmpty()) {
+			return ResponseEntity.ok(Collections.emptySet());
+		}
+		Set<String> repos = issuesCache.stream()
+			.map(issue -> issue.repo)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toSet());
+		return ResponseEntity.ok(repos);
+	}
+
 	@GetMapping("/search")
 	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
 			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees") List<String> fields,
 			@RequestParam(defaultValue = "100") int limit,
 			@RequestParam(defaultValue = "false") boolean includeExtended,
-			@RequestParam(required = false, defaultValue = "all") String state) {
+			@RequestParam(required = false, defaultValue = "all") String state,
+			@RequestParam(required = false) List<String> repos) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -547,15 +561,25 @@ public class IssuesController {
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-			boolean includeExtended, String state) {
+			boolean includeExtended, String state, List<String> repos) {
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
+		final List<IssueDto> repoFilteredIssues;
+		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
+			Set<String> repoSet = new HashSet<>(repos);
+			repoFilteredIssues = allIssues.stream()
+					.filter(issue -> issue.repo != null && repoSet.contains(issue.repo))
+					.collect(Collectors.toList());
+		} else {
+			repoFilteredIssues = allIssues;
+		}
 
 		final List<IssueDto> stateFilteredIssues;
 		if (state != null && !state.equalsIgnoreCase("all") && !state.isEmpty()) {
-			stateFilteredIssues = allIssues.stream().filter(issue -> state.equalsIgnoreCase(issue.state))
+			stateFilteredIssues = repoFilteredIssues.stream().filter(issue -> state.equalsIgnoreCase(issue.state))
 					.collect(Collectors.toList());
 		} else {
-			stateFilteredIssues = allIssues;
+			stateFilteredIssues = repoFilteredIssues;
 		}
 
 		if (query == null || query.trim().isEmpty()) {
