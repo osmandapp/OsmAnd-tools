@@ -2,24 +2,24 @@
 
 import gc
 import os
-import sys
 import time
-from collections import defaultdict
-from multiprocessing import Pool
+import sys
 
 from PIL import Image
+from multiprocessing import Pool
+from collections import defaultdict
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib')))
 
-from python.lib.block_images_utils import IMAGE_WIDTH_MAIN, IMAGE_WIDTH_ARRAY, IMAGE_STORAGE_PATH
-from python.lib.block_images_utils import BLOCK_INVALID, block_images, remove_image_files
-from python.lib.download_utils import is_valid_image_file_name
+from lib.block_images_utils import IMAGE_WIDTH_MAIN, IMAGE_WIDTH_ARRAY, IMAGE_STORAGE_PATH
+from lib.block_images_utils import BLOCK_INVALID, block_images, remove_image_files
+from lib.download_utils import is_valid_image_file_name
 
 # Configuration
 SIZES = IMAGE_WIDTH_ARRAY
 SOURCE_DIR = IMAGE_STORAGE_PATH
 PARALLEL = int(os.getenv('PARALLEL', '15'))
-BUCKET_SIZE = int(os.getenv('BUCKET_SIZE', '1000'))  # Files per task
+BUCKET_SIZE = int(os.getenv('BUCKET_SIZE', '1000'))# Files per task
 
 
 def scan_directory(base_path: str) -> set[str]:
@@ -109,7 +109,7 @@ def main():
     print(f"\nStarting processing with {PARALLEL} workers across {len(buckets)} tasks...", flush=True)
     print(f"Each task processes up to {BUCKET_SIZE} files\n", flush=True)
 
-    # task_results = []
+    #task_results = []
     total_processed = total_resized = total_errors = 0
     start_time = time.time()
     invalid_files = set()
@@ -119,10 +119,10 @@ def main():
         ### 1. Requires large batches and tasks > 5-10s
         for result in pool.imap_unordered(process_bucket, args):
             files_in_task, resized_in_task, errors_in_task, invalid_files_in_task, duration, bucket_num = result
-            ### 2. Faster but no progress
-            # results = pool.map_async(process_bucket, args).get()
-            # for i, (files_in_task, resized_in_task, duration, bucket_num) in enumerate(results):
-            # task_results.append((bucket_num, files_in_task, resized_in_task, duration))
+        ### 2. Faster but no progress
+        #results = pool.map_async(process_bucket, args).get()
+        #for i, (files_in_task, resized_in_task, duration, bucket_num) in enumerate(results):
+            #task_results.append((bucket_num, files_in_task, resized_in_task, duration))
             total_processed += files_in_task
             total_resized += resized_in_task
             total_errors += errors_in_task
@@ -136,11 +136,10 @@ def main():
     total_duration = time.time() - start_time
 
     print(f"\nTotal: {total_processed} files processed, {total_resized} resized, {total_errors} errors", flush=True)
-    print(f"Total time: {total_duration:.2f}s ({total_processed / max(total_duration, 1):.2f} files/s)", flush=True)
+    print(f"Total time: {total_duration:.2f}s ({total_processed/max(total_duration,1):.2f} files/s)", flush=True)
 
     block_images(invalid_files, BLOCK_INVALID)
     remove_image_files(invalid_files)
-
 
 if __name__ == '__main__':
     main()
