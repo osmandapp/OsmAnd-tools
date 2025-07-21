@@ -87,7 +87,6 @@ public class IssuesController {
 	private static final long MODEL_PRICING_CACHE_TTL_MS = TimeUnit.HOURS.toMillis(1);
 	private static final int MAX_CONTEXT_BYTES = 1_000_000;
 	
-
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
 
@@ -134,11 +133,13 @@ public class IssuesController {
 		public String milestone;
 		public List<String> assignees = new ArrayList<>();
 		public String project_status;
+		public Boolean project_archived;
 	}
 	
 	private static class ProjectBacklogDto {
 	    String projectStatus;
 	    String milestone;
+		Boolean projectArchived;
 	}
 
 	public static class ChatMessage {
@@ -233,6 +234,7 @@ public class IssuesController {
 				ProjectBacklogDto backlogInfo = backlogData.get(key);
 				if (backlogInfo != null) {
 					issue.project_status = backlogInfo.projectStatus;
+					issue.project_archived = backlogInfo.projectArchived;
 					if (issue.milestone == null || issue.milestone.trim().isEmpty()) {
 						issue.milestone = backlogInfo.milestone;
 					}
@@ -265,10 +267,11 @@ public class IssuesController {
 			@RequestParam(required = false, defaultValue = "all") String state,
 			@RequestParam(required = false) List<String> repos,
 			@RequestParam(required = false) List<String> project_statuses,
-			@RequestParam(required = false) List<String> exclude_project_statuses) {
+			@RequestParam(required = false) List<String> exclude_project_statuses,
+			@RequestParam(required = false) Boolean archived) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses, archived);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -501,6 +504,7 @@ public class IssuesController {
 	        ProjectBacklogDto backlogInfo = new ProjectBacklogDto();
 	        backlogInfo.projectStatus = getString(group, "project_status");
 	        backlogInfo.milestone = getString(group, "milestone");
+			backlogInfo.projectArchived = getBoolean(group, "project_archived");
 	        
 	        data.put(id.toLowerCase(), backlogInfo);
 	    });
@@ -594,6 +598,18 @@ public class IssuesController {
 		return 0L;
 	}
 
+	private Boolean getBoolean(Group group, String fieldName) {
+		if (hasField(group, fieldName) && group.getFieldRepetitionCount(fieldName) > 0) {
+			try {
+				return group.getBoolean(fieldName, 0);
+			} catch (Exception e) {
+				LOGGER.warn("Could not read boolean value for field: " + fieldName);
+				return null;
+			}
+		}
+		return null;
+	}
+
 	private List<String> getStringList(Group group, String fieldName) {
 		List<String> list = new ArrayList<>();
 		if (hasField(group, fieldName) && group.getFieldRepetitionCount(fieldName) > 0) {
@@ -612,8 +628,10 @@ public class IssuesController {
 	 * Filters a list of issues based on the search query and selected fields.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-			boolean includeExtended, String state, List<String> repos, List<String> project_statuses, List<String> exclude_project_statuses) {
+			boolean includeExtended, String state, List<String> repos, List<String> project_statuses, List<String> exclude_project_statuses, Boolean archived) {
+		
 		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
 		final List<IssueDto> repoFilteredIssues;
 		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
 			Set<String> repoSet = new HashSet<>(repos);
@@ -631,6 +649,18 @@ public class IssuesController {
 		} else {
 			stateFilteredIssues = repoFilteredIssues;
 		}
+		
+		final List<IssueDto> archivedFilteredIssues;
+		if (archived != null) {
+			archivedFilteredIssues = stateFilteredIssues.stream()
+				.filter(issue -> {
+					boolean isArchived = issue.project_archived != null && issue.project_archived;
+					return isArchived == archived;
+				})
+				.collect(Collectors.toList());
+		} else {
+			archivedFilteredIssues = stateFilteredIssues;
+		}
 
 		final List<IssueDto> statusFilteredIssues;
 		final boolean hasInclusionFilter = project_statuses != null && !project_statuses.isEmpty();
@@ -640,13 +670,13 @@ public class IssuesController {
 			final Set<String> includeSet = hasInclusionFilter ? new HashSet<>(project_statuses) : Collections.emptySet();
 			final Set<String> excludeSet = hasExclusionFilter ? new HashSet<>(exclude_project_statuses) : Collections.emptySet();
 
-			statusFilteredIssues = stateFilteredIssues.stream().filter(issue -> {
+			statusFilteredIssues = archivedFilteredIssues.stream().filter(issue -> {
 				boolean passesInclude = !hasInclusionFilter || (issue.project_status != null && includeSet.contains(issue.project_status));
 				boolean passesExclude = !hasExclusionFilter || (issue.project_status == null || !excludeSet.contains(issue.project_status));
 				return passesInclude && passesExclude;
 			}).collect(Collectors.toList());
 		} else {
-			statusFilteredIssues = stateFilteredIssues;
+			statusFilteredIssues = archivedFilteredIssues;
 		}
 
 
