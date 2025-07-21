@@ -214,7 +214,7 @@ public class UpdateInAppPurchase {
 
                 boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
                 boolean isAmazonApp = sku.equals("net.osmand.amazon.maps.inapp") && platform.equals(PLATFORM_AMAZON);
-                if (orderId.startsWith(OSMAND_PLUS_APP) && (isGoogleApp || isAmazonApp)) {
+                if (orderId.equals(OSMAND_PLUS_APP) && (isGoogleApp || isAmazonApp)) {
                     continue; // Skip OsmAnd Plus app purchases
                 }
 

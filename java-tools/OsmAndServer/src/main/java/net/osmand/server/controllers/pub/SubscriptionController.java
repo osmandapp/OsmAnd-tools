@@ -491,8 +491,6 @@ public class SubscriptionController {
         String payloadParam = request.getParameter("payload");
         String skuParam = request.getParameter("sku");
 
-		String aidParam = request.getParameter("aid");
-
         // Platform and Effective IDs
         String platform = PurchaseHelper.getPlatformBySku(skuParam);
         boolean ios = PLATFORM_APPLE.equals(platform) || Algorithms.isEmpty(orderIdParam);
@@ -560,13 +558,13 @@ public class SubscriptionController {
             return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"subscription\" }");
 
         } else if (PURCHASE_TYPE_INAPP.equalsIgnoreCase(purchaseType)) {
-	        ResponseEntity<String> error = processOsmandPlusAppPurchase(userId, effectiveOrderId, skuParam, platform);
-			if (error != null) {
-				return error;
-			}
+	        if (!Algorithms.isEmpty(effectiveOrderId) && effectiveOrderId.equals(OSMAND_PLUS_APP)) {
+		        return ResponseEntity.ok("{ \"res\" : \"OK\", \"type\": \"inapp\" }");
+	        }
+
             SupporterDeviceInAppPurchase iap = new SupporterDeviceInAppPurchase();
             iap.purchaseToken = effectivePurchaseToken;
-            iap.orderId = processingOrderId(effectiveOrderId, aidParam); // Google orderId or Apple transaction_id
+            iap.orderId = effectiveOrderId; // Google orderId or Apple transaction_id
             iap.sku = skuParam;
             iap.valid = null; // Needs verification
             iap.timestamp = new Date(); // Record creation time
@@ -600,38 +598,6 @@ public class SubscriptionController {
             return userSubService.error("Invalid purchaseType specified: " + purchaseType);
         }
     }
-
-	private String processingOrderId(String effectiveOrderId, String aid) {
-		if (effectiveOrderId.equals(OSMAND_PLUS_APP) && aid != null) {
-			return OSMAND_PLUS_APP + "-" + aid;
-		}
-		return effectiveOrderId;
-	}
-
-	private ResponseEntity<String> processOsmandPlusAppPurchase(Integer userId, String orderId, String sku, String platform) {
-		if (!Algorithms.isEmpty(orderId) && orderId.equals(OSMAND_PLUS_APP)) {
-			if (Algorithms.isEmpty(sku)) {
-				return userSubService.error("SKU is not provided for OsmAnd+ App purchase.");
-			}
-			if (Algorithms.isEmpty(platform)) {
-				return userSubService.error("Platform is not provided for OsmAnd+ App purchase.");
-			}
-			boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
-			boolean isAmazonApp = sku.equals("net.osmand.amazon.maps.inapp") && platform.equals(PLATFORM_AMAZON);
-			if (!isGoogleApp && !isAmazonApp) {
-				return userSubService.error("SKU and platform mismatch for OsmAnd+ App purchase: sku=" + sku + ", platform=" + platform);
-			}
-			if (userId == null) {
-				return userSubService.error("User ID is not provided for OsmAnd+ App purchase.");
-			}
-			CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
-			if (pu == null) {
-				return userSubService.error("User not found. To purchase Maps+ in-app features, please register first.");
-			}
-			return null;
-		}
-		return null;
-	}
 
 	private void updateUserOrderId(Integer userId, String orderId, String sku) {
 		if (userId != null) {
