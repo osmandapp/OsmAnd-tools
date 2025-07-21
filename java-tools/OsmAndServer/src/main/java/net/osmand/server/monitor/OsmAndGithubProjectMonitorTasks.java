@@ -18,31 +18,20 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.parquet.ParquetReadOptions;
-import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroup;
 import org.apache.parquet.example.data.simple.SimpleGroupFactory;
-import org.apache.parquet.example.data.simple.convert.GroupRecordConverter;
-import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.ExampleParquetWriter;
-import org.apache.parquet.hadoop.util.HadoopInputFile;
-import org.apache.parquet.io.ColumnIOFactory;
-import org.apache.parquet.io.MessageColumnIO;
-import org.apache.parquet.io.RecordReader;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
-import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Types;
 import org.springframework.beans.factory.annotation.Value;
@@ -87,7 +76,6 @@ public class OsmAndGithubProjectMonitorTasks {
 	private String websiteLocation;
 
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
-	private static final String ISSUES_FILE = "osmandapp_issues.parquet";
 	private static final String BACKLOG_FILE = "project_backlog.parquet";
 	
 	Gson gson = new GsonBuilder().serializeNulls().create();
@@ -209,122 +197,84 @@ public class OsmAndGithubProjectMonitorTasks {
 			LOGGER.error("Failed to create directory: " + folder.getAbsolutePath());
 			return;
 		}
-	
-		Path sourceParquetPath = Paths.get(folder.getAbsolutePath(), ISSUES_FILE);
-		Path destinationParquetPath = Paths.get(folder.getAbsolutePath(), BACKLOG_FILE);
 
-		if (!Files.exists(sourceParquetPath)) {
-			LOGGER.warn("Source issues file not found, skipping update: " + sourceParquetPath);
-			return;
-		}
-
-		// 1. Load project items from DB
+		// 1. Load all current items from ClickHouse DB. This is the only source of truth.
 		Map<String, ProjectItem> dbItems = loadItemsFromSQLQuery();
+		List<Group> records = new ArrayList<>();
+		MessageType schema = getProjectBacklogSchema();
+		SimpleGroupFactory groupFactory = new SimpleGroupFactory(schema);
 
-		// 2. Read source parquet, update records and add new ones
-		List<Group> updatedRecords = processParquetIssues(sourceParquetPath, dbItems);
+		// 2. Convert each item from the database into a Parquet record.
+		for (ProjectItem dbItem : dbItems.values()) {
+			SimpleGroup group = (SimpleGroup) groupFactory.newGroup();
+			
+			// Main identifiers
+			group.add("id", dbItem.id);
+			group.add("num", Long.parseLong(dbItem.num));
+			group.add("repo", dbItem.repo);
+			group.add("title", dbItem.title);
+			group.add("url", dbItem.url);
 
-		// 3. Write the updated records to the new parquet file
-		if (updatedRecords != null && !updatedRecords.isEmpty()) {
-			MessageType schema = getProjectBacklogSchema();
-			writeToParquet(destinationParquetPath, updatedRecords, schema);
-		}
-		
-		LOGGER.info(String.format("Updating project backlog parquet file - DONE in %.1f s", (System.currentTimeMillis() - time) / 1.0e3));
-	}
+			// Status and planning fields
+			if (dbItem.statusName != null) {
+				group.add("project_status", dbItem.statusName);
+			}
+			if (dbItem.iterationName != null) {
+				group.add("iterationName", dbItem.iterationName);
+			}
+			if (dbItem.milestoneName != null) {
+				group.add("milestone", dbItem.milestoneName);
+			}
 
-	private List<Group> processParquetIssues(Path sourcePath, Map<String, ProjectItem> dbItems) throws IOException {
-		List<Group> updatedRecords = new ArrayList<>();
-		Set<String> processedIssueIds = new HashSet<>();
-		Configuration conf = new Configuration();
+			// Numeric fields
+			group.add("complexity", dbItem.complexity);
+			group.add("storyPoints", dbItem.storyPoints);
+			group.add("value", dbItem.value);
 
-		MessageType targetSchema = getProjectBacklogSchema();
-		SimpleGroupFactory groupFactory = new SimpleGroupFactory(targetSchema);
-		
-		HadoopInputFile inputFile = HadoopInputFile.fromPath(new org.apache.hadoop.fs.Path(sourcePath.toUri()), conf);
-		
-		try (ParquetFileReader reader = ParquetFileReader.open(inputFile, ParquetReadOptions.builder().build())) {
-			MessageType sourceSchema = reader.getFileMetaData().getSchema();
-
-			PageReadStore pages;
-			while ((pages = reader.readNextRowGroup()) != null) {
-				long rows = pages.getRowCount();
-				MessageColumnIO columnIO = new ColumnIOFactory().getColumnIO(sourceSchema);
-				RecordReader<Group> recordReader = columnIO.getRecordReader(pages, new GroupRecordConverter(sourceSchema));
-
-				for (int i = 0; i < rows; i++) {
-					Group sourceGroup = recordReader.read();
-					SimpleGroup targetGroup = (SimpleGroup) groupFactory.newGroup();
-
-					// Copy data from source group to target group
-					copyGroupData(sourceGroup, targetGroup, "id", "number", "title", "body", "state", "created_at",
-							"updated_at", "closed_at", "user", "repo", "milestone");
-					
-					String repo = sourceGroup.getFieldRepetitionCount("repo") > 0 ? sourceGroup.getString("repo", 0) : null;
-					Long number = sourceGroup.getFieldRepetitionCount("number") > 0 ? sourceGroup.getLong("number", 0) : null;
-					
-					if (repo != null && number != null) {
-						String issueId = repo + "/" + number;
-						processedIssueIds.add(issueId);
-
-						ProjectItem dbItem = dbItems.get(issueId);
-						if (dbItem != null && !Algorithms.isEmpty(dbItem.statusName)) {
-							targetGroup.add("project_status", dbItem.statusName);
-						}
-					}
-					updatedRecords.add(targetGroup);
-				}
+			// State and authoring
+			group.add("state", dbItem.closed ? "closed" : "open");
+			group.add("project_archived", dbItem.archived);
+			if (dbItem.author != null) {
+				group.add("user", dbItem.author);
 			}
 			
-			// Add new issues from the database that were not in the source parquet file
-			for (ProjectItem dbItem : dbItems.values()) {
-				if (!processedIssueIds.contains(dbItem.id)) {
-					SimpleGroup newRecord = (SimpleGroup) groupFactory.newGroup();
-					newRecord.add("number", Long.parseLong(dbItem.num));
-					newRecord.add("repo", dbItem.repo);
-					newRecord.add("title", dbItem.title);
-					newRecord.add("state", dbItem.closed ? "closed" : "open");
-					if (dbItem.publishedAt != null) newRecord.add("created_at", dbItem.publishedAt);
-					if (dbItem.closedAt != null) newRecord.add("closed_at", dbItem.closedAt);
-					if (dbItem.author != null) newRecord.add("user", dbItem.author);
-					if (dbItem.milestoneName != null) newRecord.add("milestone", dbItem.milestoneName);
-					if (dbItem.statusName != null) newRecord.add("project_status", dbItem.statusName);
-					updatedRecords.add(newRecord);
+			// Timestamps and version
+			group.add("timestamp", dbItem.timestamp);
+			group.add("version", dbItem.version);
+			if (dbItem.publishedAt != null) {
+				group.add("created_at", dbItem.publishedAt);
+			}
+			if (dbItem.closedAt != null) {
+				group.add("closed_at", dbItem.closedAt);
+			}
+			
+			// Lists (assignees and labels)
+			if (dbItem.assignees != null && !dbItem.assignees.isEmpty()) {
+				Group assigneesGroup = group.addGroup("assignees");
+				for (String assignee : dbItem.assignees) {
+					assigneesGroup.addGroup("list").add("element", assignee);
+				}
+			}
+			if (dbItem.labels != null && !dbItem.labels.isEmpty()) {
+				Group labelsGroup = group.addGroup("labels");
+				for (String label : dbItem.labels) {
+					labelsGroup.addGroup("list").add("element", label);
 				}
 			}
 
-		} catch (Exception e) {
-			LOGGER.error("Error reading parquet file: " + sourcePath, e);
-			return null;
+			records.add(group);
 		}
 
-		return updatedRecords;
-	}
-
-	private void copyGroupData(Group source, SimpleGroup target, String... fields) {
-		for(String fieldName : fields) {
-			try {
-				if(source.getType().containsField(fieldName) && source.getFieldRepetitionCount(fieldName) > 0) {
-					// This is a simplification. A full implementation would need to check field types.
-					switch(target.getType().getType(fieldName).asPrimitiveType().getPrimitiveTypeName()) {
-						case INT64:
-							target.add(fieldName, source.getLong(fieldName, 0));
-							break;
-						case BINARY:
-							target.add(fieldName, source.getString(fieldName, 0));
-							break;
-						// Add other types as needed
-						default:
-							break;
-					}
-				}
-			} catch(Exception e) {
-				// Ignore if field doesn't exist or type mismatch
-			}
+		// 3. Write the records to the new parquet file, overwriting the old one.
+		if (!records.isEmpty()) {
+			Path destinationParquetPath = Paths.get(folder.getAbsolutePath(), BACKLOG_FILE);
+			writeToParquet(destinationParquetPath, records, schema);
 		}
+		
+		LOGGER.info(String.format("Updating project backlog parquet file with %d records - DONE in %.1f s", 
+				records.size(), (System.currentTimeMillis() - time) / 1.0e3));
 	}
-
-
+	
 	private void writeToParquet(Path destinationPath, List<Group> records, MessageType schema) throws IOException {
 		Configuration conf = new Configuration();
 		// To overwrite the file if it exists
@@ -347,19 +297,40 @@ public class OsmAndGithubProjectMonitorTasks {
 	}
 
 	private MessageType getProjectBacklogSchema() {
+		// Defines the schema for the output Parquet file.
 		return Types.buildMessage()
-			.optional(PrimitiveTypeName.INT64).named("id")
-			.optional(PrimitiveTypeName.INT64).named("number")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("title")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("body")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("state")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("created_at")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("updated_at")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("closed_at")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("user")
+			// Main identifiers
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("id")
+			.optional(PrimitiveTypeName.INT64).named("num")
 			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("repo")
-			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("milestone")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("title")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("url")
+
+			// Status and planning fields
 			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("project_status")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("iterationName")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("milestone")
+
+			// Numeric fields
+			.optional(PrimitiveTypeName.DOUBLE).named("complexity")
+			.optional(PrimitiveTypeName.DOUBLE).named("storyPoints")
+			.optional(PrimitiveTypeName.DOUBLE).named("value")
+			
+			// State and authoring
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("state")
+			.optional(PrimitiveTypeName.BOOLEAN).named("project_archived")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("user")
+			
+			// Timestamps and version
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("timestamp")
+			.optional(PrimitiveTypeName.INT32).named("version")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("created_at")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("closed_at")
+
+			// Lists (assignees and labels)
+			.optionalList().optionalElement(PrimitiveTypeName.BINARY, LogicalTypeAnnotation.stringType()).named("assignees")
+			.optionalList().optionalElement(PrimitiveTypeName.BINARY, LogicalTypeAnnotation.stringType()).named("labels")
+
 			.named("issue");
 	}
 
@@ -554,9 +525,8 @@ public class OsmAndGithubProjectMonitorTasks {
 		String line = null;
 		while ((line = br.readLine()) != null) {
 			ProjectItem pi = gson.fromJson(line, ProjectItem.class);
-			if (!pi.archived) {
-				mp.put(pi.id, pi);
-			}
+			// We keep archived items now to set the 'project_archived' flag
+			mp.put(pi.id, pi);
 		}
 		return mp;
 	}
