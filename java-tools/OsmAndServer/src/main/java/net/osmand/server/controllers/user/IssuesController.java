@@ -78,7 +78,8 @@ public class IssuesController {
 	private String websiteLocation;
 	
 	private static final Log LOGGER = LogFactory.getLog(IssuesController.class);
-
+	
+	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
 	private static final String CATEGORIES_FILE = "categories.parquet";
@@ -136,6 +137,7 @@ public class IssuesController {
 		public String project_status;
 		public Boolean project_archived;
 		public Date updatedAt;
+		public Date closedAt;
 		public Date getTimestamp() {
 			return updatedAt == null ? createdAt : updatedAt;
 		}
@@ -226,7 +228,6 @@ public class IssuesController {
 			cat.body = det.body;
 			cat.comments = det.comments;
 			cat.milestone = det.milestone;
-			cat.updatedAt = det.updatedAt;
 			cat.assignees = det.assignees;
 			return cat;
 		}));
@@ -490,7 +491,14 @@ public class IssuesController {
 			if (nanoTimestamp > 0) {
 				issue.createdAt = new Date(TimeUnit.NANOSECONDS.toMillis(nanoTimestamp));
 			}
-			
+			nanoTimestamp = getLong(group, "updated_at");
+			if (nanoTimestamp > 0) {
+				issue.updatedAt = new Date(TimeUnit.NANOSECONDS.toMillis(nanoTimestamp));
+			}
+			nanoTimestamp = getLong(group, "closed_at");
+			if (nanoTimestamp > 0) {
+				issue.closedAt = new Date(TimeUnit.MICROSECONDS.toMillis(nanoTimestamp));
+			}
 			data.put(issue.id, issue);
 		});
 		return data;
@@ -525,7 +533,7 @@ public class IssuesController {
 	private Map<Long, IssueDto> readIssuesDetailParquet() throws IOException {
 		Map<Long, IssueDto> data = new HashMap<>();
 		Path path = Paths.get(websiteLocation, ISSUES_FOLDER, ISSUES_FILE);
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+		
 		readParquetFile(path, (group, schema) -> {
 			IssueDto issue = new IssueDto();
 			long id = getLong(group, "id");
@@ -536,14 +544,8 @@ public class IssuesController {
 			issue.body = getString(group, "body");
 			issue.milestone = getString(group, "milestone");
 			issue.assignees = getStringList(group, "assignees");
-			String updateTime = getString(group, "updated_at");
-			if (!updateTime.isEmpty()) {
-				try {
-					issue.updatedAt = sdf.parse(updateTime);
-				} catch (ParseException e) {
-					LOGGER.warn(e.getMessage(), e);
-				}
-			}
+			issue.updatedAt = getDate(group, "updated_at");
+			
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
@@ -557,7 +559,6 @@ public class IssuesController {
 						comment.id = getLong(commentGroup, "id");
 						comment.user = getString(commentGroup, "user");
 						comment.body = getString(commentGroup, "body");
-						comment.createdAt = getString(commentGroup, "created_at");
 						issue.comments.add(comment);
 					}
 				}
@@ -565,6 +566,18 @@ public class IssuesController {
 			data.put(issue.id, issue);
 		});
 		return data;
+	}
+
+	private Date getDate(Group group, String string) {
+		String date = getString(group, string);
+		if (!date.isEmpty()) {
+			try {
+				return sdf.parse(date);
+			} catch (ParseException e) {
+				LOGGER.warn(e.getMessage(), e);
+			}
+		}
+		return null;
 	}
 
 	/**
