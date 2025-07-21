@@ -40,6 +40,7 @@ import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.RecordReader;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
@@ -143,9 +144,7 @@ public class OsmAndGithubProjectMonitorTasks {
 	
 
 	@Scheduled(fixedRateString = "PT30M")
-//	@Scheduled(fixedRateString = "PT5S")
 	public void syncGithubProject() throws IOException, ParseException {
-//		if (TOTAL_SYNC > 5 || TOTAL_SYNC++ > 10000) return; 
 		if (Algorithms.isEmpty(projectdb)) {
 			return;
 		}
@@ -188,11 +187,18 @@ public class OsmAndGithubProjectMonitorTasks {
 		insertIntoProject(toArch);
 		LOG.info(String.format("SYNC Github project (%d items, %d updated, %d archived) - DONE in %.1f s", items.size(),
 				upd, arch, (System.currentTimeMillis() - time) / 1.0e3));
-		updateProjectBacklogParquet();
+		
+		try {
+			updateProjectBacklogParquet();
+		} catch (Exception e) {
+			LOGGER.error("Failed to update project backlog parquet file.", e);
+		}
 	}
 
-
 	public void updateProjectBacklogParquet() throws IOException {
+		long time = System.currentTimeMillis();
+		LOGGER.info("Updating project backlog parquet file - Start...");
+		
 		if (Algorithms.isEmpty(websiteLocation)) {
 			LOGGER.error("osmand.web.location is not configured. Parquet file will not be updated.");
 			return;
@@ -223,6 +229,8 @@ public class OsmAndGithubProjectMonitorTasks {
 			MessageType schema = getProjectBacklogSchema();
 			writeToParquet(destinationParquetPath, updatedRecords, schema);
 		}
+		
+		LOGGER.info(String.format("Updating project backlog parquet file - DONE in %.1f s", (System.currentTimeMillis() - time) / 1.0e3));
 	}
 
 	private List<Group> processParquetIssues(Path sourcePath, Map<String, ProjectItem> dbItems) throws IOException {
@@ -260,7 +268,7 @@ public class OsmAndGithubProjectMonitorTasks {
 						processedIssueIds.add(issueId);
 
 						ProjectItem dbItem = dbItems.get(issueId);
-						if (dbItem != null) {
+						if (dbItem != null && !Algorithms.isEmpty(dbItem.statusName)) {
 							targetGroup.add("project_status", dbItem.statusName);
 						}
 					}
@@ -342,16 +350,16 @@ public class OsmAndGithubProjectMonitorTasks {
 		return Types.buildMessage()
 			.optional(PrimitiveTypeName.INT64).named("id")
 			.optional(PrimitiveTypeName.INT64).named("number")
-			.optional(PrimitiveTypeName.BINARY).named("title")
-			.optional(PrimitiveTypeName.BINARY).named("body")
-			.optional(PrimitiveTypeName.BINARY).named("state")
-			.optional(PrimitiveTypeName.BINARY).named("created_at")
-			.optional(PrimitiveTypeName.BINARY).named("updated_at")
-			.optional(PrimitiveTypeName.BINARY).named("closed_at")
-			.optional(PrimitiveTypeName.BINARY).named("user")
-			.optional(PrimitiveTypeName.BINARY).named("repo")
-			.optional(PrimitiveTypeName.BINARY).named("milestone")
-			.optional(PrimitiveTypeName.BINARY).named("project_status")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("title")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("body")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("state")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("created_at")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("updated_at")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("closed_at")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("user")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("repo")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("milestone")
+			.optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("project_status")
 			.named("issue");
 	}
 
