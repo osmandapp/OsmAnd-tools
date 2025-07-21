@@ -20,7 +20,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -134,6 +133,10 @@ public class IssuesController {
 		public List<String> assignees = new ArrayList<>();
 		public String project_status;
 		public Boolean project_archived;
+		public Date updatedAt;
+		public Date getTimestamp() {
+			return updatedAt == null ? createdAt : updatedAt;
+		}
 	}
 	
 	private static class ProjectBacklogDto {
@@ -221,6 +224,7 @@ public class IssuesController {
 			cat.body = det.body;
 			cat.comments = det.comments;
 			cat.milestone = det.milestone;
+			cat.updatedAt = det.updatedAt;
 			cat.assignees = det.assignees;
 			return cat;
 		}));
@@ -484,6 +488,7 @@ public class IssuesController {
 			if (nanoTimestamp > 0) {
 				issue.createdAt = new Date(TimeUnit.NANOSECONDS.toMillis(nanoTimestamp));
 			}
+			
 			data.put(issue.id, issue);
 		});
 		return data;
@@ -529,6 +534,10 @@ public class IssuesController {
 			issue.body = getString(group, "body");
 			issue.milestone = getString(group, "milestone");
 			issue.assignees = getStringList(group, "assignees");
+			long nanoTimestamp = getLong(group, "updated_at");
+			if (nanoTimestamp > 0) {
+				issue.updatedAt = new Date(TimeUnit.NANOSECONDS.toMillis(nanoTimestamp));
+			}
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
@@ -630,7 +639,8 @@ public class IssuesController {
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
 			boolean includeExtended, String state, List<String> repos, List<String> project_statuses, List<String> exclude_project_statuses, Boolean archived) {
 		
-		allIssues.sort(Comparator.comparing(issue -> issue.createdAt, Comparator.nullsLast(Comparator.reverseOrder())));
+		allIssues.sort(Comparator.comparing(issue -> issue.getTimestamp()
+				, Comparator.nullsLast(Comparator.reverseOrder())));
 
 		final List<IssueDto> repoFilteredIssues;
 		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
