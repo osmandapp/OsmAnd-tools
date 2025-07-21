@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -523,7 +525,7 @@ public class IssuesController {
 	private Map<Long, IssueDto> readIssuesDetailParquet() throws IOException {
 		Map<Long, IssueDto> data = new HashMap<>();
 		Path path = Paths.get(websiteLocation, ISSUES_FOLDER, ISSUES_FILE);
-
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 		readParquetFile(path, (group, schema) -> {
 			IssueDto issue = new IssueDto();
 			long id = getLong(group, "id");
@@ -534,9 +536,13 @@ public class IssuesController {
 			issue.body = getString(group, "body");
 			issue.milestone = getString(group, "milestone");
 			issue.assignees = getStringList(group, "assignees");
-			long nanoTimestamp = getLong(group, "updated_at");
-			if (nanoTimestamp > 0) {
-				issue.updatedAt = new Date(TimeUnit.NANOSECONDS.toMillis(nanoTimestamp));
+			String updateTime = getString(group, "updated_at");
+			if (!updateTime.isEmpty()) {
+				try {
+					issue.updatedAt = sdf.parse(updateTime);
+				} catch (ParseException e) {
+					LOGGER.warn(e.getMessage(), e);
+				}
 			}
 
 			// Handle nested list of comments
