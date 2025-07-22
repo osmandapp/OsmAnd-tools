@@ -77,9 +77,9 @@ public class IssuesController {
 
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
-	
+
 	private static final Log LOGGER = LogFactory.getLog(IssuesController.class);
-	
+
 	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
 	private static final String ISSUES_FOLDER = "servers/github_issues/issues";
@@ -89,7 +89,7 @@ public class IssuesController {
 	private static final long CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(1);
 	private static final long MODEL_PRICING_CACHE_TTL_MS = TimeUnit.HOURS.toMillis(1);
 	private static final int MAX_CONTEXT_BYTES = 1_000_000;
-	
+
 	private volatile List<IssueDto> issuesCache;
 	private volatile long lastCacheRefresh = 0;
 
@@ -139,20 +139,21 @@ public class IssuesController {
 		public Boolean project_archived;
 		public Date updatedAt;
 		public Date closedAt;
-		
+
 		public Date getUpdateTimestamp() {
 			return updatedAt == null ? createdAt : updatedAt;
 		}
-		
+
 		public Date getClosedTimestamp() {
 			return closedAt == null ? createdAt : closedAt;
 		}
 	}
-	
+
 	private static class ProjectBacklogDto {
-	    String projectStatus;
-	    String milestone;
+		String projectStatus;
+		String milestone;
 		Boolean projectArchived;
+		List<String> assignees = new ArrayList<>();
 	}
 
 	public static class ChatMessage {
@@ -237,7 +238,7 @@ public class IssuesController {
 			cat.assignees = det.assignees;
 			return cat;
 		}));
-		
+
 		List<IssueDto> mergedIssues = new ArrayList<>(categoriesData.values());
 
 		// Second merge with backlog data
@@ -251,10 +252,13 @@ public class IssuesController {
 					if (issue.milestone == null || issue.milestone.trim().isEmpty()) {
 						issue.milestone = backlogInfo.milestone;
 					}
+					if (issue.assignees.isEmpty()) {
+						issue.assignees = backlogInfo.assignees;
+					}
 				}
 			}
 		}
-		
+
 		issuesCache = mergedIssues;
 		lastCacheRefresh = System.currentTimeMillis();
 	}
@@ -265,10 +269,8 @@ public class IssuesController {
 		if (issuesCache == null || issuesCache.isEmpty()) {
 			return ResponseEntity.ok(Collections.emptySet());
 		}
-		Set<String> repos = issuesCache.stream()
-			.map(issue -> issue.repo)
-			.filter(Objects::nonNull)
-			.collect(Collectors.toSet());
+		Set<String> repos = issuesCache.stream().map(issue -> issue.repo).filter(Objects::nonNull)
+				.collect(Collectors.toSet());
 		return ResponseEntity.ok(repos);
 	}
 
@@ -286,7 +288,8 @@ public class IssuesController {
 			@RequestParam(required = false, defaultValue = "desc") String sortOrder) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, q, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses, archived, sortBy, sortOrder);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, q, fields, includeExtended, state, repos,
+					project_statuses, exclude_project_statuses, archived, sortBy, sortOrder);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -295,11 +298,12 @@ public class IssuesController {
 	}
 
 	@PostMapping("/analyze")
-	public ResponseEntity<StreamingResponseBody> analyzeIssues(@RequestBody AnalyzeRequest request) throws IOException, InterruptedException {
+	public ResponseEntity<StreamingResponseBody> analyzeIssues(@RequestBody AnalyzeRequest request)
+			throws IOException, InterruptedException {
 		String apiKey = System.getenv("ISSUE_OPENROUTER_TOKEN");
 		if (apiKey == null || apiKey.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+					writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
 		}
 
 		refreshCache();
@@ -309,7 +313,8 @@ public class IssuesController {
 			String context = buildContextFromIssues(request.issueIds);
 			if (context.getBytes(StandardCharsets.UTF_8).length > MAX_CONTEXT_BYTES) {
 				return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(writer -> writer.write(
-						"Error: Selected issues exceed the 100,000-byte context limit. Please select fewer issues.".getBytes()));
+						"Error: Selected issues exceed the 100,000-byte context limit. Please select fewer issues."
+								.getBytes()));
 			}
 			messages.add(createMessage("system",
 					"You are a helpful assistant. The user has provided details for one or more GitHub issues. Analyze them based on the user's prompt and provide a concise, well-structured answer in Markdown format."));
@@ -329,7 +334,7 @@ public class IssuesController {
 				HttpRequest openRouterRequest = HttpRequest.newBuilder()
 						.uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
 						.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
-				        .timeout(Duration.of(5, ChronoUnit.MINUTES))
+						.timeout(Duration.of(5, ChronoUnit.MINUTES))
 						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
 								Map.of("model", request.model, "messages", messages, "stream", true))))
 						.build();
@@ -388,7 +393,8 @@ public class IssuesController {
 					DecimalFormat df = new DecimalFormat("#.######");
 					String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
 							+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
-					LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " " + costInfo.replace("\n", " "));
+					LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " "
+							+ costInfo.replace("\n", " "));
 					writer.write(costInfo);
 					writer.flush();
 				}
@@ -511,27 +517,29 @@ public class IssuesController {
 		});
 		return data;
 	}
-	
+
 	private Map<String, ProjectBacklogDto> readProjectBacklogParquet() throws IOException {
-	    Map<String, ProjectBacklogDto> data = new HashMap<>();
-	    Path path = Paths.get(websiteLocation, ISSUES_FOLDER, PROJECT_BACKLOG_FILE);
-	    if (!path.toFile().exists()) {
-	        LOGGER.warn(PROJECT_BACKLOG_FILE + " not found. Skipping.");
-	        return data;
-	    }
+		Map<String, ProjectBacklogDto> data = new HashMap<>();
+		Path path = Paths.get(websiteLocation, ISSUES_FOLDER, PROJECT_BACKLOG_FILE);
+		if (!path.toFile().exists()) {
+			LOGGER.warn(PROJECT_BACKLOG_FILE + " not found. Skipping.");
+			return data;
+		}
 
-	    readParquetFile(path, (group, schema) -> {
-	        String id = getString(group, "id"); // e.g., "OsmAnd-Issues/2995"
-	        if (id == null || id.isEmpty()) return;
+		readParquetFile(path, (group, schema) -> {
+			String id = getString(group, "id"); // e.g., "OsmAnd-Issues/2995"
+			if (id == null || id.isEmpty())
+				return;
 
-	        ProjectBacklogDto backlogInfo = new ProjectBacklogDto();
-	        backlogInfo.projectStatus = getString(group, "project_status");
-	        backlogInfo.milestone = getString(group, "milestone");
+			ProjectBacklogDto backlogInfo = new ProjectBacklogDto();
+			backlogInfo.projectStatus = getString(group, "project_status");
+			backlogInfo.milestone = getString(group, "milestone");
+			backlogInfo.assignees = getStringList(group, "assignees");
 			backlogInfo.projectArchived = getBoolean(group, "project_archived");
-	        
-	        data.put(id.toLowerCase(), backlogInfo);
-	    });
-	    return data;
+
+			data.put(id.toLowerCase(), backlogInfo);
+		});
+		return data;
 	}
 
 	/**
@@ -541,7 +549,7 @@ public class IssuesController {
 	private Map<Long, IssueDto> readIssuesDetailParquet() throws IOException {
 		Map<Long, IssueDto> data = new HashMap<>();
 		Path path = Paths.get(websiteLocation, ISSUES_FOLDER, ISSUES_FILE);
-		
+
 		readParquetFile(path, (group, schema) -> {
 			IssueDto issue = new IssueDto();
 			long id = getLong(group, "id");
@@ -553,7 +561,6 @@ public class IssuesController {
 			issue.milestone = getString(group, "milestone");
 			issue.assignees = getStringList(group, "assignees");
 			issue.updatedAt = getDate(group, "updated_at");
-			
 
 			// Handle nested list of comments
 			if (hasField(group, "comments") && group.getFieldRepetitionCount("comments") > 0) {
@@ -666,23 +673,24 @@ public class IssuesController {
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
 			boolean includeExtended, String state, List<String> repos, List<String> project_statuses,
 			List<String> exclude_project_statuses, Boolean archived, String sortBy, String sortOrder) {
-		
+
 		// 1. Create Sorter
 		Function<IssueDto, Date> keyExtractor;
 		switch (sortBy.toLowerCase()) {
-			case "created":
-				keyExtractor = issue -> issue.createdAt;
-				break;
-			case "closed":
-				keyExtractor = issue -> issue.getClosedTimestamp();
-				break;
-			case "updated":
-			default:
-				keyExtractor = issue -> issue.getUpdateTimestamp();
-				break;
+		case "created":
+			keyExtractor = issue -> issue.createdAt;
+			break;
+		case "closed":
+			keyExtractor = issue -> issue.getClosedTimestamp();
+			break;
+		case "updated":
+		default:
+			keyExtractor = issue -> issue.getUpdateTimestamp();
+			break;
 		}
 
-		Comparator<IssueDto> comparator = Comparator.comparing(keyExtractor, Comparator.nullsLast(Comparator.naturalOrder()));
+		Comparator<IssueDto> comparator = Comparator.comparing(keyExtractor,
+				Comparator.nullsLast(Comparator.naturalOrder()));
 		if ("desc".equalsIgnoreCase(sortOrder)) {
 			comparator = comparator.reversed();
 		}
@@ -694,8 +702,7 @@ public class IssuesController {
 		final List<IssueDto> repoFilteredIssues;
 		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
 			Set<String> repoSet = new HashSet<>(repos);
-			repoFilteredIssues = allIssues.stream()
-					.filter(issue -> issue.repo != null && repoSet.contains(issue.repo))
+			repoFilteredIssues = allIssues.stream().filter(issue -> issue.repo != null && repoSet.contains(issue.repo))
 					.collect(Collectors.toList());
 		} else {
 			repoFilteredIssues = allIssues;
@@ -708,15 +715,13 @@ public class IssuesController {
 		} else {
 			stateFilteredIssues = repoFilteredIssues;
 		}
-		
+
 		final List<IssueDto> archivedFilteredIssues;
 		if (archived != null) {
-			archivedFilteredIssues = stateFilteredIssues.stream()
-				.filter(issue -> {
-					boolean isArchived = issue.project_archived != null && issue.project_archived;
-					return isArchived == archived;
-				})
-				.collect(Collectors.toList());
+			archivedFilteredIssues = stateFilteredIssues.stream().filter(issue -> {
+				boolean isArchived = issue.project_archived != null && issue.project_archived;
+				return isArchived == archived;
+			}).collect(Collectors.toList());
 		} else {
 			archivedFilteredIssues = stateFilteredIssues;
 		}
@@ -726,27 +731,30 @@ public class IssuesController {
 		final boolean hasExclusionFilter = exclude_project_statuses != null && !exclude_project_statuses.isEmpty();
 
 		if (hasInclusionFilter || hasExclusionFilter) {
-			final Set<String> includeSet = hasInclusionFilter ? new HashSet<>(project_statuses) : Collections.emptySet();
-			final Set<String> excludeSet = hasExclusionFilter ? new HashSet<>(exclude_project_statuses) : Collections.emptySet();
+			final Set<String> includeSet = hasInclusionFilter ? new HashSet<>(project_statuses)
+					: Collections.emptySet();
+			final Set<String> excludeSet = hasExclusionFilter ? new HashSet<>(exclude_project_statuses)
+					: Collections.emptySet();
 
 			statusFilteredIssues = archivedFilteredIssues.stream().filter(issue -> {
-				boolean passesInclude = !hasInclusionFilter || (issue.project_status != null && includeSet.contains(issue.project_status));
-				boolean passesExclude = !hasExclusionFilter || (issue.project_status == null || !excludeSet.contains(issue.project_status));
+				boolean passesInclude = !hasInclusionFilter
+						|| (issue.project_status != null && includeSet.contains(issue.project_status));
+				boolean passesExclude = !hasExclusionFilter
+						|| (issue.project_status == null || !excludeSet.contains(issue.project_status));
 				return passesInclude && passesExclude;
 			}).collect(Collectors.toList());
 		} else {
 			statusFilteredIssues = archivedFilteredIssues;
 		}
 
-
 		if (query == null || query.trim().isEmpty()) {
 			return statusFilteredIssues;
 		}
-		
+
 		// 4. Parse search query for inclusion and exclusion terms
 		List<String> includedQuotedTerms = new ArrayList<>();
 		List<String> excludedTerms = new ArrayList<>();
-		
+
 		// Regex to find -"..." exclusion phrases and "..." inclusion phrases
 		Pattern pattern = Pattern.compile("(?:^|\\s)(-|)\"([^\"]*)\"");
 		Matcher matcher = pattern.matcher(query);
@@ -765,10 +773,9 @@ public class IssuesController {
 
 		String remainingQuery = sb.toString().toLowerCase();
 		final boolean isOrLogic = remainingQuery.contains(",");
-		List<String> includedRegularTerms = Stream.of(isOrLogic ? remainingQuery.split(",") : remainingQuery.split("\\s+"))
-				.map(String::trim)
-				.filter(s -> !s.isEmpty())
-				.filter(s -> {
+		List<String> includedRegularTerms = Stream
+				.of(isOrLogic ? remainingQuery.split(",") : remainingQuery.split("\\s+")).map(String::trim)
+				.filter(s -> !s.isEmpty()).filter(s -> {
 					if (s.startsWith("-")) {
 						if (s.length() > 1) {
 							excludedTerms.add(s.substring(1));
@@ -778,25 +785,34 @@ public class IssuesController {
 					return true; // This term is for inclusion
 				}).collect(Collectors.toList());
 
-
 		if (includedQuotedTerms.isEmpty() && includedRegularTerms.isEmpty() && excludedTerms.isEmpty()) {
 			return statusFilteredIssues;
 		}
 
 		return statusFilteredIssues.stream().filter(issue -> {
 			StringBuilder searchableContentBuilder = new StringBuilder();
-			if (fields.contains("title") && issue.title != null) searchableContentBuilder.append(issue.title).append(" ");
-			if (fields.contains("short_summary") && issue.shortSummary != null) searchableContentBuilder.append(issue.shortSummary).append(" ");
-			if (fields.contains("user") && issue.user != null) searchableContentBuilder.append(issue.user).append(" ");
-			if (fields.contains("labels") && issue.labels != null) searchableContentBuilder.append(String.join(" ", issue.labels)).append(" ");
-			if (fields.contains("llm_categories") && issue.llmCategories != null) searchableContentBuilder.append(String.join(" ", issue.llmCategories)).append(" ");
-			if (fields.contains("milestone") && issue.milestone != null) searchableContentBuilder.append(issue.milestone).append(" ");
-			if (fields.contains("assignees") && issue.assignees != null) searchableContentBuilder.append(String.join(" ", issue.assignees)).append(" ");
-			if (fields.contains("project_status") && issue.project_status != null) searchableContentBuilder.append(issue.project_status).append(" ");
+			if (fields.contains("title") && issue.title != null)
+				searchableContentBuilder.append(issue.title).append(" ");
+			if (fields.contains("short_summary") && issue.shortSummary != null)
+				searchableContentBuilder.append(issue.shortSummary).append(" ");
+			if (fields.contains("user") && issue.user != null)
+				searchableContentBuilder.append(issue.user).append(" ");
+			if (fields.contains("labels") && issue.labels != null)
+				searchableContentBuilder.append(String.join(" ", issue.labels)).append(" ");
+			if (fields.contains("llm_categories") && issue.llmCategories != null)
+				searchableContentBuilder.append(String.join(" ", issue.llmCategories)).append(" ");
+			if (fields.contains("milestone") && issue.milestone != null)
+				searchableContentBuilder.append(issue.milestone).append(" ");
+			if (fields.contains("assignees") && issue.assignees != null)
+				searchableContentBuilder.append(String.join(" ", issue.assignees)).append(" ");
+			if (fields.contains("project_status") && issue.project_status != null)
+				searchableContentBuilder.append(issue.project_status).append(" ");
 			if (includeExtended) {
-				if (issue.body != null) searchableContentBuilder.append(issue.body).append(" ");
+				if (issue.body != null)
+					searchableContentBuilder.append(issue.body).append(" ");
 				if (issue.comments != null) {
-					issue.comments.forEach(c -> searchableContentBuilder.append(c.user).append(" ").append(c.body).append(" "));
+					issue.comments.forEach(
+							c -> searchableContentBuilder.append(c.user).append(" ").append(c.body).append(" "));
 				}
 			}
 			String finalContent = searchableContentBuilder.toString().toLowerCase();
@@ -805,12 +821,12 @@ public class IssuesController {
 			if (!excludedTerms.isEmpty() && excludedTerms.stream().anyMatch(finalContent::contains)) {
 				return false;
 			}
-			
+
 			// Check required quoted terms
 			if (!includedQuotedTerms.isEmpty() && !includedQuotedTerms.stream().allMatch(finalContent::contains)) {
 				return false;
 			}
-			
+
 			// Check required regular terms
 			if (!includedRegularTerms.isEmpty()) {
 				if (isOrLogic) {
@@ -823,7 +839,7 @@ public class IssuesController {
 					}
 				}
 			}
-			
+
 			return true;
 		}).collect(Collectors.toList());
 	}
