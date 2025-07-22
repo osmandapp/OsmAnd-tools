@@ -252,30 +252,35 @@ public class GpxController {
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
 	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                               HttpSession httpSession) throws IOException {
-		
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		
+
+		String fileType = "gpx";
+		String filename = file.getOriginalFilename();
+		if(filename != null) {
+			fileType = filename.substring(filename.lastIndexOf('.') + 1);
+		}
+		File tmpFile = File.createTempFile(fileType +"_" + httpSession.getId(), "." + fileType);
+
 		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpGpx);
+		FileOutputStream fous = new FileOutputStream(tmpFile);
 		Algorithms.streamCopy(is, fous);
 		is.close();
 		fous.close();
-		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
-		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
+		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpFile));
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
-					"process-track-data loadGpxFile (%s) error (%s)", file.getName(), gpxFile.getError().getMessage()));
+					"process-track-data loadGpxFile (%s) error (%s)", file.getOriginalFilename(), gpxFile.getError().getMessage()));
 			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpGpx, null);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpFile, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
 	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
 	                                                         HttpSession httpSession) throws IOException {
