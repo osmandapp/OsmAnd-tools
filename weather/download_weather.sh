@@ -114,8 +114,8 @@ download_with_retry() {
     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     test -f "$FILENAME" && return
 
-    sleep 600
-    echo "Download try 3 (600s): ${FILENAME}"
+    sleep 900
+    echo "Download try 3 (900s): ${FILENAME}"
     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
     test -f "$FILENAME" && return
 
