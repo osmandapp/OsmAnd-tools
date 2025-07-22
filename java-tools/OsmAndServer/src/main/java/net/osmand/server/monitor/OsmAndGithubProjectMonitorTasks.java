@@ -165,10 +165,12 @@ public class OsmAndGithubProjectMonitorTasks {
 		insertIntoProject(toUpd);
 		List<ProjectItem> toArch = new ArrayList<>();
 		for (ProjectItem it : dbItems.values()) {
-			it.setCurrentDate();
-			it.archived = true;
-			arch++;
-			toArch.add(it);
+			if (!it.archived) {
+				it.setCurrentDate();
+				it.archived = true;
+				arch++;
+				toArch.add(it);
+			}
 		}
 		insertIntoProject(toArch);
 		LOG.info(String.format("SYNC Github project (%d items, %d updated, %d archived) - DONE in %.1f s", items.size(),
