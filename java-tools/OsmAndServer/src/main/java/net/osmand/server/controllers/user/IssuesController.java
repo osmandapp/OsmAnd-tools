@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -138,8 +139,13 @@ public class IssuesController {
 		public Boolean project_archived;
 		public Date updatedAt;
 		public Date closedAt;
-		public Date getTimestamp() {
+		
+		public Date getUpdateTimestamp() {
 			return updatedAt == null ? createdAt : updatedAt;
+		}
+		
+		public Date getClosedTimestamp() {
+			return closedAt == null ? createdAt : closedAt;
 		}
 	}
 	
@@ -267,7 +273,7 @@ public class IssuesController {
 	}
 
 	@GetMapping("/search")
-	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String query,
+	public ResponseEntity<List<IssueDto>> getIssues(@RequestParam(required = false) String q,
 			@RequestParam(required = false, defaultValue = "title,short_summary,labels,llm_categories,user,milestone,assignees,project_status") List<String> fields,
 			@RequestParam(defaultValue = "100") int limit,
 			@RequestParam(defaultValue = "false") boolean includeExtended,
@@ -275,10 +281,12 @@ public class IssuesController {
 			@RequestParam(required = false) List<String> repos,
 			@RequestParam(required = false) List<String> project_statuses,
 			@RequestParam(required = false) List<String> exclude_project_statuses,
-			@RequestParam(required = false) Boolean archived) {
+			@RequestParam(required = false) Boolean archived,
+			@RequestParam(required = false, defaultValue = "updated") String sortBy,
+			@RequestParam(required = false, defaultValue = "desc") String sortOrder) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, query, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses, archived);
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, q, fields, includeExtended, state, repos, project_statuses, exclude_project_statuses, archived, sortBy, sortOrder);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -570,7 +578,7 @@ public class IssuesController {
 
 	private Date getDate(Group group, String string) {
 		String date = getString(group, string);
-		if (!date.isEmpty()) {
+		if (date != null && !date.isEmpty()) {
 			try {
 				return sdf.parse(date);
 			} catch (ParseException e) {
@@ -653,14 +661,36 @@ public class IssuesController {
 	}
 
 	/**
-	 * Filters a list of issues based on the search query and selected fields.
+	 * Filters and sorts a list of issues based on search criteria.
 	 */
 	private List<IssueDto> filterAndSortIssues(List<IssueDto> allIssues, String query, List<String> fields,
-			boolean includeExtended, String state, List<String> repos, List<String> project_statuses, List<String> exclude_project_statuses, Boolean archived) {
+			boolean includeExtended, String state, List<String> repos, List<String> project_statuses,
+			List<String> exclude_project_statuses, Boolean archived, String sortBy, String sortOrder) {
 		
-		allIssues.sort(Comparator.comparing(issue -> issue.getTimestamp()
-				, Comparator.nullsLast(Comparator.reverseOrder())));
+		// 1. Create Sorter
+		Function<IssueDto, Date> keyExtractor;
+		switch (sortBy.toLowerCase()) {
+			case "created":
+				keyExtractor = issue -> issue.createdAt;
+				break;
+			case "closed":
+				keyExtractor = issue -> issue.getClosedTimestamp();
+				break;
+			case "updated":
+			default:
+				keyExtractor = issue -> issue.getUpdateTimestamp();
+				break;
+		}
 
+		Comparator<IssueDto> comparator = Comparator.comparing(keyExtractor, Comparator.nullsLast(Comparator.naturalOrder()));
+		if ("desc".equalsIgnoreCase(sortOrder)) {
+			comparator = comparator.reversed();
+		}
+
+		// 2. Initial sort of all issues
+		allIssues.sort(comparator);
+
+		// 3. Apply filters sequentially
 		final List<IssueDto> repoFilteredIssues;
 		if (repos != null && !repos.isEmpty() && !repos.contains("all")) {
 			Set<String> repoSet = new HashSet<>(repos);
@@ -712,65 +742,89 @@ public class IssuesController {
 		if (query == null || query.trim().isEmpty()) {
 			return statusFilteredIssues;
 		}
-
-		List<String> quotedTerms = new ArrayList<>();
-		Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+		
+		// 4. Parse search query for inclusion and exclusion terms
+		List<String> includedQuotedTerms = new ArrayList<>();
+		List<String> excludedTerms = new ArrayList<>();
+		
+		// Regex to find -"..." exclusion phrases and "..." inclusion phrases
+		Pattern pattern = Pattern.compile("(?:^|\\s)(-|)\"([^\"]*)\"");
 		Matcher matcher = pattern.matcher(query);
+		StringBuffer sb = new StringBuffer();
 		while (matcher.find()) {
-			quotedTerms.add(matcher.group(1).toLowerCase());
+			boolean isExcluded = "-".equals(matcher.group(1));
+			String term = matcher.group(2).toLowerCase();
+			if (isExcluded) {
+				excludedTerms.add(term);
+			} else {
+				includedQuotedTerms.add(term);
+			}
+			matcher.appendReplacement(sb, "");
 		}
+		matcher.appendTail(sb);
 
-		String unquotedQuery = matcher.replaceAll("").toLowerCase();
-		final boolean isOrLogic = unquotedQuery.contains(",");
-		List<String> regularTerms = Stream.of(isOrLogic ? unquotedQuery.split(",") : unquotedQuery.split("\\s+"))
-				.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+		String remainingQuery = sb.toString().toLowerCase();
+		final boolean isOrLogic = remainingQuery.contains(",");
+		List<String> includedRegularTerms = Stream.of(isOrLogic ? remainingQuery.split(",") : remainingQuery.split("\\s+"))
+				.map(String::trim)
+				.filter(s -> !s.isEmpty())
+				.filter(s -> {
+					if (s.startsWith("-")) {
+						if (s.length() > 1) {
+							excludedTerms.add(s.substring(1));
+						}
+						return false; // This term is for exclusion
+					}
+					return true; // This term is for inclusion
+				}).collect(Collectors.toList());
 
-		if (quotedTerms.isEmpty() && regularTerms.isEmpty()) {
+
+		if (includedQuotedTerms.isEmpty() && includedRegularTerms.isEmpty() && excludedTerms.isEmpty()) {
 			return statusFilteredIssues;
 		}
 
 		return statusFilteredIssues.stream().filter(issue -> {
-			StringBuilder searchableContent = new StringBuilder();
-			if (fields.contains("title") && issue.title != null)
-				searchableContent.append(issue.title).append(" ");
-			if (fields.contains("short_summary") && issue.shortSummary != null)
-				searchableContent.append(issue.shortSummary).append(" ");
-			if (fields.contains("user") && issue.user != null)
-				searchableContent.append(issue.user).append(" ");
-			if (fields.contains("labels") && issue.labels != null)
-				searchableContent.append(String.join(" ", issue.labels)).append(" ");
-			if (fields.contains("llm_categories") && issue.llmCategories != null)
-				searchableContent.append(String.join(" ", issue.llmCategories)).append(" ");
-			if (fields.contains("milestone") && issue.milestone != null)
-				searchableContent.append(issue.milestone).append(" ");
-			if (fields.contains("assignees") && issue.assignees != null)
-				searchableContent.append(String.join(" ", issue.assignees)).append(" ");
-			if (fields.contains("project_status") && issue.project_status != null)
-				searchableContent.append(issue.project_status).append(" ");
+			StringBuilder searchableContentBuilder = new StringBuilder();
+			if (fields.contains("title") && issue.title != null) searchableContentBuilder.append(issue.title).append(" ");
+			if (fields.contains("short_summary") && issue.shortSummary != null) searchableContentBuilder.append(issue.shortSummary).append(" ");
+			if (fields.contains("user") && issue.user != null) searchableContentBuilder.append(issue.user).append(" ");
+			if (fields.contains("labels") && issue.labels != null) searchableContentBuilder.append(String.join(" ", issue.labels)).append(" ");
+			if (fields.contains("llm_categories") && issue.llmCategories != null) searchableContentBuilder.append(String.join(" ", issue.llmCategories)).append(" ");
+			if (fields.contains("milestone") && issue.milestone != null) searchableContentBuilder.append(issue.milestone).append(" ");
+			if (fields.contains("assignees") && issue.assignees != null) searchableContentBuilder.append(String.join(" ", issue.assignees)).append(" ");
+			if (fields.contains("project_status") && issue.project_status != null) searchableContentBuilder.append(issue.project_status).append(" ");
 			if (includeExtended) {
-				if (issue.body != null)
-					searchableContent.append(issue.body).append(" ");
+				if (issue.body != null) searchableContentBuilder.append(issue.body).append(" ");
 				if (issue.comments != null) {
-					issue.comments
-							.forEach(c -> searchableContent.append(c.user).append(" ").append(c.body).append(" "));
+					issue.comments.forEach(c -> searchableContentBuilder.append(c.user).append(" ").append(c.body).append(" "));
 				}
 			}
-			String finalContent = searchableContent.toString().toLowerCase();
+			String finalContent = searchableContentBuilder.toString().toLowerCase();
 
-			boolean matchesQuoted = quotedTerms.stream().allMatch(finalContent::contains);
-			if (!matchesQuoted) {
+			// Check exclusions first
+			if (!excludedTerms.isEmpty() && excludedTerms.stream().anyMatch(finalContent::contains)) {
 				return false;
 			}
-
-			if (regularTerms.isEmpty()) {
-				return true;
+			
+			// Check required quoted terms
+			if (!includedQuotedTerms.isEmpty() && !includedQuotedTerms.stream().allMatch(finalContent::contains)) {
+				return false;
 			}
-
-			if (isOrLogic) {
-				return regularTerms.stream().anyMatch(finalContent::contains);
-			} else {
-				return regularTerms.stream().allMatch(finalContent::contains);
+			
+			// Check required regular terms
+			if (!includedRegularTerms.isEmpty()) {
+				if (isOrLogic) {
+					if (!includedRegularTerms.stream().anyMatch(finalContent::contains)) {
+						return false;
+					}
+				} else {
+					if (!includedRegularTerms.stream().allMatch(finalContent::contains)) {
+						return false;
+					}
+				}
 			}
+			
+			return true;
 		}).collect(Collectors.toList());
 	}
 }
