@@ -72,7 +72,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * filtering, retrieving issue details, and analyzing issues with LLMs.
  */
 @Controller
-@RequestMapping("/admin/issues/")
+@RequestMapping("/admin/issues")
 public class IssuesController {
 
 	@Value("${osmand.web.location}")
