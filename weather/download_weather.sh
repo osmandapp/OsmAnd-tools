@@ -1,4 +1,5 @@
 #!/bin/bash -xe
+
 SCRIPT_PROVIDER_MODE=$1
 DOWNLOAD_MODE=$2
 THIS_LOCATION="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -32,7 +33,7 @@ NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
 
-SLEEP_BEFORE_CURL=0.5
+SLEEP_BEFORE_CURL=1.0 # was 0.5
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
@@ -71,14 +72,27 @@ download() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
+    local INTERMEDIATE="$FILENAME.tmp"
+
     sleep $SLEEP_BEFORE_CURL
 
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
-        curl -k -L $URL --output ${FILENAME} --http1.1   || echo "Error of CURL with downloading $URl"
+        HTTP_CODE=$(curl -k -L -w "%{http_code}" "$URL" --output "$INTERMEDIATE" --http1.1)
     else
         # download part file by byte offset
-        curl -k -L --range $START_BYTE_OFFSET-$END_BYTE_OFFSET $URL --output ${FILENAME} --http1.1  || echo "Error of CURL with partial downloading $URl"
+        HTTP_CODE=$(curl -k -L -w "%{http_code}" --range $START_BYTE_OFFSET-$END_BYTE_OFFSET "$URL" --output "$INTERMEDIATE" --http1.1)
+    fi
+
+    if [ "$HTTP_CODE" = "200" -o "$HTTP_CODE" = "206" ]; then
+      mv -vf "$INTERMEDIATE" "$FILENAME"
+    else
+      echo
+      echo "Download failed with code $HTTP_CODE ($URL) [$START_BYTE_OFFSET]-[$END_BYTE_OFFSET]"
+      echo
+      cat "$INTERMEDIATE"
+      echo
+      rm -vf "$INTERMEDIATE"
     fi
 }
 
@@ -93,24 +107,20 @@ download_with_retry() {
 
     echo "Download try 1: ${FILENAME}"
     download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    test -f "$FILENAME" && return
 
-    if [[ -f $FILENAME ]]; then
-        echo "Downloading success with try 1: ${FILENAME}"
-        return
-    else
-        sleep 60
-        echo "Download try 2: ${FILENAME}"
-        download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    fi
+    sleep 60
+    echo "Download try 2 (60s): ${FILENAME}"
+    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    test -f "$FILENAME" && return
 
-    if [[ -f $FILENAME ]]; then
-        echo "Downloading success with try 2: ${FILENAME}"
-        return
-    else
-        echo "Fatal Download Error: ${FILENAME} still not downloaded!"
-        exit 1
-    fi
-    return
+    sleep 600
+    echo "Download try 3 (600s): ${FILENAME}"
+    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+    test -f "$FILENAME" && return
+
+    echo "Fatal Download Error: ${FILENAME} still not downloaded!"
+    exit 1
 }
 
 is_file_content_with_html() {
@@ -431,7 +441,10 @@ get_raw_ecmwf_files() {
                 # Parse from index file start and end byte offset for needed band
                 local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
                 if [[ -z "$CHANNEL_LINE" ]]; then
+                    echo
                     cat $DOWNLOAD_FOLDER/$FILETIME.index
+                    echo
+                    echo
                     echo "Missing for ${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]} - $FILETIME - index url $INDEX_FILE_URL"
                     cp $DOWNLOAD_FOLDER/"$FILETIME".index $BROKEN_RAW_FILES/
                     exit 1
@@ -495,6 +508,7 @@ get_raw_ecmwf_files() {
 
 export LC_ALL=en_US.UTF-8
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
+    mkdir -p "$ROOT_FOLDER/$ECMWF"
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start $DOWNLOAD_MODE
     get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
@@ -503,6 +517,7 @@ if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
     split_tiles
     clean_temp_files_on_finish
 elif [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
+    mkdir -p "$ROOT_FOLDER/$ECMWF"
     cd "$ROOT_FOLDER/$ECMWF"
     setup_folders_on_start $DOWNLOAD_MODE
 
