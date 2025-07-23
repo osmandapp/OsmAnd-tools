@@ -5,14 +5,11 @@ export LANG="${1:-$LANG}"
 export INPUT_PATTERN="${2:-$INPUT_PATTERN}"
 export API_KEY="${3:-$API_KEY}"
 
-if [ -z "$TOOLS_PATH" ]; then
-  TOOLS_PATH=$(pwd)/tools
-fi
 if [ -z "$WEB_DIR" ]; then
-  WEB_DIR=$(pwd)/web
+  WEB_DIR=../web
 fi
 if [ -z "$WEB_SERVER_CONFIG_PATH" ]; then
-  export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config
+  export WEB_SERVER_CONFIG_PATH=../web-server-config
 fi
 
 export MODEL_TEMPERATURE=0.5
