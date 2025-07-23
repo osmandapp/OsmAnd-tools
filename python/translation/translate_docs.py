@@ -385,7 +385,7 @@ def yarn_install() -> None:
         raise
 
 
-def create_i18n(i18n_lang_dir: Path) -> None:
+def create_i18n(i18n_lang_dir: Path, lang_code: str, lang_name: str) -> None:
     i18n_lang_dir.mkdir(parents=True, exist_ok=True)
     print(f"Directory {i18n_lang_dir} created.", flush=True)
 
@@ -393,11 +393,10 @@ def create_i18n(i18n_lang_dir: Path) -> None:
     main_dir = input_dir / "main"
     print(f"Running 'npm run write-translations' in {main_dir}...", flush=True)
     try:
-        completed_process_npm = subprocess.run(["npm", "run", "write-translations"],
-                                               cwd=main_dir, check=True, capture_output=True, text=True)
+        # Correct command: npm run write-translations -- --locale <lang_code>
+        completed_process_npm = subprocess.run(["npm", "run", "write-translations", "--", "--locale", lang_code, ], cwd=main_dir, check=True,
+                                               capture_output=True, text=True)
         print(f"'npm run write-translations' output:\n{completed_process_npm.stdout}", flush=True)
-        if completed_process_npm.stderr:
-            print(f"'npm run write-translations' errors:\n{completed_process_npm.stderr}", flush=True)
     except FileNotFoundError:
         print(f"Error: 'npm' command not found. Please ensure npm is installed and in your PATH.", flush=True)
         raise
@@ -407,19 +406,37 @@ def create_i18n(i18n_lang_dir: Path) -> None:
         print(f"Stderr: {e.stderr}", flush=True)
         raise
 
-    # Copy from ./i18n/en/* to ./i18n/$LANG/ and remove ./i18n/en, if LANG is not 'en'
-    i18n_en_dir = main_dir / "i18n/en"
-    if i18n_en_dir.is_dir():
-        print(f"Copying base translations from {i18n_en_dir} to {i18n_lang_dir}...", flush=True)
-        for item in i18n_en_dir.iterdir():
-            target_item_path = i18n_lang_dir / item.name
-            if item.is_dir():
-                shutil.copytree(item, target_item_path, dirs_exist_ok=True)
-            else:
-                shutil.copy2(item, target_item_path)
-        shutil.rmtree(i18n_en_dir, ignore_errors=True)  # True to mimic 'rm -rf'
-    else:
-        print(f"Warning: Expected English translations directory {i18n_en_dir} not found after 'npm run write-translations'. Skipping copy and cleanup.", flush=True)
+    navbar_path = input_dir / "main/i18n/en/docusaurus-theme-classic/navbar.json"
+    try:
+        if navbar_path.is_file():
+            with open(navbar_path, 'r', encoding='utf-8') as f:
+                navbar_data = json.load(f)
+
+            key = f"localeDropdown.label.{lang_code}"
+            if key not in navbar_data:
+                navbar_data[key] = {"message": lang_name, "description": f"Locale dropdown label for {lang_name}"}
+                with open(navbar_path, 'w', encoding='utf-8') as f:
+                    json.dump(navbar_data, f, indent=2, ensure_ascii=False)
+                print(f"Added '{key}' to {navbar_path}", flush=True)
+
+            # Propagate updated navbar.json to all existing i18n folders
+            i18n_root_dir = input_dir / "main/i18n"
+            for lang_dir in i18n_root_dir.iterdir():
+                if not lang_dir.is_dir():
+                    continue
+
+                target_navbar = lang_dir / "docusaurus-theme-classic/navbar.json"
+                if navbar_path == target_navbar:
+                    continue
+                try:
+                    shutil.copy2(navbar_path, target_navbar)
+                except IOError as ce:
+                    print(f"Warning: Could not copy {navbar_path} to {target_navbar}: {ce}", flush=True)
+            print(f"Copied updated navbar.json to all language folders in {i18n_root_dir}", flush=True)
+        else:
+            print(f"Warning: {navbar_path} does not exist; cannot update locale dropdown label.", flush=True)
+    except (IOError, json.JSONDecodeError) as e:
+        print(f"Error updating {navbar_path}: {e}", flush=True)
 
 
 def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> None:
@@ -433,7 +450,7 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
     print(f"Translation to '{lang_code}' is starting...", flush=True)
     if not INPUT_PATTERN:
         if not i18n_lang_dir.exists():
-            create_i18n(i18n_lang_dir)
+            create_i18n(i18n_lang_dir, lang_code, lang_name)
         init_i18n(lang_code, i18n_lang_dir)
 
         extensions = ['*'] if not INPUT_PATTERN else [f'*{ext}' for ext in IMAGES_EXTS]
@@ -442,7 +459,8 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
 
         make_translation(prompts['CURRENT_JSON_PROMPT'].format(lang=lang_name), root_lang_dir, root_lang_dir, 'current.json')
         make_translation(prompts['CATEGORY_JSON_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '_*_.json')
-        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code, "web-translation.json")
+        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code,
+                         "web-translation.json")
         make_translation(prompts['MD_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '*.md*')
     else:
         make_translation(prompts['MD_PROMPT'].format(lang=lang_name), blog_dir, blog_lang_dir, INPUT_PATTERN)
