@@ -53,12 +53,12 @@ Below are all environment variables, arguments, and their roles:
 ### 1. Clone the web-server-config/ and web/ repositories.
 
 ```bash
-git clone ssh://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
+git clone https://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
 
 git clone ssh://git@github.com/osmandapp/web-server-config                      # Clone web-server-config
 cd web-server-config && git checkout main && git pull       # Optional if you want to use a different branch
 
-git clone ssh://git@github.com/osmandapp/web                                    # Clone web
+git clone https://git@github.com/osmandapp/web                                    # Clone web
 cd web && git checkout main && git reset --hard && git pull # Optional if you want to use a different branch
 ```
 
