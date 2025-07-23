@@ -11,6 +11,9 @@ fi
 if [ -z "$WEB_DIR" ]; then
   WEB_DIR=$(pwd)/web
 fi
+if [ -z "$WEB_SERVER_CONFIG_PATH" ]; then
+  export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config
+fi
 
 export MODEL_TEMPERATURE=0.5
 export MODEL=or@google/gemini-2.5-flash
