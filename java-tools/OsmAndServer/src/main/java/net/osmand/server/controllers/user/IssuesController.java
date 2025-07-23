@@ -280,7 +280,7 @@ public class IssuesController {
 			@RequestParam(defaultValue = "100") int limit,
 			@RequestParam(defaultValue = "false") boolean includeExtended,
 			@RequestParam(required = false, defaultValue = "all") String state,
-			@RequestParam(required = false) List<String> repos,
+			@RequestParam(required = false) List<String> repo,
 			@RequestParam(required = false) List<String> project_statuses,
 			@RequestParam(required = false) List<String> exclude_project_statuses,
 			@RequestParam(required = false) Boolean archived,
@@ -288,7 +288,7 @@ public class IssuesController {
 			@RequestParam(required = false, defaultValue = "desc") String sortOrder) {
 		try {
 			refreshCache();
-			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, q, fields, includeExtended, state, repos,
+			List<IssueDto> filteredIssues = filterAndSortIssues(issuesCache, q, fields, includeExtended, state, repo,
 					project_statuses, exclude_project_statuses, archived, sortBy, sortOrder);
 			return ResponseEntity.ok(filteredIssues.stream().limit(limit).collect(Collectors.toList()));
 		} catch (IOException e) {
