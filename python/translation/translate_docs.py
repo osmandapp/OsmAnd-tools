@@ -393,8 +393,9 @@ def create_i18n(i18n_lang_dir: Path, lang_code: str, lang_name: str) -> None:
     main_dir = input_dir / "main"
     print(f"Running 'npm run write-translations' in {main_dir}...", flush=True)
     try:
-        completed_process_npm = subprocess.run(["npm", "run", f"write-translations -- --locale {lang_code}"],
-                                               cwd=main_dir, check=True, capture_output=True, text=True)
+        # Correct command: npm run write-translations -- --locale <lang_code>
+        completed_process_npm = subprocess.run(["npm", "run", "write-translations", "--", "--locale", lang_code, ], cwd=main_dir, check=True,
+                                               capture_output=True, text=True)
         print(f"'npm run write-translations' output:\n{completed_process_npm.stdout}", flush=True)
         if completed_process_npm.stderr:
             print(f"'npm run write-translations' errors:\n{completed_process_npm.stderr}", flush=True)
