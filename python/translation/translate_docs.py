@@ -418,7 +418,7 @@ def create_i18n(i18n_lang_dir: Path, lang_code: str, lang_name: str) -> None:
         print(f"Stderr: {e.stderr}", flush=True)
         raise
 
-    navbar_path = input_dir / "main/i18n/en/docusaurus-theme-classic/navbar.json"
+    navbar_path = input_dir / "main/src/theme/navbar.json"
     try:
         if navbar_path.is_file():
             with open(navbar_path, 'r', encoding='utf-8') as f:
