@@ -33,15 +33,15 @@ Before running the script, ensure you have the following:
 
 Below are all environment variables, arguments, and their roles:
 
-| Variable / Argument             | Required | Purpose                                                                         | Example                 |
-|---------------------------------|----------|---------------------------------------------------------------------------------|-------------------------|
-| **LANG (argument #1)**          | Yes      | Target language code for translation, or `all` to process all.                  | `fr`, `de`, `all`       |
-| **INPUT_PATTERN (argument #2)** | No       | Optional file pattern to filter which files are translated.                     | `'topic/*.md'`          |
-| **API_KEY (argument #3)**       | Yes      | API key for the LLM.                                                            | `sk-abc123xyz`          |
-| **MODEL**                       | No       | Model to use for translation. Defaults to `or@google/gemini-2.5-flash-preview`. |                         |
-| **TOOLS_PATH**                  | No       | Path to tools project. Should be clone or pull preliminary.                     | `/opt/projects/tools`   |
-| **WEB_SERVER_CONFIG_PATH**      | No       | Path to web-server-config project.                                              | `/opt/projects/website` |
-| **WEB_DIR**                     | No       | Name of documentation git repo. Default is `web`.                               | `web`                   |
+| Variable / Argument             | Required | Purpose                                                                 | Example                 |
+|---------------------------------|----------|-------------------------------------------------------------------------|-------------------------|
+| **LANG (argument #1)**          | Yes      | Target language code for translation, or `all` to process all.          | `fr`, `de`, `all`       |
+| **INPUT_PATTERN (argument #2)** | No       | Optional file pattern to filter which files are translated.             | `'topic/*.md'`          |
+| **API_KEY (argument #3)**       | Yes      | API key for the LLM.                                                    | `sk-abc123xyz`          |
+| **MODEL**                       | No       | Model to use for translation. Defaults to `or@google/gemini-2.5-flash`. |                         |
+| **TOOLS_PATH**                  | No       | Path to tools project. Should be clone or pull preliminary.             | `/opt/projects/tools`   |
+| **WEB_SERVER_CONFIG_PATH**      | No       | Path to web-server-config project.                                      | `/opt/projects/website` |
+| **WEB_DIR**                     | No       | Name of documentation git repo. Default is `web`.                       | `web`                   |
 
 > **Note:**
 > - `LANG` is first **positional argument** only (not an environment variable).
@@ -53,12 +53,12 @@ Below are all environment variables, arguments, and their roles:
 ### 1. Clone the web-server-config/ and web/ repositories.
 
 ```bash
-git clone ssh://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
+git clone https://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
 
 git clone ssh://git@github.com/osmandapp/web-server-config                      # Clone web-server-config
 cd web-server-config && git checkout main && git pull       # Optional if you want to use a different branch
 
-git clone ssh://git@github.com/osmandapp/web                                    # Clone web
+git clone https://git@github.com/osmandapp/web                                    # Clone web
 cd web && git checkout main && git reset --hard && git pull # Optional if you want to use a different branch
 ```
 
