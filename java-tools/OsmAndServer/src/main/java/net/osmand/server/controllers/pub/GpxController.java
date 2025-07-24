@@ -18,7 +18,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import kotlin.Pair;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.helper.ImportGpx;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.util.IProgress;
 import net.osmand.shared.gpx.GpxFile;
@@ -56,6 +58,8 @@ import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
+
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 
 
 @RestController
@@ -257,12 +261,12 @@ public class GpxController {
 	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                               HttpSession httpSession) throws IOException {
 
-		String fileType = "gpx";
+		String fileExt = GPX_FILE_EXT;
 		String filename = file.getOriginalFilename();
 		if(filename != null) {
-			fileType = filename.substring(filename.lastIndexOf('.') + 1);
+			fileExt = filename.substring(filename.lastIndexOf('.'));
 		}
-		File tmpFile = File.createTempFile(fileType +"_" + httpSession.getId(), "." + fileType);
+		File tmpFile = File.createTempFile(fileExt.substring(1) + "_" + httpSession.getId(), fileExt);
 
 		InputStream is = file.getInputStream();
 		FileOutputStream fous = new FileOutputStream(tmpFile);
@@ -270,10 +274,22 @@ public class GpxController {
 		is.close();
 		fous.close();
 		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
-		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpFile));
+		Source source = Okio.source(tmpFile);
+		GpxFile gpxFile;
+		if (!GPX_FILE_EXT.equals(fileExt)) {
+			Pair<GpxFile, Long> gpxInfo = ImportGpx.INSTANCE.loadGpx(source, filename);
+			if (gpxInfo != null) {
+				gpxFile = gpxInfo.getFirst();
+			} else {
+				LOGGER.error(String.format("process-track-data loadGpxFile (%s) error", filename));
+				return ResponseEntity.badRequest().body("Error reading file: " + filename);
+			}
+		} else {
+			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+		}
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
-					"process-track-data loadGpxFile (%s) error (%s)", file.getOriginalFilename(), gpxFile.getError().getMessage()));
+					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
 			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
 			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpFile, null);
