@@ -114,14 +114,22 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
     locales_pattern = re.compile(r"(locales\s*:\s*\[)([^\]]*)(\])", re.MULTILINE)
     m = locales_pattern.search(content)
     if m:
-        before, inner, after = m.groups()
-        # Check if the lang already exists (e.g., 'fr' or "fr")
-        if re.search(rf"['\"]{re.escape(lang_code)}['\"]", inner) is None:
-            # Prepare insertion: add ', ' if inner is non-empty, else just the new item
-            separator = ", " if inner.strip() else ""
-            new_inner = inner + separator + f"'{lang_code}'"
-            content = locales_pattern.sub(f"\\1{new_inner}\\3", content, count=1)
-            updated = True
+        prefix, inner, suffix = m.groups()
+
+        # extract list of locale codes
+        locales_list = re.findall(r"['\"]([^'\"]+)['\"]", inner)
+        if lang_code not in locales_list:
+            locales_list.append(lang_code)
+
+        locales_sorted = sorted(set(locales_list))
+        if 'en' in locales_sorted:
+            locales_sorted.remove('en')
+            locales_sorted.insert(0, 'en')
+
+        new_inner = ", ".join(f"'{lc}'" for lc in locales_sorted)
+
+        content = locales_pattern.sub(f"{prefix}{new_inner}{suffix}", content, count=1)
+        updated = True
     else:
         print("Warning: Could not find a locales array in docusaurus.config.js")
         return False
@@ -135,26 +143,30 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
     m_cfg = configs_pattern.search(content)
     if m_cfg:
         g1, inner_cfg, g3 = m_cfg.groups()
-        # If lang is not already in the inner block, we’ll insert it
-        if re.search(rf"{re.escape(lang_code)}\s*:", inner_cfg) is None:
-            # Determine the indentation of existing entries by looking at the first indented line
-            indent_match = re.search(r"^([ \t]+)\w", inner_cfg, re.MULTILINE)
-            indent = indent_match.group(1) if indent_match else "  "
 
-            # Ensure the existing block ends with a comma
-            trimmed_inner = inner_cfg.rstrip()
-            if not trimmed_inner.endswith(","):
-                trimmed_inner += ","
+        # Determine indentation
+        indent_match = re.search(r"^([ \t]+)\w", inner_cfg, re.MULTILINE)
+        indent = indent_match.group(1) if indent_match else "  "
 
-            # Build the new entry line
-            new_entry = f"\n{indent}{lang_code}: {{ label: '{native_label}' }},"
+        # Extract existing locale lines into dict code->label
+        existing_pairs = re.findall(r"^\s*([\w-]+)\s*:\s*\{\s*label\s*:\s*['\"]([^'\"]+)['\"]\s*}\s*,?", inner_cfg, re.MULTILINE)
+        locale_dict = {code: label for code, label in existing_pairs}
 
-            # Reconstruct the inner block, making sure to add a newline after our insertion
-            new_inner_cfg = trimmed_inner + new_entry + "\n"
+        # Add new locale
+        locale_dict.setdefault(lang_code, native_label)
 
-            # Reassemble the full localeConfigs block
-            content = configs_pattern.sub(f"\\1{new_inner_cfg}\\3", content, count=1)
-            updated = True
+        # Build sorted lines
+        sorted_codes = sorted(locale_dict.keys())
+        if 'en' in sorted_codes:
+            sorted_codes.remove('en')
+            sorted_codes.insert(0, 'en')
+
+        cfg_lines = [f"{indent}{code}: {{ label: '{locale_dict[code]}' }}," for code in sorted_codes]
+
+        new_inner_cfg = "\n".join(cfg_lines) + "\n"
+
+        content = configs_pattern.sub(f"{g1}{new_inner_cfg}{g3}", content, count=1)
+        updated = True
     else:
         print("Warning: Could not find a localeConfigs object in docusaurus.config.js")
         return False
@@ -406,7 +418,7 @@ def create_i18n(i18n_lang_dir: Path, lang_code: str, lang_name: str) -> None:
         print(f"Stderr: {e.stderr}", flush=True)
         raise
 
-    navbar_path = input_dir / "main/i18n/en/docusaurus-theme-classic/navbar.json"
+    navbar_path = input_dir / "main/src/theme/navbar.json"
     try:
         if navbar_path.is_file():
             with open(navbar_path, 'r', encoding='utf-8') as f:
