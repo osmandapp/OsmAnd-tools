@@ -18,7 +18,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import kotlin.Pair;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.helper.ImportGpx;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.util.IProgress;
 import net.osmand.shared.gpx.GpxFile;
@@ -56,6 +58,8 @@ import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
+
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 
 
 @RestController
@@ -252,30 +256,49 @@ public class GpxController {
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
 	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                               HttpSession httpSession) throws IOException {
-		
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		
-		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpGpx);
-		Algorithms.streamCopy(is, fous);
-		is.close();
-		fous.close();
-		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
-		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+
+		String filename = file.getOriginalFilename();
+		File tmpFile = createTempFile(file, httpSession);
+		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
+		Source source = Okio.source(tmpFile);
+		GpxFile gpxFile = loadGpxFile(source, filename);
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
-					"process-track-data loadGpxFile (%s) error (%s)", file.getName(), gpxFile.getError().getMessage()));
+					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
 			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpGpx, null);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpFile, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}
-	
+
+	private GpxFile loadGpxFile(Source source, String filename) throws IOException {
+		GpxFile gpxFile;
+		if (filename.endsWith(GPX_FILE_EXT)) {
+			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+		} else {
+			Pair<GpxFile, Long> gpxInfo = ImportGpx.INSTANCE.loadGpx(source, filename);
+			gpxFile = gpxInfo.getFirst();
+		}
+		return gpxFile;
+	}
+
+	private File createTempFile(MultipartFile file, HttpSession httpSession) throws IOException {
+		String filename = file.getOriginalFilename();
+		String fileExt = filename.substring(filename.lastIndexOf('.'));
+		File tmpFile = File.createTempFile(fileExt.substring(1) + "_" + httpSession.getId(), fileExt);
+		InputStream is = file.getInputStream();
+		FileOutputStream fous = new FileOutputStream(tmpFile);
+		Algorithms.streamCopy(is, fous);
+		is.close();
+		fous.close();
+		return tmpFile;
+	}
+
 	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
 	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
 	                                                         HttpSession httpSession) throws IOException {
