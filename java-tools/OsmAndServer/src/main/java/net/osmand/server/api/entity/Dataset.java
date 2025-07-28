@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "datasets")
+@Table(name = "dataset")
 public class Dataset {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,6 +21,17 @@ public class Dataset {
 
     @Column(nullable = false)
     private String sourceStatus = "NEW";
+
+    public Integer getSizeLimit() {
+        return sizeLimit;
+    }
+
+    public void setSizeLimit(Integer sizeLimit) {
+        this.sizeLimit = sizeLimit;
+    }
+
+    @Column(nullable = true)
+    private Integer sizeLimit = 10000;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime created = LocalDateTime.now();

@@ -12,11 +12,9 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 
 ## 1. Data Ingestion
 
-- [ ] **POST `/admin/test/overpass`** – accepts Overpass JSON query + `sizeLimit` and triggers the 3-step ingestion 
-  pipeline (#FR-1).
-- [ ] **POST `/admin/test/csv/count`** – streams an uploaded CSV and returns total row count `N` (#FR-2-1).
-- [ ] **POST `/admin/test/csv/retrieve`** – uploads CSV (or internal temp file) and persists a random sample 
-  (Reservoir Sampling) limited by `sizeLimit` (#FR-2-2).
+- [x] **POST `/admin/test/csv/count`** – reads a local CSV file (path provided in request) and returns total row 
+  count `N` (#FR-2-1).
+- [ ] **POST `/admin/test/refreshDataset`** – reads a local CSV file (path provided in request) and persists a random sample (Reservoir Sampling) limited by `sizeLimit` (#FR-2-2).
 
 ## 2. Test Execution
 
@@ -43,3 +41,18 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 ## 5. Security
 
 - [ ] All endpoints above require **JWT authentication**; test/job operations limited to role `ADMIN` (#FR-20-21).
+
+## Test Search API
+
+### Ingest data from Overpass API
+
+- **URL:** `/admin/test/overpass`
+- **Method:** `POST`
+- **Body:** `OverpassTestRequest`
+
+```json
+{
+  "datasetName": "my_test_dataset",
+  "query": "node[amenity=restaurant](around:1000, 50.45, 30.52);out;"
+}
+```

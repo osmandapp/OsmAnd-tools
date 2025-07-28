@@ -2,106 +2,101 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.osmand.server.api.dto.OverpassTestRequest;
+import net.osmand.server.api.dto.OverpassQueryRequest;
+import net.osmand.server.api.dto.OverpassQueryResult;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.repo.DatasetRepository;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import jakarta.annotation.PostConstruct;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
 @Service
 public class TestSearchService {
-    public static enum DatasetType {
+    public enum DatasetType {
         NEW, COMPLETED, FAILED
     }
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
-    private static final String OVERPASS_API_URL = "https://overpass-api.de/api/interpreter";
-    private static final int DEFAULT_SIZE_LIMIT = 10_000;
 
     private final DatasetRepository datasetRepository;
-    private final WebClient webClient;
+    private WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final WebClient.Builder webClientBuilder;
+    @Value("${test.csv.dir}")
+    private String csvDownloadingDir;
+    @Value("${test.overpass.url}")
+    private String overpassApiUrl;
 
     @Autowired
     public TestSearchService(DatasetRepository datasetRepository, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
-        this.webClient = webClientBuilder.baseUrl(OVERPASS_API_URL).build();
+        this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
     }
 
+    @PostConstruct
+    private void initWebClient() {
+        this.webClient = webClientBuilder.baseUrl(overpassApiUrl).build();
+    }
+
+    private Dataset createDataset(String datasetName, String query, String type) {
+        Dataset dataset = new Dataset();
+        dataset.setName(datasetName);
+        dataset.setType(type);
+        dataset.setSource(query);
+        dataset.setSourceStatus(DatasetType.NEW.name());
+        dataset = datasetRepository.save(dataset);
+
+        return dataset;
+    }
     @Async
-    public CompletableFuture<Dataset> ingestFromOverpass(OverpassTestRequest request) {
+    public CompletableFuture<OverpassQueryResult> queryOverpass(String query) {
         return CompletableFuture.supplyAsync(() -> {
-            String datasetName = generateDatasetName();
-            if (datasetRepository.findByName(datasetName).isPresent()) {
-                throw new DataIntegrityViolationException("Dataset with name '" + datasetName + "' already exists.");
-            }
-
-            Dataset dataset = new Dataset();
-            dataset.setName(datasetName);
-            dataset.setType("Overpass");
-            dataset.setSource(request.query());
-            dataset.setSourceStatus(DatasetType.NEW.name());
-            dataset = datasetRepository.save(dataset);
-
-            Path tempFile = null;
+            Path tempFile;
             try {
-                String overpassResponse = queryOverpass(request.query()).join();
-                tempFile = Files.createTempFile("overpass_", ".csv");
-                int rowCount = convertJsonToCsv(overpassResponse, tempFile);
-                // In a real implementation, we would now perform sampling and ingest into SQLite.
-                // For now, we'll just mark it as complete.
+                String overpassResponse = webClient.post()
+                        .uri("")
+                        .bodyValue("data=[out:json][timeout:25];" + query)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .toFuture().join();
+                tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv.gz");
+                int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
                 LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 
-                dataset.setSourceStatus(DatasetType.COMPLETED.name());
-                return datasetRepository.save(dataset);
+                return new OverpassQueryResult(tempFile.toString(), rowCount);
             } catch (Exception e) {
-                LOGGER.error("Failed to ingest data from Overpass for dataset {}", dataset.getId(), e);
-                dataset.setSourceStatus(DatasetType.FAILED.name());
-                datasetRepository.save(dataset);
-                throw new RuntimeException("Failed to ingest from Overpass", e);
-            } finally {
-                if (tempFile != null) {
-                    try {
-                        Files.delete(tempFile);
-                    } catch (IOException e) {
-                        LOGGER.warn("Failed to delete temporary file: {}", tempFile, e);
-                    }
-                }
+                LOGGER.error("Failed to query data from Overpass for {}", query, e);
+                throw new RuntimeException("Failed to query from Overpass", e);
             }
         });
     }
 
-    private CompletableFuture<String> queryOverpass(String query) {
-        return webClient.post()
-                .uri("")
-                .bodyValue("data=" + query)
-                .retrieve()
-                .bodyToMono(String.class)
-                .toFuture();
-    }
-
-    private int convertJsonToCsv(String jsonResponse, Path outputPath) throws IOException {
+    private int convertJsonToSaveInCsv(String jsonResponse, Path outputPath) throws IOException {
         JsonNode root = objectMapper.readTree(jsonResponse);
         JsonNode elements = root.path("elements");
 
@@ -139,6 +134,82 @@ public class TestSearchService {
             }
         }
         return rowCount;
+    }
+
+    @Async
+    public CompletableFuture<Long> countCsvRows(String filePath) {
+        return CompletableFuture.supplyAsync(() -> {
+            Path fullPath = Path.of(csvDownloadingDir, filePath);
+            try (BufferedReader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
+                // Subtract 1 for the header row
+                return Math.max(0, reader.lines().count() - 1);
+            } catch (IOException e) {
+                LOGGER.error("Failed to count rows in CSV file: {}", fullPath, e);
+                throw new RuntimeException("Failed to count rows in CSV file", e);
+            }
+        });
+    }
+
+    @Async
+    public CompletableFuture<String> refreshDataset(Long datasetId, Integer sizeLimit) {
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<Dataset> datasetOption = datasetRepository.findById(datasetId);
+            if (datasetOption.isEmpty()) {
+                throw new RuntimeException("Dataset not found");
+            }
+
+            Dataset dataset = datasetOption.get();
+            String filePath = dataset.getSource();
+            int currentSizeLimit = dataset.getSizeLimit();
+            if (currentSizeLimit != sizeLimit) {
+                dataset.setSizeLimit(sizeLimit);
+                datasetRepository.save(dataset);
+            }
+
+            Path fullPath = Path.of(csvDownloadingDir, filePath);
+            try (Reader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
+                CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader());
+
+                List<CSVRecord> records = csvParser.getRecords();
+                List<CSVRecord> sample = reservoirSample(records, sizeLimit);
+
+                Path tempFile = Files.createTempFile(Path.of(csvDownloadingDir),"sample_", ".csv.gz");
+                writeSampleToCsv(sample, csvParser.getHeaderMap().keySet(), tempFile);
+
+                LOGGER.info("Wrote {} rows to temporary sample file: {}", sample.size(), tempFile);
+                return tempFile.toAbsolutePath().toString();
+            } catch (IOException e) {
+                LOGGER.error("Failed to retrieve sample from CSV file: {}", fullPath, e);
+                throw new RuntimeException("Failed to process CSV file", e);
+            }
+        });
+    }
+
+    private <T> List<T> reservoirSample(List<T> stream, int n) {
+        if (stream.size() <= n) {
+            return stream;
+        }
+
+        Random random = new Random();
+        List<T> reservoir = new ArrayList<>(stream.subList(0, n));
+
+        for (int i = n; i < stream.size(); i++) {
+            int j = random.nextInt(i + 1);
+            if (j < n) {
+                reservoir.set(j, stream.get(i));
+            }
+        }
+        return reservoir;
+    }
+
+    private void writeSampleToCsv(List<CSVRecord> sample, Set<String> headers, Path outputPath) throws IOException {
+        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(Files.newOutputStream(outputPath));
+             CSVPrinter csvPrinter = new CSVPrinter(new OutputStreamWriter(gzipOutputStream), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
+
+            for (CSVRecord record : sample) {
+                csvPrinter.printRecord(record);
+            }
+        }
     }
 
     private String generateDatasetName() {

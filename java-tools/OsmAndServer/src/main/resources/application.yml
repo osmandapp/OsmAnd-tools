@@ -144,7 +144,6 @@ monitoring:
 geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
----
 spring.jpa.hibernate.ddl-auto: validate
 
 osmand.web.location: ${osmand.files.location}/website
@@ -177,3 +176,10 @@ spring:
       on-profile: production
   resources.static-locations: file:${osmand.web.location}
   thymeleaf.prefix: file:${osmand.web.location}/templates/
+
+# Directory for storing downloaded CSV samples and Overpass API endpoint used by TestSearchService
+test:
+  csv:
+    dir: ${osmand.files.location}/csv
+  overpass:
+    url: https://overpass-api.de/api/interpreter
