@@ -24,7 +24,6 @@ import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -63,17 +62,6 @@ public class TestSearchService {
     @PostConstruct
     private void initWebClient() {
         this.webClient = webClientBuilder.baseUrl(overpassApiUrl).build();
-    }
-
-    private Dataset createDataset(String datasetName, String query, String type) {
-        Dataset dataset = new Dataset();
-        dataset.setName(datasetName);
-        dataset.setType(type);
-        dataset.setSource(query);
-        dataset.setSourceStatus(DatasetType.NEW.name());
-        dataset = datasetRepository.save(dataset);
-
-        return dataset;
     }
 
     private Path queryOverpass(String query) {
@@ -200,6 +188,24 @@ public class TestSearchService {
                     }
                 }
             }
+        });
+    }
+
+    @Async
+    public CompletableFuture<Dataset> createDataset(String name, String type, String source) {
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<Dataset> datasetOptional = datasetRepository.findByName(name);
+            if (datasetOptional.isPresent())
+                throw new RuntimeException("Dataset is already created: " + name);
+
+            Dataset dataset = new Dataset();
+            dataset.setName(name);
+            dataset.setType(type);
+            dataset.setSource(source);
+            dataset.setSourceStatus(DatasetType.NEW.name());
+            dataset = datasetRepository.save(dataset);
+
+            return dataset;
         });
     }
 

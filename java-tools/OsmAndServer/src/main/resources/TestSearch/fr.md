@@ -7,7 +7,7 @@
 - 
 ### 1. Data Ingestion
 - FR-1: REST endpoint `POST /admin/test/dataset` accepts name, source (CSV/Overpass) and actual path for CSV to a 
-  local CSV file, query for Overpass to create a new dataset.
+  local CSV file or query for Overpass to create a new dataset and save in database.
 - FR-2-1: REST endpoint `POST /admin/test/csv/count` accepts a relative path to a local CSV file and counts the 
   number of rows by streaming it once to determine the total row count `N`.
 - FR-2-2: REST endpoint `POST /admin/test/retrieve` accepts a dataset object with a `source` and a 

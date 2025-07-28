@@ -32,4 +32,17 @@ public class TestSearchController {
             return ResponseEntity.created(location).body(path);
         });
     }
+
+    @PostMapping(value = "/dataset", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public CompletableFuture<ResponseEntity<?>> createDataset(@RequestBody Map<String, String> body) {
+        String name = body.getOrDefault("name", "");
+        String type = body.getOrDefault("type", "CSV");
+        String source = body.getOrDefault("source", "");
+        final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
+        return testSearchService.createDataset(name, type, source)
+                .thenApply(dataset -> {
+                    URI location = locationBuilder.path("/{id}").buildAndExpand(dataset.getId()).toUri();
+                    return ResponseEntity.created(location).body(dataset);
+                });
+    }
 }
