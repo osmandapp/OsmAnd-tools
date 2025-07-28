@@ -173,11 +173,9 @@ public class TestSearchService {
                 List<CSVRecord> records = csvParser.getRecords();
                 List<CSVRecord> sample = reservoirSample(records, sizeLimit);
 
-                Path tempFile = Files.createTempFile(Path.of(csvDownloadingDir),"sample_", ".csv.gz");
-                writeSampleToCsv(sample, csvParser.getHeaderMap().keySet(), tempFile);
-
-                LOGGER.info("Wrote {} rows to temporary sample file: {}", sample.size(), tempFile);
-                return tempFile.toAbsolutePath().toString();
+                // Implement store sample here
+                LOGGER.info("Store {} rows to table: {}", sample.size(), dataset.getName());
+                return dataset.getSourceStatus();
             } catch (IOException e) {
                 LOGGER.error("Failed to retrieve sample from CSV file: {}", fullPath, e);
                 throw new RuntimeException("Failed to process CSV file", e);
