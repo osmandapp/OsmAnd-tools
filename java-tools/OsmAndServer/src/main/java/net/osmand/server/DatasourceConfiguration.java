@@ -8,6 +8,7 @@ import javax.sql.DataSource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -58,8 +59,8 @@ public class DatasourceConfiguration {
     }
     
     @Bean
-	@ConfigurationProperties(prefix = "spring.sqlitedatasource")
-	public DataSourceProperties sqliteDataSourceProperties() {
+	@ConfigurationProperties(prefix = "spring.testdatasource")
+	public DataSourceProperties testDataSourceProperties() {
 		return new DataSourceProperties();
 	}
 
@@ -134,10 +135,11 @@ public class DatasourceConfiguration {
 		return emptyDataSource();
 	}
 
-	@Bean(name = "sqliteDataSource")
-	public DataSource sqliteDataSource() {
+	@Bean(name = "testDataSource")
+	public DataSource testDataSource() {
 		try {
-			DataSource ds = sqliteDataSourceProperties().initializeDataSourceBuilder().build();
+			DataSource ds = testDataSourceProperties().initializeDataSourceBuilder().build();
+			monitorInitialzed = true;
 			return ds;
 		} catch (Exception e) {
 			LOG.warn("Warning - SQLite database not configured: " + e.getMessage());
@@ -199,8 +201,8 @@ public class DatasourceConfiguration {
 		return new JdbcTemplate(ds);
 	}
 
-	@Bean(name = "sqliteJdbcTemplate")
-	public JdbcTemplate sqliteJdbcTemplate(@Qualifier("sqliteDataSource") DataSource ds) {
+	@Bean(name = "testJdbcTemplate")
+	public JdbcTemplate testJdbcTemplate(@Qualifier("testDataSource") DataSource ds) {
 		return new JdbcTemplate(ds);
 	}
 	

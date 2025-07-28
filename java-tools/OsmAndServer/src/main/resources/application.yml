@@ -1,3 +1,4 @@
+
 admin.api-oauth2-url: https://api.github.com/orgs/osmandapp/teams/serveradmins
 
 google.androidPublisher.clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
@@ -115,12 +116,11 @@ spring:
     username:
     password:
     driverClassname:
-  sqlitedatasource:
-    url: jdbc:sqlite:${osmand.files.location}/db/test_search.db
-    driver-class-name: org.sqlite.JDBC
-    username:
-    password:
-  web.resources.static-locations: file:${osmand.web.location}/build
+  testdatasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
+    username: ${DB_USER:test}
+    password: ${DB_PWD:test}
+  web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/
     cache: false
@@ -148,10 +148,6 @@ monitoring:
 
 geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
-
-spring.jpa.hibernate.ddl-auto: validate
-
-osmand.web.location: ${osmand.files.location}/website
 
 # Directory for storing downloaded CSV samples and Overpass API endpoint used by TestSearchService
 test:

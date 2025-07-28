@@ -24,7 +24,7 @@ public class TestSearchController {
                 .thenApply(count -> ResponseEntity.ok(Map.of("count", count)));
     }
 
-    @PostMapping(value = "/refresh", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
     public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId, @RequestParam("sizeLimit") Integer sizeLimit) {
         final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
         return testSearchService.refreshDataset(datasetId, sizeLimit).thenApply(path -> {

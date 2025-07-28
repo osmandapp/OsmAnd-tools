@@ -33,14 +33,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
+
+import static net.osmand.server.api.utils.StringUtils.sanitize;
 
 @Service
 public class TestSearchService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
 
     private final DatasetRepository datasetRepository;
-    private final JdbcTemplate sqliteJdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
     private WebClient webClient;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
@@ -51,10 +54,10 @@ public class TestSearchService {
 
     @Autowired
     public TestSearchService(DatasetRepository datasetRepository,
-                             @Qualifier("sqliteJdbcTemplate") JdbcTemplate sqliteJdbcTemplate,
+                             @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
                              WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
-        this.sqliteJdbcTemplate = sqliteJdbcTemplate;
+        this.jdbcTemplate = jdbcTemplate;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
     }
@@ -156,14 +159,10 @@ public class TestSearchService {
             }
 
             String tableName = "dataset_" + dataset.getName();
-            try (Reader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
-                CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader());
-                List<String> headers = csvParser.getHeaderNames();
-
+            try {
+                List<String> sample = reservoirSample(fullPath, sizeLimit + 1);
+                String[] headers = sample.get(0).split(",");
                 createDynamicTable(tableName, headers);
-
-                List<CSVRecord> records = csvParser.getRecords();
-                List<CSVRecord> sample = reservoirSample(records, sizeLimit);
 
                 insertSampleData(tableName, headers, sample);
 
@@ -209,47 +208,59 @@ public class TestSearchService {
         });
     }
 
-    private void createDynamicTable(String tableName, List<String> headers) {
-        String columns = headers.stream()
-                .map(header -> "\"" + header + "\" TEXT")
+    private void createDynamicTable(String tableName, String[] headers) {
+        String columns = Stream.of(headers)
+                .map(header -> "\"" + sanitize(header) + "\" VARCHAR(255)")
                 .collect(Collectors.joining(", "));
-        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY AUTOINCREMENT, %s)", tableName, columns);
-        sqliteJdbcTemplate.execute(createTableSql);
+        // Use a dedicated primary key column (row_id) with PostgreSQL-compatible identity generation
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (row_id BIGSERIAL PRIMARY KEY, %s)", tableName, columns);
+        jdbcTemplate.execute(createTableSql);
 
         LOGGER.info("Ensured table {} exists.", tableName);
     }
 
-    private void insertSampleData(String tableName, List<String> headers, List<CSVRecord> sample) {
-        String columns = headers.stream().map(h -> "\"" + h + "\"").collect(Collectors.joining(", "));
-        String placeholders = String.join(", ", Collections.nCopies(headers.size(), "?"));
+    private void insertSampleData(String tableName, String[] headers, List<String> sample) {
+        String columns = Stream.of(headers).map(h -> "\"" + sanitize(h) + "\"").collect(Collectors.joining(", "));
+        String placeholders = String.join(", ", Collections.nCopies(headers.length, "?"));
         String insertSql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, columns, placeholders);
 
         List<Object[]> batchArgs = new ArrayList<>();
-        for (CSVRecord record : sample) {
-            Object[] values = new Object[headers.size()];
-            for (int i = 0; i < headers.size(); i++) {
-                values[i] = record.get(i);
+        for (int i = 1; i < sample.size(); i++) {
+            String[] record = sample.get(i).split(",");
+            Object[] sanitizedRecord = new Object[record.length];
+            for (int j = 0; j < record.length; j++) {
+                sanitizedRecord[j] = sanitize(record[j]);
             }
-            batchArgs.add(values);
+            batchArgs.add(sanitizedRecord);
         }
-        sqliteJdbcTemplate.batchUpdate(insertSql, batchArgs);
-        LOGGER.info("Batch inserted {} records into {}.", sample.size(), tableName);
+        jdbcTemplate.batchUpdate(insertSql, batchArgs);
+        LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
     }
 
-    private <T> List<T> reservoirSample(List<T> stream, int n) {
-        if (stream.size() <= n) {
-            return stream;
-        }
-
-        Random random = new Random();
-        List<T> reservoir = new ArrayList<>(stream.subList(0, n));
-
-        for (int i = n; i < stream.size(); i++) {
-            int j = random.nextInt(i + 1);
-            if (j < n) {
-                reservoir.set(j, stream.get(i));
+    private static List<String> reservoirSample(Path filePath, int n) throws IOException {
+            List<String> sample = new ArrayList<>();
+            try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+                String header = reader.readLine();
+                String line;
+                int i = 1; // Line index (after header)
+                while ((line = reader.readLine()) != null) {
+                    if (i <= n) {
+                        // Fill reservoir
+                        if (sample.size() <= n) {
+                            sample.add(line.trim());
+                        }
+                    } else {
+                        // Replace with probability n/i
+                        int j = new Random().nextInt(i);
+                        if (j < n) {
+                            sample.set(j, line.trim());
+                        }
+                    }
+                    i++;
+                }
+                sample.set(0, header); // Restore header
             }
+
+            return sample;
         }
-        return reservoir;
-    }
 }
