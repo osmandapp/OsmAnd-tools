@@ -57,6 +57,12 @@ public class DatasourceConfiguration {
         return new DataSourceProperties();
     }
     
+    @Bean
+	@ConfigurationProperties(prefix = "spring.sqlitedatasource")
+	public DataSourceProperties sqliteDataSourceProperties() {
+		return new DataSourceProperties();
+	}
+
 	@Bean
 	@Primary
 	public DataSource primaryDataSource() {
@@ -128,6 +134,16 @@ public class DatasourceConfiguration {
 		return emptyDataSource();
 	}
 
+	@Bean(name = "sqliteDataSource")
+	public DataSource sqliteDataSource() {
+		try {
+			DataSource ds = sqliteDataSourceProperties().initializeDataSourceBuilder().build();
+			return ds;
+		} catch (Exception e) {
+			LOG.warn("Warning - SQLite database not configured: " + e.getMessage());
+		}
+		return emptyDataSource();
+	}
 
 	private DataSource emptyDataSource() {
 		return new AbstractDataSource() {
@@ -179,11 +195,13 @@ public class DatasourceConfiguration {
 	}
 	
 	@Bean
-	public JdbcTemplate monitorJdbcTemplate(@Qualifier("monitorDataSource") DataSource dataSource) {
-		if (dataSource == null) {
-			return null;
-		}
-		return new JdbcTemplate(dataSource);
+	public JdbcTemplate monitorJdbcTemplate(@Qualifier("monitorDataSource") DataSource ds) {
+		return new JdbcTemplate(ds);
+	}
+
+	@Bean(name = "sqliteJdbcTemplate")
+	public JdbcTemplate sqliteJdbcTemplate(@Qualifier("sqliteDataSource") DataSource ds) {
+		return new JdbcTemplate(ds);
 	}
 	
 }

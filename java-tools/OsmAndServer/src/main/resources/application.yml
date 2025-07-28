@@ -115,6 +115,11 @@ spring:
     username:
     password:
     driverClassname:
+  sqlitedatasource:
+    url: jdbc:sqlite:${osmand.files.location}/db/test_search.db
+    driver-class-name: org.sqlite.JDBC
+    username:
+    password:
   web.resources.static-locations: file:${osmand.web.location}/build
   thymeleaf:
     prefix: file:${osmand.web.location}/templates/

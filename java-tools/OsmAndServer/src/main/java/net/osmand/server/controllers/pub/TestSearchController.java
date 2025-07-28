@@ -1,8 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.api.dto.CsvRequest;
-import net.osmand.server.api.dto.OverpassQueryRequest;
-import net.osmand.server.api.dto.OverpassQueryResult;
 import net.osmand.server.api.services.TestSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -22,8 +19,8 @@ public class TestSearchController {
     private TestSearchService testSearchService;
 
     @PostMapping(value = "/csv/count", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public CompletableFuture<ResponseEntity<Map<String, Long>>> countCsvRows(@RequestBody CsvRequest request) {
-        return testSearchService.countCsvRows(request.filePath())
+    public CompletableFuture<ResponseEntity<Map<String, Long>>> countCsvRows(@RequestBody String filePath) {
+        return testSearchService.countCsvRows(filePath)
                 .thenApply(count -> ResponseEntity.ok(Map.of("count", count)));
     }
 

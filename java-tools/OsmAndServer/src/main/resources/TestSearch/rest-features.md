@@ -12,9 +12,11 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 
 ## 1. Data Ingestion
 
+- [ ] **POST `/admin/test/dataset`** – creates a new dataset from a local CSV or an Overpass query (#FR-1).
 - [x] **POST `/admin/test/csv/count`** – reads a local CSV file (path provided in request) and returns total row 
   count `N` (#FR-2-1).
-- [ ] **POST `/admin/test/refreshDataset`** – reads a local CSV file (path provided in request) and persists a random sample (Reservoir Sampling) limited by `sizeLimit` (#FR-2-2).
+- [x] **POST `/admin/test/refresh`** – refreshes an existing dataset from its original source file, applying a new 
+  random sample (#FR-2-2).
 
 ## 2. Test Execution
 
@@ -44,15 +46,8 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 
 ## Test Search API
 
-### Ingest data from Overpass API
-
-- **URL:** `/admin/test/overpass`
-- **Method:** `POST`
-- **Body:** `OverpassTestRequest`
-
 ```json
 {
   "datasetName": "my_test_dataset",
   "query": "node[amenity=restaurant](around:1000, 50.45, 30.52);out;"
 }
-```

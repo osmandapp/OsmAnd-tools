@@ -2,8 +2,6 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.osmand.server.api.dto.OverpassQueryRequest;
-import net.osmand.server.api.dto.OverpassQueryResult;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.DatasetType;
 import net.osmand.server.api.repo.DatasetRepository;
@@ -14,7 +12,9 @@ import org.apache.commons.csv.CSVRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -41,6 +41,7 @@ public class TestSearchService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
 
     private final DatasetRepository datasetRepository;
+    private final JdbcTemplate sqliteJdbcTemplate;
     private WebClient webClient;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
@@ -50,8 +51,11 @@ public class TestSearchService {
     private String overpassApiUrl;
 
     @Autowired
-    public TestSearchService(DatasetRepository datasetRepository, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+    public TestSearchService(DatasetRepository datasetRepository,
+                             @Qualifier("sqliteJdbcTemplate") JdbcTemplate sqliteJdbcTemplate,
+                             WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
+        this.sqliteJdbcTemplate = sqliteJdbcTemplate;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
     }
@@ -71,27 +75,25 @@ public class TestSearchService {
 
         return dataset;
     }
-    @Async
-    public CompletableFuture<OverpassQueryResult> queryOverpass(String query) {
-        return CompletableFuture.supplyAsync(() -> {
-            Path tempFile;
-            try {
-                String overpassResponse = webClient.post()
-                        .uri("")
-                        .bodyValue("data=[out:json][timeout:25];" + query)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .toFuture().join();
-                tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv.gz");
-                int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
-                LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 
-                return new OverpassQueryResult(tempFile.toString(), rowCount);
-            } catch (Exception e) {
-                LOGGER.error("Failed to query data from Overpass for {}", query, e);
-                throw new RuntimeException("Failed to query from Overpass", e);
-            }
-        });
+    private Path queryOverpass(String query) {
+        Path tempFile;
+        try {
+            String overpassResponse = webClient.post()
+                    .uri("")
+                    .bodyValue("data=[out:json][timeout:25];" + query)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .toFuture().join();
+            tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv.gz");
+            int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
+            LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
+
+            return tempFile;
+        } catch (Exception e) {
+            LOGGER.error("Failed to query data from Overpass for {}", query, e);
+            throw new RuntimeException("Failed to query from Overpass", e);
+        }
     }
 
     private int convertJsonToSaveInCsv(String jsonResponse, Path outputPath) throws IOException {
@@ -151,34 +153,66 @@ public class TestSearchService {
     @Async
     public CompletableFuture<String> refreshDataset(Long datasetId, Integer sizeLimit) {
         return CompletableFuture.supplyAsync(() -> {
-            Optional<Dataset> datasetOption = datasetRepository.findById(datasetId);
-            if (datasetOption.isEmpty()) {
-                throw new RuntimeException("Dataset not found");
-            }
+            Dataset dataset = datasetRepository.findById(datasetId)
+                    .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-            Dataset dataset = datasetOption.get();
-            String filePath = dataset.getSource();
-            int currentSizeLimit = dataset.getSizeLimit();
-            if (currentSizeLimit != sizeLimit) {
+            if (!Objects.equals(dataset.getSizeLimit(), sizeLimit)) {
                 dataset.setSizeLimit(sizeLimit);
                 datasetRepository.save(dataset);
             }
 
-            Path fullPath = Path.of(csvDownloadingDir, filePath);
+            Path fullPath = Path.of(csvDownloadingDir, dataset.getSource());
+            String tableName = "dataset_" + dataset.getName();
             try (Reader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
                 CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader());
+                List<String> headers = csvParser.getHeaderNames();
+
+                createDynamicTable(tableName, headers);
 
                 List<CSVRecord> records = csvParser.getRecords();
                 List<CSVRecord> sample = reservoirSample(records, sizeLimit);
 
-                // Implement store sample here
-                LOGGER.info("Store {} rows to table: {}", sample.size(), dataset.getName());
+                insertSampleData(tableName, headers, sample);
+
+                dataset.setSourceStatus(DatasetType.COMPLETED.name());
+                datasetRepository.save(dataset);
+
+                LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 return dataset.getSourceStatus();
-            } catch (IOException e) {
-                LOGGER.error("Failed to retrieve sample from CSV file: {}", fullPath, e);
+            } catch (Exception e) {
+                dataset.setSourceStatus(DatasetType.FAILED.name());
+                datasetRepository.save(dataset);
+                LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
                 throw new RuntimeException("Failed to process CSV file", e);
             }
         });
+    }
+
+    private void createDynamicTable(String tableName, List<String> headers) {
+        String columns = headers.stream()
+                .map(header -> "\"" + header + "\" TEXT")
+                .collect(Collectors.joining(", "));
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY AUTOINCREMENT, %s)", tableName, columns);
+        sqliteJdbcTemplate.execute(createTableSql);
+
+        LOGGER.info("Ensured table {} exists.", tableName);
+    }
+
+    private void insertSampleData(String tableName, List<String> headers, List<CSVRecord> sample) {
+        String columns = headers.stream().map(h -> "\"" + h + "\"").collect(Collectors.joining(", "));
+        String placeholders = String.join(", ", Collections.nCopies(headers.size(), "?"));
+        String insertSql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, columns, placeholders);
+
+        List<Object[]> batchArgs = new ArrayList<>();
+        for (CSVRecord record : sample) {
+            Object[] values = new Object[headers.size()];
+            for (int i = 0; i < headers.size(); i++) {
+                values[i] = record.get(i);
+            }
+            batchArgs.add(values);
+        }
+        sqliteJdbcTemplate.batchUpdate(insertSql, batchArgs);
+        LOGGER.info("Batch inserted {} records into {}.", sample.size(), tableName);
     }
 
     private <T> List<T> reservoirSample(List<T> stream, int n) {

@@ -6,22 +6,12 @@
 - System should use org.apache.commons.logging.
 - 
 ### 1. Data Ingestion
-
-- FR-1: REST endpoint `POST /admin/test/overpass` accepts an Overpass JSON query and `sizeLimit`. The operation is 
-  **not atomic** and follows this pipeline:
-	1. **Query & Convert**: The server queries Overpass, converts the JSON response lat, lon, tags items (see 
-	   Overpass API Call Example) to CSV, and calculates the total row count `N` while writing to a temporary `.csv`
-	   file on disk.
-	2. **Sample & Ingest**: The server internally calls the logic equivalent to `POST /admin/test/csv/retrieve` 
-	   (FR-2-2), passing the temporary file path, the pre-calculated row count `N`, and the `sizeLimit`. This step 
-	   performs random sampling and inserts the data into the `dataset_<name>` table.
-	3. **Cleanup**: The temporary file SHALL be deleted after the sampling and insertion step is complete, regardless of 
-	   its success or failure.
+- FR-1: REST endpoint `POST /admin/test/dataset` accepts name, source (CSV/Overpass) and actual path for CSV to a 
+  local CSV file, query for Overpass to create a new dataset.
 - FR-2-1: REST endpoint `POST /admin/test/csv/count` accepts a relative path to a local CSV file and counts the 
   number of rows by streaming it once to determine the total row count `N`.
-- FR-2-2: REST endpoint `POST /admin/test/csv/retrieve` accepts a relative path to a local CSV file and a 
-  `sizeLimit`, then stores a random sample in a new dataset. **When called indirectly by FR-1, the temporary 
-  Overpass file is passed to this step.**
+- FR-2-2: REST endpoint `POST /admin/test/retrieve` accepts a dataset object with a `source` and a 
+  `sizeLimit`, then stores a random sample in a dataset.
 - FR-2-3: UI opens a native file-chooser allowing selection of *.csv, *.gz, or *.tar.gz files for ingestion from
   configured directory on server.
 - FR-3: While ingesting, the system SHALL select rows randomly based on `sizeLimit` to minimise bias.
@@ -35,7 +25,7 @@ Unsupported Media Type`.
   `HTTP 422 Unprocessable Entity`.
 
 - FR-4: For every created dataset the **server SHALL generate the dataset `name` to show for user interface** from the input
-  source (e.g. file name without extension, or `overpass_YY-MM-DD`) and **sanitise** it by converting spaces to
+  source (e.g. file name without extension, or `sample_YY-MM-DD`) and **sanitise** it by converting spaces to
   underscores, removing accents/diacritics and folding to lower-case. If the resulting name does not match `[a-z0-9_]
   +` characters it SHALL be further reduced by stripping invalid characters. **If a dataset with the same final name
   already exists the endpoint SHALL return `HTTP 409 Conflict`.** The system MUST persist a metadata record (`id`,
@@ -210,49 +200,6 @@ If the client omits the parameter, the server SHALL apply a **default value of `
   established brand identity of OsmAnd. Consistency in visual design helps reinforce brand recognition and provides a 
   cohesive user experience.
 
-### Overpass API Call Example
-
-To query the Overpass API directly, you can use a `curl` command like this:
-
-**Request:**
-```bash
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode 'data=[out:json][timeout:25];node["amenity"="cafe"](50.74,7.17,50.75,7.18);out center;' https://overpass-api.de/api/interpreter
-```
-
-**Response JSON:**
-```json
-{
-  "version": 0.6,
-  "generator": "Overpass API 0.7.62.7 375dc00a",
-  "osm3s": {
-    "timestamp_osm_base": "2025-07-25T13:15:56Z",
-    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
-  },
-  "elements": [{
-    "type": "node",
-    "id": 12069602128,
-    "lat": 50.7442720,
-    "lon": 7.1745538,
-    "tags": {
-      "addr:city": "Bonn",
-      "addr:housenumber": "2",
-      "addr:postcode": "53229",
-      "addr:street": "Primelweg",
-      "amenity": "cafe",
-      "cuisine": "ice_cream",
-      "email": "dieprimel@outlook.de",
-      "name": "Die Primel Eiscafé",
-      "opening_hours": "Mo-Su 11:00-20:00",
-      "opening_hours:url": "https://www.dieprimeleiskaffee.de/",
-      "outdoor_seating": "yes",
-      "phone": "+49 228 84262231",
-      "website": "https://www.dieprimeleiskaffee.de/",
-      "website:menu": "https://www.dieprimeleiskaffee.de/preisliste/",
-      "wikidata": "Q135233549"
-    }
-  }]
-}
-```
 ### 📑 SQLite Database Schema (DDL)
 
 ```sql
@@ -295,7 +242,7 @@ CREATE TABLE IF NOT EXISTS dataset_job (
 CREATE TABLE IF NOT EXISTS test_result (
   job_id INTEGER NOT NULL REFERENCES dataset_job(job_id) ON DELETE CASCADE,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
-  -- All original source columns are duplicated here for traceability <dynamic columns from dataset_<name>…>
+  original TEXT NOT NULL, -- Original dataset record in JSON format
   status VARCHAR(64) NOT NULL,
   duration INTEGER,
   timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

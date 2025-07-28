@@ -68,6 +68,16 @@ public class TestResult {
 	@Column(name = "results_count")
 	private Integer resultsCount;
 
+	public String getOriginal() {
+		return original;
+	}
+
+	public void setOriginal(String original) {
+		this.original = original;
+	}
+
+	@Column(name = "original")
+	private String 	original;
 	// Getters and Setters
 
 	public ResultId getId() {
