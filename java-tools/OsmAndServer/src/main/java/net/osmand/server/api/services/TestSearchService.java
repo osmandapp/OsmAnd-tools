@@ -30,11 +30,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.zip.GZIPOutputStream;
 
 @Service
-public class SearchTestService {
+public class TestSearchService {
     public static enum DatasetType {
         NEW, COMPLETED, FAILED
     }
-    private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
     private static final String OVERPASS_API_URL = "https://overpass-api.de/api/interpreter";
     private static final int DEFAULT_SIZE_LIMIT = 10_000;
 
@@ -43,7 +43,7 @@ public class SearchTestService {
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public SearchTestService(DatasetRepository datasetRepository, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+    public TestSearchService(DatasetRepository datasetRepository, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
         this.webClient = webClientBuilder.baseUrl(OVERPASS_API_URL).build();
         this.objectMapper = objectMapper;

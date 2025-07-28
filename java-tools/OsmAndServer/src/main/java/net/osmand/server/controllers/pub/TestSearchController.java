@@ -1,9 +1,7 @@
 package net.osmand.server.controllers.pub;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import net.osmand.server.api.dto.OverpassTestRequest;
-import net.osmand.server.api.services.SearchTestService;
+import net.osmand.server.api.services.TestSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,14 +14,14 @@ import java.util.concurrent.CompletableFuture;
 
 @Controller
 @RequestMapping(path = "/admin/test", produces = MediaType.APPLICATION_JSON_VALUE)
-public class SearchTestController {
+public class TestSearchController {
 
     @Autowired
-    private SearchTestService searchTestService;
+    private TestSearchService testSearchService;
 
     @PostMapping("/overpass")
     public CompletableFuture<ResponseEntity<?>> testFromOverpass(@RequestBody OverpassTestRequest request) {
-        return searchTestService.ingestFromOverpass(request).thenApply(dataset -> {
+        return testSearchService.ingestFromOverpass(request).thenApply(dataset -> {
             URI location = ServletUriComponentsBuilder
                     .fromCurrentRequest()
                     .path("/{id}")
