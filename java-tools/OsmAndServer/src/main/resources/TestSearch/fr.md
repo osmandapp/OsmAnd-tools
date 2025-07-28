@@ -292,7 +292,7 @@ CREATE TABLE IF NOT EXISTS dataset_job (
 );
 
 -- Results of address search evaluation (one row per source record per job)
-CREATE TABLE IF NOT EXISTS results (
+CREATE TABLE IF NOT EXISTS test_result (
   job_id INTEGER NOT NULL REFERENCES dataset_job(job_id) ON DELETE CASCADE,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   -- All original source columns are duplicated here for traceability <dynamic columns from dataset_<name>…>

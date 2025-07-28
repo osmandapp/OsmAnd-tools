@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.server.api.dto.OverpassQueryRequest;
 import net.osmand.server.api.dto.OverpassQueryResult;
 import net.osmand.server.api.entity.Dataset;
+import net.osmand.server.api.entity.DatasetType;
 import net.osmand.server.api.repo.DatasetRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -37,9 +38,6 @@ import java.util.zip.GZIPOutputStream;
 
 @Service
 public class TestSearchService {
-    public enum DatasetType {
-        NEW, COMPLETED, FAILED
-    }
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
 
     private final DatasetRepository datasetRepository;
