@@ -158,10 +158,15 @@ public class TestSearchService {
 
             if (!Objects.equals(dataset.getSizeLimit(), sizeLimit)) {
                 dataset.setSizeLimit(sizeLimit);
-                datasetRepository.save(dataset);
             }
 
-            Path fullPath = Path.of(csvDownloadingDir, dataset.getSource());
+            Path fullPath;
+            if (dataset.getSource().equals("OVERPASS")) {
+                fullPath = queryOverpass(dataset.getSource());
+            } else {
+                fullPath = Path.of(csvDownloadingDir, dataset.getSource());
+            }
+
             String tableName = "dataset_" + dataset.getName();
             try (Reader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
                 CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader());
@@ -184,6 +189,16 @@ public class TestSearchService {
                 datasetRepository.save(dataset);
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
                 throw new RuntimeException("Failed to process CSV file", e);
+            } finally {
+                if (dataset.getSource().equals("OVERPASS")) {
+                    try {
+                        if (fullPath != null && !Files.deleteIfExists(fullPath)) {
+                            LOGGER.warn("Could not delete temporary file: {}", fullPath);
+                        }
+                    } catch (IOException e) {
+                        LOGGER.error("Error deleting temporary file: {}", fullPath, e);
+                    }
+                }
             }
         });
     }
