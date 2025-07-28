@@ -153,35 +153,6 @@ spring.jpa.hibernate.ddl-auto: validate
 
 osmand.web.location: ${osmand.files.location}/website
 
-logging:
-  file: ${osmand.files.location}/osmand-server-logs/error.log
-  config: classpath:logback-spring.xml
-
-server:
-  port: 8090
-  servlet.session.timeout: 7d
-  # use-forward-headers: true
-  forward-headers-strategy: native
-  # session.timeout: 18000 #432000 #servlet.session.timeout
-  address: 127.0.0.1 #keep it behind proxy
-  tomcat:
-    redirect-context-root: false
-    threads.max: 50
-    protocol_header: x-forwarded-proto
-    remote_ip_header: x-forwarded-for
-    accesslog:
-      directory: ${osmand.files.location}/osmand-server-logs/
-      enabled: true
-      rotate: false
-      pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
-
-spring:
-  config:
-    activate:
-      on-profile: production
-  resources.static-locations: file:${osmand.web.location}
-  thymeleaf.prefix: file:${osmand.web.location}/templates/
-
 # Directory for storing downloaded CSV samples and Overpass API endpoint used by TestSearchService
 test:
   csv:

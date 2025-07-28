@@ -252,19 +252,4 @@ public class TestSearchService {
         }
         return reservoir;
     }
-
-    private void writeSampleToCsv(List<CSVRecord> sample, Set<String> headers, Path outputPath) throws IOException {
-        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(Files.newOutputStream(outputPath));
-             CSVPrinter csvPrinter = new CSVPrinter(new OutputStreamWriter(gzipOutputStream), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
-
-            for (CSVRecord record : sample) {
-                csvPrinter.printRecord(record);
-            }
-        }
-    }
-
-    private String generateDatasetName() {
-        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yy-MM-dd"));
-        return String.format("overpass_%s", date).toLowerCase(Locale.ROOT);
-    }
 }
