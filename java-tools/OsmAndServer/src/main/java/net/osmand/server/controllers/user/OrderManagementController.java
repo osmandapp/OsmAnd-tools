@@ -98,7 +98,8 @@ public class OrderManagementController {
 			@RequestParam(required = false) Integer period,
 			@RequestParam(required = false) String interval,
 			@RequestParam String orderId,
-			@RequestParam String purchaseToken) {
+			@RequestParam String purchaseToken,
+			@RequestParam boolean isSubscription) {
 
 		if (usersRepository.findByEmailIgnoreCase(email) == null) {
 			return ResponseEntity
@@ -113,7 +114,7 @@ public class OrderManagementController {
 		}
 
 		try {
-			orderManagementService.registerNewOrder(email, sku, period, interval, orderId, purchaseToken);
+			orderManagementService.registerNewOrder(email, sku, period, interval, orderId, purchaseToken, isSubscription);
 			List<AdminService.Purchase> pList = orderManagementService.findPurchaseByOrderAndSku(orderId, sku);
 			if (pList.isEmpty()) {
 				return ResponseEntity
