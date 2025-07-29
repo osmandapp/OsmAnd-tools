@@ -41,7 +41,7 @@ public class GeometryUtils {
 		return geometry;
 	}
 
-	public static String getGeometry(GeojsonClasses.Geometry geometry, String[] values) {
+	public static String geometryToString(GeojsonClasses.Geometry geometry, String[] values) {
 		int[] latLon = (int[]) geometry.coordinates;
 		return String.format("POINT(%s %s)", values[latLon[0]], values[latLon[1]]);
 	}

@@ -37,7 +37,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
-import static net.osmand.server.api.utils.GeometryUtils.getGeometry;
 import static net.osmand.server.api.utils.StringUtils.crop;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
 import static net.osmand.server.api.utils.StringUtils.unquote;
@@ -329,7 +328,7 @@ public class TestSearchService {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
-        GeojsonClasses.Geometry geometry = getGeometry(headers);
+        GeojsonClasses.Geometry geometry = GeometryUtils.getGeometry(headers);
 
         String[] columns = new String[headers.length + 1];
         columns[0] = "geometry";
@@ -345,7 +344,7 @@ public class TestSearchService {
             String[] record = sample.get(i).split(",");
             Object[] values = new String[columns.length];
 
-            values[0] = getGeometry(geometry, record);
+            values[0] = GeometryUtils.geometryToString(geometry, record);
             for (int j = 1; j < values.length; j++) {
                 values[j] = crop(unquote(record[j - 1]), 255);
             }
