@@ -18,9 +18,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-import kotlin.Pair;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
-import net.osmand.shared.gpx.helper.ImportGpx;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.util.IProgress;
 import net.osmand.shared.gpx.GpxFile;
@@ -38,7 +36,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -52,14 +49,11 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
-
-import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 
 
 @RestController
@@ -67,9 +61,7 @@ import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 public class GpxController {
     
 	protected static final Log LOGGER = LogFactory.getLog(GpxController.class);
-	
-    public static final int MAX_SIZE_FILES = 10;
-    public static final int MAX_SIZE_FILES_AUTH = 100;
+
 
 	Gson gson = new Gson();
 	
@@ -179,7 +171,7 @@ public class GpxController {
 
 		double fileSizeMb = file.getSize() / (double) (1 << 20);
 		double filesSize = getCommonSavedFilesSize(ctx.files);
-		double maxSizeMb = getCommonMaxSizeFiles();
+		double maxSizeMb = gpxService.getCommonMaxSizeFiles();
 
 		if (fileSizeMb + filesSize > maxSizeMb) {
 			return ResponseEntity.badRequest()
@@ -262,10 +254,10 @@ public class GpxController {
 	                                               HttpSession httpSession) throws IOException {
 
 		String filename = file.getOriginalFilename();
-		File tmpFile = createTempFile(file, httpSession);
+		File tmpFile = gpxService.saveMultipartFileToTemp(file, httpSession.getId());
 		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
 		Source source = Okio.source(tmpFile);
-		GpxFile gpxFile = loadGpxFile(source, filename);
+		GpxFile gpxFile = gpxService.loadGpxFromGeoFile(source, filename);
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
 					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
@@ -274,29 +266,6 @@ public class GpxController {
 			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpFile, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
-	}
-
-	private GpxFile loadGpxFile(Source source, String filename) throws IOException {
-		GpxFile gpxFile;
-		if (filename.endsWith(GPX_FILE_EXT)) {
-			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
-		} else {
-			Pair<GpxFile, Long> gpxInfo = ImportGpx.INSTANCE.loadGpx(source, filename);
-			gpxFile = gpxInfo.getFirst();
-		}
-		return gpxFile;
-	}
-
-	private File createTempFile(MultipartFile file, HttpSession httpSession) throws IOException {
-		String filename = file.getOriginalFilename();
-		String fileExt = filename.substring(filename.lastIndexOf('.'));
-		File tmpFile = File.createTempFile(fileExt.substring(1) + "_" + httpSession.getId(), fileExt);
-		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpFile);
-		Algorithms.streamCopy(is, fous);
-		is.close();
-		fous.close();
-		return tmpFile;
 	}
 
 	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
@@ -332,15 +301,7 @@ public class GpxController {
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
 	}
-    
-    private double getCommonMaxSizeFiles() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof OsmAndProUser) {
-            return MAX_SIZE_FILES_AUTH;
-        } else
-            return MAX_SIZE_FILES;
-    }
-    
+
     private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
 	    double sizeFiles = 0L;
         for (GPXSessionFile file: files) {

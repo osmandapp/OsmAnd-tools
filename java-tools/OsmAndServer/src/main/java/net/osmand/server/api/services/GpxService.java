@@ -2,14 +2,17 @@ package net.osmand.server.api.services;
 
 import kotlin.Pair;
 import net.osmand.obf.preparation.IndexHeightData;
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.PointAttributes;
+import net.osmand.shared.gpx.helper.ImportGpx;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.Algorithms;
 import okio.Buffer;
 import okio.Okio;
 import okio.Source;
@@ -18,11 +21,13 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.Iterator;
@@ -31,10 +36,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
+
 @Service
 public class GpxService {
     
     protected static final Log LOGGER = LogFactory.getLog(GpxService.class);
+
+    public static final int MAX_SIZE_FILES = 10;
+    public static final int MAX_SIZE_FILES_AUTH = 100;
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -267,5 +277,36 @@ public class GpxService {
         if (Double.isNaN(wpt.getHdop())) {
             wpt.setHdop(-1);
         }
+    }
+
+
+    public double getCommonMaxSizeFiles() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof WebSecurityConfiguration.OsmAndProUser) {
+            return MAX_SIZE_FILES_AUTH;
+        } else
+            return MAX_SIZE_FILES;
+    }
+
+    public GpxFile loadGpxFromGeoFile(Source source, String filename) throws IOException {
+        GpxFile gpxFile;
+        if (filename.endsWith(GPX_FILE_EXT)) {
+            gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+        } else {
+            gpxFile = ImportGpx.INSTANCE.importFile(source, filename);
+        }
+        return gpxFile;
+    }
+
+    public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
+        String filename = file.getOriginalFilename();
+        String fileExt = filename.substring(filename.lastIndexOf('.'));
+        File tmpFile = File.createTempFile(fileExt.substring(1) + "_" + httpSessionId, fileExt);
+        InputStream is = file.getInputStream();
+        FileOutputStream fous = new FileOutputStream(tmpFile);
+        Algorithms.streamCopy(is, fous);
+        is.close();
+        fous.close();
+        return tmpFile;
     }
 }
