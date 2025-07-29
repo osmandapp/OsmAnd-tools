@@ -1,0 +1,139 @@
+package net.osmand.server.api.entity;
+
+import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.io.Serializable;
+import java.sql.Timestamp;
+import java.util.Map;
+import java.util.Objects;
+
+@Entity
+@Table(name = "eval_result")
+public class EvalResult {
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+	@Column
+	private Long jobId;
+
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "jsonb")
+	private Map<String, String> original;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = true)
+	private String error;
+
+	@Column
+	private Integer duration;
+
+	@Column(nullable = false)
+	private Timestamp timestamp;
+
+	@Column(length = 512)
+	private String address;
+
+	@Column(name = "min_distance")
+	private Integer minDistance;
+
+	@Column(name = "closest_result", length = 512)
+	private String closestResult;
+
+	@Column(name = "actual_place")
+	private Integer actualPlace;
+
+	@Column(name = "results_count")
+	private Integer resultsCount;
+
+	// Getters and Setters
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public Long getJobId() {
+		return jobId;
+	}
+
+	public void setJob(Long job) {
+		this.jobId = job;
+	}
+
+	public Map<String, String> getOriginal() {
+		return original;
+	}
+
+	public void setOriginal(Map<String, String> sourceData) {
+		this.original = sourceData;
+	}
+
+	public String getError() {
+		return error;
+	}
+
+	public void setError(String status) {
+		this.error = error;
+	}
+
+	public Integer getDuration() {
+		return duration;
+	}
+
+	public void setDuration(Integer duration) {
+		this.duration = duration;
+	}
+
+	public Timestamp getTimestamp() {
+		return timestamp;
+	}
+
+	public void setTimestamp(Timestamp timestamp) {
+		this.timestamp = timestamp;
+	}
+
+	public String getAddress() {
+		return address;
+	}
+
+	public void setAddress(String address) {
+		this.address = address;
+	}
+
+	public Integer getMinDistance() {
+		return minDistance;
+	}
+
+	public void setMinDistance(Integer minDistance) {
+		this.minDistance = minDistance;
+	}
+
+	public String getClosestResult() {
+		return closestResult;
+	}
+
+	public void setClosestResult(String closestResult) {
+		this.closestResult = closestResult;
+	}
+
+	public Integer getActualPlace() {
+		return actualPlace;
+	}
+
+	public void setActualPlace(Integer actualPlace) {
+		this.actualPlace = actualPlace;
+	}
+
+	public Integer getResultsCount() {
+		return resultsCount;
+	}
+
+	public void setResultsCount(Integer resultsCount) {
+		this.resultsCount = resultsCount;
+	}
+}

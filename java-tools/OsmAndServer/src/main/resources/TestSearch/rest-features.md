@@ -12,7 +12,6 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 
 ## 1. Data Ingestion
 
-- [ ] **POST `/admin/test/dataset`** – creates a new dataset from a local CSV or an Overpass query (#FR-1).
 - [x] **POST `/admin/test/csv/count`** – reads a local CSV file (path provided in request) and returns total row 
   count `N` (#FR-2-1).
 - [x] **POST `/admin/test/refresh`** – refreshes an existing dataset from its original source file, applying a new 
@@ -32,10 +31,10 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 - [ ] **GET `/admin/test/reports/{datasetId}/download`** – downloads raw result set in `csv` or `json` format (#FR-14).
 
 ## 4. Dataset Management & Querying
-
-- [ ] **GET `/admin/test/datasets`** – paginated & filterable list of datasets including latest job status (#FR-18).  
+- [x] **POST `/admin/test/dataset`** – creates a new dataset from a local CSV or an Overpass query (#FR-1).
+- [x] **GET `/admin/test/datasets`** – paginated & filterable list of datasets including latest job status (#FR-18).  
   Parameters: `page`, `size`, `search`, `status`, `sort`.
-- [ ] **GET `/admin/test/datasets/{datasetId}/jobs`** – paginated list of all jobs for a dataset (#FR-19).  
+- [x] **GET `/admin/test/datasets/{datasetId}/jobs`** – paginated list of all jobs for a dataset (#FR-19).  
   Parameters: `page`, `size`.
 - [ ] **POST `/admin/test/datasets/{datasetId}/delete`** – deletes dataset metadata, SQLite table and related
   results rows (referenced in FR-16).

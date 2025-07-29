@@ -13,4 +13,11 @@ public final class StringUtils {
 		// Replace all non-alphanumeric characters with an underscore
 		return input.replaceAll("[^a-zA-Z0-9_]", "_");
 	}
+
+	public static String unquote(String input) {
+		if (input != null && input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
+			return input.substring(1, input.length() - 1);
+		}
+		return input;
+	}
 }

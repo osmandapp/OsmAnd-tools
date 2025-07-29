@@ -19,16 +19,11 @@ public class Dataset {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String source; // Overpass query or file path
 
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String columns; // CSV column names
+
     @Column(nullable = false)
     private String sourceStatus = "NEW";
-
-    public Integer getSizeLimit() {
-        return sizeLimit;
-    }
-
-    public void setSizeLimit(Integer sizeLimit) {
-        this.sizeLimit = sizeLimit;
-    }
 
     @Column(nullable = true)
     private Integer sizeLimit = 10000;
@@ -40,6 +35,21 @@ public class Dataset {
     private LocalDateTime updated = LocalDateTime.now();
 
     // Getters and Setters
+    public String getColumns() {
+        return columns;
+    }
+
+    public void setColumns(String columns) {
+        this.columns = columns;
+    }
+
+    public Integer getSizeLimit() {
+        return sizeLimit;
+    }
+
+    public void setSizeLimit(Integer sizeLimit) {
+        this.sizeLimit = sizeLimit;
+    }
 
     public Long getId() {
         return id;

@@ -17,17 +17,15 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.sql.Timestamp;
 
 @Entity
-@Table(name = "dataset_job")
-public class DatasetJob {
+@Table(name = "eval_job")
+public class EvalJob {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "job_id")
-	private Long jobId;
+	private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "dataset_id", nullable = false)
-	private Dataset dataset;
+	@Column(name = "dataset_id", nullable = false)
+	private Long datasetId;
 
 	@Column(name = "address_expression", nullable = false)
 	private String addressExpression;
@@ -57,20 +55,20 @@ public class DatasetJob {
 	@Column
 	private String error;
 
-	public Long getJobId() {
-		return jobId;
+	public Long getId() {
+		return id;
 	}
 
-	public void setJobId(Long jobId) {
-		this.jobId = jobId;
+	public void setId(Long jobId) {
+		this.id = jobId;
 	}
 
-	public Dataset getDataset() {
-		return dataset;
+	public Long getDatasetId() {
+		return datasetId;
 	}
 
-	public void setDataset(Dataset dataset) {
-		this.dataset = dataset;
+	public void setDatasetId(Long datasetId) {
+		this.datasetId = datasetId;
 	}
 
 	public String getAddressExpression() {

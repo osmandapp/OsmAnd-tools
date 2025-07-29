@@ -3,17 +3,20 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.server.api.entity.Dataset;
+import net.osmand.server.api.entity.EvalJob;
 import net.osmand.server.api.entity.DatasetType;
+import net.osmand.server.api.entity.JobStatus;
+import net.osmand.server.api.repo.DatasetJobRepository;
 import net.osmand.server.api.repo.DatasetRepository;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.csv.CSVRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -25,11 +28,8 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -37,12 +37,14 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.server.api.utils.StringUtils.sanitize;
+import static net.osmand.server.api.utils.StringUtils.unquote;
 
 @Service
 public class TestSearchService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
 
     private final DatasetRepository datasetRepository;
+    private final DatasetJobRepository datasetJobRepository;
     private final JdbcTemplate jdbcTemplate;
     private WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -54,9 +56,11 @@ public class TestSearchService {
 
     @Autowired
     public TestSearchService(DatasetRepository datasetRepository,
+                             DatasetJobRepository datasetJobRepository,
                              @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
                              WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
+        this.datasetJobRepository = datasetJobRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
@@ -163,8 +167,7 @@ public class TestSearchService {
                 List<String> sample = reservoirSample(fullPath, sizeLimit + 1);
                 String[] headers = sample.get(0).split(",");
                 createDynamicTable(tableName, headers);
-
-                insertSampleData(tableName, headers, sample);
+                dataset.setColumns(insertSampleData(tableName, headers, sample));
 
                 dataset.setSourceStatus(DatasetType.COMPLETED.name());
                 datasetRepository.save(dataset);
@@ -208,18 +211,44 @@ public class TestSearchService {
         });
     }
 
+    @Async
+    public CompletableFuture<EvalJob> startEvaluation(Long datasetId, Map<String, String> payload) {
+        return CompletableFuture.supplyAsync(() -> {
+            EvalJob job = new EvalJob();
+            job.setDatasetId(datasetId);
+            job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
+
+            job.setAddressExpression(payload.get("addressExpression"));
+            job.setLocale(payload.get("locale"));
+            job.setNorthWest(payload.get("northWest"));
+            job.setSouthEast(payload.get("southEast"));
+            job.setBaseSearch(Boolean.getBoolean(payload.get("baseSearch")));
+
+            job.setStatus(JobStatus.RUNNING);
+            return datasetJobRepository.save(job);
+        });
+    }
+
+    public Page<Dataset> getDatasets(Pageable pageable) {
+        return datasetRepository.findAll(pageable);
+    }
+
+    public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
+        return datasetJobRepository.findByDatasetId(datasetId, pageable);
+    }
+
     private void createDynamicTable(String tableName, String[] headers) {
         String columns = Stream.of(headers)
                 .map(header -> "\"" + sanitize(header) + "\" VARCHAR(255)")
                 .collect(Collectors.joining(", "));
-        // Use a dedicated primary key column (row_id) with PostgreSQL-compatible identity generation
-        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (row_id BIGSERIAL PRIMARY KEY, %s)", tableName, columns);
+        // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (id BIGSERIAL PRIMARY KEY, geometry VARCHAR(1024), %s)", tableName, columns);
         jdbcTemplate.execute(createTableSql);
 
         LOGGER.info("Ensured table {} exists.", tableName);
     }
 
-    private void insertSampleData(String tableName, String[] headers, List<String> sample) {
+    private String insertSampleData(String tableName, String[] headers, List<String> sample) {
         String columns = Stream.of(headers).map(h -> "\"" + sanitize(h) + "\"").collect(Collectors.joining(", "));
         String placeholders = String.join(", ", Collections.nCopies(headers.length, "?"));
         String insertSql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, columns, placeholders);
@@ -227,14 +256,14 @@ public class TestSearchService {
         List<Object[]> batchArgs = new ArrayList<>();
         for (int i = 1; i < sample.size(); i++) {
             String[] record = sample.get(i).split(",");
-            Object[] sanitizedRecord = new Object[record.length];
             for (int j = 0; j < record.length; j++) {
-                sanitizedRecord[j] = sanitize(record[j]);
+                record[j] = unquote(record[j]);
             }
-            batchArgs.add(sanitizedRecord);
+            batchArgs.add(record);
         }
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
+        return columns;
     }
 
     private static List<String> reservoirSample(Path filePath, int n) throws IOException {

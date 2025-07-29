@@ -37,8 +37,7 @@ Unsupported Media Type`.
   additional ingestion requests SHALL respond with `HTTP 409 Conflict` (or be queued, if queuing is later
   implemented). **Ingestion and testing jobs are independent; one ingestion _can_ run in parallel with one test job**.
 - FR-7: REST endpoint `POST /admin/test/eval/{datasetId, addressExpression}` triggers address search tests for the specified 
-  dataset
-  and returns a **`jobId`** identifying this execution and store input tests and corresponding results in `results` 
+  dataset and returns a **`jobId`** identifying this execution and store input tests and corresponding results in `results` 
   table. 
 - FR-8-1: The test process SHALL include the following prerequisites for testing:
 	1. Before starting the test process, the system SHALL check that the dataset is **not already in the `RUNNING` state**.
@@ -209,6 +208,7 @@ CREATE TABLE IF NOT EXISTS dataset (
   name VARCHAR(255) NOT NULL UNIQUE,
   type VARCHAR(64) NOT NULL, -- Overpass/CSV
   source TEXT NOT NULL, -- Overpass query or CSV file path
+  columns TEXT, -- Comma-separated list of column names
   source_status VARCHAR(32) NOT NULL DEFAULT 'NEW' -- NEW/PROCESSED/FAILED
   sizeLimit INTEGER NOT NULL DEFAULT 10000,
   created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -219,13 +219,14 @@ CREATE TABLE IF NOT EXISTS dataset (
 -- The concrete schema is derived at runtime from the CSV / Overpass header so only the
 -- surrogate primary key is fixed here.
 CREATE TABLE IF NOT EXISTS dataset_<name> (
-  id INTEGER PRIMARY KEY AUTOINCREMENT
+  id INTEGER PRIMARY KEY AUTOINCREMENT,    
+  geometry VARCHAR(1024),
   -- , <dynamic columns …>
 );
 
 -- Test-job metadata (one record per execution)
-CREATE TABLE IF NOT EXISTS dataset_job (
-  job_id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS eval_job (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   address_expression VARCHAR(255) NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'NEW',
@@ -239,19 +240,21 @@ CREATE TABLE IF NOT EXISTS dataset_job (
 );
 
 -- Results of address search evaluation (one row per source record per job)
-CREATE TABLE IF NOT EXISTS test_result (
+CREATE TABLE IF NOT EXISTS eval_result (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,    
   job_id INTEGER NOT NULL REFERENCES dataset_job(job_id) ON DELETE CASCADE,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   original TEXT NOT NULL, -- Original dataset record in JSON format
-  status VARCHAR(64) NOT NULL,
+  error VARCHAR(512),
   duration INTEGER,
   timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  geometry VARCHAR(1024),
   address VARCHAR(512),
   min_distance INTEGER,
   closest_result VARCHAR(512),
   actual_place INTEGER,
   results_count INTEGER,
-  PRIMARY KEY (job_id, rowid)
+  PRIMARY KEY (id)
 );
 ```
 
