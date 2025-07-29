@@ -6,6 +6,7 @@ import net.osmand.server.api.services.TestSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -77,5 +79,14 @@ public class TestSearchController {
                     URI location = locationBuilder.path("/{id}").buildAndExpand(dataset.getId()).toUri();
                     return ResponseEntity.created(location).body(dataset);
                 });
+    }
+
+    @GetMapping("/browse")
+    public ResponseEntity<?> browseCsvFiles() {
+        try {
+            return ResponseEntity.ok(testSearchService.browseCsvFiles());
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error browsing CSV files: " + e.getMessage());
+        }
     }
 }

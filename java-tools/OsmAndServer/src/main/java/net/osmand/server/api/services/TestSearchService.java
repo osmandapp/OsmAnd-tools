@@ -152,7 +152,7 @@ public class TestSearchService {
     }
 
     @Async
-    public CompletableFuture<String> refreshDataset(Long datasetId, Integer sizeLimit) {
+    public CompletableFuture<Dataset> refreshDataset(Long datasetId, Integer sizeLimit) {
         return CompletableFuture.supplyAsync(() -> {
             Dataset dataset = datasetRepository.findById(datasetId)
                     .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
@@ -179,7 +179,7 @@ public class TestSearchService {
                 datasetRepository.save(dataset);
 
                 LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
-                return dataset.getSourceStatus();
+                return dataset;
             } catch (Exception e) {
                 dataset.setSourceStatus(DatasetType.FAILED.name());
                 datasetRepository.save(dataset);
@@ -251,11 +251,12 @@ public class TestSearchService {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
             for (Map<String, Object> row : rows) {
                 long startTime = System.currentTimeMillis();
-                String originalJson = null;
+                String originalJson = null, address = null, geometry = null;
                 try {
                     originalJson = objectMapper.writeValueAsString(row);
-                    String address = (String) row.get("address");
-                    LatLon point = parsePoint((String) row.get("geometry"));
+                    address = (String) row.get("address");
+                    geometry = (String)row.get("geometry");
+                    LatLon point = parsePoint(geometry);
 
                     if (point == null) {
                         throw new IllegalArgumentException("Invalid or missing geometry in WKT format.");
@@ -264,11 +265,11 @@ public class TestSearchService {
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
                     long duration = System.currentTimeMillis() - startTime;
 
-                    saveResults(job, dataset, originalJson, searchResults, point, duration, null);
+                    saveResults(job, dataset, address, geometry, originalJson, searchResults, point, duration, null);
                 } catch (Exception e) {
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
                     long duration = System.currentTimeMillis() - startTime;
-                    saveResults(job, dataset, originalJson, Collections.emptyList(), null, duration, e.getMessage() == null ? e.toString() : e.getMessage());
+                    saveResults(job, dataset, address, geometry, originalJson, Collections.emptyList(), null, duration, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
             }
             job.setStatus(JobStatus.COMPLETED);
@@ -282,34 +283,39 @@ public class TestSearchService {
         }
     }
 
-    private void saveResults(EvalJob job, Dataset dataset, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
+    private void saveResults(EvalJob job, Dataset dataset, String address, String geometry, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
         int resultsCount = searchResults.size();
-        Integer minDistance = null;
+        Integer minDistance = null, actualPlace = null;
         String closestResult = null;
 
         if (originalPoint != null && !searchResults.isEmpty()) {
             double minDistanceMeters = Double.MAX_VALUE;
             float[] closestPoint = null;
+            int place = 0;
 
             for (Feature feature : searchResults) {
+                place++;
+                if (feature == null)
+                    continue;
                 float[] point = "Point".equals(feature.geometry.type) ? (float[])feature.geometry.coordinates : ((float[][])feature.geometry.coordinates)[0];
                 if (point != null) {
-                    double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point[0], point[1]);
+                    double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point[1], point[0]);
                     if (distance < minDistanceMeters) {
                         minDistanceMeters = distance;
                         closestPoint = point;
+                        actualPlace = place;
                     }
                 }
             }
 
             if (closestPoint != null) {
                 minDistance = (int) minDistanceMeters;
-                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint[0], closestPoint[1]);
+                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint[1], closestPoint[0]);
             }
         }
 
-        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, new java.sql.Timestamp(System.currentTimeMillis()));
+        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, address, geometry, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, geometry, actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
     private LatLon parsePoint(String wkt) {
@@ -367,7 +373,7 @@ public class TestSearchService {
             if (latIndex != -1 && lonIndex != -1) {
                 String lat = unquote(record[latIndex]);
                 String lon = unquote(record[lonIndex]);
-                values[0] = String.format("POINT(%s %s)", lon, lat);
+                values[0] = String.format("POINT(%s %s)", lat, lon);
             } else {
                 // Placeholder for other geometry patterns
                 values[0] = "";
@@ -420,5 +426,23 @@ public class TestSearchService {
         }
 
         return sample;
+    }
+
+    public Map<String, Integer> browseCsvFiles() throws IOException {
+        Map<String, Integer> fileRowCounts = new HashMap<>();
+        try (Stream<Path> paths = Files.walk(Path.of(csvDownloadingDir))) {
+            List<Path> csvFiles = paths
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toString().toLowerCase().endsWith(".csv"))
+                    .collect(Collectors.toList());
+
+            for (Path csvFile : csvFiles) {
+                try (BufferedReader reader = new BufferedReader(new FileReader(csvFile.toFile()))) {
+                    int rowCount = (int) reader.lines().count();
+                    fileRowCounts.put(csvFile.getFileName().toString(), rowCount);
+                }
+            }
+        }
+        return fileRowCounts;
     }
 }

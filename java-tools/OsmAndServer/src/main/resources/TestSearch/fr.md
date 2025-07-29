@@ -220,7 +220,6 @@ CREATE TABLE IF NOT EXISTS dataset (
 -- surrogate primary key is fixed here.
 CREATE TABLE IF NOT EXISTS dataset_<name> (
   id INTEGER PRIMARY KEY AUTOINCREMENT,    
-  geometry VARCHAR(1024),
   -- , <dynamic columns …>
 );
 

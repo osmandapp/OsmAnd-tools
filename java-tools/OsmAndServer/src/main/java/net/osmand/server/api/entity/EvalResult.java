@@ -37,6 +37,9 @@ public class EvalResult {
 	@Column(length = 512)
 	private String address;
 
+	@Column(length = 1024)
+	private String geometry;
+
 	@Column(name = "min_distance")
 	private Integer minDistance;
 
@@ -59,6 +62,13 @@ public class EvalResult {
 		this.id = id;
 	}
 
+	public String getGeometry() {
+		return geometry;
+	}
+
+	public void setGeometry(String geometry) {
+		this.geometry = geometry;
+	}
 	public Long getDatasetId() {
 		return datasetId;
 	}
