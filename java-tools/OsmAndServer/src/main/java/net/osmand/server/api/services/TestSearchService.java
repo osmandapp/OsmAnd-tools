@@ -9,6 +9,8 @@ import net.osmand.server.api.entity.DatasetType;
 import net.osmand.server.api.entity.JobStatus;
 import net.osmand.server.api.repo.DatasetJobRepository;
 import net.osmand.server.api.repo.DatasetRepository;
+import net.osmand.server.api.dto.JobProgress;
+import net.osmand.server.api.dto.EvaluationReport;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -42,7 +45,6 @@ import static net.osmand.server.api.utils.StringUtils.sanitize;
 import static net.osmand.server.api.utils.StringUtils.unquote;
 
 import net.osmand.server.api.utils.GeometryUtils;
-import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.MapUtils;
@@ -58,6 +60,7 @@ public class TestSearchService {
     private WebClient webClient;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
+    private final SimpMessagingTemplate messagingTemplate;
     @Value("${test.csv.dir}")
     private String csvDownloadingDir;
     @Value("${test.overpass.url}")
@@ -67,13 +70,15 @@ public class TestSearchService {
     public TestSearchService(DatasetRepository datasetRepository,
                              DatasetJobRepository datasetJobRepository,
                              @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
-                             SearchService searchService, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+                             SearchService searchService, WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+                             SimpMessagingTemplate messagingTemplate) {
         this.datasetRepository = datasetRepository;
         this.datasetJobRepository = datasetJobRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.searchService = searchService;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @PostConstruct
@@ -247,8 +252,11 @@ public class TestSearchService {
     protected void runTest(EvalJob job, Dataset dataset) {
         String tableName = "dataset_" + dataset.getName();
         String sql = String.format("SELECT *, %s AS address FROM %s", job.getAddressExpression(), tableName);
+        long processedCount = 0;
+        long errorCount = 0;
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            long totalRows = rows.size();
             for (Map<String, Object> row : rows) {
                 if (datasetJobRepository.findById(job.getId()).map(j -> j.getStatus() == JobStatus.CANCELED).orElse(false)) {
                     LOGGER.info("Job {} was cancelled. Stopping execution.", job.getId());
@@ -268,11 +276,17 @@ public class TestSearchService {
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
                     saveResults(job, dataset, address, geometry, originalJson, searchResults, point, System.currentTimeMillis() - startTime, null);
                 } catch (Exception e) {
+                    errorCount++;
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
                     saveResults(job, dataset, address, geometry, originalJson, Collections.emptyList(), null, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
+                processedCount++;
+                JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), totalRows, processedCount, errorCount);
+                messagingTemplate.convertAndSend("/topic/job-progress/" + job.getId(), progress);
             }
-            job.setStatus(JobStatus.COMPLETED);
+            if (job.getStatus() != JobStatus.CANCELED) {
+                job.setStatus(JobStatus.COMPLETED);
+            }
         } catch (Exception e) {
             LOGGER.error("Evaluation failed for job {} on dataset {}", job.getId(), dataset.getId(), e);
             job.setStatus(JobStatus.FAILED);
@@ -280,6 +294,8 @@ public class TestSearchService {
         } finally {
             job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
             datasetJobRepository.save(job);
+            JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), processedCount, processedCount, errorCount);
+            messagingTemplate.convertAndSend("/topic/job-progress/" + job.getId(), finalProgress);
         }
     }
 
@@ -339,6 +355,54 @@ public class TestSearchService {
 
     public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
         return datasetJobRepository.findByDatasetId(datasetId, pageable);
+    }
+
+    public Optional<EvaluationReport> getEvaluationReport(Long datasetId, Optional<Long> jobIdOpt) {
+        Optional<EvalJob> jobOptional = jobIdOpt
+                .flatMap(datasetJobRepository::findById)
+                .or(() -> datasetJobRepository.findTopByDatasetIdOrderByIdDesc(datasetId));
+
+        if (jobOptional.isEmpty()) {
+            return Optional.empty();
+        }
+
+        EvalJob job = jobOptional.get();
+        long jobId = job.getId();
+
+        String sql = """
+            SELECT
+                count(*) AS total_requests,
+                count(*) FILTER (WHERE error IS NOT NULL) AS failed_requests,
+                avg(duration) AS average_duration,
+                sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS \"0-1m\",
+                sum(CASE WHEN min_distance > 0 AND min_distance <= 50 THEN 1 ELSE 0 END) AS \"0-50m\",
+                sum(CASE WHEN min_distance > 50 AND min_distance <= 500 THEN 1 ELSE 0 END) AS \"50-500m\",
+                sum(CASE WHEN min_distance > 500 AND min_distance <= 1000 THEN 1 ELSE 0 END) AS \"500-1000m\",
+                sum(CASE WHEN min_distance > 1000 THEN 1 ELSE 0 END) AS \"1000m+\"
+            FROM
+                eval_result
+            WHERE
+                job_id = ?
+            """;
+
+        Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
+
+        long totalRequests = ((Number) result.get("total_requests")).longValue();
+        if (totalRequests == 0) {
+            return Optional.empty(); // No data to report
+        }
+        long failedRequests = ((Number) result.get("failed_requests")).longValue();
+        double averageDuration = result.get("average_duration") == null ? 0 : ((Number) result.get("average_duration")).doubleValue();
+        double errorRate = (double) failedRequests / totalRequests;
+
+        Map<String, Long> distanceHistogram = new LinkedHashMap<>();
+        distanceHistogram.put("0-50m", ((Number) result.getOrDefault("0-50m", 0)).longValue());
+        distanceHistogram.put("50-500m", ((Number) result.getOrDefault("50-500m", 0)).longValue());
+        distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
+        distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
+
+        EvaluationReport report = new EvaluationReport(jobId, totalRequests, failedRequests, errorRate, averageDuration, distanceHistogram);
+        return Optional.of(report);
     }
 
     public Optional<EvalJob> getEvaluationJob(Long jobId) {
@@ -421,7 +485,7 @@ public class TestSearchService {
             List<Path> csvFiles = paths
                     .filter(Files::isRegularFile)
                     .filter(p -> p.toString().toLowerCase().endsWith(".csv"))
-                    .collect(Collectors.toList());
+                    .toList();
 
             for (Path csvFile : csvFiles) {
                 try (BufferedReader reader = new BufferedReader(new FileReader(csvFile.toFile()))) {

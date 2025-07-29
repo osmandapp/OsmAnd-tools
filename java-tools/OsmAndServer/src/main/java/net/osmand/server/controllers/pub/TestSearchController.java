@@ -2,6 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.EvalJob;
+import net.osmand.server.api.dto.EvaluationReport;
 import net.osmand.server.api.services.TestSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -17,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
@@ -26,6 +31,12 @@ public class TestSearchController {
     @Autowired
     private TestSearchService testSearchService;
 
+    @MessageMapping("/eval/ws/{jobId}")
+    @SendTo("/topic/test-job-progress/{jobId}")
+    public EvalJob handleJobUpdates(@DestinationVariable Long jobId) {
+        return testSearchService.getEvaluationJob(jobId).orElse(null);
+    }
+
     @GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Page<Dataset>> getDatasets(Pageable pageable) {
         return ResponseEntity.ok(testSearchService.getDatasets(pageable));
@@ -34,6 +45,15 @@ public class TestSearchController {
     @GetMapping(value = "/datasets/{datasetId}/jobs", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Page<EvalJob>> getEvalJobs(@PathVariable Long datasetId, Pageable pageable) {
         return ResponseEntity.ok(testSearchService.getDatasetJobs(datasetId, pageable));
+    }
+
+    @GetMapping(value = "/reports/{datasetId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<EvaluationReport> getEvaluationReport(
+            @PathVariable Long datasetId,
+            @RequestParam(required = false) Long jobId) {
+        return testSearchService.getEvaluationReport(datasetId, Optional.ofNullable(jobId))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping(value = "/eval/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

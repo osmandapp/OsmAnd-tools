@@ -23,11 +23,11 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
   `addressExpression` (+ optional locale & other params) (#FR-7, FR-8-1).
 - [x] **GET `/admin/test/eval/{jobId}`** – polls job progress or final status (#FR-10).
 - [x] **POST `/admin/test/eval/cancel/{jobId}`** – requests cancellation of a running job (#FR-11).
-- [ ] **WebSocket `/admin/test/eval/ws/{jobId}`** – real-time job progress push channel (#FR-17).
+- [x] **WebSocket `/admin/test/eval/ws/{jobId}`** – real-time job progress push channel (#FR-17).
 
 ## 3. Reporting
 
-- [ ] **GET `/admin/test/reports/{datasetId}`** – returns aggregated metrics for latest or specified run (#FR-13).
+- [x] **GET `/admin/test/reports/{datasetId}`** – returns aggregated metrics for latest or specified run (#FR-13).
 - [ ] **GET `/admin/test/reports/{datasetId}/download`** – downloads raw result set in `csv` or `json` format (#FR-14).
 
 ## 4. Dataset Management & Querying
