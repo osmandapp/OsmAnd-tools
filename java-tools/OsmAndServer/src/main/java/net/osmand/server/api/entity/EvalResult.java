@@ -18,11 +18,13 @@ public class EvalResult {
 	@Column
 	private Long jobId;
 
+	@Column
+	private Long datasetId;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "jsonb")
 	private Map<String, String> original;
 
-	@Enumerated(EnumType.STRING)
 	@Column(nullable = true)
 	private String error;
 
@@ -57,6 +59,13 @@ public class EvalResult {
 		this.id = id;
 	}
 
+	public Long getDatasetId() {
+		return datasetId;
+	}
+
+	public void setDatasetId(Long datasetId) {
+		this.datasetId = datasetId;
+	}
 	public Long getJobId() {
 		return jobId;
 	}

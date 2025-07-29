@@ -171,10 +171,10 @@ public class TestSearchService {
             String tableName = "dataset_" + dataset.getName();
             try {
                 List<String> sample = reservoirSample(fullPath, sizeLimit + 1);
-                String[] headers = sample.get(0).split(",");
-                createDynamicTable(tableName, headers);
-                dataset.setColumns(insertSampleData(tableName, headers, sample, true));
+                String[] headers = sample.get(0).toLowerCase().split(",");
+                String[] columns = insertSampleData(tableName, headers, sample, true);
 
+                dataset.setColumns(objectMapper.writeValueAsString(columns));
                 dataset.setSourceStatus(DatasetType.COMPLETED.name());
                 datasetRepository.save(dataset);
 
@@ -335,36 +335,46 @@ public class TestSearchService {
         return datasetJobRepository.findByDatasetId(datasetId, pageable);
     }
 
-    private void createDynamicTable(String tableName, String[] headers) {
-        String columns = Stream.of(headers)
-                .map(header -> "\"" + sanitize(header) + "\" VARCHAR(255)")
-                .collect(Collectors.joining(", "));
-        // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
-        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (id BIGSERIAL PRIMARY KEY, geometry VARCHAR(1024), %s)", tableName, columns);
-        jdbcTemplate.execute(createTableSql);
-
-        LOGGER.info("Ensured table {} exists.", tableName);
-    }
-
-    private String insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
+    public String[] insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
         if (deleteBefore) {
-            String deleteSql = String.format("DELETE FROM %s", tableName);
-            int deletedRows = jdbcTemplate.update(deleteSql);
-            LOGGER.info("Deleted {} rows from {}.", deletedRows, tableName);
+            jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
+        String[] columns = new String[headers.length + 1];
+        columns[0] = "geometry";
+        System.arraycopy(headers, 0, columns, 1, headers.length);
 
-        String columns = Stream.of(headers).map(h -> "\"" + sanitize(h) + "\"").collect(Collectors.joining(", "));
-        String placeholders = String.join(", ", Collections.nCopies(headers.length, "?"));
-        String insertSql = String.format("INSERT INTO %s (geometry, %s) VALUES (?, %s)", tableName, columns, placeholders);
+        createDynamicTable(tableName, columns);
+
+        String insertSql = "INSERT INTO " + tableName + " (" + String.join(", ", columns) + ") VALUES (" +
+                String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
 
         List<Object[]> batchArgs = new ArrayList<>();
+
+        int latIndex = -1;
+        int lonIndex = -1;
+        for (int i = 0; i < headers.length; i++) {
+            if ("lat".equalsIgnoreCase(headers[i])) {
+                latIndex = i;
+            } else if ("lon".equalsIgnoreCase(headers[i])) {
+                lonIndex = i;
+            }
+        }
+
         for (int i = 1; i < sample.size(); i++) {
             String[] record = sample.get(i).split(",");
-            Object[] values = new Object[record.length+1];
+            Object[] values = new String[columns.length];
 
-            values[0] = "POINT[0 0]";
+            if (latIndex != -1 && lonIndex != -1) {
+                String lat = unquote(record[latIndex]);
+                String lon = unquote(record[lonIndex]);
+                values[0] = String.format("POINT(%s %s)", lon, lat);
+            } else {
+                // Placeholder for other geometry patterns
+                values[0] = "";
+            }
+
             for (int j = 1; j < values.length; j++) {
-                values[j] = unquote(record[j-1]);
+                values[j] = unquote(record[j - 1]);
             }
             batchArgs.add(values);
         }
@@ -372,6 +382,17 @@ public class TestSearchService {
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
 
         return columns;
+    }
+
+    private void createDynamicTable(String tableName, String[] headers) {
+        String columnsDefinition = Stream.of(headers)
+                .map(header -> "\"" + sanitize(header) + "\" VARCHAR(255)")
+                .collect(Collectors.joining(", "));
+        // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id BIGSERIAL PRIMARY KEY, %s)", tableName, columnsDefinition);
+        jdbcTemplate.execute(createTableSql);
+
+        LOGGER.info("Ensured table {} exists.", tableName);
     }
 
     private static List<String> reservoirSample(Path filePath, int n) throws IOException {
