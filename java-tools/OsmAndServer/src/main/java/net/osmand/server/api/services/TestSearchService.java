@@ -268,7 +268,7 @@ public class TestSearchService {
                 } catch (Exception e) {
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
                     long duration = System.currentTimeMillis() - startTime;
-                    saveResults(job, dataset, originalJson, Collections.emptyList(), null, duration, e.getMessage());
+                    saveResults(job, dataset, originalJson, Collections.emptyList(), null, duration, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
             }
             job.setStatus(JobStatus.COMPLETED);

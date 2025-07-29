@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,11 +35,15 @@ public class TestSearchController {
     }
 
     @PostMapping(value = "/eval/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public CompletableFuture<ResponseEntity<EvalJob>> startEvaluation(@PathVariable Long datasetId, @RequestBody Map<String, String> payload) {
+    public CompletableFuture<ResponseEntity<EvalJob>> startEvaluation(@PathVariable Long datasetId, @RequestBody Map<String, String> payload, HttpServletRequest request) {
+        String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
+                .replacePath(null)
+                .build()
+                .toUriString();
+
         return testSearchService.startEvaluation(datasetId, payload)
                 .thenApply(job -> {
-                    URI location = ServletUriComponentsBuilder
-                            .fromCurrentContextPath()
+                    URI location = ServletUriComponentsBuilder.fromUriString(baseUrl)
                             .path("/admin/test/eval/{jobId}")
                             .buildAndExpand(job.getId())
                             .toUri();
