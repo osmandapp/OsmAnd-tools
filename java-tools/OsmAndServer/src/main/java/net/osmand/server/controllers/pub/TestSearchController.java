@@ -37,20 +37,32 @@ public class TestSearchController {
     }
 
     @PostMapping(value = "/eval/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public CompletableFuture<ResponseEntity<EvalJob>> startEvaluation(@PathVariable Long datasetId, @RequestBody Map<String, String> payload, HttpServletRequest request) {
+    public ResponseEntity<EvalJob> startEvaluation(@PathVariable Long datasetId, @RequestBody Map<String, String> payload, HttpServletRequest request) {
         String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
                 .replacePath(null)
                 .build()
                 .toUriString();
 
-        return testSearchService.startEvaluation(datasetId, payload)
-                .thenApply(job -> {
-                    URI location = ServletUriComponentsBuilder.fromUriString(baseUrl)
-                            .path("/admin/test/eval/{jobId}")
-                            .buildAndExpand(job.getId())
-                            .toUri();
-                    return ResponseEntity.accepted().location(location).body(job);
-                });
+        EvalJob job = testSearchService.startEvaluation(datasetId, payload);
+
+        URI location = ServletUriComponentsBuilder.fromUriString(baseUrl)
+                .path("/admin/test/eval/{jobId}")
+                .buildAndExpand(job.getId())
+                .toUri();
+        return ResponseEntity.accepted().location(location).body(job);
+    }
+
+    @GetMapping(value = "/eval/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<EvalJob> getEvaluation(@PathVariable Long jobId) {
+        return testSearchService.getEvaluationJob(jobId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping(value = "/eval/cancel/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public CompletableFuture<ResponseEntity<EvalJob>> cancelEvaluation(@PathVariable Long jobId) {
+        return testSearchService.cancelEvaluation(jobId)
+                .thenApply(ResponseEntity::ok);
     }
 
     @PostMapping(value = "/csv/count", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

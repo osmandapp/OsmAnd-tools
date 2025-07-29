@@ -19,10 +19,10 @@ This document tracks all REST endpoints defined in `fr.md` along with their curr
 
 ## 2. Test Execution
 
-- [ ] **POST `/admin/test/eval/{datasetId}`** – starts an asynchronous address search evaluation job; body contains 
+- [x] **POST `/admin/test/eval/{datasetId}`** – starts an asynchronous address search evaluation job; body contains 
   `addressExpression` (+ optional locale & other params) (#FR-7, FR-8-1).
-- [ ] **GET `/admin/test/eval/{jobId}`** – polls job progress or final status (#FR-10).
-- [ ] **POST `/admin/test/eval/cancel/{jobId}`** – requests cancellation of a running job (#FR-11).
+- [x] **GET `/admin/test/eval/{jobId}`** – polls job progress or final status (#FR-10).
+- [x] **POST `/admin/test/eval/cancel/{jobId}`** – requests cancellation of a running job (#FR-11).
 - [ ] **WebSocket `/admin/test/eval/ws/{jobId}`** – real-time job progress push channel (#FR-17).
 
 ## 3. Reporting

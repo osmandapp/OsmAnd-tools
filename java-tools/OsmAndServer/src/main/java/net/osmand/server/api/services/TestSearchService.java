@@ -44,6 +44,7 @@ import static net.osmand.server.api.utils.StringUtils.unquote;
 import net.osmand.server.api.utils.GeometryUtils;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.MapUtils;
 
 @Service
@@ -220,29 +221,26 @@ public class TestSearchService {
         });
     }
 
-    @Async
-    public CompletableFuture<EvalJob> startEvaluation(Long datasetId, Map<String, String> payload) {
-        return CompletableFuture.supplyAsync(() -> {
-            Dataset dataset = datasetRepository.findById(datasetId)
-                    .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
+    public EvalJob startEvaluation(Long datasetId, Map<String, String> payload) {
+        Dataset dataset = datasetRepository.findById(datasetId)
+                .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-            EvalJob job = new EvalJob();
-            job.setDatasetId(datasetId);
-            job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
+        EvalJob job = new EvalJob();
+        job.setDatasetId(datasetId);
+        job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
 
-            job.setAddressExpression(payload.get("addressExpression"));
-            job.setLocale(payload.get("locale"));
-            job.setNorthWest(payload.get("northWest"));
-            job.setSouthEast(payload.get("southEast"));
-            job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
+        job.setAddressExpression(payload.get("addressExpression"));
+        job.setLocale(payload.get("locale"));
+        job.setNorthWest(payload.get("northWest"));
+        job.setSouthEast(payload.get("southEast"));
+        job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
 
-            job.setStatus(JobStatus.RUNNING);
-            EvalJob savedJob = datasetJobRepository.save(job);
+        job.setStatus(JobStatus.RUNNING);
+        EvalJob savedJob = datasetJobRepository.save(job);
 
-            runTest(savedJob, dataset);
+        runTest(savedJob, dataset);
 
-            return savedJob;
-        });
+        return savedJob;
     }
 
     @Async
@@ -252,6 +250,10 @@ public class TestSearchService {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
             for (Map<String, Object> row : rows) {
+                if (datasetJobRepository.findById(job.getId()).map(j -> j.getStatus() == JobStatus.CANCELED).orElse(false)) {
+                    LOGGER.info("Job {} was cancelled. Stopping execution.", job.getId());
+                    break; // Exit the loop if the job has been cancelled
+                }
                 long startTime = System.currentTimeMillis();
                 String originalJson = null, address = null, geometry = null;
                 try {
@@ -279,6 +281,23 @@ public class TestSearchService {
             job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
             datasetJobRepository.save(job);
         }
+    }
+
+    @Async
+    public CompletableFuture<EvalJob> cancelEvaluation(Long jobId) {
+        return CompletableFuture.supplyAsync(() -> {
+            EvalJob job = datasetJobRepository.findById(jobId)
+                    .orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
+
+            if (job.getStatus() == JobStatus.RUNNING) {
+                job.setStatus(JobStatus.CANCELED);
+                job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
+                return datasetJobRepository.save(job);
+            } else {
+                // If the job is not running, just return its current state without changes.
+                return job;
+            }
+        });
     }
 
     private void saveResults(EvalJob job, Dataset dataset, String address, String geometry, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
@@ -314,8 +333,6 @@ public class TestSearchService {
         jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, geometry, actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
-
-
     public Page<Dataset> getDatasets(Pageable pageable) {
         return datasetRepository.findAll(pageable);
     }
@@ -324,11 +341,15 @@ public class TestSearchService {
         return datasetJobRepository.findByDatasetId(datasetId, pageable);
     }
 
+    public Optional<EvalJob> getEvaluationJob(Long jobId) {
+        return datasetJobRepository.findById(jobId);
+    }
+
     public String[] insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
-        GeojsonClasses.Geometry geometry = GeometryUtils.getGeometry(headers);
+        Geometry geometry = GeometryUtils.getGeometry(headers);
 
         String[] columns = new String[headers.length + 1];
         columns[0] = "geometry";
