@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.data.LatLon;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.EvalJob;
 import net.osmand.server.api.entity.DatasetType;
@@ -39,6 +40,9 @@ import java.util.zip.GZIPOutputStream;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
 import static net.osmand.server.api.utils.StringUtils.unquote;
 
+import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+import net.osmand.util.MapUtils;
+
 @Service
 public class TestSearchService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
@@ -46,6 +50,7 @@ public class TestSearchService {
     private final DatasetRepository datasetRepository;
     private final DatasetJobRepository datasetJobRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final SearchService searchService;
     private WebClient webClient;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
@@ -58,10 +63,11 @@ public class TestSearchService {
     public TestSearchService(DatasetRepository datasetRepository,
                              DatasetJobRepository datasetJobRepository,
                              @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
-                             WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+                             SearchService searchService, WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.datasetRepository = datasetRepository;
         this.datasetJobRepository = datasetJobRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.searchService = searchService;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
     }
@@ -167,7 +173,7 @@ public class TestSearchService {
                 List<String> sample = reservoirSample(fullPath, sizeLimit + 1);
                 String[] headers = sample.get(0).split(",");
                 createDynamicTable(tableName, headers);
-                dataset.setColumns(insertSampleData(tableName, headers, sample));
+                dataset.setColumns(insertSampleData(tableName, headers, sample, true));
 
                 dataset.setSourceStatus(DatasetType.COMPLETED.name());
                 datasetRepository.save(dataset);
@@ -214,6 +220,9 @@ public class TestSearchService {
     @Async
     public CompletableFuture<EvalJob> startEvaluation(Long datasetId, Map<String, String> payload) {
         return CompletableFuture.supplyAsync(() -> {
+            Dataset dataset = datasetRepository.findById(datasetId)
+                    .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
+
             EvalJob job = new EvalJob();
             job.setDatasetId(datasetId);
             job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
@@ -222,11 +231,100 @@ public class TestSearchService {
             job.setLocale(payload.get("locale"));
             job.setNorthWest(payload.get("northWest"));
             job.setSouthEast(payload.get("southEast"));
-            job.setBaseSearch(Boolean.getBoolean(payload.get("baseSearch")));
+            job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
 
             job.setStatus(JobStatus.RUNNING);
-            return datasetJobRepository.save(job);
+            EvalJob savedJob = datasetJobRepository.save(job);
+
+            runTest(savedJob, dataset);
+
+            return savedJob;
         });
+    }
+
+    @Async
+    protected void runTest(EvalJob job, Dataset dataset) {
+        String tableName = "dataset_" + dataset.getName();
+        String sql = String.format("SELECT *, %s AS address FROM %s", job.getAddressExpression(), tableName);
+
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            for (Map<String, Object> row : rows) {
+                long startTime = System.currentTimeMillis();
+                String originalJson = null;
+                try {
+                    originalJson = objectMapper.writeValueAsString(row);
+                    String address = (String) row.get("address");
+                    LatLon point = parsePoint((String) row.get("geometry"));
+
+                    if (point == null) {
+                        throw new IllegalArgumentException("Invalid or missing geometry in WKT format.");
+                    }
+
+                    List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
+                    long duration = System.currentTimeMillis() - startTime;
+
+                    saveResults(job, dataset, originalJson, searchResults, point, duration, null);
+                } catch (Exception e) {
+                    LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
+                    long duration = System.currentTimeMillis() - startTime;
+                    saveResults(job, dataset, originalJson, Collections.emptyList(), null, duration, e.getMessage());
+                }
+            }
+            job.setStatus(JobStatus.COMPLETED);
+        } catch (Exception e) {
+            LOGGER.error("Evaluation failed for job {} on dataset {}", job.getId(), dataset.getId(), e);
+            job.setStatus(JobStatus.FAILED);
+            job.setError(e.getMessage());
+        } finally {
+            job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
+            datasetJobRepository.save(job);
+        }
+    }
+
+    private void saveResults(EvalJob job, Dataset dataset, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
+        int resultsCount = searchResults.size();
+        Integer minDistance = null;
+        String closestResult = null;
+
+        if (originalPoint != null && !searchResults.isEmpty()) {
+            double minDistanceMeters = Double.MAX_VALUE;
+            float[] closestPoint = null;
+
+            for (Feature feature : searchResults) {
+                float[] point = "Point".equals(feature.geometry.type) ? (float[])feature.geometry.coordinates : ((float[][])feature.geometry.coordinates)[0];
+                if (point != null) {
+                    double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point[0], point[1]);
+                    if (distance < minDistanceMeters) {
+                        minDistanceMeters = distance;
+                        closestPoint = point;
+                    }
+                }
+            }
+
+            if (closestPoint != null) {
+                minDistance = (int) minDistanceMeters;
+                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint[0], closestPoint[1]);
+            }
+        }
+
+        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult);
+    }
+
+    private LatLon parsePoint(String wkt) {
+        if (wkt == null || !wkt.toUpperCase().startsWith("POINT")) {
+            return null;
+        }
+        try {
+            String[] parts = wkt.substring(wkt.indexOf('(') + 1, wkt.indexOf(')')).trim().split("\\s+");
+            double lat = Double.parseDouble(parts[0]);
+            double lon = Double.parseDouble(parts[1]);
+            return new LatLon(lat, lon);
+        } catch (Exception e) {
+            LOGGER.warn("Could not parse WKT point: {}", wkt, e);
+            return null;
+        }
     }
 
     public Page<Dataset> getDatasets(Pageable pageable) {
@@ -248,48 +346,58 @@ public class TestSearchService {
         LOGGER.info("Ensured table {} exists.", tableName);
     }
 
-    private String insertSampleData(String tableName, String[] headers, List<String> sample) {
+    private String insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
+        if (deleteBefore) {
+            String deleteSql = String.format("DELETE FROM %s", tableName);
+            int deletedRows = jdbcTemplate.update(deleteSql);
+            LOGGER.info("Deleted {} rows from {}.", deletedRows, tableName);
+        }
+
         String columns = Stream.of(headers).map(h -> "\"" + sanitize(h) + "\"").collect(Collectors.joining(", "));
         String placeholders = String.join(", ", Collections.nCopies(headers.length, "?"));
-        String insertSql = String.format("INSERT INTO %s (%s) VALUES (%s)", tableName, columns, placeholders);
+        String insertSql = String.format("INSERT INTO %s (geometry, %s) VALUES (?, %s)", tableName, columns, placeholders);
 
         List<Object[]> batchArgs = new ArrayList<>();
         for (int i = 1; i < sample.size(); i++) {
             String[] record = sample.get(i).split(",");
-            for (int j = 0; j < record.length; j++) {
-                record[j] = unquote(record[j]);
+            Object[] values = new Object[record.length+1];
+
+            values[0] = "POINT[0 0]";
+            for (int j = 1; j < values.length; j++) {
+                values[j] = unquote(record[j-1]);
             }
-            batchArgs.add(record);
+            batchArgs.add(values);
         }
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
+
         return columns;
     }
 
     private static List<String> reservoirSample(Path filePath, int n) throws IOException {
-            List<String> sample = new ArrayList<>();
-            try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-                String header = reader.readLine();
-                String line;
-                int i = 1; // Line index (after header)
-                while ((line = reader.readLine()) != null) {
-                    if (i <= n) {
-                        // Fill reservoir
-                        if (sample.size() <= n) {
-                            sample.add(line.trim());
-                        }
-                    } else {
-                        // Replace with probability n/i
-                        int j = new Random().nextInt(i);
-                        if (j < n) {
-                            sample.set(j, line.trim());
-                        }
+        List<String> sample = new ArrayList<>();
+        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+            String header = reader.readLine();
+            String line;
+            int i = 1; // Line index (after header)
+            while ((line = reader.readLine()) != null) {
+                if (i <= n) {
+                    // Fill reservoir
+                    if (sample.size() <= n) {
+                        sample.add(line.trim());
                     }
-                    i++;
+                } else {
+                    // Replace with probability n/i
+                    int j = new Random().nextInt(i);
+                    if (j < n) {
+                        sample.set(j, line.trim());
+                    }
                 }
-                sample.set(0, header); // Restore header
+                i++;
             }
-
-            return sample;
+            sample.set(0, header); // Restore header
         }
+
+        return sample;
+    }
 }
