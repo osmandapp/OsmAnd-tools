@@ -239,14 +239,23 @@ public class OrderManagementService {
 	                             Integer period,
 	                             String interval,
 	                             String orderId,
-	                             String purchaseToken) {
+	                             String purchaseToken,
+	                             boolean isSubscription) {
+		if (email == null || sku == null || orderId == null || purchaseToken == null) {
+			throw new IllegalArgumentException("Required parameters must not be null");
+		}
+		if (isSubscription) {
+			if (period == null || period <= 0 || interval == null) {
+				throw new IllegalArgumentException("For subscriptions, period and interval are required");
+			}
+		}
 		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			throw new IllegalArgumentException("User with email “" + email + "” not found");
 		}
 		int userId = pu.id;
 
-		if (period != null && period != 0 && interval != null) {
+		if (isSubscription) {
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription s =
 					new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 			s.userId = userId;
