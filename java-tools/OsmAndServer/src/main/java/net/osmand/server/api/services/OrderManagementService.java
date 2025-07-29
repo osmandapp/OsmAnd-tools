@@ -241,9 +241,6 @@ public class OrderManagementService {
 	                             String orderId,
 	                             String purchaseToken,
 	                             boolean isSubscription) {
-		if (email == null || sku == null || orderId == null || purchaseToken == null) {
-			throw new IllegalArgumentException("Required parameters must not be null");
-		}
 		if (isSubscription) {
 			if (period == null || period <= 0 || interval == null) {
 				throw new IllegalArgumentException("For subscriptions, period and interval are required");
