@@ -308,8 +308,8 @@ public class TestSearchService {
             }
         }
 
-        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult);
+        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
     private LatLon parsePoint(String wkt) {

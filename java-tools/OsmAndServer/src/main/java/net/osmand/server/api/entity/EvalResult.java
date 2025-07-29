@@ -25,14 +25,14 @@ public class EvalResult {
 	@Column(columnDefinition = "jsonb")
 	private Map<String, String> original;
 
-	@Column(nullable = true)
+	@Column(columnDefinition = "TEXT")
 	private String error;
 
 	@Column
 	private Integer duration;
 
 	@Column(nullable = false)
-	private Timestamp timestamp;
+	private Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 
 	@Column(length = 512)
 	private String address;
