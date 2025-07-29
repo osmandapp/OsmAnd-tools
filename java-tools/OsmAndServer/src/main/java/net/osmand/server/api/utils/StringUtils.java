@@ -15,9 +15,19 @@ public final class StringUtils {
 	}
 
 	public static String unquote(String input) {
-		if (input != null && input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
+		if (input == null)
+			return null;
+
+		if (input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
 			return input.substring(1, input.length() - 1);
 		}
 		return input;
+	}
+
+	public static String crop(String input, int length) {
+		if (input == null)
+			return null;
+
+		return input.substring(0, Math.min(length, input.length()));
 	}
 }

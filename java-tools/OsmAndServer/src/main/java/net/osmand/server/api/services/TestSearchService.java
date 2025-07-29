@@ -37,9 +37,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 
+import static net.osmand.server.api.utils.GeometryUtils.getGeometry;
+import static net.osmand.server.api.utils.StringUtils.crop;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
 import static net.osmand.server.api.utils.StringUtils.unquote;
 
+import net.osmand.server.api.utils.GeometryUtils;
+import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 
@@ -246,7 +250,6 @@ public class TestSearchService {
     protected void runTest(EvalJob job, Dataset dataset) {
         String tableName = "dataset_" + dataset.getName();
         String sql = String.format("SELECT *, %s AS address FROM %s", job.getAddressExpression(), tableName);
-
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
             for (Map<String, Object> row : rows) {
@@ -255,21 +258,17 @@ public class TestSearchService {
                 try {
                     originalJson = objectMapper.writeValueAsString(row);
                     address = (String) row.get("address");
-                    geometry = (String)row.get("geometry");
-                    LatLon point = parsePoint(geometry);
-
+                    geometry = (String) row.get("geometry");
+                    LatLon point = GeometryUtils.parsePoint(geometry);
                     if (point == null) {
                         throw new IllegalArgumentException("Invalid or missing geometry in WKT format.");
                     }
 
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
-                    long duration = System.currentTimeMillis() - startTime;
-
-                    saveResults(job, dataset, address, geometry, originalJson, searchResults, point, duration, null);
+                    saveResults(job, dataset, address, geometry, originalJson, searchResults, point, System.currentTimeMillis() - startTime, null);
                 } catch (Exception e) {
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
-                    long duration = System.currentTimeMillis() - startTime;
-                    saveResults(job, dataset, address, geometry, originalJson, Collections.emptyList(), null, duration, e.getMessage() == null ? e.toString() : e.getMessage());
+                    saveResults(job, dataset, address, geometry, originalJson, Collections.emptyList(), null, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
             }
             job.setStatus(JobStatus.COMPLETED);
@@ -290,27 +289,25 @@ public class TestSearchService {
 
         if (originalPoint != null && !searchResults.isEmpty()) {
             double minDistanceMeters = Double.MAX_VALUE;
-            float[] closestPoint = null;
+            LatLon closestPoint = null;
             int place = 0;
 
             for (Feature feature : searchResults) {
                 place++;
                 if (feature == null)
                     continue;
-                float[] point = "Point".equals(feature.geometry.type) ? (float[])feature.geometry.coordinates : ((float[][])feature.geometry.coordinates)[0];
-                if (point != null) {
-                    double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point[1], point[0]);
-                    if (distance < minDistanceMeters) {
-                        minDistanceMeters = distance;
-                        closestPoint = point;
-                        actualPlace = place;
-                    }
+                LatLon point = GeometryUtils.getLatLon(feature);
+                double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point.getLatitude(), point.getLongitude());
+                if (distance < minDistanceMeters) {
+                    minDistanceMeters = distance;
+                    closestPoint = point;
+                    actualPlace = place;
                 }
             }
 
             if (closestPoint != null) {
                 minDistance = (int) minDistanceMeters;
-                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint[1], closestPoint[0]);
+                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint.getLatitude(), closestPoint.getLongitude());
             }
         }
 
@@ -318,20 +315,7 @@ public class TestSearchService {
         jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, geometry, actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
-    private LatLon parsePoint(String wkt) {
-        if (wkt == null || !wkt.toUpperCase().startsWith("POINT")) {
-            return null;
-        }
-        try {
-            String[] parts = wkt.substring(wkt.indexOf('(') + 1, wkt.indexOf(')')).trim().split("\\s+");
-            double lat = Double.parseDouble(parts[0]);
-            double lon = Double.parseDouble(parts[1]);
-            return new LatLon(lat, lon);
-        } catch (Exception e) {
-            LOGGER.warn("Could not parse WKT point: {}", wkt, e);
-            return null;
-        }
-    }
+
 
     public Page<Dataset> getDatasets(Pageable pageable) {
         return datasetRepository.findAll(pageable);
@@ -345,6 +329,8 @@ public class TestSearchService {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
+        GeojsonClasses.Geometry geometry = getGeometry(headers);
+
         String[] columns = new String[headers.length + 1];
         columns[0] = "geometry";
         System.arraycopy(headers, 0, columns, 1, headers.length);
@@ -355,32 +341,13 @@ public class TestSearchService {
                 String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
 
         List<Object[]> batchArgs = new ArrayList<>();
-
-        int latIndex = -1;
-        int lonIndex = -1;
-        for (int i = 0; i < headers.length; i++) {
-            if ("lat".equalsIgnoreCase(headers[i])) {
-                latIndex = i;
-            } else if ("lon".equalsIgnoreCase(headers[i])) {
-                lonIndex = i;
-            }
-        }
-
         for (int i = 1; i < sample.size(); i++) {
             String[] record = sample.get(i).split(",");
             Object[] values = new String[columns.length];
 
-            if (latIndex != -1 && lonIndex != -1) {
-                String lat = unquote(record[latIndex]);
-                String lon = unquote(record[lonIndex]);
-                values[0] = String.format("POINT(%s %s)", lat, lon);
-            } else {
-                // Placeholder for other geometry patterns
-                values[0] = "";
-            }
-
+            values[0] = getGeometry(geometry, record);
             for (int j = 1; j < values.length; j++) {
-                values[j] = unquote(record[j - 1]);
+                values[j] = crop(unquote(record[j - 1]), 255);
             }
             batchArgs.add(values);
         }
