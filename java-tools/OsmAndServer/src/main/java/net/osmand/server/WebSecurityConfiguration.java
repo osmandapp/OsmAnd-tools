@@ -213,10 +213,11 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/ws/test-jobs/**").permitAll()
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-//						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-						.requestMatchers("/admin/issues/**").permitAll()
+						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+//						.requestMatchers("/admin/issues/**").permitAll()
 						.requestMatchers("/admin/test/**").permitAll()
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)

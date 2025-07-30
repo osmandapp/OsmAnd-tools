@@ -47,10 +47,7 @@ import static net.osmand.server.api.utils.StringUtils.unquote;
 
 import net.osmand.server.api.utils.GeometryUtils;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
-import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.MapUtils;
-
-import javax.annotation.Nonnull;
 
 @Service
 public class TestSearchService {
@@ -267,7 +264,7 @@ public class TestSearchService {
                 }
                 long startTime = System.currentTimeMillis();
                 LatLon point = null;
-                String originalJson = null, address = null, geometry = null;
+                String originalJson = null, address = null;
                 try {
                     originalJson = objectMapper.writeValueAsString(row);
                     address = (String) row.get("address");
@@ -359,12 +356,12 @@ public class TestSearchService {
                 minDistance, closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(), originalPoint == null ? null : originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
-    public Page<Dataset> getDatasets(Pageable pageable) {
-        return datasetRepository.findAll(pageable);
+    public Page<Dataset> getDatasets(String search, String status, Pageable pageable) {
+        return datasetRepository.findAllDatasets(search, status, pageable);
     }
 
     public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
-        return datasetJobRepository.findByDatasetId(datasetId, pageable);
+        return datasetJobRepository.findByDatasetIdOrderByIdDesc(datasetId, pageable);
     }
 
     public Optional<EvaluationReport> getEvaluationReport(Long datasetId, Optional<Long> jobIdOpt) {
@@ -384,11 +381,11 @@ public class TestSearchService {
                 count(*) AS total_requests,
                 count(*) FILTER (WHERE error IS NOT NULL) AS failed_requests,
                 avg(duration) AS average_duration,
-                sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS \"0-1m\",
-                sum(CASE WHEN min_distance > 0 AND min_distance <= 50 THEN 1 ELSE 0 END) AS \"0-50m\",
-                sum(CASE WHEN min_distance > 50 AND min_distance <= 500 THEN 1 ELSE 0 END) AS \"50-500m\",
-                sum(CASE WHEN min_distance > 500 AND min_distance <= 1000 THEN 1 ELSE 0 END) AS \"500-1000m\",
-                sum(CASE WHEN min_distance > 1000 THEN 1 ELSE 0 END) AS \"1000m+\"
+                sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
+                sum(CASE WHEN min_distance > 0 AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
+                sum(CASE WHEN min_distance > 50 AND min_distance <= 500 THEN 1 ELSE 0 END) AS "50-500m",
+                sum(CASE WHEN min_distance > 500 AND min_distance <= 1000 THEN 1 ELSE 0 END) AS "500-1000m",
+                sum(CASE WHEN min_distance > 1000 THEN 1 ELSE 0 END) AS "1000m+"
             FROM
                 eval_result
             WHERE
@@ -503,8 +500,6 @@ public class TestSearchService {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
-        Geometry geometry = GeometryUtils.getGeometry(headers);
-
         String[] columns = new String[headers.length];
         System.arraycopy(headers, 0, columns, 1, headers.length);
 
