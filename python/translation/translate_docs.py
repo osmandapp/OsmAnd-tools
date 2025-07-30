@@ -19,6 +19,7 @@ INPUT_PATTERN = os.getenv('INPUT_PATTERN', '')
 LANG = os.getenv('LANG')
 IMAGES_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".svg"]
 WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
+FORCE_TRANSLATION = os.getenv('FORCE_TRANSLATION', 'false').lower() == 'true'
 
 # Validate INPUT_PATTERN
 if INPUT_PATTERN:
@@ -250,6 +251,9 @@ def digest(path: Path) -> str:
 
 
 def stored_digest(path: Path):
+    if FORCE_TRANSLATION:
+        return None
+
     try:
         with path.open(encoding="utf-8") as fh:
             if path.suffix == ".json":
