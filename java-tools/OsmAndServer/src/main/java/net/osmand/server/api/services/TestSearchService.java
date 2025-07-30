@@ -226,6 +226,30 @@ public class TestSearchService {
         });
     }
 
+    @Async
+    public CompletableFuture<Dataset> updateDataset(Long datasetId, Map<String, String> updates) {
+        return CompletableFuture.supplyAsync(() -> {
+            Dataset dataset = datasetRepository.findById(datasetId)
+                    .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
+
+            updates.forEach((key, value) -> {
+                switch (key) {
+                    case "name":
+                        dataset.setName(value);
+                        break;
+                    case "type":
+                        dataset.setType(value);
+                        break;
+                    case "source":
+                        dataset.setSource(value);
+                        break;
+                }
+            });
+
+            return datasetRepository.save(dataset);
+        });
+    }
+
     public EvalJob startEvaluation(Long datasetId, Map<String, String> payload) {
         Dataset dataset = datasetRepository.findById(datasetId)
                 .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));

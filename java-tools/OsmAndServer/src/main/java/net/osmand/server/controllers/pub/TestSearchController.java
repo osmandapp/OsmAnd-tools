@@ -139,6 +139,13 @@ public class TestSearchController {
                 });
     }
 
+    @PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId, @RequestBody Map<String, String> body) {
+        return testSearchService.updateDataset(datasetId, body)
+                .thenApply(ResponseEntity::ok);
+    }
+
     @GetMapping("/browse")
     @ResponseBody
     public ResponseEntity<?> browseCsvFiles() {
