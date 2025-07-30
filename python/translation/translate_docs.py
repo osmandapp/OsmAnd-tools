@@ -460,6 +460,8 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         return
 
     print(f"Translation to '{lang_code}' is starting...", flush=True)
+    prompt = prompts.get(f"MD_PROMPT_{lang_code.upper()}", None)
+    prompt = prompt if prompt else prompts['MD_PROMPT'].format(lang=lang_name)
     if not INPUT_PATTERN:
         if not i18n_lang_dir.exists():
             create_i18n(i18n_lang_dir, lang_code, lang_name)
@@ -473,10 +475,10 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         make_translation(prompts['CATEGORY_JSON_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '_*_.json')
         make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code,
                          "web-translation.json")
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '*.md*')
+        make_translation(prompt, docs_dir, docs_lang_dir, '*.md*')
     else:
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), blog_dir, blog_lang_dir, INPUT_PATTERN)
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, INPUT_PATTERN)
+        make_translation(prompt, blog_dir, blog_lang_dir, INPUT_PATTERN)
+        make_translation(prompt, docs_dir, docs_lang_dir, INPUT_PATTERN)
         make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
 
 
