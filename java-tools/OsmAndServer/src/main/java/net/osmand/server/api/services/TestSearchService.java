@@ -184,13 +184,14 @@ public class TestSearchService {
                 String[] columns = insertSampleData(tableName, headers, sample, true);
 
                 dataset.setColumns(objectMapper.writeValueAsString(columns));
-                dataset.setSourceStatus(DatasetType.COMPLETED.name());
+                dataset.setSourceStatus(DatasetType.OK.name());
                 datasetRepository.save(dataset);
 
                 LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 return dataset;
             } catch (Exception e) {
                 dataset.setSourceStatus(DatasetType.FAILED.name());
+                dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
                 datasetRepository.save(dataset);
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
                 throw new RuntimeException("Failed to process CSV file", e);

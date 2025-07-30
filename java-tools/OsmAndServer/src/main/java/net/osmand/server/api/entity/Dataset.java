@@ -19,8 +19,11 @@ public class Dataset {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String source; // Overpass query or file path
 
-    @Column(nullable = true, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String columns; // CSV column names
+
+    @Column(columnDefinition = "TEXT")
+    private String error;
 
     @Column(nullable = false)
     private String sourceStatus = "NEW";
@@ -33,6 +36,14 @@ public class Dataset {
 
     @Column(nullable = false)
     private LocalDateTime updated = LocalDateTime.now();
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
+    }
 
     // Getters and Setters
     public String getColumns() {
