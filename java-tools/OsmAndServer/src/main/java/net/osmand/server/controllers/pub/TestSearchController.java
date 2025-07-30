@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.net.URI;
@@ -54,6 +55,20 @@ public class TestSearchController {
         return testSearchService.getEvaluationReport(datasetId, Optional.ofNullable(jobId))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping(value = "/reports/{datasetId}/download")
+    public void downloadReport(
+            @PathVariable Long datasetId,
+            @RequestParam(required = false) Long jobId,
+            @RequestParam(defaultValue = "csv") String format,
+            HttpServletResponse response) throws IOException {
+
+        String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
+        response.setContentType(contentType);
+        response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
+
+        testSearchService.downloadRawResults(response.getWriter(), datasetId, Optional.ofNullable(jobId), format);
     }
 
     @PostMapping(value = "/eval/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

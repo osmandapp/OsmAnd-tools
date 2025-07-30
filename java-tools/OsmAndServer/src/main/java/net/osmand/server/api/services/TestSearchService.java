@@ -32,6 +32,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -418,6 +419,86 @@ public class TestSearchService {
         return datasetJobRepository.findById(jobId);
     }
 
+    public void downloadRawResults(Writer writer, Long datasetId, Optional<Long> jobIdOpt, String format) throws IOException {
+        Optional<EvalJob> jobOptional = jobIdOpt
+                .flatMap(datasetJobRepository::findById)
+                .or(() -> datasetJobRepository.findTopByDatasetIdOrderByIdDesc(datasetId));
+
+        if (jobOptional.isEmpty()) {
+            throw new RuntimeException("No evaluation job found for datasetId: " + datasetId);
+        }
+
+        long jobId = jobOptional.get().getId();
+        List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT * FROM eval_result WHERE job_id = ?", jobId);
+
+        if ("csv".equalsIgnoreCase(format)) {
+            writeResultsAsCsv(writer, results);
+        } else if ("json".equalsIgnoreCase(format)) {
+            objectMapper.writeValue(writer, results);
+        } else {
+            throw new IllegalArgumentException("Unsupported format: " + format);
+        }
+    }
+
+    private void writeResultsAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
+        if (results.isEmpty()) {
+            writer.write("");
+            return;
+        }
+
+        // Dynamically determine headers
+        Set<String> headers = new LinkedHashSet<>();
+        results.get(0).keySet().stream()
+                .filter(k -> !k.equals("original"))
+                .forEach(headers::add);
+
+        // Add headers from the 'original' JSON object
+        Set<String> originalHeaders = new LinkedHashSet<>();
+        for (Map<String, Object> row : results) {
+            Object originalObj = row.get("original");
+            if (originalObj != null) {
+                try {
+                    JsonNode originalNode = objectMapper.readTree(originalObj.toString());
+                    originalNode.fieldNames().forEachRemaining(originalHeaders::add);
+                } catch (IOException e) {
+                    // Ignore if 'original' is not valid JSON
+                }
+            }
+        }
+        headers.addAll(originalHeaders);
+
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+                .setHeader(headers.toArray(new String[0]))
+                .build();
+
+        try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
+            for (Map<String, Object> row : results) {
+                List<String> record = new ArrayList<>();
+                JsonNode originalNode = null;
+                Object originalObj = row.get("original");
+                if (originalObj != null) {
+                    try {
+                        originalNode = objectMapper.readTree(originalObj.toString());
+                    } catch (IOException e) {
+                        // Keep originalNode null
+                    }
+                }
+
+                for (String header : headers) {
+                    if (row.containsKey(header)) {
+                        Object value = row.get(header);
+                        record.add(value != null ? value.toString() : null);
+                    } else if (originalNode != null && originalNode.has(header)) {
+                        record.add(originalNode.get(header).asText());
+                    } else {
+                        record.add(null);
+                    }
+                }
+                printer.printRecord(record);
+            }
+        }
+    }
+
     public String[] insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
@@ -433,15 +514,15 @@ public class TestSearchService {
                 String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
 
         List<Object[]> batchArgs = new ArrayList<>();
-		for (String s : sample) {
-			String[] record = s.split(",");
-			Object[] values = new String[columns.length];
+        for (String s : sample) {
+            String[] record = s.split(",");
+            Object[] values = new String[columns.length];
 
-			for (int j = 0; j < values.length; j++) {
-				values[j] = crop(unquote(record[j]), 255);
-			}
-			batchArgs.add(values);
-		}
+            for (int j = 0; j < values.length; j++) {
+                values[j] = crop(unquote(record[j]), 255);
+            }
+            batchArgs.add(values);
+        }
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
 
