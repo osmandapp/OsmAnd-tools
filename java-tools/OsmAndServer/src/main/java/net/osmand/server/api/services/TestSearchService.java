@@ -194,7 +194,7 @@ public class TestSearchService {
                 dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
                 datasetRepository.save(dataset);
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
-                throw new RuntimeException("Failed to process CSV file", e);
+                return dataset;
             } finally {
                 if (dataset.getSource().equals("OVERPASS")) {
                     try {
