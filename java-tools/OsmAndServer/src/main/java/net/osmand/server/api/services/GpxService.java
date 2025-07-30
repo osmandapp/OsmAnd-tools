@@ -288,7 +288,7 @@ public class GpxService {
             return MAX_SIZE_FILES;
     }
 
-    public GpxFile loadGpxFromGeoFile(Source source, String filename) throws IOException {
+    public GpxFile importGpx(Source source, String filename) throws IOException {
         GpxFile gpxFile;
         if (filename.endsWith(GPX_FILE_EXT)) {
             gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);

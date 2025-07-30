@@ -257,7 +257,7 @@ public class GpxController {
 		File tmpFile = gpxService.saveMultipartFileToTemp(file, httpSession.getId());
 		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
 		Source source = Okio.source(tmpFile);
-		GpxFile gpxFile = gpxService.loadGpxFromGeoFile(source, filename);
+		GpxFile gpxFile = gpxService.importGpx(source, filename);
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
 					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
