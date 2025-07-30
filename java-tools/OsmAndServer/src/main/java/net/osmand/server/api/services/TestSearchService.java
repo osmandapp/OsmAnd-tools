@@ -2,7 +2,6 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.Nonnull;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.EvalJob;
@@ -49,6 +48,8 @@ import net.osmand.server.api.utils.GeometryUtils;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.MapUtils;
+
+import javax.annotation.Nonnull;
 
 @Service
 public class TestSearchService {
@@ -264,13 +265,14 @@ public class TestSearchService {
                     break; // Exit the loop if the job has been cancelled
                 }
                 long startTime = System.currentTimeMillis();
+                LatLon point = null;
                 String originalJson = null, address = null, geometry = null;
                 try {
                     originalJson = objectMapper.writeValueAsString(row);
                     address = (String) row.get("address");
                     String lat = (String) row.get("lat");
                     String lon = (String) row.get("lon");
-                    LatLon point = GeometryUtils.parseLatLon(lat, lon);
+                    point = GeometryUtils.parseLatLon(lat, lon);
                     if (point == null) {
                         throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format.");
                     }
@@ -280,7 +282,7 @@ public class TestSearchService {
                 } catch (Exception e) {
                     errorCount++;
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
-                    saveResults(job, dataset, address, originalJson, Collections.emptyList(), null, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
+                    saveResults(job, dataset, address, originalJson, Collections.emptyList(), point, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
                 processedCount++;
                 JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), totalRows, processedCount, errorCount);
@@ -318,7 +320,10 @@ public class TestSearchService {
         });
     }
 
-    private void saveResults(EvalJob job, Dataset dataset, String address, String originalJson, List<Feature> searchResults, @Nonnull LatLon originalPoint, long duration, String error) {
+    private void saveResults(EvalJob job, Dataset dataset, String address, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
+        if (job == null || dataset == null) {
+            return;
+        }
         int resultsCount = searchResults.size();
         Integer minDistance = null, actualPlace = null;
         String closestResult = null;
@@ -332,23 +337,25 @@ public class TestSearchService {
                 place++;
                 if (feature == null)
                     continue;
-                LatLon point = GeometryUtils.getLatLon(feature);
-                double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), point.getLatitude(), point.getLongitude());
+                LatLon foundPoint = GeometryUtils.getLatLon(feature);
+                double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(), foundPoint.getLatitude(), foundPoint.getLongitude());
                 if (distance < minDistanceMeters) {
                     minDistanceMeters = distance;
-                    closestPoint = point;
+                    closestPoint = foundPoint;
                     actualPlace = place;
                 }
             }
 
             if (closestPoint != null) {
                 minDistance = (int) minDistanceMeters;
-                closestResult = String.format(Locale.US, "POINT(%f %f)", closestPoint.getLatitude(), closestPoint.getLongitude());
+                closestResult = GeometryUtils.pointToString(closestPoint);
             }
         }
 
-        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, originalPoint.getLatitude(), originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
+        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
+                "min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount,
+                minDistance, closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(), originalPoint == null ? null : originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
     public Page<Dataset> getDatasets(Pageable pageable) {

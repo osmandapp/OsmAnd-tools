@@ -47,6 +47,21 @@ public class EvalResult {
 	@Column(name = "results_count")
 	private Integer resultsCount;
 
+	@Column()
+	private Double lat;
+
+	@Column()
+	private Double lon;
+	// Getters and Setters
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
 	public Double getLat() {
 		return lat;
 	}
@@ -65,21 +80,6 @@ public class EvalResult {
 
 	public void setJobId(Long jobId) {
 		this.jobId = jobId;
-	}
-
-	@Column()
-	private Double lat;
-
-	@Column()
-	private Double lon;
-	// Getters and Setters
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
 	}
 
 	public Long getDatasetId() {

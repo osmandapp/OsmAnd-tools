@@ -3,6 +3,8 @@ package net.osmand.server.api.utils;
 import net.osmand.data.LatLon;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 
+import java.util.Locale;
+
 public class GeometryUtils {
 	private GeometryUtils() {
 		// Private constructor to prevent instantiation
@@ -54,5 +56,8 @@ public class GeometryUtils {
 	public static String geometryToString(GeojsonClasses.Geometry geometry, String[] values) {
 		int[] latLon = (int[]) geometry.coordinates;
 		return String.format("POINT(%s %s)", values[latLon[0]], values[latLon[1]]);
+	}
+	public static String pointToString(LatLon point) {
+		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
 	}
 }
