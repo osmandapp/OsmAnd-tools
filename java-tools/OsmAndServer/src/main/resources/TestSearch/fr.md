@@ -243,11 +243,12 @@ CREATE TABLE IF NOT EXISTS eval_result (
   id INTEGER PRIMARY KEY AUTOINCREMENT,    
   job_id INTEGER NOT NULL REFERENCES dataset_job(job_id) ON DELETE CASCADE,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+  lat DOUBLE NOT NULL,
+  lon DOUBLE NOT NULL,
   original TEXT NOT NULL, -- Original dataset record in JSON format
   error VARCHAR(512),
   duration INTEGER,
   timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  geometry VARCHAR(1024),
   address VARCHAR(512),
   min_distance INTEGER,
   closest_result VARCHAR(512),

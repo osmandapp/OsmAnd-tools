@@ -13,6 +13,16 @@ public class GeometryUtils {
 		return new LatLon(point[1], point[0]);
 	}
 
+	public static LatLon parseLatLon(String lat, String lon) {
+		if (lat == null || lon == null) {
+			return null;
+		}
+		try {
+			return new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+		} catch (Exception e) {
+			return null;
+		}
+	}
 	public static LatLon parsePoint(String wkt) {
 		if (wkt == null || !wkt.toUpperCase().startsWith("POINT")) {
 			return null;

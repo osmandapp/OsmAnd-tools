@@ -1,6 +1,6 @@
 # UI Features To-Do List
 
-Below is the backlog of user-interface-specific requirements extracted from `fr.md`.  Each item is expressed as an 
+Below is the backlog of user-interface-specific requirements extracted from `fr.md`.  Each item is expressed as an
 unchecked task so that it can be ticked off upon completion.
 
 ## Datasets Page
@@ -12,14 +12,15 @@ unchecked task so that it can be ticked off upon completion.
 - [ ] Lazy-load historical runs on demand via `GET /admin/test/datasets/{datasetId}/jobs`.
 - [ ] Within each historical run row expose a **Report** button that can either display the aggregated report (FR-13)
   or download raw results (FR-14).
-- [ ] Add a **search & filter toolbar** that debounces input ≤300 ms and hits `GET /admin/test/datasets` with 
+- [ ] Add a **search & filter toolbar** that debounces input ≤300 ms and hits `GET /admin/test/datasets` with
   `search` and `status` parameters.
 - [ ] Implement a tree-view presentation where the dataset row is a parent node and job rows are child nodes.
 
 ## Dataset Management
 
 - [ ] Implement **Create**, **Delete**, and **Refresh** actions via modal dialogs bound to ingestion endpoints (FR-1 and FR-2).
-- [ ] Support **drag-and-drop CSV upload** in addition to the native file picker.
+- [ ] Support browsing of CSV files from server.
+- [ ] Support **drag-and-drop CSV upload** to server in addition to the native file picker.
 - [ ] Show a confirmation dialog (“Are you sure?”) before deleting a dataset.
 - [ ] Display any ingestion or deletion errors in a modal dialog.
 - [ ] When a dataset is deleted, visually update the list once the backend has confirmed cascade deletion of related data.

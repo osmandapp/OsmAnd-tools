@@ -4,10 +4,8 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Map;
-import java.util.Objects;
 
 @Entity
 @Table(name = "eval_result")
@@ -37,9 +35,6 @@ public class EvalResult {
 	@Column(length = 512)
 	private String address;
 
-	@Column(length = 1024)
-	private String geometry;
-
 	@Column(name = "min_distance")
 	private Integer minDistance;
 
@@ -52,6 +47,31 @@ public class EvalResult {
 	@Column(name = "results_count")
 	private Integer resultsCount;
 
+	public Double getLat() {
+		return lat;
+	}
+
+	public void setLat(Double lat) {
+		this.lat = lat;
+	}
+
+	public Double getLon() {
+		return lon;
+	}
+
+	public void setLon(Double lon) {
+		this.lon = lon;
+	}
+
+	public void setJobId(Long jobId) {
+		this.jobId = jobId;
+	}
+
+	@Column()
+	private Double lat;
+
+	@Column()
+	private Double lon;
 	// Getters and Setters
 
 	public Long getId() {
@@ -62,13 +82,6 @@ public class EvalResult {
 		this.id = id;
 	}
 
-	public String getGeometry() {
-		return geometry;
-	}
-
-	public void setGeometry(String geometry) {
-		this.geometry = geometry;
-	}
 	public Long getDatasetId() {
 		return datasetId;
 	}

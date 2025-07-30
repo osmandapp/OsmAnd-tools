@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Nonnull;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.EvalJob;
@@ -267,18 +268,19 @@ public class TestSearchService {
                 try {
                     originalJson = objectMapper.writeValueAsString(row);
                     address = (String) row.get("address");
-                    geometry = (String) row.get("geometry");
-                    LatLon point = GeometryUtils.parsePoint(geometry);
+                    String lat = (String) row.get("lat");
+                    String lon = (String) row.get("lon");
+                    LatLon point = GeometryUtils.parseLatLon(lat, lon);
                     if (point == null) {
-                        throw new IllegalArgumentException("Invalid or missing geometry in WKT format.");
+                        throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format.");
                     }
 
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
-                    saveResults(job, dataset, address, geometry, originalJson, searchResults, point, System.currentTimeMillis() - startTime, null);
+                    saveResults(job, dataset, address, originalJson, searchResults, point, System.currentTimeMillis() - startTime, null);
                 } catch (Exception e) {
                     errorCount++;
                     LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
-                    saveResults(job, dataset, address, geometry, originalJson, Collections.emptyList(), null, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
+                    saveResults(job, dataset, address, originalJson, Collections.emptyList(), null, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
                 processedCount++;
                 JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), totalRows, processedCount, errorCount);
@@ -316,7 +318,7 @@ public class TestSearchService {
         });
     }
 
-    private void saveResults(EvalJob job, Dataset dataset, String address, String geometry, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
+    private void saveResults(EvalJob job, Dataset dataset, String address, String originalJson, List<Feature> searchResults, @Nonnull LatLon originalPoint, long duration, String error) {
         int resultsCount = searchResults.size();
         Integer minDistance = null, actualPlace = null;
         String closestResult = null;
@@ -345,8 +347,8 @@ public class TestSearchService {
             }
         }
 
-        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, address, geometry, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, geometry, actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
+        String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount, minDistance, closestResult, address, originalPoint.getLatitude(), originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
 
     public Page<Dataset> getDatasets(Pageable pageable) {
@@ -415,8 +417,7 @@ public class TestSearchService {
         }
         Geometry geometry = GeometryUtils.getGeometry(headers);
 
-        String[] columns = new String[headers.length + 1];
-        columns[0] = "geometry";
+        String[] columns = new String[headers.length];
         System.arraycopy(headers, 0, columns, 1, headers.length);
 
         createDynamicTable(tableName, columns);
@@ -425,16 +426,15 @@ public class TestSearchService {
                 String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
 
         List<Object[]> batchArgs = new ArrayList<>();
-        for (int i = 1; i < sample.size(); i++) {
-            String[] record = sample.get(i).split(",");
-            Object[] values = new String[columns.length];
+		for (String s : sample) {
+			String[] record = s.split(",");
+			Object[] values = new String[columns.length];
 
-            values[0] = GeometryUtils.geometryToString(geometry, record);
-            for (int j = 1; j < values.length; j++) {
-                values[j] = crop(unquote(record[j - 1]), 255);
-            }
-            batchArgs.add(values);
-        }
+			for (int j = 0; j < values.length; j++) {
+				values[j] = crop(unquote(record[j]), 255);
+			}
+			batchArgs.add(values);
+		}
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
 
