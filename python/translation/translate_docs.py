@@ -28,7 +28,7 @@ if INPUT_PATTERN:
     except Exception as e:
         raise ValueError(f"INPUT_PATTERN '{INPUT_PATTERN}' is not a valid file/directory pattern: {e}")
 
-print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}", flush=True)
+print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}, FORCE_TRANSLATION: {FORCE_TRANSLATION}", flush=True)
 if not all([MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
     raise ValueError("Missing required environment variables (MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
 if INPUT_PATTERN and not (INPUT_PATTERN.endswith('.json') or '.md' in INPUT_PATTERN):
