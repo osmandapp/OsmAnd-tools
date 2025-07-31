@@ -95,7 +95,7 @@ spring:
     properties.hibernate.jdbc.lob.non_contextual_creation: true
     hibernate.ddl-auto: update
   datasource:
-    url: ${DB_URL:jdbc:postgresql://172.23.64.1:5432/osmanddb}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   changesetdatasource:
@@ -117,7 +117,7 @@ spring:
     password:
     driverClassname:
   testdatasource:
-    url: ${DB_URL:jdbc:postgresql://172.23.64.1:5432/osmanddb}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   web.resources.static-locations: file:${osmand.web.location}
