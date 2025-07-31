@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import jakarta.annotation.PostConstruct;
@@ -37,8 +38,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import java.time.LocalDateTime;
 
 import static net.osmand.server.api.utils.StringUtils.crop;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
@@ -82,7 +83,13 @@ public class TestSearchService {
 
     @PostConstruct
     private void initWebClient() {
-        this.webClient = webClientBuilder.baseUrl(overpassApiUrl).build();
+        this.webClient = webClientBuilder.baseUrl(overpassApiUrl)
+                .exchangeStrategies(ExchangeStrategies.builder()
+                        .codecs(configurer -> configurer
+                                .defaultCodecs()
+                                .maxInMemorySize(16 * 1024 * 1024))
+                        .build())
+                .build();
     }
 
     private Path queryOverpass(String query) {
@@ -90,11 +97,11 @@ public class TestSearchService {
         try {
             String overpassResponse = webClient.post()
                     .uri("")
-                    .bodyValue("data=[out:json][timeout:25];" + query)
+                    .bodyValue("[out:json][timeout:25];" + query + ";out;")
                     .retrieve()
                     .bodyToMono(String.class)
                     .toFuture().join();
-            tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv.gz");
+            tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv");
             int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
             LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 
@@ -124,7 +131,7 @@ public class TestSearchService {
         });
 
         int rowCount = 0;
-        try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(Files.newOutputStream(outputPath));
+        try (OutputStream gzipOutputStream = new BufferedOutputStream(Files.newOutputStream(outputPath));
              CSVPrinter csvPrinter = new CSVPrinter(new OutputStreamWriter(gzipOutputStream), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
 
             for (JsonNode element : elementList) {
@@ -167,7 +174,7 @@ public class TestSearchService {
 
             Path fullPath = null;
             try {
-                if (dataset.getSource().equals("OVERPASS")) {
+                if (dataset.getType().equals("Overpass")) {
                     fullPath = queryOverpass(dataset.getSource());
                 } else {
                     fullPath = Path.of(csvDownloadingDir, dataset.getSource());
@@ -178,10 +185,16 @@ public class TestSearchService {
                     return dataset;
                 }
 
-                String tableName = "dataset_" + dataset.getName();
+                String tableName = "dataset_" + sanitize(dataset.getName());
                 String header = getHeader(fullPath);
+				if (header == null || header.trim().isEmpty()) {
+                    dataset.setError("File doesn't have header.");
+                    datasetRepository.save(dataset);
+                    return dataset;
+                }
+
                 String del = header.chars().filter(ch -> ch == ',').count() < header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
-                String[] headers = Stream.of(header.toLowerCase().split(del)).map(StringUtils::sanitize).toArray(String[]::new);
+				String[] headers = Stream.of(header.toLowerCase().split(del)).map(StringUtils::sanitize).toArray(String[]::new);
                 dataset.setColumns(objectMapper.writeValueAsString(headers));
                 if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
                     dataset.setError("Header doesn't include 'lat' or 'lon'.");
@@ -190,18 +203,18 @@ public class TestSearchService {
                 }
 
                 if (reload != null && reload) {
-                    List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit() + 1);
+                    List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit());
                     insertSampleData(tableName, headers, sample.subList(1, sample.size()), true);
                     LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 }
 
                 if (dataset.getAddressExpression() == null || dataset.getAddressExpression().trim().isEmpty()) {
-                    String exp = Stream.of(headers).filter(h -> !h.equals("hash") && !h.equals("id") && !h.equals("lon") && !h.equals("lat")).collect(Collectors.joining(" || ' ' || "));
+                    String exp = Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith("street") || h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" || ' ' || "));
                     dataset.setAddressExpression(exp);
                 } else {
                     String error = checkSQLExpression(dataset.getName(), dataset.getAddressExpression());
                     if (error != null) {
-                        dataset.setError("Incorrect SQL expression" + error);
+                        dataset.setError("Incorrect SQL expression: " + error);
                         datasetRepository.save(dataset);
                         return dataset;
                     }
@@ -373,6 +386,17 @@ public class TestSearchService {
         });
     }
 
+    @Async
+    public CompletableFuture<Void> deleteJob(Long jobId) {
+        return CompletableFuture.runAsync(() -> {
+            if (!datasetJobRepository.existsById(jobId)) {
+                throw new RuntimeException("Job not found with id: " + jobId);
+            }
+            datasetJobRepository.deleteById(jobId);
+            LOGGER.info("Deleted job with id: {}", jobId);
+        });
+    }
+
     private void saveResults(EvalJob job, Dataset dataset, String address, String originalJson, List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
         if (job == null || dataset == null) {
             return;
@@ -418,6 +442,7 @@ public class TestSearchService {
     public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
         return datasetJobRepository.findByDatasetIdOrderByIdDesc(datasetId, pageable);
     }
+
     public String checkSQLExpression(String name, String exp) {
         String tableName = "dataset_" + sanitize(name);
         String sql = "SELECT " + exp + " as address FROM " + tableName + " LIMIT 1";
@@ -442,7 +467,6 @@ public class TestSearchService {
 
         String tableName = "dataset_" + sanitize(dataset.getName());
         String sql = "SELECT * FROM " + tableName;
-
         try {
             StringWriter stringWriter = new StringWriter();
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
@@ -453,7 +477,6 @@ public class TestSearchService {
 
             String[] headers = rows.get(0).keySet().toArray(new String[0]);
             CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers).setDelimiter(';').build();
-
             try (final CSVPrinter printer = new CSVPrinter(stringWriter, csvFormat)) {
                 for (Map<String, Object> row : rows) {
                     printer.printRecord(row.values());
@@ -467,23 +490,18 @@ public class TestSearchService {
         }
     }
 
-    public Optional<EvaluationReport> getEvaluationReport(Long datasetId, Optional<Long> jobIdOpt) {
-        Optional<EvalJob> jobOptional = jobIdOpt
-                .flatMap(datasetJobRepository::findById)
-                .or(() -> datasetJobRepository.findTopByDatasetIdOrderByIdDesc(datasetId));
-
+    public Optional<EvaluationReport> getEvaluationReport(Long jobId) {
+        Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
         if (jobOptional.isEmpty()) {
             return Optional.empty();
         }
-
-        EvalJob job = jobOptional.get();
-        long jobId = job.getId();
 
         String sql = """
             SELECT
                 count(*) AS total_requests,
                 count(*) FILTER (WHERE error IS NOT NULL) AS failed_requests,
                 avg(duration) AS average_duration,
+                avg(actual_place) AS average_place,
                 sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
                 sum(CASE WHEN min_distance > 0 AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
                 sum(CASE WHEN min_distance > 50 AND min_distance <= 500 THEN 1 ELSE 0 END) AS "50-500m",
@@ -503,6 +521,7 @@ public class TestSearchService {
         }
         long failedRequests = ((Number) result.get("failed_requests")).longValue();
         double averageDuration = result.get("average_duration") == null ? 0 : ((Number) result.get("average_duration")).doubleValue();
+        double averagePlace = result.get("average_place") == null ? 0 : ((Number) result.get("average_place")).doubleValue();
         double errorRate = (double) failedRequests / totalRequests;
 
         Map<String, Long> distanceHistogram = new LinkedHashMap<>();
@@ -511,7 +530,7 @@ public class TestSearchService {
         distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
         distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
 
-        EvaluationReport report = new EvaluationReport(jobId, totalRequests, failedRequests, errorRate, averageDuration, distanceHistogram);
+        EvaluationReport report = new EvaluationReport(jobId, totalRequests, failedRequests, errorRate, averageDuration, averagePlace, distanceHistogram);
         return Optional.of(report);
     }
 
@@ -519,18 +538,13 @@ public class TestSearchService {
         return datasetJobRepository.findById(jobId);
     }
 
-    public void downloadRawResults(Writer writer, Long datasetId, Optional<Long> jobIdOpt, String format) throws IOException {
-        Optional<EvalJob> jobOptional = jobIdOpt
-                .flatMap(datasetJobRepository::findById)
-                .or(() -> datasetJobRepository.findTopByDatasetIdOrderByIdDesc(datasetId));
-
+    public void downloadRawResults(Writer writer, Long jobId, String format) throws IOException {
+        Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
         if (jobOptional.isEmpty()) {
-            throw new RuntimeException("No evaluation job found for datasetId: " + datasetId);
+            throw new RuntimeException("No evaluation job found for jobId: " + jobId);
         }
 
-        long jobId = jobOptional.get().getId();
         List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT * FROM eval_result WHERE job_id = ?", jobId);
-
         if ("csv".equalsIgnoreCase(format)) {
             writeResultsAsCsv(writer, results);
         } else if ("json".equalsIgnoreCase(format)) {
@@ -599,7 +613,7 @@ public class TestSearchService {
         }
     }
 
-    public String[] insertSampleData(String tableName, String[] columns, List<String> sample, boolean deleteBefore) {
+    public void insertSampleData(String tableName, String[] columns, List<String> sample, boolean deleteBefore) {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
@@ -610,17 +624,14 @@ public class TestSearchService {
         List<Object[]> batchArgs = new ArrayList<>();
         for (String s : sample) {
             String[] record = s.split(",");
-            Object[] values = new String[columns.length];
-
-            for (int j = 0; j < values.length; j++) {
+            String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
+            for (int j = 0; j < values.length && j < record.length; j++) {
                 values[j] = crop(unquote(record[j]), 255);
             }
             batchArgs.add(values);
         }
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
         LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
-
-        return columns;
     }
 
     private void createDynamicTable(String tableName, String[] columns) {
@@ -634,10 +645,19 @@ public class TestSearchService {
         LOGGER.info("Ensured table {} exists.", tableName);
     }
 
-    private static String getHeader(Path filePath) throws IOException {
-        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-            return reader.readLine();
+    private String getHeader(Path filePath) throws IOException {
+        String fileName = filePath.getFileName().toString();
+        if (fileName.endsWith(".csv")) {
+            try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+                return reader.readLine();
+            }
         }
+        if (fileName.endsWith(".gz")) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(filePath))))) {
+                return reader.readLine();
+            }
+        }
+        return null;
     }
 
     private static List<String> reservoirSample(Path filePath, int n) throws IOException {

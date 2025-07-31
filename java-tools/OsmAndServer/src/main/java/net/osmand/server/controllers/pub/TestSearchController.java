@@ -64,20 +64,18 @@ public class TestSearchController {
         }
     }
 
-    @GetMapping(value = "/reports/{datasetId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/reports/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<EvaluationReport> getEvaluationReport(
-            @PathVariable Long datasetId,
-            @RequestParam(required = false) Long jobId) {
-        return testSearchService.getEvaluationReport(datasetId, Optional.ofNullable(jobId))
+            @PathVariable Long jobId) {
+        return testSearchService.getEvaluationReport(jobId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping(value = "/reports/{datasetId}/download")
+    @GetMapping(value = "/reports/{jobId}/download")
     public void downloadReport(
-            @PathVariable Long datasetId,
-            @RequestParam(required = false) Long jobId,
+            @PathVariable Long jobId,
             @RequestParam(defaultValue = "csv") String format,
             HttpServletResponse response) throws IOException {
 
@@ -85,7 +83,7 @@ public class TestSearchController {
         response.setContentType(contentType);
         response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-        testSearchService.downloadRawResults(response.getWriter(), datasetId, Optional.ofNullable(jobId), format);
+        testSearchService.downloadRawResults(response.getWriter(), jobId, format);
     }
 
     @PostMapping(value = "/eval/{datasetId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -118,6 +116,13 @@ public class TestSearchController {
     public CompletableFuture<ResponseEntity<EvalJob>> cancelEvaluation(@PathVariable Long jobId) {
         return testSearchService.cancelEvaluation(jobId)
                 .thenApply(ResponseEntity::ok);
+    }
+
+    @DeleteMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public CompletableFuture<ResponseEntity<Void>> deleteJob(@PathVariable Long jobId) {
+        return testSearchService.deleteJob(jobId)
+                .thenApply(v -> ResponseEntity.noContent().build());
     }
 
     @PostMapping(value = "/csv/count", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

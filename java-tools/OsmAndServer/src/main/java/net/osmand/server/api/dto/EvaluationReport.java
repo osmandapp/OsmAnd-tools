@@ -8,5 +8,6 @@ public record EvaluationReport(
         long failedRequests,
         double errorRate,
         double averageDuration,
+		double averagePlace,
         Map<String, Long> distanceHistogram) {
 }

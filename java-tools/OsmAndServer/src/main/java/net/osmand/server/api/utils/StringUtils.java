@@ -11,7 +11,7 @@ public final class StringUtils {
 			return "";
 		}
 		// Replace all non-alphanumeric characters with an underscore
-		return input.replaceAll("[^a-zA-Z0-9_]", "_");
+		return input.toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
 	}
 
 	public static String unquote(String input) {
@@ -26,7 +26,7 @@ public final class StringUtils {
 
 	public static String crop(String input, int length) {
 		if (input == null)
-			return null;
+			return "";
 
 		return input.substring(0, Math.min(length, input.length()));
 	}
