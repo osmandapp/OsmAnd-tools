@@ -45,6 +45,9 @@ public class Dataset {
     }
 
     public void setError(String error) {
+        if (error != null) {
+            sourceStatus = DatasetType.ERROR.name();
+        }
         this.error = error;
     }
 

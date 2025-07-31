@@ -173,7 +173,6 @@ public class TestSearchService {
                     fullPath = Path.of(csvDownloadingDir, dataset.getSource());
                 }
                 if (!Files.exists(fullPath)) {
-                    dataset.setSourceStatus(DatasetType.FAILED.name());
                     dataset.setError("File is not existed.");
                     datasetRepository.save(dataset);
                     return dataset;
@@ -185,7 +184,6 @@ public class TestSearchService {
                 String[] headers = Stream.of(header.toLowerCase().split(del)).map(StringUtils::sanitize).toArray(String[]::new);
                 dataset.setColumns(objectMapper.writeValueAsString(headers));
                 if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
-                    dataset.setSourceStatus(DatasetType.FAILED.name());
                     dataset.setError("Header doesn't include 'lat' or 'lon'.");
                     datasetRepository.save(dataset);
                     return dataset;
@@ -196,12 +194,24 @@ public class TestSearchService {
                     insertSampleData(tableName, headers, sample.subList(1, sample.size()), true);
                     LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 }
+
+                if (dataset.getAddressExpression() == null || dataset.getAddressExpression().trim().isEmpty()) {
+                    String exp = Stream.of(headers).filter(h -> !h.equals("hash") && !h.equals("id") && !h.equals("lon") && !h.equals("lat")).collect(Collectors.joining(" || ' ' || "));
+                    dataset.setAddressExpression(exp);
+                } else {
+                    String error = checkSQLExpression(dataset.getName(), dataset.getAddressExpression());
+                    if (error != null) {
+                        dataset.setError("Incorrect SQL expression" + error);
+                        datasetRepository.save(dataset);
+                        return dataset;
+                    }
+                }
+
                 dataset.setSourceStatus(DatasetType.OK.name());
                 datasetRepository.save(dataset);
 
                 return dataset;
             } catch (Exception e) {
-                dataset.setSourceStatus(DatasetType.FAILED.name());
                 dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
                 datasetRepository.save(dataset);
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
@@ -407,6 +417,23 @@ public class TestSearchService {
 
     public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
         return datasetJobRepository.findByDatasetIdOrderByIdDesc(datasetId, pageable);
+    }
+    public String checkSQLExpression(String name, String exp) {
+        String tableName = "dataset_" + sanitize(name);
+        String sql = "SELECT " + exp + " as address FROM " + tableName + " LIMIT 1";
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            if (rows.isEmpty()) {
+                return "Dataset is empty";
+            }
+            String address = (String)rows.get(0).get("address");
+            if (address == null || address.trim().isEmpty()) {
+                return "Result is empty";
+            }
+            return null;
+        } catch (Exception e) {
+            return e.getMessage();
+        }
     }
 
     public String getDatasetSample(Long datasetId) {
