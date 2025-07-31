@@ -20,6 +20,9 @@ public class Dataset {
     private String source; // Overpass query or file path
 
     @Column(columnDefinition = "TEXT")
+    private String addressExpression; // SQL expression to calculate address
+
+    @Column(columnDefinition = "TEXT")
     private String columns; // CSV column names
 
     @Column(columnDefinition = "TEXT")
@@ -43,6 +46,14 @@ public class Dataset {
 
     public void setError(String error) {
         this.error = error;
+    }
+
+    public String getAddressExpression() {
+        return addressExpression;
+    }
+
+    public void setAddressExpression(String addressExpression) {
+        this.addressExpression = addressExpression;
     }
 
     // Getters and Setters

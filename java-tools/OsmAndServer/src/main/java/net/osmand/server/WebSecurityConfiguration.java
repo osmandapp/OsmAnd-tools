@@ -200,7 +200,7 @@ public class WebSecurityConfiguration {
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 						.requireCsrfProtectionMatcher(request -> {
 							String method = request.getMethod();
-							Set<String> enabledMethods = Set.of("GET", "HEAD", "TRACE", "OPTIONS", "POST", "DELETE");
+							Set<String> enabledMethods = Set.of("GET", "HEAD", "TRACE", "OPTIONS", "POST", "PUT", "DELETE");
 							if (method != null && !enabledMethods.contains(method)) {
 								String url = request.getServletPath();
 								if (request.getPathInfo() != null) {
@@ -217,7 +217,6 @@ public class WebSecurityConfiguration {
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-//						.requestMatchers("/admin/issues/**").permitAll()
 						.requestMatchers("/admin/test/**").permitAll()
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)

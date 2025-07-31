@@ -35,11 +35,13 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
+import java.time.LocalDateTime;
 
 import static net.osmand.server.api.utils.StringUtils.crop;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
@@ -240,9 +242,16 @@ public class TestSearchService {
                     case "source":
                         dataset.setSource(value);
                         break;
+                    case "sizeLimit":
+                        dataset.setSizeLimit(Integer.valueOf(value));
+                        break;
+                    case "addressExpression":
+                        dataset.setAddressExpression(value);
+                        break;
                 }
             });
 
+            dataset.setUpdated(LocalDateTime.now());
             return datasetRepository.save(dataset);
         });
     }
