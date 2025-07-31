@@ -11,6 +11,7 @@ import net.osmand.server.api.repo.DatasetJobRepository;
 import net.osmand.server.api.repo.DatasetRepository;
 import net.osmand.server.api.dto.JobProgress;
 import net.osmand.server.api.dto.EvaluationReport;
+import net.osmand.server.api.utils.StringUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -28,11 +29,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import jakarta.annotation.PostConstruct;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -163,29 +160,45 @@ public class TestSearchService {
     }
 
     @Async
-    public CompletableFuture<Dataset> refreshDataset(Long datasetId) {
+    public CompletableFuture<Dataset> refreshDataset(Long datasetId, Boolean reload) {
         return CompletableFuture.supplyAsync(() -> {
             Dataset dataset = datasetRepository.findById(datasetId)
                     .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-            Path fullPath;
-            if (dataset.getSource().equals("OVERPASS")) {
-                fullPath = queryOverpass(dataset.getSource());
-            } else {
-                fullPath = Path.of(csvDownloadingDir, dataset.getSource());
-            }
-
-            String tableName = "dataset_" + dataset.getName();
+            Path fullPath = null;
             try {
-                List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit() + 1);
-                String[] headers = sample.get(0).toLowerCase().split(",");
-                String[] columns = insertSampleData(tableName, headers, sample, true);
+                if (dataset.getSource().equals("OVERPASS")) {
+                    fullPath = queryOverpass(dataset.getSource());
+                } else {
+                    fullPath = Path.of(csvDownloadingDir, dataset.getSource());
+                }
+                if (!Files.exists(fullPath)) {
+                    dataset.setSourceStatus(DatasetType.FAILED.name());
+                    dataset.setError("File is not existed.");
+                    datasetRepository.save(dataset);
+                    return dataset;
+                }
 
-                dataset.setColumns(objectMapper.writeValueAsString(columns));
+                String tableName = "dataset_" + dataset.getName();
+                String header = getHeader(fullPath);
+                String del = header.chars().filter(ch -> ch == ',').count() < header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
+                String[] headers = Stream.of(header.toLowerCase().split(del)).map(StringUtils::sanitize).toArray(String[]::new);
+                dataset.setColumns(objectMapper.writeValueAsString(headers));
+                if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
+                    dataset.setSourceStatus(DatasetType.FAILED.name());
+                    dataset.setError("Header doesn't include 'lat' or 'lon'.");
+                    datasetRepository.save(dataset);
+                    return dataset;
+                }
+
+                if (reload != null && reload) {
+                    List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit() + 1);
+                    insertSampleData(tableName, headers, sample.subList(1, sample.size()), true);
+                    LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
+                }
                 dataset.setSourceStatus(DatasetType.OK.name());
                 datasetRepository.save(dataset);
 
-                LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 return dataset;
             } catch (Exception e) {
                 dataset.setSourceStatus(DatasetType.FAILED.name());
@@ -208,7 +221,7 @@ public class TestSearchService {
     }
 
     @Async
-    public CompletableFuture<Dataset> createDataset(String name, String type, String source) {
+    public CompletableFuture<Dataset> createDataset(String name, String type, String source, String addressExpression) {
         return CompletableFuture.supplyAsync(() -> {
             Optional<Dataset> datasetOptional = datasetRepository.findByName(name);
             if (datasetOptional.isPresent())
@@ -218,6 +231,7 @@ public class TestSearchService {
             dataset.setName(name);
             dataset.setType(type);
             dataset.setSource(source);
+            dataset.setAddressExpression(addressExpression);
             dataset.setSourceStatus(DatasetType.NEW.name());
             dataset = datasetRepository.save(dataset);
 
@@ -252,6 +266,7 @@ public class TestSearchService {
             });
 
             dataset.setUpdated(LocalDateTime.now());
+            dataset.setSourceStatus(DatasetType.OK.name());
             return datasetRepository.save(dataset);
         });
     }
@@ -394,6 +409,37 @@ public class TestSearchService {
         return datasetJobRepository.findByDatasetIdOrderByIdDesc(datasetId, pageable);
     }
 
+    public String getDatasetSample(Long datasetId) {
+        Dataset dataset = datasetRepository.findById(datasetId)
+                .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
+
+        String tableName = "dataset_" + sanitize(dataset.getName());
+        String sql = "SELECT * FROM " + tableName;
+
+        try {
+            StringWriter stringWriter = new StringWriter();
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+
+            if (rows.isEmpty()) {
+                return "";
+            }
+
+            String[] headers = rows.get(0).keySet().toArray(new String[0]);
+            CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers).setDelimiter(';').build();
+
+            try (final CSVPrinter printer = new CSVPrinter(stringWriter, csvFormat)) {
+                for (Map<String, Object> row : rows) {
+                    printer.printRecord(row.values());
+                }
+            }
+
+            return stringWriter.toString();
+        } catch (Exception e) {
+            LOGGER.error("Failed to retrieve sample for dataset {}", datasetId, e);
+            throw new RuntimeException("Failed to generate dataset sample: " + e.getMessage(), e);
+        }
+    }
+
     public Optional<EvaluationReport> getEvaluationReport(Long datasetId, Optional<Long> jobIdOpt) {
         Optional<EvalJob> jobOptional = jobIdOpt
                 .flatMap(datasetJobRepository::findById)
@@ -526,18 +572,14 @@ public class TestSearchService {
         }
     }
 
-    public String[] insertSampleData(String tableName, String[] headers, List<String> sample, boolean deleteBefore) {
+    public String[] insertSampleData(String tableName, String[] columns, List<String> sample, boolean deleteBefore) {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
-        String[] columns = new String[headers.length];
-        System.arraycopy(headers, 0, columns, 1, headers.length);
-
         createDynamicTable(tableName, columns);
 
         String insertSql = "INSERT INTO " + tableName + " (" + String.join(", ", columns) + ") VALUES (" +
                 String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
-
         List<Object[]> batchArgs = new ArrayList<>();
         for (String s : sample) {
             String[] record = s.split(",");
@@ -554,15 +596,21 @@ public class TestSearchService {
         return columns;
     }
 
-    private void createDynamicTable(String tableName, String[] headers) {
-        String columnsDefinition = Stream.of(headers)
-                .map(header -> "\"" + sanitize(header) + "\" VARCHAR(255)")
+    private void createDynamicTable(String tableName, String[] columns) {
+        String columnsDefinition = Stream.of(columns)
+                .map(header -> "\"" + header + "\" VARCHAR(255)")
                 .collect(Collectors.joining(", "));
         // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
         String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id BIGSERIAL PRIMARY KEY, %s)", tableName, columnsDefinition);
         jdbcTemplate.execute(createTableSql);
 
         LOGGER.info("Ensured table {} exists.", tableName);
+    }
+
+    private static String getHeader(Path filePath) throws IOException {
+        try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+            return reader.readLine();
+        }
     }
 
     private static List<String> reservoirSample(Path filePath, int n) throws IOException {
@@ -586,7 +634,7 @@ public class TestSearchService {
                 }
                 i++;
             }
-            sample.set(0, header); // Restore header
+            sample.add(0, header); // Restore header
         }
 
         return sample;

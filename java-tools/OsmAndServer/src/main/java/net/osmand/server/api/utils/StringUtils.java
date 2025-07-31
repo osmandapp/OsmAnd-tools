@@ -16,7 +16,7 @@ public final class StringUtils {
 
 	public static String unquote(String input) {
 		if (input == null)
-			return null;
+			return "";
 
 		if (input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
 			return input.substring(1, input.length() - 1);

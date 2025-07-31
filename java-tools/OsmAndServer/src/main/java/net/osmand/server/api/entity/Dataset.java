@@ -110,6 +110,9 @@ public class Dataset {
     }
 
     public void setSourceStatus(String status) {
+        if (DatasetType.OK.name().equals(sourceStatus)) {
+            error = null;
+        }
         this.sourceStatus = status;
     }
 

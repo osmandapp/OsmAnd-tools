@@ -52,6 +52,18 @@ public class TestSearchController {
         return ResponseEntity.ok(testSearchService.getDatasetJobs(datasetId, pageable));
     }
 
+    @GetMapping(value = "/datasets/{datasetId}/sample", produces = "text/csv")
+    public void getDatasetSample(@PathVariable Long datasetId, HttpServletResponse response) throws IOException {
+        try {
+            String csvData = testSearchService.getDatasetSample(datasetId);
+            response.setContentType("text/csv");
+            response.setHeader("Content-Disposition", "attachment; filename=\"sample.csv\"");
+            response.getWriter().write(csvData);
+        } catch (RuntimeException e) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
+        }
+    }
+
     @GetMapping(value = "/reports/{datasetId}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<EvaluationReport> getEvaluationReport(
@@ -117,32 +129,26 @@ public class TestSearchController {
 
     @PostMapping(value = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId) {
+    public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId, @RequestParam("reload") Boolean reload) {
         final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
-        return testSearchService.refreshDataset(datasetId).thenApply(path -> {
+        return testSearchService.refreshDataset(datasetId, reload).thenApply(path -> {
             URI location = locationBuilder.buildAndExpand().toUri();
             return ResponseEntity.created(location).body(path);
         });
     }
 
-    @PostMapping(value = "/dataset", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/dataset", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public CompletableFuture<ResponseEntity<?>> createDataset(@RequestBody Map<String, String> body) {
-        String name = body.getOrDefault("name", "");
-        String type = body.getOrDefault("type", "CSV");
-        String source = body.getOrDefault("source", "");
-        final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
-        return testSearchService.createDataset(name, type, source)
-                .thenApply(dataset -> {
-                    URI location = locationBuilder.path("/{id}").buildAndExpand(dataset.getId()).toUri();
-                    return ResponseEntity.created(location).body(dataset);
-                });
+    public CompletableFuture<ResponseEntity<Dataset>> createDataset(@RequestBody Dataset request) {
+        return testSearchService.createDataset(request.getName(), request.getType(), request.getSource(), request.getAddressExpression())
+                .thenApply(ResponseEntity::ok)
+                .exceptionally(e -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
     }
 
-    @PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId, @RequestBody Map<String, String> body) {
-        return testSearchService.updateDataset(datasetId, body)
+    public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId, @RequestBody Map<String, String> updates) {
+        return testSearchService.updateDataset(datasetId, updates)
                 .thenApply(ResponseEntity::ok);
     }
 

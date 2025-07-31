@@ -209,6 +209,7 @@ CREATE TABLE IF NOT EXISTS dataset (
   type VARCHAR(64) NOT NULL, -- Overpass/CSV
   source TEXT NOT NULL, -- Overpass query or CSV file path
   columns TEXT, -- Comma-separated list of column names
+  address_expression TEXT,
   source_status VARCHAR(32) NOT NULL DEFAULT 'NEW' -- NEW/PROCESSED/FAILED
   sizeLimit INTEGER NOT NULL DEFAULT 10000,
   created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -227,7 +228,7 @@ CREATE TABLE IF NOT EXISTS dataset_<name> (
 CREATE TABLE IF NOT EXISTS eval_job (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
-  address_expression VARCHAR(255) NOT NULL,
+  address_expression TEXT NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'NEW',
   locale VARCHAR(8), -- Optional parameter to `SearchService`
   base_search BOOLEAN, -- Optional parameter to `SearchService`
