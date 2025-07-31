@@ -117,9 +117,9 @@ public class TestSearchController {
 
     @PostMapping(value = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId, @RequestParam("sizeLimit") Integer sizeLimit) {
+    public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId) {
         final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
-        return testSearchService.refreshDataset(datasetId, sizeLimit).thenApply(path -> {
+        return testSearchService.refreshDataset(datasetId).thenApply(path -> {
             URI location = locationBuilder.buildAndExpand().toUri();
             return ResponseEntity.created(location).body(path);
         });

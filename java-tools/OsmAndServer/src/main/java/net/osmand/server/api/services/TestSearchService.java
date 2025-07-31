@@ -161,14 +161,10 @@ public class TestSearchService {
     }
 
     @Async
-    public CompletableFuture<Dataset> refreshDataset(Long datasetId, Integer sizeLimit) {
+    public CompletableFuture<Dataset> refreshDataset(Long datasetId) {
         return CompletableFuture.supplyAsync(() -> {
             Dataset dataset = datasetRepository.findById(datasetId)
                     .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
-
-            if (!Objects.equals(dataset.getSizeLimit(), sizeLimit)) {
-                dataset.setSizeLimit(sizeLimit);
-            }
 
             Path fullPath;
             if (dataset.getSource().equals("OVERPASS")) {
@@ -179,7 +175,7 @@ public class TestSearchService {
 
             String tableName = "dataset_" + dataset.getName();
             try {
-                List<String> sample = reservoirSample(fullPath, sizeLimit + 1);
+                List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit() + 1);
                 String[] headers = sample.get(0).toLowerCase().split(",");
                 String[] columns = insertSampleData(tableName, headers, sample, true);
 
