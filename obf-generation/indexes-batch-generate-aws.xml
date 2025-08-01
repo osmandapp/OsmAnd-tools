@@ -10,7 +10,7 @@
 		directory_for_srtm_files="/home/relief-data/srtm/">
 		
 		
-		<external dockerSlots="15">
+		<external dockerSlots="18">
 			<!--  Disable AWS for now
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
