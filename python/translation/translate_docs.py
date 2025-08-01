@@ -19,6 +19,7 @@ INPUT_PATTERN = os.getenv('INPUT_PATTERN', '')
 LANG = os.getenv('LANG')
 IMAGES_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".svg"]
 WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
+FORCE_TRANSLATION = os.getenv('FORCE_TRANSLATION', 'false').lower() == 'true'
 
 # Validate INPUT_PATTERN
 if INPUT_PATTERN:
@@ -27,7 +28,7 @@ if INPUT_PATTERN:
     except Exception as e:
         raise ValueError(f"INPUT_PATTERN '{INPUT_PATTERN}' is not a valid file/directory pattern: {e}")
 
-print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}", flush=True)
+print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}, FORCE_TRANSLATION: {FORCE_TRANSLATION}", flush=True)
 if not all([MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
     raise ValueError("Missing required environment variables (MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
 if INPUT_PATTERN and not (INPUT_PATTERN.endswith('.json') or '.md' in INPUT_PATTERN):
@@ -250,6 +251,9 @@ def digest(path: Path) -> str:
 
 
 def stored_digest(path: Path):
+    if FORCE_TRANSLATION:
+        return None
+
     try:
         with path.open(encoding="utf-8") as fh:
             if path.suffix == ".json":
@@ -460,6 +464,8 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         return
 
     print(f"Translation to '{lang_code}' is starting...", flush=True)
+    prompt = prompts.get(f"MD_PROMPT_{lang_code.upper()}", None)
+    prompt = prompt if prompt else prompts['MD_PROMPT'].format(lang=lang_name)
     if not INPUT_PATTERN:
         if not i18n_lang_dir.exists():
             create_i18n(i18n_lang_dir, lang_code, lang_name)
@@ -473,10 +479,10 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         make_translation(prompts['CATEGORY_JSON_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '_*_.json')
         make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code,
                          "web-translation.json")
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '*.md*')
+        make_translation(prompt, docs_dir, docs_lang_dir, '*.md*')
     else:
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), blog_dir, blog_lang_dir, INPUT_PATTERN)
-        make_translation(prompts['MD_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, INPUT_PATTERN)
+        make_translation(prompt, blog_dir, blog_lang_dir, INPUT_PATTERN)
+        make_translation(prompt, docs_dir, docs_lang_dir, INPUT_PATTERN)
         make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
 
 

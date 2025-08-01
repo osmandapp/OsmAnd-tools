@@ -35,6 +35,7 @@ Below are all environment variables, arguments, and their roles:
 
 | Variable / Argument             | Required | Purpose                                                                 | Example                 |
 |---------------------------------|----------|-------------------------------------------------------------------------|-------------------------|
+| **--force (first argument)**    | No       | Marker to force translation even original file is not changed           | --force                 |
 | **LANG (argument #1)**          | Yes      | Target language code for translation, or `all` to process all.          | `fr`, `de`, `all`       |
 | **INPUT_PATTERN (argument #2)** | No       | Optional file pattern to filter which files are translated.             | `'topic/*.md'`          |
 | **API_KEY (argument #3)**       | Yes      | API key for the LLM.                                                    | `sk-abc123xyz`          |
@@ -53,12 +54,12 @@ Below are all environment variables, arguments, and their roles:
 ### 1. Clone the web-server-config/ and web/ repositories.
 
 ```bash
-git clone https://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
+git clone ssh://git@github.com/osmandapp/OsmAnd-tools tools                      # Clone tools
 
 git clone ssh://git@github.com/osmandapp/web-server-config                      # Clone web-server-config
 cd web-server-config && git checkout main && git pull       # Optional if you want to use a different branch
 
-git clone https://git@github.com/osmandapp/web                                    # Clone web
+git clone ssh://git@github.com/osmandapp/web                                    # Clone web
 cd web && git checkout main && git reset --hard && git pull # Optional if you want to use a different branch
 ```
 
@@ -70,7 +71,8 @@ export WEB_SERVER_CONFIG_PATH=$(pwd)/web-server-config  # Optional, path to web-
 export WEB_REPO=$(pwd)/web                              # Optional, path to web
 
 cd tools                                                      # Set tools as current dir
-python/translation/translate_docs.sh fr                       # Example to translate all files to French
+python/translation/translate_docs.sh fr                       # Example to translate all updated files to French
+python/translation/translate_docs.sh --force fr               # Example to translate all files to French even they are not changed
 python/translation/translate_docs.sh all web-translation.json # Example to translate only web-translation.json to all current languages
 ```
 
