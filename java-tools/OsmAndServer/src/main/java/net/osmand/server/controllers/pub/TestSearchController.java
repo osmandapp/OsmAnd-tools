@@ -159,14 +159,6 @@ public class TestSearchController {
         });
     }
 
-    @PostMapping(value = "/dataset", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseBody
-    public CompletableFuture<ResponseEntity<Dataset>> createDataset(@RequestBody Dataset request) {
-        return testSearchService.createDataset(request.getName(), request.getType(), request.getSource(), request.getAddressExpression())
-                .thenApply(ResponseEntity::ok)
-                .exceptionally(e -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-    }
-
     @PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId, @RequestBody Map<String, String> updates) {
@@ -183,6 +175,21 @@ public class TestSearchController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error browsing CSV files: " + e.getMessage());
         }
     }
+
+    /**
+     * Create a new dataset.
+     */
+    @PostMapping(value = "/datasets", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Dataset> createDataset(@RequestBody Map<String, Object> payload) {
+        String name = (String) payload.get("name");
+        String type = (String) payload.get("type");
+        String source = (String) payload.get("source");
+        String addressExpr = (String) payload.getOrDefault("addressExpression", "");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(testSearchService.createDataset(name, type, source, addressExpr).join());
+    }
+
 
     // --- Dataset management -------------------------------------------------
 
