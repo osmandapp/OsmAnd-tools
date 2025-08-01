@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.entity.Dataset;
 import net.osmand.server.api.entity.EvalJob;
@@ -39,7 +40,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.server.api.utils.StringUtils.crop;
 import static net.osmand.server.api.utils.StringUtils.sanitize;
@@ -65,13 +65,15 @@ public class TestSearchService {
     private String csvDownloadingDir;
     @Value("${test.overpass.url}")
     private String overpassApiUrl;
+    private final EntityManager em;
 
     @Autowired
-    public TestSearchService(DatasetRepository datasetRepository,
+    public TestSearchService(EntityManager em, DatasetRepository datasetRepository,
                              DatasetJobRepository datasetJobRepository,
                              @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
                              SearchService searchService, WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
                              SimpMessagingTemplate messagingTemplate) {
+        this.em = em;
         this.datasetRepository = datasetRepository;
         this.datasetJobRepository = datasetJobRepository;
         this.jdbcTemplate = jdbcTemplate;
@@ -230,7 +232,7 @@ public class TestSearchService {
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
                 return dataset;
             } finally {
-                if (dataset.getSource().equals("OVERPASS")) {
+                if (dataset.getSource().equals("Overpass")) {
                     try {
                         if (fullPath != null && !Files.deleteIfExists(fullPath)) {
                             LOGGER.warn("Could not delete temporary file: {}", fullPath);
@@ -297,6 +299,9 @@ public class TestSearchService {
         Dataset dataset = datasetRepository.findById(datasetId)
                 .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
+        if (dataset.getSourceStatus() != DatasetType.OK) {
+            throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", datasetId, dataset.getSourceStatus()));
+        }
         EvalJob job = new EvalJob();
         job.setDatasetId(datasetId);
         job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
@@ -319,19 +324,30 @@ public class TestSearchService {
     public void processEvaluation(Long jobId) {
         Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
         EvalJob job = jobOptional.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
-        Dataset dataset = datasetRepository.findById(job.getDatasetId())
-                .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + job.getDatasetId()));
 
-        String tableName = "dataset_" + dataset.getName();
+        if (job.getStatus() != JobStatus.RUNNING) {
+            LOGGER.info("Job {} is not in RUNNING state ({}). Skipping processing request.", jobId, job.getStatus());
+            return; // do not process cancelled/completed jobs
+        }
+
+        EvalJob finalJob = job;
+        Dataset dataset = datasetRepository.findById(job.getDatasetId())
+                .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + finalJob.getDatasetId()));
+
+        String tableName = "dataset_" + sanitize(dataset.getName());
         String sql = String.format("SELECT *, %s AS address FROM %s", job.getAddressExpression(), tableName);
         long processedCount = 0;
         long errorCount = 0;
+        long totalStartTime = System.currentTimeMillis();
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
             long totalRows = rows.size();
             for (Map<String, Object> row : rows) {
-                if (datasetJobRepository.findById(job.getId()).map(j -> j.getStatus() == JobStatus.CANCELED).orElse(false)) {
-                    LOGGER.info("Job {} was cancelled. Stopping execution.", job.getId());
+                job = datasetJobRepository.findById(jobId)
+                        .map(j -> { em.detach(j); return j; }) // detach to avoid caching
+                        .orElse(null);
+                if (job == null || job.getStatus() != JobStatus.RUNNING) {
+                    LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
                     break; // Exit the loop if the job has been cancelled
                 }
                 long startTime = System.currentTimeMillis();
@@ -344,7 +360,7 @@ public class TestSearchService {
                     String lon = (String) row.get("lon");
                     point = GeometryUtils.parseLatLon(lat, lon);
                     if (point == null) {
-                        throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format: ("+ lat + " " + lon + ")");
+                        throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format: (" + lat + " " + lon + ")");
                     }
 
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
@@ -355,10 +371,10 @@ public class TestSearchService {
                     saveResults(job, dataset, address, originalJson, Collections.emptyList(), point, System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() : e.getMessage());
                 }
                 processedCount++;
-                JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), totalRows, processedCount, errorCount);
+                JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(), totalRows, processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
                 messagingTemplate.convertAndSend("/topic/eval/ws", progress);
             }
-            if (job.getStatus() != JobStatus.CANCELED) {
+            if (job != null && job.getStatus() != JobStatus.CANCELED) {
                 job.setStatus(JobStatus.COMPLETED);
             }
         } catch (Exception e) {
@@ -366,10 +382,12 @@ public class TestSearchService {
             job.setStatus(JobStatus.FAILED);
             job.setError(e.getMessage());
         } finally {
-            job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
-            datasetJobRepository.save(job);
-            JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), processedCount, processedCount, errorCount);
-            messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
+            if (job != null) {
+                job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
+                datasetJobRepository.save(job);
+                JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(), processedCount, processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
+                messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
+            }
         }
     }
 
@@ -397,6 +415,9 @@ public class TestSearchService {
                 throw new RuntimeException("Job not found with id: " + jobId);
             }
             datasetJobRepository.deleteById(jobId);
+            String deleteSql = "DELETE FROM eval_result WHERE job_id = ?";
+            jdbcTemplate.update(deleteSql, jobId);
+
             LOGGER.info("Deleted job with id: {}", jobId);
         });
     }
@@ -504,7 +525,7 @@ public class TestSearchService {
             SELECT
                 count(*) AS total,
                 count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-                avg(duration) AS average_duration,
+                sum(duration) AS duration,
                 avg(actual_place) AS average_place,
                 sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
                 sum(CASE WHEN min_distance > 0 AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
@@ -518,15 +539,13 @@ public class TestSearchService {
             """;
 
         Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
-
-        long total = ((Number) result.get("total")).longValue();
-        if (total == 0) {
+        long processed = ((Number) result.get("total")).longValue();
+        if (processed == 0) {
             return Optional.empty(); // No data to report
         }
         long error = ((Number) result.get("failed")).longValue();
-        double averageDuration = result.get("average_duration") == null ? 0 : ((Number) result.get("average_duration")).doubleValue();
+        long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
         double averagePlace = result.get("average_place") == null ? 0 : ((Number) result.get("average_place")).doubleValue();
-        double errorRate = (double) error / total;
 
         Map<String, Long> distanceHistogram = new LinkedHashMap<>();
         distanceHistogram.put("0-50m", ((Number) result.getOrDefault("0-50m", 0)).longValue());
@@ -534,11 +553,11 @@ public class TestSearchService {
         distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
         distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
 
-        EvaluationReport report = new EvaluationReport(jobId, total, error, total, errorRate, averageDuration, averagePlace, distanceHistogram);
+        EvaluationReport report = new EvaluationReport(jobId, processed, processed, error, duration, averagePlace, distanceHistogram);
         return Optional.of(report);
     }
 
-    public Optional<EvalJob> getEvaluationJob(Long jobId) {
+    public Optional<EvalJob> getJob(Long jobId) {
         return datasetJobRepository.findById(jobId);
     }
 

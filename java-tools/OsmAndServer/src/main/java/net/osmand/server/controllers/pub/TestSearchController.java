@@ -120,10 +120,10 @@ public class TestSearchController {
         return ResponseEntity.accepted().build();
     }
 
-    @GetMapping(value = "/eval/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/job/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<EvalJob> getEvaluation(@PathVariable Long jobId) {
-        return testSearchService.getEvaluationJob(jobId)
+    public ResponseEntity<EvalJob> getJob(@PathVariable Long jobId) {
+        return testSearchService.getJob(jobId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
