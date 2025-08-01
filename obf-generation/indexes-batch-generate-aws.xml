@@ -56,7 +56,7 @@
 				
 				<filter exclude="world_seamarks" />
 			</job>
-			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="900" type="docker">
+			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
