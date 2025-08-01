@@ -9,5 +9,5 @@ public record EvaluationReport(
         long error,
 		long duration,
 		double averagePlace,
-        Map<String, Long> distanceHistogram) {
+        Map<String, Number> distanceHistogram) {
 }

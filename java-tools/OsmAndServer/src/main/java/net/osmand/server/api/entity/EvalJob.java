@@ -107,16 +107,16 @@ public class EvalJob {
 		return northWest;
 	}
 
-	public void setNorthWest(String northWest) {
-		this.northWest = northWest;
+	public void setNorthWest(String val) {
+		this.northWest = val != null && val.trim().isEmpty() ? null : val;
 	}
 
 	public String getSouthEast() {
 		return southEast;
 	}
 
-	public void setSouthEast(String southEast) {
-		this.southEast = southEast;
+	public void setSouthEast(String val) {
+		this.southEast = val != null && val.trim().isEmpty() ? null : val;
 	}
 
 	public Timestamp getCreated() {
