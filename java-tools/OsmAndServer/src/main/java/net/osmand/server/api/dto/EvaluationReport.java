@@ -4,8 +4,9 @@ import java.util.Map;
 
 public record EvaluationReport(
         long jobId,
-        long totalRequests,
-        long failedRequests,
+        long total,
+		long processed,
+        long error,
         double errorRate,
         double averageDuration,
 		double averagePlace,

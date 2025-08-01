@@ -312,15 +312,16 @@ public class TestSearchService {
         job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
 
         job.setStatus(JobStatus.RUNNING);
-        EvalJob savedJob = datasetJobRepository.save(job);
-
-        runTest(savedJob, dataset);
-
-        return savedJob;
+        return datasetJobRepository.save(job);
     }
 
     @Async
-    protected void runTest(EvalJob job, Dataset dataset) {
+    public void processEvaluation(Long jobId) {
+        Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
+        EvalJob job = jobOptional.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
+        Dataset dataset = datasetRepository.findById(job.getDatasetId())
+                .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + job.getDatasetId()));
+
         String tableName = "dataset_" + dataset.getName();
         String sql = String.format("SELECT *, %s AS address FROM %s", job.getAddressExpression(), tableName);
         long processedCount = 0;
@@ -355,7 +356,7 @@ public class TestSearchService {
                 }
                 processedCount++;
                 JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), totalRows, processedCount, errorCount);
-                messagingTemplate.convertAndSend("/topic/job-progress/" + job.getId(), progress);
+                messagingTemplate.convertAndSend("/topic/eval/ws", progress);
             }
             if (job.getStatus() != JobStatus.CANCELED) {
                 job.setStatus(JobStatus.COMPLETED);
@@ -368,7 +369,7 @@ public class TestSearchService {
             job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
             datasetJobRepository.save(job);
             JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus().name(), processedCount, processedCount, errorCount);
-            messagingTemplate.convertAndSend("/topic/job-progress/" + job.getId(), finalProgress);
+            messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
         }
     }
 
@@ -501,8 +502,8 @@ public class TestSearchService {
 
         String sql = """
             SELECT
-                count(*) AS total_requests,
-                count(*) FILTER (WHERE error IS NOT NULL) AS failed_requests,
+                count(*) AS total,
+                count(*) FILTER (WHERE error IS NOT NULL) AS failed,
                 avg(duration) AS average_duration,
                 avg(actual_place) AS average_place,
                 sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
@@ -518,14 +519,14 @@ public class TestSearchService {
 
         Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
 
-        long totalRequests = ((Number) result.get("total_requests")).longValue();
-        if (totalRequests == 0) {
+        long total = ((Number) result.get("total")).longValue();
+        if (total == 0) {
             return Optional.empty(); // No data to report
         }
-        long failedRequests = ((Number) result.get("failed_requests")).longValue();
+        long error = ((Number) result.get("failed")).longValue();
         double averageDuration = result.get("average_duration") == null ? 0 : ((Number) result.get("average_duration")).doubleValue();
         double averagePlace = result.get("average_place") == null ? 0 : ((Number) result.get("average_place")).doubleValue();
-        double errorRate = (double) failedRequests / totalRequests;
+        double errorRate = (double) error / total;
 
         Map<String, Long> distanceHistogram = new LinkedHashMap<>();
         distanceHistogram.put("0-50m", ((Number) result.getOrDefault("0-50m", 0)).longValue());
@@ -533,12 +534,23 @@ public class TestSearchService {
         distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
         distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
 
-        EvaluationReport report = new EvaluationReport(jobId, totalRequests, failedRequests, errorRate, averageDuration, averagePlace, distanceHistogram);
+        EvaluationReport report = new EvaluationReport(jobId, total, error, total, errorRate, averageDuration, averagePlace, distanceHistogram);
         return Optional.of(report);
     }
 
     public Optional<EvalJob> getEvaluationJob(Long jobId) {
         return datasetJobRepository.findById(jobId);
+    }
+
+    public boolean deleteDataset(Long datasetId) {
+        Optional<Dataset> dsOpt = datasetRepository.findById(datasetId);
+        if (dsOpt.isEmpty()) {
+            return false;
+        }
+        Dataset ds = dsOpt.get();
+        datasetRepository.delete(ds);
+        // TODO: drop SQLite table and any files if needed
+        return true;
     }
 
     public void downloadRawResults(Writer writer, Long jobId, String format) throws IOException {

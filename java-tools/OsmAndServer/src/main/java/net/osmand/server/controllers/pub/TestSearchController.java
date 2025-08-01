@@ -86,9 +86,15 @@ public class TestSearchController {
         testSearchService.downloadRawResults(response.getWriter(), jobId, format);
     }
 
+    /**
+     * Step 1 – create a new evaluation job (synchronous).
+     * Returns the freshly created {@link EvalJob} in PENDING/RUNNING state.
+     */
     @PostMapping(value = "/eval/{datasetId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<EvalJob> startEvaluation(@PathVariable Long datasetId, @RequestBody Map<String, String> payload, HttpServletRequest request) {
+    public ResponseEntity<EvalJob> createEvaluation(@PathVariable Long datasetId,
+                                                    @RequestBody Map<String, String> payload,
+                                                    HttpServletRequest request) {
         String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
                 .replacePath(null)
                 .build()
@@ -101,6 +107,17 @@ public class TestSearchController {
                 .buildAndExpand(job.getId())
                 .toUri();
         return ResponseEntity.accepted().location(location).body(job);
+    }
+
+    /**
+     * Step 2 – continue processing of an existing job asynchronously.
+     * The call returns immediately with 202 while the heavy work happens in the background.
+     */
+    @PostMapping(value = "/eval/process/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Void> processEvaluation(@PathVariable Long jobId) {
+        testSearchService.processEvaluation(jobId); // @Async – returns immediately
+        return ResponseEntity.accepted().build();
     }
 
     @GetMapping(value = "/eval/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -165,5 +182,13 @@ public class TestSearchController {
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error browsing CSV files: " + e.getMessage());
         }
+    }
+
+    // --- Dataset management -------------------------------------------------
+
+    @DeleteMapping(value = "/datasets/{datasetId:\\d+}")
+    public ResponseEntity<Void> deleteDataset(@PathVariable Long datasetId) {
+        boolean deleted = testSearchService.deleteDataset(datasetId);
+        return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 }
