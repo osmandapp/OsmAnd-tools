@@ -52,7 +52,7 @@ public class EvalJob {
 	@UpdateTimestamp
 	private Timestamp updated;
 
-	@Column
+	@Column(columnDefinition = "TEXT")
 	private String error;
 
 	public Long getId() {

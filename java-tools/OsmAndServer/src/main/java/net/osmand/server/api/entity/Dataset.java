@@ -28,8 +28,9 @@ public class Dataset {
     @Column(columnDefinition = "TEXT")
     private String error;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String sourceStatus = "NEW";
+    private DatasetType sourceStatus = DatasetType.NEW;
 
     @Column(nullable = true)
     private Integer sizeLimit = 10000;
@@ -46,7 +47,7 @@ public class Dataset {
 
     public void setError(String error) {
         if (error != null) {
-            sourceStatus = DatasetType.ERROR.name();
+            sourceStatus = DatasetType.ERROR;
         }
         this.error = error;
     }
@@ -108,12 +109,12 @@ public class Dataset {
         this.source = source;
     }
 
-    public String getSourceStatus() {
+    public DatasetType getSourceStatus() {
         return sourceStatus;
     }
 
-    public void setSourceStatus(String status) {
-        if (DatasetType.OK.name().equals(sourceStatus)) {
+    public void setSourceStatus(DatasetType status) {
+        if (DatasetType.OK.equals(sourceStatus)) {
             error = null;
         }
         this.sourceStatus = status;

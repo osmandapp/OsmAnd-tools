@@ -220,7 +220,7 @@ public class TestSearchService {
                     }
                 }
 
-                dataset.setSourceStatus(DatasetType.OK.name());
+                dataset.setSourceStatus(DatasetType.OK);
                 datasetRepository.save(dataset);
 
                 return dataset;
@@ -255,7 +255,6 @@ public class TestSearchService {
             dataset.setType(type);
             dataset.setSource(source);
             dataset.setAddressExpression(addressExpression);
-            dataset.setSourceStatus(DatasetType.NEW.name());
             dataset = datasetRepository.save(dataset);
 
             return dataset;
@@ -289,7 +288,7 @@ public class TestSearchService {
             });
 
             dataset.setUpdated(LocalDateTime.now());
-            dataset.setSourceStatus(DatasetType.OK.name());
+            dataset.setSourceStatus(DatasetType.OK);
             return datasetRepository.save(dataset);
         });
     }
@@ -302,8 +301,12 @@ public class TestSearchService {
         job.setDatasetId(datasetId);
         job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
 
-        job.setAddressExpression(payload.get("addressExpression"));
-        job.setLocale(payload.get("locale"));
+        job.setAddressExpression(dataset.getAddressExpression());
+        String locale = payload.get("locale");
+        if (locale == null || locale.trim().isEmpty()) {
+            locale = "en";
+        }
+        job.setLocale(locale);
         job.setNorthWest(payload.get("northWest"));
         job.setSouthEast(payload.get("southEast"));
         job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
@@ -340,7 +343,7 @@ public class TestSearchService {
                     String lon = (String) row.get("lon");
                     point = GeometryUtils.parseLatLon(lat, lon);
                     if (point == null) {
-                        throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format.");
+                        throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format: ("+ lat + " " + lon + ")");
                     }
 
                     List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(), address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
@@ -430,7 +433,7 @@ public class TestSearchService {
         }
 
         String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
-                "min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount,
                 minDistance, closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(), originalPoint == null ? null : originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
@@ -582,7 +585,7 @@ public class TestSearchService {
         headers.addAll(originalHeaders);
 
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(headers.toArray(new String[0]))
+                .setHeader(headers.toArray(new String[0])).setDelimiter(";")
                 .build();
 
         try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
@@ -601,7 +604,7 @@ public class TestSearchService {
                 for (String header : headers) {
                     if (row.containsKey(header)) {
                         Object value = row.get(header);
-                        record.add(value != null ? value.toString() : null);
+                        record.add(value != null ? value.toString().trim() : null);
                     } else if (originalNode != null && originalNode.has(header)) {
                         record.add(originalNode.get(header).asText());
                     } else {
