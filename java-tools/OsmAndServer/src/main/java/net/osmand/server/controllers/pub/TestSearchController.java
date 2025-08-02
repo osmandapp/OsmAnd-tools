@@ -181,13 +181,9 @@ public class TestSearchController {
      */
     @PostMapping(value = "/datasets", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<Dataset> createDataset(@RequestBody Map<String, Object> payload) {
-        String name = (String) payload.get("name");
-        String type = (String) payload.get("type");
-        String source = (String) payload.get("source");
-        String addressExpr = (String) payload.getOrDefault("addressExpression", "");
+    public ResponseEntity<Dataset> createDataset(@RequestBody Dataset payload) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(testSearchService.createDataset(name, type, source, addressExpr).join());
+                .body(testSearchService.createDataset(payload).join());
     }
 
 

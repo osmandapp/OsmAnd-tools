@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.entity.Dataset;
-import net.osmand.server.api.entity.EvalJob;
-import net.osmand.server.api.entity.DatasetType;
-import net.osmand.server.api.entity.JobStatus;
+import net.osmand.server.api.entity.*;
 import net.osmand.server.api.repo.DatasetJobRepository;
 import net.osmand.server.api.repo.DatasetRepository;
 import net.osmand.server.api.dto.JobProgress;
@@ -175,8 +172,10 @@ public class TestSearchService {
                     .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
             Path fullPath = null;
+            dataset.setTotal(null);
+            dataset.setSourceStatus(DatasetConfigStatus.UNKNOWN);
             try {
-                if (dataset.getType().equals("Overpass")) {
+                if (dataset.getType() == DatasetSource.Overpass) {
                     fullPath = queryOverpass(dataset.getSource());
                 } else {
                     fullPath = Path.of(csvDownloadingDir, dataset.getSource());
@@ -206,14 +205,15 @@ public class TestSearchService {
 
                 if (reload != null && reload) {
                     List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit());
-                    insertSampleData(tableName, headers, sample.subList(1, sample.size()), true);
+                    insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
+                    dataset.setTotal(sample.size() - 1);
                     LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
                 }
 
                 if (dataset.getAddressExpression() == null || dataset.getAddressExpression().trim().isEmpty()) {
                     String exp = Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith("street") || h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" || ' ' || "));
                     dataset.setAddressExpression(exp);
-                } else {
+                } else if (dataset.getTotal() != null) {
                     String error = checkSQLExpression(dataset.getName(), dataset.getAddressExpression());
                     if (error != null) {
                         dataset.setError("Incorrect SQL expression: " + error);
@@ -222,7 +222,7 @@ public class TestSearchService {
                     }
                 }
 
-                dataset.setSourceStatus(DatasetType.OK);
+                dataset.setSourceStatus(dataset.getTotal() != null ? DatasetConfigStatus.OK : DatasetConfigStatus.UNKNOWN);
                 datasetRepository.save(dataset);
 
                 return dataset;
@@ -232,7 +232,7 @@ public class TestSearchService {
                 LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
                 return dataset;
             } finally {
-                if (dataset.getSource().equals("Overpass")) {
+                if (dataset.getType() == DatasetSource.Overpass) {
                     try {
                         if (fullPath != null && !Files.deleteIfExists(fullPath)) {
                             LOGGER.warn("Could not delete temporary file: {}", fullPath);
@@ -246,20 +246,13 @@ public class TestSearchService {
     }
 
     @Async
-    public CompletableFuture<Dataset> createDataset(String name, String type, String source, String addressExpression) {
+    public CompletableFuture<Dataset> createDataset(Dataset dataset) {
         return CompletableFuture.supplyAsync(() -> {
-            Optional<Dataset> datasetOptional = datasetRepository.findByName(name);
+            Optional<Dataset> datasetOptional = datasetRepository.findByName(dataset.getName());
             if (datasetOptional.isPresent())
-                throw new RuntimeException("Dataset is already created: " + name);
+                throw new RuntimeException("Dataset is already created: " + dataset.getName());
 
-            Dataset dataset = new Dataset();
-            dataset.setName(name);
-            dataset.setType(type);
-            dataset.setSource(source);
-            dataset.setAddressExpression(addressExpression);
-            dataset = datasetRepository.save(dataset);
-
-            return dataset;
+            return datasetRepository.save(dataset);
         });
     }
 
@@ -275,7 +268,7 @@ public class TestSearchService {
                         dataset.setName(value);
                         break;
                     case "type":
-                        dataset.setType(value);
+                        dataset.setType(DatasetSource.valueOf(value));
                         break;
                     case "source":
                         dataset.setSource(value);
@@ -290,7 +283,7 @@ public class TestSearchService {
             });
 
             dataset.setUpdated(LocalDateTime.now());
-            dataset.setSourceStatus(DatasetType.OK);
+            dataset.setSourceStatus(DatasetConfigStatus.OK);
             return datasetRepository.save(dataset);
         });
     }
@@ -299,7 +292,7 @@ public class TestSearchService {
         Dataset dataset = datasetRepository.findById(datasetId)
                 .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-        if (dataset.getSourceStatus() != DatasetType.OK) {
+        if (dataset.getSourceStatus() != DatasetConfigStatus.OK) {
             throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", datasetId, dataset.getSourceStatus()));
         }
         EvalJob job = new EvalJob();
@@ -414,10 +407,11 @@ public class TestSearchService {
             if (!datasetJobRepository.existsById(jobId)) {
                 throw new RuntimeException("Job not found with id: " + jobId);
             }
-            datasetJobRepository.deleteById(jobId);
+
             String deleteSql = "DELETE FROM eval_result WHERE job_id = ?";
             jdbcTemplate.update(deleteSql, jobId);
 
+            datasetJobRepository.deleteById(jobId);
             LOGGER.info("Deleted job with id: {}", jobId);
         });
     }
@@ -569,9 +563,17 @@ public class TestSearchService {
         if (dsOpt.isEmpty()) {
             return false;
         }
+        String tableName = "dataset_" + sanitize(dsOpt.get().getName());
+        jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
+
+        String deleteSql = "DELETE FROM eval_result WHERE dataset_id = ?";
+        jdbcTemplate.update(deleteSql, datasetId);
+
+        deleteSql = "DELETE FROM eval_job WHERE dataset_id = ?";
+        jdbcTemplate.update(deleteSql, datasetId);
+
         Dataset ds = dsOpt.get();
         datasetRepository.delete(ds);
-        // TODO: drop SQLite table and any files if needed
         return true;
     }
 
@@ -650,7 +652,7 @@ public class TestSearchService {
         }
     }
 
-    public void insertSampleData(String tableName, String[] columns, List<String> sample, boolean deleteBefore) {
+    public void insertSampleData(String tableName, String[] columns, List<String> sample, String delimiter, boolean deleteBefore) {
         if (deleteBefore) {
             jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
         }
@@ -660,7 +662,7 @@ public class TestSearchService {
                 String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
         List<Object[]> batchArgs = new ArrayList<>();
         for (String s : sample) {
-            String[] record = s.split(",");
+            String[] record = s.split(delimiter);
             String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
             for (int j = 0; j < values.length && j < record.length; j++) {
                 values[j] = crop(unquote(record[j]), 255);

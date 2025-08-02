@@ -13,8 +13,9 @@ public class Dataset {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String type; // e.g., "Overpass", "CSV"
+    private DatasetSource type; // e.g., "Overpass", "CSV"
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String source; // Overpass query or file path
@@ -30,10 +31,13 @@ public class Dataset {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private DatasetType sourceStatus = DatasetType.NEW;
+    private DatasetConfigStatus sourceStatus = DatasetConfigStatus.UNKNOWN;
 
-    @Column(nullable = true)
+    @Column()
     private Integer sizeLimit = 10000;
+
+    @Column()
+    private Integer total;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime created = LocalDateTime.now();
@@ -47,9 +51,17 @@ public class Dataset {
 
     public void setError(String error) {
         if (error != null) {
-            sourceStatus = DatasetType.ERROR;
+            sourceStatus = DatasetConfigStatus.ERROR;
         }
         this.error = error;
+    }
+
+    public Integer getTotal() {
+        return total;
+    }
+
+    public void setTotal(Integer total) {
+        this.total = total;
     }
 
     public String getAddressExpression() {
@@ -93,11 +105,11 @@ public class Dataset {
         this.name = name;
     }
 
-    public String getType() {
+    public DatasetSource getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(DatasetSource type) {
         this.type = type;
     }
 
@@ -109,12 +121,12 @@ public class Dataset {
         this.source = source;
     }
 
-    public DatasetType getSourceStatus() {
+    public DatasetConfigStatus getSourceStatus() {
         return sourceStatus;
     }
 
-    public void setSourceStatus(DatasetType status) {
-        if (DatasetType.OK.equals(sourceStatus)) {
+    public void setSourceStatus(DatasetConfigStatus status) {
+        if (DatasetConfigStatus.OK.equals(sourceStatus)) {
             error = null;
         }
         this.sourceStatus = status;
