@@ -45,7 +45,7 @@
 				<filter excludePattern="_australia-oceania" />
 			</job>
 			-->
-			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="120" type="docker">
+			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
