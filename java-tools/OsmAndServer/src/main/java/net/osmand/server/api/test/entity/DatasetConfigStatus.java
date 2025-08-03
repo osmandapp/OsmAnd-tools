@@ -1,4 +1,4 @@
-package net.osmand.server.api.entity;
+package net.osmand.server.api.test.entity;
 
 public enum DatasetConfigStatus {
 	UNKNOWN, OK, ERROR

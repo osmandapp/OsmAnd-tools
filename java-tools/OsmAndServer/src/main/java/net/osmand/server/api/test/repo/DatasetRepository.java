@@ -1,6 +1,6 @@
-package net.osmand.server.api.repo;
+package net.osmand.server.api.test.repo;
 
-import net.osmand.server.api.entity.Dataset;
+import net.osmand.server.api.test.entity.Dataset;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

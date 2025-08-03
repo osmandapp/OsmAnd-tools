@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.entity.*;
-import net.osmand.server.api.repo.DatasetJobRepository;
-import net.osmand.server.api.repo.DatasetRepository;
-import net.osmand.server.api.dto.JobProgress;
-import net.osmand.server.api.dto.EvaluationReport;
+import net.osmand.server.api.test.repo.DatasetJobRepository;
+import net.osmand.server.api.test.repo.DatasetRepository;
+import net.osmand.server.api.test.dto.JobProgress;
+import net.osmand.server.api.test.dto.EvaluationReport;
 import net.osmand.server.api.utils.StringUtils;
+import net.osmand.server.api.test.entity.*;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -670,7 +670,7 @@ public class TestSearchService {
             batchArgs.add(values);
         }
         jdbcTemplate.batchUpdate(insertSql, batchArgs);
-        LOGGER.info("Batch inserted {} records into {}.", sample.size() - 1, tableName);
+        LOGGER.info("Batch inserted {} records into {}.", sample.size(), tableName);
     }
 
     private void createDynamicTable(String tableName, String[] columns) {

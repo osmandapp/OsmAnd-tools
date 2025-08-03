@@ -1,4 +1,4 @@
-package net.osmand.server.api.dto;
+package net.osmand.server.api.test.dto;
 
 import java.util.Map;
 

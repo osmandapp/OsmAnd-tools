@@ -1,6 +1,6 @@
-package net.osmand.server.api.dto;
+package net.osmand.server.api.test.dto;
 
-import net.osmand.server.api.entity.JobStatus;
+import net.osmand.server.api.test.entity.JobStatus;
 
 public record JobProgress (
 		long jobId,

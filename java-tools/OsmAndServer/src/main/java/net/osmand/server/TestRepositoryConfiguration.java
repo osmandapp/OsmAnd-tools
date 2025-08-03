@@ -1,0 +1,49 @@
+package net.osmand.server;
+
+import net.osmand.server.api.test.repo.DatasetJobRepository;
+import net.osmand.server.api.test.repo.DatasetRepository;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
+import org.springframework.context.annotation.*;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import javax.sql.DataSource;
+
+/**
+ * Configures all standard JPA repositories to use the SQLite datasource.
+ */
+@Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(
+        basePackageClasses = {DatasetRepository.class, DatasetJobRepository.class},
+        includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
+                {DatasetRepository.class, DatasetJobRepository.class})
+)
+public class TestRepositoryConfiguration {
+    protected static final Log LOG = LogFactory.getLog(TestRepositoryConfiguration.class);
+
+    @Bean
+    @ConfigurationProperties(prefix = "spring.testdatasource")
+    public DataSourceProperties testDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean(name = "testDataSource")
+    public DataSource testDataSource() {
+        return testDataSourceProperties().initializeDataSourceBuilder().build();
+    }
+
+    @Bean(name = "testJdbcTemplate")
+    public JdbcTemplate testJdbcTemplate(@Qualifier("testDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
+}

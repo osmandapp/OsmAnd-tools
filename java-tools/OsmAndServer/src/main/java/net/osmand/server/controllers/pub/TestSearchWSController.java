@@ -1,6 +1,6 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.api.entity.EvalJob;
+import net.osmand.server.api.test.entity.EvalJob;
 import net.osmand.server.api.services.TestSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;

@@ -1,10 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import net.osmand.server.api.entity.Dataset;
-import net.osmand.server.api.entity.EvalJob;
-import net.osmand.server.api.dto.EvaluationReport;
+import net.osmand.server.api.test.entity.Dataset;
+import net.osmand.server.api.test.entity.EvalJob;
+import net.osmand.server.api.test.dto.EvaluationReport;
 import net.osmand.server.api.services.TestSearchService;
-import net.osmand.server.controllers.user.IssuesController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +18,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
