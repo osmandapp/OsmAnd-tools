@@ -298,7 +298,7 @@ public class UserdataService {
 		        }
 	        }
 
-	        if (isNewestFile) {
+	        if (isNewestFile && sf.filesize >= 0) {
 		        res.totalFiles++;
 		        res.uniqueFiles.add(sf);
 	        }
