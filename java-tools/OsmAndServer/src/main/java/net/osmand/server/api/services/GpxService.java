@@ -52,10 +52,11 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
 
-    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, boolean createAnalyses, GpxTrackAnalysis analysis) throws IOException {
+    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, boolean createAnalysis,
+                                                            GpxTrackAnalysis existingAnalysis) throws IOException {
 
         GpxFile gpxFileForAnalyse = null;
-        if (createAnalyses) {
+        if (createAnalysis) {
             gpxFileForAnalyse = gpxFile.clone();
         }
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
@@ -74,15 +75,15 @@ public class GpxService {
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        addAnalysis(gpxData, gpxFileForAnalyse, analysis);
+        addAnalysis(gpxData, gpxFileForAnalyse, existingAnalysis);
         gpxData.pointsGroups = (webGpxParser.getPointsGroups(gpxFile));
 
         return gpxData;
     }
 
-    private void addAnalysis(WebGpxParser.TrackData gpxData, GpxFile gpxFileForAnalyse, GpxTrackAnalysis gpxAnalysis) throws IOException {
-        if (gpxAnalysis == null && gpxFileForAnalyse != null) {
-                gpxAnalysis = getAnalysis(gpxFileForAnalyse, false);
+    private void addAnalysis(WebGpxParser.TrackData gpxData, GpxFile gpxFileForAnalysis, GpxTrackAnalysis gpxAnalysis) throws IOException {
+        if (gpxAnalysis == null && gpxFileForAnalysis != null) {
+            gpxAnalysis = getAnalysis(gpxFileForAnalysis, false);
         }
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
