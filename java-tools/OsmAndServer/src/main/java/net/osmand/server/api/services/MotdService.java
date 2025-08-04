@@ -330,6 +330,7 @@ public class MotdService {
 			}
 			if (!Algorithms.isEmpty(this.paid_features)) {
 				String[] conditions = this.paid_features.split(",");
+				boolean allFailed = false;
 				for (String condition : conditions) {
 					String c = condition.trim();
 					if (c.startsWith("-")) {
@@ -339,9 +340,14 @@ public class MotdService {
 						}
 					} else {
 						if (!params.features.contains(c)) {
-							return false;
+							allFailed = true;
+						} else {
+							allFailed = false;
 						}
 					}
+				}
+				if (allFailed) {
+					return false;
 				}
 			}
 			if (this.appPackage != null
