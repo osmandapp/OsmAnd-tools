@@ -151,7 +151,7 @@ public class OsmGpxController {
 		RouteFile routeFile = routesCache.get(id.toString());
 		// get from cache
 		if (routeFile != null) {
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(routeFile.gpxFile.clone(), null, routeFile.analysis);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(routeFile.gpxFile.clone(), false, routeFile.analysis);
 			if (gpxData != null) {
 				return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 			} else {
@@ -172,7 +172,7 @@ public class OsmGpxController {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 					if (gpxFile.getError() != null) {
 						GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, null, analysis);
+						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, false, analysis);
 						if (gpxData != null) {
 							return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 						}
