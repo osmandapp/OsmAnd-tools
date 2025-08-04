@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.TimeZone;
 
 import jakarta.annotation.PostConstruct;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -73,6 +75,7 @@ public class MotdService {
 		public String os;
 		public String version;
 		public String lang;
+		public List<String> features = Collections.emptyList();
 		public Integer numberOfDays;
 		public Integer numberOfStarts;
 	}
@@ -201,6 +204,8 @@ public class MotdService {
         private String numberOfStarts;
         @JsonProperty("number_of_days")
         private String numberOfDays;
+        @JsonProperty("features")
+        private String paid_features;
         
         
         @JsonProperty("lang")
@@ -273,6 +278,9 @@ public class MotdService {
 			if (appVersion != null) {
 				filter += " AppVersion '" + appVersion + "'";
 			}
+			if (paid_features != null) {
+				filter += " Features '" + paid_features + "'";
+			}
 			if (version != null) {
 				filter += " Version in '" + version + "'";
 			}
@@ -318,6 +326,22 @@ public class MotdService {
 				String osVersion = params.os != null && params.os.equals("ios") ? "ios" : "android";
 				if (!osVersion.equals(this.os)) {
 					return false;
+				}
+			}
+			if (!Algorithms.isEmpty(this.paid_features)) {
+				String[] conditions = this.paid_features.split(",");
+				for (String condition : conditions) {
+					String c = condition.trim();
+					if (c.startsWith("-")) {
+						// negative condition
+						if (params.features.contains(c.substring(1))) {
+							return false;
+						}
+					} else {
+						if (!params.features.contains(c)) {
+							return false;
+						}
+					}
 				}
 			}
 			if (this.appPackage != null
