@@ -172,7 +172,6 @@ public class TestSearchService {
                     .orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
             Path fullPath = null;
-            dataset.setTotal(null);
             dataset.setSourceStatus(DatasetConfigStatus.UNKNOWN);
             try {
                 if (dataset.getType() == DatasetSource.Overpass) {
@@ -378,7 +377,8 @@ public class TestSearchService {
             if (job != null) {
                 job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
                 datasetJobRepository.save(job);
-                JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(), processedCount, processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
+
+                JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(), dataset.getTotal(), processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
                 messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
             }
         }
@@ -449,7 +449,7 @@ public class TestSearchService {
         }
 
         String insertSql = "INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
-                "min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount,
                 minDistance, closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(), originalPoint == null ? null : originalPoint.getLongitude(), actualPlace, new java.sql.Timestamp(System.currentTimeMillis()));
     }
@@ -677,8 +677,8 @@ public class TestSearchService {
         String columnsDefinition = Stream.of(columns)
                 .map(header -> "\"" + header + "\" VARCHAR(255)")
                 .collect(Collectors.joining(", "));
-        // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
-        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER AUTOINCREMENT PRIMARY KEY, %s)", tableName, columnsDefinition);
+        // Use an auto-incrementing primary key column compatible with SQLite (INTEGER PRIMARY KEY AUTOINCREMENT)
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT, %s)", tableName, columnsDefinition);
         jdbcTemplate.execute(createTableSql);
 
         LOGGER.info("Ensured table {} exists.", tableName);

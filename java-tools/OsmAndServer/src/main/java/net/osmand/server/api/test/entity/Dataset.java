@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class Dataset {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(columnDefinition = "INTEGER")
     private Integer id;
 
     @Column(nullable = false, unique = true)

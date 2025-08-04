@@ -22,8 +22,8 @@ public class StrictSQLiteDialect extends SQLiteDialect {
 
 			@Override                 // ➌ column fragment used in DDL
 			public String getIdentityColumnString(int type) {
-				return "integer";     // (= 64-bit)     add " primary key autoincrement"
-			}                         //                 here if you need the keyword
+				return "not null";     // (= 64-bit)     add " primary key autoincrement"
+			}
 
 			@Override                 // ➍ we *did* put the type in ➌
 			public boolean hasDataTypeInIdentityColumn() {
@@ -32,4 +32,3 @@ public class StrictSQLiteDialect extends SQLiteDialect {
 		};
 	}
 }
-

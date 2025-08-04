@@ -12,12 +12,13 @@ import java.util.Map;
 public class EvalResult {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(columnDefinition = "INTEGER")
 	private Long id;
 
-	@Column
+	@Column(name = "job_id", nullable = false)
 	private Long jobId;
 
-	@Column
+	@Column(name = "dataset_id", nullable = false)
 	private Long datasetId;
 
 	@JdbcTypeCode(SqlTypes.JSON)

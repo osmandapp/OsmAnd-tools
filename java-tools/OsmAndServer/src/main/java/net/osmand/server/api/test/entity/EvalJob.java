@@ -19,6 +19,7 @@ public class EvalJob {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(columnDefinition = "INTEGER")
 	private Long id;
 
 	@Column(name = "dataset_id", nullable = false)
