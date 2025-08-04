@@ -51,8 +51,13 @@ public class GpxService {
     
     @Value("${osmand.srtm.location}")
     String srtmLocation;
-    
-    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, File originalSourceGpx, GpxTrackAnalysis analysis) throws IOException {
+
+    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, boolean createAnalyses, GpxTrackAnalysis analysis) throws IOException {
+
+        GpxFile gpxFileForAnalyse = null;
+        if (createAnalyses) {
+            gpxFileForAnalyse = gpxFile.clone();
+        }
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = (new WebGpxParser.WebMetaData(gpxFile.getMetadata()));
@@ -69,19 +74,15 @@ public class GpxService {
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        addAnalysis(gpxData, originalSourceGpx, analysis);
+        addAnalysis(gpxData, gpxFileForAnalyse, analysis);
         gpxData.pointsGroups = (webGpxParser.getPointsGroups(gpxFile));
 
         return gpxData;
     }
 
-    private void addAnalysis(WebGpxParser.TrackData gpxData, File originalSourceGpx, GpxTrackAnalysis analysis) throws IOException {
-        GpxTrackAnalysis gpxAnalysis = analysis;
-        if (gpxAnalysis == null && originalSourceGpx != null) {
-            GpxFile gpxFileForAnalyse = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(originalSourceGpx));
-            if (gpxFileForAnalyse.getError() == null) {
+    private void addAnalysis(WebGpxParser.TrackData gpxData, GpxFile gpxFileForAnalyse, GpxTrackAnalysis gpxAnalysis) throws IOException {
+        if (gpxAnalysis == null && gpxFileForAnalyse != null) {
                 gpxAnalysis = getAnalysis(gpxFileForAnalyse, false);
-            }
         }
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
@@ -279,7 +280,6 @@ public class GpxService {
         }
     }
 
-
     public double getCommonMaxSizeFiles() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof WebSecurityConfiguration.OsmAndProUser) {
@@ -290,7 +290,7 @@ public class GpxService {
 
     public GpxFile importGpx(Source source, String filename) throws IOException {
         GpxFile gpxFile;
-        if (filename.endsWith(GPX_FILE_EXT)) {
+        if (filename.toLowerCase().endsWith(GPX_FILE_EXT)) {
             gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
         } else {
             gpxFile = ImportGpx.INSTANCE.importFile(source, filename);
@@ -299,9 +299,7 @@ public class GpxService {
     }
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
-        String filename = file.getOriginalFilename();
-        String fileExt = filename.substring(filename.lastIndexOf('.'));
-        File tmpFile = File.createTempFile(fileExt.substring(1) + "_" + httpSessionId, fileExt);
+        File tmpFile = File.createTempFile("gpx_" + httpSessionId, GPX_FILE_EXT);
         InputStream is = file.getInputStream();
         FileOutputStream fous = new FileOutputStream(tmpFile);
         Algorithms.streamCopy(is, fous);
