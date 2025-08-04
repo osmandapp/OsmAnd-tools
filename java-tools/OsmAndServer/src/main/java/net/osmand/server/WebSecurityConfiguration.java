@@ -1,22 +1,20 @@
 package net.osmand.server;
 
-import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
-
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
+import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
@@ -49,68 +47,45 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
-import net.osmand.server.api.repo.CloudUsersRepository;
-import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
-import net.osmand.server.api.services.UserdataService;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @EnableOAuth2Client
 public class WebSecurityConfiguration {
-	
-	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
+
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
 	public static final String ROLE_USER = "ROLE_USER";
+	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
 	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
-    
-    @Value("${admin.api-oauth2-url}")
-    private String adminOauth2Url;
-
-	@Value("${spring.session.redisHost}")
-	private String redisHost;
-
-	@Value("${spring.session.redisPort}")
-	private String redisPort;
-
-
 	@Autowired
 	protected CloudUsersRepository usersRepository;
-    
-    @Autowired
+	@Autowired
 	protected CloudUserDevicesRepository devicesRepository;
-	
 	@Autowired
 	UserdataService userdataService;
-
+	@Value("${admin.api-oauth2-url}")
+	private String adminOauth2Url;
+	@Value("${spring.session.redisHost}")
+	private String redisHost;
+	@Value("${spring.session.redisPort}")
+	private String redisPort;
 	@Autowired
 	private WebAccessConfig webAccessConfig;
-    
-
-	public static class OsmAndProUser extends User {
-
-		private static final long serialVersionUID = -881322456618342435L;
-		CloudUserDevice userDevice;
-
-		public OsmAndProUser(String username, String password, CloudUserDevice pud,
-				List<GrantedAuthority> authorities) {
-			super(username, password, authorities);
-			this.userDevice = pud;
-		}
-
-		public CloudUserDevice getUserDevice() {
-			return userDevice;
-		}
-	}
 
 	private boolean isRedisAvailable() {
 		return redisHost != null && !redisHost.isEmpty() && redisPort != null && !redisPort.isEmpty();
 	}
 
 	@Bean
-	@ConditionalOnExpression("T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && T(org.springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
+	@ConditionalOnExpression("T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && T(org" +
+			".springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
 	public MapSessionRepository mapSessionRepository() {
 		if (!isRedisAvailable()) {
 			LOG.warn("Redis is not configured, falling back to MapSessionRepository.");
@@ -120,22 +95,6 @@ public class WebSecurityConfiguration {
 		}
 		LOG.info("Redis configuration is detected, skipping MapSessionRepository.");
 		return null;
-	}
-
-	@Configuration
-	@ConditionalOnExpression("!T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && !T(org.springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
-	@EnableRedisHttpSession(maxInactiveIntervalInSeconds = SESSION_TTL_SECONDS)
-	public class ConditionalRedisConfig {
-
-		@Bean
-		public RedisConnectionFactory redisConnectionFactory() {
-			LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-					.commandTimeout(Duration.ofSeconds(5))  // Sets the maximum time to wait for a Redis command to complete
-					.shutdownTimeout(Duration.ofMillis(100)) // Defines how long to wait when shutting down the Redis connection
-					.build();
-			return new LettuceConnectionFactory(
-					new RedisStandaloneConfiguration(redisHost, Integer.parseInt(redisPort)), clientConfig);
-		}
 	}
 
 	@Bean
@@ -162,7 +121,6 @@ public class WebSecurityConfiguration {
 			return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
 		};
 	}
-
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -200,7 +158,8 @@ public class WebSecurityConfiguration {
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 						.requireCsrfProtectionMatcher(request -> {
 							String method = request.getMethod();
-							Set<String> enabledMethods = Set.of("GET", "HEAD", "TRACE", "OPTIONS", "POST", "PUT", "DELETE");
+							Set<String> enabledMethods = Set.of("GET", "HEAD", "TRACE", "OPTIONS", "POST", "PUT",
+									"DELETE");
 							if (method != null && !enabledMethods.contains(method)) {
 								String url = request.getServletPath();
 								if (request.getPathInfo() != null) {
@@ -217,7 +176,7 @@ public class WebSecurityConfiguration {
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-						.requestMatchers("/admin/test/**").permitAll()
+						.requestMatchers("/admin/test/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
@@ -230,7 +189,8 @@ public class WebSecurityConfiguration {
 							@Override
 							public void handle(HttpServletRequest request,
 											   HttpServletResponse response,
-											   AccessDeniedException accessDeniedException) throws IOException, ServletException {
+											   AccessDeniedException accessDeniedException) throws IOException,
+									ServletException {
 								response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 								request.getRequestDispatcher(request.getContextPath() + "/admin/security-error").forward(request, response);
 							}
@@ -263,7 +223,6 @@ public class WebSecurityConfiguration {
 		provider.setPasswordEncoder(passwordEncoder);
 		return new ProviderManager(provider);
 	}
-    
 
 	@Bean
 	public PasswordEncoder passwordEncoder() {
@@ -277,14 +236,49 @@ public class WebSecurityConfiguration {
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
-				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net", 
+				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net",
 				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**",  configuration);
+		source.registerCorsConfiguration("/**", configuration);
 		return source;
+	}
+
+	public static class OsmAndProUser extends User {
+
+		private static final long serialVersionUID = -881322456618342435L;
+		CloudUserDevice userDevice;
+
+		public OsmAndProUser(String username, String password, CloudUserDevice pud,
+							 List<GrantedAuthority> authorities) {
+			super(username, password, authorities);
+			this.userDevice = pud;
+		}
+
+		public CloudUserDevice getUserDevice() {
+			return userDevice;
+		}
+	}
+
+	@Configuration
+	@ConditionalOnExpression("!T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && !T(org" +
+			".springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
+	@EnableRedisHttpSession(maxInactiveIntervalInSeconds = SESSION_TTL_SECONDS)
+	public class ConditionalRedisConfig {
+
+		@Bean
+		public RedisConnectionFactory redisConnectionFactory() {
+			LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+					.commandTimeout(Duration.ofSeconds(5))  // Sets the maximum time to wait for a Redis command to
+					// complete
+					.shutdownTimeout(Duration.ofMillis(100)) // Defines how long to wait when shutting down the Redis
+					// connection
+					.build();
+			return new LettuceConnectionFactory(
+					new RedisStandaloneConfiguration(redisHost, Integer.parseInt(redisPort)), clientConfig);
+		}
 	}
 
 }
