@@ -18,14 +18,12 @@ logging:
   config: classpath:logback-spring.xml
   purchase.debug: false
   pattern.console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){yellow} %-5level [%thread]: %message%n%ex{10}"
-  level:
-    com.zaxxer.hikari: WARN
-    org.postgresql: WARN
+
 
 osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
-  files.location: ${user.dir}/../
+  files.location: ${user.dir}/../../../
   gen.location: ${osmand.files.location}/gen
   web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}
@@ -75,9 +73,6 @@ management:
     web:
       exposure:
         include: "*"
-  health:
-    db:
-      enabled: false
 
 spring.mvc.async.request-timeout: 600000
 spring:
@@ -152,3 +147,38 @@ test:
     dir: ${osmand.files.location}/csv
   overpass:
     url: https://overpass-api.de/api/interpreter
+
+---
+spring.jpa.hibernate.ddl-auto: validate
+
+osmand.files.location: /var/www-download
+osmand.web.location: ${osmand.files.location}/website
+
+logging:
+  file: /var/log/osmand-server-logs/error.log
+  config: classpath:logback-spring.xml
+
+server:
+  port: 8090
+  servlet.session.timeout: 7d
+  # use-forward-headers: true
+  forward-headers-strategy: native
+  # session.timeout: 18000 #432000 #servlet.session.timeout
+  address: 127.0.0.1 #keep it behind proxy
+  tomcat:
+    redirect-context-root: false
+    threads.max: 50
+    protocol_header: x-forwarded-proto
+    remote_ip_header: x-forwarded-for
+    accesslog:
+      directory: /var/log/osmand-server-logs/
+      enabled: true
+      rotate: false
+      pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
+
+spring:
+  config:
+    activate:
+      on-profile: production
+  resources.static-locations: file:${osmand.web.location}
+  thymeleaf.prefix: file:${osmand.web.location}/templates/
