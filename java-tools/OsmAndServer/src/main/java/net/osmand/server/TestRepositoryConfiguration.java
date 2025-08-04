@@ -17,6 +17,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
+import java.util.Map;
+
+import jakarta.persistence.EntityManagerFactory;
 
 /**
  * Configures all standard JPA repositories to use the SQLite datasource.
@@ -26,7 +29,9 @@ import javax.sql.DataSource;
 @EnableJpaRepositories(
         basePackageClasses = {DatasetRepository.class, DatasetJobRepository.class},
         includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
-                {DatasetRepository.class, DatasetJobRepository.class})
+                {DatasetRepository.class, DatasetJobRepository.class}),
+        entityManagerFactoryRef = "testEntityManagerFactory",
+        transactionManagerRef = "testTransactionManager"
 )
 public class TestRepositoryConfiguration {
     protected static final Log LOG = LogFactory.getLog(TestRepositoryConfiguration.class);
@@ -45,5 +50,25 @@ public class TestRepositoryConfiguration {
     @Bean(name = "testJdbcTemplate")
     public JdbcTemplate testJdbcTemplate(@Qualifier("testDataSource") DataSource ds) {
         return new JdbcTemplate(ds);
+    }
+
+    @Bean(name = "testEntityManagerFactory")
+    public LocalContainerEntityManagerFactoryBean testEntityManagerFactory(
+            @Qualifier("testDataSource") DataSource dataSource,
+            EntityManagerFactoryBuilder builder) {
+        return builder
+                .dataSource(dataSource)
+                .packages("net.osmand.server.api.test.entity")
+                .persistenceUnit("test")
+                .properties(Map.of(
+                        "hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
+                        "hibernate.hbm2ddl.auto", "update"))
+                .build();
+    }
+
+    @Bean(name = "testTransactionManager")
+    public PlatformTransactionManager testTransactionManager(
+            @Qualifier("testEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
     }
 }

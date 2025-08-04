@@ -2,9 +2,11 @@ package net.osmand.server;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
+import jakarta.persistence.EntityManagerFactory;
 import net.osmand.server.api.test.repo.DatasetJobRepository;
 import net.osmand.server.api.test.repo.DatasetRepository;
 import org.apache.commons.logging.Log;
@@ -27,7 +29,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableJpaRepositories(
         basePackages = "net.osmand.server",
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                classes = {DatasetRepository.class, DatasetJobRepository.class}))
+                classes = {DatasetRepository.class, DatasetJobRepository.class}),
+        entityManagerFactoryRef = "entityManager")
 public class DatasourceConfiguration {
 
     protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
@@ -195,5 +198,25 @@ public class DatasourceConfiguration {
             return null;
         }
         return new JdbcTemplate(dataSource);
+    }
+
+    @Bean(name = "entityManager")
+    @Primary
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+            EntityManagerFactoryBuilder builder,
+            @Qualifier("primaryDataSource") DataSource dataSource) {
+        return builder
+                .dataSource(dataSource)
+                .packages("net.osmand.server")
+                .persistenceUnit("default")
+                .properties(Map.of(
+                        "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"))
+                .build();
+    }
+
+    @Bean(name = "transactionManager")
+    public PlatformTransactionManager transactionManager(
+            @Qualifier("entityManager") EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
     }
 }

@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public class Dataset {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(nullable = false, unique = true)
     private String name;
@@ -33,10 +33,10 @@ public class Dataset {
     @Column(nullable = false)
     private DatasetConfigStatus sourceStatus = DatasetConfigStatus.UNKNOWN;
 
-    @Column()
+    @Column
     private Integer sizeLimit = 10000;
 
-    @Column()
+    @Column
     private Integer total;
 
     @Column(nullable = false, updatable = false)
@@ -89,11 +89,11 @@ public class Dataset {
         this.sizeLimit = sizeLimit;
     }
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

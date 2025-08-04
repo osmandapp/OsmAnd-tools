@@ -13,6 +13,7 @@ public class EvalResult {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
+
 	@Column
 	private Long jobId;
 
@@ -20,7 +21,7 @@ public class EvalResult {
 	private Long datasetId;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(columnDefinition = "jsonb")
+	@Column
 	private Map<String, String> original;
 
 	@Column(columnDefinition = "TEXT")
@@ -47,10 +48,10 @@ public class EvalResult {
 	@Column(name = "results_count")
 	private Integer resultsCount;
 
-	@Column()
+	@Column
 	private Double lat;
 
-	@Column()
+	@Column
 	private Double lon;
 	// Getters and Setters
 

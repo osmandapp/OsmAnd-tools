@@ -24,7 +24,7 @@ public class EvalJob {
 	@Column(name = "dataset_id", nullable = false)
 	private Long datasetId;
 
-	@Column(name = "address_expression", nullable = false)
+	@Column(name = "address_expression", nullable = false, columnDefinition = "TEXT")
 	private String addressExpression;
 
 	@Enumerated(EnumType.STRING)

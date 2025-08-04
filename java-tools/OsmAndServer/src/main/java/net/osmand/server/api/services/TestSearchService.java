@@ -678,7 +678,7 @@ public class TestSearchService {
                 .map(header -> "\"" + header + "\" VARCHAR(255)")
                 .collect(Collectors.joining(", "));
         // Use a dedicated primary key column (id) with PostgreSQL-compatible identity generation
-        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id BIGSERIAL PRIMARY KEY, %s)", tableName, columnsDefinition);
+        String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER AUTOINCREMENT PRIMARY KEY, %s)", tableName, columnsDefinition);
         jdbcTemplate.execute(createTableSql);
 
         LOGGER.info("Ensured table {} exists.", tableName);
