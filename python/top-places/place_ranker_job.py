@@ -32,6 +32,7 @@ MODEL = os.getenv('MODEL')
 API_URL = os.getenv('API_URL')
 K_FACTOR = 16  # 32
 
+CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'data.osmand.net')
 CLICKHOUSE_PWD = os.getenv('CLICKHOUSE_PWD')
 API_KEY = os.getenv('API_KEY')
 if not CLICKHOUSE_PWD:
@@ -180,7 +181,7 @@ def process_round_results(selected_places, winning_places, bbox_shortlink, clien
 
 def run_one_round(selected_places, selectTop, shortlink, round_num, rounds):
     # Create a new client for this thread
-    client = Client('localhost', user='default', password=CLICKHOUSE_PWD, database='wiki')
+    client = Client(CLICKHOUSE_HOST, user='default', password=CLICKHOUSE_PWD, database='wiki')
     response = {}
     try:
         time.sleep(SLEEP)
@@ -204,7 +205,7 @@ def run_one_round(selected_places, selectTop, shortlink, round_num, rounds):
 
 
 def run_rounds(data, shortlink, series, llm_executor):
-    client = Client('localhost', user='default', password=CLICKHOUSE_PWD, database='wiki')
+    client = Client(CLICKHOUSE_HOST, user='default', password=CLICKHOUSE_PWD, database='wiki')
     data = [item for item in data if item['shortlink'].startswith(shortlink)]
     # Load existing rounds and process
     existing_rounds = client.execute(
@@ -301,7 +302,7 @@ def run_series(data, roundsArray, filter_):
 
 
 # Connect to ClickHouse
-client = Client('localhost', user='default', password=CLICKHOUSE_PWD, database='wiki')
+client = Client(CLICKHOUSE_HOST, user='default', password=CLICKHOUSE_PWD, database='wiki')
 
 # Fetch initial data
 query = f"""SELECT wikiTitle, lat, lon, poitype, poisubtype, qrank, osmid, osmtype, osmcnt, id
