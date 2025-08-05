@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
         basePackages = "net.osmand.server",
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
                 classes = {DatasetRepository.class, DatasetJobRepository.class}),
-        entityManagerFactoryRef = "entityManager")
+        entityManagerFactoryRef = "entityManagerFactory")
 public class DatasourceConfiguration {
 
     protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
@@ -216,7 +216,7 @@ public class DatasourceConfiguration {
 
     @Bean(name = "transactionManager")
     public PlatformTransactionManager transactionManager(
-            @Qualifier("entityManager") EntityManagerFactory entityManagerFactory) {
+            @Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
         return new JpaTransactionManager(entityManagerFactory);
     }
 }
