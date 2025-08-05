@@ -85,10 +85,16 @@ spring:
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:50MB}
       enabled: true
   jpa:
-    properties.hibernate.jdbc.lob.non_contextual_creation: true
-    hibernate.ddl-auto: update
+    properties:
+      hibernate:
+        ddl-auto: update
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        jdbc:
+          lob:
+            non_contextual_creation: true
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
+    url: ${DB_URL:jdbc:postgresql://172.23.64.1:5432/osmanddb}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   changesetdatasource:
@@ -147,38 +153,3 @@ test:
     dir: ${osmand.files.location}/csv
   overpass:
     url: https://overpass-api.de/api/interpreter
-
----
-spring.jpa.hibernate.ddl-auto: validate
-
-osmand.files.location: /var/www-download
-osmand.web.location: ${osmand.files.location}/website
-
-logging:
-  file: /var/log/osmand-server-logs/error.log
-  config: classpath:logback-spring.xml
-
-server:
-  port: 8090
-  servlet.session.timeout: 7d
-  # use-forward-headers: true
-  forward-headers-strategy: native
-  # session.timeout: 18000 #432000 #servlet.session.timeout
-  address: 127.0.0.1 #keep it behind proxy
-  tomcat:
-    redirect-context-root: false
-    threads.max: 50
-    protocol_header: x-forwarded-proto
-    remote_ip_header: x-forwarded-for
-    accesslog:
-      directory: /var/log/osmand-server-logs/
-      enabled: true
-      rotate: false
-      pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
-
-spring:
-  config:
-    activate:
-      on-profile: production
-  resources.static-locations: file:${osmand.web.location}
-  thymeleaf.prefix: file:${osmand.web.location}/templates/

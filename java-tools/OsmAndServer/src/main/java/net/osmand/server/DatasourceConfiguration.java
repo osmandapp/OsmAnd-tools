@@ -209,8 +209,6 @@ public class DatasourceConfiguration {
                 .dataSource(dataSource)
                 .packages("net.osmand.server")
                 .persistenceUnit("default")
-                .properties(Map.of(
-                        "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"))
                 .build();
     }
 
