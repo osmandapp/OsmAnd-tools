@@ -25,7 +25,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
-@EnableTransactionManagement
 @EnableJpaRepositories(
         basePackages = "net.osmand.server",
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
