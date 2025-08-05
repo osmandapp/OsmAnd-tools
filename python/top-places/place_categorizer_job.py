@@ -10,6 +10,7 @@ import requests
 # Global Constants (from environment variables)
 MODEL = os.getenv('MODEL')
 API_URL = os.getenv('API_URL')
+CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'data.osmand.net')
 CLICKHOUSE_PWD = os.getenv('CLICKHOUSE_PWD')
 API_KEY = os.getenv('API_KEY')
 PLACES_BATCH = int(os.getenv('PLACES_BATCH', '100'))  # Default to 100
@@ -60,7 +61,7 @@ def categorize_places():
         """
 
         # Use a single connection to fetch all the places at once.
-        with clickhouse_connect.get_client(host='localhost', password=CLICKHOUSE_PWD, database='wiki') as client:
+        with clickhouse_connect.get_client(host=CLICKHOUSE_HOST, password=CLICKHOUSE_PWD, database='wiki') as client:
             result = client.query(base_query)
             all_places = result.result_rows
 
@@ -79,7 +80,7 @@ def categorize_places():
 def process_batch(batch):
     """Processes a single batch of places.  Now takes only the batch data."""
     # Create a *new* ClickHouse client *within* the thread.
-    client = clickhouse_connect.get_client(host='localhost', password=CLICKHOUSE_PWD, database='wiki')
+    client = clickhouse_connect.get_client(host=CLICKHOUSE_HOST, password=CLICKHOUSE_PWD, database='wiki')
     try:
         time.sleep(SLEEP)
         start_time = time.time()

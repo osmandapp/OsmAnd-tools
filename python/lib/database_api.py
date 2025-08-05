@@ -10,7 +10,7 @@ from clickhouse_pool import ChPool
 
 # Maximum 4500 token - looks like 15 photos by 360px or by 720px
 PHOTOS_PER_PLACE = int(os.getenv('PHOTOS_PER_PLACE', '40'))
-CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'localhost')
+CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'data.osmand.net')
 CLICKHOUSE_PORT = int(os.getenv('CLICKHOUSE_PORT', '9000'))
 CLICKHOUSE_PWD = os.getenv('CLICKHOUSE_PWD')
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '999999'))  # Default 1000
