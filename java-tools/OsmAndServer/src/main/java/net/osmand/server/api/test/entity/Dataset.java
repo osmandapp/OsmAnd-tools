@@ -47,16 +47,6 @@ public class Dataset {
 	@Column(nullable = false)
 	private LocalDateTime updated = LocalDateTime.now();
 
-	@Column(nullable = false)
-	private Boolean libPostal = false;
-
-	public Boolean getLibPostal() {
-		return libPostal;
-	}
-
-	public void setLibPostal(Boolean libPostal) {
-		this.libPostal = libPostal;
-	}
 	// Getters and Setters
 	public String getError() {
 		return error;
