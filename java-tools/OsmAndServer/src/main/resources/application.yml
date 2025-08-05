@@ -1,3 +1,4 @@
+
 admin.api-oauth2-url: https://api.github.com/orgs/osmandapp/teams/serveradmins
 
 google.androidPublisher.clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
@@ -6,12 +7,12 @@ google.androidPublisher.clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
 storage:
   default: ${STORAGE_DEFAULT:local}
   datasource.s3:
-    type: s3
-    endpoint: ${STORAGE_S3_ENDPOINT_URL}
-    region: ${STORAGE_S3_REGION}
-    bucket: ${STORAGE_S3_BUCKET}
-    accesskey: ${STORAGE_S3_ACCESS_KEY:}
-    secretkey: ${STORAGE_S3_SECRET_KEY:}
+      type: s3
+      endpoint: ${STORAGE_S3_ENDPOINT_URL}
+      region: ${STORAGE_S3_REGION}
+      bucket: ${STORAGE_S3_BUCKET}
+      accesskey: ${STORAGE_S3_ACCESS_KEY:}
+      secretkey: ${STORAGE_S3_SECRET_KEY:}
 
 logging:
   file: logs/server.log
@@ -94,7 +95,7 @@ spring:
           lob:
             non_contextual_creation: true
   datasource:
-    url: ${DB_URL:jdbc:postgresql://172.23.64.1:5432/osmanddb}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
     password: ${DB_PWD:test}
   changesetdatasource:
@@ -123,14 +124,14 @@ spring:
     prefix: file:${osmand.web.location}/templates/
     cache: false
   security:
-    oauth2:
-      client:
-        registration:
-          github:
-            clientId: ${GITHUB_CLIENT_ID:42f89eddbf81c54c518a}
-            clientSecret: ${GITHUB_CLIENT_SECRET:180c2863aaabb15c7e779bb192c88f1a726507d5}
-            scope: read:org,user:email
-            # creds for localhost
+   oauth2:
+     client:
+       registration:
+         github:
+           clientId: ${GITHUB_CLIENT_ID:42f89eddbf81c54c518a}
+           clientSecret: ${GITHUB_CLIENT_SECRET:180c2863aaabb15c7e779bb192c88f1a726507d5}
+           scope: read:org,user:email
+           # creds for localhost
 
 
 # classpath:/static/
@@ -153,3 +154,38 @@ test:
     dir: ${osmand.files.location}/csv
   overpass:
     url: https://overpass-api.de/api/interpreter
+
+---
+spring.jpa.hibernate.ddl-auto: validate
+
+osmand.files.location: /var/www-download
+osmand.web.location: ${osmand.files.location}/website
+
+logging:
+  file: /var/log/osmand-server-logs/error.log
+  config: classpath:logback-spring.xml
+
+server:
+  port: 8090
+  servlet.session.timeout: 7d
+  # use-forward-headers: true
+  forward-headers-strategy: native
+  # session.timeout: 18000 #432000 #servlet.session.timeout
+  address: 127.0.0.1 #keep it behind proxy
+  tomcat:
+    redirect-context-root: false
+    threads.max: 50
+    protocol_header: x-forwarded-proto
+    remote_ip_header: x-forwarded-for
+    accesslog:
+      directory: /var/log/osmand-server-logs/
+      enabled: true
+      rotate: false
+      pattern: '%h %l %u %t "%r" %s %b %D "%{Referer}i" "%{User-Agent}i"'
+
+spring:
+  config:
+    activate:
+      on-profile: production
+  resources.static-locations: file:${osmand.web.location}
+  thymeleaf.prefix: file:${osmand.web.location}/templates/
