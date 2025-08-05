@@ -200,7 +200,7 @@ public class DatasourceConfiguration {
         return new JdbcTemplate(dataSource);
     }
 
-    @Bean(name = "entityManager")
+    @Bean(name = "entityManagerFactory")
     @Primary
     public LocalContainerEntityManagerFactoryBean entityManagerFactory(
             EntityManagerFactoryBuilder builder,
