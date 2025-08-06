@@ -58,16 +58,16 @@ import net.osmand.server.api.services.UserdataService;
 @Configuration
 @EnableOAuth2Client
 public class WebSecurityConfiguration {
-
+	
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
 	public static final String ROLE_USER = "ROLE_USER";
 	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
-
-	@Value("${admin.api-oauth2-url}")
-	private String adminOauth2Url;
+    
+    @Value("${admin.api-oauth2-url}")
+    private String adminOauth2Url;
 
 	@Value("${spring.session.redisHost}")
 	private String redisHost;
@@ -78,16 +78,16 @@ public class WebSecurityConfiguration {
 
 	@Autowired
 	protected CloudUsersRepository usersRepository;
-
-	@Autowired
+    
+    @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
-
+	
 	@Autowired
 	UserdataService userdataService;
 
 	@Autowired
 	private WebAccessConfig webAccessConfig;
-
+    
 
 	public static class OsmAndProUser extends User {
 
@@ -95,7 +95,7 @@ public class WebSecurityConfiguration {
 		CloudUserDevice userDevice;
 
 		public OsmAndProUser(String username, String password, CloudUserDevice pud,
-							 List<GrantedAuthority> authorities) {
+				List<GrantedAuthority> authorities) {
 			super(username, password, authorities);
 			this.userDevice = pud;
 		}
@@ -214,24 +214,24 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
-								.requestMatchers("/admin/security-error").permitAll()
-								.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-								.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/security-error").permitAll()
+						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 //						.requestMatchers("/admin/issues/**").permitAll()
-								.requestMatchers("/admin/test/**").permitAll()
-								.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-								.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
-								.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
-								.requestMatchers("/mapapi/auth/**").permitAll()
-								.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
-								.anyRequest().permitAll()
+						.requestMatchers("/admin/test/**").permitAll()
+						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
+						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
+						.requestMatchers("/mapapi/auth/**").permitAll()
+						.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
+						.anyRequest().permitAll()
 				)
 				.exceptionHandling(ex -> ex
 						.accessDeniedHandler(new AccessDeniedHandler() {
 							@Override
 							public void handle(HttpServletRequest request,
-											   HttpServletResponse response,
-											   AccessDeniedException accessDeniedException) throws IOException, ServletException {
+							                   HttpServletResponse response,
+							                   AccessDeniedException accessDeniedException) throws IOException, ServletException {
 								response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 								request.getRequestDispatcher(request.getContextPath() + "/admin/security-error").forward(request, response);
 							}
@@ -264,7 +264,7 @@ public class WebSecurityConfiguration {
 		provider.setPasswordEncoder(passwordEncoder);
 		return new ProviderManager(provider);
 	}
-
+    
 
 	@Bean
 	public PasswordEncoder passwordEncoder() {
@@ -278,7 +278,7 @@ public class WebSecurityConfiguration {
 	CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
-				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net",
+				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net", 
 				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
