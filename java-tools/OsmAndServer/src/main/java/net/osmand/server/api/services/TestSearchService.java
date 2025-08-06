@@ -571,7 +571,6 @@ public class TestSearchService {
 				    avg(actual_place) AS average_place,
 				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
 				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS not_found,
-				    sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
 				    sum(CASE WHEN 0 <= min_distance AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
 				    sum(CASE WHEN 50 < min_distance AND min_distance <= 500 THEN 1 ELSE 0 END) AS "50-500m",
 				    sum(CASE WHEN 500 < min_distance AND min_distance <= 1000 THEN 1 ELSE 0 END) AS "500-1000m",
