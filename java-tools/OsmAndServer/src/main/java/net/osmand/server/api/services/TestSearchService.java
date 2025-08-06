@@ -569,6 +569,7 @@ public class TestSearchService {
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
 				    avg(actual_place) AS average_place,
+				    count(*) FILTER (WHERE address IS NOT NULL or trim(address) != '') AS empty,
 				    count(*) FILTER (WHERE min_distance IS NULL) AS not_found,
 				    sum(CASE WHEN min_distance BETWEEN 0 AND 1 THEN 1 ELSE 0 END) AS "0-1m",
 				    sum(CASE WHEN 0 <= min_distance AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
@@ -591,8 +592,10 @@ public class TestSearchService {
 		double averagePlace = result.get("average_place") == null ? 0 :
 				((Number) result.get("average_place")).doubleValue();
 		Number notFound = (Number) result.get("not_found");
+		Number empty = (Number) result.get("empty");
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
+		distanceHistogram.put("Empty", empty);
 		distanceHistogram.put("Not found", notFound);
 		distanceHistogram.put("0-50m", ((Number) result.getOrDefault("0-50m", 0)).longValue());
 		distanceHistogram.put("50-500m", ((Number) result.getOrDefault("50-500m", 0)).longValue());
