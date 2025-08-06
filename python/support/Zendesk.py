@@ -79,6 +79,10 @@ class Zendesk:
             return
 
         ticket_id = ticket['id']
+        comments = self._get_ticket_comments(ticket_id)
+        if len(comments) > 0 and bool(comments[0].get('attachments')):
+            return
+
         print(f"Auto-replying ticket# {ticket_id}, internal reply: {auto_reply_internal_note}")
 
         url = f"https://{domain}.zendesk.com/api/v2/tickets/{ticket_id}.json"
