@@ -22,7 +22,7 @@ public class Dataset {
 	@Column(nullable = false, columnDefinition = "TEXT")
 	private String source; // Overpass query or file path
 
-	@Column(columnDefinition = "TEXT")
+	@Column(name = "address_expression", columnDefinition = "TEXT")
 	private String addressExpression; // SQL expression to calculate address
 
 	@Column(columnDefinition = "TEXT")
@@ -32,7 +32,7 @@ public class Dataset {
 	private String error;
 
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false)
+	@Column(name = "source_status", nullable = false)
 	private DatasetConfigStatus sourceStatus = DatasetConfigStatus.UNKNOWN;
 
 	@Column
