@@ -729,7 +729,7 @@ public class AdminController {
 			boolean lvl4 = (formatVersion & (1 << 4)) > 0;
 			StringBuilder row = new StringBuilder();
 			if (active > 0) {
-				if(activeRenew > 0) {
+				if (activeRenew > 0) {
 					row.append(String.format("%d (%d%%) <br>", active, activeRenew * 100 / active));
 				} else {
 					row.append(String.format("%d<br>", active));
@@ -882,7 +882,7 @@ public class AdminController {
 				c.add(period == MONTH ? Calendar.MONTH
 						: (period == YEAR ? Calendar.YEAR : Calendar.DAY_OF_MONTH), -1);
 			}
-			for(Subscription s : subs) {
+			for (Subscription s : subs) {
 				addResult(s, dateFormat);
 			}
 			return values;
