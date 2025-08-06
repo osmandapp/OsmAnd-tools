@@ -62,7 +62,7 @@ public class TestRepositoryConfiguration {
                 .persistenceUnit("test")
                 .properties(Map.of(
                         "hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
-                        "hibernate.hbm2ddl.auto", "update",
+                        "hibernate.hbm2ddl.auto", "create",
                         "hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"))
                 .build();
     }
