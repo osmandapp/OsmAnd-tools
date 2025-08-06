@@ -382,7 +382,7 @@ public class TestSearchService {
 				String originalJson = null, address = null;
 				try {
 					originalJson = objectMapper.writeValueAsString(row);
-					address = (String) row.get("address");
+					address = (String) row.get("_address");
 					String lat = (String) row.get("lat");
 					String lon = (String) row.get("lon");
 					point = GeometryUtils.parseLatLon(lat, lon);
@@ -513,12 +513,12 @@ public class TestSearchService {
 	public String updateSQLExpression(String name, String exp) {
 		String tableName = "dataset_" + sanitize(name);
 		try {
-			int rows = jdbcTemplate.update("UPDATE " + tableName + " SET address = " + exp);
+			int rows = jdbcTemplate.update("UPDATE " + tableName + " SET _address = " + exp);
 			if (rows <= 0) {
 				return "Dataset is empty";
 			}
 
-			Integer numRows = jdbcTemplate.queryForObject("SELECT count(*) FROM " + tableName + " WHERE address IS " +
+			Integer numRows = jdbcTemplate.queryForObject("SELECT count(*) FROM " + tableName + " WHERE _address IS " +
 					"NULL", Integer.class);
 			if (numRows != null && numRows > 0)
 				return "There are " + numRows + " rows with null address.";
@@ -733,7 +733,7 @@ public class TestSearchService {
 				.collect(Collectors.joining(", "));
 		// Use an auto-incrementing primary key column compatible with SQLite (INTEGER PRIMARY KEY AUTOINCREMENT)
 		String createTableSql = String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-				" address VARCHAR(255), %s)", tableName, columnsDefinition);
+				" _address VARCHAR(255), %s)", tableName, columnsDefinition);
 		jdbcTemplate.execute(createTableSql);
 
 		LOGGER.info("Ensured table {} exists.", tableName);
