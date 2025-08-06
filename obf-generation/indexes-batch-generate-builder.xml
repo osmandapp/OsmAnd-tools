@@ -10,7 +10,7 @@
 		directory_for_srtm_files="/home/relief-data/srtm/">
 		
 		
-		<external dockerSlots="60">
+		<external dockerSlots="56">
 			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
@@ -21,7 +21,6 @@
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
 				
 				<filter exclude="world_seamarks" />
-				<filter exclude="kazakhstan_asia" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
@@ -33,7 +32,6 @@
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
                 
 				<filter exclude="world_seamarks" />
-				<filter exclude="kazakhstan_asia" />
 			</job>
 		</external>
 	</process>
