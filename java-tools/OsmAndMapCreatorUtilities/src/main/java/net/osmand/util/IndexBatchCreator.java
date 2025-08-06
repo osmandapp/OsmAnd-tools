@@ -514,9 +514,12 @@ public class IndexBatchCreator {
 								dockerFailedGenerations.add(p);
 							} else {
 								log.info(String.format("FAILED GENERATION %s - container %s retry last", p.name, p.container.getId()));
-								dockerRetryGenerations.add(p.name);
-								p.container = null;
-								queue.add(p);
+								dockerFailedGenerations.add(p);
+								// TODO not tested
+//								dockerRetryGenerations.add(p.name);
+//								p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
+//										.withName(p.name).exec();
+//								dockerClient.startContainerCmd(p.container.getId()).exec();
 							}
 						} else {
 							log.info(String.format("Finished %s container %s at %s (started %s).",
