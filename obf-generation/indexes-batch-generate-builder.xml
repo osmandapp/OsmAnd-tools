@@ -27,7 +27,7 @@
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
 
-				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
+				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx35000M "/>
                 <parameter k="env_2" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
                 
