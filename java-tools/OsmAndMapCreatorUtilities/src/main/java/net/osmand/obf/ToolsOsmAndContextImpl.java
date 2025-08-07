@@ -7,6 +7,7 @@ import net.osmand.shared.data.KLatLon;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.io.KFile;
+import net.osmand.shared.settings.enums.AltitudeMetrics;
 import net.osmand.shared.settings.enums.MetricsConstants;
 import net.osmand.shared.settings.enums.SpeedConstants;
 import net.osmand.shared.util.KStringMatcher;
@@ -70,6 +71,11 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
 
     @Override
     public MetricsConstants getMetricSystem() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+    
+    @Override
+    public AltitudeMetrics getAltitudeMetric() {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
