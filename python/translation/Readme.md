@@ -37,7 +37,7 @@ Below are all environment variables, arguments, and their roles:
 |---------------------------------|----------|-------------------------------------------------------------------------|-------------------------|
 | **LANG (argument #1)**          | Yes      | Target language code for translation, or `all` to process all.          | `fr`, `de`, `all`       |
 | **INPUT_PATTERN (argument #2)** | No       | Optional file pattern to filter which files are translated.             | `'topic/*.md'`          |
-| **API_KEY (argument #3)**       | No       | API key for the LLM.                                                    | `sk-abc123xyz`          |
+| **API_KEY**                     | Yes      | API key for the LLM.                                                    | `sk-abc123xyz`          |
 | **MODEL**                       | No       | Model to use for translation. Defaults to `or@google/gemini-2.5-flash`. |                         |
 | **TOOLS_PATH**                  | No       | Path to tools project. Should be clone or pull preliminary.             | `/opt/projects/tools`   |
 | **WEB_SERVER_CONFIG_PATH**      | No       | Path to web-server-config project.                                      | `/opt/projects/website` |
