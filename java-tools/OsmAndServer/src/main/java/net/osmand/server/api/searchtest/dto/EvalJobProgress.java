@@ -2,11 +2,10 @@ package net.osmand.server.api.searchtest.dto;
 
 import net.osmand.server.api.searchtest.entity.EvalJob;
 
-public record JobProgress (
+public record EvalJobProgress(
 	long jobId,
-	long datasetId,
-	EvalJob.Status status,
-	long total,
+	long notFound,
 	long processed,
 	long error,
-	long duration) {}
+	long duration,
+	double averagePlace) {}

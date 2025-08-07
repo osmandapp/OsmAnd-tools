@@ -2,8 +2,9 @@ package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.server.api.searchtest.dto.EvalJobProgress;
 import net.osmand.server.api.services.SearchTestService;
-import net.osmand.server.api.searchtest.dto.EvaluationReport;
+import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,9 +64,18 @@ public class SearchTestController {
 
 	@GetMapping(value = "/reports/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvaluationReport> getEvaluationReport(
+	public ResponseEntity<EvalJobReport> getEvaluationReport(
 			@PathVariable Long jobId) {
 		return testSearchService.getEvaluationReport(jobId)
+				.map(ResponseEntity::ok)
+				.orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/progress/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<EvalJobProgress> getEvaluationProgress(
+			@PathVariable Long jobId) {
+		return testSearchService.getEvaluationProgress(jobId)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
 	}

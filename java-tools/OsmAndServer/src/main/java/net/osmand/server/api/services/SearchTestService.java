@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.EvaluationReport;
-import net.osmand.server.api.searchtest.dto.JobProgress;
+import net.osmand.server.api.searchtest.dto.EvalJobProgress;
+import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.entity.*;
 import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -23,7 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -49,7 +48,6 @@ public class SearchTestService {
 	private final SearchService searchService;
 	private final ObjectMapper objectMapper;
 	private final WebClient.Builder webClientBuilder;
-	private final SimpMessagingTemplate messagingTemplate;
 	private final EntityManager em;
 	private WebClient webClient;
 	@Value("${testsearch.tiger.csv.dir}")
@@ -106,8 +104,7 @@ public class SearchTestService {
 							 DatasetJobRepository datasetJobRepository,
 							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
 							 SearchService searchService, WebClient.Builder webClientBuilder,
-							 ObjectMapper objectMapper,
-							 SimpMessagingTemplate messagingTemplate) {
+							 ObjectMapper objectMapper) {
 		this.em = em;
 		this.datasetRepository = datasetRepository;
 		this.datasetJobRepository = datasetJobRepository;
@@ -115,7 +112,6 @@ public class SearchTestService {
 		this.searchService = searchService;
 		this.webClientBuilder = webClientBuilder;
 		this.objectMapper = objectMapper;
-		this.messagingTemplate = messagingTemplate;
 	}
 
 	private static List<String> reservoirSample(Path filePath, int n) throws IOException {
@@ -401,12 +397,8 @@ public class SearchTestService {
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = String.format("SELECT * FROM %s", tableName);
-		long processedCount = 0;
-		long errorCount = 0;
-		long totalStartTime = System.currentTimeMillis();
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			long totalRows = rows.size();
 			for (Map<String, Object> row : rows) {
 				job = datasetJobRepository.findById(jobId)
 						.map(j -> {
@@ -437,16 +429,11 @@ public class SearchTestService {
 					saveResults(job, dataset, address, originalJson, searchResults, point,
 							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
-					errorCount++;
 					LOGGER.warn("Failed to process row for job {}: {}", job.id, originalJson, e);
 					saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
-				processedCount++;
-				JobProgress progress = new JobProgress(job.id, dataset.id, job.status, totalRows,
-						processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
-				messagingTemplate.convertAndSend("/topic/eval/ws", progress);
 			}
 			if (job != null && job.status != EvalJob.Status.CANCELED) {
 				job.status = EvalJob.Status.COMPLETED;
@@ -459,10 +446,6 @@ public class SearchTestService {
 			if (job != null) {
 				job.updated = new java.sql.Timestamp(System.currentTimeMillis());
 				datasetJobRepository.save(job);
-
-				JobProgress finalProgress = new JobProgress(job.id, dataset.id, job.status,
-						dataset.total, processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
-				messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
 			}
 		}
 	}
@@ -598,7 +581,7 @@ public class SearchTestService {
 		}
 	}
 
-	public Optional<EvaluationReport> getEvaluationReport(Long jobId) {
+	public Optional<EvalJobReport> getEvaluationReport(Long jobId) {
 		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
 		if (jobOptional.isEmpty()) {
 			return Optional.empty();
@@ -627,11 +610,11 @@ public class SearchTestService {
 		if (processed == 0) {
 			return Optional.empty(); // No data to report
 		}
-		long error = ((Number) result.get("failed")).longValue();
+		long failed = ((Number) result.get("failed")).longValue();
 		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
 		double averagePlace = result.get("average_place") == null ? 0 :
 				((Number) result.get("average_place")).doubleValue();
-		Number notFound = (Number) result.get("not_found");
+		long notFound = ((Number) result.get("not_found")).longValue();
 		Number empty = (Number) result.get("empty");
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
@@ -642,7 +625,7 @@ public class SearchTestService {
 		distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
 		distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
 
-		EvaluationReport report = new EvaluationReport(jobId, processed, processed, error, duration, averagePlace,
+		EvalJobReport report = new EvalJobReport(jobId, notFound, processed, failed, duration, averagePlace,
 				distanceHistogram);
 		return Optional.of(report);
 	}
@@ -812,5 +795,40 @@ public class SearchTestService {
 			}
 		}
 		return fileRowCounts;
+	}
+
+	public Optional<EvalJobProgress> getEvaluationProgress(Long jobId) {
+		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
+		if (jobOptional.isEmpty()) {
+			return Optional.empty();
+		}
+
+		String sql = """
+				SELECT
+				    count(*) AS total,
+				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
+				    sum(duration) AS duration,
+				    avg(actual_place) AS average_place,
+				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
+				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS not_found
+				FROM
+				    eval_result
+				WHERE
+				    job_id = ?
+				""";
+
+		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
+		long processed = ((Number) result.get("total")).longValue();
+		if (processed == 0) {
+			return Optional.empty(); // No data to report
+		}
+		long failed = ((Number) result.get("failed")).longValue();
+		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
+		double averagePlace = result.get("average_place") == null ? 0 :
+				((Number) result.get("average_place")).doubleValue();
+		long notFound = ((Number) result.get("not_found")).longValue();
+
+		EvalJobProgress report = new EvalJobProgress(jobId, notFound, processed, failed, duration, averagePlace);
+		return Optional.of(report);
 	}
 }

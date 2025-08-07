@@ -2,9 +2,9 @@ package net.osmand.server.api.searchtest.dto;
 
 import java.util.Map;
 
-public record EvaluationReport(
+public record EvalJobReport(
         long jobId,
-        long total,
+        long notFound,
 		long processed,
         long error,
 		long duration,
