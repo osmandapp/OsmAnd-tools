@@ -1,12 +1,7 @@
 #!/bin/bash -e
 
-# Parse command-line options
-while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-  --force)
-    export FORCE_TRANSLATION=true
-    ;;
-esac; shift; done
-if [[ "$1" == '--' ]]; then shift; fi
+# Uncomment to switch it on
+# export FORCE_TRANSLATION=true
 
 # Environment ($1 - LANG, $2 - INPUT_PATTERN, $3 - API_KEY)
 export LANG="${1:-$LANG}"
