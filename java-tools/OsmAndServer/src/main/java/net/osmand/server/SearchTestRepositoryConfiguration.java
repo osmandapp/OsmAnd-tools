@@ -38,7 +38,7 @@ public class SearchTestRepositoryConfiguration {
     protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
     @Bean
-    @ConfigurationProperties(prefix = "spring.testdatasource")
+    @ConfigurationProperties(prefix = "spring.searchtestdatasource")
     public DataSourceProperties testDataSourceProperties() {
         return new DataSourceProperties();
     }

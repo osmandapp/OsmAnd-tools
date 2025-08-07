@@ -2,7 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import net.osmand.server.api.services.TestSearchService;
+import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.api.searchtest.dto.EvaluationReport;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
@@ -23,15 +23,15 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Controller
-@RequestMapping(path = "/admin/test")
-public class TestSearchController {
+@RequestMapping(path = "/admin/search_test")
+public class SearchTestController {
 
 	@Autowired
-	private TestSearchService testSearchService;
+	private SearchTestService testSearchService;
 
 	@GetMapping
 	public String index(Model model) throws IOException {
-		return "admin/test_search";
+		return "admin/search_test";
 	}
 
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)

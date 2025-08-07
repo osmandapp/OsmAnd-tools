@@ -116,7 +116,7 @@ spring:
     username:
     password:
     driverClassname:
-  testdatasource:
+  searchtestdatasource:
     url: jdbc:sqlite:${osmand.files.location}/test.db
     driverClassname: org.sqlite.JDBC
   web.resources.static-locations: file:${osmand.web.location}

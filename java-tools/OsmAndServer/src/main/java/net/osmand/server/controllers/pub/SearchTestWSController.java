@@ -1,17 +1,17 @@
 package net.osmand.server.controllers.pub;
 
 import net.osmand.server.api.searchtest.entity.EvalJob;
-import net.osmand.server.api.services.TestSearchService;
+import net.osmand.server.api.services.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;
 
 @Controller
-public class TestSearchWSController {
+public class SearchTestWSController {
 
     @Autowired
-    private TestSearchService testSearchService;
+    private SearchTestService testSearchService;
 
     @MessageMapping("/eval/ws/{jobId}")
     public EvalJob handleJobUpdates(@DestinationVariable Long jobId) {

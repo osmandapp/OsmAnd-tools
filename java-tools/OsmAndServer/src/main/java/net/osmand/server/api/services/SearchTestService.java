@@ -40,8 +40,8 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 @Service
-public class TestSearchService {
-	private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
+public class SearchTestService {
+	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 
 	private final DatasetRepository datasetRepository;
 	private final DatasetJobRepository datasetJobRepository;
@@ -102,7 +102,7 @@ public class TestSearchService {
 	}
 
 	@Autowired
-	public TestSearchService(EntityManager em, DatasetRepository datasetRepository,
+	public SearchTestService(EntityManager em, DatasetRepository datasetRepository,
 							 DatasetJobRepository datasetJobRepository,
 							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
 							 SearchService searchService, WebClient.Builder webClientBuilder,
@@ -262,7 +262,7 @@ public class TestSearchService {
 				String del =
 						header.chars().filter(ch -> ch == ',').count() < header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 				String[] headers =
-						Stream.of(header.toLowerCase().split(del)).map(TestSearchService::sanitize).toArray(String[]::new);
+						Stream.of(header.toLowerCase().split(del)).map(SearchTestService::sanitize).toArray(String[]::new);
 				dataset.columns = objectMapper.writeValueAsString(headers);
 				if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
 					dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
