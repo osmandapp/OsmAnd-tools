@@ -6,7 +6,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.xml.parsers.SAXParser;
 
@@ -59,6 +61,7 @@ public class WikiDataHandler extends DefaultHandler {
 
 	private OsmandRegions regions;
 	private List<String> keyNames = new ArrayList<>();
+	private final Set<Long> seenIds = new HashSet<>();
 
 	OsmCoordinatesByTag osmWikiCoordinates;
 	private long lastProcessedId;
@@ -178,6 +181,9 @@ public class WikiDataHandler extends DefaultHandler {
 						long id = Long.parseLong(title.substring(1));
 						if (id < lastProcessedId) {
 							return;
+						}
+						if (!seenIds.add(id)) {
+							return; // Skip already processed ids
 						}
 						processJsonPage(id, ctext.toString());
 					} catch (Exception e) {
