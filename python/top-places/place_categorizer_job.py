@@ -61,7 +61,7 @@ def categorize_places():
         """
 
         # Use a single connection to fetch all the places at once.
-        with clickhouse_connect.get_client(host=CLICKHOUSE_HOST, password=CLICKHOUSE_PWD, database='wiki') as client:
+        with clickhouse_connect.get_client(host=CLICKHOUSE_HOST, username='wiki', password=CLICKHOUSE_PWD, database='wiki') as client:
             result = client.query(base_query)
             all_places = result.result_rows
 
@@ -80,7 +80,7 @@ def categorize_places():
 def process_batch(batch):
     """Processes a single batch of places.  Now takes only the batch data."""
     # Create a *new* ClickHouse client *within* the thread.
-    client = clickhouse_connect.get_client(host=CLICKHOUSE_HOST, password=CLICKHOUSE_PWD, database='wiki')
+    client = clickhouse_connect.get_client(host=CLICKHOUSE_HOST, username='wiki', password=CLICKHOUSE_PWD, database='wiki')
     try:
         time.sleep(SLEEP)
         start_time = time.time()
