@@ -1,7 +1,8 @@
 package net.osmand.server;
 
-import net.osmand.server.api.test.repo.DatasetJobRepository;
-import net.osmand.server.api.test.repo.DatasetRepository;
+import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
+import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,8 +34,8 @@ import jakarta.persistence.EntityManagerFactory;
         entityManagerFactoryRef = "testEntityManagerFactory",
         transactionManagerRef = "testTransactionManager"
 )
-public class TestRepositoryConfiguration {
-    protected static final Log LOG = LogFactory.getLog(TestRepositoryConfiguration.class);
+public class SearchTestRepositoryConfiguration {
+    protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
     @Bean
     @ConfigurationProperties(prefix = "spring.testdatasource")
@@ -58,7 +59,7 @@ public class TestRepositoryConfiguration {
             EntityManagerFactoryBuilder builder) {
         return builder
                 .dataSource(dataSource)
-                .packages("net.osmand.server.api.test.entity")
+                .packages(Dataset.class.getPackage().getName())
                 .persistenceUnit("test")
                 .properties(Map.of(
                         "hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",

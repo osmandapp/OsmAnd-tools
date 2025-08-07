@@ -1,4 +1,4 @@
-package net.osmand.server.api.test.dto;
+package net.osmand.server.api.searchtest.dto;
 
 import java.util.Map;
 

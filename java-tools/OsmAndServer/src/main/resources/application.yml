@@ -149,11 +149,9 @@ geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
 # Directory for storing downloaded CSV samples and Overpass API endpoint used by TestSearchService
-test:
-  csv:
-    dir: ${osmand.files.location}/uploads/csv
-  overpass:
-    url: https://overpass-api.de/api/interpreter
+testsearch:
+  tiger.csv.dir: ${osmand.files.location}/uploads/csv
+  overpass.url: https://overpass-api.de/api/interpreter
 
 ---
 spring.jpa.hibernate.ddl-auto: validate

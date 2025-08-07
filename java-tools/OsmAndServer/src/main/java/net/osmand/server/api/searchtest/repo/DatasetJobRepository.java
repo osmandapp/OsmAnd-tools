@@ -1,6 +1,6 @@
-package net.osmand.server.api.test.repo;
+package net.osmand.server.api.searchtest.repo;
 
-import net.osmand.server.api.test.entity.EvalJob;
+import net.osmand.server.api.searchtest.entity.EvalJob;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

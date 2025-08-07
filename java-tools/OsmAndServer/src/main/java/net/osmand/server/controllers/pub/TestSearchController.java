@@ -3,9 +3,9 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.services.TestSearchService;
-import net.osmand.server.api.test.dto.EvaluationReport;
-import net.osmand.server.api.test.entity.Dataset;
-import net.osmand.server.api.test.entity.EvalJob;
+import net.osmand.server.api.searchtest.dto.EvaluationReport;
+import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.entity.EvalJob;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -102,7 +102,7 @@ public class TestSearchController {
 
 		URI location = ServletUriComponentsBuilder.fromUriString(baseUrl)
 				.path("/admin/test/eval/{jobId:\\d+}")
-				.buildAndExpand(job.getId())
+				.buildAndExpand(job.id)
 				.toUri();
 		return ResponseEntity.accepted().location(location).body(job);
 	}

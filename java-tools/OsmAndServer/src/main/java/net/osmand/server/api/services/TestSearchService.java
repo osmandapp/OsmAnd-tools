@@ -5,13 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.test.dto.EvaluationReport;
-import net.osmand.server.api.test.dto.JobProgress;
-import net.osmand.server.api.test.entity.*;
-import net.osmand.server.api.test.repo.DatasetJobRepository;
-import net.osmand.server.api.test.repo.DatasetRepository;
-import net.osmand.server.api.utils.GeometryUtils;
-import net.osmand.server.api.utils.StringUtils;
+import net.osmand.server.api.searchtest.dto.EvaluationReport;
+import net.osmand.server.api.searchtest.dto.JobProgress;
+import net.osmand.server.api.searchtest.entity.*;
+import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
+import net.osmand.server.api.searchtest.repo.DatasetRepository;
+import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -40,8 +39,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
-import static net.osmand.server.api.utils.StringUtils.*;
-
 @Service
 public class TestSearchService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(TestSearchService.class);
@@ -55,10 +52,54 @@ public class TestSearchService {
 	private final SimpMessagingTemplate messagingTemplate;
 	private final EntityManager em;
 	private WebClient webClient;
-	@Value("${test.csv.dir}")
+	@Value("${testsearch.tiger.csv.dir}")
 	private String csvDownloadingDir;
-	@Value("${test.overpass.url}")
+	@Value("${testsearch.overpass.url}")
 	private String overpassApiUrl;
+
+	public static String pointToString(LatLon point) {
+		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
+	}
+	public static LatLon getLatLon(GeojsonClasses.Feature feature) {
+		float[] point = "Point".equals(feature.geometry.type) ? (float[])feature.geometry.coordinates : ((float[][])feature.geometry.coordinates)[0];
+		return new LatLon(point[1], point[0]);
+	}
+
+	public static LatLon parseLatLon(String lat, String lon) {
+		if (lat == null || lon == null) {
+			return null;
+		}
+		try {
+			return new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	public static String sanitize(String input) {
+		if (input == null) {
+			return "";
+		}
+		// Replace all non-alphanumeric characters with an underscore
+		return input.toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+	}
+
+	public static String unquote(String input) {
+		if (input == null)
+			return "";
+
+		if (input.length() >= 2 && input.startsWith("\"") && input.endsWith("\"")) {
+			return input.substring(1, input.length() - 1);
+		}
+		return input;
+	}
+
+	public static String crop(String input, int length) {
+		if (input == null)
+			return "";
+
+		return input.substring(0, Math.min(length, input.length()));
+	}
 
 	@Autowired
 	public TestSearchService(EntityManager em, DatasetRepository datasetRepository,
@@ -197,12 +238,12 @@ public class TestSearchService {
 					.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
 			Path fullPath = null;
-			dataset.setSourceStatus(DatasetConfigStatus.UNKNOWN);
+			dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
 			try {
-				if (dataset.getType() == DatasetSource.Overpass) {
-					fullPath = queryOverpass(dataset.getSource());
+				if (dataset.type == Dataset.Source.Overpass) {
+					fullPath = queryOverpass(dataset.source);
 				} else {
-					fullPath = Path.of(csvDownloadingDir, dataset.getSource());
+					fullPath = Path.of(csvDownloadingDir, dataset.source);
 				}
 				if (!Files.exists(fullPath)) {
 					dataset.setError("File is not existed.");
@@ -210,7 +251,7 @@ public class TestSearchService {
 					return dataset;
 				}
 
-				String tableName = "dataset_" + sanitize(dataset.getName());
+				String tableName = "dataset_" + sanitize(dataset.name);
 				String header = getHeader(fullPath);
 				if (header == null || header.trim().isEmpty()) {
 					dataset.setError("File doesn't have header.");
@@ -221,8 +262,8 @@ public class TestSearchService {
 				String del =
 						header.chars().filter(ch -> ch == ',').count() < header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 				String[] headers =
-						Stream.of(header.toLowerCase().split(del)).map(StringUtils::sanitize).toArray(String[]::new);
-				dataset.setColumns(objectMapper.writeValueAsString(headers));
+						Stream.of(header.toLowerCase().split(del)).map(TestSearchService::sanitize).toArray(String[]::new);
+				dataset.columns = objectMapper.writeValueAsString(headers);
 				if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
 					dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
 					datasetRepository.save(dataset);
@@ -230,20 +271,20 @@ public class TestSearchService {
 				}
 
 				if (reload != null && reload) {
-					List<String> sample = reservoirSample(fullPath, dataset.getSizeLimit());
+					List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
 					insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
-					dataset.setTotal(sample.size() - 1);
+					dataset.total  = sample.size() - 1;
 					LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
 				}
 
-				if (dataset.getAddressExpression() == null || dataset.getAddressExpression().trim().isEmpty()) {
-					String exp =
-							Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith("street") || h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" || ' ' || "));
-					dataset.setAddressExpression(exp);
+				if (dataset.addressExpression == null || dataset.addressExpression.trim().isEmpty()) {
+					dataset.addressExpression = Stream.of(headers).filter(h -> h.startsWith("city") ||
+							h.startsWith("street") || h.startsWith("road") ||
+							h.startsWith("addr_")).collect(Collectors.joining(" || ' ' || "));
 				}
 
-				if (dataset.getTotal() != null) {
-					String error = updateSQLExpression(dataset.getName(), dataset.getAddressExpression());
+				if (dataset.total != null) {
+					String error = updateSQLExpression(dataset.name, dataset.addressExpression);
 					if (error != null) {
 						dataset.setError("Incorrect SQL expression: " + error);
 						datasetRepository.save(dataset);
@@ -251,8 +292,8 @@ public class TestSearchService {
 					}
 				}
 
-				dataset.setSourceStatus(dataset.getTotal() != null ? DatasetConfigStatus.OK :
-						DatasetConfigStatus.UNKNOWN);
+				dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK :
+						Dataset.ConfigStatus.UNKNOWN);
 				datasetRepository.save(dataset);
 
 				return dataset;
@@ -262,7 +303,7 @@ public class TestSearchService {
 				LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
 				return dataset;
 			} finally {
-				if (dataset.getType() == DatasetSource.Overpass) {
+				if (dataset.type == Dataset.Source.Overpass) {
 					try {
 						if (fullPath != null && !Files.deleteIfExists(fullPath)) {
 							LOGGER.warn("Could not delete temporary file: {}", fullPath);
@@ -278,9 +319,9 @@ public class TestSearchService {
 	@Async
 	public CompletableFuture<Dataset> createDataset(Dataset dataset) {
 		return CompletableFuture.supplyAsync(() -> {
-			Optional<Dataset> datasetOptional = datasetRepository.findByName(dataset.getName());
+			Optional<Dataset> datasetOptional = datasetRepository.findByName(dataset.name);
 			if (datasetOptional.isPresent())
-				throw new RuntimeException("Dataset is already created: " + dataset.getName());
+				throw new RuntimeException("Dataset is already created: " + dataset.name);
 
 			return datasetRepository.save(dataset);
 		});
@@ -295,25 +336,25 @@ public class TestSearchService {
 			updates.forEach((key, value) -> {
 				switch (key) {
 					case "name":
-						dataset.setName(value);
+						dataset.name = value;
 						break;
 					case "type":
-						dataset.setType(DatasetSource.valueOf(value));
+						dataset.type = Dataset.Source.valueOf(value);
 						break;
 					case "source":
-						dataset.setSource(value);
+						dataset.source = value;
 						break;
 					case "sizeLimit":
-						dataset.setSizeLimit(Integer.valueOf(value));
+						dataset.sizeLimit  = Integer.valueOf(value);
 						break;
 					case "addressExpression":
-						dataset.setAddressExpression(value);
+						dataset.addressExpression = value;
 						break;
 				}
 			});
 
-			dataset.setUpdated(LocalDateTime.now());
-			dataset.setSourceStatus(DatasetConfigStatus.OK);
+			dataset.updated  = LocalDateTime.now();
+			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
 			return datasetRepository.save(dataset);
 		});
 	}
@@ -322,25 +363,25 @@ public class TestSearchService {
 		Dataset dataset = datasetRepository.findById(datasetId)
 				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-		if (dataset.getSourceStatus() != DatasetConfigStatus.OK) {
+		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
 			throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", datasetId,
 					dataset.getSourceStatus()));
 		}
 		EvalJob job = new EvalJob();
-		job.setDatasetId(datasetId);
-		job.setCreated(new java.sql.Timestamp(System.currentTimeMillis()));
+		job.datasetId = datasetId;
+		job.created = new java.sql.Timestamp(System.currentTimeMillis());
 
-		job.setAddressExpression(dataset.getAddressExpression());
+		job.addressExpression = dataset.addressExpression;
 		String locale = payload.get("locale");
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
 		}
-		job.setLocale(locale);
+		job.locale = locale;
 		job.setNorthWest(payload.get("northWest"));
 		job.setSouthEast(payload.get("southEast"));
-		job.setBaseSearch(Boolean.parseBoolean(payload.get("baseSearch")));
+		job.baseSearch = Boolean.parseBoolean(payload.get("baseSearch"));
 
-		job.setStatus(JobStatus.RUNNING);
+		job.status = EvalJob.Status.RUNNING;
 		return datasetJobRepository.save(job);
 	}
 
@@ -349,16 +390,16 @@ public class TestSearchService {
 		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
 		EvalJob job = jobOptional.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
 
-		if (job.getStatus() != JobStatus.RUNNING) {
-			LOGGER.info("Job {} is not in RUNNING state ({}). Skipping processing request.", jobId, job.getStatus());
+		if (job.status != EvalJob.Status.RUNNING) {
+			LOGGER.info("Job {} is not in RUNNING state ({}). Skipping processing request.", jobId, job.status);
 			return; // do not process cancelled/completed jobs
 		}
 
 		EvalJob finalJob = job;
-		Dataset dataset = datasetRepository.findById(job.getDatasetId())
-				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + finalJob.getDatasetId()));
+		Dataset dataset = datasetRepository.findById(job.datasetId)
+				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + finalJob.datasetId));
 
-		String tableName = "dataset_" + sanitize(dataset.getName());
+		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = String.format("SELECT * FROM %s", tableName);
 		long processedCount = 0;
 		long errorCount = 0;
@@ -373,7 +414,7 @@ public class TestSearchService {
 							return j;
 						}) // detach to avoid caching
 						.orElse(null);
-				if (job == null || job.getStatus() != JobStatus.RUNNING) {
+				if (job == null || job.status != EvalJob.Status.RUNNING) {
 					LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
 					break; // Exit the loop if the job has been cancelled
 				}
@@ -385,42 +426,42 @@ public class TestSearchService {
 					address = (String) row.get("_address");
 					String lat = (String) row.get("lat");
 					String lon = (String) row.get("lon");
-					point = GeometryUtils.parseLatLon(lat, lon);
+					point = parseLatLon(lat, lon);
 					if (point == null) {
 						throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format: (" + lat + " "
 								+ lon + ")");
 					}
 
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-							address, job.getLocale(), job.getBaseSearch(), job.getNorthWest(), job.getSouthEast());
+							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
 					saveResults(job, dataset, address, originalJson, searchResults, point,
 							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					errorCount++;
-					LOGGER.warn("Failed to process row for job {}: {}", job.getId(), originalJson, e);
+					LOGGER.warn("Failed to process row for job {}: {}", job.id, originalJson, e);
 					saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
 				processedCount++;
-				JobProgress progress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(), totalRows,
+				JobProgress progress = new JobProgress(job.id, dataset.id, job.status, totalRows,
 						processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
 				messagingTemplate.convertAndSend("/topic/eval/ws", progress);
 			}
-			if (job != null && job.getStatus() != JobStatus.CANCELED) {
-				job.setStatus(JobStatus.COMPLETED);
+			if (job != null && job.status != EvalJob.Status.CANCELED) {
+				job.status = EvalJob.Status.COMPLETED;
 			}
 		} catch (Exception e) {
-			LOGGER.error("Evaluation failed for job {} on dataset {}", job.getId(), dataset.getId(), e);
-			job.setStatus(JobStatus.FAILED);
-			job.setError(e.getMessage());
+			LOGGER.error("Evaluation failed for job {} on dataset {}", job.id, dataset.id, e);
+			job.status = EvalJob.Status.FAILED;
+			job.error = e.getMessage();
 		} finally {
 			if (job != null) {
-				job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
+				job.updated = new java.sql.Timestamp(System.currentTimeMillis());
 				datasetJobRepository.save(job);
 
-				JobProgress finalProgress = new JobProgress(job.getId(), dataset.getId(), job.getStatus(),
-						dataset.getTotal(), processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
+				JobProgress finalProgress = new JobProgress(job.id, dataset.id, job.status,
+						dataset.total, processedCount, errorCount, System.currentTimeMillis() - totalStartTime);
 				messagingTemplate.convertAndSend("/topic/eval/ws", finalProgress);
 			}
 		}
@@ -432,9 +473,9 @@ public class TestSearchService {
 			EvalJob job = datasetJobRepository.findById(jobId)
 					.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
 
-			if (job.getStatus() == JobStatus.RUNNING) {
-				job.setStatus(JobStatus.CANCELED);
-				job.setUpdated(new java.sql.Timestamp(System.currentTimeMillis()));
+			if (job.status == EvalJob.Status.RUNNING) {
+				job.status = EvalJob.Status.CANCELED;
+				job.updated  = new java.sql.Timestamp(System.currentTimeMillis());
 				return datasetJobRepository.save(job);
 			} else {
 				// If the job is not running, just return its current state without changes.
@@ -476,7 +517,7 @@ public class TestSearchService {
 				place++;
 				if (feature == null)
 					continue;
-				LatLon foundPoint = GeometryUtils.getLatLon(feature);
+				LatLon foundPoint = getLatLon(feature);
 				double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(),
 						foundPoint.getLatitude(), foundPoint.getLongitude());
 				if (distance < minDistanceMeters) {
@@ -488,7 +529,7 @@ public class TestSearchService {
 
 			if (closestPoint != null) {
 				minDistance = (int) minDistanceMeters;
-				closestResult = GeometryUtils.pointToString(closestPoint);
+				closestResult = pointToString(closestPoint);
 			}
 		}
 
@@ -496,7 +537,7 @@ public class TestSearchService {
 				"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?, ?, ?," +
 				" " +
 				"?, ?, ?, ?, ?, ?, ?)";
-		jdbcTemplate.update(insertSql, job.getId(), dataset.getId(), originalJson, error, duration, resultsCount,
+		jdbcTemplate.update(insertSql, job.id, dataset.id, originalJson, error, duration, resultsCount,
 				minDistance, closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(),
 				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
 				new java.sql.Timestamp(System.currentTimeMillis()));
@@ -532,7 +573,7 @@ public class TestSearchService {
 		Dataset dataset = datasetRepository.findById(datasetId)
 				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
 
-		String tableName = "dataset_" + sanitize(dataset.getName());
+		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = "SELECT * FROM " + tableName;
 		try {
 			StringWriter stringWriter = new StringWriter();
@@ -615,7 +656,7 @@ public class TestSearchService {
 		if (dsOpt.isEmpty()) {
 			return false;
 		}
-		String tableName = "dataset_" + sanitize(dsOpt.get().getName());
+		String tableName = "dataset_" + sanitize(dsOpt.get().name);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
 
 		String deleteSql = "DELETE FROM eval_result WHERE dataset_id = ?";
