@@ -6,7 +6,6 @@
 # Environment ($1 - LANG, $2 - INPUT_PATTERN, $3 - API_KEY)
 export LANG="${1:-$LANG}"
 export INPUT_PATTERN="${2:-$INPUT_PATTERN}"
-export API_KEY="${3:-$API_KEY}"
 
 # Compute absolute path of current dir
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
