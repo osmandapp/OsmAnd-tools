@@ -34,12 +34,22 @@ task collectActivities(type: Copy) {
 	into "src/main/resources/resources/"
 }
 
+task collectWorldBrands(type: Copy) {
+    doFirst {
+        file("src/main/resources/net/osmand/osm").mkdirs()
+    }
+    from("../../../resources/poi/") {
+        include "world_brands.csv"
+    }
+    into "src/main/resources/net/osmand/osm/"
+}
+
 compileJava {
-	dependsOn collectMdpiIcons, collectFonts, collectActivities
+	dependsOn collectMdpiIcons, collectFonts, collectActivities, collectWorldBrands
 }
 
 processResources {
-	dependsOn collectMdpiIcons, collectFonts, collectActivities
+	dependsOn collectMdpiIcons, collectFonts, collectActivities, collectWorldBrands
 }
 
 configurations.all {
