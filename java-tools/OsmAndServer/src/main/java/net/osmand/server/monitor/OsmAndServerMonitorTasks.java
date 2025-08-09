@@ -117,7 +117,19 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+//	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+	// Formatter for the first pattern (e.g., "2025-08-09 12:21:49 -0700")
+	private static final SimpleDateFormat FORMAT_RFC822 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+	// Formatter for the second pattern (e.g., "2025-08-09 18:20:24 UTC")
+	private static final SimpleDateFormat FORMAT_ZONE_ID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss zzz");
+
+	private static Date parseDate(String s) throws ParseException {
+		try {
+			return FORMAT_RFC822.parse(s);
+		} catch (ParseException e) {
+			return FORMAT_ZONE_ID.parse(s);
+		}
+	}
 
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
@@ -919,9 +931,9 @@ public class OsmAndServerMonitorTasks {
 				case "name":
 					if (lastEntry != null) lastEntry.author = content.toString(); break;
 				case "published":
-					if (lastEntry != null) lastEntry.published = XML_DATE_FORMAT.parse(content.toString()); break;
+					if (lastEntry != null) lastEntry.published = parseDate(content.toString()); break;
 				case "updated":
-					if (lastEntry != null) lastEntry.updated = XML_DATE_FORMAT.parse(content.toString()); break;
+					if (lastEntry != null) lastEntry.updated = parseDate(content.toString()); break;
 				case "id":
 					if (lastEntry != null) lastEntry.id = content.toString(); break;
 				case "title":
