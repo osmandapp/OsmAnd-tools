@@ -1,7 +1,8 @@
-#Spec: Nashorn-compatible “test*” rule functions (JDK 8–14)
+#Spec: Nashorn-compatible rule functions (JDK 8–14)
 
 This spec defines how to write small, pure JavaScript rule functions that will run on a Java server via Nashorn 
-(JDK 8–14). The host system will load one or more .js files and discover/export functions whose names start with test.
+(JDK 8–14). The host system will load one .js file and discover/export functions which have two or more parameters 
+with specified names.
 1) Runtime & language constraints
 - Engine: Oracle Nashorn, JDK 8–14.
 - ECMAScript level: Write in ES5 syntax for maximum compatibility.
@@ -12,13 +13,12 @@ This spec defines how to write small, pure JavaScript rule functions that will r
 - Java interop: Not required. If absolutely needed, prefer Java.type(...) guarded for compatibility.
 
 2) Function discovery & naming
-- Only top-level functions whose name starts with test are considered exposed.
-- Example: function testJoinColumns(row, columns, separator) { ... }
+- Example: function joinColumns(row, columns, separator) { ... }
 - Do not attach functions to objects; do not use modules/exports.
 
 3) Function signature & parameters
 Every exposed function MUST follow this order:
-- function testSomething(row, columns, param1, ..., paramN) -> string[]
+- function something(row, columns, param1, ..., paramN) -> string[]
 - row (required): an object representing a single record. Values are typically strings (from CSV/Overpass), but may 
   be numbers or null/undefined. Access by key: row["colName"].
 - columns (required): an ordered array of strings listing the column names present in row. Example: 
@@ -78,19 +78,19 @@ Template:
 * @returns {string[]} <Describe the output semantics>.
 * @throws {Error} If required parameters are missing or of wrong type.
 */
-  function testExample(row, columns, separator, outputCount) { ... }
+  function example(row, columns, separator, outputCount) { ... }
 
 9) Testing guidelines
-    Provide a tiny JSON fixture in comments for manual testing:
-    // Example:
-    // var row = { house_number: " 12 ", street: "Main St", city: "Berlin", country: "" };
-    // var columns = ["house_number","street","city","country"];
-    // print(JSON.stringify(testJoinOrdered(row, columns, " ")));
-
-    Do not rely on external frameworks. Simple print(...) or returning arrays is sufficient for smoke tests.
-    Ensure deterministic output when a seed is provided.
+Provide a additional tiny function for manual testing without parameters and its name must start with "test":
+function testExample() {
+  var row = { house_number: " 12 ", street: "Main St", city: "Berlin", country: "" };
+  var columns = ["house_number","street","city","country"];
+  const resalt = testRandomPermutationJoin(row, columns, " ", 10);    
+  return JSON.stringify(resalt);
+}
+Do not rely on external frameworks. Simple returning string is sufficient for smoke tests.
 
 10) Packaging & delivery
-- One or more .js files; each begins with "use strict";.
+- One .js file with "use strict";.
 - No transpilation required; do not include bundlers or node_modules.
-- Each file should contain only the exposed test* functions and helper code local to those functions.
+- Each file should contain only the exposed functions and helper testing code local to those functions.
