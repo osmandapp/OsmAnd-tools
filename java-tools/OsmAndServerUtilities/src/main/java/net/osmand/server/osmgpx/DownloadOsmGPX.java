@@ -238,6 +238,8 @@ public class DownloadOsmGPX {
 				switch (s[0]) {
 				case "--max-empty-fetch":
 					MAX_EMPTY_FETCH = Integer.parseInt(val);
+					System.out.println("Max empty fetch " + MAX_EMPTY_FETCH);
+					break;
 				}
 			}
 			utility.downloadGPXMain();
