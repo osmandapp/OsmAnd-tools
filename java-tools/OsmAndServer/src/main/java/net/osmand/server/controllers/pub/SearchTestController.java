@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
+import net.osmand.server.api.searchtest.dto.EvalStarter;
 import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -20,6 +21,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -101,7 +103,7 @@ public class SearchTestController {
             MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<EvalJob> createEvaluation(@PathVariable Long datasetId,
-													@RequestBody Map<String, String> payload,
+													@RequestBody EvalStarter payload,
 													HttpServletRequest request) {
 		String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
 				.replacePath(null)
