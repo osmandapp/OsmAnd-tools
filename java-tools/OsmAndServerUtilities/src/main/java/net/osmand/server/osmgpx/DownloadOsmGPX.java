@@ -227,7 +227,7 @@ public class DownloadOsmGPX {
 			utility.addActivityColumnAndPopulate(args[1]);
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
-			for (int i = 1; i < args.length; i++) {
+			for (int i = 0; i < args.length; i++) {
 				String[] s = args[i].split("=");
 				if (s.length == 1) {
 					continue;
