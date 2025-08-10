@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "dataset")
-public class Dataset {
+public class Dataset extends Config {
 	public enum ConfigStatus {
 		UNKNOWN, OK, ERROR
 	}
@@ -28,15 +28,6 @@ public class Dataset {
 
 	@Column(nullable = false, columnDefinition = "TEXT")
 	public String source; // Overpass query or file path
-
-	@Column(name = "address_expression", columnDefinition = "TEXT")
-	public String addressExpression; // SQL expression to calculate address
-
-	@Column(columnDefinition = "TEXT")
-	public String columns; // CSV column names
-
-	@Column(columnDefinition = "TEXT")
-	private String error;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "source_status", nullable = false)

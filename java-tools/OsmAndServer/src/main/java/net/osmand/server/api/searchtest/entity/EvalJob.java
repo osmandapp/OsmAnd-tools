@@ -15,7 +15,7 @@ import java.sql.Timestamp;
 
 @Entity
 @Table(name = "eval_job")
-public class EvalJob {
+public class EvalJob extends Config {
 	public enum Status {
 		NEW, RUNNING, CANCELED, FAILED, COMPLETED
 	}
@@ -27,9 +27,6 @@ public class EvalJob {
 
 	@Column(name = "dataset_id", nullable = false)
 	public Long datasetId;
-
-	@Column(name = "address_expression", nullable = false, columnDefinition = "TEXT")
-	public String addressExpression;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
@@ -52,9 +49,6 @@ public class EvalJob {
 
 	@UpdateTimestamp
 	public Timestamp updated;
-
-	@Column(columnDefinition = "TEXT")
-	public String error;
 
 	public String getNorthWest() {
 		return northWest;

@@ -54,5 +54,4 @@ public class EvalResult {
 
 	@Column
 	public Double lon;
-
 }
