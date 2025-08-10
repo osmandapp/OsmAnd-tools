@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.common.DataService;
+import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
 import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.dto.EvalStarter;

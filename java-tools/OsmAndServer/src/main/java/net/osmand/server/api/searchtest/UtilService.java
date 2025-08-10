@@ -1,4 +1,4 @@
-package net.osmand.server.api.searchtest.common;
+package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
