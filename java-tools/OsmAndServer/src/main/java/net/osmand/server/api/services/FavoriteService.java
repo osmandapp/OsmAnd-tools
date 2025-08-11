@@ -33,7 +33,6 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 @Service
 public class FavoriteService {
     
-    public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_EXT_GPX = ".gpx";
     private static final String DEFAULT_GROUP_FILE_NAME = "favorites.gpx";
@@ -99,14 +98,9 @@ public class FavoriteService {
         }
         return resp;
     }
-    
+
     public File createTmpGpxFile(GpxFile file, String fileName) throws IOException {
-        File tmpGpx = File.createTempFile(fileName, FILE_EXT_GPX);
-        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), file);
-        if (exception != null) {
-            throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);
-        }
-        return tmpGpx;
+        return gpxService.createTmpGpxFile(file, fileName);
     }
 
     @Nullable
