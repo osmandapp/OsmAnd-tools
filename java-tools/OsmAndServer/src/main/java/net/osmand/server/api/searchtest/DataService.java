@@ -147,7 +147,7 @@ public abstract class DataService extends UtilService {
 	public CompletableFuture<Dataset> updateDataset(Long datasetId, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
 			Dataset dataset =
-					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset " + "not " +
+					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not " +
 							"found with id: " + datasetId));
 
 			updates.forEach((key, value) -> {
@@ -156,7 +156,6 @@ public abstract class DataService extends UtilService {
 					case "type" -> dataset.type = Dataset.Source.valueOf(value);
 					case "source" -> dataset.source = value;
 					case "sizeLimit" -> dataset.sizeLimit = Integer.valueOf(value);
-					case "addressExpression" -> dataset.function = value;
 				}
 			});
 
