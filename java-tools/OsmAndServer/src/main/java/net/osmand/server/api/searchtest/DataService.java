@@ -123,7 +123,7 @@ public abstract class DataService extends UtilService {
 			if (datasetOptional.isPresent()) {
 				throw new RuntimeException("Dataset is already created: " + dataset.name);
 			}
-			Path scriptPath = Path.of(webLocation, "js", "test", "modules", "lib", "default.js");
+			Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "default.js");
 			try {
 				dataset.script = Files.readString(scriptPath);
 			} catch (IOException e) {
