@@ -142,7 +142,7 @@ public class WikivoyageDataGenerator {
 			if (!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
 				// Encoder.encodeUrl(imageTitle)
-				String originalMsg = " ";
+				String originalMsg = "";
 				try {
 					String sourceFile;
 					try {
@@ -157,7 +157,7 @@ public class WikivoyageDataGenerator {
 					}
 				} catch (IOException | InterruptedException e) {
 					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "
-							+ originalMsg + e.getMessage());
+							+ originalMsg + " " + e.getMessage());
 				}
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
