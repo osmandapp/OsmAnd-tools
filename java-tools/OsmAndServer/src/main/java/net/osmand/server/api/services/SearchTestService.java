@@ -9,6 +9,7 @@ import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
 import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.dto.EvalStarter;
+import net.osmand.server.api.searchtest.dto.Script;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
@@ -105,10 +106,13 @@ public class SearchTestService extends DataService {
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = String.format("SELECT * FROM %s", tableName);
 		try {
+			Script script = objectMapper.readValue(dataset.script, Script.class);
+
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			for (Map<String, Object> row : rows) {
-				job = datasetJobRepository.findById(jobId)
-						.map(j -> {
+			List<RowAddress> examples = execute(script.code(), job.function, rows, job.selCols,
+					objectMapper.readValue(job.params, String[].class));
+			for (RowAddress example : examples) {
+				job = datasetJobRepository.findById(jobId).map(j -> {
 							em.detach(j);
 							return j;
 						}) // detach to avoid caching
@@ -117,10 +121,12 @@ public class SearchTestService extends DataService {
 					LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
 					break; // Exit the loop if the job has been cancelled
 				}
+
 				long startTime = System.currentTimeMillis();
 				LatLon point = null;
-				String originalJson = null;
-				String[] addressExamples = new String[0];
+				Map<String, Object> row = example.row();
+				String address = example.address();
+				String originalJson = objectMapper.writeValueAsString(row);
 				try {
 					String lat = (String) row.get("lat");
 					String lon = (String) row.get("lon");
@@ -130,19 +136,13 @@ public class SearchTestService extends DataService {
 								+ lon + ")");
 					}
 
-					originalJson = objectMapper.writeValueAsString(row);
-					addressExamples = execute(dataset.script, job.function, originalJson, job.selCols,
-							objectMapper.readValue(job.params, String[].class));
-					for (String address : addressExamples) {
-						List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-								address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-						saveResults(job, dataset, address, originalJson, searchResults, point,
-								System.currentTimeMillis() - startTime, null);
-					}
+					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
+					saveResults(job, dataset, address, originalJson, searchResults, point,
+							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for job {}: {}", job.id, originalJson, e);
-					for (String address : addressExamples)
-						saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
+					saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
