@@ -65,4 +65,15 @@ public class EvalJob extends Config {
 	public void setSouthEast(String val) {
 		this.southEast = val != null && val.trim().isEmpty() ? null : val;
 	}
+
+	public String getError() {
+		return error;
+	}
+
+	public void setError(String error) {
+		if (error != null) {
+			status = EvalJob.Status.FAILED;
+		}
+		this.error = error;
+	}
 }

@@ -65,7 +65,7 @@ public class SearchTestService extends DataService {
 		job.datasetId = datasetId;
 		job.created = new java.sql.Timestamp(System.currentTimeMillis());
 
-		job.addressExpression = dataset.addressExpression;
+		job.function = dataset.function;
 		String locale = payload.locale();
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
@@ -139,8 +139,7 @@ public class SearchTestService extends DataService {
 			}
 		} catch (Exception e) {
 			LOGGER.error("Evaluation failed for job {} on dataset {}", job.id, dataset.id, e);
-			job.status = EvalJob.Status.FAILED;
-			job.error = e.getMessage();
+			job.setError(e.getMessage());
 		} finally {
 			if (job != null) {
 				job.updated = new java.sql.Timestamp(System.currentTimeMillis());

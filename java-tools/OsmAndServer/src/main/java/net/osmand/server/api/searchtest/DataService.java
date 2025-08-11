@@ -32,8 +32,8 @@ public abstract class DataService extends UtilService {
 	protected final JdbcTemplate jdbcTemplate;
 	protected final EntityManager em;
 
-	public DataService(EntityManager em, DatasetRepository datasetRepository, @Qualifier(
-			"testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
+	public DataService(EntityManager em, DatasetRepository datasetRepository,
+					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 					   ObjectMapper objectMapper) {
 		super(webClientBuilder, objectMapper);
 
@@ -46,7 +46,8 @@ public abstract class DataService extends UtilService {
 	public CompletableFuture<Dataset> refreshDataset(Long datasetId, Boolean reload) {
 		return CompletableFuture.supplyAsync(() -> {
 			Dataset dataset =
-					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset " + "not " + "found with id: " + datasetId));
+					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found " +
+							"with id: " + datasetId));
 
 			Path fullPath = null;
 			dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
@@ -71,7 +72,8 @@ public abstract class DataService extends UtilService {
 				}
 
 				String del =
-						header.chars().filter(ch -> ch == ',').count() < header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
+						header.chars().filter(ch -> ch == ',').count() <
+								header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 				String[] headers =
 						Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
 				dataset.columns = objectMapper.writeValueAsString(headers);
@@ -88,13 +90,17 @@ public abstract class DataService extends UtilService {
 					LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
 				}
 
-				if (dataset.addressExpression == null || dataset.addressExpression.trim().isEmpty()) {
-					dataset.addressExpression = Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith(
-							"street") || h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" " + "|| ' ' || "));
+				if (dataset.function == null || dataset.function.trim().isEmpty()) {
+					dataset.function =
+							Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith("street") ||
+									h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" || '" +
+									" " +
+									"'" +
+									" || "));
 				}
 
 				if (dataset.total != null) {
-					String error = updateSQLExpression(dataset.name, dataset.addressExpression);
+					String error = updateSQLExpression(dataset.name, dataset.function);
 					if (error != null) {
 						dataset.setError("Incorrect SQL expression: " + error);
 						datasetRepository.save(dataset);
@@ -141,7 +147,8 @@ public abstract class DataService extends UtilService {
 	public CompletableFuture<Dataset> updateDataset(Long datasetId, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
 			Dataset dataset =
-					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset " + "not " + "found with id: " + datasetId));
+					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset " + "not " +
+							"found with id: " + datasetId));
 
 			updates.forEach((key, value) -> {
 				switch (key) {
@@ -149,7 +156,7 @@ public abstract class DataService extends UtilService {
 					case "type" -> dataset.type = Dataset.Source.valueOf(value);
 					case "source" -> dataset.source = value;
 					case "sizeLimit" -> dataset.sizeLimit = Integer.valueOf(value);
-					case "addressExpression" -> dataset.addressExpression = value;
+					case "addressExpression" -> dataset.function = value;
 				}
 			});
 
@@ -196,7 +203,8 @@ public abstract class DataService extends UtilService {
 
 		String insertSql =
 				"INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
-						"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, " + "?," + " ?, ?," + " " + "?, ?, ?, ?, ?, ?, ?)";
+						"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
+						+ " ?, ?,?, ?, ?, ?, ?, ?, ?)";
 		jdbcTemplate.update(insertSql, job.id, dataset.id, originalJson, error, duration, resultsCount, minDistance,
 				closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(),
 				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
@@ -229,7 +237,8 @@ public abstract class DataService extends UtilService {
 
 	public String getDatasetSample(Long datasetId) {
 		Dataset dataset =
-				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not " + "found " + "with id: " + datasetId));
+				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found with " +
+						"id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = "SELECT * FROM " + tableName;

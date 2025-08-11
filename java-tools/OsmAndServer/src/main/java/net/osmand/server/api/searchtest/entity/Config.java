@@ -8,8 +8,8 @@ import org.hibernate.type.SqlTypes;
 @MappedSuperclass
 public abstract class Config {
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name = "address_expression", columnDefinition = "TEXT")
-	public String addressExpression; // JS expression to calculate address
+	@Column(columnDefinition = "TEXT")
+	public String function; // JS expression to calculate address
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")
