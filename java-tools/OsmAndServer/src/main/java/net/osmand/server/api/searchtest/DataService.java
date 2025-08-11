@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.Script;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -46,13 +45,15 @@ public abstract class DataService extends UtilService {
 
 	@Async
 	public CompletableFuture<Dataset> refreshDataset(Long datasetId, boolean reload) {
-		return CompletableFuture.supplyAsync(() -> checkDatasetInternal(datasetId, reload));
+		return CompletableFuture.supplyAsync(() -> {
+			Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
+					new RuntimeException("Dataset not found with id: " + datasetId));
+			return checkDatasetInternal(dataset, reload);
+		});
 	}
 
-	private Dataset checkDatasetInternal(Long datasetId, boolean reload) {
-		Dataset dataset =
-				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found " +
-						"with id: " + datasetId));
+	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
+		reload = dataset.total == null || reload;
 
 		Path fullPath = null;
 		dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
@@ -81,7 +82,7 @@ public abstract class DataService extends UtilService {
 							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 			String[] headers =
 					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
-			dataset.columns = objectMapper.writeValueAsString(headers);
+			updateColumns(dataset, headers);
 			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
 				dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
 				datasetRepository.save(dataset);
@@ -95,16 +96,13 @@ public abstract class DataService extends UtilService {
 				LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
 			}
 
-			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK :
-					Dataset.ConfigStatus.UNKNOWN);
-			datasetRepository.save(dataset);
-
-			return dataset;
+			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
+			return datasetRepository.save(dataset);
 		} catch (Exception e) {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
-			datasetRepository.save(dataset);
+
 			LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
-			return dataset;
+			return datasetRepository.save(dataset);
 		} finally {
 			if (dataset.type == Dataset.Source.Overpass) {
 				try {
@@ -139,9 +137,8 @@ public abstract class DataService extends UtilService {
 	@Async
 	public CompletableFuture<Dataset> updateDataset(Long datasetId, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset =
-					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not " +
-							"found with id: " + datasetId));
+			Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
+					new RuntimeException("Dataset not found with id: " + datasetId));
 
 			updates.forEach((key, value) -> {
 				switch (key) {
@@ -153,21 +150,23 @@ public abstract class DataService extends UtilService {
 				}
 			});
 
-			try {
-				Script script = objectMapper.readValue(dataset.script, Script.class);
-				if (script.functions().length > 0 && dataset.function == null) {
-					dataset.function = script.functions()[0].name();
-				}
-			} catch (JsonProcessingException e) {
-				LOGGER.error("Failed to parse script: {}", dataset.script, e);
-				throw new RuntimeException("Failed to parse script: " + e.getMessage(), e);
-			}
-
 			dataset.updated = LocalDateTime.now();
 			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
 			datasetRepository.save(dataset);
-			return checkDatasetInternal(datasetId, false);
+			return checkDatasetInternal(dataset, false);
 		});
+	}
+
+	private void updateColumns(Dataset dataset, String[] headers) {
+		try {
+			dataset.allCols = objectMapper.writeValueAsString(headers);
+			headers = Arrays.stream(headers).filter(s -> s.startsWith("road") || s.startsWith("city")
+					|| s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new);
+			dataset.selCols = objectMapper.writeValueAsString(headers);
+		} catch (JsonProcessingException e) {
+			LOGGER.error("Failed to parse script: {}", dataset.script, e);
+			throw new RuntimeException("Failed to parse script: " + e.getMessage(), e);
+		}
 	}
 
 	protected void saveResults(EvalJob job, Dataset dataset, String address, String originalJson,
@@ -220,9 +219,8 @@ public abstract class DataService extends UtilService {
 	}
 
 	public String getDatasetSample(Long datasetId) {
-		Dataset dataset =
-				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found with " +
-						"id: " + datasetId));
+		Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not " +
+				"found with " + "id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = "SELECT * FROM " + tableName;
@@ -295,8 +293,8 @@ public abstract class DataService extends UtilService {
 		String columnsDefinition =
 				Stream.of(columns).map(header -> "\"" + header + "\" VARCHAR(255)").collect(Collectors.joining(", "));
 		String createTableSql =
-				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT," + " " +
-						"%s)", tableName, columnsDefinition);
+				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT," + " " + "%s)",
+						tableName, columnsDefinition);
 		jdbcTemplate.execute(createTableSql);
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}

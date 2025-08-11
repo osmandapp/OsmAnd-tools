@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -74,6 +75,14 @@ public class SearchTestService extends DataService {
 		job.setNorthWest(payload.northWest());
 		job.setSouthEast(payload.southEast());
 		job.baseSearch = payload.baseSearch();
+
+		job.function = payload.functionName();
+		try {
+			job.allCols = objectMapper.writeValueAsString(payload.columns());
+			job.params = objectMapper.writeValueAsString(payload.paramValues());
+		} catch (JsonProcessingException e) {
+			throw new RuntimeException(e);
+		}
 
 		job.status = EvalJob.Status.RUNNING;
 		return datasetJobRepository.save(job);
