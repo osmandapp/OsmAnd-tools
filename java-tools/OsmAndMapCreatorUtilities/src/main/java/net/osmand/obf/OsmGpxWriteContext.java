@@ -285,43 +285,49 @@ public class OsmGpxWriteContext {
 	private Map<String, String> collectGpxTrackTags(OsmGpxFile gpxInfo, GpxFile gpxFile, GpxTrackAnalysis analysis,
 	                                                @Nullable Map<String, String> poiSectionTags,
 	                                                @Nullable Map<String, String> mapSectionTags,
-	                                                @Nullable Track track, @Nullable TrkSegment segment) {
+			@Nullable Track track, @Nullable TrkSegment segment) {
 		Map<String, String> allTags = new LinkedHashMap<>();
 		Map<String, String> metadataExtraTags = new LinkedHashMap<>();
 		Map<String, String> extensionsExtraTags = new LinkedHashMap<>();
+		try {
+			addGpxInfoTags(allTags, gpxInfo);
+			addAnalysisTags(allTags, analysis);
+			addElevationGraphTags(allTags, segment);
+			addMetadataTags(allTags, gpxFile.getMetadata());
+			addPointGroupsTags(allTags, gpxFile.getPointsGroups());
+			addNameDescDisplaycolor(allTags, extensionsExtraTags, track);
 
-		addGpxInfoTags(allTags, gpxInfo);
-		addAnalysisTags(allTags, analysis);
-		addElevationGraphTags(allTags, segment);
-		addMetadataTags(allTags, gpxFile.getMetadata());
-		addPointGroupsTags(allTags, gpxFile.getPointsGroups());
-		addNameDescDisplaycolor(allTags, extensionsExtraTags, track);
+			addExtensionsTags(allTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
+			addExtensionsTags(allTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
 
-		addExtensionsTags(allTags, extensionsExtraTags, gpxFile.getExtensionsToRead());
-		addExtensionsTags(allTags, metadataExtraTags, gpxFile.getMetadata().getExtensionsToRead());
+			IndexRouteRelationCreator.finalizeRouteShieldTags(allTags);
+			IndexRouteRelationCreator.finalizeActivityTypeAndColors(allTags, metadataExtraTags, extensionsExtraTags,
+					gpxInfo.tags);
 
-		IndexRouteRelationCreator.finalizeRouteShieldTags(allTags);
-		IndexRouteRelationCreator.finalizeActivityTypeAndColors(allTags, metadataExtraTags, extensionsExtraTags, gpxInfo.tags);
+			allTags.put("route_bbox_radius", gpxFile.getOuterRadius());
 
-		allTags.put("route_bbox_radius", gpxFile.getOuterRadius());
+			if (!metadataExtraTags.isEmpty()) {
+				allTags.put("metadata_extra_tags", gson.toJson(metadataExtraTags));
+			}
+			if (!extensionsExtraTags.isEmpty()) {
+				allTags.put("extensions_extra_tags", gson.toJson(extensionsExtraTags));
+			}
 
-		if (!metadataExtraTags.isEmpty()) {
-			allTags.put("metadata_extra_tags", gson.toJson(metadataExtraTags));
+			if (poiSectionTags != null) {
+				poiSectionTags.putAll(allTags);
+				poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
+			}
+			if (mapSectionTags != null) {
+				mapSectionTags.putAll(allTags);
+				mapSectionTags.put("route", "segment");
+				mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
+			}
+
+		} catch (RuntimeException e) {
+			// TODO: handle exception
+			System.err.printf("Error for object with all tags %s,  metadata tags %s \n", allTags, metadataExtraTags);
+			throw e;
 		}
-		if (!extensionsExtraTags.isEmpty()) {
-			allTags.put("extensions_extra_tags", gson.toJson(extensionsExtraTags));
-		}
-
-		if (poiSectionTags != null) {
-			poiSectionTags.putAll(allTags);
-			poiSectionTags.remove(TRACK_COLOR); // track_color is required for Rendering only
-		}
-		if (mapSectionTags != null) {
-			mapSectionTags.putAll(allTags);
-			mapSectionTags.put("route", "segment");
-			mapSectionTags.remove(ROUTE_TYPE); // avoid creation of POI-data when indexing Ways
-		}
-
 		return allTags; // compatibility for writeTrackWithoutDetails
 	}
 
