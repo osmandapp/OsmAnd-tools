@@ -78,7 +78,7 @@ public class SearchTestService extends DataService {
 
 		job.function = payload.functionName();
 		try {
-			job.allCols = objectMapper.writeValueAsString(payload.columns());
+			job.selCols = objectMapper.writeValueAsString(payload.columns());
 			job.params = objectMapper.writeValueAsString(payload.paramValues());
 		} catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
@@ -119,10 +119,9 @@ public class SearchTestService extends DataService {
 				}
 				long startTime = System.currentTimeMillis();
 				LatLon point = null;
-				String originalJson = null, address = null;
+				String originalJson = null;
+				String[] addressExamples = new String[0];
 				try {
-					originalJson = objectMapper.writeValueAsString(row);
-					address = (String) row.get("_address");
 					String lat = (String) row.get("lat");
 					String lon = (String) row.get("lon");
 					point = parseLatLon(lat, lon);
@@ -131,13 +130,19 @@ public class SearchTestService extends DataService {
 								+ lon + ")");
 					}
 
-					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-					saveResults(job, dataset, address, originalJson, searchResults, point,
-							System.currentTimeMillis() - startTime, null);
+					originalJson = objectMapper.writeValueAsString(row);
+					addressExamples = execute(dataset.script, job.function, originalJson, job.selCols,
+							objectMapper.readValue(job.params, String[].class));
+					for (String address : addressExamples) {
+						List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+								address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
+						saveResults(job, dataset, address, originalJson, searchResults, point,
+								System.currentTimeMillis() - startTime, null);
+					}
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for job {}: {}", job.id, originalJson, e);
-					saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
+					for (String address : addressExamples)
+						saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
