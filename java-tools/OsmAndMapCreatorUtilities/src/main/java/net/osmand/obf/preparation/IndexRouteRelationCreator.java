@@ -338,7 +338,9 @@ public class IndexRouteRelationCreator {
 				}
 			}
 			if (compatibleOsmRouteType != null) {
-				commonTags.putIfAbsent(TRACK_COLOR, compatibleOsmRouteType.getColor());
+				if (compatibleOsmRouteType.getColor() != null) {
+					commonTags.putIfAbsent(TRACK_COLOR, compatibleOsmRouteType.getColor());
+				}
 				commonTags.putIfAbsent(ROUTE_ACTIVITY_TYPE, compatibleOsmRouteType.getName().toLowerCase());
 			}
 		}
