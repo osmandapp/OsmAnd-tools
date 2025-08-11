@@ -95,15 +95,6 @@ public abstract class DataService extends UtilService {
 				LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
 			}
 
-			if (dataset.total != null) {
-				String error = updateSQLExpression(dataset.name, dataset.function);
-				if (error != null) {
-					dataset.setError("Incorrect SQL expression: " + error);
-					datasetRepository.save(dataset);
-					return dataset;
-				}
-			}
-
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK :
 					Dataset.ConfigStatus.UNKNOWN);
 			datasetRepository.save(dataset);
@@ -133,6 +124,13 @@ public abstract class DataService extends UtilService {
 			Optional<Dataset> datasetOptional = datasetRepository.findByName(dataset.name);
 			if (datasetOptional.isPresent()) {
 				throw new RuntimeException("Dataset is already created: " + dataset.name);
+			}
+			Path scriptPath = Path.of(webLocation, "js", "test", "modules", "lib", "default.js");
+			try {
+				dataset.script = Files.readString(scriptPath);
+			} catch (IOException e) {
+				LOGGER.error("Failed to read default script from {}", scriptPath, e);
+				dataset.script = null;
 			}
 			return datasetRepository.save(dataset);
 		});
@@ -221,26 +219,6 @@ public abstract class DataService extends UtilService {
 		return datasetRepository.findAllDatasets(search, status, pageable);
 	}
 
-	public String updateSQLExpression(String name, String exp) {
-		String tableName = "dataset_" + sanitize(name);
-		try {
-			int rows = jdbcTemplate.update("UPDATE " + tableName + " SET _address = " + exp);
-			if (rows <= 0) {
-				return "Dataset is empty";
-			}
-
-			Integer numRows =
-					jdbcTemplate.queryForObject("SELECT count(*) FROM " + tableName + " WHERE _address IS " + "NULL",
-							Integer.class);
-			if (numRows != null && numRows > 0) {
-				return "There are " + numRows + " rows with null address.";
-			}
-			return null;
-		} catch (Exception e) {
-			return e.getMessage();
-		}
-	}
-
 	public String getDatasetSample(Long datasetId) {
 		Dataset dataset =
 				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found with " +
@@ -318,7 +296,7 @@ public abstract class DataService extends UtilService {
 				Stream.of(columns).map(header -> "\"" + header + "\" VARCHAR(255)").collect(Collectors.joining(", "));
 		String createTableSql =
 				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT," + " " +
-						"_address VARCHAR(255), %s)", tableName, columnsDefinition);
+						"%s)", tableName, columnsDefinition);
 		jdbcTemplate.execute(createTableSql);
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
