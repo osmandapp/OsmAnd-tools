@@ -27,7 +27,7 @@ public class WikivoyageDataGenerator {
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageDataGenerator.class);
 	private static final int BATCH_SIZE = 500;
-	private static final long SLEEP_WIKIMEDIA_RAW_MS = 1000;
+	private static final long SLEEP_WIKIMEDIA_RAW_MS = 5000;
 	
 
 	public static void main(String[] args) throws SQLException, IOException {
