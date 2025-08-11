@@ -62,22 +62,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
+    private WorldBrands worldBrands;
 
 	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
-
-    private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
-            "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
-            "TotalEnergies", "Aral", "Q8", "Petronas", "Caltex", "Esso", "Tesla Supercharger", "Ionity", "Walmart", "Carrefour",
-            "Tesco", "Lidl", "Aldi", "Costco", "Auchan", "IKEA", "H&M", "Zara", "Uniqlo", "Nike", "Adidas", "Decathlon", "REI",
-            "The North Face", "Apple Store", "Samsung", "Media Markt", "Best Buy", "Barnes & Noble",
-            "WHSmith", "Waterstones", "Marriott", "Hilton", "Holiday Inn", "Ibis", "Best Western", "Radisson",
-            "Planet Fitness", "Anytime Fitness", "Gold's Gym", "24 Hour Fitness", "Snap Fitness", "Walgreens", "CVS Pharmacy", "Boots", "Watsons",
-            "Hertz", "Avis", "Sixt", "Enterprise", "Europcar", "Mountain Warehouse", "Intersport", "Hudson News");
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
 		this.poiTypes = MapPoiTypes.getDefault();
+        this.worldBrands = new WorldBrands();
 	}
 
 	public void storeCities(CityDataStorage cityDataStorage) {
@@ -737,15 +730,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (!topIndexKeys.contains(entry.getKey())) {
 				continue;
 			}
+            String column = entry.getKey();
+            if (column.contains(":")) {
+                // with lang
+                continue;
+            }
             if (entry.getKey().equals("top_index_brand")) {
                 isBrand = true;
             }
-			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount = minCount > 0 ? minCount : PoiType.DEFAULT_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : PoiType.DEFAULT_MAX_PER_MAP;
-			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\"" +
+			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\", *" +
 					" from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
 					" order by cnt desc");
 			HashSet<String> set = new HashSet<>();
@@ -753,8 +750,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                 String value = rs.getString(2);
                 if (maxPerMap > 0) {
                     set.add(value);
-                } else if (isBrand && WORLD_BRANDS.contains(value)) {
+                    addTopIndexWithLang(rs, column, value);
+                } else if (isBrand && worldBrands.isWorldBrand(value)) {
                     set.add(rs.getString(2));
+                    addTopIndexWithLang(rs, column, value);
                 }
                 maxPerMap--;
 			}
@@ -762,6 +761,28 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		return;
 	}
+
+    private void addTopIndexWithLang(ResultSet rs, String topIndexKey, String topIndexVal) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        List<String> savedValues = new ArrayList<>();
+        for (int i = 3; i < columnCount; i++) {
+            String value = rs.getString(i);
+            if (Algorithms.isEmpty(value)) {
+                continue;
+            }
+            String columnName = metaData.getColumnName(i);
+            if (columnName.startsWith(topIndexKey)) {
+                if (!value.equals(topIndexVal) && !savedValues.contains(value)) {
+                    topIndexAdditional
+                            .computeIfAbsent(columnName, k -> new HashSet<>())
+                            .add(value);
+                    savedValues.add(value);
+                }
+            }
+        }
+    }
 
 	private PoiAdditionalType retrieveAdditionalType(String key) {
 		for (PoiAdditionalType t : additionalTypesId) {
