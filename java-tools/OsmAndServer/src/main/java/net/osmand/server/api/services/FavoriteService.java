@@ -93,7 +93,7 @@ public class FavoriteService {
             if (userFile.details == null) {
                 userFile.details = new JsonObject();
             }
-            WebGpxParser.TrackData trackData = gpxService.buildTrackDataFromGpxFile(file, tmpFile, null);
+            WebGpxParser.TrackData trackData = gpxService.buildTrackDataFromGpxFile(file, true, null);
             userFile.details.add("trackData", gson.toJsonTree(gsonWithNans.toJson(trackData)));
             resp = new UserdataService.ResponseFileStatus(userFile);
         }

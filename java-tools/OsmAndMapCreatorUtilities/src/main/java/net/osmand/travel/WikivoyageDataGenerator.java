@@ -27,6 +27,7 @@ public class WikivoyageDataGenerator {
 
 	private static final Log log = PlatformUtil.getLog(WikivoyageDataGenerator.class);
 	private static final int BATCH_SIZE = 500;
+	private static final long SLEEP_WIKIMEDIA_RAW_MS = 5000;
 	
 
 	public static void main(String[] args) throws SQLException, IOException {
@@ -141,20 +142,22 @@ public class WikivoyageDataGenerator {
 			if (!existingImagesMapping.containsKey(imageTitle)) {
 				existingImagesMapping.put(imageTitle, null);
 				// Encoder.encodeUrl(imageTitle)
+				String originalMsg = "";
 				try {
 					String sourceFile;
 					try {
 						sourceFile = retrieveSourcePage(pInsert, "commons.wikimedia.org", imageTitle);
 					} catch (IOException e) {
+						originalMsg = e.getMessage();
 						sourceFile = retrieveSourcePage(pInsert, lang + ".wikivoyage.org", imageTitle);
 					}
 					existingImagesMapping.put(imageTitle, sourceFile);
 					if (++imagesFetched % 100 == 0) {
 						System.out.printf("Images metadata fetched: %d %s -> %s \n ", imagesFetched, imageTitle, sourceFile);
 					}
-				} catch (IOException e) {
+				} catch (IOException | InterruptedException e) {
 					System.err.println("Error fetching image " + imageTitle + " " + lang + ":" + name + " "
-							+ e.getMessage());
+							+ originalMsg + " " + e.getMessage());
 				}
 			}
 			String sourceFile = existingImagesMapping.get(imageTitle);
@@ -181,7 +184,7 @@ public class WikivoyageDataGenerator {
 	}
 
 	private String retrieveSourcePage(PreparedStatement pInsert, String website, String imageTitle)
-			throws MalformedURLException, IOException, SQLException {
+			throws MalformedURLException, IOException, SQLException, InterruptedException {
 		StringBuilder metadata = new StringBuilder();
 		String param = Encoder.encodeUrl(imageTitle).replaceAll("\\(", "%28").replaceAll("\\)", "%29");
 		String metadataUrl = "https://" + website + "/w/index.php?title=File:" + param + "&action=raw";
@@ -201,6 +204,7 @@ public class WikivoyageDataGenerator {
 		pInsert.setString(3, metadata.toString());
 		pInsert.setString(4, sourceFile);
 		pInsert.executeUpdate();
+		Thread.sleep(SLEEP_WIKIMEDIA_RAW_MS);
 		return sourceFile;
 	}
 

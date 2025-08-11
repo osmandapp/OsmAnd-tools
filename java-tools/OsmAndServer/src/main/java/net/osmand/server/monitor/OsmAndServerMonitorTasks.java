@@ -78,7 +78,7 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
 			"maptile.osmand.net" };
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
-			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/",
+			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/", // TODO add builder
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
 			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
 
@@ -87,6 +87,7 @@ public class OsmAndServerMonitorTasks {
 	// Build Server
 	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
 	{
+//		buildServers.add(new BuildServerCheckInfo("https://builder.osmand.net:8080", "builder")); // TODO no-anonymous
 		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
 		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
 		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
@@ -116,7 +117,19 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+//	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+	// Formatter for the first pattern (e.g., "2025-08-09 12:21:49 -0700")
+	private static final SimpleDateFormat FORMAT_RFC822 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+	// Formatter for the second pattern (e.g., "2025-08-09 18:20:24 UTC")
+	private static final SimpleDateFormat FORMAT_ZONE_ID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss zzz");
+
+	private static Date parseDate(String s) throws ParseException {
+		try {
+			return FORMAT_RFC822.parse(s);
+		} catch (ParseException e) {
+			return FORMAT_ZONE_ID.parse(s);
+		}
+	}
 
 	@Value("${monitoring.enabled}")
 	private boolean enabled;
@@ -709,7 +722,7 @@ public class OsmAndServerMonitorTasks {
 			}
 		}
 		if (failed == 0) {
-			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n";
+			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n"; // TODO builder
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
@@ -745,7 +758,7 @@ public class OsmAndServerMonitorTasks {
 		DescriptiveStatistics live3Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 3);
 		DescriptiveStatistics live7Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 7);
 		DescriptiveStatistics live30Days = readStats(RED_KEY_OSMAND_LIVE, RED_MAIN_SERVER, 24 * 30);
-		return String.format("<a href='https://creator.osmand.net/osm_live/'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
+		return String.format("<a href='https://builder.osmand.net/osm_live/'>live</a>: <b>%s</b>. Delayed by: %s h · 3h — %s h · 24h — %s (%s) h\n"
 				+ "Day stats: 3d %s (%s) h  · 7d — %s (%s) h · 30d — %s (%s) h",
 				delay < HOUR ? "OK" : "FAILED",
 						formatTime(delay), formatTime(live3Hours.getPercentile(PERC)),
@@ -918,9 +931,9 @@ public class OsmAndServerMonitorTasks {
 				case "name":
 					if (lastEntry != null) lastEntry.author = content.toString(); break;
 				case "published":
-					if (lastEntry != null) lastEntry.published = XML_DATE_FORMAT.parse(content.toString()); break;
+					if (lastEntry != null) lastEntry.published = parseDate(content.toString()); break;
 				case "updated":
-					if (lastEntry != null) lastEntry.updated = XML_DATE_FORMAT.parse(content.toString()); break;
+					if (lastEntry != null) lastEntry.updated = parseDate(content.toString()); break;
 				case "id":
 					if (lastEntry != null) lastEntry.id = content.toString(); break;
 				case "title":
@@ -962,8 +975,8 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
-		String serverUrl = "https://creator.osmand.net:8080";
-		String serverName = "creator";
+		String serverUrl;
+		String serverName;
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
 		

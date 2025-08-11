@@ -272,7 +272,11 @@ public class UserdataService {
 		return name.replace(CR_SANITIZE, "\r").replace(LF_SANITIZE, "\n");
 	}
 
-	public UserdataController.UserFilesResults getUserFilesResults(List<CloudUserFilesRepository.UserFileNoData> files, int userId, boolean allVersions) {
+	public UserdataController.UserFilesResults getUserFilesResults(List<UserFileNoData> files, int userId, boolean allVersions) {
+		files.sort(Comparator
+				.comparingLong((UserFileNoData f) -> f.updatetimems)
+				.reversed()
+		);
         CloudUser user = usersRepository.findById(userId);
         UserdataController.UserFilesResults res = new UserdataController.UserFilesResults();
         res.maximumAccountSize = Algorithms.isEmpty(user.orderid) ? MAXIMUM_FREE_ACCOUNT_SIZE : MAXIMUM_ACCOUNT_SIZE;
@@ -281,24 +285,27 @@ public class UserdataService {
             res.allFiles = new ArrayList<>();
         }
         res.userid = userId;
-        Set<String> fileIds = new TreeSet<String>();
-        for (CloudUserFilesRepository.UserFileNoData sf : files) {
+        Set<String> fileIds = new TreeSet<>();
+        for (UserFileNoData sf : files) {
             String fileId = sf.type + "____" + sf.name;
-            if (sf.filesize >= 0) {
-                res.totalFileVersions++;
-                res.totalZipSize += sf.zipSize;
-                res.totalFileSize += sf.filesize;
-            }
-            if (fileIds.add(fileId)) {
-                if (sf.filesize >= 0) {
-                    res.totalFiles++;
-                    res.uniqueFiles.add(sf);
-                }
-            }
-            if (allVersions) {
-                res.allFiles.add(sf);
+	        boolean isNewestFile = fileIds.add(fileId);
 
-            }
+	        if (sf.filesize >= 0) {
+		        res.totalFileVersions++;
+		        if (allVersions || isNewestFile) {
+			        res.totalZipSize += sf.zipSize;
+			        res.totalFileSize += sf.filesize;
+		        }
+	        }
+
+	        if (isNewestFile && sf.filesize >= 0) {
+		        res.totalFiles++;
+		        res.uniqueFiles.add(sf);
+	        }
+
+	        if (allVersions) {
+		        res.allFiles.add(sf);
+	        }
         }
         return res;
     }

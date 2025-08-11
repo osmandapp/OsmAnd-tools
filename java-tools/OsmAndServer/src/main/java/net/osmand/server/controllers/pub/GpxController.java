@@ -3,8 +3,7 @@ package net.osmand.server.controllers.pub;
 
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileInputStream;;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
@@ -36,7 +35,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,12 +48,10 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
-import net.osmand.util.Algorithms;
 
 
 @RestController
@@ -63,9 +59,6 @@ import net.osmand.util.Algorithms;
 public class GpxController {
     
 	protected static final Log LOGGER = LogFactory.getLog(GpxController.class);
-	
-    public static final int MAX_SIZE_FILES = 10;
-    public static final int MAX_SIZE_FILES_AUTH = 100;
 
 	Gson gson = new Gson();
 	
@@ -171,11 +164,9 @@ public class GpxController {
 	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file, 
 			HttpServletRequest request, HttpSession httpSession) throws IOException {
 		GPXSessionContext ctx = session.getGpxResources(httpSession);
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-
 		double fileSizeMb = file.getSize() / (double) (1 << 20);
 		double filesSize = getCommonSavedFilesSize(ctx.files);
-		double maxSizeMb = getCommonMaxSizeFiles();
+		double maxSizeMb = gpxService.getCommonMaxSizeFiles();
 
 		if (fileSizeMb + filesSize > maxSizeMb) {
 			return ResponseEntity.badRequest()
@@ -187,12 +178,7 @@ public class GpxController {
 							fileSizeMb, maxSizeMb, maxSizeMb - filesSize));
 		}
 
-		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpGpx);
-		Algorithms.streamCopy(is, fous);
-		is.close();
-		fous.close();
-
+		File tmpGpx = gpxService.saveMultipartFileToTemp(file, httpSession.getId());
 		ctx.tempFiles.add(tmpGpx);
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
 		if (gpxFile.getError() != null) {
@@ -218,17 +204,12 @@ public class GpxController {
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/get-gpx-analysis"}, produces = "application/json")
 	public ResponseEntity<String> getGpxInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                         HttpServletRequest request, HttpSession httpSession) throws IOException {
-		
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpGpx);
-		Algorithms.streamCopy(is, fous);
-		is.close();
-		fous.close();
+
+		File tmpGpx = gpxService.saveMultipartFileToTemp(file, httpSession.getId());
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
 		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
@@ -252,30 +233,25 @@ public class GpxController {
 			return ResponseEntity.ok(gson.toJson(Map.of("info", sessionFile)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/process-track-data"}, produces = "application/json")
 	public ResponseEntity<String> processTrackData(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                               HttpSession httpSession) throws IOException {
-		
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		
-		InputStream is = file.getInputStream();
-		FileOutputStream fous = new FileOutputStream(tmpGpx);
-		Algorithms.streamCopy(is, fous);
-		is.close();
-		fous.close();
-		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
-		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(tmpGpx));
+
+		String filename = file.getOriginalFilename();
+		File tmpFile = gpxService.saveMultipartFileToTemp(file, httpSession.getId());
+		session.getGpxResources(httpSession).tempFiles.add(tmpFile);
+		GpxFile gpxFile = gpxService.importGpx(Okio.source(tmpFile), filename);
 		if (gpxFile.getError() != null) {
 			LOGGER.error(String.format(
-					"process-track-data loadGpxFile (%s) error (%s)", file.getName(), gpxFile.getError().getMessage()));
+					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
 			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, tmpGpx, null);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, true, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}
-	
+
 	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
 	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
 	                                                         HttpSession httpSession) throws IOException {
@@ -293,7 +269,7 @@ public class GpxController {
 				.contentType(MediaType.APPLICATION_XML)
 				.body(resource);
 	}
-	
+
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
 	public ResponseEntity<String> getSrtmData(@RequestBody String data) throws IOException {
 		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
@@ -309,15 +285,7 @@ public class GpxController {
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
 	}
-    
-    private double getCommonMaxSizeFiles() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof OsmAndProUser) {
-            return MAX_SIZE_FILES_AUTH;
-        } else
-            return MAX_SIZE_FILES;
-    }
-    
+
     private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
 	    double sizeFiles = 0L;
         for (GPXSessionFile file: files) {

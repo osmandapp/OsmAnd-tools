@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -14,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.TimeZone;
 
 import jakarta.annotation.PostConstruct;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -73,6 +75,7 @@ public class MotdService {
 		public String os;
 		public String version;
 		public String lang;
+		public List<String> features = Collections.emptyList();
 		public Integer numberOfDays;
 		public Integer numberOfStarts;
 	}
@@ -201,6 +204,8 @@ public class MotdService {
         private String numberOfStarts;
         @JsonProperty("number_of_days")
         private String numberOfDays;
+        @JsonProperty("features")
+        private String paid_features;
         
         
         @JsonProperty("lang")
@@ -273,6 +278,9 @@ public class MotdService {
 			if (appVersion != null) {
 				filter += " AppVersion '" + appVersion + "'";
 			}
+			if (paid_features != null) {
+				filter += " Features '" + paid_features + "'";
+			}
 			if (version != null) {
 				filter += " Version in '" + version + "'";
 			}
@@ -281,68 +289,148 @@ public class MotdService {
 		}
         
 
-        public boolean checkCondition(MessageParams params, IpLocationService locationService) {
-            if (ip != null && !ip.contains(params.hostAddress)) {
-                return false;
-            }
-            if(!checkActiveDate(params.now)) {
-            	return false;
-            }
-            if(country != null) {
+		public boolean checkCondition(MessageParams params, IpLocationService locationService) {
+			if (ip != null && !ip.contains(params.hostAddress)) {
+				return false;
+			}
+			if (!checkActiveDate(params.now)) {
+				return false;
+			}
+			if (country != null) {
 				String cnt = locationService.getField(params.hostAddress, IpLocationService.COUNTRY_NAME);
-            	if(!cnt.equalsIgnoreCase(country)) {
-            		return false;
-            	}
-            } 
-            if (numberOfDaysStart != 0 && numberOfDaysEnd != 0) {
-            	if(params.numberOfDays == null || params.numberOfDays.intValue() > numberOfDaysEnd || 
-            			params.numberOfDays.intValue() < numberOfDaysStart) {
-            		return false;
-            	}
-            }
-            
-            if (numberOfStartsStart != 0 && numberOfStartsEnd != 0) {
-            	if(params.numberOfStarts == null || params.numberOfStarts.intValue() > numberOfStartsEnd || 
-            			params.numberOfStarts.intValue() < numberOfDaysStart) {
-            		return false;
-            	}
-            }
-            
-            if(city != null) {
-				String cnt = locationService.getField(params.hostAddress, IpLocationService.CITY);
-            	if(!cnt.equalsIgnoreCase(city)) {
-            		return false;
-            	}
-            }
-            if (this.os != null && this.os.length() > 0) {
-				String osVersion = params.os != null && params.os.equals("ios") ? "ios" : "android";
-				if(!osVersion.equals(this.os)) {
+				if (!cnt.equalsIgnoreCase(country)) {
 					return false;
 				}
-            }
-            if (this.appPackage != null && (params.appPackage == null || !params.appPackage.equalsIgnoreCase(this.appPackage))) {
-                return false;
-            }
-            if (this.appVersion != null && (params.appVersion == null || !params.appVersion.equalsIgnoreCase(this.appVersion))) {
-                return false;
-            }
-            if (this.version != null && (params.version == null || !params.version.startsWith(this.version))) {
-                return false;
-            }
-            if (this.lang != null && (params.lang == null || !this.lang.contains(params.lang))) {
-                return false;
-            }
-            return true;
-        }
+			}
+			if (numberOfDaysStart != 0 && numberOfDaysEnd != 0) {
+				if (params.numberOfDays == null || params.numberOfDays.intValue() > numberOfDaysEnd
+						|| params.numberOfDays.intValue() < numberOfDaysStart) {
+					return false;
+				}
+			}
+
+			if (numberOfStartsStart != 0 && numberOfStartsEnd != 0) {
+				if (params.numberOfStarts == null || params.numberOfStarts.intValue() > numberOfStartsEnd
+						|| params.numberOfStarts.intValue() < numberOfDaysStart) {
+					return false;
+				}
+			}
+
+			if (city != null) {
+				String cnt = locationService.getField(params.hostAddress, IpLocationService.CITY);
+				if (!cnt.equalsIgnoreCase(city)) {
+					return false;
+				}
+			}
+			if (this.os != null && this.os.length() > 0) {
+				String osVersion = params.os != null && params.os.equals("ios") ? "ios" : "android";
+				if (!osVersion.equals(this.os)) {
+					return false;
+				}
+			}
+			if (!Algorithms.isEmpty(this.paid_features)) {
+				String[] conditions = this.paid_features.split(",");
+				boolean allFailed = false;
+				for (String condition : conditions) {
+					String c = condition.trim();
+					if (c.startsWith("-")) {
+						// negative condition
+						if (params.features.contains(c.substring(1))) {
+							return false;
+						}
+					} else {
+						if (!params.features.contains(c)) {
+							allFailed = true;
+						} else {
+							allFailed = false;
+						}
+					}
+				}
+				if (allFailed) {
+					return false;
+				}
+			}
+			if (this.appPackage != null
+					&& (params.appPackage == null || !params.appPackage.equalsIgnoreCase(this.appPackage))) {
+				return false;
+			}
+			if (this.appVersion != null
+					&& (params.appVersion == null || !params.appVersion.equalsIgnoreCase(this.appVersion))) {
+				return false;
+			}
+			if (this.version != null) {
+				if (this.version.startsWith(">=")) {
+					String checkVersion = this.version.substring(2).trim();
+					if (isVersion1Greater(checkVersion, params.version, false)) {
+						return false;
+					}
+				} else if (this.version.startsWith(">")) {
+					String checkVersion = this.version.substring(1).trim();
+					if (isVersion1Greater(checkVersion, params.version, true)) {
+						return false;
+					}
+				} else if (this.version.startsWith("<=")) {
+					String checkVersion = this.version.substring(2).trim();
+					if (!isVersion1Greater(checkVersion, params.version, true)) {
+						return false;
+					}
+				} else if (this.version.startsWith("<")) {
+					String checkVersion = this.version.substring(1).trim();
+					if (!isVersion1Greater(checkVersion, params.version, false)) {
+						return false;
+					}
+				} else if (!params.version.startsWith(this.version)) {
+					return false;
+				}
+			}
+
+			if (this.lang != null && (params.lang == null || !this.lang.contains(params.lang))) {
+				return false;
+			}
+			return true;
+		}
+
+		private boolean isVersion1Greater(String version1, String version2, boolean allowEquals) {
+			// Handle null or empty strings if necessary
+			if (version1 == null || version1.isEmpty())
+				return false;
+			if (version2 == null || version2.isEmpty())
+				return true; // Any version is greater than no version
+
+			String[] parts1 = version1.split("\\.");
+			String[] parts2 = version2.split("\\.");
+
+			int length = Math.max(parts1.length, parts2.length);
+			for (int i = 0; i < length; i++) {
+				// Get the numeric value for each part, defaulting to 0 if a part doesn't exist.
+				int num1 = (i < parts1.length) ? Integer.parseInt(parts1[i]) : 0;
+				int num2 = (i < parts2.length) ? Integer.parseInt(parts2[i]) : 0;
+
+				// If num1 is greater, version1 is greater.
+				if (num1 > num2) {
+					return true;
+				}
+
+				// If num1 is smaller, version1 is not greater.
+				if (num1 < num2) {
+					return false;
+				}
+				// If they are equal, continue to the next part.
+			}
+
+			// If the loop completes, the versions are identical.
+			// Return true only if equality is allowed by the flag.
+			return allowEquals;
+		}
 
 		public boolean checkActiveDate(Date date) {
 			if (startDate != null && !date.after(startDate)) {
-            	return false;
-            }
-            if (endDate != null && !date.before(endDate)) {
-            	return false;
-            }
-            return true;
+				return false;
+			}
+			if (endDate != null && !date.before(endDate)) {
+				return false;
+			}
+			return true;
 		}
     }
 }

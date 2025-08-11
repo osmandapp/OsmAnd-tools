@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<batch_process>
+	<!-- not supported yet for AWS -->
+	<process_attributes mapZooms="" renderingTypesFile="" zoomWaySmoothness="2" 
+		osmDbDialect="sqlite_in_memory" mapDbDialect="sqlite_in_memory"/>
+
+	 <process directory_for_osm_files=".work/osm" directory_for_index_files="/var/lib/jenkins/indexes/prepare" directory_for_generation=".work"
+		skipExistingIndexesAt="/var/lib/jenkins/indexes/prepare"	
+		indexPOI="true" indexMap="true" indexRouting="true" indexTransport="true" indexAddress="true" 
+		directory_for_srtm_files="/home/relief-data/srtm/">
+		
+		
+		<external dockerSlots="56">
+			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd_1" v="generate-obf" />
+				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+                <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
+				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
+                <parameter k="env_2" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
+				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+				
+				<filter exclude="world_seamarks" />
+			</job>
+			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd_1" v="generate-obf" />
+				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<!-- 24000 enough without kazakhstan -->
+				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx24000M "/> 
+				<parameter k="env_2" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
+				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+                
+				<filter exclude="world_seamarks" />
+			</job>
+		</external>
+	</process>
+	
+	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >
+		<regionList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"
+				/>
+	</regions>
+
+</batch_process> 

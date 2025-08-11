@@ -7,7 +7,7 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 
 | Parameter              | Type | Default           | Purpose & Dependencies                                                       |
 |------------------------|------|-------------------|------------------------------------------------------------------------------|
-| CLICKHOUSE_HOST        | str  | 'localhost'       | Hostname for ClickHouse connections. Required alongside `CLICKHOUSE_PWD`.    |
+| CLICKHOUSE_HOST        | str  | 'data.osmand.net' | Hostname for ClickHouse connections. Required alongside `CLICKHOUSE_PWD`.    |
 | CLICKHOUSE_PORT        | int  | 9000              | Port for ClickHouse connections.                                             |
 | CLICKHOUSE_PWD         | str  |                   | Password for ClickHouse. **Required**.                                       |
 | DB_TIMEOUT             | int  | 30                | Max execution time (seconds) for ClickHouse queries.                         |

@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
@@ -368,7 +369,7 @@ public class ApiController {
 			@RequestParam(required = false) String os,
 			@RequestParam(required = false) String aid,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request) throws IOException, ParseException {
-	MessageParams params = new MessageParams();
+		MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
 		if (headers.getFirst("X-Forwarded-For") != null) {
 			params.hostAddress = headers.getFirst("X-Forwarded-For");
@@ -556,6 +557,7 @@ public class ApiController {
                              @RequestParam(required = false) String lang,
                              @RequestParam(required = false) String os,
                              @RequestParam(required = false) String aid,
+                             @RequestParam(required = false) String features,
                              @RequestParam(required = false) String discount,
                              @RequestHeader HttpHeaders headers,
                              HttpServletRequest request) throws IOException, ParseException {
@@ -568,6 +570,9 @@ public class ApiController {
 		params.numberOfStarts = ns;
 		params.appVersion = "";
 		params.os = os;
+		if (!Algorithms.isEmpty(features)) {
+			params.features = Arrays.asList(features.split(","));
+		}
 		params.lang = lang;
 		if (version != null) {
 			int i = version.indexOf(" ");

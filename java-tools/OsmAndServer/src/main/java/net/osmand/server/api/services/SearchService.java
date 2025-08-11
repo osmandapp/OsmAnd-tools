@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
@@ -150,6 +152,7 @@ public class SearchService {
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
             
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
+            resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
             List<SearchResult> res;
             if (resultCollection != null) {
                 res = resultCollection.getCurrentSearchResults();
@@ -167,6 +170,30 @@ public class SearchService {
         } else {
             return Collections.emptyList();
         }
+    }
+
+    private SearchUICore.SearchResultCollection addPoiCategoriesToSearchResult(SearchUICore.SearchResultCollection resultCollection, String text, String locale, SearchUICore searchUICore) {
+        List<SearchResult> poiCategories = searchPoiCategoriesByName(text, locale);
+        List<SearchResult> uniquePoiCategories = new ArrayList<>(
+                poiCategories.stream()
+                        .collect(Collectors.toMap(
+                                sr -> sr.localeName,
+                                Function.identity(),
+                                (first, second) -> first
+                        ))
+                        .values()
+        );
+        if (!uniquePoiCategories.isEmpty()) {
+            if (resultCollection != null) {
+                resultCollection.addSearchResults(uniquePoiCategories, true, true);
+            } else {
+                resultCollection = searchUICore.getCurrentSearchResult();
+                if (resultCollection != null) {
+                    resultCollection.addSearchResults(uniquePoiCategories, true, true);
+                }
+            }
+        }
+        return resultCollection;
     }
 
     private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast, String locale, double lat, double lon, boolean baseSearch) throws IOException {
@@ -530,19 +557,28 @@ public class SearchService {
     
     
     public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) {
-        Map<String, Map<String, String>> searchRes = new HashMap<>();
+        Map<String, Map<String, String>> results = new HashMap<>();
+        List<SearchResult> categories = searchPoiCategoriesByName(search, locale);
+        if (categories != null && !categories.isEmpty()) {
+            results = preparePoiCategoriesResult(categories);
+        }
+        return results;
+    }
+
+    private List<SearchResult> searchPoiCategoriesByName(String search, String locale) {
         MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, true);
-        
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         List<AbstractPoiType> topFilters = searchUICore.getPoiTypes().getTopVisibleFilters();
         List<String> filterOrder = topFilters.stream().map(AbstractPoiType::getKeyName).toList();
         searchAmenityTypesAPI.setActivePoiFiltersByOrder(filterOrder);
         searchUICore.registerAPI(searchAmenityTypesAPI);
-        
-        List<SearchResult> results = searchUICore.immediateSearch(search, null).getCurrentSearchResults();
-        
+
+        return searchUICore.immediateSearch(search, null).getCurrentSearchResults();
+    }
+
+    private Map<String, Map<String, String>> preparePoiCategoriesResult(List<SearchResult> results) {
+        Map<String, Map<String, String>> searchRes = new HashMap<>();
         results.forEach(res -> searchRes.put(res.localeName, getPoiTypeFields(res.object)));
         return searchRes;
     }

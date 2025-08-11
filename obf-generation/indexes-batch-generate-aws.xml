@@ -10,7 +10,7 @@
 		directory_for_srtm_files="/home/relief-data/srtm/">
 		
 		
-		<external dockerSlots="14">
+		<external dockerSlots="24">
 			<!--  Disable AWS for now
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
@@ -45,7 +45,7 @@
 				<filter excludePattern="_australia-oceania" />
 			</job>
 			-->
-			<job queue="gen-docker-small" slotsPerJob="1" name="{1}-{0}" sizeUpToMB="120" type="docker">
+			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
@@ -56,7 +56,7 @@
 				
 				<filter exclude="world_seamarks" />
 			</job>
-			<job queue="gen-docker-large" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="900" type="docker">
+			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />

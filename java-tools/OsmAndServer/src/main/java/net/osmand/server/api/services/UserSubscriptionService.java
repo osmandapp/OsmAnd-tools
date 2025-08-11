@@ -595,10 +595,11 @@ public class UserSubscriptionService {
 				}
 				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
-			// get other purchases
-			info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu, subMap)));
-			info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu, inappMap)));
 		}
+		// get other purchases
+		info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu, subMap)));
+		info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu, inappMap)));
+
 		return info;
 	}
 

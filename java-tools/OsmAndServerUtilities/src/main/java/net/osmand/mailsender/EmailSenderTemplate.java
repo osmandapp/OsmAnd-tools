@@ -10,8 +10,8 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,8 +26,12 @@ Environment:
 	EMAIL_DELAY - optional delay before each send (in seconds)
 	TEST_EMAIL_COPY - copy each email to this address (testing)
 
-	EXCLUDE_DOMAINS - exclude from mailing (comma-separated substrings to match email)
-	SENDGRID_DOMAINS - send directly via SendGrid (comma-separated substrings to match email)
+	DEFAULT_ENGINE = SMTP|SENDGRID (default = SMTP)
+
+	EXCLUDE_DOMAINS - exclude from mailing *
+	SMTP_DOMAINS - first try via SMTP server *
+	SENDGRID_DOMAINS - first try via SendGrid *
+	* Format is comma-separated substrings to match a part of the email address.
 
 Template files structure:
 
@@ -80,13 +84,18 @@ public class EmailSenderTemplate {
 
 	public String defaultTemplatesDirectory = "./templates";
 
-	private SmtpSendGridSender sender;
+	private final SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
-	private String testEmailCopy; // TEST_EMAIL_COPY set by env
-	private List<String> toList = new ArrayList<>(); // added by to()
-	private HashMap<String, String> vars = new HashMap<>(); // set by set()
+	private final String testEmailCopy; // TEST_EMAIL_COPY set by env
+	private final List<String> toList = new ArrayList<>(); // added by to()
+	private final HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
-	private HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
+	private final HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
+
+	private final String defaultEngine = System.getenv("DEFAULT_ENGINE");
+	private final String excludedDomains = System.getenv("EXCLUDE_DOMAINS");
+	private final String sendGridDomains = System.getenv("SENDGRID_DOMAINS");
+	private final String smtpDomains = System.getenv("SMTP_DOMAINS");
 
 	public static void test(String[] args) {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
@@ -116,14 +125,7 @@ public class EmailSenderTemplate {
 		}
 
 		final String smtpServer = System.getenv("SMTP_SERVER");
-		if (smtpServer != null) {
-			// LOG.info("Using env SMTP_SERVER: " + smtpServer);
-		}
-
 		final String apiKey = System.getenv("SENDGRID_KEY");
-		if (apiKey != null) {
-			// LOG.info("Using env SENDGRID_KEY: qwerty :-)");
-		}
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
 
@@ -267,27 +269,14 @@ public class EmailSenderTemplate {
 	}
 
 	private boolean isDomainAllowed(String email) {
-		String excludedDomains = System.getenv("EXCLUDE_DOMAINS");
-		if (excludedDomains != null) {
-			for (String domain : excludedDomains.split("[,|]")) {
-				if (email.toLowerCase().contains(domain.trim().toLowerCase())) {
-					return false;
-				}
-			}
-		}
-		return true;
+		return ! sender.matchEmailAddress(email, excludedDomains);
 	}
 
 	// should be called with distinct To before each send() iteration
 	private void setVarsByTo(String to) {
-		try {
-			String to64 = null;
-			to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), "UTF-8");
-			set("TO", URLEncoder.encode(to, "UTF-8")); // @TO@
-			set("TO_BASE64", to64); // @TO_BASE64@
-		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
-		}
+		String to64 = URLEncoder.encode(Base64.getEncoder().encodeToString(to.getBytes()), StandardCharsets.UTF_8);
+		set("TO", URLEncoder.encode(to, StandardCharsets.UTF_8)); // @TO@
+		set("TO_BASE64", to64); // @TO_BASE64@
 	}
 
 	private void validateLoadedTemplates() {
@@ -379,7 +368,7 @@ public class EmailSenderTemplate {
 		}
 
 		List<String> templateLines = new ArrayList<>();
-		Scanner reader = null;
+		Scanner reader;
 		try {
 			reader = new Scanner(foundFile);
 		} catch (FileNotFoundException e) {
@@ -436,10 +425,15 @@ public class EmailSenderTemplate {
 	// compatible with SendGrid
 	// derived from EmailSenderService
 	private class SmtpSendGridSender {
-		private String smtpServer;
-		private SendGrid sendGridClient;
+		private final String smtpServer;
+		private final SendGrid sendGridClient;
 		private final int STATUS_CODE_ERROR = 500;
 		private final int STATUS_CODE_SENT = 202; // success code 202 comes originally from SendGrid
+
+		private enum Engine {
+			SMTP,
+			SENDGRID
+		}
 
 		private SmtpSendGridSender(String smtpServer, String apiKeySendGrid) {
 			this.smtpServer = smtpServer;
@@ -448,7 +442,7 @@ public class EmailSenderTemplate {
 			} else {
 				sendGridClient = new SendGrid(null) {
 					@Override
-					public Response api(Request request) throws IOException {
+					public Response api(Request request) {
 						LOG.error("SendGrid sender is not configured: " + request.getBody());
 						return error();
 					}
@@ -457,11 +451,10 @@ public class EmailSenderTemplate {
 			}
 		}
 
-		private boolean enforceViaSendGrid(String to) {
-			String sendGridDomains = System.getenv("SENDGRID_DOMAINS");
-			if (sendGridDomains != null) {
-				for (String domain : sendGridDomains.split("[,|]")) {
-					if (to.toLowerCase().contains(domain.trim().toLowerCase())) {
+		private boolean matchEmailAddress(String email, String matchDomains) {
+			if (matchDomains != null) {
+				for (String domain : matchDomains.split("[,|]")) {
+					if (email.toLowerCase().contains(domain.trim().toLowerCase())) {
 						return true;
 					}
 				}
@@ -482,14 +475,34 @@ public class EmailSenderTemplate {
 		private Response send(Mail mail) throws IOException {
 			this.mail = mail;
 
-			Response first = sendWithSmtp();
+			Engine firstTryEngine;
 
-			if (first.getStatusCode() == STATUS_CODE_SENT) {
-				return first;
+			if ("SMTP".equalsIgnoreCase(defaultEngine)) {
+				firstTryEngine = Engine.SMTP;
+			} else if ("SENDGRID".equalsIgnoreCase(defaultEngine)) {
+				firstTryEngine = Engine.SENDGRID;
+			} else {
+				firstTryEngine = Engine.SMTP; // default
 			}
 
-			LOG.warn("SMTP failed (" + first.getStatusCode() + ") - fallback to SendGrid");
-			return sendWithSendGrid(); // fallback
+			String to = getTo();
+			boolean isSmtpDomain = matchEmailAddress(to, smtpDomains);
+			boolean isSendGridDomain = matchEmailAddress(to, sendGridDomains);
+
+			if (isSmtpDomain && !isSendGridDomain) {
+				firstTryEngine = Engine.SMTP;
+			} else if (isSendGridDomain && !isSmtpDomain) {
+				firstTryEngine = Engine.SENDGRID;
+			}
+
+			Response firstResponse = firstTryEngine == Engine.SMTP ? sendWithSmtp() : sendWithSendGrid();
+
+			if (firstResponse.getStatusCode() == STATUS_CODE_SENT) {
+				return firstResponse;
+			}
+
+			LOG.warn("First Engine failed (" + firstResponse.getStatusCode() + ") - use fallback");
+			return firstTryEngine == Engine.SMTP ? sendWithSendGrid() : sendWithSmtp();
 		}
 
 		// this.headers are not passed to SendGrid
@@ -508,11 +521,6 @@ public class EmailSenderTemplate {
 			}
 
 			String to = getTo();
-
-			if (enforceViaSendGrid(to)) {
-				LOG.warn(concealEmail(to) + ": send via SendGrid");
-				return error();
-			}
 
 			try {
 				org.apache.commons.mail.HtmlEmail smtp = new HtmlEmail();

@@ -96,7 +96,7 @@ public class DownloadOsmGPX {
 	private static final int PS_INSERT_GPX_DETAILS = 4;
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 50000;
-	private static final int MAX_EMPTY_FETCH = 5;
+	private static int MAX_EMPTY_FETCH = 7;
 	
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
@@ -226,6 +226,23 @@ public class DownloadOsmGPX {
 		} else if ("add_activity".equals(main)) {
 			utility.addActivityColumnAndPopulate(args[1]);
 		} else {
+			System.out.println("Arguments " + Arrays.toString(args));
+			for (int i = 0; i < args.length; i++) {
+				String[] s = args[i].split("=");
+				if (s.length == 1) {
+					continue;
+				}
+				String val = s[1].trim();
+				if (val.isEmpty()) {
+					continue;
+				}
+				switch (s[0]) {
+				case "--max-empty-fetch":
+					MAX_EMPTY_FETCH = Integer.parseInt(val);
+					System.out.println("Max empty fetch " + MAX_EMPTY_FETCH);
+					break;
+				}
+			}
 			utility.downloadGPXMain();
 		}
 		utility.commitAllStatements();
