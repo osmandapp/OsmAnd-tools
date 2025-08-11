@@ -3,11 +3,11 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
-import net.osmand.server.api.searchtest.dto.EvalStarter;
-import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.api.searchtest.dto.EvalJobReport;
+import net.osmand.server.api.searchtest.dto.EvalStarter;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
+import net.osmand.server.api.services.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +21,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,15 +34,6 @@ public class SearchTestController {
 	@GetMapping
 	public String index(Model model) throws IOException {
 		return "admin/search_test";
-	}
-
-	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<Page<Dataset>> getDatasets(
-			@RequestParam(required = false) String search,
-			@RequestParam(required = false) String status,
-			Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getDatasets(search, status, pageable));
 	}
 
 	@GetMapping(value = "/datasets/{datasetId}/jobs", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -66,27 +56,19 @@ public class SearchTestController {
 
 	@GetMapping(value = "/reports/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJobReport> getEvaluationReport(
-			@PathVariable Long jobId) {
-		return testSearchService.getEvaluationReport(jobId)
-				.map(ResponseEntity::ok)
-				.orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<EvalJobReport> getEvaluationReport(@PathVariable Long jobId) {
+		return testSearchService.getEvaluationReport(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/progress/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJobProgress> getEvaluationProgress(
-			@PathVariable Long jobId) {
-		return testSearchService.getEvaluationProgress(jobId)
-				.map(ResponseEntity::ok)
-				.orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<EvalJobProgress> getEvaluationProgress(@PathVariable Long jobId) {
+		return testSearchService.getEvaluationProgress(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/reports/{jobId}/download")
-	public void downloadReport(
-			@PathVariable Long jobId,
-			@RequestParam(defaultValue = "csv") String format,
-			HttpServletResponse response) throws IOException {
+	public void downloadReport(@PathVariable Long jobId, @RequestParam(defaultValue = "csv") String format,
+							   HttpServletResponse response) throws IOException {
 
 		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
 		response.setContentType(contentType);
@@ -100,22 +82,16 @@ public class SearchTestController {
 	 * Returns the freshly created {@link EvalJob} in PENDING/RUNNING state.
 	 */
 	@PostMapping(value = "/eval/{datasetId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE, produces =
-            MediaType.APPLICATION_JSON_VALUE)
+			MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJob> createEvaluation(@PathVariable Long datasetId,
-													@RequestBody EvalStarter payload,
+	public ResponseEntity<EvalJob> createEvaluation(@PathVariable Long datasetId, @RequestBody EvalStarter payload,
 													HttpServletRequest request) {
-		String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
-				.replacePath(null)
-				.build()
-				.toUriString();
+		String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request).replacePath(null).build().toUriString();
 
 		EvalJob job = testSearchService.startEvaluation(datasetId, payload);
 
-		URI location = ServletUriComponentsBuilder.fromUriString(baseUrl)
-				.path("/admin/test/eval/{jobId:\\d+}")
-				.buildAndExpand(job.id)
-				.toUri();
+		URI location =
+				ServletUriComponentsBuilder.fromUriString(baseUrl).path("/admin/test/eval/{jobId:\\d+}").buildAndExpand(job.id).toUri();
 		return ResponseEntity.accepted().location(location).body(job);
 	}
 
@@ -133,50 +109,26 @@ public class SearchTestController {
 	@GetMapping(value = "/job/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<EvalJob> getJob(@PathVariable Long jobId) {
-		return testSearchService.getJob(jobId)
-				.map(ResponseEntity::ok)
-				.orElse(ResponseEntity.notFound().build());
+		return testSearchService.getJob(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@PostMapping(value = "/eval/cancel/{jobId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<EvalJob>> cancelEvaluation(@PathVariable Long jobId) {
-		return testSearchService.cancelEvaluation(jobId)
-				.thenApply(ResponseEntity::ok);
+		return testSearchService.cancelEvaluation(jobId).thenApply(ResponseEntity::ok);
 	}
 
 	@DeleteMapping(value = "/jobs/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Void>> deleteJob(@PathVariable Long jobId) {
-		return testSearchService.deleteJob(jobId)
-				.thenApply(v -> ResponseEntity.noContent().build());
+		return testSearchService.deleteJob(jobId).thenApply(v -> ResponseEntity.noContent().build());
 	}
 
 	@PostMapping(value = "/csv/count", consumes = MediaType.APPLICATION_JSON_VALUE, produces =
-            MediaType.APPLICATION_JSON_VALUE)
+			MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Map<String, Long>>> countCsvRows(@RequestBody String filePath) {
-		return testSearchService.countCsvRows(filePath)
-				.thenApply(count -> ResponseEntity.ok(Map.of("count", count)));
-	}
-
-	@PostMapping(value = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId,
-                                                               @RequestParam("reload") Boolean reload) {
-		final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
-		return testSearchService.refreshDataset(datasetId, reload).thenApply(path -> {
-			URI location = locationBuilder.buildAndExpand().toUri();
-			return ResponseEntity.created(location).body(path);
-		});
-	}
-
-	@PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId,
-                                                                    @RequestBody Map<String, String> updates) {
-		return testSearchService.updateDataset(datasetId, updates)
-				.thenApply(ResponseEntity::ok);
+		return testSearchService.countCsvRows(filePath).thenApply(count -> ResponseEntity.ok(Map.of("count", count)));
 	}
 
 	@GetMapping("/browse")
@@ -189,19 +141,42 @@ public class SearchTestController {
 		}
 	}
 
+	// --- Dataset management -------------------------------------------------
+	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Page<Dataset>> getDatasets(@RequestParam(required = false) String search,
+													 @RequestParam(required = false) String status,
+													 Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getDatasets(search, status, pageable));
+	}
+
+	@PostMapping(value = "/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<?>> refreshDataset(@RequestParam("datasetId") Long datasetId,
+															   @RequestParam("reload") Boolean reload) {
+		final var locationBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
+		return testSearchService.refreshDataset(datasetId, reload).thenApply(path -> {
+			URI location = locationBuilder.buildAndExpand().toUri();
+			return ResponseEntity.created(location).body(path);
+		});
+	}
+
+	@PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId,
+																	@RequestBody Map<String, String> updatesPayload) {
+		return testSearchService.updateDataset(datasetId, updatesPayload).thenApply(ResponseEntity::ok);
+	}
+
 	/**
 	 * Create a new dataset.
 	 */
 	@PostMapping(value = "/datasets", consumes = MediaType.APPLICATION_JSON_VALUE, produces =
-            MediaType.APPLICATION_JSON_VALUE)
+			MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Dataset> createDataset(@RequestBody Dataset payload) {
-		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(testSearchService.createDataset(payload).join());
+		return ResponseEntity.status(HttpStatus.CREATED).body(testSearchService.createDataset(payload).join());
 	}
-
-
-	// --- Dataset management -------------------------------------------------
 
 	@DeleteMapping(value = "/datasets/{datasetId:\\d+}")
 	public ResponseEntity<Void> deleteDataset(@PathVariable Long datasetId) {

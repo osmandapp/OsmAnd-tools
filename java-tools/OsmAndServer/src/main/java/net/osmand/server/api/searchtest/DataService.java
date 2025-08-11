@@ -1,8 +1,10 @@
 package net.osmand.server.api.searchtest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
+import net.osmand.server.api.searchtest.dto.Script;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -43,93 +45,86 @@ public abstract class DataService extends UtilService {
 	}
 
 	@Async
-	public CompletableFuture<Dataset> refreshDataset(Long datasetId, Boolean reload) {
-		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset =
-					datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found " +
-							"with id: " + datasetId));
+	public CompletableFuture<Dataset> refreshDataset(Long datasetId, boolean reload) {
+		return CompletableFuture.supplyAsync(() -> checkDatasetInternal(datasetId, reload));
+	}
 
-			Path fullPath = null;
-			dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
-			try {
-				if (dataset.type == Dataset.Source.Overpass) {
-					fullPath = queryOverpass(dataset.source);
-				} else {
-					fullPath = Path.of(csvDownloadingDir, dataset.source);
-				}
-				if (!Files.exists(fullPath)) {
-					dataset.setError("File is not existed.");
-					datasetRepository.save(dataset);
-					return dataset;
-				}
+	private Dataset checkDatasetInternal(Long datasetId, boolean reload) {
+		Dataset dataset =
+				datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not found " +
+						"with id: " + datasetId));
 
-				String tableName = "dataset_" + sanitize(dataset.name);
-				String header = getHeader(fullPath);
-				if (header == null || header.trim().isEmpty()) {
-					dataset.setError("File doesn't have header.");
-					datasetRepository.save(dataset);
-					return dataset;
-				}
-
-				String del =
-						header.chars().filter(ch -> ch == ',').count() <
-								header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
-				String[] headers =
-						Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
-				dataset.columns = objectMapper.writeValueAsString(headers);
-				if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
-					dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
-					datasetRepository.save(dataset);
-					return dataset;
-				}
-
-				if (reload != null && reload) {
-					List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
-					insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
-					dataset.total = sample.size() - 1;
-					LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
-				}
-
-				if (dataset.function == null || dataset.function.trim().isEmpty()) {
-					dataset.function =
-							Stream.of(headers).filter(h -> h.startsWith("city") || h.startsWith("street") ||
-									h.startsWith("road") || h.startsWith("addr_")).collect(Collectors.joining(" || '" +
-									" " +
-									"'" +
-									" || "));
-				}
-
-				if (dataset.total != null) {
-					String error = updateSQLExpression(dataset.name, dataset.function);
-					if (error != null) {
-						dataset.setError("Incorrect SQL expression: " + error);
-						datasetRepository.save(dataset);
-						return dataset;
-					}
-				}
-
-				dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK :
-						Dataset.ConfigStatus.UNKNOWN);
+		Path fullPath = null;
+		dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
+		try {
+			if (dataset.type == Dataset.Source.Overpass) {
+				fullPath = queryOverpass(dataset.source);
+			} else {
+				fullPath = Path.of(csvDownloadingDir, dataset.source);
+			}
+			if (!Files.exists(fullPath)) {
+				dataset.setError("File is not existed.");
 				datasetRepository.save(dataset);
+				return dataset;
+			}
 
-				return dataset;
-			} catch (Exception e) {
-				dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
+			String tableName = "dataset_" + sanitize(dataset.name);
+			String header = getHeader(fullPath);
+			if (header == null || header.trim().isEmpty()) {
+				dataset.setError("File doesn't have header.");
 				datasetRepository.save(dataset);
-				LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
 				return dataset;
-			} finally {
-				if (dataset.type == Dataset.Source.Overpass) {
-					try {
-						if (fullPath != null && !Files.deleteIfExists(fullPath)) {
-							LOGGER.warn("Could not delete temporary file: {}", fullPath);
-						}
-					} catch (IOException e) {
-						LOGGER.error("Error deleting temporary file: {}", fullPath, e);
-					}
+			}
+
+			String del =
+					header.chars().filter(ch -> ch == ',').count() <
+							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
+			String[] headers =
+					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
+			dataset.columns = objectMapper.writeValueAsString(headers);
+			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
+				dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
+				datasetRepository.save(dataset);
+				return dataset;
+			}
+
+			if (reload) {
+				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
+				insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
+				dataset.total = sample.size() - 1;
+				LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
+			}
+
+			if (dataset.total != null) {
+				String error = updateSQLExpression(dataset.name, dataset.function);
+				if (error != null) {
+					dataset.setError("Incorrect SQL expression: " + error);
+					datasetRepository.save(dataset);
+					return dataset;
 				}
 			}
-		});
+
+			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK :
+					Dataset.ConfigStatus.UNKNOWN);
+			datasetRepository.save(dataset);
+
+			return dataset;
+		} catch (Exception e) {
+			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
+			datasetRepository.save(dataset);
+			LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
+			return dataset;
+		} finally {
+			if (dataset.type == Dataset.Source.Overpass) {
+				try {
+					if (fullPath != null && !Files.deleteIfExists(fullPath)) {
+						LOGGER.warn("Could not delete temporary file: {}", fullPath);
+					}
+				} catch (IOException e) {
+					LOGGER.error("Error deleting temporary file: {}", fullPath, e);
+				}
+			}
+		}
 	}
 
 	@Async
@@ -156,12 +151,24 @@ public abstract class DataService extends UtilService {
 					case "type" -> dataset.type = Dataset.Source.valueOf(value);
 					case "source" -> dataset.source = value;
 					case "sizeLimit" -> dataset.sizeLimit = Integer.valueOf(value);
+					case "script" -> dataset.script = value;
 				}
 			});
 
+			try {
+				Script script = objectMapper.readValue(dataset.script, Script.class);
+				if (script.functions().length > 0 && dataset.function == null) {
+					dataset.function = script.functions()[0].name();
+				}
+			} catch (JsonProcessingException e) {
+				LOGGER.error("Failed to parse script: {}", dataset.script, e);
+				throw new RuntimeException("Failed to parse script: " + e.getMessage(), e);
+			}
+
 			dataset.updated = LocalDateTime.now();
 			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
-			return datasetRepository.save(dataset);
+			datasetRepository.save(dataset);
+			return checkDatasetInternal(datasetId, false);
 		});
 	}
 

@@ -9,7 +9,9 @@ import org.hibernate.type.SqlTypes;
 public abstract class Config {
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")
-	public String function; // JS expression to calculate address
+	public String script; // JS script with functions
+
+	public String function; // Selected JS function name to calculate address
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")
