@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.logging.Log;
@@ -117,10 +119,10 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-//	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
-	// Formatter for the first pattern (e.g., "2025-08-09 12:21:49 -0700")
+//  private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+	// Formatter for the pattern "2025-08-09 12:21:49 -0700"
 	private static final SimpleDateFormat FORMAT_RFC822 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
-	// Formatter for the second pattern (e.g., "2025-08-09 18:20:24 UTC")
+	// Formatter for the pattern "2025-08-09 18:20:24 UTC"
 	private static final SimpleDateFormat FORMAT_ZONE_ID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss zzz");
 
 	private static Date parseDate(String s) throws ParseException {
@@ -172,7 +174,8 @@ public class OsmAndServerMonitorTasks {
 		String title;
 		String author;
 		String link;
-		String linkTitle;
+		// This new field will hold the specific title of the PR or Issue
+		String itemSpecificTitle;
 	}
 
 
@@ -613,7 +616,6 @@ public class OsmAndServerMonitorTasks {
 						return ps.execute();
 					}
 				});
-//		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
 	}
 
 	private double estimateResponse(String tileUrl) {
@@ -670,7 +672,6 @@ public class OsmAndServerMonitorTasks {
 	private DescriptiveStatistics readStats(String key, String server, int hour) {
 		
 		DescriptiveStatistics stats = new DescriptiveStatistics();
-//		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
 		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and server = ? and timestamp >= now() - interval ? hour "
 						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
 
@@ -733,10 +734,6 @@ public class OsmAndServerMonitorTasks {
 		return msg;
 	}
 
-	
-
-	
-
 	private String timeAgo(long tm) {
 		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));
 		int h = (int) hr;
@@ -789,12 +786,10 @@ public class OsmAndServerMonitorTasks {
 			if (lastFeedCheckTimestamp == 0) {
 				if (newFeed.size() > 0) {
 					FeedEntry last = newFeed.get(newFeed.size() - 1);
-					downloadLinkTitle(last);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
 				}
 			} else {
 				for (FeedEntry n : newFeed) {
-					downloadLinkTitle(n);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
 				}
 			}
@@ -803,99 +798,137 @@ public class OsmAndServerMonitorTasks {
 				feed.remove(0);
 			}
 			
-
 			lastFeedCheckTimestamp = timestampNow;
 		}
 	}
-	
-	private void downloadLinkTitle(FeedEntry e) {
-		if (e.link != null) {
-			try {
-				URL url = new URL(e.link);
-				InputStream stream = url.openStream();
-				BufferedReader br = new BufferedReader(new InputStreamReader(stream));
-				String s;
-				while ((s = br.readLine()) != null) {
-					if (s.contains("<title>")) {
-						LOG.info("Check " + s);
-						int i1 = s.indexOf("<title>");
-						int i2 = s.indexOf("</title>");
-						if (i1 != -1 && i2 != -1) {
-							e.linkTitle = s.substring(i1 + "<title>".length(), i2).trim();
-							break;
-						}
-					}
-				}
-				br.close();
-			} catch (Exception e1) {
-				LOG.info("Failed to fetch " + e.link, e1);
-			}
+
+	/**
+	 * NEW: Helper method to extract the specific item title from the HTML content of a feed entry.
+	 * This avoids making a separate, slow network call.
+	 */
+	private String parseItemTitleFromContent(String content) {
+		if (content == null) {
+			return null;
 		}
+
+		// Pattern 1: Look for a link with the title as its text content (common for new pull requests).
+		// e.g., <a ...>fix catch error</a>
+		Pattern p1 = Pattern.compile("<a class=\"color-fg-default text-bold\"[^>]*>([^<]+)</a>");
+		Matcher m1 = p1.matcher(content);
+		if (m1.find()) {
+			return m1.group(1).trim();
+		}
+
+		// Pattern 2: Look for a link with a 'title' attribute (common for comments and issues).
+		// e.g., <a ... title="No layer available to add as overlay or underlay">
+		Pattern p2 = Pattern.compile("<a [^>]*title=\"([^\"]+)\"[^>]*>");
+		Matcher m2 = p2.matcher(content);
+		if (m2.find()) {
+			String title = m2.group(1).trim();
+			// GitHub sometimes puts useless object info in the title, so we clean it.
+			if (title.startsWith("#<Issue:") || title.startsWith("#<PullRequest:")) {
+				return null;
+			}
+			return title;
+		}
+		return null;
 	}
 
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
+	/**
+	 * REWRITTEN: This method now creates a much more informative and robust message.
+	 */
 	private String formatGithubMsg(FeedEntry n) {
 		String emoji = EmojiConstants.GITHUB_EMOJI;
 		String tags = "";
-		if(n.title.contains("reopen")) {
-			emoji = EmojiConstants.REOPEN_EMOJI;
-			tags = "#reopen";
-		} else if(n.title.contains("open")) {
+		String action = "interacted";
+		String itemType = "item";
+
+		String title = n.title.toLowerCase();
+
+		if (title.contains("opened a pull request")) {
 			emoji = EmojiConstants.OPEN_EMOJI;
-			tags = "#open";
-		} else if(n.title.contains("create")) {
-			emoji = EmojiConstants.CREATE_EMOJI;
-			tags = "#create";
-		} else if(n.title.contains("close")) {
+			action = "opened pull request";
+			itemType = "pull request";
+			tags = "#pullrequest #open";
+		} else if (title.contains("opened an issue")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			action = "opened issue";
+			itemType = "issue";
+			tags = "#issue #open";
+		} else if (title.contains("reopened")) {
+			emoji = EmojiConstants.REOPEN_EMOJI;
+			action = "reopened";
+			tags = "#reopen";
+		} else if (title.contains("closed")) {
 			emoji = EmojiConstants.CLOSED_EMOJI;
+			action = "closed";
+			itemType = title.contains("issue") ? "issue" : "pull request";
 			tags = "#close";
-		} else if(n.title.contains("pushed")) {
+		} else if (title.contains("pushed")) {
 			emoji = EmojiConstants.PUSHED_EMOJI;
-			tags = "#push";
-		} else if(n.title.contains("comment")) {
+			action = "pushed to";
+			itemType = "branch";
+			tags = "#push #branch";
+		} else if (title.contains("commented on")) {
 			emoji = EmojiConstants.COMMENT_EMOJI;
+			action = "commented on";
+			itemType = title.contains("issue") ? "issue" : "pull request";
 			tags = "#comment";
-		} else if(n.title.contains("merge")) {
+		} else if (title.contains("merged")) {
 			emoji = EmojiConstants.MERGE_EMOJI;
+			action = "merged";
+			itemType = "pull request";
 			tags = "#merge";
-		} else if(n.title.contains("delete")) {
+		} else if (title.contains("created a branch")) {
+			emoji = EmojiConstants.CREATE_EMOJI;
+			action = "created branch";
+			itemType = "branch";
+			tags = "#create #branch";
+		} else if (title.contains("deleted a branch")) {
 			emoji = EmojiConstants.DELETE_EMOJI;
-			tags = "#delete";
-		} 
-		if(n.title.contains("branch")) {
-			tags += " #branch";
-		} else if (n.title.contains("pull request")) {
-			tags += " #pullrequest";
-		} else if (n.title.contains("issue")) {
-			tags += " #issue";
+			action = "deleted branch";
+			itemType = "branch";
+			tags = "#delete #branch";
 		}
 
-		String[] words = n.title.split(" ");
-		StringBuilder bld = new StringBuilder();
-		boolean author = false;
-		for (int i = 0; i < words.length; i++) {
-			bld.append(" ");
-			if (words[i].startsWith("osmandapp/")) {
-				String linkName = n.linkTitle;
-				if (Algorithms.isEmpty(linkName)) {
-					linkName = words[i].substring("osmandapp/".length());
-				}
-				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
-			} else if (words[i].equals(n.author)) {
-				author = true;
-				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));
-			} else {
-				bld.append(words[i]);
+		// Extract repository name from the title string
+		String repoName = "";
+		int inIndex = title.lastIndexOf(" in ");
+		if (inIndex != -1) {
+			repoName = n.title.substring(inIndex + " in ".length());
+		} else {
+			int toIndex = title.lastIndexOf(" to ");
+			if (toIndex != -1) {
+				repoName = n.title.substring(toIndex + " to ".length());
 			}
 		}
-		String message = bld.toString();
-		if (!author) {
-			message = " " + String.format("<b>#%s</b>:", n.author.replace('-', '_'));
+
+		// Build the main message body
+		StringBuilder bld = new StringBuilder();
+		bld.append(emoji).append(" <b>").append(n.author).append("</b> ").append(action);
+		if (!repoName.isEmpty()) {
+			bld.append(" in <b>").append(repoName).append("</b>");
 		}
-		message = emoji + " " + message;
-		message += "\n<i>" + DATE_FORMAT.format(n.updated) + "</i>\n" + tags.trim();
-		return message;
+
+		// Create the main link with an informative title
+		String linkText = n.itemSpecificTitle;
+		if (Algorithms.isEmpty(linkText)) {
+			// Create a fallback title if parsing the content failed
+			if (n.link != null && (n.link.contains("/pull/") || n.link.contains("/issues/"))) {
+				String[] parts = n.link.split("/");
+				linkText = Character.toTitleCase(itemType.charAt(0)) + itemType.substring(1) + " #" + parts[parts.length - 1];
+			} else {
+				linkText = "View details on GitHub";
+			}
+		}
+		
+		bld.append(": <a href='").append(n.link).append("'>").append(linkText).append("</a>");
+
+		// Add timestamp and tags
+		bld.append("\n<i>").append(DATE_FORMAT.format(n.updated)).append("</i>\n").append(tags.trim());
+		return bld.toString();
 	}
 
 	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
@@ -939,7 +972,11 @@ public class OsmAndServerMonitorTasks {
 				case "title":
 					if (lastEntry != null) lastEntry.title = content.toString(); break;
 				case "content":
-					if (lastEntry != null) lastEntry.content = content.toString(); break;
+					if (lastEntry != null) {
+						lastEntry.content = content.toString();
+						lastEntry.itemSpecificTitle = parseItemTitleFromContent(lastEntry.content);
+					}
+					break;
 				}
 			}
 		};
@@ -1039,7 +1076,6 @@ public class OsmAndServerMonitorTasks {
 		try {
 			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
 			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 			String s, commit = "";
 			// read the output from the command
 			while ((s = stdInput.readLine()) != null) {
@@ -1061,9 +1097,4 @@ public class OsmAndServerMonitorTasks {
 	public void setSender(Sender sender) {
 		this.telegram = sender;
 	}
-	
-	
-	
-	
-	
 }
