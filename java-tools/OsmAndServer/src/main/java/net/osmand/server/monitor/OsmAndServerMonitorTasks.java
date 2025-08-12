@@ -833,15 +833,15 @@ public class OsmAndServerMonitorTasks {
 			}
 		}
 
-		// Pattern 3: Look for the title in the description div for newly created
-		// issues.
-		// e.g., <div class="dashboard-break-word...">**Some formatting** and some
-		// comment</div>
-		Pattern p3 = Pattern.compile("<div class=\"dashboard-break-word[^\"]*\">\\s*([^<]+)");
+		// Pattern 3: Look for the description div that follows the issue/PR number span.
+		// This is more robust than relying on "dashboard-break-word".
+		// e.g., <span ...>#12345</span> <div ...>The actual title is here</div>
+		Pattern p3 = Pattern.compile("<span class=\"f4 color-fg-muted ml-1\">[^<]+</span>\\s*<div[^>]*>\\s*([^<]+)");
 		Matcher m3 = p3.matcher(content);
 		if (m3.find()) {
 			return m3.group(1).trim();
 		}
+
 
 		return null;
 	}
