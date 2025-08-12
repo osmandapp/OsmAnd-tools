@@ -837,12 +837,13 @@ public class OsmAndServerMonitorTasks {
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
 	/**
-	 * REWRITTEN: This method now creates a much more informative and robust message.
+	 * This method now creates a plain text message with a raw link
+	 * to allow for Telegram's link preview functionality.
 	 */
 	private String formatGithubMsg(FeedEntry n) {
 		String emoji = EmojiConstants.GITHUB_EMOJI;
 		String tags = "";
-		String action = "interacted";
+		String action = "interacted with";
 		String itemType = "item";
 
 		String title = n.title.toLowerCase();
@@ -907,29 +908,31 @@ public class OsmAndServerMonitorTasks {
 
 		// Build the main message body
 		StringBuilder bld = new StringBuilder();
-		bld.append(emoji).append(" <b>").append(n.author).append("</b> ").append(action);
+		bld.append(emoji).append(" ").append(n.author).append(" ").append(action);
 		if (!repoName.isEmpty()) {
-			bld.append(" in <b>").append(repoName).append("</b>");
+			bld.append(" in ").append(repoName);
 		}
 
-		// Create the main link with an informative title
-		String linkText = n.itemSpecificTitle;
-		if (Algorithms.isEmpty(linkText)) {
+		// Get the specific title of the issue or pull request
+		String specificTitle = n.itemSpecificTitle;
+		if (!Algorithms.isEmpty(specificTitle)) {
+			bld.append(": ").append(specificTitle);
+		} else {
 			// Create a fallback title if parsing the content failed
 			if (n.link != null && (n.link.contains("/pull/") || n.link.contains("/issues/"))) {
 				String[] parts = n.link.split("/");
-				linkText = Character.toTitleCase(itemType.charAt(0)) + itemType.substring(1) + " #" + parts[parts.length - 1];
-			} else {
-				linkText = "View details on GitHub";
+				bld.append(": ").append(Character.toTitleCase(itemType.charAt(0))).append(itemType.substring(1)).append(" #").append(parts[parts.length - 1]);
 			}
 		}
-		
-		bld.append(": <a href='").append(n.link).append("'>").append(linkText).append("</a>");
 
-		// Add timestamp and tags
-		bld.append("\n<i>").append(DATE_FORMAT.format(n.updated)).append("</i>\n").append(tags.trim());
+		// Add timestamp, tags, and the raw link on separate lines
+		bld.append("\n").append(DATE_FORMAT.format(n.updated).trim());
+		bld.append("\n").append(tags.trim());
+		bld.append("\n").append(n.link);
+		
 		return bld.toString();
 	}
+
 
 	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
