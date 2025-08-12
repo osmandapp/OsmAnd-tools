@@ -14,8 +14,8 @@
 			<!--  Disable AWS for now
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-small" name="{1}-{0}" sizeUpToMB="60" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
-				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
-				<parameter k="env" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
+				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
+				<parameter k="env" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<filter excludePattern="_europe" />
 				<filter excludePattern="_northamerica" />
 				<filter excludePattern="_africa" />
@@ -26,8 +26,8 @@
 			</job>
 			<job queue="gen-map-queue-fargate" definition="gen-map-fargate-large" name="{1}-{0}" sizeUpToMB="900" type="aws">
 				<parameter k="upload" v="s3://osmand-maps-gen/{1}/{0}_2.obf" />
-				<parameter k="map" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf"/>
-                <parameter k="env" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
+				<parameter k="map" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf"/>
+                <parameter k="env" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<filter exclude="world_seamarks" />
                 <filter exclude="nigeria_africa" />
 				<filter exclude="us_florida_northamerica" />
@@ -48,22 +48,22 @@
 			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
-				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
                 <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
-                <parameter k="env_2" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
-				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://creator.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+                <parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
+				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
 				
 				<filter exclude="world_seamarks" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
-				<parameter k="cmd_2" v="https://creator.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
 
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
-                <parameter k="env_2" v="OVERPASS_URL=http://creator.osmand.net:8083/"/>
-				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://creator.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+                <parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
+				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
                 
 				<filter exclude="world_seamarks" />
 			</job>
