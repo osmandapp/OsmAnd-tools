@@ -655,6 +655,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
     public Map<String, String> transformTurnLanesTags(Map<String, String> tags) {
 		if (tags.containsKey("turn:lanes:both_ways")) {
+			tags = new LinkedHashMap<>(tags);
 			String value = tags.get("turn:lanes:both_ways");
 			if (tags.containsKey("turn:lanes:forward")) {
 				addBothWayValue(tags, "turn:lanes:forward", value);
