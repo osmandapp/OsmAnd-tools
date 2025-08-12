@@ -312,9 +312,9 @@ public class GpxService {
         return tmpFile;
     }
     
-    public File createTmpGpxFile(GpxFile file, String fileName) throws IOException {
+    public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
         File tmpGpx = File.createTempFile(fileName, GPX_FILE_EXT);
-        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), file);
+        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);
         }
