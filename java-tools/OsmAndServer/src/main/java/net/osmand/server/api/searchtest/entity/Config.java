@@ -7,6 +7,9 @@ import org.hibernate.type.SqlTypes;
 
 @MappedSuperclass
 public abstract class Config {
+	@Column(name = "file_name")
+	public String fileName = "Default"; // Uploaded JS file name
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")
 	public String script; // JS script with functions

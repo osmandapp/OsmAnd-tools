@@ -67,7 +67,6 @@ public class SearchTestService extends DataService {
 		job.datasetId = datasetId;
 		job.created = new java.sql.Timestamp(System.currentTimeMillis());
 
-		job.function = dataset.function;
 		String locale = payload.locale();
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
@@ -77,14 +76,19 @@ public class SearchTestService extends DataService {
 		job.setSouthEast(payload.southEast());
 		job.baseSearch = payload.baseSearch();
 
+		job.fileName = dataset.fileName;
 		job.function = payload.functionName();
+		dataset.function = payload.functionName();
 		try {
 			job.selCols = objectMapper.writeValueAsString(payload.columns());
+			dataset.selCols = job.selCols;
 			job.params = objectMapper.writeValueAsString(payload.paramValues());
+			dataset.params = job.params;
 		} catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
 		}
 
+		datasetRepository.save(dataset);
 		job.status = EvalJob.Status.RUNNING;
 		return datasetJobRepository.save(job);
 	}

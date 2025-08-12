@@ -123,12 +123,15 @@ public abstract class DataService extends UtilService {
 			if (datasetOptional.isPresent()) {
 				throw new RuntimeException("Dataset is already created: " + dataset.name);
 			}
-			Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "default.js");
-			try {
-				dataset.script = Files.readString(scriptPath);
-			} catch (IOException e) {
-				LOGGER.error("Failed to read default script from {}", scriptPath, e);
-				dataset.script = null;
+
+			if (dataset.script == null) {
+				Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "default.js");
+				try {
+					dataset.script = Files.readString(scriptPath);
+				} catch (IOException e) {
+					LOGGER.error("Failed to read default script from {}", scriptPath, e);
+					dataset.script = null;
+				}
 			}
 			return datasetRepository.save(dataset);
 		});
@@ -146,6 +149,7 @@ public abstract class DataService extends UtilService {
 					case "type" -> dataset.type = Dataset.Source.valueOf(value);
 					case "source" -> dataset.source = value;
 					case "sizeLimit" -> dataset.sizeLimit = Integer.valueOf(value);
+					case "fileName" -> dataset.fileName = value;
 					case "script" -> dataset.script = value;
 				}
 			});
