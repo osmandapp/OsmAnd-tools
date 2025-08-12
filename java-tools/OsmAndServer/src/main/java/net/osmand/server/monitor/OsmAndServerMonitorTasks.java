@@ -803,7 +803,7 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	/**
-	 * NEW: Helper method to extract the specific item title from the HTML content of a feed entry.
+	 * Helper method to extract the specific item title from the HTML content of a feed entry.
 	 * This avoids making a separate, slow network call.
 	 */
 	private String parseItemTitleFromContent(String content) {
@@ -811,7 +811,8 @@ public class OsmAndServerMonitorTasks {
 			return null;
 		}
 
-		// Pattern 1: Look for a link with the title as its text content (common for new pull requests).
+		// Pattern 1: Look for a link with the title as its text content (common for new
+		// pull requests).
 		// e.g., <a ...>fix catch error</a>
 		Pattern p1 = Pattern.compile("<a class=\"color-fg-default text-bold\"[^>]*>([^<]+)</a>");
 		Matcher m1 = p1.matcher(content);
@@ -819,18 +820,29 @@ public class OsmAndServerMonitorTasks {
 			return m1.group(1).trim();
 		}
 
-		// Pattern 2: Look for a link with a 'title' attribute (common for comments and issues).
+		// Pattern 2: Look for a link with a 'title' attribute (common for comments and
+		// other issues).
 		// e.g., <a ... title="No layer available to add as overlay or underlay">
 		Pattern p2 = Pattern.compile("<a [^>]*title=\"([^\"]+)\"[^>]*>");
 		Matcher m2 = p2.matcher(content);
 		if (m2.find()) {
 			String title = m2.group(1).trim();
 			// GitHub sometimes puts useless object info in the title, so we clean it.
-			if (title.startsWith("#<Issue:") || title.startsWith("#<PullRequest:")) {
-				return null;
+			if (!title.startsWith("#<Issue:") && !title.startsWith("#<PullRequest:")) {
+				return title;
 			}
-			return title;
 		}
+
+		// Pattern 3: Look for the title in the description div for newly created
+		// issues.
+		// e.g., <div class="dashboard-break-word...">**Some formatting** and some
+		// comment</div>
+		Pattern p3 = Pattern.compile("<div class=\"dashboard-break-word[^\"]*\">\\s*([^<]+)");
+		Matcher m3 = p3.matcher(content);
+		if (m3.find()) {
+			return m3.group(1).trim();
+		}
+
 		return null;
 	}
 
@@ -908,7 +920,7 @@ public class OsmAndServerMonitorTasks {
 
 		// Build the main message body
 		StringBuilder bld = new StringBuilder();
-		bld.append(emoji).append(" ").append(n.author).append(" ").append(action);
+		bld.append(emoji).append(" <b>#").append(n.author).append("</b> ").append(action);
 		if (!repoName.isEmpty()) {
 			bld.append(" in ").append(repoName);
 		}
