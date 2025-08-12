@@ -349,7 +349,7 @@ public class UserdataService {
 				if (!FILE_TYPE_GPX.equalsIgnoreCase(originalFilename)) {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
-					File tmpGpxFile = gpxService.createTmpGpxFile(gpxFile, name);
+					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
 					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
 				} else {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
