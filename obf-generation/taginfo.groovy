@@ -131,7 +131,7 @@ def builder = new groovy.json.JsonBuilder()
 
 def json = [:]
 json["data_format"] = 1; 
-json["data_url"] = "https://creator.osmand.net/taginfo.json"
+json["data_url"] = "https://builder.osmand.net/taginfo.json"
 json["data_updated"] = new Date().format("yyyyMMdd'T'HHmmss'Z'")
 json["project"] = [
 	"name": "OsmAnd",
