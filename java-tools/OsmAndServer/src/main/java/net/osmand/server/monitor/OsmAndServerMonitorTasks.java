@@ -174,8 +174,6 @@ public class OsmAndServerMonitorTasks {
 		String title;
 		String author;
 		String link;
-		// This new field will hold the specific title of the PR or Issue
-		String itemSpecificTitle;
 	}
 
 
@@ -770,7 +768,7 @@ public class OsmAndServerMonitorTasks {
 		if (!Algorithms.isEmpty(urlChangesFeed)) {
 			List<FeedEntry> newFeed = new ArrayList<>();
 			long timestampNow = System.currentTimeMillis();
-			for (FeedEntry e : parseFeed(urlChangesFeed)) {
+			for (FeedEntry e : parseFeed(new URL(urlChangesFeed).openStream())) {
 				FeedEntry old = null;
 				for (FeedEntry o : feed) {
 					if (Algorithms.objectEquals(o.id, e.id)) {
@@ -802,49 +800,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	/**
-	 * Helper method to extract the specific item title from the HTML content of a feed entry.
-	 * This avoids making a separate, slow network call.
-	 */
-	private String parseItemTitleFromContent(String content) {
-		if (content == null) {
-			return null;
-		}
-
-		// Pattern 1: Look for a link with the title as its text content (common for new
-		// pull requests).
-		// e.g., <a ...>fix catch error</a>
-		Pattern p1 = Pattern.compile("<a class=\"color-fg-default text-bold\"[^>]*>([^<]+)</a>");
-		Matcher m1 = p1.matcher(content);
-		if (m1.find()) {
-			return m1.group(1).trim();
-		}
-
-		// Pattern 2: Look for a link with a 'title' attribute (common for comments and
-		// other issues).
-		// e.g., <a ... title="No layer available to add as overlay or underlay">
-		Pattern p2 = Pattern.compile("<a [^>]*title=\"([^\"]+)\"[^>]*>");
-		Matcher m2 = p2.matcher(content);
-		if (m2.find()) {
-			String title = m2.group(1).trim();
-			// GitHub sometimes puts useless object info in the title, so we clean it.
-			if (!title.startsWith("#<Issue:") && !title.startsWith("#<PullRequest:")) {
-				return title;
-			}
-		}
-
-		// Pattern 3: Look for the description div that follows the issue/PR number span.
-		// This is more robust than relying on "dashboard-break-word".
-		// e.g., <span ...>#12345</span> <div ...>The actual title is here</div>
-		Pattern p3 = Pattern.compile("<span class=\"f4 color-fg-muted ml-1\">[^<]+</span>\\s*<div[^>]*>\\s*([^<]+)");
-		Matcher m3 = p3.matcher(content);
-		if (m3.find()) {
-			return m3.group(1).trim();
-		}
-
-
-		return null;
-	}
+	
 
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
@@ -855,86 +811,47 @@ public class OsmAndServerMonitorTasks {
 	private String formatGithubMsg(FeedEntry n) {
 		String emoji = EmojiConstants.GITHUB_EMOJI;
 		String tags = "";
-		String action = "interacted with";
-		String itemType = "item";
 
 		String title = n.title.toLowerCase();
 
+		
 		if (title.contains("opened a pull request")) {
 			emoji = EmojiConstants.OPEN_EMOJI;
-			action = "opened pull request";
-			itemType = "pull request";
 			tags = "#pullrequest #open";
-		} else if (title.contains("opened an issue")) {
-			emoji = EmojiConstants.OPEN_EMOJI;
-			action = "opened issue";
-			itemType = "issue";
-			tags = "#issue #open";
 		} else if (title.contains("reopened")) {
 			emoji = EmojiConstants.REOPEN_EMOJI;
-			action = "reopened";
 			tags = "#reopen";
+		} else if (title.contains("opened an issue")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			tags = "#issue #open";
 		} else if (title.contains("closed")) {
 			emoji = EmojiConstants.CLOSED_EMOJI;
-			action = "closed";
-			itemType = title.contains("issue") ? "issue" : "pull request";
 			tags = "#close";
 		} else if (title.contains("pushed")) {
 			emoji = EmojiConstants.PUSHED_EMOJI;
-			action = "pushed to";
-			itemType = "branch";
 			tags = "#push #branch";
 		} else if (title.contains("commented on")) {
 			emoji = EmojiConstants.COMMENT_EMOJI;
-			action = "commented on";
-			itemType = title.contains("issue") ? "issue" : "pull request";
 			tags = "#comment";
 		} else if (title.contains("merged")) {
 			emoji = EmojiConstants.MERGE_EMOJI;
-			action = "merged";
-			itemType = "pull request";
 			tags = "#merge";
 		} else if (title.contains("created a branch")) {
 			emoji = EmojiConstants.CREATE_EMOJI;
-			action = "created branch";
-			itemType = "branch";
 			tags = "#create #branch";
 		} else if (title.contains("deleted a branch")) {
 			emoji = EmojiConstants.DELETE_EMOJI;
-			action = "deleted branch";
-			itemType = "branch";
 			tags = "#delete #branch";
-		}
-
-		// Extract repository name from the title string
-		String repoName = "";
-		int inIndex = title.lastIndexOf(" in ");
-		if (inIndex != -1) {
-			repoName = n.title.substring(inIndex + " in ".length());
-		} else {
-			int toIndex = title.lastIndexOf(" to ");
-			if (toIndex != -1) {
-				repoName = n.title.substring(toIndex + " to ".length());
-			}
 		}
 
 		// Build the main message body
 		StringBuilder bld = new StringBuilder();
-		bld.append(emoji).append(" <b>#").append(n.author).append("</b> ").append(action);
-		if (!repoName.isEmpty()) {
-			bld.append(" in ").append(repoName);
-		}
+		bld.append(emoji).append(" <b>#").append(n.author).append("</b> ").append(title.toLowerCase().replace(n.author.toLowerCase(), ""));
+		
 
-		// Get the specific title of the issue or pull request
-		String specificTitle = n.itemSpecificTitle;
-		if (!Algorithms.isEmpty(specificTitle)) {
-			bld.append(": ").append(specificTitle);
-		} else {
-			// Create a fallback title if parsing the content failed
-			if (n.link != null && (n.link.contains("/pull/") || n.link.contains("/issues/"))) {
-				String[] parts = n.link.split("/");
-				bld.append(": ").append(Character.toTitleCase(itemType.charAt(0))).append(itemType.substring(1)).append(" #").append(parts[parts.length - 1]);
-			}
+		if (n.link != null) {
+			bld.append("\n").append(loadPreviewTitleAndDescription(n.link));
+			
 		}
 
 		// Add timestamp, tags, and the raw link on separate lines
@@ -944,11 +861,54 @@ public class OsmAndServerMonitorTasks {
 		
 		return bld.toString();
 	}
+	
+	public String loadPreviewTitleAndDescription(String urlString) {
+		String title = "";
+		String description = "";
+		try {
+			URL url = new URL(urlString);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestProperty("User-Agent", "Mozilla/5.0"); // Act like a browser
+			// Request only the first 4KB of the page, which should contain the <head> tag.
+			connection.setInstanceFollowRedirects(true);
+			int responseCode = connection.getResponseCode();
+			if (responseCode != HttpURLConnection.HTTP_OK) {
+				return "";
+			}
+			Pattern titleM = Pattern.compile("property=\"og:title\" content=\"([^\"]*)\"");
+			Pattern descM = Pattern.compile("property=\"og:description\" content=\"([^\"]*)\"");
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					Matcher matcher = titleM.matcher(line);
+					if (matcher.find()) {
+						title = matcher.group(1);
+					}
+					matcher = descM.matcher(line);
+					if (matcher.find()) {
+						description = matcher.group(1);
+					}
+					// Stop early if both are found
+					if (!title.isEmpty() && !description.isEmpty()) {
+						break;
+					}
+				}
+			}
+		} catch (IOException e) {
+			System.err.println("Error fetching or parsing URL: " + e.getMessage());
+			return ""; // Return empty string on error
+		}
+
+		//return (title + " " + description).trim();
+//		System.out.println("TITLE: " + title);
+//		System.out.println("DESC: " + description);
+		return title.trim();
+	}
 
 
-	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
+	public List<FeedEntry> parseFeed(InputStream stream) throws IOException, XmlPullParserException, ParseException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		parser.setInput(new InputStreamReader(new URL(url).openStream()));
+		parser.setInput(new InputStreamReader(stream));
 		int token;
 		StringBuilder content = new StringBuilder();
 		FeedEntry lastEntry = null;
@@ -989,7 +949,7 @@ public class OsmAndServerMonitorTasks {
 				case "content":
 					if (lastEntry != null) {
 						lastEntry.content = content.toString();
-						lastEntry.itemSpecificTitle = parseItemTitleFromContent(lastEntry.content);
+						// no title could be parsed
 					}
 					break;
 				}
@@ -1111,5 +1071,13 @@ public class OsmAndServerMonitorTasks {
 
 	public void setSender(Sender sender) {
 		this.telegram = sender;
+	}
+	
+	public static void main(String[] args) throws IOException, XmlPullParserException, ParseException {
+		OsmAndServerMonitorTasks t = new OsmAndServerMonitorTasks();
+		for (FeedEntry e : t.parseFeed(OsmAndServerMonitorTasks.class.getResourceAsStream("/test-feed.xml"))) {
+			System.out.println(t.formatGithubMsg(e));
+			System.out.println("----------");
+		}
 	}
 }
