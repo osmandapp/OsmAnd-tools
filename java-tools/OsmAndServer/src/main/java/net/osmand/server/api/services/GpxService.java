@@ -4,6 +4,7 @@ import kotlin.Pair;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -12,6 +13,7 @@ import net.osmand.shared.gpx.helper.ImportGpx;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.shared.io.KFile;
 import net.osmand.util.Algorithms;
 import okio.Buffer;
 import okio.Okio;
@@ -45,6 +47,7 @@ public class GpxService {
 
     public static final int MAX_SIZE_FILES = 10;
     public static final int MAX_SIZE_FILES_AUTH = 100;
+    public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -307,5 +310,14 @@ public class GpxService {
         is.close();
         fous.close();
         return tmpFile;
+    }
+    
+    public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
+        File tmpGpx = File.createTempFile(fileName, GPX_FILE_EXT);
+        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
+        if (exception != null) {
+            throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);
+        }
+        return tmpGpx;
     }
 }
