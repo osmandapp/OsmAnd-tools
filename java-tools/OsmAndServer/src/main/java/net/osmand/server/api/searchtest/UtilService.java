@@ -272,8 +272,13 @@ public abstract class UtilService {
 						}
 					}
 
-					for (String address : execute(context, functionName, args)) {
-						results.add(new RowAddress(row, address));
+					String[] addresses = execute(context, functionName, args);
+					if (addresses.length == 0) {
+						results.add(new RowAddress(row, ""));
+					} else {
+						for (String address : addresses) {
+							results.add(new RowAddress(row, address));
+						}
 					}
 				}
 				return results;
