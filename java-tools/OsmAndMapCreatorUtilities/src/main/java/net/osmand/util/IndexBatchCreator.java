@@ -494,10 +494,11 @@ public class IndexBatchCreator {
 				names.add(d.name);
 			}
 
-			log.warn(String.format("Waiting %d docker jobs to complete. Pending: %d, Rescheduled: %d, Running: %d: %s",
+			long freeRamPerc = getFreeRamPercentage();
+			log.warn(String.format("Waiting %d docker jobs to complete (Ram free %d). Pending: %d, Rescheduled: %d, Running: %d: %s", freeRamPerc,
 					total, pending, rescheduled, running, names));
 
-			waitDockerJobsIteration();
+			waitDockerJobsIteration(freeRamPerc);
 			try {
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
@@ -673,14 +674,13 @@ public class IndexBatchCreator {
 		}
 	}
 
-	private synchronized void waitDockerJobsIteration() {
+	private synchronized void waitDockerJobsIteration(long freeRamPerc) {
 		if (dockerClient == null) {
 			dockerClient = DockerClientBuilder.getInstance().build();
 		}
 		// 1. Check status of running containers
 		checkStatusRunningContainers();
 		// 2. Check for low RAM and stop the last started container if necessary
-		long freeRamPerc = getFreeRamPercentage();
 		if(stopIfNotEnoughRam(freeRamPerc)) {
 			// Only stop one container per check
 			return;
