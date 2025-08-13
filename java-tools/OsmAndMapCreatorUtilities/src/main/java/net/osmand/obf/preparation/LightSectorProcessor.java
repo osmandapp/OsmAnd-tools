@@ -55,7 +55,7 @@ public class LightSectorProcessor {
 
 	private static final Log log = PlatformUtil.getLog(LightSectorProcessor.class);
 	private static final AtomicLong entityIdCounter = new AtomicLong(-1000);
-	private static final double SCALE_ALL_DIFF_PYTHON = 0.5;
+	private static final double SCALE_RANGE_DIFF_PYTHON = 0.62;
 	// From s57.py
 	private static final List<String> LEADING_LIGHT_CATEGORIES = Arrays.asList("leading", "front", "rear", "lower", "upper");
 
@@ -78,6 +78,7 @@ public class LightSectorProcessor {
 	
 	   // Abbreviation map, same as in the Python script's s57.py dependency
     private static final Map<String, String> ABBREVIATIONS = new HashMap<>();
+	private static final double NAUTICAL_MILE_IN_M = 1852;
     static {
     	ABBREVIATIONS.put("permanent", "perm");
         ABBREVIATIONS.put("occasional", "occas");
@@ -128,6 +129,8 @@ public class LightSectorProcessor {
 					try {
 						if (this == HEIGHT) {
 							v = RouteDataObject.parseLength(vl, v);
+						} else if (this == RANGE) {
+							v = parseRange(vl);
 						} else {
 							v = Float.parseFloat(vl.split(" ")[0]);
 						}
@@ -212,13 +215,13 @@ public class LightSectorProcessor {
 		LightSectorConfigLayer(int level, double f_arc, double f_range, int min_range, MapZoomPair... pairs) {
 			this.level = level;
 			this.mapZooms = Arrays.asList(pairs);
-			this.f_arc = f_arc * SCALE_ALL_DIFF_PYTHON;
-			this.f_range = f_range;
+			this.f_arc = f_arc;
+			this.f_range = f_range * SCALE_RANGE_DIFF_PYTHON;
 			this.min_range = min_range;
 
 			// Default values from lightsectors.py
 			this.major_lights = Arrays.asList("light_major");
-			this.max_range = 12.0;
+			this.max_range = 12.0 * SCALE_RANGE_DIFF_PYTHON;
 			this.full_range_threshold = 19.0;
 			this.default_range = 0.0;
 			this.process_leading_lights = false;
@@ -348,14 +351,15 @@ public class LightSectorProcessor {
 		boolean isMajorLight = config.major_lights.contains(seamarkType);
 		boolean rangeSufficient = false;
 		for (Map<String, String> sector : sectors) {
+			String rng = sector.getOrDefault(LIGHT_PROPERTY.RANGE.tag, String.valueOf(config.default_range));
 			try {
-				double range = Double.parseDouble(sector.getOrDefault(LIGHT_PROPERTY.RANGE.tag, String.valueOf(config.default_range)));
+				double range = parseRange(rng);
 				if (range >= config.min_range) {
 					rangeSufficient = true;
 					break;
 				}
 			} catch (NumberFormatException e) {
-				System.err.printf("Error parsing range %s\n", sector.get(LIGHT_PROPERTY.RANGE.tag)); 
+				System.err.printf("Error parsing range %s\n", rng); 
 			}
 		}
 
@@ -365,7 +369,22 @@ public class LightSectorProcessor {
 		return Collections.emptyList();
 	}
 
-	  /**
+	private static float parseRange(String rng) {
+		rng = rng.toLowerCase();
+		boolean miles = false;
+		if (rng.contains("nm")) {
+			rng = rng.replace("nmi", "").replace("nm", "");
+			miles = true;
+		}
+		rng = rng.replace("m", "");
+		float range = (float) Double.parseDouble(rng);
+		if (miles) {
+			range *= NAUTICAL_MILE_IN_M;
+		}
+		return range;
+	}
+
+	/**
      * Groups sectors by a key composed of their character, group, and period.
      * This is a direct, step-by-step translation of the Python group_by function.
      *
@@ -420,9 +439,15 @@ public class LightSectorProcessor {
                     @SuppressWarnings("unchecked")
 					List<Double> values = (List<Double>) merged.computeIfAbsent(k, key -> new ArrayList<Double>());
                     try {
-                        values.add(Double.parseDouble(v.split(" ")[0]));
+                    	double vl;
+                    	if(LIGHT_PROPERTY.RANGE.tag.equals(k)) {
+                    		vl = parseRange(v);
+                    	}  else {
+                    		vl = RouteDataObject.parseLength(v, 0);
+                    	}
+                        values.add(vl);
                     } catch (NumberFormatException e) {
-                        // Ignore if value is not a valid number
+                    	System.err.printf("Error parsing %s %s \n", k, v);
                     }
                 } else if (merged.containsKey(k)) {
                     // For other string properties, combine unique values with a semicolon
@@ -637,6 +662,20 @@ public class LightSectorProcessor {
 	        boolean isSector = sectorStart != null && sectorEnd != null;
 	        boolean isFullCircle = isSector && (sectorStart % 360 == sectorEnd % 360);
 
+	        if (sectors.size() == 1 && !config.process_leading_lights) {
+				String category = s.getOrDefault(LIGHT_PROPERTY.CATEGORY.tag, "");
+				boolean isLeading = false;
+				for (String leadingCat : LEADING_LIGHT_CATEGORIES) {
+					if (category.contains(leadingCat)) {
+						isLeading = true;
+						break;
+					}
+				}
+				if (isLeading) {
+					continue;
+				}
+			}
+	        
 	        // # directional line
 	        if (renderedRange > 0 && orientation != null) {
 	            Map<String, Object> attrs = new HashMap<>();
@@ -651,20 +690,6 @@ public class LightSectorProcessor {
 	            lines.put(orientation, attrs);
 	        }
 	        
-	        if (sectors.size() == 1 && !config.process_leading_lights) {
-				String category = s.getOrDefault(LIGHT_PROPERTY.CATEGORY.tag, "");
-				boolean isLeading = false;
-				for (String leadingCat : LEADING_LIGHT_CATEGORIES) {
-					if (category.contains(leadingCat)) {
-						isLeading = true;
-						break;
-					}
-				}
-				if (isLeading) {
-					continue;
-				}
-			}
-
 	        // # sector limits
 	        if (renderedRange > 0 && isSector && !isFullCircle) {
 				for (double bearing : new double[] { sectorStart, sectorEnd }) {
@@ -682,6 +707,26 @@ public class LightSectorProcessor {
 	                }
 	            }
 	        }
+	        
+	        for (Map.Entry<Double, Map<String, Object>> entry : lines.entrySet()) {
+		        Map<String, Object> attrs = entry.getValue();
+		        double bearing = (Double) attrs.get(LIGHT_PROPERTY.ORIENTATION.tag);
+		        double range = (Double) attrs.get(LIGHT_PROPERTY.RANGE.tag);
+
+		        LatLon endPoint = MapUtils.rhumbDestinationPoint(centerPoint, range * NAUTICAL_MILE_IN_M, bearing + 180);
+		        Node endNode = new Node(endPoint.getLatitude(), endPoint.getLongitude(), nextId());
+		        Way lineWay = new Way(nextId());
+		        lineWay.addNode(centerNode);
+		        lineWay.addNode(endNode);
+
+		        for (Map.Entry<String, Object> tag : attrs.entrySet()) {
+		            if (tag.getValue() != null) {
+		                lineWay.putTag(tag.getKey(), String.valueOf(tag.getValue()));
+		            }
+		        }
+		        newEntities.add(endNode);
+		        newEntities.add(lineWay);
+		    }
 
 	        // # sector arc
 	        if (renderedRange > 0 && isSector && (!isFullCircle || nominalRange >= config.full_range_threshold)) {
@@ -695,7 +740,7 @@ public class LightSectorProcessor {
 	            Way arcWay = new Way(nextId());
 	            for (int i = 0; i <= pointsCount; i++) {
 	                double bearing = start + (i * (end - start) / pointsCount);
-	                LatLon arcPoint = MapUtils.rhumbDestinationPoint(centerPoint, arcRadius * 1852, bearing + 180);
+	                LatLon arcPoint = MapUtils.rhumbDestinationPoint(centerPoint, arcRadius * NAUTICAL_MILE_IN_M, bearing + 180);
 	                Node arcNode = new Node(arcPoint.getLatitude(), arcPoint.getLongitude(), nextId());
 	                arcWay.addNode(arcNode);
 	                newEntities.add(arcNode);
@@ -713,25 +758,7 @@ public class LightSectorProcessor {
 	        }
 	    }
 
-	    for (Map.Entry<Double, Map<String, Object>> entry : lines.entrySet()) {
-	        Map<String, Object> attrs = entry.getValue();
-	        double bearing = (Double) attrs.get(LIGHT_PROPERTY.ORIENTATION.tag);
-	        double range = (Double) attrs.get(LIGHT_PROPERTY.RANGE.tag);
-
-	        LatLon endPoint = MapUtils.rhumbDestinationPoint(centerPoint, range * 1852, bearing + 180);
-	        Node endNode = new Node(endPoint.getLatitude(), endPoint.getLongitude(), nextId());
-	        Way lineWay = new Way(nextId());
-	        lineWay.addNode(centerNode);
-	        lineWay.addNode(endNode);
-
-	        for (Map.Entry<String, Object> tag : attrs.entrySet()) {
-	            if (tag.getValue() != null) {
-	                lineWay.putTag(tag.getKey(), String.valueOf(tag.getValue()));
-	            }
-	        }
-	        newEntities.add(endNode);
-	        newEntities.add(lineWay);
-	    }
+	
 
 		return newEntities;
 	}
