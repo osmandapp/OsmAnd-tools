@@ -180,7 +180,6 @@ public class WeatherController {
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
 			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
-			resultCollection.getCurrentSearchResults().forEach(sr -> LOGGER.info(sr.object.toString()));
 			nearestPlace = getNearestPlace(resultCollection, lat, lon);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);

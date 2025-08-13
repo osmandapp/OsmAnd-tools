@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.logging.Log;
@@ -117,10 +119,10 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-//	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
-	// Formatter for the first pattern (e.g., "2025-08-09 12:21:49 -0700")
+//  private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+	// Formatter for the pattern "2025-08-09 12:21:49 -0700"
 	private static final SimpleDateFormat FORMAT_RFC822 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
-	// Formatter for the second pattern (e.g., "2025-08-09 18:20:24 UTC")
+	// Formatter for the pattern "2025-08-09 18:20:24 UTC"
 	private static final SimpleDateFormat FORMAT_ZONE_ID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss zzz");
 
 	private static Date parseDate(String s) throws ParseException {
@@ -172,7 +174,6 @@ public class OsmAndServerMonitorTasks {
 		String title;
 		String author;
 		String link;
-		String linkTitle;
 	}
 
 
@@ -613,7 +614,6 @@ public class OsmAndServerMonitorTasks {
 						return ps.execute();
 					}
 				});
-//		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
 	}
 
 	private double estimateResponse(String tileUrl) {
@@ -670,7 +670,6 @@ public class OsmAndServerMonitorTasks {
 	private DescriptiveStatistics readStats(String key, String server, int hour) {
 		
 		DescriptiveStatistics stats = new DescriptiveStatistics();
-//		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
 		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and server = ? and timestamp >= now() - interval ? hour "
 						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
 
@@ -733,10 +732,6 @@ public class OsmAndServerMonitorTasks {
 		return msg;
 	}
 
-	
-
-	
-
 	private String timeAgo(long tm) {
 		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));
 		int h = (int) hr;
@@ -773,7 +768,7 @@ public class OsmAndServerMonitorTasks {
 		if (!Algorithms.isEmpty(urlChangesFeed)) {
 			List<FeedEntry> newFeed = new ArrayList<>();
 			long timestampNow = System.currentTimeMillis();
-			for (FeedEntry e : parseFeed(urlChangesFeed)) {
+			for (FeedEntry e : parseFeed(new URL(urlChangesFeed).openStream())) {
 				FeedEntry old = null;
 				for (FeedEntry o : feed) {
 					if (Algorithms.objectEquals(o.id, e.id)) {
@@ -789,12 +784,10 @@ public class OsmAndServerMonitorTasks {
 			if (lastFeedCheckTimestamp == 0) {
 				if (newFeed.size() > 0) {
 					FeedEntry last = newFeed.get(newFeed.size() - 1);
-					downloadLinkTitle(last);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
 				}
 			} else {
 				for (FeedEntry n : newFeed) {
-					downloadLinkTitle(n);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
 				}
 			}
@@ -803,104 +796,119 @@ public class OsmAndServerMonitorTasks {
 				feed.remove(0);
 			}
 			
-
 			lastFeedCheckTimestamp = timestampNow;
 		}
 	}
+
 	
-	private void downloadLinkTitle(FeedEntry e) {
-		if (e.link != null) {
-			try {
-				URL url = new URL(e.link);
-				InputStream stream = url.openStream();
-				BufferedReader br = new BufferedReader(new InputStreamReader(stream));
-				String s;
-				while ((s = br.readLine()) != null) {
-					if (s.contains("<title>")) {
-						LOG.info("Check " + s);
-						int i1 = s.indexOf("<title>");
-						int i2 = s.indexOf("</title>");
-						if (i1 != -1 && i2 != -1) {
-							e.linkTitle = s.substring(i1 + "<title>".length(), i2).trim();
-							break;
-						}
-					}
-				}
-				br.close();
-			} catch (Exception e1) {
-				LOG.info("Failed to fetch " + e.link, e1);
-			}
-		}
-	}
 
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
+	/**
+	 * This method now creates a plain text message with a raw link
+	 * to allow for Telegram's link preview functionality.
+	 */
 	private String formatGithubMsg(FeedEntry n) {
 		String emoji = EmojiConstants.GITHUB_EMOJI;
 		String tags = "";
-		if(n.title.contains("reopen")) {
+
+		String title = n.title.toLowerCase();
+
+		
+		if (title.contains("opened a pull request")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			tags = "#pullrequest #open";
+		} else if (title.contains("reopened")) {
 			emoji = EmojiConstants.REOPEN_EMOJI;
 			tags = "#reopen";
-		} else if(n.title.contains("open")) {
+		} else if (title.contains("opened an issue")) {
 			emoji = EmojiConstants.OPEN_EMOJI;
-			tags = "#open";
-		} else if(n.title.contains("create")) {
-			emoji = EmojiConstants.CREATE_EMOJI;
-			tags = "#create";
-		} else if(n.title.contains("close")) {
+			tags = "#issue #open";
+		} else if (title.contains("closed")) {
 			emoji = EmojiConstants.CLOSED_EMOJI;
 			tags = "#close";
-		} else if(n.title.contains("pushed")) {
+		} else if (title.contains("pushed")) {
 			emoji = EmojiConstants.PUSHED_EMOJI;
-			tags = "#push";
-		} else if(n.title.contains("comment")) {
+			tags = "#push #branch";
+		} else if (title.contains("commented on")) {
 			emoji = EmojiConstants.COMMENT_EMOJI;
 			tags = "#comment";
-		} else if(n.title.contains("merge")) {
+		} else if (title.contains("merged")) {
 			emoji = EmojiConstants.MERGE_EMOJI;
 			tags = "#merge";
-		} else if(n.title.contains("delete")) {
+		} else if (title.contains("created a branch")) {
+			emoji = EmojiConstants.CREATE_EMOJI;
+			tags = "#create #branch";
+		} else if (title.contains("deleted a branch")) {
 			emoji = EmojiConstants.DELETE_EMOJI;
-			tags = "#delete";
-		} 
-		if(n.title.contains("branch")) {
-			tags += " #branch";
-		} else if (n.title.contains("pull request")) {
-			tags += " #pullrequest";
-		} else if (n.title.contains("issue")) {
-			tags += " #issue";
+			tags = "#delete #branch";
 		}
 
-		String[] words = n.title.split(" ");
+		// Build the main message body
 		StringBuilder bld = new StringBuilder();
-		boolean author = false;
-		for (int i = 0; i < words.length; i++) {
-			bld.append(" ");
-			if (words[i].startsWith("osmandapp/")) {
-				String linkName = n.linkTitle;
-				if (Algorithms.isEmpty(linkName)) {
-					linkName = words[i].substring("osmandapp/".length());
-				}
-				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
-			} else if (words[i].equals(n.author)) {
-				author = true;
-				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));
-			} else {
-				bld.append(words[i]);
+		bld.append(emoji).append(" <b>#").append(n.author).append("</b> ").append(title.toLowerCase().replace(n.author.toLowerCase(), ""));
+		
+
+		if (n.link != null) {
+			bld.append("\n").append(loadPreviewTitleAndDescription(n.link));
+			
+		}
+
+		// Add timestamp, tags, and the raw link on separate lines
+		bld.append("\n").append(DATE_FORMAT.format(n.updated).trim());
+		bld.append("\n").append(tags.trim());
+		bld.append("\n").append(n.link);
+		
+		return bld.toString();
+	}
+	
+	public String loadPreviewTitleAndDescription(String urlString) {
+		String title = "";
+		String description = "";
+		try {
+			URL url = new URL(urlString);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestProperty("User-Agent", "Mozilla/5.0"); // Act like a browser
+			// Request only the first 4KB of the page, which should contain the <head> tag.
+			connection.setInstanceFollowRedirects(true);
+			int responseCode = connection.getResponseCode();
+			if (responseCode != HttpURLConnection.HTTP_OK) {
+				return "";
 			}
+			Pattern titleM = Pattern.compile("property=\"og:title\" content=\"([^\"]*)\"");
+			Pattern descM = Pattern.compile("property=\"og:description\" content=\"([^\"]*)\"");
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					Matcher matcher = titleM.matcher(line);
+					if (matcher.find()) {
+						title = matcher.group(1);
+					}
+					matcher = descM.matcher(line);
+					if (matcher.find()) {
+						description = matcher.group(1);
+					}
+					// Stop early if both are found
+					if (!title.isEmpty() && !description.isEmpty()) {
+						break;
+					}
+				}
+			}
+		} catch (IOException e) {
+			System.err.println("Error fetching or parsing URL: " + e.getMessage());
+			return ""; // Return empty string on error
 		}
-		String message = bld.toString();
-		if (!author) {
-			message = " " + String.format("<b>#%s</b>:", n.author.replace('-', '_'));
-		}
-		message = emoji + " " + message;
-		message += "\n<i>" + DATE_FORMAT.format(n.updated) + "</i>\n" + tags.trim();
-		return message;
+
+		//return (title + " " + description).trim();
+//		System.out.println("TITLE: " + title);
+//		System.out.println("DESC: " + description);
+		return title.trim();
 	}
 
-	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
+
+	public List<FeedEntry> parseFeed(InputStream stream) throws IOException, XmlPullParserException, ParseException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		parser.setInput(new InputStreamReader(new URL(url).openStream()));
+		parser.setInput(new InputStreamReader(stream));
 		int token;
 		StringBuilder content = new StringBuilder();
 		FeedEntry lastEntry = null;
@@ -939,7 +947,11 @@ public class OsmAndServerMonitorTasks {
 				case "title":
 					if (lastEntry != null) lastEntry.title = content.toString(); break;
 				case "content":
-					if (lastEntry != null) lastEntry.content = content.toString(); break;
+					if (lastEntry != null) {
+						lastEntry.content = content.toString();
+						// no title could be parsed
+					}
+					break;
 				}
 			}
 		};
@@ -1039,7 +1051,6 @@ public class OsmAndServerMonitorTasks {
 		try {
 			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
 			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 			String s, commit = "";
 			// read the output from the command
 			while ((s = stdInput.readLine()) != null) {
@@ -1062,8 +1073,11 @@ public class OsmAndServerMonitorTasks {
 		this.telegram = sender;
 	}
 	
-	
-	
-	
-	
+	public static void main(String[] args) throws IOException, XmlPullParserException, ParseException {
+		OsmAndServerMonitorTasks t = new OsmAndServerMonitorTasks();
+		for (FeedEntry e : t.parseFeed(OsmAndServerMonitorTasks.class.getResourceAsStream("/test-feed.xml"))) {
+			System.out.println(t.formatGithubMsg(e));
+			System.out.println("----------");
+		}
+	}
 }
