@@ -310,7 +310,7 @@ public class OsmAndServerMonitorTasks {
 					JSONObject object = new JSONObject(new JSONTokener(is));
 					jobsArray = object.getJSONArray("jobs");
 					is.close();
-				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED) {
+				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED && code != HttpURLConnection.HTTP_FORBIDDEN) {
 					sendBroadcastMessage(String.format("Jenkins %s is unavailable (%d)", buildServer.jenkinsUrl, code));
 				}
 
