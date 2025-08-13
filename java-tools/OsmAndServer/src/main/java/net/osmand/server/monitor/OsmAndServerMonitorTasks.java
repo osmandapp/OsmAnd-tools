@@ -917,7 +917,11 @@ public class OsmAndServerMonitorTasks {
 			if(token == XmlPullParser.START_TAG) {
 				switch (parser.getName()) {
 				case "entry": lastEntry = new FeedEntry(); break;
-				case "link": if (lastEntry != null) lastEntry.link = parser.getAttributeValue("", "href"); break;
+				case "link":
+					if (lastEntry != null) {
+						lastEntry.link = parser.getAttributeValue("", "href");
+					}
+					break;
 				}
 				content.setLength(0);
 			} else if(token == XmlPullParser.TEXT) {
