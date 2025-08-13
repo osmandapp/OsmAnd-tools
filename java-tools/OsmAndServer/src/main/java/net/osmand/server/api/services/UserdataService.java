@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -30,10 +31,8 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.io.KFile;
-import okio.Buffer;
 import okio.GzipSource;
 import okio.Okio;
-import okio.Source;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -44,12 +43,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,8 +55,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
@@ -352,7 +346,19 @@ public class UserdataService {
 			zipfile = InternalZipFile.buildFromServerFile(serverCommonFile, name);
 		} else {
 			try {
-				zipfile = InternalZipFile.buildFromMultipartFile(file);
+				String originalFilename = file.getOriginalFilename();
+				if (originalFilename == null) {
+					originalFilename = name;
+				}
+				if (isEmptyFileByName(name, originalFilename) || isGpxFileByName(originalFilename)) {
+					zipfile = InternalZipFile.buildFromMultipartFile(file);
+				} else {
+					// try to create gpx file from unknown file
+					InputStream is = new GZIPInputStream(file.getInputStream());
+					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
+					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
+					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
+				}
 			} catch (IOException e) {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
@@ -361,6 +367,13 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
+	private boolean isGpxFileByName(String originalFilename) {
+		return originalFilename.toLowerCase().endsWith(GPX_FILE_EXT);
+	}
+
+	private boolean isEmptyFileByName(String name, String originalFilename) {
+		return name.endsWith(EMPTY_FILE_NAME) && originalFilename.equals("empty");
+	}
 
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,

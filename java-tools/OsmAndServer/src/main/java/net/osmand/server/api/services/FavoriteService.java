@@ -10,7 +10,6 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
-import net.osmand.shared.io.KFile;
 import okio.Buffer;
 import okio.Source;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +32,6 @@ import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 @Service
 public class FavoriteService {
     
-    public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_EXT_GPX = ".gpx";
     private static final String DEFAULT_GROUP_FILE_NAME = "favorites.gpx";
@@ -78,7 +76,7 @@ public class FavoriteService {
     
     public ResponseEntity<String> updateFavoriteFile(String fileName, CloudUserDevicesRepository.CloudUserDevice dev,
                                                      Long updatetime, GpxFile file) throws IOException {
-        File tmpGpx = createTmpGpxFile(file, fileName);
+        File tmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, file, tmpGpx);
         
@@ -98,15 +96,6 @@ public class FavoriteService {
             resp = new UserdataService.ResponseFileStatus(userFile);
         }
         return resp;
-    }
-    
-    public File createTmpGpxFile(GpxFile file, String fileName) throws IOException {
-        File tmpGpx = File.createTempFile(fileName, FILE_EXT_GPX);
-        Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), file);
-        if (exception != null) {
-            throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);
-        }
-        return tmpGpx;
     }
 
     @Nullable
@@ -141,9 +130,9 @@ public class FavoriteService {
     }
     
     private CloudUserFilesRepository.UserFile createDefaultGroup(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
-        GpxFile file = new GpxFile(OSMAND_ROUTER_V2);
-        file.getMetadata().setName(DEFAULT_GROUP_NAME);
-        File tmpGpx = createTmpGpxFile(file, groupName);
+        GpxFile gpxFile = new GpxFile(OSMAND_ROUTER_V2);
+        gpxFile.getMetadata().setName(DEFAULT_GROUP_NAME);
+        File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, groupName);
         uploadFavoriteFile(tmpGpx, dev, groupName, updatetime);
         return userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
     }
@@ -152,7 +141,7 @@ public class FavoriteService {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         gpxFile.getMetadata().setName(groupName);
         String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
-        File tmpGpx = createTmpGpxFile(gpxFile, name);
+        File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, name);
         uploadFavoriteFile(tmpGpx, dev, name, null);
         UserdataService.ResponseFileStatus resp = createResponse(dev, name, gpxFile, tmpGpx);
         if (resp != null) {
