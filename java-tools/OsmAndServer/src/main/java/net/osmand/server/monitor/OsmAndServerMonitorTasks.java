@@ -311,7 +311,7 @@ public class OsmAndServerMonitorTasks {
 					jobsArray = object.getJSONArray("jobs");
 					is.close();
 				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED && code != HttpURLConnection.HTTP_FORBIDDEN) {
-					sendBroadcastMessage(String.format("Jenkins %s is unavailable (%d)", buildServer.jenkinsUrl, code));
+					sendBroadcastMessage(String.format("Jenkins %s bad response (%d)", buildServer.jenkinsUrl, code));
 				}
 
 				if (jobsArray.isEmpty() && buildServer.statusJsonUrl != null) {
