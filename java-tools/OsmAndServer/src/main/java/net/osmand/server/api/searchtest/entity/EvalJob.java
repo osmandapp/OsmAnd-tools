@@ -44,6 +44,12 @@ public class EvalJob extends Config {
 	@Column(name = "south_east")
 	private String southEast;
 
+	@Column()
+	public Double lat;
+
+	@Column()
+	public Double lon;
+
 	@CreationTimestamp
 	public Timestamp created;
 

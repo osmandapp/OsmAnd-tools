@@ -85,6 +85,9 @@ public class SearchTestService extends DataService {
 		job.setNorthWest(payload.northWest());
 		job.setSouthEast(payload.southEast());
 		job.baseSearch = payload.baseSearch();
+		// Persist optional lat/lon overrides if provided
+		job.lat = payload.lat();
+		job.lon = payload.lon();
 
 		job.fileName = dataset.fileName;
 		job.function = payload.functionName();
@@ -134,24 +137,30 @@ public class SearchTestService extends DataService {
 				}
 
 				long startTime = System.currentTimeMillis();
-				LatLon point = null;
 				Map<String, Object> row = example.row();
+				String lat = (String) row.get("lat");
+				String lon = (String) row.get("lon");
+				LatLon expectedPoint = parseLatLon(lat, lon);
+				if (expectedPoint == null) {
+					LOGGER.warn("Invalid expected (lat, lon) in input format: {}, {}", lat, lon);
+					continue;
+				}
+
+				LatLon point;
+				if (job.lat == null || job.lon == null) {
+					point = expectedPoint;
+				} else {
+					point = new LatLon(job.lat, job.lon);
+				}
+
 				String address = example.address();
 				try {
-					String lat = (String) row.get("lat");
-					String lon = (String) row.get("lon");
-					point = parseLatLon(lat, lon);
-					if (point == null) {
-						throw new IllegalArgumentException("Invalid or missing (lat, lon) in WKT format: (" + lat + " "
-								+ lon + ")");
-					}
-
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
 							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-					saveResults(job, address, row, searchResults, point, System.currentTimeMillis() - startTime, null);
+					saveResults(job, address, row, searchResults, expectedPoint, System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for job {}.", job.id, e);
-					saveResults(job, address, row, Collections.emptyList(), point,
+					saveResults(job, address, row, Collections.emptyList(), expectedPoint,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
