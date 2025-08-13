@@ -103,7 +103,7 @@ public class OsmAndServerMonitorTasks {
 	// Build Server
 	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
 	{
-//		buildServers.add(new BuildServerCheckInfo("https://builder.osmand.net:8080", "builder")); // TODO no-anonymous
+		buildServers.add(new BuildServerCheckInfo("https://builder.osmand.net:8080", "builder"));
 		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
 		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
 		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
@@ -735,7 +735,7 @@ public class OsmAndServerMonitorTasks {
 			}
 		}
 		if (failed == 0) {
-			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n"; // TODO builder
+			msg += "<a href='https://builder.osmand.net:8080/'>Jenkins</a>: <b>OK</b>.\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
