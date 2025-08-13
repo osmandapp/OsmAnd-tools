@@ -1011,6 +1011,10 @@ public class IndexBatchCreator {
 					return;
 				}
 				if (regionName.toLowerCase().contains("seamarks")) {
+					// for now it's processed separately
+					return;
+				}
+				if (regionName.toLowerCase().contains("seamarks")) {
 					settings.keepOnlySeaObjects = true;
 					settings.indexTransport = false;
 					settings.indexAddress = false;
