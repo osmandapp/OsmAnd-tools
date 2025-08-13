@@ -223,8 +223,8 @@ public abstract class DataService extends UtilService {
 	}
 
 	public String getDatasetSample(Long datasetId) {
-		Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() -> new RuntimeException("Dataset not " +
-				"found with " + "id: " + datasetId));
+		Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
+				new RuntimeException("Dataset not found with id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = "SELECT * FROM " + tableName;

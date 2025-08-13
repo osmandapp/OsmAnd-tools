@@ -116,12 +116,8 @@ public class SearchTestService extends DataService {
 			List<RowAddress> examples = execute(script.code(), job.function, rows, job.selCols,
 					objectMapper.readValue(job.params, String[].class));
 			for (RowAddress example : examples) {
-				job = datasetJobRepository.findById(jobId).map(j -> {
-							em.detach(j);
-							return j;
-						}) // detach to avoid caching
-						.orElse(null);
-				if (job == null || job.status != EvalJob.Status.RUNNING) {
+				String status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class, jobId);
+				if (!EvalJob.Status.RUNNING.name().equals(status)) {
 					LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
 					break; // Exit the loop if the job has been cancelled
 				}
