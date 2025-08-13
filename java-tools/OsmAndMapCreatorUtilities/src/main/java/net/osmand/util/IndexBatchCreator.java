@@ -16,6 +16,7 @@ import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -26,7 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -105,6 +105,7 @@ public class IndexBatchCreator {
 		int slotsPerJob = 1;
 		int freeRamToStartPerc = 0;
 		int freeRamToStopPerc = 0;
+		int order = 0;
 		// AWS
 		String definition;
 		
@@ -112,6 +113,9 @@ public class IndexBatchCreator {
 		int sizeUpToMB = -1;
 		Set<String> excludedRegions = new TreeSet<>();
 		List<String> excludePatterns = new ArrayList<>();
+		
+		
+		List<DockerPendingGeneration> pendingGenerations = new ArrayList<>();
 
 	}
 
@@ -175,7 +179,6 @@ public class IndexBatchCreator {
 	/// DOCKER gen block
 	DockerClient dockerClient;
 	int dockerSlots = 4;
-	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new ConcurrentHashMap<>();
 	List<DockerPendingGeneration> dockerRunningGenerations = new ArrayList<>();
 	List<DockerPendingGeneration> dockerRescheduledGenerations = new ArrayList<>();
 	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
@@ -291,6 +294,9 @@ public class IndexBatchCreator {
 				jd.definition = jbe.getAttribute("definition");
 				if (!Algorithms.isEmpty(jbe.getAttribute("slotsPerJob"))) {
 					jd.slotsPerJob = Integer.parseInt(jbe.getAttribute("slotsPerJob"));
+				}
+				if (!Algorithms.isEmpty(jbe.getAttribute("order"))) {
+					jd.order = Integer.parseInt(jbe.getAttribute("order"));
 				}
 				if (!Algorithms.isEmpty(jbe.getAttribute("freeRamToStartPerc"))) {
 					jd.freeRamToStartPerc = Integer.parseInt(jbe.getAttribute("freeRamToStartPerc"));
@@ -472,8 +478,8 @@ public class IndexBatchCreator {
 	private void waitDockerJobsToFinish(long timeout) {
 		while (true) {
 			int pending = 0;
-			for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
-				pending += l.size();
+			for (ExternalJobDefinition jd : externalJobQueues) {
+				pending += jd.pendingGenerations.size();
 			}
 			int rescheduled = dockerRescheduledGenerations.size();
 			int running = dockerRunningGenerations.size();
@@ -616,13 +622,15 @@ public class IndexBatchCreator {
 		// Build a list of jobs to potentially start, giving priority to rescheduled
 		List<DockerPendingGeneration> queueToRun = new ArrayList<>(dockerRescheduledGenerations);
 		// Find the first queue with pending jobs and add them
-		for (ExternalJobDefinition jd : externalJobQueues) {
-			if (dockerPendingGenerations.containsKey(jd)) {
-				List<DockerPendingGeneration> pendingForJd = dockerPendingGenerations.get(jd);
-				if (pendingForJd != null && !pendingForJd.isEmpty()) {
-					queueToRun.addAll(pendingForJd);
-				}
+		Collections.sort(externalJobQueues, new Comparator<ExternalJobDefinition>() {
+
+			@Override
+			public int compare(ExternalJobDefinition o1, ExternalJobDefinition o2) {
+				return Integer.compare(o1.order, o2.order);
 			}
+		});
+		for (ExternalJobDefinition jd : externalJobQueues) {
+			queueToRun.addAll(jd.pendingGenerations);
 		}
 		return queueToRun;
 	}
@@ -645,7 +653,7 @@ public class IndexBatchCreator {
 				}
 				try {
 					// In future: we can find & remove container if it exists with same name
-					dockerPendingGenerations.get(p.jd).remove(p);
+					p.jd.pendingGenerations.remove(p);
 					dockerRescheduledGenerations.remove(p);
 					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
 							.withEnv(p.envs).withName(p.name).exec();
@@ -980,7 +988,7 @@ public class IndexBatchCreator {
 			}
 			if (jd.type.equals("aws")) {
 				log.warn("-------------------------------------------");
-				log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
+				log.warn("----------- Generate on AWS " + file.getName() + " " + jd.queue +  "\n\n\n");
 				try {
 					generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 					return true;
@@ -989,7 +997,7 @@ public class IndexBatchCreator {
 				}
 			} else if (jd.type.equals("docker")) {
 				log.warn("-------------------------------------------");
-				log.warn("----------- Generate on Docker " + file.getName() + "\n\n\n");
+				log.warn("----------- Generate on Docker " + file.getName() + " " + jd.queue + " \n\n\n");
 				try {
 					generateDockerIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 					return true;
@@ -1050,12 +1058,7 @@ public class IndexBatchCreator {
 		
 		
 		// to avoid concurrency issues
-		List<DockerPendingGeneration> lst = new ArrayList<DockerPendingGeneration>();
-		if (dockerPendingGenerations.containsKey(jd)) {
-			lst.addAll(dockerPendingGenerations.get(jd));
-		}
-		lst.add(p);
-		dockerPendingGenerations.put(jd, lst);
+		jd.pendingGenerations.add(p);
 	}
 	
 	private void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,

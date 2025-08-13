@@ -11,8 +11,20 @@
 		
 		
 		<external dockerSlots="56">
+			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker"
+					freeRamToStartPerc="12" freeRamToStopPerc="5" order="2">
+				<parameter k="image" v="osmandapp/osmand-mapcreator" />
+				<parameter k="cmd_1" v="generate-obf" />
+				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
+				<parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
+				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
+				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
+				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+				
+				<filter exclude="world_seamarks" />
+			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker" 
-					freeRamToStartPerc="17" freeRamToStopPerc="5">
+					freeRamToStartPerc="17" freeRamToStopPerc="5" order="1">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
@@ -20,19 +32,6 @@
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx24000M "/> 
 				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
-                
-				<filter exclude="world_seamarks" />
-			</job>
-			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker"
-					freeRamToStartPerc="12" freeRamToStopPerc="5">
-				<parameter k="image" v="osmandapp/osmand-mapcreator" />
-				<parameter k="cmd_1" v="generate-obf" />
-				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
-                <parameter k="cmd_3" v="--max-height-tiles-in-ram=100" />
-				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
-                <parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
-				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
-				
 				<filter exclude="world_seamarks" />
 			</job>
 		</external>
