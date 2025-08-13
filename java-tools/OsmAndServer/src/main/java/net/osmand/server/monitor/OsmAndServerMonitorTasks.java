@@ -77,12 +77,18 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
 			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", 
 			 "maptile.osmand.net", "data.osmand.net"};
-	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
-			"maptile.osmand.net" };
-	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
-			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/", // TODO add builder
+	private static final String[] JAVA_HOSTS_TO_TEST = new String[]{
+			"download.osmand.net",
+			"builder.osmand.net",
+			"creator.osmand.net",
+			"maptile.osmand.net"
+	};
+	private static final String[] JAVA_HOSTS_TO_RESTART = new String[]{
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
-			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
+			"https://builder.osmand.net:8080/job/WebSite_OsmAndServer/",
+			"https://creator.osmand.net:8080/job/WebSite_OsmAndServer/",
+			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/"
+	};
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 	
