@@ -254,7 +254,7 @@ public class LightSectorProcessor {
 	private static List<LightSectorConfigLayer> defaultLightSectorsConfig() {
 		List<LightSectorConfigLayer> configs = new ArrayList<>();
 //        configs.add(new LightSectorConfigLayer(0, 0.30, 1.6, 16, new MapZoomPair(6, 9), new MapZoomPair(10, 11))); // strangely doesn't work
-        configs.add(new LightSectorConfigLayer(0, 0.30, 1.6, 16, new MapZoomPair(6, 11)));
+        configs.add(new LightSectorConfigLayer(0, 0.30, 1.6, 16, new MapZoomPair(9, 11)));
         configs.add(new LightSectorConfigLayer(1, 0.20, 0.8, 8, new MapZoomPair(12, 13)));
         configs.add(new LightSectorConfigLayer(2, 0.15, 0.4, 4, new MapZoomPair(14, 15)));
         configs.add(new LightSectorConfigLayer(3, 0.10, 0.2, 2, new MapZoomPair(16, MapZoomPair.MAX_ALLOWED_ZOOM)));
