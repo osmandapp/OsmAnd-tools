@@ -104,7 +104,7 @@ public class OsmAndServerMonitorTasks {
 	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
 	{
 		buildServers.add(new BuildServerCheckInfo(
-				"builder", "https://builder.osmand.net:8080", null));
+				"builder", "https://builder.osmand.net:8080", "https://builder.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
 				"creator", "https://creator.osmand.net:8080", null));
 		buildServers.add(new BuildServerCheckInfo(
@@ -298,41 +298,45 @@ public class OsmAndServerMonitorTasks {
 		}
 		for (BuildServerCheckInfo buildServer : buildServers) {
 			try {
+				JSONArray jobsArray = new JSONArray();
 				Set<String> jobsFailed = new TreeSet<String>();
+
 				URL url = new URL(buildServer.jenkinsUrl + "/api/json");
-				InputStream is = url.openConnection().getInputStream();
-				JSONObject object = new JSONObject(new JSONTokener(is));
-				JSONArray jsonArray = object.getJSONArray("jobs");
-				if (!jsonArray.isEmpty()) {
-					for (int i = 0; i < jsonArray.length(); i++) {
-						JSONObject jb = jsonArray.getJSONObject(i);
-						String name = jb.getString("name");
-						String color = jb.getString("color");
-						if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
-								&& !color.equals("blue_anime")) {
-							jobsFailed.add(name);
-						}
-					}
-				} else if (buildServer.statusJsonUrl != null) {
-					// TODO refactor after tests
-					URL jsonUrl = new URL(buildServer.statusJsonUrl);
-					InputStream jsonIS = jsonUrl.openConnection().getInputStream();
-					JSONArray jobsArray = new JSONArray(new JSONTokener(jsonIS));
-					for (int i = 0; i < jobsArray.length(); i++) {
-						JSONObject jb = jobsArray.getJSONObject(i);
-						String name = jb.getString("name");
-						String color = jb.getString("color");
-						if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
-								&& !color.equals("blue_anime")) {
-							jobsFailed.add(name);
-						}
-					}
-					jsonIS.close();
-				} else {
-					sendBroadcastMessage("No statusJsonUrl defined for non-anonymous Jenkins Server: "
-							+ buildServer.jenkinsUrl);
+				HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+				int code = connection.getResponseCode();
+
+				if (code == HttpURLConnection.HTTP_OK) {
+					InputStream is = connection.getInputStream();
+					JSONObject object = new JSONObject(new JSONTokener(is));
+					jobsArray = object.getJSONArray("jobs");
+					is.close();
+				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED) {
+					sendBroadcastMessage(String.format("Jenkins %s is unavailable (%d)", buildServer.jenkinsUrl, code));
 				}
-				is.close();
+
+				if (jobsArray.isEmpty() && buildServer.statusJsonUrl != null) {
+					url = new URL(buildServer.statusJsonUrl);
+					connection = (HttpURLConnection) url.openConnection();
+					InputStream is = connection.getInputStream();
+					jobsArray = new JSONArray(new JSONTokener(is));
+					is.close();
+				}
+
+				if (jobsArray.isEmpty()) {
+					sendBroadcastMessage(String.format(
+							"No Jenkins jobs found (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
+				}
+
+				for (int i = 0; i < jobsArray.length(); i++) {
+					JSONObject jb = jobsArray.getJSONObject(i);
+					String name = jb.getString("name");
+					String color = jb.getString("color");
+					if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
+							&& !color.equals("blue_anime")) {
+						jobsFailed.add(name);
+					}
+				}
+
 				if (buildServer.jobsFailed == null) {
 					buildServer.jobsFailed = jobsFailed;
 				} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
@@ -352,7 +356,9 @@ public class OsmAndServerMonitorTasks {
 				}
 				buildServer.lastCheckTimestamp = System.currentTimeMillis();
 			} catch (Exception e) {
-				sendBroadcastMessage("Exception while checking the build server status: " + buildServer.jenkinsUrl);
+				sendBroadcastMessage(String.format(
+						"Exception in checkOsmAndBuildServer (%s) (%s) (%s)",
+						buildServer.jenkinsUrl, buildServer.statusJsonUrl, e.getMessage()));
 				LOG.error(buildServer.jenkinsUrl + "\n" + e.getMessage(), e);
 			}
 		}
