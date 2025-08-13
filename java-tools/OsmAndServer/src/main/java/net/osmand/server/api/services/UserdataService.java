@@ -350,7 +350,7 @@ public class UserdataService {
 				if (originalFilename == null) {
 					originalFilename = name;
 				}
-				if (isEmptyFile(name, originalFilename) || isGpxFile(originalFilename)) {
+				if (isEmptyFileByName(name, originalFilename) || isGpxFileByName(originalFilename)) {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
 				} else {
 					// try to create gpx file from unknown file
@@ -367,11 +367,11 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
-	private boolean isGpxFile(String originalFilename) {
+	private boolean isGpxFileByName(String originalFilename) {
 		return originalFilename.toLowerCase().endsWith(GPX_FILE_EXT);
 	}
 
-	private boolean isEmptyFile(String name, String originalFilename) {
+	private boolean isEmptyFileByName(String name, String originalFilename) {
 		return name.endsWith(EMPTY_FILE_NAME) && originalFilename.equals("empty");
 	}
 
