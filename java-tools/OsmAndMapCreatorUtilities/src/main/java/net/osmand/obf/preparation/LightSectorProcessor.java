@@ -55,7 +55,7 @@ public class LightSectorProcessor {
 
 	private static final Log log = PlatformUtil.getLog(LightSectorProcessor.class);
 	private static final AtomicLong entityIdCounter = new AtomicLong(-1000);
-	private static final double SCALE_RANGE_DIFF_PYTHON = 0.62;
+	private static final double SCALE_RANGE_DIFF_PYTHON = 0.62; // python uses mercator projection to scale, here we scale in meters
 	// From s57.py
 	private static final List<String> LEADING_LIGHT_CATEGORIES = Arrays.asList("leading", "front", "rear", "lower", "upper");
 

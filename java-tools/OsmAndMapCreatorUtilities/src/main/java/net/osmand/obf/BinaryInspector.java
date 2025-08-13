@@ -61,15 +61,15 @@ public class BinaryInspector {
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=15",
+					"-zoom=10",
 					// road
 //					"-latlon=50.441932,30.510840,0.0005",
 					//"-xyz=12071,26142,16",
 //					"-c",
-					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_2.osm",
-					System.getProperty("maps.dir") + "lightsector/World_lightsectors_src_2.obf"
-//					"-osm="+System.getProperty("maps.dir")+"lightsectors-2.osm",
-//					System.getProperty("maps.dir") + "lightsector/original/lightsectors-2.obf"
+					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					System.getProperty("maps.dir") + "lightsector/World_lightsectors_src_0.obf"
+//					"-osm="+System.getProperty("maps.dir")+"lightsectors-0.osm",
+//					System.getProperty("maps.dir") + "lightsector/original/lightsectors-0.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
