@@ -1,9 +1,6 @@
 package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.services.FavoriteService;
@@ -16,16 +13,13 @@ import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.WptPt;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.*;
 import java.util.*;
 
-import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 
 @Controller
@@ -88,7 +82,7 @@ public class FavoriteController {
             }
             file.updatePointsGroup(groupName, file.getPointsGroups().get(groupName));
 
-            File newTmpGpx = favoriteService.createTmpGpxFile(file, fileName);
+            File newTmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
             Date clienttime = null;
             
             if (!updateTimestamp) {
@@ -156,12 +150,12 @@ public class FavoriteController {
                         UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
         
-        File newTmpGpx = favoriteService.createTmpGpxFile(newGpxFile, newGroupName);
+        File newTmpGpx = gpxService.createTmpFileByGpxFile(newGpxFile, newGroupName);
         favoriteService.uploadFavoriteFile(newTmpGpx, dev, newGroupName, newGroupUpdatetime);
         
         File oldTmpGpx = null;
         if (changeGroup) {
-            oldTmpGpx = favoriteService.createTmpGpxFile(oldGpxFile, oldGroupName);
+            oldTmpGpx = gpxService.createTmpFileByGpxFile(oldGpxFile, oldGroupName);
             favoriteService.uploadFavoriteFile(oldTmpGpx, dev, oldGroupName, oldGroupUpdatetime);
         }
         
@@ -196,7 +190,7 @@ public class FavoriteController {
             pointsGroup.getPoints().forEach(p -> p.setCategory(newName));
             gpxFile.updatePointsGroup(oldName, pointsGroup);
             
-            File tmpGpx = favoriteService.createTmpGpxFile(gpxFile, fullNewName);
+            File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fullNewName);
             InternalZipFile fl = InternalZipFile.buildFromFile(tmpGpx);
             
             return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
