@@ -3,7 +3,7 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager;
+
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
@@ -15,6 +15,7 @@ import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -30,8 +31,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+
+import jakarta.persistence.EntityManager;
 
 @Service
 public class SearchTestService extends DataService {
@@ -103,20 +113,21 @@ public class SearchTestService extends DataService {
 			return; // do not process cancelled/completed jobs
 		}
 
-		EvalJob finalJob = job;
 		Dataset dataset = datasetRepository.findById(job.datasetId)
-				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + finalJob.datasetId));
+				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + job.datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
-		String sql = String.format("SELECT * FROM %s", tableName);
 		try {
+			String[] columns = objectMapper.readValue(job.selCols, String[].class);
+			String sql = String.format("SELECT lat, lon, %s FROM %s", String.join(",", columns), tableName);
 			Script script = objectMapper.readValue(dataset.script, Script.class);
 
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			List<RowAddress> examples = execute(script.code(), job.function, rows, job.selCols,
 					objectMapper.readValue(job.params, String[].class));
 			for (RowAddress example : examples) {
-				String status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class, jobId);
+				String status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class,
+						jobId);
 				if (!EvalJob.Status.RUNNING.name().equals(status)) {
 					LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
 					break; // Exit the loop if the job has been cancelled
@@ -126,7 +137,6 @@ public class SearchTestService extends DataService {
 				LatLon point = null;
 				Map<String, Object> row = example.row();
 				String address = example.address();
-				String originalJson = objectMapper.writeValueAsString(row);
 				try {
 					String lat = (String) row.get("lat");
 					String lon = (String) row.get("lon");
@@ -138,17 +148,16 @@ public class SearchTestService extends DataService {
 
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
 							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-					saveResults(job, dataset, address, originalJson, searchResults, point,
-							System.currentTimeMillis() - startTime, null);
+					saveResults(job, address, row, searchResults, point, System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
-					LOGGER.warn("Failed to process row for job {}: {}", job.id, originalJson, e);
-					saveResults(job, dataset, address, originalJson, Collections.emptyList(), point,
+					LOGGER.warn("Failed to process row for job {}.", job.id, e);
+					saveResults(job, address, row, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
 			}
 
-			if (job != null && job.status != EvalJob.Status.CANCELED) {
+			if (job.status != EvalJob.Status.CANCELED) {
 				job.status = EvalJob.Status.COMPLETED;
 			}
 		} catch (Exception e) {
@@ -252,8 +261,8 @@ public class SearchTestService extends DataService {
 			throw new RuntimeException("No evaluation job found for jobId: " + jobId);
 		}
 
-		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT * FROM eval_result WHERE job_id = ?",
-				jobId);
+		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT lat, lon, address, min_distance, " +
+					"results_count, actual_place, closest_result, original FROM eval_result WHERE job_id = ?", jobId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeResultsAsCsv(writer, results);
 		} else if ("json".equalsIgnoreCase(format)) {

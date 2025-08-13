@@ -173,12 +173,14 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	protected void saveResults(EvalJob job, Dataset dataset, String address, String originalJson,
-							   List<Feature> searchResults, LatLon originalPoint, long duration, String error) {
-		if (job == null || dataset == null) {
+	protected void saveResults(EvalJob job, String address, Map<String, Object> row,
+							   List<Feature> searchResults, LatLon originalPoint, long duration, String error) throws IOException {
+		if (job == null) {
 			return;
 		}
+
 		int resultsCount = searchResults.size();
+		Feature minFeature = null;
 		Integer minDistance = null, actualPlace = null;
 		String closestResult = null;
 
@@ -199,6 +201,7 @@ public abstract class DataService extends UtilService {
 					minDistanceMeters = distance;
 					closestPoint = foundPoint;
 					actualPlace = place;
+					minFeature = feature;
 				}
 			}
 
@@ -208,11 +211,17 @@ public abstract class DataService extends UtilService {
 			}
 		}
 
+		if (minFeature != null) {
+			for (Map.Entry<String, Object> e : minFeature.properties.entrySet())
+				row.put(e.getKey(), e.getValue().toString());
+		}
+
 		String insertSql =
 				"INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
 						"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
-						+ " ?, ?,?, ?, ?, ?, ?, ?, ?)";
-		jdbcTemplate.update(insertSql, job.id, dataset.id, originalJson, error, duration, resultsCount, minDistance,
+						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String rowJson = objectMapper.writeValueAsString(row);
+		jdbcTemplate.update(insertSql, job.id, job.datasetId, rowJson, error, duration, resultsCount, minDistance,
 				closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(),
 				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
 				new java.sql.Timestamp(System.currentTimeMillis()));
