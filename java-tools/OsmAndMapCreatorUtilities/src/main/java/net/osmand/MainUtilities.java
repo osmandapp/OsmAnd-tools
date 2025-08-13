@@ -293,6 +293,12 @@ public class MainUtilities {
 			} else if (s.equals("--keep-only-sea-objects")) {
 				settings.keepOnlySeaObjects = true;
 				it.remove();
+			} else if (s.equals("--no-address")) {
+				settings.indexAddress = false;
+				it.remove();
+			} else if (s.equals("--no-transport")) {
+				settings.indexTransport = false;
+				it.remove();
 			} else if (s.equals("--ram-process")) {
 				settings.processInRam = true;
 				it.remove();
