@@ -103,13 +103,20 @@ public class OsmAndServerMonitorTasks {
 	// Build Server
 	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
 	{
-		buildServers.add(new BuildServerCheckInfo("https://builder.osmand.net:8080", "builder"));
-		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
-		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
-		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
-		buildServers.add(new BuildServerCheckInfo("https://maptile.osmand.net:8080", "jenkins-maptile"));
-		buildServers.add(new BuildServerCheckInfo("https://data.osmand.net:8080", "jenkins-data"));
-		buildServers.add(new BuildServerCheckInfo("https://veles.osmand.net:8080", "jenkins-veles"));
+		buildServers.add(new BuildServerCheckInfo(
+				"builder", "https://builder.osmand.net:8080", null));
+		buildServers.add(new BuildServerCheckInfo(
+				"creator", "https://creator.osmand.net:8080", null));
+		buildServers.add(new BuildServerCheckInfo(
+				"dl2", "https://dl2.osmand.net:8080", null));
+		buildServers.add(new BuildServerCheckInfo(
+				"main", "https://osmand.net:8095", null));
+		buildServers.add(new BuildServerCheckInfo(
+				"maptile", "https://maptile.osmand.net:8080", "https://maptile.osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"data", "https://data.osmand.net:8080", null));
+		buildServers.add(new BuildServerCheckInfo(
+				"veles", "https://veles.osmand.net:8080", null));
 	}
 	
 
@@ -292,18 +299,38 @@ public class OsmAndServerMonitorTasks {
 		for (BuildServerCheckInfo buildServer : buildServers) {
 			try {
 				Set<String> jobsFailed = new TreeSet<String>();
-				URL url = new URL(buildServer.serverUrl + "/api/json");
+				URL url = new URL(buildServer.jenkinsUrl + "/api/json");
 				InputStream is = url.openConnection().getInputStream();
 				JSONObject object = new JSONObject(new JSONTokener(is));
 				JSONArray jsonArray = object.getJSONArray("jobs");
-				for (int i = 0; i < jsonArray.length(); i++) {
-					JSONObject jb = jsonArray.getJSONObject(i);
-					String name = jb.getString("name");
-					String color = jb.getString("color");
-					if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
-							&& !color.equals("blue_anime")) {
-						jobsFailed.add(name);
+				if (!jsonArray.isEmpty()) {
+					for (int i = 0; i < jsonArray.length(); i++) {
+						JSONObject jb = jsonArray.getJSONObject(i);
+						String name = jb.getString("name");
+						String color = jb.getString("color");
+						if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
+								&& !color.equals("blue_anime")) {
+							jobsFailed.add(name);
+						}
 					}
+				} else if (buildServer.statusJsonUrl != null) {
+					// TODO refactor after tests
+					URL jsonUrl = new URL(buildServer.statusJsonUrl);
+					InputStream jsonIS = jsonUrl.openConnection().getInputStream();
+					JSONArray jobsArray = new JSONArray(new JSONTokener(jsonIS));
+					for (int i = 0; i < jobsArray.length(); i++) {
+						JSONObject jb = jobsArray.getJSONObject(i);
+						String name = jb.getString("name");
+						String color = jb.getString("color");
+						if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
+								&& !color.equals("blue_anime")) {
+							jobsFailed.add(name);
+						}
+					}
+					jsonIS.close();
+				} else {
+					sendBroadcastMessage("No statusJsonUrl defined for non-anonymous Jenkins Server: "
+							+ buildServer.jenkinsUrl);
 				}
 				is.close();
 				if (buildServer.jobsFailed == null) {
@@ -325,8 +352,8 @@ public class OsmAndServerMonitorTasks {
 				}
 				buildServer.lastCheckTimestamp = System.currentTimeMillis();
 			} catch (Exception e) {
-				sendBroadcastMessage("Exception while checking the build server status: " + buildServer.serverUrl);
-				LOG.error(buildServer.serverUrl + "\n" + e.getMessage(), e);
+				sendBroadcastMessage("Exception while checking the build server status: " + buildServer.jenkinsUrl);
+				LOG.error(buildServer.jenkinsUrl + "\n" + e.getMessage(), e);
 			}
 		}
 	}
@@ -730,7 +757,7 @@ public class OsmAndServerMonitorTasks {
 		for (BuildServerCheckInfo buildServer : buildServers) {
 			if (buildServer.jobsFailed != null && !buildServer.jobsFailed.isEmpty()) {
 				failed++;
-				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.serverUrl,
+				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.jenkinsUrl,
 						buildServer.serverName, formatJobNamesAsHref(buildServer, buildServer.jobsFailed));
 			}
 		}
@@ -756,7 +783,7 @@ public class OsmAndServerMonitorTasks {
 	private Set<String> formatJobNamesAsHref(BuildServerCheckInfo buildServer, Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.serverUrl, jobName, jobName));
+			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.jenkinsUrl, jobName, jobName));
 		}
 		return formatted;
 	}
@@ -1001,14 +1028,16 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
-		String serverUrl;
 		String serverName;
+		String jenkinsUrl;
+		String statusJsonUrl;
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
 		
-		public BuildServerCheckInfo(String serverUrl, String serverName) {
+		public BuildServerCheckInfo(String serverName, String jenkinsUrl, String statusJsonUrl) {
 			this.serverName = serverName;
-			this.serverUrl = serverUrl;
+			this.jenkinsUrl = jenkinsUrl;
+			this.statusJsonUrl = statusJsonUrl;
 		}
 	}
 
