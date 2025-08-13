@@ -213,7 +213,7 @@ public abstract class DataService extends UtilService {
 
 		if (minFeature != null) {
 			for (Map.Entry<String, Object> e : minFeature.properties.entrySet())
-				row.put(e.getKey(), e.getValue().toString());
+				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
 		}
 
 		String insertSql =
