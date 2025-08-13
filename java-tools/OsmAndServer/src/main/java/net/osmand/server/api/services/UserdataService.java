@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -346,13 +347,17 @@ public class UserdataService {
 		} else {
 			try {
 				String originalFilename = file.getOriginalFilename();
-				if (!FILE_TYPE_GPX.equalsIgnoreCase(originalFilename)) {
+				if (originalFilename == null) {
+					originalFilename = name;
+				}
+				if (isEmptyFile(name, originalFilename) || isGpxFile(originalFilename)) {
+					zipfile = InternalZipFile.buildFromMultipartFile(file);
+				} else {
+					// try to create gpx file from unknown file
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
 					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
-				} else {
-					zipfile = InternalZipFile.buildFromMultipartFile(file);
 				}
 			} catch (IOException e) {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
@@ -362,6 +367,13 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
+	private boolean isGpxFile(String originalFilename) {
+		return originalFilename.toLowerCase().endsWith(GPX_FILE_EXT);
+	}
+
+	private boolean isEmptyFile(String name, String originalFilename) {
+		return name.endsWith(EMPTY_FILE_NAME) && originalFilename.equals("empty");
+	}
 
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
