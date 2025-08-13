@@ -55,7 +55,7 @@ public class LightSectorProcessor {
 
 	private static final Log log = PlatformUtil.getLog(LightSectorProcessor.class);
 	private static final AtomicLong entityIdCounter = new AtomicLong(-1000);
-
+	private static final double SCALE_ALL_DIFF_PYTHON = 0.5;
 	// From s57.py
 	private static final List<String> LEADING_LIGHT_CATEGORIES = Arrays.asList("leading", "front", "rear", "lower", "upper");
 
@@ -212,7 +212,7 @@ public class LightSectorProcessor {
 		LightSectorConfigLayer(int level, double f_arc, double f_range, int min_range, MapZoomPair... pairs) {
 			this.level = level;
 			this.mapZooms = Arrays.asList(pairs);
-			this.f_arc = f_arc;
+			this.f_arc = f_arc * SCALE_ALL_DIFF_PYTHON;
 			this.f_range = f_range;
 			this.min_range = min_range;
 
@@ -286,7 +286,7 @@ public class LightSectorProcessor {
 		List<File> fls = new ArrayList<File>();
 		int ind = 0;
 		for (LightSectorConfigLayer config : configs) {
-			ind++;
+			
 			File osmFile = new File(outputFile.getParentFile(), outputFile.getName().replace(".obf", "_"+(ind)+".osm"));
 			fls.add(new File(outputFile.getParentFile(), outputFile.getName().replace(".obf", "_"+(ind)+".obf")));
 			Map<EntityId, Entity> entities = new HashMap<Entity.EntityId, Entity>();
@@ -321,6 +321,7 @@ public class LightSectorProcessor {
 			ms.setLevels(config.mapZooms);
 			MainUtilities.generateObf(subArgs, ms, settings);
 			RTree.clearCache();
+			ind++;
 			
 		}
 		FileExtractFrom fileExtractFrom = new FileExtractFrom();
@@ -694,7 +695,7 @@ public class LightSectorProcessor {
 	            Way arcWay = new Way(nextId());
 	            for (int i = 0; i <= pointsCount; i++) {
 	                double bearing = start + (i * (end - start) / pointsCount);
-	                LatLon arcPoint = MapUtils.rhumbDestinationPoint(centerPoint, arcRadius * 1852, bearing);
+	                LatLon arcPoint = MapUtils.rhumbDestinationPoint(centerPoint, arcRadius * 1852, bearing + 180);
 	                Node arcNode = new Node(arcPoint.getLatitude(), arcPoint.getLongitude(), nextId());
 	                arcWay.addNode(arcNode);
 	                newEntities.add(arcNode);
@@ -717,7 +718,7 @@ public class LightSectorProcessor {
 	        double bearing = (Double) attrs.get(LIGHT_PROPERTY.ORIENTATION.tag);
 	        double range = (Double) attrs.get(LIGHT_PROPERTY.RANGE.tag);
 
-	        LatLon endPoint = MapUtils.rhumbDestinationPoint(centerPoint, range * 1852, bearing);
+	        LatLon endPoint = MapUtils.rhumbDestinationPoint(centerPoint, range * 1852, bearing + 180);
 	        Node endNode = new Node(endPoint.getLatitude(), endPoint.getLongitude(), nextId());
 	        Way lineWay = new Way(nextId());
 	        lineWay.addNode(centerNode);
