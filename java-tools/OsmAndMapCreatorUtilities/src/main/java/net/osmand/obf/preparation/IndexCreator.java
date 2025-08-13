@@ -205,8 +205,10 @@ public class IndexCreator {
 
 	private void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		calculateRegionTagAndTransliterate(e, icc);
-        if (e.getTag(TIGER_OSMAND_TAG) != null && settings.indexAddress) {
-            indexAddressCreator.iterateMainEntity(e, ctx, icc);
+        if (e.getTag(TIGER_OSMAND_TAG) != null) {
+			if (settings.indexAddress) {
+				indexAddressCreator.iterateMainEntity(e, ctx, icc);
+			}
             return;
         }
 		if (heightData != null && e instanceof Way) {
