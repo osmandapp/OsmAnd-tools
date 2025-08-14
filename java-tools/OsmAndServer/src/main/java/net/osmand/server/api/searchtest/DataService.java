@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.EvalJobReport;
+import net.osmand.server.api.searchtest.dto.EvalJobMetric;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -358,14 +358,15 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<EvalJobReport> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
+	public Optional<EvalJobMetric> getEvaluationProgress(Long jobId) {
 		String sql = """
-				SELECT
+				SELECT (select status from eval_job where id = job_id) AS status,
 				    count(*) AS total,
-				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE results_count = 0) AS notFound,
+				    count(*) FILTER (WHERE error IS NOT NULL) AS error,
 				    sum(duration) AS duration,
-				    avg(actual_place) AS average_place
+				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
+				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
+				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS no_result
 				FROM
 				    eval_result
 				WHERE
@@ -373,15 +374,27 @@ public abstract class DataService extends UtilService {
 				""";
 
 		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
-		long processed = ((Number) result.get("total")).longValue();
-		if (processed == 0) {
+		long total = ((Number) result.get("total")).longValue();
+		if (total == 0) {
 			return Optional.empty();
 		}
-		long failed = ((Number) result.get("failed")).longValue();
-		long notFound = ((Number) result.get("notFound")).longValue();
-		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
-		double averagePlace = result.get("average_place") == null ? 0 :
-				((Number) result.get("average_place")).doubleValue();
+
+		EvalJob.Status status = EvalJob.Status.valueOf((String)result.get("status"));
+		long error = ((Number) result.get("error")).longValue();
+		long duration = ((Number) result.get("duration")).longValue();
+		Number number = ((Number) result.get("average_place"));
+		double averagePlace = number == null ? 0.0 : number.doubleValue();
+		long noResult = ((Number) result.get("no_result")).longValue();
+
+		EvalJobMetric report = new EvalJobMetric(status, noResult, total, error, duration, averagePlace, null);
+		return Optional.of(report);
+	}
+
+	public Optional<EvalJobMetric> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
+		Optional<EvalJobMetric> opt = getEvaluationProgress(jobId);
+		if (opt.isEmpty()) {
+			return Optional.empty();
+		}
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
 		distanceHistogram.put("Empty", 0);
@@ -395,8 +408,10 @@ public abstract class DataService extends UtilService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		EvalJobReport report = new EvalJobReport(jobId, notFound, processed, failed, duration, averagePlace, distanceHistogram);
-		return Optional.of(report);
+		EvalJobMetric metric = opt.get();
+		metric = new EvalJobMetric(metric.status(), metric.noResult(), metric.processed(),
+				metric.error(), metric.duration(), metric.averagePlace(), distanceHistogram);
+		return Optional.of(metric);
 	}
 
 	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {

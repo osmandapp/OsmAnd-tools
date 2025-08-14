@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
-import net.osmand.server.api.searchtest.dto.EvalJobProgress;
-import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.dto.EvalStarter;
 import net.osmand.server.api.searchtest.dto.Script;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -23,10 +21,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+ import org.springframework.web.reactive.function.client.WebClient;
+ import org.springframework.dao.EmptyResultDataAccessException;
 
-import java.io.IOException;
-import java.io.Writer;
+import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -110,7 +108,7 @@ public class SearchTestService extends DataService {
 		}
 
 		Dataset dataset = datasetRepository.findById(job.datasetId)
-				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + job.datasetId));
+				.orElseThrow(() -> new RuntimeException("Dataset not found for job id: " + jobId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		try {
@@ -136,10 +134,17 @@ public class SearchTestService extends DataService {
 			List<RowAddress> examples = execute(script.code(), job.function, delCols, rows, job.selCols,
 					objectMapper.readValue(job.params, String[].class));
 			for (RowAddress example : examples) {
-				String status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class,
-						jobId);
+				String status;
+				try {
+					status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class, jobId);
+				} catch (EmptyResultDataAccessException ex) {
+					job = null;
+					LOGGER.info("Job {} was deleted. Stopping execution.", jobId);
+					return;
+				}
 				if (!EvalJob.Status.RUNNING.name().equals(status)) {
-					LOGGER.info("Job {} was cancelled or deleted. Stopping execution.", jobId);
+					job.status = EvalJob.Status.valueOf(status);
+					LOGGER.info("Job {} was cancelled. Stopping execution.", jobId);
 					break; // Exit the loop if the job has been cancelled
 				}
 
@@ -174,7 +179,7 @@ public class SearchTestService extends DataService {
 				}
 			}
 
-			if (job.status != EvalJob.Status.CANCELED) {
+			if (job.status != EvalJob.Status.CANCELED && job.status != EvalJob.Status.FAILED) {
 				job.status = EvalJob.Status.COMPLETED;
 			}
 		} catch (Exception e) {
@@ -195,12 +200,15 @@ public class SearchTestService extends DataService {
 					.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
 
 			if (job.status == EvalJob.Status.RUNNING) {
+				String sql = "UPDATE eval_job SET status = ?, updated = ? WHERE id = ?";
+				Timestamp updated = new Timestamp(System.currentTimeMillis());
+				jdbcTemplate.update(sql, EvalJob.Status.CANCELED, updated, jobId);
+
 				job.status = EvalJob.Status.CANCELED;
-				job.updated = new java.sql.Timestamp(System.currentTimeMillis());
-				return datasetJobRepository.save(job);
-			} else {
+				job.updated = updated;
 				return job;
 			}
+			return job;
 		});
 	}
 
@@ -211,8 +219,8 @@ public class SearchTestService extends DataService {
 				throw new RuntimeException("Job not found with id: " + jobId);
 			}
 
-			String deleteSql = "DELETE FROM eval_result WHERE job_id = ?";
-			jdbcTemplate.update(deleteSql, jobId);
+			String sql = "DELETE FROM eval_result WHERE job_id = ?";
+			jdbcTemplate.update(sql, jobId);
 
 			datasetJobRepository.deleteById(jobId);
 			LOGGER.info("Deleted job with id: {}", jobId);
@@ -221,40 +229,5 @@ public class SearchTestService extends DataService {
 
 	public Optional<EvalJob> getJob(Long jobId) {
 		return datasetJobRepository.findById(jobId);
-	}
-
-	public Optional<EvalJobProgress> getEvaluationProgress(Long jobId) {
-		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
-		if (jobOptional.isEmpty()) {
-			return Optional.empty();
-		}
-
-		String sql = """
-				SELECT
-				    count(*) AS total,
-				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
-				    avg(actual_place) AS average_place,
-				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
-				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS not_found
-				FROM
-				    eval_result
-				WHERE
-				    job_id = ?
-				""";
-
-		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
-		long processed = ((Number) result.get("total")).longValue();
-		if (processed == 0) {
-			return Optional.empty();
-		}
-		long failed = ((Number) result.get("failed")).longValue();
-		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
-		double averagePlace = result.get("average_place") == null ? 0 :
-				((Number) result.get("average_place")).doubleValue();
-		long notFound = ((Number) result.get("not_found")).longValue();
-
-		EvalJobProgress report = new EvalJobProgress(jobId, notFound, processed, failed, duration, averagePlace);
-		return Optional.of(report);
 	}
 }
