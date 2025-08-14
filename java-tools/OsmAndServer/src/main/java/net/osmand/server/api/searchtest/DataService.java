@@ -363,6 +363,7 @@ public abstract class DataService extends UtilService {
 				SELECT
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
+				    count(*) FILTER (WHERE results_count = 0) AS notFound,
 				    sum(duration) AS duration,
 				    avg(actual_place) AS average_place
 				FROM
@@ -377,6 +378,7 @@ public abstract class DataService extends UtilService {
 			return Optional.empty();
 		}
 		long failed = ((Number) result.get("failed")).longValue();
+		long notFound = ((Number) result.get("notFound")).longValue();
 		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
 		double averagePlace = result.get("average_place") == null ? 0 :
 				((Number) result.get("average_place")).doubleValue();
@@ -393,7 +395,7 @@ public abstract class DataService extends UtilService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		EvalJobReport report = new EvalJobReport(jobId, processed, failed, duration, averagePlace, distanceHistogram);
+		EvalJobReport report = new EvalJobReport(jobId, notFound, processed, failed, duration, averagePlace, distanceHistogram);
 		return Optional.of(report);
 	}
 

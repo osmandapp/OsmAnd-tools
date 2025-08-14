@@ -4,6 +4,7 @@ import java.util.Map;
 
 public record EvalJobReport(
         long jobId,
+		long notFound,
 		long processed,
         long error,
 		long duration,
