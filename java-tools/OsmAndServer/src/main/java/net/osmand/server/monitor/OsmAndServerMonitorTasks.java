@@ -323,8 +323,6 @@ public class OsmAndServerMonitorTasks {
 							"No Jenkins jobs found on (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
 				}
 
-				LOG.info(String.format("jobsArray debug (%s) = (%d)", buildServer.serverName, jobsArray.length()));
-
 				for (int i = 0; i < jobsArray.length(); i++) {
 					JSONObject jb = jobsArray.getJSONObject(i);
 					String name = jb.getString("name");
