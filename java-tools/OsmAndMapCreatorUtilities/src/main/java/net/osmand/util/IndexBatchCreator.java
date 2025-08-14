@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -81,11 +82,11 @@ public class IndexBatchCreator {
 	private static final int INMEM_LIMIT = 2000;
 	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
 	private static final long TIMEOUT_TO_CHECK_DOCKER = 15000;
+	private static final long MAX_TO_START_PER_TIMEOUT = 2;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
 	public static final String GEN_LOG_EXT = ".gen.log";
-
 
 
 	public static class RegionCountries {
@@ -446,23 +447,26 @@ public class IndexBatchCreator {
 		}
 		generateLocalFolderIndexes(alreadyGeneratedFiles);
 		// run check in parallel
+		if (awsPendingGenerations.size() > 0) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
+				}
+			}).start();
+		}
+		// run check in parallel until it reaches main loop
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS * 4);
-			}
-		}).start();
-		// run check in parallel
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER * 2);
+				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 			}
 		}).start();
 		log.info("Generate local " + localPendingGenerations.size() + " maps");
 		for (LocalPendingGeneration lp : localPendingGenerations) {
 			generateLocalIndex(lp.file, lp.regionName, lp.mapFileName, lp.rdata, alreadyGeneratedFiles);
 		}
+		
 		waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
 		waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 		log.info("GENERATING INDEXES FINISHED ");
@@ -475,8 +479,17 @@ public class IndexBatchCreator {
 	}
 
 
+	private AtomicLong lastRunWaitDockerMs = new AtomicLong(0l); 
 	private void waitDockerJobsToFinish(long timeout) {
 		while (true) {
+			try {
+				Thread.sleep(timeout);
+			} catch (InterruptedException e) {
+			}
+			if (System.currentTimeMillis() - lastRunWaitDockerMs.get() < timeout / 2) {
+				continue;
+			}
+			lastRunWaitDockerMs.set(System.currentTimeMillis());
 			int pending = 0;
 			for (ExternalJobDefinition jd : externalJobQueues) {
 				pending += jd.pendingGenerations.size();
@@ -499,10 +512,6 @@ public class IndexBatchCreator {
 					total, freeRamPerc, pending, rescheduled, running, names));
 
 			waitDockerJobsIteration(freeRamPerc);
-			try {
-				Thread.sleep(timeout);
-			} catch (InterruptedException e) {
-			}
 		}
 	}
 
@@ -643,6 +652,7 @@ public class IndexBatchCreator {
 		for (DockerPendingGeneration running : dockerRunningGenerations) {
 			slotsLeft -= running.jd.slotsPerJob;
 		}
+		int start = 0;
 		while (startIt.hasNext() && slotsLeft > 0) {
 			DockerPendingGeneration p = startIt.next();
 			if (slotsLeft >= p.jd.slotsPerJob) {
@@ -662,6 +672,10 @@ public class IndexBatchCreator {
 					log.info("Started container " + p.name);
 					dockerRunningGenerations.add(p);
 					slotsLeft -= p.jd.slotsPerJob;
+					start++;
+					if (start >= MAX_TO_START_PER_TIMEOUT) {
+						break;
+					}
 				} catch (Exception e) {
 					log.error("Failed to start container " + p.name, e);
 					if (!dockerFailedGenerations.contains(p)) {
@@ -704,14 +718,19 @@ public class IndexBatchCreator {
 		}
 	}
 
+	private AtomicLong lastRunWaitAwsMs = new AtomicLong(0l);
 	private void waitAwsJobsToFinish(long timeout) {
 		log.info(String.format("Waiting %d aws jobs to complete...", awsPendingGenerations.size()));
 		while (awsPendingGenerations.size() > 0) {
-			waitAwsJobsIteration();
 			try {
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 			}
+			if (System.currentTimeMillis() - lastRunWaitAwsMs.get() < timeout / 2) {
+				continue;
+			}
+			lastRunWaitAwsMs.set(System.currentTimeMillis());
+			waitAwsJobsIteration();
 		}
 	}
 
