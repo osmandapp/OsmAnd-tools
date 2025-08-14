@@ -112,7 +112,7 @@ public class OsmAndServerMonitorTasks {
 		buildServers.add(new BuildServerCheckInfo(
 				"data", "https://data.osmand.net:8080", "https://data.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
-				"veles", "https://veles.osmand.net:8080", null));
+				"veles", "https://veles.osmand.net:8080", "https://veles.osmand.net/jenkins_status.json"));
 	}
 	
 
