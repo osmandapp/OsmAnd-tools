@@ -88,13 +88,11 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[]{
 			"download.osmand.net",
 			"builder.osmand.net",
-			"creator.osmand.net",
 			"maptile.osmand.net"
 	};
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[]{
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
 			"https://builder.osmand.net:8080/job/WebSite_OsmAndServer/",
-			"https://creator.osmand.net:8080/job/WebSite_OsmAndServer/",
 			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/"
 	};
 
@@ -105,8 +103,6 @@ public class OsmAndServerMonitorTasks {
 	{
 		buildServers.add(new BuildServerCheckInfo(
 				"builder", "https://builder.osmand.net:8080", "https://builder.osmand.net/jenkins_status.json"));
-		buildServers.add(new BuildServerCheckInfo(
-				"creator", "https://creator.osmand.net:8080", null));
 		buildServers.add(new BuildServerCheckInfo(
 				"dl2", "https://dl2.osmand.net:8080", null));
 		buildServers.add(new BuildServerCheckInfo(
