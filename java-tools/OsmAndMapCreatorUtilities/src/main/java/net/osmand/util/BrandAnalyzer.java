@@ -9,11 +9,14 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class BrandAnalyzer {
 
 	private static final String PLANET_NAME = "planet";
+	private static final int MIN_OCCURENCIES = 5;
+	private static final int TOP_PER_MAP = 30;
 	public static double BRAND_OWNERSHIP = 0.7;
 	private static int VERBOSE = 1;
 
@@ -23,19 +26,45 @@ public class BrandAnalyzer {
 		float ownerPercent;
 		Integer ownerCount;
 		Integer globalCount;
+		boolean include;
 		
 		BrandInfo anotherOwnRegion = null; // linked list
+		
+		public boolean regionOwnsThisBrand(BrandRegion r, boolean includeChildren) {
+			if (ownerRegion == r) {
+				return true;
+			}
+			if (includeChildren && r.checkIfThisIsParent(ownerRegion)) {
+				return true;
+			}
+			if (anotherOwnRegion == null) {
+				return false;
+			}
+			return anotherOwnRegion.regionOwnsThisBrand(r, includeChildren);
+		}
 	}
 
 	public static class BrandRegion {
 		final String name;
 		final Map<String, Integer> brands = new TreeMap<String, Integer>();
+		Map<String, Integer> brandsSorted = new TreeMap<>(new Comparator<String>() {
+			@Override
+			public int compare(String o1, String o2) {
+				Integer i1 = brands.get(o1);
+				Integer i2 = brands.get(o2);
+				if (Integer.compare(i1, i2) != 0) {
+					return -Integer.compare(i1, i2);
+				}
+				return o1.compareTo(o2);
+			}
+
+		});
 		
 		int depth;
 		String parent;
 		boolean map;
 		BrandRegion parentRegion;
-		int countOwnAndChildren;
+		int countIncluded;
 
 		public BrandRegion(String regName) {
 			this.name = regName;
@@ -64,41 +93,112 @@ public class BrandAnalyzer {
 
 	private void analyzeBrands(File fl) throws IOException {
 		Map<String, BrandRegion> regions = parseBrandsFile(fl);
-		calculateParents(regions);
-		checkDepth(regions);
-
-		Map<String, BrandInfo> brandOwnership = calculateBrandOwnership(regions);
 		
-		int minOccurrencies = 15;
+		Map<String, BrandInfo> brands = calculateBrandOwnership(regions);
+		
+		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, TOP_PER_MAP);
+		consolidateEnabledBrands(brands, regions);
 		// include all parent and
-		for (BrandRegion r : regions.values()) {
-			int countOwnAndChildren = 0;
-			for (String brand : r.brands.keySet()) {
-				BrandInfo owner = brandOwnership.get(brand);
-				boolean includeBrand = false;
-				while (owner != null) {
-					if (r.checkIfThisIsParent(owner.ownerRegion)) {
-						includeBrand = owner.globalCount > minOccurrencies;
-						break;
-					}
-					owner = owner.anotherOwnRegion;
-				}
-				if (includeBrand) {
-					countOwnAndChildren++;
-				}
-			}
-			r.countOwnAndChildren = countOwnAndChildren;
-		}
-		printRegionsSorted(regions);
+		countIncluded(regions, brands);
+		
+		printRegionsSorted(regions, brands, null, 200, 0);
+		System.out.println("-----------");
+		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
 
 	}
 
-	private void printRegionsSorted(Map<String, BrandRegion> regions) {
+	private void consolidateEnabledBrands(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions) {
+		// validate main thing that for each region ownership of enabled brand includes all brands above it
+		boolean changed = true;
+		int iteration = 1;
+		while (changed) {
+			changed = false;
+			for (BrandInfo b : brands.values()) {
+				if (!b.include) {
+					continue;
+				}
+				String brandName = b.brandName;
+				while (b != null) {
+					BrandRegion ownerRegion = b.ownerRegion;
+					Iterator<String> it = ownerRegion.brandsSorted.keySet().iterator();
+					while (it.hasNext()) {
+						String topRegionBrand = it.next();
+						BrandInfo topBrandToBeEnabled = brands.get(topRegionBrand);
+						if (!topBrandToBeEnabled.include
+								&& topBrandToBeEnabled.regionOwnsThisBrand(ownerRegion, false)) {
+							if (VERBOSE >= 3) {
+								System.out.println("Enable " + topRegionBrand + " for " + ownerRegion.name
+										+ " because of " + brandName);
+							}
+							topBrandToBeEnabled.include = true;
+							changed = true;
+						}
+						if (topRegionBrand.equals(brandName)) {
+							break;
+						}
+					}
+					b = b.anotherOwnRegion;
+				}
+
+			}
+			System.out.printf("Consolidation # %d - enabled %d brands \n", iteration, countAllIncluded(brands));
+			iteration++;
+		}
+	}
+
+	private void enableBrandsPerRegion(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions,
+			int minOccurencies, int topPerMap) {
+		for (BrandRegion r : regions.values()) {
+			Iterator<Entry<String, Integer>> it = r.brandsSorted.entrySet().iterator();
+			int cnt = 0;
+			while (it.hasNext() && cnt++ < topPerMap) {
+				Entry<String, Integer> e = it.next();
+				String brandName = e.getKey();
+				if (e.getValue() < minOccurencies) {
+					break;
+				}
+				BrandInfo brandInfo = brands.get(brandName);
+				brandInfo.include = true;
+				if (VERBOSE >= 2) {
+					System.out.println("Enable " + e.getKey() + " " + r.name + " " + e.getValue());
+				}
+			}
+		}
+		System.out.printf("For %d min occurencies and top %d per map - enabled %d brands \n",
+				minOccurencies, topPerMap, countAllIncluded(brands));
+	}
+
+	private int countAllIncluded(Map<String, BrandInfo> brands) {
+		int enabled = 0;
+		for (BrandInfo i : brands.values()) {
+			if (i.include) {
+				enabled++;
+			}
+		}
+		return enabled;
+	}
+
+	private void countIncluded(Map<String, BrandRegion> regions, Map<String, BrandInfo> brands) {
+		for (BrandRegion r : regions.values()) {
+			int count = 0;
+			for (String brandName : r.brandsSorted.keySet()) {
+				BrandInfo brand = brands.get(brandName);
+				if (brand.include) {
+					count++;
+				}
+			}
+			r.countIncluded = count;
+		}
+	}
+
+	private void printRegionsSorted(Map<String, BrandRegion> regions, Map<String, BrandInfo> brands, 
+			String filter, int limit, int topBrands) {
+		countIncluded(regions, brands);
 		Map<String, BrandRegion> regSorted = new TreeMap<>(new Comparator<String>() {
 			@Override
 			public int compare(String o1, String o2) {
-				Integer i1 = regions.get(o1).countOwnAndChildren;
-				Integer i2 = regions.get(o2).countOwnAndChildren;
+				Integer i1 = regions.get(o1).countIncluded;
+				Integer i2 = regions.get(o2).countIncluded;
 				if (Integer.compare(i1, i2) != 0) {
 					return -Integer.compare(i1, i2);
 				}
@@ -109,10 +209,22 @@ public class BrandAnalyzer {
 		regSorted.putAll(regions);
 		int i = 0;
 		for (BrandRegion r : regSorted.values()) {
-			if (i++ > 50) {
+			if (filter != null && !r.name.contains(filter)) {
+				continue;
+			}
+			if (i++ > limit) {
 				break;
 			}
-			System.out.println(r.name + " --- " + r.countOwnAndChildren);
+			System.out.println(r.name + " --- " + r.countIncluded);
+			int l = topBrands;
+			Iterator<Entry<String, Integer>> it = r.brandsSorted.entrySet().iterator();
+			while (it.hasNext() && l-- > 0) {
+				Entry<String, Integer> n = it.next();
+				BrandInfo brandInfo = brands.get(n.getKey());
+				System.out.printf("    %s - %d in=%s: owner %s %d/%d (%.2f)\n", n.getKey(), n.getValue(),
+						brandInfo.include, brandInfo.ownerRegion.name, brandInfo.ownerCount, brandInfo.globalCount,
+						brandInfo.ownerPercent);
+			}
 		}
 	}
 
@@ -139,25 +251,11 @@ public class BrandAnalyzer {
 
 	private void countBrandOnwershipPerRegion(Map<String, BrandInfo> brandOnwership, BrandRegion planet,
 			BrandRegion reg) {
-		Map<String, Integer> brands = new TreeMap<String, Integer>(new Comparator<String>() {
-			@Override
-			public int compare(String o1, String o2) {
-				Integer i1 = reg.brands.get(o1);
-				Integer i2 = reg.brands.get(o2);
-				if (Integer.compare(i1, i2) != 0) {
-					return -Integer.compare(i1, i2);
-				}
-				return o1.compareTo(o2);
-			}
-			
-		});
-		brands.putAll(reg.brands);
 		
-		
-		Iterator<Entry<String, Integer>> it = brands.entrySet().iterator();
+		Iterator<Entry<String, Integer>> it = reg.brandsSorted.entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, Integer> e = it.next();
-			Integer globalCount = planet.brands.get(e.getKey());
+			Integer globalCount = planet.brandsSorted.get(e.getKey());
 			float percent = ((float) e.getValue()) / globalCount;
 			if (percent > BRAND_OWNERSHIP) {
 				BrandInfo info = new BrandInfo();
@@ -176,7 +274,7 @@ public class BrandAnalyzer {
 					childPossible = childPossible.anotherOwnRegion;
 				}
 				if (!checkIfIncludedInChild) {
-					if (VERBOSE >= 2 && info.ownerCount > 10) {
+					if (VERBOSE >= 2 && info.ownerCount > MIN_OCCURENCIES) {
 						System.out.printf("%s --- %d/%d (%.2f)\n", info.brandName,
 								info.ownerCount, info.globalCount, percent);
 					}
@@ -222,11 +320,14 @@ public class BrandAnalyzer {
 			}
 		}
 		r.close();
+		finishReading(regions);
 		return regions;
 	}
 
-	private void calculateParents(Map<String, BrandRegion> regions) {
+	private void finishReading(Map<String, BrandRegion> regions) {
 		for (BrandRegion b : regions.values()) {
+			b.brandsSorted.putAll(b.brands);
+			// calculate parents
 			if (!b.name.equals(PLANET_NAME)) {
 				b.parentRegion = regions.get(b.parent);
 				if (b.parentRegion == null) {
@@ -234,6 +335,7 @@ public class BrandAnalyzer {
 				}
 			}
 		}
+		checkDepth(regions);
 	}
 
 	private void checkDepth(Map<String, BrandRegion> regions) {
