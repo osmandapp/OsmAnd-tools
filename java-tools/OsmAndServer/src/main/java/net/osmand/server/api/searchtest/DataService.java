@@ -343,7 +343,7 @@ public abstract class DataService extends UtilService {
 			"        WHEN is_place AND NOT is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND is_addr_match)" +
 			"            THEN 'Too Far'" +
 			"        ELSE 'Not Found'" +
-			"END AS grp, web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count, original " +
+			"END AS \"group\", web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count, original " +
 			"FROM result";
 
 	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long jobId, String format) throws IOException {
@@ -387,10 +387,10 @@ public abstract class DataService extends UtilService {
 		distanceHistogram.put("Near", 0);
 		distanceHistogram.put("Too Far", 0);
 		distanceHistogram.put("Not Found", 0);
-		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT grp, count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY grp",
+		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY \"group\"",
 				placeLimit, distLimit, jobId);
 		for (Map<String, Object> values : results) {
-			distanceHistogram.put(values.get("grp").toString(), ((Number) values.get("cnt")).longValue());
+			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
 		EvalJobReport report = new EvalJobReport(jobId, processed, failed, duration, averagePlace, distanceHistogram);
