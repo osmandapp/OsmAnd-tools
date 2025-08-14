@@ -495,8 +495,8 @@ public class IndexBatchCreator {
 			}
 
 			long freeRamPerc = getFreeRamPercentage();
-			log.warn(String.format("Waiting %d docker jobs to complete (Ram free %d). Pending: %d, Rescheduled: %d, Running: %d: %s", freeRamPerc,
-					total, pending, rescheduled, running, names));
+			log.warn(String.format("Waiting %d docker jobs to complete (Ram free %d). Pending: %d, Rescheduled: %d, Running: %d: %s", 
+					total, freeRamPerc, pending, rescheduled, running, names));
 
 			waitDockerJobsIteration(freeRamPerc);
 			try {
