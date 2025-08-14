@@ -104,13 +104,13 @@ public class OsmAndServerMonitorTasks {
 		buildServers.add(new BuildServerCheckInfo(
 				"builder", "https://builder.osmand.net:8080", "https://builder.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
-				"dl2", "https://dl2.osmand.net:8080", null));
+				"dl2", "https://dl2.osmand.net:8080", "https://dl2.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
-				"main", "https://osmand.net:8095", null));
+				"main", "https://osmand.net:8095", "https://osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
 				"maptile", "https://maptile.osmand.net:8080", "https://maptile.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
-				"data", "https://data.osmand.net:8080", null));
+				"data", "https://data.osmand.net:8080", "https://data.osmand.net/jenkins_status.json"));
 		buildServers.add(new BuildServerCheckInfo(
 				"veles", "https://veles.osmand.net:8080", null));
 	}
