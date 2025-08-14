@@ -320,8 +320,10 @@ public class OsmAndServerMonitorTasks {
 
 				if (jobsArray.isEmpty()) {
 					sendBroadcastMessage(String.format(
-							"No Jenkins jobs found at (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
+							"No Jenkins jobs found on (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
 				}
+
+				LOG.info(String.format("jobsArray debug (%s) = (%d)", buildServer.serverName, jobsArray.length()));
 
 				for (int i = 0; i < jobsArray.length(); i++) {
 					JSONObject jb = jobsArray.getJSONObject(i);
@@ -339,14 +341,14 @@ public class OsmAndServerMonitorTasks {
 					Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 					jobsFailedCopy.removeAll(buildServer.jobsFailed);
 					if (!jobsFailedCopy.isEmpty()) {
-						sendBroadcastMessage(
-								"There are new failures on Build Server: " + formatJobNamesAsHref(buildServer, jobsFailedCopy));
+						sendBroadcastMessage(String.format("New failures on %s: %s",
+								buildServer.serverName, formatJobNamesAsHref(buildServer, jobsFailedCopy)));
 					}
 					Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 					jobsRecoveredCopy.removeAll(jobsFailed);
 					if (!jobsRecoveredCopy.isEmpty()) {
-						sendBroadcastMessage(
-								"There are recovered jobs on Build Server: " + formatJobNamesAsHref(buildServer, jobsRecoveredCopy));
+						sendBroadcastMessage(String.format("Recovered jobs on %s: %s",
+								buildServer.serverName, formatJobNamesAsHref(buildServer, jobsRecoveredCopy)));
 					}
 					buildServer.jobsFailed = jobsFailed;
 				}
