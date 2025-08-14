@@ -1,9 +1,11 @@
 package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
+import net.osmand.server.api.searchtest.dto.EvalJobReport;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -20,6 +22,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -306,9 +309,175 @@ public abstract class DataService extends UtilService {
 		String columnsDefinition =
 				Stream.of(columns).map(header -> "\"" + header + "\" VARCHAR(255)").collect(Collectors.joining(", "));
 		String createTableSql =
-				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT," + " " + "%s)",
+				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT, " + "%s)",
 						tableName, columnsDefinition);
 		jdbcTemplate.execute(createTableSql);
 		LOGGER.info("Ensured table {} exists.", tableName);
+	}
+
+	final String REPORT_SQL = "WITH result AS (" +
+			"    SELECT" +
+			"        UPPER(COALESCE(json_extract(original, '$.web_type'), ''))               AS web_type," +
+			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, original," +
+			"        actual_place <= ?                                                       AS is_place," +
+			"        min_distance <= ?                                                       AS is_dist," +
+			"        CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER)            AS id," +
+			"        COALESCE(json_extract(original, '$.web_name'), '')                      AS web_name," +
+			"        COALESCE(json_extract(original, '$.web_address1'), '')                  AS web_address1," +
+			"        COALESCE(json_extract(original, '$.web_address2'), '')                  AS web_address2," +
+			"        CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
+			"        (address LIKE '%' || COALESCE(json_extract(original, '$.web_name'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address1'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address2'), '') || '%')" +
+			"                                                                                AS is_addr_match," +
+			"        ((CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
+			"         CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
+			"    FROM eval_result AS r WHERE job_id = ? ORDER BY actual_place, min_distance" +
+			") " +
+			"SELECT" +
+			"    CASE" +
+			"        WHEN address IS NULL OR trim(address) = '' THEN 'Empty'" +
+			"        WHEN is_place AND is_dist THEN 'Found'" +
+			"        WHEN NOT is_place AND is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND is_addr_match)" +
+			"            THEN 'Near'" +
+			"        WHEN is_place AND NOT is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND is_addr_match)" +
+			"            THEN 'Too Far'" +
+			"        ELSE 'Not Found'" +
+			"END AS grp, web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count, original " +
+			"FROM result";
+
+	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long jobId, String format) throws IOException {
+
+		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, jobId);
+		if ("csv".equalsIgnoreCase(format)) {
+			writeAsCsv(writer, results);
+		} else if ("json".equalsIgnoreCase(format)) {
+			writeAsJson(writer, results);
+		} else {
+			throw new IllegalArgumentException("Unsupported format: " + format);
+		}
+	}
+
+	public Optional<EvalJobReport> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
+		String sql = """
+				SELECT
+				    count(*) AS total,
+				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
+				    sum(duration) AS duration,
+				    avg(actual_place) AS average_place
+				FROM
+				    eval_result
+				WHERE
+				    job_id = ?
+				""";
+
+		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
+		long processed = ((Number) result.get("total")).longValue();
+		if (processed == 0) {
+			return Optional.empty();
+		}
+		long failed = ((Number) result.get("failed")).longValue();
+		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
+		double averagePlace = result.get("average_place") == null ? 0 :
+				((Number) result.get("average_place")).doubleValue();
+
+		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
+		distanceHistogram.put("Empty", 0);
+		distanceHistogram.put("Found", 0);
+		distanceHistogram.put("Near", 0);
+		distanceHistogram.put("Too Far", 0);
+		distanceHistogram.put("Not Found", 0);
+		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT grp, count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY grp",
+				placeLimit, distLimit, jobId);
+		for (Map<String, Object> values : results) {
+			distanceHistogram.put(values.get("grp").toString(), ((Number) values.get("cnt")).longValue());
+		}
+
+		EvalJobReport report = new EvalJobReport(jobId, processed, failed, duration, averagePlace, distanceHistogram);
+		return Optional.of(report);
+	}
+
+	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
+		List<Map<String, Object>> expanded = results.stream().map(row -> {
+			Map<String, Object> out = new LinkedHashMap<>();
+			// copy base fields except 'original'
+			for (Map.Entry<String, Object> e : row.entrySet()) {
+				if (!"original".equals(e.getKey())) {
+					out.put(e.getKey(), e.getValue());
+				}
+			}
+			Object originalObj = row.get("original");
+			if (originalObj != null) {
+				try {
+					JsonNode originalNode = objectMapper.readTree(originalObj.toString());
+					// For consistency with CSV, serialize values as text
+					originalNode.fieldNames().forEachRemaining(fn -> {
+						JsonNode v = originalNode.get(fn);
+						out.put(fn, v == null || v.isNull() ? null : v.asText());
+					});
+				} catch (IOException e) {
+					// ignore invalid JSON in 'original'
+				}
+			}
+			return out;
+		}).collect(Collectors.toList());
+		objectMapper.writeValue(writer, expanded);
+	}
+
+	protected void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
+		if (results.isEmpty()) {
+			writer.write("");
+			return;
+		}
+
+		Set<String> headers = new LinkedHashSet<>();
+		results.get(0).keySet().stream()
+				.filter(k -> !k.equals("original"))
+				.forEach(headers::add);
+
+		Set<String> originalHeaders = new LinkedHashSet<>();
+		for (Map<String, Object> row : results) {
+			Object originalObj = row.get("original");
+			if (originalObj != null) {
+				try {
+					JsonNode originalNode = objectMapper.readTree(originalObj.toString());
+					originalNode.fieldNames().forEachRemaining(originalHeaders::add);
+				} catch (IOException e) {
+					// ignore invalid JSON in 'original'
+				}
+			}
+		}
+		headers.addAll(originalHeaders);
+
+		CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+				.setHeader(headers.toArray(new String[0])).setDelimiter(";")
+				.build();
+
+		try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
+			for (Map<String, Object> row : results) {
+				List<String> record = new ArrayList<>();
+				JsonNode originalNode = null;
+				Object originalObj = row.get("original");
+				if (originalObj != null) {
+					try {
+						originalNode = objectMapper.readTree(originalObj.toString());
+					} catch (IOException e) {
+						// keep originalNode null
+					}
+				}
+
+				for (String header : headers) {
+					if (row.containsKey(header)) {
+						Object value = row.get(header);
+						record.add(value != null ? value.toString().trim() : null);
+					} else if (originalNode != null && originalNode.has(header)) {
+						record.add(originalNode.get(header).asText());
+					} else {
+						record.add(null);
+					}
+				}
+				printer.printRecord(record);
+			}
+		}
 	}
 }

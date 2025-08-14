@@ -1,9 +1,8 @@
 package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
+import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.EvalJobProgress;
@@ -15,9 +14,6 @@ import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,22 +27,12 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
-
-import jakarta.persistence.EntityManager;
 
 @Service
 public class SearchTestService extends DataService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-
 	private final SearchService searchService;
 	private final DatasetJobRepository datasetJobRepository;
 
@@ -91,15 +77,22 @@ public class SearchTestService extends DataService {
 
 		job.fileName = dataset.fileName;
 		job.function = payload.functionName();
-		dataset.function = payload.functionName();
 		try {
 			job.selCols = objectMapper.writeValueAsString(payload.columns());
-			dataset.selCols = job.selCols;
 			job.params = objectMapper.writeValueAsString(payload.paramValues());
-			dataset.params = job.params;
 		} catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
 		}
+
+		dataset.selCols = job.selCols;
+		dataset.params = job.params;
+		dataset.function = payload.functionName();
+		dataset.locale = locale;
+		dataset.setNorthWest(payload.northWest());
+		dataset.setSouthEast(payload.southEast());
+		dataset.baseSearch = payload.baseSearch();
+		dataset.lat = payload.lat();
+		dataset.lon = payload.lon();
 
 		datasetRepository.save(dataset);
 		job.status = EvalJob.Status.RUNNING;
@@ -121,12 +114,25 @@ public class SearchTestService extends DataService {
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		try {
-			String[] columns = objectMapper.readValue(job.selCols, String[].class);
-			String sql = String.format("SELECT lat, lon, %s FROM %s", String.join(",", columns), tableName);
+			String[] selCols = objectMapper.readValue(job.selCols, String[].class);
+			List<String> columns = Arrays.asList(selCols), delCols = new ArrayList<>();
+			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
+				columns.add("lon");
+				delCols.add("lon");
+			}
+			if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
+				columns.add("lat");
+				delCols.add("lat");
+			}
+			if (Arrays.stream(selCols).noneMatch("id"::equals)) {
+				columns.add("id");
+				delCols.add("id");
+			}
+			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			Script script = objectMapper.readValue(dataset.script, Script.class);
 
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<RowAddress> examples = execute(script.code(), job.function, rows, job.selCols,
+			List<RowAddress> examples = execute(script.code(), job.function, delCols, rows, job.selCols,
 					objectMapper.readValue(job.params, String[].class));
 			for (RowAddress example : examples) {
 				String status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class,
@@ -157,7 +163,8 @@ public class SearchTestService extends DataService {
 				try {
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
 							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-					saveResults(job, address, row, searchResults, expectedPoint, System.currentTimeMillis() - startTime, null);
+					saveResults(job, address, row, searchResults, expectedPoint,
+							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for job {}.", job.id, e);
 					saveResults(job, address, row, Collections.emptyList(), expectedPoint,
@@ -211,131 +218,8 @@ public class SearchTestService extends DataService {
 		});
 	}
 
-	public Optional<EvalJobReport> getEvaluationReport(Long jobId) {
-		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
-		if (jobOptional.isEmpty()) {
-			return Optional.empty();
-		}
-
-		String sql = """
-				SELECT
-				    count(*) AS total,
-				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
-				    avg(actual_place) AS average_place,
-				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
-				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS not_found,
-				    sum(CASE WHEN 0 <= min_distance AND min_distance <= 50 THEN 1 ELSE 0 END) AS "0-50m",
-				    sum(CASE WHEN 50 < min_distance AND min_distance <= 500 THEN 1 ELSE 0 END) AS "50-500m",
-				    sum(CASE WHEN 500 < min_distance AND min_distance <= 1000 THEN 1 ELSE 0 END) AS "500-1000m",
-				    sum(CASE WHEN 1000 < min_distance THEN 1 ELSE 0 END) AS "1000m+"
-				FROM
-				    eval_result
-				WHERE
-				    job_id = ?
-				""";
-
-		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
-		long processed = ((Number) result.get("total")).longValue();
-		if (processed == 0) {
-			return Optional.empty();
-		}
-		long failed = ((Number) result.get("failed")).longValue();
-		long duration = result.get("duration") == null ? 0 : ((Number) result.get("duration")).longValue();
-		double averagePlace = result.get("average_place") == null ? 0 :
-				((Number) result.get("average_place")).doubleValue();
-		long notFound = ((Number) result.get("not_found")).longValue();
-		Number empty = (Number) result.get("empty");
-
-		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
-		distanceHistogram.put("Empty", empty);
-		distanceHistogram.put("Not found", notFound);
-		distanceHistogram.put("0-50m", ((Number) result.getOrDefault("0-50m", 0)).longValue());
-		distanceHistogram.put("50-500m", ((Number) result.getOrDefault("50-500m", 0)).longValue());
-		distanceHistogram.put("500-1000m", ((Number) result.getOrDefault("500-1000m", 0)).longValue());
-		distanceHistogram.put("1000m+", ((Number) result.getOrDefault("1000m+", 0)).longValue());
-
-		EvalJobReport report = new EvalJobReport(jobId, notFound, processed, failed, duration, averagePlace,
-				distanceHistogram);
-		return Optional.of(report);
-	}
-
 	public Optional<EvalJob> getJob(Long jobId) {
 		return datasetJobRepository.findById(jobId);
-	}
-
-	public void downloadRawResults(Writer writer, Long jobId, String format) throws IOException {
-		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
-		if (jobOptional.isEmpty()) {
-			throw new RuntimeException("No evaluation job found for jobId: " + jobId);
-		}
-
-		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT lat, lon, address, min_distance, " +
-					"results_count, actual_place, closest_result, original FROM eval_result WHERE job_id = ?", jobId);
-		if ("csv".equalsIgnoreCase(format)) {
-			writeResultsAsCsv(writer, results);
-		} else if ("json".equalsIgnoreCase(format)) {
-			objectMapper.writeValue(writer, results);
-		} else {
-			throw new IllegalArgumentException("Unsupported format: " + format);
-		}
-	}
-
-	private void writeResultsAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
-		if (results.isEmpty()) {
-			writer.write("");
-			return;
-		}
-
-		Set<String> headers = new LinkedHashSet<>();
-		results.get(0).keySet().stream()
-				.filter(k -> !k.equals("original"))
-				.forEach(headers::add);
-
-		Set<String> originalHeaders = new LinkedHashSet<>();
-		for (Map<String, Object> row : results) {
-			Object originalObj = row.get("original");
-			if (originalObj != null) {
-				try {
-					JsonNode originalNode = objectMapper.readTree(originalObj.toString());
-					originalNode.fieldNames().forEachRemaining(originalHeaders::add);
-				} catch (IOException e) {
-					// ignore invalid JSON in 'original'
-				}
-			}
-		}
-		headers.addAll(originalHeaders);
-
-		CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-				.setHeader(headers.toArray(new String[0])).setDelimiter(";")
-				.build();
-
-		try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
-			for (Map<String, Object> row : results) {
-				List<String> record = new ArrayList<>();
-				JsonNode originalNode = null;
-				Object originalObj = row.get("original");
-				if (originalObj != null) {
-					try {
-						originalNode = objectMapper.readTree(originalObj.toString());
-					} catch (IOException e) {
-						// keep originalNode null
-					}
-				}
-
-				for (String header : headers) {
-					if (row.containsKey(header)) {
-						Object value = row.get(header);
-						record.add(value != null ? value.toString().trim() : null);
-					} else if (originalNode != null && originalNode.has(header)) {
-						record.add(originalNode.get(header).asText());
-					} else {
-						record.add(null);
-					}
-				}
-				printer.printRecord(record);
-			}
-		}
 	}
 
 	public Optional<EvalJobProgress> getEvaluationProgress(Long jobId) {

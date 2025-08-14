@@ -219,7 +219,7 @@ public abstract class UtilService {
 	}
 	protected record RowAddress(Map<String, Object> row, String address) {}
 
-	protected List<RowAddress> execute(String script, String functionName, List<Map<String, Object>> rows, String columnsJson,
+	protected List<RowAddress> execute(String script, String functionName, List<String> delCols, List<Map<String, Object>> rows, String columnsJson,
 							   String[] otherParams) {
 		if (script == null || script.trim().isEmpty()) {
 			throw new IllegalArgumentException("Script must not be null or empty");
@@ -238,6 +238,12 @@ public abstract class UtilService {
 
 				// 2) Prepare JS-native arguments
 				for (Map<String, Object> row : rows) {
+					if (!delCols.isEmpty()) {
+						row = new HashMap<>(row);
+						for (String key : delCols) {
+							row.remove(key);
+						}
+					}
 					String rowJson = objectMapper.writeValueAsString(row);
 					org.graalvm.polyglot.Value jsonParse = context.eval("js", "JSON.parse");
 					org.graalvm.polyglot.Value jsRow = jsonParse.execute(rowJson);

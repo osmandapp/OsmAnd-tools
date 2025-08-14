@@ -56,8 +56,10 @@ public class SearchTestController {
 
 	@GetMapping(value = "/reports/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJobReport> getEvaluationReport(@PathVariable Long jobId) {
-		return testSearchService.getEvaluationReport(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<EvalJobReport> getEvaluationReport(@PathVariable Long jobId,
+															 @RequestParam(defaultValue = "10") Integer placeLimit,
+															 @RequestParam(defaultValue = "50") Integer distLimit) {
+		return testSearchService.getEvaluationReport(jobId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/progress/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -67,14 +69,17 @@ public class SearchTestController {
 	}
 
 	@GetMapping(value = "/reports/{jobId}/download")
-	public void downloadReport(@PathVariable Long jobId, @RequestParam(defaultValue = "csv") String format,
+	public void downloadReport(@PathVariable Long jobId,
+							   @RequestParam(defaultValue = "10") Integer placeLimit,
+							   @RequestParam(defaultValue = "50") Integer distLimit,
+							   @RequestParam(defaultValue = "csv") String format,
 							   HttpServletResponse response) throws IOException {
 
 		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
 		response.setContentType(contentType);
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-		testSearchService.downloadRawResults(response.getWriter(), jobId, format);
+		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, jobId, format);
 	}
 
 	/**

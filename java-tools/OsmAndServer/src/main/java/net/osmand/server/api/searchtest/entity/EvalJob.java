@@ -32,45 +32,11 @@ public class EvalJob extends Config {
 	@Column(nullable = false)
 	public Status status;
 
-	@Column
-	public String locale;
-
-	@Column(name = "base_search")
-	public Boolean baseSearch;
-
-	@Column(name = "north_west")
-	private String northWest;
-
-	@Column(name = "south_east")
-	private String southEast;
-
-	@Column()
-	public Double lat;
-
-	@Column()
-	public Double lon;
-
 	@CreationTimestamp
 	public Timestamp created;
 
 	@UpdateTimestamp
 	public Timestamp updated;
-
-	public String getNorthWest() {
-		return northWest;
-	}
-
-	public void setNorthWest(String val) {
-		this.northWest = val != null && val.trim().isEmpty() ? null : val;
-	}
-
-	public String getSouthEast() {
-		return southEast;
-	}
-
-	public void setSouthEast(String val) {
-		this.southEast = val != null && val.trim().isEmpty() ? null : val;
-	}
 
 	public String getError() {
 		return error;
