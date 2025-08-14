@@ -282,7 +282,7 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 		} catch (Exception e) {
-			sendBroadcastMessage("Exception while checking the java server status.");
+			sendBroadcastMessage("Exception while checking the Java server status.");
 			LOG.error(e.getMessage(), e);
 		}
 	}
@@ -311,7 +311,7 @@ public class OsmAndServerMonitorTasks {
 					jobsArray = object.getJSONArray("jobs");
 					is.close();
 				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED && code != HttpURLConnection.HTTP_FORBIDDEN) {
-					sendBroadcastMessage(String.format("Jenkins %s bad response (%d)", buildServer.jenkinsUrl, code));
+					sendBroadcastMessage(String.format("Jenkins %s got bad response (%d)", buildServer.jenkinsUrl, code));
 				}
 
 				if (jobsArray.isEmpty() && buildServer.statusJsonUrl != null) {
@@ -324,7 +324,7 @@ public class OsmAndServerMonitorTasks {
 
 				if (jobsArray.isEmpty()) {
 					sendBroadcastMessage(String.format(
-							"No Jenkins jobs found (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
+							"No Jenkins jobs found at (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
 				}
 
 				for (int i = 0; i < jobsArray.length(); i++) {
@@ -357,8 +357,7 @@ public class OsmAndServerMonitorTasks {
 				buildServer.lastCheckTimestamp = System.currentTimeMillis();
 			} catch (Exception e) {
 				sendBroadcastMessage(String.format(
-						"Exception in checkOsmAndBuildServer (%s) (%s) (%s)",
-						buildServer.jenkinsUrl, buildServer.statusJsonUrl, e.getMessage()));
+						"Exception in checkOsmAndBuildServer (%s) (%s)", buildServer.serverName, e.getMessage()));
 				LOG.error(buildServer.jenkinsUrl + "\n" + e.getMessage(), e);
 			}
 		}
