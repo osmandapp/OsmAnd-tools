@@ -15,25 +15,27 @@ public class BrandAnalyzer {
 
 	private static final String PLANET_NAME = "planet";
 	public static double BRAND_OWNERSHIP = 0.7;
-	private static int VERBOSE = 2;
+	private static int VERBOSE = 1;
 
 	public static class BrandInfo {
 		String brandName;
 		BrandRegion ownerRegion;
 		float ownerPercent;
-		public Integer ownerCount;
-		public Integer globalCount;
+		Integer ownerCount;
+		Integer globalCount;
 		
 		BrandInfo anotherOwnRegion = null; // linked list
 	}
 
 	public static class BrandRegion {
-		String name;
+		final String name;
+		final Map<String, Integer> brands = new TreeMap<String, Integer>();
+		
 		int depth;
 		String parent;
-		Map<String, Integer> brands = new TreeMap<String, Integer>();
-		public boolean map;
-		public BrandRegion parentRegion;
+		boolean map;
+		BrandRegion parentRegion;
+		int countOwnAndChildren;
 
 		public BrandRegion(String regName) {
 			this.name = regName;
@@ -65,13 +67,56 @@ public class BrandAnalyzer {
 		calculateParents(regions);
 		checkDepth(regions);
 
-		calculateBrandOwnership(regions);
+		Map<String, BrandInfo> brandOwnership = calculateBrandOwnership(regions);
 		
-		
+		int minOccurrencies = 15;
+		// include all parent and
+		for (BrandRegion r : regions.values()) {
+			int countOwnAndChildren = 0;
+			for (String brand : r.brands.keySet()) {
+				BrandInfo owner = brandOwnership.get(brand);
+				boolean includeBrand = false;
+				while (owner != null) {
+					if (r.checkIfThisIsParent(owner.ownerRegion)) {
+						includeBrand = owner.globalCount > minOccurrencies;
+						break;
+					}
+					owner = owner.anotherOwnRegion;
+				}
+				if (includeBrand) {
+					countOwnAndChildren++;
+				}
+			}
+			r.countOwnAndChildren = countOwnAndChildren;
+		}
+		printRegionsSorted(regions);
 
 	}
 
-	private void calculateBrandOwnership(Map<String, BrandRegion> regions) {
+	private void printRegionsSorted(Map<String, BrandRegion> regions) {
+		Map<String, BrandRegion> regSorted = new TreeMap<>(new Comparator<String>() {
+			@Override
+			public int compare(String o1, String o2) {
+				Integer i1 = regions.get(o1).countOwnAndChildren;
+				Integer i2 = regions.get(o2).countOwnAndChildren;
+				if (Integer.compare(i1, i2) != 0) {
+					return -Integer.compare(i1, i2);
+				}
+				return o1.compareTo(o2);
+			}
+
+		});
+		regSorted.putAll(regions);
+		int i = 0;
+		for (BrandRegion r : regSorted.values()) {
+			if (i++ > 50) {
+				break;
+			}
+			System.out.println(r.name + " --- " + r.countOwnAndChildren);
+		}
+	}
+
+	private Map<String, BrandInfo> calculateBrandOwnership(Map<String, BrandRegion> regions) {
 		int maxDepth = 0;
 		for (BrandRegion b : regions.values()) {
 			maxDepth = Math.max(maxDepth, b.depth);
@@ -89,6 +134,7 @@ public class BrandAnalyzer {
 				countBrandOnwershipPerRegion(brandOnwership, planet, reg);
 			}
 		}
+		return brandOnwership;
 	}
 
 	private void countBrandOnwershipPerRegion(Map<String, BrandInfo> brandOnwership, BrandRegion planet,
