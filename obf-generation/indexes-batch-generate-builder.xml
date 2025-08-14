@@ -12,7 +12,7 @@
 		
 		<external dockerSlots="56">
 			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker"
-					freeRamToStartPerc="12" freeRamToStopPerc="5" order="2">
+					freeRamToStartPerc="15" freeRamToStopPerc="5" order="2">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
@@ -24,7 +24,7 @@
 				<filter exclude="world_seamarks" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker" 
-					freeRamToStartPerc="17" freeRamToStopPerc="5" order="1">
+					freeRamToStartPerc="18" freeRamToStopPerc="5" order="1">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
 				<parameter k="cmd_1" v="generate-obf" />
 				<parameter k="cmd_2" v="https://builder.osmand.net/osm-extract/{0}/{0}.pbf" />
