@@ -237,9 +237,10 @@ public abstract class UtilService {
 				context.eval("js", script);
 
 				// 2) Prepare JS-native arguments
-				for (Map<String, Object> row : rows) {
+				for (Map<String, Object> origRow : rows) {
+					Map<String, Object> row = origRow;
 					if (!delCols.isEmpty()) {
-						row = new HashMap<>(row);
+						row = new HashMap<>(origRow);
 						for (String key : delCols) {
 							row.remove(key);
 						}
@@ -280,10 +281,10 @@ public abstract class UtilService {
 
 					String[] addresses = execute(context, functionName, args);
 					if (addresses.length == 0) {
-						results.add(new RowAddress(row, ""));
+						results.add(new RowAddress(origRow, ""));
 					} else {
 						for (String address : addresses) {
-							results.add(new RowAddress(row, address));
+							results.add(new RowAddress(origRow, address));
 						}
 					}
 				}

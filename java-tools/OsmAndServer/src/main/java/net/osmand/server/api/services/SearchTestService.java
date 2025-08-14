@@ -115,7 +115,8 @@ public class SearchTestService extends DataService {
 		String tableName = "dataset_" + sanitize(dataset.name);
 		try {
 			String[] selCols = objectMapper.readValue(job.selCols, String[].class);
-			List<String> columns = Arrays.asList(selCols), delCols = new ArrayList<>();
+			List<String> columns =  new ArrayList<>(), delCols = new ArrayList<>();
+			Collections.addAll(columns, selCols);
 			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
 				columns.add("lon");
 				delCols.add("lon");
