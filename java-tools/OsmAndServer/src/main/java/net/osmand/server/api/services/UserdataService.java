@@ -350,14 +350,13 @@ public class UserdataService {
 				if (originalFilename == null) {
 					originalFilename = name;
 				}
-				if (isEmptyFileByName(name, originalFilename) || isGpxFileByName(originalFilename)) {
-					zipfile = InternalZipFile.buildFromMultipartFile(file);
-				} else {
-					// try to create gpx file from unknown file
+				if (isKmlKmzFileByName(originalFilename)) {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
 					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
+				} else {
+					zipfile = InternalZipFile.buildFromMultipartFile(file);
 				}
 			} catch (IOException e) {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
@@ -367,14 +366,9 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
-	private boolean isGpxFileByName(String originalFilename) {
-		return originalFilename.toLowerCase().endsWith(GPX_FILE_EXT);
+	private boolean isKmlKmzFileByName(String originalFilename) {
+		return originalFilename.toLowerCase().endsWith(".kml") || originalFilename.toLowerCase().endsWith(".kmz");
 	}
-
-	private boolean isEmptyFileByName(String name, String originalFilename) {
-		return name.endsWith(EMPTY_FILE_NAME) && originalFilename.equals("empty");
-	}
-
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
