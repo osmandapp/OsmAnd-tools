@@ -297,6 +297,7 @@
 
             thead.innerHTML = `
                 <tr>
+                    <th>#</th>
                     <th class="sortable" data-sort="name">Region Name</th>
                     <th class="sortable" data-sort="included">Included Brands</th>
                     <th class="sortable" data-sort="total">Total Brands</th>
@@ -312,10 +313,11 @@
             });
 
             tbody.innerHTML = '';
-            filteredRegions.forEach(region => {
+            filteredRegions.forEach((region, index) => {
                 const row = document.createElement('tr');
                 row.className = 'clickable-row';
                 row.innerHTML = `
+                    <td>${index + 1}.</td>
                     <td>${region.name}</td>
                     <td>${region.included.toLocaleString()}</td>
                     <td>${region.total.toLocaleString()}</td>
@@ -355,6 +357,7 @@
             
             thead.innerHTML = `
                 <tr>
+                    <th>#</th>
                     <th class="emoji-cell"></th>
                     <th>Brand Name</th>
                     <th>Count</th>
@@ -368,11 +371,11 @@
             const filteredBrands = region.brands.filter(b => b.count > filterValue);
 
             if (filteredBrands.length === 0) {
-                 tbody.innerHTML = `<tr><td colspan="6">No brands match the filter > ${filterValue}.</td></tr>`;
+                 tbody.innerHTML = `<tr><td colspan="7">No brands match the filter > ${filterValue}.</td></tr>`;
                  return;
             }
 
-            filteredBrands.forEach(brand => {
+            filteredBrands.forEach((brand, index) => {
                 const brandInfo = brandsData[brand.id];
                 if (!brandInfo) return;
 
@@ -382,6 +385,7 @@
                 const isOwner = brandInfo.owner === regionName;
 
                 row.innerHTML = `
+                    <td>${index + 1}.</td>
                     <td class="emoji-cell">${brandInfo.include ? '✅' : '❌'}</td>
                     <td class="${isOwner ? 'owner-brand' : ''}">${truncateText(brandInfo.name)}</td>
                     <td>${brand.count.toLocaleString()}</td>

@@ -72,6 +72,8 @@ public class MainUtilities {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
+			} else if (utl.equals("brand-analyzer")) {
+				BrandAnalyzer.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {

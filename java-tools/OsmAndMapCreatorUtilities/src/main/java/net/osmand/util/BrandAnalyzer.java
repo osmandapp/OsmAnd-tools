@@ -115,7 +115,7 @@ public class BrandAnalyzer {
 //		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
 //		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "netherlands", 100, 1000 );
-		generateHtmlPage(regions, brands, "brands.html", 2);
+		generateHtmlPage(regions, brands, "brands.html", 0);
 
 	}
 
