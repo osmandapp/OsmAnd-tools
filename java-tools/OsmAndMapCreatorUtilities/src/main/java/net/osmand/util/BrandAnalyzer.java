@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
@@ -93,7 +94,7 @@ public class BrandAnalyzer {
 	}
 
 	public static void main(String[] args) throws IOException {
-		File fl = new File("../../../all_brands.csv");
+		File fl;
 		boolean consolidate = false;
 		if (args.length == 0) {
 			fl = new File("../../../all_brands.csv");
@@ -101,11 +102,12 @@ public class BrandAnalyzer {
 		} else {
 			fl = new File(args[0]);
 		}
-		for(String ar : args) {
-			if("--consolidate".equals(ar)) {
+		for (String ar : args) {
+			if ("--consolidate".equals(ar)) {
 				consolidate = true;
 			}
 		}
+		System.out.printf("Run (%s) %s consolidate=%s", Arrays.toString(args), fl.getName(), consolidate);
 		new BrandAnalyzer().analyzeBrands(fl, consolidate);
 	}
 
