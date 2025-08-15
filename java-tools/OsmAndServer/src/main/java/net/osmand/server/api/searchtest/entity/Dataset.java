@@ -22,6 +22,9 @@ public class Dataset extends Config {
 	@Column(nullable = false, unique = true)
 	public String name;
 
+	@Column()
+	public String tags;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	public Source type; // e.g., "Overpass", "CSV"

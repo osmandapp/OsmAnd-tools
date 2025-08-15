@@ -347,7 +347,6 @@ public abstract class DataService extends UtilService {
 			"FROM result";
 
 	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long jobId, String format) throws IOException {
-
 		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, jobId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeAsCsv(writer, results);

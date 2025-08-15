@@ -25,6 +25,9 @@ public class EvalJob extends Config {
 	@Column(columnDefinition = "INTEGER")
 	public Long id;
 
+	@Column()
+	public String name;
+
 	@Column(name = "dataset_id", nullable = false)
 	public Long datasetId;
 

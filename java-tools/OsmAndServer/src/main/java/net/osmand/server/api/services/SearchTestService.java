@@ -60,6 +60,8 @@ public class SearchTestService extends DataService {
 		EvalJob job = new EvalJob();
 		job.datasetId = datasetId;
 		job.created = new java.sql.Timestamp(System.currentTimeMillis());
+		// Optional job name provided by client
+		job.name = payload.name();
 
 		String locale = payload.locale();
 		if (locale == null || locale.trim().isEmpty()) {
