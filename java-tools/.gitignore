@@ -17,3 +17,5 @@ regions.ocbf
 .attach_*
 OsmAndServer/src/main/resources/colorPalette.zip
 OsmAndMapCreatorUtilities/src/main/resources/page.txt
+OsmAndMapCreatorUtilities/brands.html
+

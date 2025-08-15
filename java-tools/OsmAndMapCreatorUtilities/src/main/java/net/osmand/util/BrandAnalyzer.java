@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
@@ -14,12 +15,15 @@ import java.util.TreeMap;
 public class BrandAnalyzer {
 
 	private static final String PLANET_NAME = "planet";
-	private static final int MIN_OCCURENCIES_PRINT = 7;
-	private static final int MIN_OCCURENCIES = 5;
-	private static final int TOP_PER_MAP = 30;
+	private static final int MIN_OCCURENCIES_PRINT = 15;
+	private static final int MIN_OCCURENCIES = 7;
+	private static final int TOP_PER_MAP = 10;
+	private static final int WORLD_TOP = 100;
 	public static double BRAND_OWNERSHIP = 0.7;
 	private static int VERBOSE = 1;
 
+	private static int BRAND_ID;
+	
 	public static class BrandInfo {
 		String brandName;
 		BrandRegion ownerRegion;
@@ -27,7 +31,8 @@ public class BrandAnalyzer {
 		Integer ownerCount;
 		Integer globalCount;
 		boolean include;
-		
+		String reasonInclude;
+		int id = BRAND_ID++;
 		BrandInfo anotherOwnRegion = null; // linked list
 		
 		public boolean regionOwnsThisBrand(BrandRegion r, boolean includeChildren) {
@@ -61,6 +66,7 @@ public class BrandAnalyzer {
 		});
 		
 		int depth;
+		boolean leaf = true;
 		String parent;
 		boolean map;
 		BrandRegion parentRegion;
@@ -96,22 +102,24 @@ public class BrandAnalyzer {
 		
 		Map<String, BrandInfo> brands = calculateBrandOwnership(regions);
 		
-		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, TOP_PER_MAP);
-		consolidateEnabledBrands(brands, regions);
+		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
+		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
+//		consolidateEnabledBrands(brands, regions);
 		// include all parent and
 		countIncluded(regions, brands);
 		
 		printRegionsSorted(regions, brands, null, 400, 0);
-		System.out.println("-----------");
+//		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
 //		System.out.println("-----------");
-		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
-		System.out.println("-----------");
-		printRegionsSorted(regions, brands, "netherlands", 100, 1000 );
+//		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
+//		System.out.println("-----------");
+//		printRegionsSorted(regions, brands, "netherlands", 100, 1000 );
+		generateHtmlPage(regions, brands, "brands.html", 2);
 
 	}
 
-	private void consolidateEnabledBrands(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions) {
+	protected void consolidateEnabledBrands(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions) {
 		// validate main thing that for each region ownership of enabled brand includes all brands above it
 		boolean changed = true;
 		int iteration = 1;
@@ -135,6 +143,8 @@ public class BrandAnalyzer {
 										+ " because of " + brandName);
 							}
 							topBrandToBeEnabled.include = true;
+							topBrandToBeEnabled.reasonInclude = String.format("For %s lower brand %s was included", 
+									ownerRegion.name, brandName);
 							changed = true;
 						}
 						if (topRegionBrand.equals(brandName)) {
@@ -151,8 +161,13 @@ public class BrandAnalyzer {
 	}
 
 	private void enableBrandsPerRegion(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions,
-			int minOccurencies, int topPerMap) {
+			int minOccurencies, int topPerMap, boolean include, String filter) {
 		for (BrandRegion r : regions.values()) {
+			if (include && !r.name.contains(filter)) {
+				continue;
+			} else if (!include && r.name.contains(filter)) {
+				continue;
+			}
 			Iterator<Entry<String, Integer>> it = r.brandsSorted.entrySet().iterator();
 			int cnt = 0;
 			while (it.hasNext() && cnt++ < topPerMap) {
@@ -163,6 +178,8 @@ public class BrandAnalyzer {
 				}
 				BrandInfo brandInfo = brands.get(brandName);
 				brandInfo.include = true;
+				brandInfo.reasonInclude = String.format("Top %d (>%d) for %s", topPerMap, minOccurencies, 
+						r.name);
 				if (VERBOSE >= 2) {
 					System.out.println("Enable " + e.getKey() + " " + r.name + " " + e.getValue());
 				}
@@ -351,6 +368,7 @@ public class BrandAnalyzer {
 			// calculate parents
 			if (!b.name.equals(PLANET_NAME)) {
 				b.parentRegion = regions.get(b.parent);
+				b.parentRegion.leaf = false;
 				if (b.parentRegion == null) {
 					throw new NullPointerException(b.name + " missing parent");
 				}
@@ -372,5 +390,80 @@ public class BrandAnalyzer {
 			}
 		}
 	}
+	
+	public void generateHtmlPage(Map<String, BrandRegion> regions, Map<String, BrandInfo> brands, String outputFile, 
+			int excludeGlobal) throws IOException {
+		countAllIncluded(brands);
+		// Read the HTML template
+		String htmlContent = new String(Algorithms.readFromInputStream(BrandAnalyzer.class.getResourceAsStream("/brand_template.html")));
+
+		// Prepare data for the template
+		StringBuilder brandData = new StringBuilder();
+		brandData.append("const brandsData = {\n");
+		for(BrandInfo brandInfo: brands.values()) {
+		brandData.append(String.format(
+				"\t\t\t\t '%s' : { name: '%s', id: %d, owner: '%s', ownerCount: %d, globalCount: %d, ownerPercent: %d,"
+				+ " includeReason: '%s', include: %s },\n",
+				brandInfo.id,
+				formatString(brandInfo.brandName),
+				brandInfo.id,
+				formatString(brandInfo.ownerRegion.name),
+				brandInfo.ownerCount,
+				brandInfo.globalCount,
+				(int) (brandInfo.ownerPercent * 100),
+				formatString(brandInfo.reasonInclude),
+				brandInfo.include
+			));
+		}
+		brandData.append("};\n");
+		
+		brandData.append("const brandsRegionData = {\n");
+
+		// Create a sorted map of regions for the dropdown
+		Map<String, BrandRegion> sortedRegions = new TreeMap<>(regions);
+
+		for (BrandRegion region : sortedRegions.values()) {
+			brandData.append(String.format("\t'%s': {\n", region.name));
+			brandData.append(String.format("\t\t'parent' : '%s',", region.parent));
+			brandData.append(String.format("\t\t'included' : '%s',", region.countIncluded));
+			brandData.append(String.format("\t\t'depth' : %s,", region.depth));
+			brandData.append(String.format("\t\t'leaf' : %s,", region.leaf));
+			brandData.append(String.format("\t\t\t'brands' : [\n"));
+			Iterator<Entry<String, Integer>> it = region.brandsSorted.entrySet().iterator();
+			while(it.hasNext()){
+				Entry<String, Integer> entry = it.next();
+				BrandInfo brandInfo = brands.get(entry.getKey());
+				if (brandInfo != null) {
+					if (!brandInfo.include && brandInfo.globalCount <= excludeGlobal) {
+						continue;
+					}
+					brandData.append(String.format("{ id: %d, count: %d},", brandInfo.id, entry.getValue()));
+				}
+			}
+			brandData.append("   ]},\n");
+		}
+		brandData.append("};\n");
+
+		// Replace placeholders in the template
+		String placeholder = "// BRAND_DATA_PLACEHOLDER";
+		int first = htmlContent.indexOf(placeholder);
+		int second = htmlContent.indexOf(placeholder, first + placeholder.length());
+		htmlContent = htmlContent.substring(0, first) + "\n" + brandData
+				+ htmlContent.substring(second + placeholder.length()); 
+
+		// Write the final HTML to a file
+		try (PrintWriter writer = new PrintWriter(outputFile)) {
+			writer.println(htmlContent);
+		}
+		System.out.println("Generated HTML page: " + outputFile);
+	}
+
+	private String formatString(String s) {
+		if (s == null) {
+			return "";
+		}
+		return s.replace("\\", "\\\\").replace("'", "\\'");
+	}
+
 
 }
