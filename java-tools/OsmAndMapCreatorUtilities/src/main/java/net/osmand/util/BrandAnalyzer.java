@@ -124,7 +124,7 @@ public class BrandAnalyzer {
 		printRegionsSorted(regions, brands, null, 400, 0);
 		
 //		System.out.println("-----------");
-//		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
+		printRegionsSorted(regions, brands, "ukraine_khar", 100, 1000 );
 //		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
 //		System.out.println("-----------");
@@ -281,8 +281,14 @@ public class BrandAnalyzer {
 			while (it.hasNext() && l-- > 0) {
 				Entry<String, Integer> n = it.next();
 				BrandInfo brandInfo = brands.get(n.getKey());
+				String owners = brandInfo.ownerRegion.name;
+				BrandInfo next = brandInfo.anotherOwnRegion;
+				while (next != null) {
+					owners += ", " + next.ownerRegion.name;
+					next = next.anotherOwnRegion;
+				}
 				System.out.printf("    %s - %d: owner %s %d/%d %d%%\n", (brandInfo.include?"+":"-")+ n.getKey(), n.getValue(),
-						brandInfo.ownerRegion.name, brandInfo.ownerCount, brandInfo.globalCount,
+						owners, brandInfo.ownerCount, brandInfo.globalCount,
 						(int)(brandInfo.ownerPercent  * 100));
 			}
 		}
@@ -324,7 +330,8 @@ public class BrandAnalyzer {
 				info.globalCount = globalCount;
 				info.ownerCount = e.getValue();
 				info.ownerRegion = reg;
-				BrandInfo childPossible = brandOnwership.get(info.brandName);
+				BrandInfo existing = brandOnwership.get(info.brandName);
+				BrandInfo childPossible = existing;
 				boolean checkIfIncludedInChild = false;
 				while (childPossible != null) {
 					if (reg.checkIfThisIsParent(childPossible.ownerRegion)) {
@@ -338,8 +345,15 @@ public class BrandAnalyzer {
 						System.out.printf("%s --- %d/%d (%.2f)\n", info.brandName,
 								info.ownerCount, info.globalCount, percent);
 					}
-					info.anotherOwnRegion = childPossible;
-					brandOnwership.put(info.brandName, info);
+					if (existing != null && existing.ownerRegion.depth > info.ownerRegion.depth) {
+						// skip ownership for higher region
+//						existing.anotherOwnRegion = info;
+					} else {
+						if (existing == null || existing.ownerRegion.depth == info.ownerRegion.depth) {
+							info.anotherOwnRegion = existing;
+						}
+						brandOnwership.put(info.brandName, info);
+					}
 				}
 			}
 		}
