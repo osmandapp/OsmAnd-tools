@@ -694,7 +694,12 @@ public class WebGpxParser {
             point.getExtensionsToWrite().put(ICON_NAME_EXTENSION, wpt.icon);
         }
         if (wpt.hidden != null) {
-            point.getExtensionsToWrite().put(HIDDEN_EXTENSION, wpt.hidden);
+            boolean isHidden = Boolean.parseBoolean(wpt.hidden);
+            if (isHidden) {
+                point.getExtensionsToWrite().put(HIDDEN_EXTENSION, wpt.hidden);
+            } else {
+                point.getExtensionsToWrite().remove(HIDDEN_EXTENSION);
+            }
         }
         return point;
     }
