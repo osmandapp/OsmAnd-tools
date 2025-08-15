@@ -19,7 +19,7 @@ public class BrandAnalyzer {
 	private static final int MIN_OCCURENCIES_PRINT = 10;
 	private static final int MIN_OCCURENCIES = 5;
 	private static final int TOP_PER_MAP = 100;
-	private static final int WORLD_TOP = 100;
+	private static final int WORLD_TOP = 500;
 	public static double BRAND_OWNERSHIP = 0.7;
 	private static int VERBOSE = 1;
 
@@ -124,7 +124,7 @@ public class BrandAnalyzer {
 		printRegionsSorted(regions, brands, null, 400, 0);
 		
 //		System.out.println("-----------");
-		printRegionsSorted(regions, brands, "ukraine_khar", 100, 1000 );
+//		printRegionsSorted(regions, brands, "ukraine_khar", 100, 1000 );
 //		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
 //		System.out.println("-----------");
