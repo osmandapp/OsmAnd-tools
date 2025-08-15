@@ -52,10 +52,10 @@
             background-color: #e9ecef;
             padding: 10px 15px;
             border-radius: 4px;
-            flex-grow: 1;
             justify-content: center;
             min-height: 24px;
             flex-wrap: wrap;
+            margin-bottom: 20px;
         }
         .stat {
             font-size: 0.9em;
@@ -157,9 +157,6 @@
                 <label for="countFilter">Filter > </label>
                 <input type="number" id="countFilter" value="7" min="0">
             </div>
-            <div id="stats" class="stats-container">
-                <!-- Statistics will be loaded here -->
-            </div>
         </div>
 
         <div class="nav-container" id="nav-container">
@@ -169,6 +166,9 @@
 
         <div class="content" id="content-area">
             <h2 id="regionTitle">All Regions Overview</h2>
+            <div id="stats" class="stats-container">
+                <!-- Statistics will be loaded here -->
+            </div>
             <div id="brand-list-container" style="overflow-x:auto;">
                 <table id="mainTable">
                     <thead>
@@ -231,7 +231,7 @@
             const updateDatalist = (filter = '') => {
                 regionList.innerHTML = '';
                 const lowerCaseFilter = filter.toLowerCase();
-                const filteredRegions = allRegionNames.filter(name => name.toLowerCase().startsWith(lowerCaseFilter));
+                const filteredRegions = allRegionNames.filter(name => name.toLowerCase().includes(lowerCaseFilter));
                 
                 const limit = Math.min(filteredRegions.length, 10);
                 for (let i = 0; i < limit; i++) {
@@ -297,8 +297,7 @@
 
             thead.innerHTML = `
                 <tr>
-                    <th>#</th>
-                    <th class="sortable" data-sort="name">Region Name</th>
+                    <th class="sortable" data-sort="name"># Region Name</th>
                     <th class="sortable" data-sort="included">Included Brands</th>
                     <th class="sortable" data-sort="total">Total Brands</th>
                     <th class="sortable" data-sort="parent">Parent</th>
@@ -317,8 +316,7 @@
                 const row = document.createElement('tr');
                 row.className = 'clickable-row';
                 row.innerHTML = `
-                    <td>${index + 1}.</td>
-                    <td>${region.name}</td>
+                    <td>${index + 1}. ${region.name}</td>
                     <td>${region.included.toLocaleString()}</td>
                     <td>${region.total.toLocaleString()}</td>
                     <td>${region.parent || 'N/A'}</td>
@@ -357,9 +355,8 @@
             
             thead.innerHTML = `
                 <tr>
-                    <th>#</th>
                     <th class="emoji-cell"></th>
-                    <th>Brand Name</th>
+                    <th># Brand Name</th>
                     <th>Count</th>
                     <th>Owner</th>
                     <th>Ownership Details</th>
@@ -371,7 +368,7 @@
             const filteredBrands = region.brands.filter(b => b.count > filterValue);
 
             if (filteredBrands.length === 0) {
-                 tbody.innerHTML = `<tr><td colspan="7">No brands match the filter > ${filterValue}.</td></tr>`;
+                 tbody.innerHTML = `<tr><td colspan="6">No brands match the filter > ${filterValue}.</td></tr>`;
                  return;
             }
 
@@ -385,9 +382,8 @@
                 const isOwner = brandInfo.owner === regionName;
 
                 row.innerHTML = `
-                    <td>${index + 1}.</td>
                     <td class="emoji-cell">${brandInfo.include ? '✅' : '❌'}</td>
-                    <td class="${isOwner ? 'owner-brand' : ''}">${truncateText(brandInfo.name)}</td>
+                    <td class="${isOwner ? 'owner-brand' : ''}">${index + 1}. ${truncateText(brandInfo.name)}</td>
                     <td>${brand.count.toLocaleString()}</td>
                     <td>${brandInfo.owner}</td>
                     <td>${brandInfo.ownerCount.toLocaleString()} / ${brandInfo.globalCount.toLocaleString()} (${brandInfo.ownerPercent}%)</td>
@@ -424,6 +420,9 @@
             const filterValue = parseInt(document.getElementById('countFilter').value, 10) || 0;
             const statsContainer = document.getElementById('stats');
             
+            const totalBrands = region.brands.length;
+            const filteredBrands = region.brands.filter(b => b.count > filterValue).length;
+
             const totalOwned = region.brands.filter(b => brandsData[b.id]?.owner === regionName).length;
             const filteredOwned = region.brands.filter(b => brandsData[b.id]?.owner === regionName && b.count > filterValue).length;
             
@@ -431,6 +430,7 @@
             const filteredIncluded = region.brands.filter(b => brandsData[b.id]?.include && b.count > filterValue).length;
 
             statsContainer.innerHTML = `
+                <div class="stat">All: <span class="stat-value">${totalBrands} (filter ${filteredBrands})</span></div>
                 <div class="stat">Included: <span class="stat-value">${totalIncluded} (filter ${filteredIncluded})</span></div>
                 <div class="stat">Owned by Region: <span class="stat-value">${totalOwned} (filter ${filteredOwned})</span></div>
             `;

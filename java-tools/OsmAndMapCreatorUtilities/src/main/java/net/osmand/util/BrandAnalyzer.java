@@ -94,21 +94,33 @@ public class BrandAnalyzer {
 
 	public static void main(String[] args) throws IOException {
 		File fl = new File("../../../all_brands.csv");
-		new BrandAnalyzer().analyzeBrands(fl);
+		boolean consolidate = false;
+		if (args.length == 0) {
+			fl = new File("../../../all_brands.csv");
+			consolidate = true;
+		} else {
+			fl = new File(args[0]);
+		}
+		for(String ar : args) {
+			if("--consolidate".equals(ar)) {
+				consolidate = true;
+			}
+		}
+		new BrandAnalyzer().analyzeBrands(fl, consolidate);
 	}
 
-	private void analyzeBrands(File fl) throws IOException {
+	private void analyzeBrands(File fl, boolean consolidate) throws IOException {
 		Map<String, BrandRegion> regions = parseBrandsFile(fl);
 		
 		Map<String, BrandInfo> brands = calculateBrandOwnership(regions);
 		
 		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
 		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
-//		consolidateEnabledBrands(brands, regions);
-		// include all parent and
-		countIncluded(regions, brands);
-		
+		if (consolidate) {
+			consolidateEnabledBrands(brands, regions, 1);
+		}
 		printRegionsSorted(regions, brands, null, 400, 0);
+		
 //		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
 //		System.out.println("-----------");
@@ -119,7 +131,7 @@ public class BrandAnalyzer {
 
 	}
 
-	protected void consolidateEnabledBrands(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions) {
+	protected void consolidateEnabledBrands(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions, int mindepth) {
 		// validate main thing that for each region ownership of enabled brand includes all brands above it
 		boolean changed = true;
 		int iteration = 1;
@@ -136,15 +148,15 @@ public class BrandAnalyzer {
 					while (it.hasNext()) {
 						String topRegionBrand = it.next();
 						BrandInfo topBrandToBeEnabled = brands.get(topRegionBrand);
-						if (!topBrandToBeEnabled.include
+						if (!topBrandToBeEnabled.include && ownerRegion.depth >= mindepth
 								&& topBrandToBeEnabled.regionOwnsThisBrand(ownerRegion, false)) {
 							if (VERBOSE >= 3) {
 								System.out.println("Enable " + topRegionBrand + " for " + ownerRegion.name
 										+ " because of " + brandName);
 							}
 							topBrandToBeEnabled.include = true;
-							topBrandToBeEnabled.reasonInclude = String.format("For %s lower brand %s was included", 
-									ownerRegion.name, brandName);
+							topBrandToBeEnabled.reasonInclude = String.format("Higher than %s in %s", 
+									brandName.substring(0, Math.min(brandName.length(), 7)), ownerRegion.name);
 							changed = true;
 						}
 						if (topRegionBrand.equals(brandName)) {
