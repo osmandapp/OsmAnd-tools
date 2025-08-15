@@ -9,12 +9,12 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
 
 public class BrandAnalyzer {
 
 	private static final String PLANET_NAME = "planet";
+	private static final int MIN_OCCURENCIES_PRINT = 7;
 	private static final int MIN_OCCURENCIES = 5;
 	private static final int TOP_PER_MAP = 30;
 	public static double BRAND_OWNERSHIP = 0.7;
@@ -101,9 +101,13 @@ public class BrandAnalyzer {
 		// include all parent and
 		countIncluded(regions, brands);
 		
-		printRegionsSorted(regions, brands, null, 200, 0);
+		printRegionsSorted(regions, brands, null, 400, 0);
 		System.out.println("-----------");
-		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
+//		printRegionsSorted(regions, brands, "ukraine", 100, 1000 );
+//		System.out.println("-----------");
+		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
+		System.out.println("-----------");
+		printRegionsSorted(regions, brands, "netherlands", 100, 1000 );
 
 	}
 
@@ -215,15 +219,32 @@ public class BrandAnalyzer {
 			if (i++ > limit) {
 				break;
 			}
-			System.out.println(r.name + " --- " + r.countIncluded);
+			int cntFilter = 0;
+			int owned = 0;
+			int sub_owns = 0;
+			for (Entry<String, Integer> brand : r.brands.entrySet()) {
+				if(brand.getValue() > MIN_OCCURENCIES_PRINT) {
+					cntFilter++;
+					BrandInfo bi = brands.get(brand.getKey());
+					if(bi.regionOwnsThisBrand(r, false)) {
+						owned++;
+					} else if(bi.regionOwnsThisBrand(r, true)) {
+						sub_owns++;
+					}
+				}
+			}
+			
+			System.out.printf("+%d %s --- %d all --- >%d: %d, own %d + subown %d\n", 
+					r.countIncluded, r.name, 
+					r.brands.size(), MIN_OCCURENCIES_PRINT, cntFilter, owned, sub_owns);
 			int l = topBrands;
 			Iterator<Entry<String, Integer>> it = r.brandsSorted.entrySet().iterator();
 			while (it.hasNext() && l-- > 0) {
 				Entry<String, Integer> n = it.next();
 				BrandInfo brandInfo = brands.get(n.getKey());
-				System.out.printf("    %s - %d in=%s: owner %s %d/%d (%.2f)\n", n.getKey(), n.getValue(),
-						brandInfo.include, brandInfo.ownerRegion.name, brandInfo.ownerCount, brandInfo.globalCount,
-						brandInfo.ownerPercent);
+				System.out.printf("    %s - %d: owner %s %d/%d %d%%\n", (brandInfo.include?"+":"-")+ n.getKey(), n.getValue(),
+						brandInfo.ownerRegion.name, brandInfo.ownerCount, brandInfo.globalCount,
+						(int)(brandInfo.ownerPercent  * 100));
 			}
 		}
 	}
