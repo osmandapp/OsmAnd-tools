@@ -16,9 +16,9 @@ import java.util.TreeMap;
 public class BrandAnalyzer {
 
 	private static final String PLANET_NAME = "planet";
-	private static final int MIN_OCCURENCIES_PRINT = 15;
-	private static final int MIN_OCCURENCIES = 7;
-	private static final int TOP_PER_MAP = 10;
+	private static final int MIN_OCCURENCIES_PRINT = 10;
+	private static final int MIN_OCCURENCIES = 5;
+	private static final int TOP_PER_MAP = 100;
 	private static final int WORLD_TOP = 100;
 	public static double BRAND_OWNERSHIP = 0.7;
 	private static int VERBOSE = 1;
@@ -116,8 +116,8 @@ public class BrandAnalyzer {
 		
 		Map<String, BrandInfo> brands = calculateBrandOwnership(regions);
 		
-		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
-		enableBrandsPerRegion(brands, regions, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
+		enableBrandsPerRegion(brands, regions, false, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
+		enableBrandsPerRegion(brands, regions, true, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
 		if (consolidate) {
 			consolidateEnabledBrands(brands, regions, 1);
 		}
@@ -174,7 +174,7 @@ public class BrandAnalyzer {
 		}
 	}
 
-	private void enableBrandsPerRegion(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions,
+	private void enableBrandsPerRegion(Map<String, BrandInfo> brands, Map<String, BrandRegion> regions, boolean onlyOwned, 
 			int minOccurencies, int topPerMap, boolean include, String filter) {
 		for (BrandRegion r : regions.values()) {
 			if (include && !r.name.contains(filter)) {
@@ -184,13 +184,21 @@ public class BrandAnalyzer {
 			}
 			Iterator<Entry<String, Integer>> it = r.brandsSorted.entrySet().iterator();
 			int cnt = 0;
-			while (it.hasNext() && cnt++ < topPerMap) {
+			l: while (it.hasNext()) {
 				Entry<String, Integer> e = it.next();
 				String brandName = e.getKey();
-				if (e.getValue() < minOccurencies) {
-					break;
-				}
 				BrandInfo brandInfo = brands.get(brandName);
+				if (onlyOwned && !brandInfo.regionOwnsThisBrand(r, false)) {
+					continue;
+				}
+				if (cnt++ >= topPerMap) {
+					break l;
+				}
+				
+				if (e.getValue() < minOccurencies) {
+					break l;
+				}
+				
 				brandInfo.include = true;
 				brandInfo.reasonInclude = String.format("Top %d (>%d) for %s", topPerMap, minOccurencies, 
 						r.name);
@@ -254,12 +262,12 @@ public class BrandAnalyzer {
 			int owned = 0;
 			int sub_owns = 0;
 			for (Entry<String, Integer> brand : r.brands.entrySet()) {
-				if(brand.getValue() > MIN_OCCURENCIES_PRINT) {
+				if (brand.getValue() > MIN_OCCURENCIES_PRINT) {
 					cntFilter++;
 					BrandInfo bi = brands.get(brand.getKey());
-					if(bi.regionOwnsThisBrand(r, false)) {
+					if (bi.regionOwnsThisBrand(r, false)) {
 						owned++;
-					} else if(bi.regionOwnsThisBrand(r, true)) {
+					} else if (bi.regionOwnsThisBrand(r, true)) {
 						sub_owns++;
 					}
 				}
