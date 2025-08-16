@@ -3,9 +3,11 @@ package net.osmand.util;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -19,7 +21,7 @@ public class BrandAnalyzer {
 	private static final int MIN_OCCURENCIES_PRINT = 10;
 	private static final int MIN_OCCURENCIES = 5;
 	private static final int TOP_PER_MAP = 100;
-	private static final int WORLD_TOP = 500;
+	private static final int WORLD_TOP = 1000;
 	public static double BRAND_OWNERSHIP = 0.7;
 	private static int VERBOSE = 1;
 
@@ -112,13 +114,17 @@ public class BrandAnalyzer {
 	}
 
 	private void analyzeBrands(File fl, boolean consolidate) throws IOException {
+		String outFile = "brands";
 		Map<String, BrandRegion> regions = parseBrandsFile(fl);
 		
 		Map<String, BrandInfo> brands = calculateBrandOwnership(regions);
 		
-		enableBrandsPerRegion(brands, regions, false, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
-		enableBrandsPerRegion(brands, regions, true, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
-		if (consolidate) {
+		boolean worldBrandsOnlyOwned = false;
+		enableBrandsPerRegion(brands, regions, worldBrandsOnlyOwned, MIN_OCCURENCIES, WORLD_TOP, true, PLANET_NAME);
+		boolean onlyOwned = true;
+		enableBrandsPerRegion(brands, regions, onlyOwned, MIN_OCCURENCIES, TOP_PER_MAP, false, PLANET_NAME);
+		if (!onlyOwned && consolidate) {
+			// not needed for only owned generates only garbage
 			consolidateEnabledBrands(brands, regions, 1);
 		}
 		printRegionsSorted(regions, brands, null, 400, 0);
@@ -129,7 +135,17 @@ public class BrandAnalyzer {
 //		printRegionsSorted(regions, brands, "slovakia", 100, 1000 );
 //		System.out.println("-----------");
 //		printRegionsSorted(regions, brands, "netherlands", 100, 1000 );
-		generateHtmlPage(regions, brands, "brands.html", 0);
+		generateHtmlPage(regions, brands, outFile + ".html", 0);
+		
+		StringBuilder allBrands = new StringBuilder();
+		for (BrandInfo brand : brands.values()) {
+			if (brand.include) {
+				allBrands.append(brand.brandName).append('\n');
+			}
+		}
+		FileOutputStream fous = new FileOutputStream(outFile + ".lst");
+		fous.write(allBrands.toString().getBytes());
+		fous.close();
 
 	}
 
@@ -388,9 +404,13 @@ public class BrandAnalyzer {
 			region.map = "true".equalsIgnoreCase(line.substring(0, ind));
 			line = line.substring(ind + 1);
 
-			String brand = line;
+			String allBrands = line;
 			if (count > 0) {
-				region.brands.put(brand, count);
+				String[] splitBrands = allBrands.split(";");
+				for(String brand : splitBrands) {
+					int existing = region.brands.getOrDefault(brand, 0);
+					region.brands.put(brand, count + existing);
+				}
 			}
 		}
 		r.close();
@@ -399,10 +419,12 @@ public class BrandAnalyzer {
 	}
 
 	private void finishReading(Map<String, BrandRegion> regions) {
+		BrandRegion planet = regions.get(PLANET_NAME);
+		planet.map = true;
 		for (BrandRegion b : regions.values()) {
 			b.brandsSorted.putAll(b.brands);
 			// calculate parents
-			if (!b.name.equals(PLANET_NAME)) {
+			if (b != planet) {
 				b.parentRegion = regions.get(b.parent);
 				if (b.parentRegion == null) {
 					throw new NullPointerException(b.name + " missing parent");
@@ -410,11 +432,21 @@ public class BrandAnalyzer {
 				b.parentRegion.leaf = false;
 			}
 		}
-		checkDepth(regions);
-	}
-
-	private void checkDepth(Map<String, BrandRegion> regions) {
 		for (BrandRegion b : regions.values()) {
+			if (b != planet) {
+				while (!b.parentRegion.map) {
+					b.parentRegion = b.parentRegion.parentRegion;
+					b.parent = b.parentRegion.name;
+				}
+
+			}
+		}
+		// remove all intermediate regions (east-asia, north-europe)... and non-map
+		for (BrandRegion b : new ArrayList<>(regions.values())) {
+			if (!b.map) {
+				regions.remove(b.name);
+				continue;
+			}
 			int calcdepth = 0;
 			BrandRegion p = b.parentRegion;
 			while (p != null) {
@@ -422,10 +454,11 @@ public class BrandAnalyzer {
 				p = p.parentRegion;
 			}
 			if (calcdepth != b.depth) {
-				throw new IllegalStateException();
+				b.depth = calcdepth;
 			}
 		}
 	}
+
 	
 	public void generateHtmlPage(Map<String, BrandRegion> regions, Map<String, BrandInfo> brands, String outputFile, 
 			int excludeGlobal) throws IOException {
