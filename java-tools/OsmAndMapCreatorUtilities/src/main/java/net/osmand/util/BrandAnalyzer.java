@@ -404,10 +404,10 @@ public class BrandAnalyzer {
 			// calculate parents
 			if (!b.name.equals(PLANET_NAME)) {
 				b.parentRegion = regions.get(b.parent);
-				b.parentRegion.leaf = false;
 				if (b.parentRegion == null) {
 					throw new NullPointerException(b.name + " missing parent");
 				}
+				b.parentRegion.leaf = false;
 			}
 		}
 		checkDepth(regions);
