@@ -901,38 +901,22 @@ public class AdminController {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			processSub(s, periodId);
-			if (s.currentPeriod == 0 && period == MONTH) {
+			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
+				String fperiodId = dateFormat.format(c.getTime());
 				for (int k = 0; k < s.totalMonths; k++) {
 					c.add(Calendar.MONTH, 1);
 					String nperiodId = dateFormat.format(c.getTime());
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
-					if (vls != null) {
-						for (int i = 0; i < columns.size(); i++) {
-							if (columns.get(i).filter(s)) {
-								vls.get(i).active++;
-							}
-						}
+					if (fperiodId.equals(nperiodId)) {
+						continue;
 					}
-				}
-			} else if (s.currentPeriod == 0 && period == YEAR) {
-				Calendar c = Calendar.getInstance();
-				c.setTimeInMillis(s.startPeriodTime);
-				int years = s.totalMonths / 12;
-				for (int k = 0; k < years; k++) {
-					c.add(Calendar.YEAR, 1);
-					String nperiodId = dateFormat.format(c.getTime());
 					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
-								if (k + 12 >= s.totalMonths) {
-									if (s.valid && s.autorenewing) {
-										vls.get(i).activeRenew++;
-									}
-								} else {
+								if (s.valid && s.autorenewing) {
 									vls.get(i).activeRenew++;
 								}
 							}
