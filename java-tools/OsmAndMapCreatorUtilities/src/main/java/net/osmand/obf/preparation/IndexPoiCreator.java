@@ -820,10 +820,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					" order by cnt desc");
 			Set<String> set = new HashSet<>();
 			while (rs.next()) {
-                String value = rs.getString(2).toLowerCase().trim();
+                String value = rs.getString(2);
 				if (providedTopIndexes != null) {
 					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + 1);
-					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(value)
+					String lc = value.toLowerCase().trim();
+					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(lc)
 							&& maxPerMap-- > 0) {
 						set.add(value);
 					}
