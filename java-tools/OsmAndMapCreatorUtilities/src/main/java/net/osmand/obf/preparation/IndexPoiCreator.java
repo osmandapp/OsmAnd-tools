@@ -1,5 +1,33 @@
 package net.osmand.obf.preparation;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
@@ -7,27 +35,39 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.ObfConstants;
-import net.osmand.data.*;
+import net.osmand.data.Amenity;
+import net.osmand.data.Boundary;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.Multipolygon;
+import net.osmand.data.MultipolygonBuilder;
+import net.osmand.data.QuadRect;
+import net.osmand.data.QuadTree;
+import net.osmand.data.Ring;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.osm.*;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.MapRenderingTypesEncoder.EntityConvertApplyType;
-import net.osmand.osm.edit.*;
+import net.osmand.osm.PoiCategory;
+import net.osmand.osm.PoiType;
+import net.osmand.osm.RelationTagsPropagation;
+import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.OSMSettings;
+import net.osmand.osm.edit.OsmMapUtils;
+import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
+import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.sql.*;
-import java.util.*;
-import java.util.Map.Entry;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
+
 
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
 
@@ -52,7 +92,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private List<PoiAdditionalType> additionalTypesId = new ArrayList<PoiAdditionalType>();
 	private Map<String, PoiAdditionalType> additionalTypesByTag = new HashMap<String, PoiAdditionalType>();
 	private IndexCreatorSettings settings;
-	private Map<String, HashSet<String>> topIndexAdditional;
+	private Map<String, Set<String>> topIndexAdditional;
 	private Set<String> topIndexKeys = new HashSet<>();
 	private TLongHashSet excludedRelations = new TLongHashSet();
 
@@ -65,6 +105,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
 
+	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity 
+	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
+	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = 3;
+	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = 100;
+	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
+	
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
             "TotalEnergies", "Aral", "Q8", "Petronas", "Caltex", "Esso", "Tesla Supercharger", "Ionity", "Walmart", "Carrefour",
@@ -401,7 +447,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String t = i == -1 ? name.substring(p) : name.substring(p, i);
 			PoiAdditionalType rulType = additionalTypesId.get(t.charAt(0) - 1);
 			if (topIndexAdditional != null && topIndexAdditional.containsKey(rulType.getTag())) {
-				HashSet<String> collection = topIndexAdditional.get(rulType.getTag());
+				Set<String> collection = topIndexAdditional.get(rulType.getTag());
 				if (!collection.contains(rulType.getValue())) {
 					if (i == -1) {
 						break;
@@ -726,9 +772,29 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	}
 
-	private void collectTopIndexMap() throws SQLException {
+	private void collectTopIndexMap() throws SQLException, IOException {
 		if (topIndexAdditional != null) {
 			return;
+		}
+		Map<String, Set<String>> providedTopIndexes = null;
+		if (settings.poiTopIndexUrl != null && !Algorithms.isEmpty(System.getenv(ENV_POI_TOP_INDEXES_URL))) {
+			String url = settings.poiTopIndexUrl != null ? settings.poiTopIndexUrl : System.getenv(ENV_POI_TOP_INDEXES_URL);
+			log.info("Using global list of poi additionals - " +url );
+			providedTopIndexes = new LinkedHashMap<String, Set<String>>(); 
+			InputStream is = new URL(url).openStream();
+			StringBuilder sb = Algorithms.readFromInputStream(is);
+			for (String s : sb.toString().split("\n")) {
+				String tag = s.substring(0, s.indexOf(','));
+				String value = s.substring(s.indexOf(',') + 1);
+				Set<String> set = providedTopIndexes.get(tag);
+				if (set == null) {
+					set = new TreeSet<String>();
+					providedTopIndexes.put(tag, set);
+				}
+				set.add(value);
+			}
+		} else {
+			log.info("Not using global list of poi indexes");
 		}
 		topIndexAdditional = new HashMap<>();
 		ResultSet rs;
@@ -737,26 +803,38 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (!topIndexKeys.contains(entry.getKey())) {
 				continue;
 			}
-            if (entry.getKey().equals("top_index_brand")) {
+            if (entry.getKey().equals(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + "brand")) {
                 isBrand = true;
             }
 			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
-			minCount = minCount > 0 ? minCount : PoiType.DEFAULT_MIN_COUNT;
-			maxPerMap = maxPerMap > 0 ? maxPerMap : PoiType.DEFAULT_MAX_PER_MAP;
+			minCount = minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
+			maxPerMap = maxPerMap > 0 ? maxPerMap : DEFAULT_TOP_INDEX_MAX_PER_MAP;
+			if(providedTopIndexes != null) {
+				minCount = 0;
+				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
+			}
 			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\"" +
 					" from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
 					" order by cnt desc");
-			HashSet<String> set = new HashSet<>();
+			Set<String> set = new HashSet<>();
 			while (rs.next()) {
                 String value = rs.getString(2);
-                if (maxPerMap > 0) {
-                    set.add(value);
-                } else if (isBrand && WORLD_BRANDS.contains(value)) {
-                    set.add(rs.getString(2));
-                }
-                maxPerMap--;
+				if (providedTopIndexes != null) {
+					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + 1);
+					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(value)
+							&& maxPerMap-- > 0) {
+						set.add(value);
+					}
+				} else {
+					if (maxPerMap-- > 0) {
+						set.add(value);
+					} else if (isBrand && WORLD_BRANDS.contains(value)) {
+						// add world brands anyway
+						set.add(rs.getString(2));
+					}
+				}
 			}
 			topIndexAdditional.put(column, set);
 		}

@@ -37,6 +37,9 @@ public class IndexCreatorSettings {
 	// mapping wikidata id <-> wikipedia articles
 	public String wikidataMappingUrl;
 	
+	// lst file <tag>,<value> to index and store as poi category like default - (toilets, cafe)
+	public String poiTopIndexUrl;
+	
 	// for example file with low emissions polygons 
 	public List<File> extraRelations = new ArrayList<>();
 	
