@@ -411,14 +411,15 @@ public class TopTagValuesAnalyzer {
 			line = line.substring(ind + 1);
 			
 			ind = line.indexOf(',');
-			String tag = line.substring(0, ind);
+			String tag = line.substring(0, ind).toLowerCase();
 			line = line.substring(ind + 1);
 
 			String allValues = line;
 			if (count > 0) {
 				String[] splitValues = allValues.split(";");
 				for(String tagValueKey : splitValues) {
-					int existing = region.tagValues.getOrDefault(tagValueKey, 0);
+					tagValueKey = tagValueKey.toLowerCase().trim();
+					int existing = region.tagValues.getOrDefault(tag + KEY_SEP + tagValueKey, 0);
 					region.tagValues.put(tag + KEY_SEP + tagValueKey, count + existing);
 				}
 			}
