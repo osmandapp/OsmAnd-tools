@@ -904,10 +904,15 @@ public class AdminController {
 			if (s.currentPeriod == 0 && period == MONTH) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
+				String periodFormatId = dateFormat.format(c.getTime());
 				for (int k = 0; k < s.totalMonths; k++) {
 					c.add(Calendar.MONTH, 1);
 					String nperiodId = dateFormat.format(c.getTime());
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
+					if (periodFormatId.equals(nperiodId)) {
+						continue;
+					}
+					periodFormatId = nperiodId;
+					List<AdminGenericSubReportColumnValue> vls = values.get(periodFormatId);
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
