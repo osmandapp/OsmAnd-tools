@@ -777,7 +777,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return;
 		}
 		Map<String, Set<String>> providedTopIndexes = null;
-		if (settings.poiTopIndexUrl != null && !Algorithms.isEmpty(System.getenv(ENV_POI_TOP_INDEXES_URL))) {
+		if (settings.poiTopIndexUrl != null || !Algorithms.isEmpty(System.getenv(ENV_POI_TOP_INDEXES_URL))) {
 			String url = settings.poiTopIndexUrl != null ? settings.poiTopIndexUrl : System.getenv(ENV_POI_TOP_INDEXES_URL);
 			log.info("Using global list of poi additionals - " +url );
 			providedTopIndexes = new LinkedHashMap<String, Set<String>>(); 
