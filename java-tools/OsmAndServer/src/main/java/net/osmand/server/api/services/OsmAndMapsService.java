@@ -501,7 +501,7 @@ public class OsmAndMapsService {
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
-	public void checkZippedFiles() throws IOException {
+	public synchronized void checkZippedFiles() throws IOException {
 		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
 			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
 			for (File zipFile : new File(tileConfig.obfZipLocation).listFiles()) {
