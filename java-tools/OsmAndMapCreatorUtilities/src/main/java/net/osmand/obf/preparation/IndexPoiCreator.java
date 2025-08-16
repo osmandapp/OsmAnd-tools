@@ -107,8 +107,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity 
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
-	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = 3;
-	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = 100;
+	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
+	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 	
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
@@ -811,7 +811,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount = minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : DEFAULT_TOP_INDEX_MAX_PER_MAP;
-			if(providedTopIndexes != null) {
+			if (providedTopIndexes != null) {
 				minCount = 0;
 				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
 			}
@@ -822,13 +822,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			while (rs.next()) {
                 String value = rs.getString(2);
 				if (providedTopIndexes != null) {
-					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + 1);
+					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
 					String lc = value.toLowerCase().trim();
-					System.out.println("Check " + key + " lc"  + lc + " ... ");
 					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(lc)
 							&& maxPerMap-- > 0) {
 						set.add(value);
-						System.out.println("ok");
 					}
 				} else {
 					if (maxPerMap-- > 0) {
