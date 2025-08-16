@@ -824,11 +824,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (providedTopIndexes != null) {
 					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
 					String lc = value.toLowerCase().trim();
-					System.out.println("Check " + key + " lc "  + lc + " ... ");
 					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(lc)
 							&& maxPerMap-- > 0) {
 						set.add(value);
-						System.out.println("ok");
 					}
 				} else {
 					if (maxPerMap-- > 0) {
