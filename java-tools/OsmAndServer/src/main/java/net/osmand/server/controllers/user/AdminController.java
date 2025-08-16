@@ -924,10 +924,15 @@ public class AdminController {
 			} else if (s.currentPeriod == 0 && period == YEAR) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
+				String periodFormatId = dateFormat.format(c.getTime());
 				for (int k = 0; k < s.totalMonths; k+= 12) {
 					c.add(Calendar.YEAR, 1);
 					String nperiodId = dateFormat.format(c.getTime());
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
+					if (periodFormatId.equals(nperiodId)) {
+						continue;
+					}
+					periodFormatId = nperiodId;
+					List<AdminGenericSubReportColumnValue> vls = values.get(periodFormatId);
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
@@ -1347,7 +1352,6 @@ public class AdminController {
 		public void buildUp(Date time, int period, ExchangeRates rts) {
 			this.startPeriodTime = time.getTime();
 			this.startPeriodDay = dayFormat.format(time.getTime());
-			LOGGER.info("Formatting date: " + time);
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.startPeriodYear = yearFormat.format(time.getTime());
 			this.currentPeriod = period;
