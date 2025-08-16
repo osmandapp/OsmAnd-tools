@@ -1059,13 +1059,10 @@ public class AdminController {
 						s.introCycles = rs.getInt(9);
 						setDefaultSkuValues(s, subMap);
 						c.setTimeInMillis(s.startTime);
+						c.add(Calendar.DAY_OF_YEAR, 20); // sometimes end time shifts 3-5 days
 						while (c.getTimeInMillis() < s.endTime) {
-							c.add(Calendar.MONTH, 1);
 							s.totalMonths++;
-						}
-						// we rolled up more than 14 days in future
-						if (c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
-							s.totalMonths--;
+							c.add(Calendar.MONTH, 1);
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
 						s.buildUp(new Date(s.startTime), 0, rates);
