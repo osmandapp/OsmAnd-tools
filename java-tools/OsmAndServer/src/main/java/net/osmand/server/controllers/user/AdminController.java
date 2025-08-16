@@ -911,7 +911,8 @@ public class AdminController {
 					if (fperiodId.equals(nperiodId)) {
 						continue;
 					}
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
+					fperiodId = nperiodId;
+					List<AdminGenericSubReportColumnValue> vls = values.get(fperiodId);
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
