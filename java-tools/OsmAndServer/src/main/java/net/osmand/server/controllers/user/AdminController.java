@@ -905,8 +905,13 @@ public class AdminController {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
 				String fperiodId = dateFormat.format(c.getTime());
-				for (int k = 0; k < s.totalMonths; k++) {
+				boolean last = false;
+				for (int k = 0; k <= s.totalMonths && !last; k++) {
 					c.add(Calendar.MONTH, 1);
+					if (c.getTimeInMillis() > s.endTime) {
+						c.setTimeInMillis(s.endTime);
+						last = true;
+					}
 					String nperiodId = dateFormat.format(c.getTime());
 					if (fperiodId.equals(nperiodId)) {
 						continue;
@@ -1044,9 +1049,9 @@ public class AdminController {
 						s.introCycles = rs.getInt(9);
 						setDefaultSkuValues(s, subMap);
 						c.setTimeInMillis(s.startTime);
-						c.add(Calendar.DAY_OF_YEAR, 20); // sometimes end time shifts 3-5 days
+						c.add(Calendar.DAY_OF_YEAR, 20); // sometimes end time shifts 3-5 days first month make 20 days
 						while (c.getTimeInMillis() < s.endTime) {
-							s.totalMonths++;
+							s.totalMonths++; 
 							c.add(Calendar.MONTH, 1);
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
