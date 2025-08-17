@@ -64,6 +64,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
+import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
@@ -779,8 +780,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<String, Set<String>> providedTopIndexes = null;
 		if (settings.poiTopIndexUrl != null || !Algorithms.isEmpty(System.getenv(ENV_POI_TOP_INDEXES_URL))) {
 			String url = settings.poiTopIndexUrl != null ? settings.poiTopIndexUrl : System.getenv(ENV_POI_TOP_INDEXES_URL);
-			log.info("Using global list of poi additionals - " +url );
-			providedTopIndexes = new LinkedHashMap<String, Set<String>>(); 
+			log.info("Using global list of poi additionals - " + url);
+			providedTopIndexes = new LinkedHashMap<String, Set<String>>();
 			InputStream is = new URL(url).openStream();
 			StringBuilder sb = Algorithms.readFromInputStream(is);
 			for (String s : sb.toString().split("\n")) {
@@ -798,14 +799,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		topIndexAdditional = new HashMap<>();
 		ResultSet rs;
-        boolean isBrand = false;
+		boolean isBrand = false;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			if (!topIndexKeys.contains(entry.getKey())) {
 				continue;
 			}
-            if (entry.getKey().equals(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + "brand")) {
-                isBrand = true;
-            }
+			if (entry.getKey().equals(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + "brand")) {
+				isBrand = true;
+			}
 			String column = entry.getKey();
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
@@ -815,25 +816,52 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				minCount = 0;
 				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
 			}
-			rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\"" +
-					" from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
-					" order by cnt desc");
-			Set<String> set = new HashSet<>();
+
+			Map<String, Map<String, Integer>> normalizedGroups = new HashMap<>();
+			rs = poiConnection.createStatement().executeQuery("select \"" + column + "\" from poi where \"" + column + "\" is not NULL");
 			while (rs.next()) {
-                String value = rs.getString(2);
+				String originalValue = rs.getString(1);
+				if (Algorithms.isEmpty(originalValue)) {
+					continue;
+				}
+				String normalizedValue = TopTagValuesAnalyzer.normalizeTagValue(originalValue);
+				Map<String, Integer> originalCounts = normalizedGroups.computeIfAbsent(normalizedValue, k -> new HashMap<>());
+				originalCounts.put(originalValue, originalCounts.getOrDefault(originalValue, 0) + 1);
+			}
+
+			Map<String, Integer> normalizedCounts = new HashMap<>();
+			for (Map.Entry<String, Map<String, Integer>> normEntry : normalizedGroups.entrySet()) {
+				int total = 0;
+				for (Integer count : normEntry.getValue().values()) {
+					total += count;
+				}
+				if (total > minCount) {
+					normalizedCounts.put(normEntry.getKey(), total);
+				}
+			}
+
+			List<Map.Entry<String, Integer>> sortedCounts = new ArrayList<>(normalizedCounts.entrySet());
+			sortedCounts.sort((e1, e2) -> -e2.getValue().compareTo(e1.getValue()));
+
+			Set<String> set = new HashSet<>();
+			for (Map.Entry<String, Integer> sortedEntry : sortedCounts) {
+				String normalizedValue = sortedEntry.getKey();
+
+				Map<String, Integer> originalCounts = normalizedGroups.get(normalizedValue);
+				String mostCommonOriginal = Collections.max(originalCounts.entrySet(), Map.Entry.comparingByValue()).getKey();
+
 				if (providedTopIndexes != null) {
 					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
-					String lc = value.toLowerCase().trim();
-					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(lc)
+					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(normalizedValue)
 							&& maxPerMap-- > 0) {
-						set.add(value);
+						set.add(mostCommonOriginal);
 					}
 				} else {
 					if (maxPerMap-- > 0) {
-						set.add(value);
-					} else if (isBrand && WORLD_BRANDS.contains(value)) {
+						set.add(mostCommonOriginal);
+					} else if (isBrand && WORLD_BRANDS.contains(mostCommonOriginal)) {
 						// add world brands anyway
-						set.add(rs.getString(2));
+						set.add(mostCommonOriginal);
 					}
 				}
 			}
