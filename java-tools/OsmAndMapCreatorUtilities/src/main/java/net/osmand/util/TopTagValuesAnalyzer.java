@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,6 +15,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.zip.GZIPOutputStream;
 
 public class TopTagValuesAnalyzer {
 
@@ -471,13 +473,17 @@ public class TopTagValuesAnalyzer {
 	}
 
 	
-	public void generateHtmlPage(Map<String, TagValueRegion> regions, Map<String, TagValueInfo> brands, String outputFile, 
+	public void generateHtmlPage(Map<String, TagValueRegion> regions, Map<String, TagValueInfo> brands, String outputFile,
 			int excludeGlobal) throws IOException {
-		countAllIncluded(brands);
-		// Read the HTML template
-		String htmlContent = new String(Algorithms.readFromInputStream(TopTagValuesAnalyzer.class.getResourceAsStream("/brand_template.html")));
+		// Copy the HTML template as is
+		FileOutputStream out = new FileOutputStream(outputFile);
+		InputStream in = TopTagValuesAnalyzer.class.getResourceAsStream("/brands.html");
+		Algorithms.streamCopy(in, out);
+		out.close();
+		in.close();
+		System.out.println("Generated HTML page: " + outputFile);
 
-		// Prepare data for the template
+		// Prepare data for the brands-data.js file
 		StringBuilder brandData = new StringBuilder();
 		brandData.append("const brandsData = {\n");
 		for (TagValueInfo tagInfo : brands.values()) {
@@ -488,53 +494,55 @@ public class TopTagValuesAnalyzer {
 				shortKeyName = tagInfo.tag + ":" + shortKeyName;
 			}
 			brandData.append(String.format(
-					"\t\t\t\t '%s' : { name: '%s', id: %d, owner: '%s', ownerCount: %d, globalCount: %d, ownerPercent: %d,"
-							+ " includeReason: '%s', include: %s },\n",
-					tagInfo.id, formatString(shortKeyName), tagInfo.id, formatString(tagInfo.ownerRegion.name),
+					"\t\t\t\t'%s': { name: '%s', owner: '%s', ownerCount: %d, globalCount: %d, ownerPercent: %d," +
+					" includeReason: '%s', include: %s },\n",
+					tagInfo.id, formatString(shortKeyName), formatString(tagInfo.ownerRegion.name),
 					tagInfo.ownerCount, tagInfo.globalCount, (int) (tagInfo.ownerPercent * 100),
 					formatString(tagInfo.reasonInclude), tagInfo.include));
 		}
 		brandData.append("};\n");
-		
+		brandData.append("\n");
 		brandData.append("const brandsRegionData = {\n");
 
-		// Create a sorted map of regions for the dropdown
 		Map<String, TagValueRegion> sortedRegions = new TreeMap<>(regions);
-
 		for (TagValueRegion region : sortedRegions.values()) {
-			brandData.append(String.format("\t'%s': {\n", region.name));
-			brandData.append(String.format("\t\t'parent' : '%s',", region.parent));
-			brandData.append(String.format("\t\t'included' : '%s',", region.countIncluded));
-			brandData.append(String.format("\t\t'depth' : %s,", region.depth));
-			brandData.append(String.format("\t\t'leaf' : %s,", region.leaf));
-			brandData.append(String.format("\t\t\t'brands' : [\n"));
+			brandData.append(String.format("	'%s': {\n", region.name));
+			brandData.append(String.format("		'parent': '%s',", region.parent));
+			brandData.append(String.format("		'included': '%s',", region.countIncluded));
+			brandData.append(String.format("		'depth': %s,", region.depth));
+			brandData.append(String.format("		'leaf': %s,", region.leaf));
+			brandData.append(String.format("		'brands': [\n"));
 			Iterator<Entry<String, Integer>> it = region.tagValuesSorted.entrySet().iterator();
-			while(it.hasNext()){
+			while (it.hasNext()) {
 				Entry<String, Integer> entry = it.next();
 				TagValueInfo brandInfo = brands.get(entry.getKey());
 				if (brandInfo != null) {
 					if (!brandInfo.include && brandInfo.globalCount <= excludeGlobal) {
 						continue;
 					}
-					brandData.append(String.format("{ id: %d, count: %d},", brandInfo.id, entry.getValue()));
+					brandData.append(String.format("			{ id: %d, count: %d },\n", brandInfo.id, entry.getValue()));
 				}
 			}
-			brandData.append("   ]},\n");
+			brandData.append("		] },\n");
 		}
 		brandData.append("};\n");
 
-		// Replace placeholders in the template
-		String placeholder = "// BRAND_DATA_PLACEHOLDER";
-		int first = htmlContent.indexOf(placeholder);
-		int second = htmlContent.indexOf(placeholder, first + placeholder.length());
-		htmlContent = htmlContent.substring(0, first) + "\n" + brandData
-				+ htmlContent.substring(second + placeholder.length()); 
+		File outputHtmlFile = new File(outputFile);
+		String jsFileName = "brands-data.js";
+		File jsFile = new File(outputHtmlFile.getParentFile(), jsFileName);
+		File gzippedJsFile = new File(outputHtmlFile.getParentFile(), jsFileName + ".gz");
 
-		// Write the final HTML to a file
-		try (PrintWriter writer = new PrintWriter(outputFile)) {
-			writer.println(htmlContent);
+		// Write the final JS to a file
+		try (PrintWriter writer = new PrintWriter(jsFile, "UTF-8")) {
+			writer.print(brandData.toString());
 		}
-		System.out.println("Generated HTML page: " + outputFile);
+		System.out.println("Generated JS data file: " + jsFile.getAbsolutePath());
+		FileOutputStream fos = new FileOutputStream(gzippedJsFile);
+		GZIPOutputStream gzipos = new GZIPOutputStream(fos);
+		gzipos.write(brandData.toString().getBytes("UTF-8"));
+		gzipos.close();
+		
+		System.out.println("Generated gzipped JS data file: " + gzippedJsFile.getAbsolutePath());
 	}
 
 	private String formatString(String s) {
