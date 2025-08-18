@@ -1,7 +1,7 @@
 package net.osmand.server;
 
 import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
+import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,9 +28,9 @@ import jakarta.persistence.EntityManagerFactory;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-        basePackageClasses = {DatasetRepository.class, DatasetJobRepository.class},
+        basePackageClasses = {DatasetRepository.class, TestCaseRepository.class},
         includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
-                {DatasetRepository.class, DatasetJobRepository.class}),
+                {DatasetRepository.class, TestCaseRepository.class}),
         entityManagerFactoryRef = "testEntityManagerFactory",
         transactionManagerRef = "testTransactionManager"
 )

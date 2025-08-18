@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.EvalJobStatus;
+import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.entity.EvalJob;
+import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
@@ -177,12 +177,18 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	protected void saveResults(EvalJob job, String address, Map<String, Object> row,
-							   List<Feature> searchResults, LatLon originalPoint, long duration, String error) throws IOException {
-		if (job == null) {
-			return;
-		}
+	protected void saveCaseResults(TestCase test, RowAddress data, long duration, String error) throws IOException {
+		String sql =
+				"INSERT INTO case_result (job_id, dataset_id, row, output, error, duration, lat, lon, timestamp) " +
+						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String rowJson = objectMapper.writeValueAsString(data.row());
+		jdbcTemplate.update(sql, test.id, test.datasetId, rowJson, data.output(), error, duration,
+				data.point().getLatitude(), data.point().getLongitude(),
+				new java.sql.Timestamp(System.currentTimeMillis()));
+	}
 
+	protected void saveRunResults(TestCase test, String address, Map<String, Object> row,
+								  List<Feature> searchResults, LatLon originalPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
 		Integer minDistance = null, actualPlace = null;
@@ -221,11 +227,11 @@ public abstract class DataService extends UtilService {
 		}
 
 		String insertSql =
-				"INSERT INTO eval_result (job_id, dataset_id, original, error, duration, results_count, " +
+				"INSERT INTO case_result (case_id, dataset_id, original, error, duration, results_count, " +
 						"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
 						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(row);
-		jdbcTemplate.update(insertSql, job.id, job.datasetId, rowJson, error, duration, resultsCount, minDistance,
+		jdbcTemplate.update(insertSql, test.id, test.datasetId, rowJson, error, duration, resultsCount, minDistance,
 				closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(),
 				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
 				new java.sql.Timestamp(System.currentTimeMillis()));
@@ -358,7 +364,7 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<EvalJobStatus> getEvaluationStatus(Long jobId) {
+	public Optional<TestCaseStatus> getTestCaseStatus(Long jobId) {
 		String sql = """
 				SELECT (select status from eval_job where id = ?) AS status,
 				    count(*) AS total,
@@ -379,7 +385,7 @@ public abstract class DataService extends UtilService {
 
 			String status = (String) result.get("status");
 			if (status == null)
-				status = EvalJob.Status.NEW.name();
+				status = TestCase.Status.NEW.name();
 
 			Number number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
@@ -393,15 +399,15 @@ public abstract class DataService extends UtilService {
 			number = ((Number) result.get("no_result"));
 			long noResult = number == null ? 0 : number.longValue();
 
-			EvalJobStatus report = new EvalJobStatus(EvalJob.Status.valueOf(status), noResult, total, failed, duration, averagePlace, null);
+			TestCaseStatus report = new TestCaseStatus(TestCase.Status.valueOf(status), noResult, total, failed, duration, averagePlace, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
 		}
 	}
 
-	public Optional<EvalJobStatus> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
-		Optional<EvalJobStatus> opt = getEvaluationStatus(jobId);
+	public Optional<TestCaseStatus> getRunReport(Long jobId, int placeLimit, int distLimit) {
+		Optional<TestCaseStatus> opt = getTestCaseStatus(jobId);
 		if (opt.isEmpty()) {
 			return Optional.empty();
 		}
@@ -418,8 +424,8 @@ public abstract class DataService extends UtilService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		EvalJobStatus metric = opt.get();
-		metric = new EvalJobStatus(metric.status(), metric.noResult(), metric.processed(),
+		TestCaseStatus metric = opt.get();
+		metric = new TestCaseStatus(metric.status(), metric.noResult(), metric.processed(),
 				metric.failed(), metric.duration(), metric.averagePlace(), distanceHistogram);
 		return Optional.of(metric);
 	}

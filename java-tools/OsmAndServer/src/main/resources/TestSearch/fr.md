@@ -4,13 +4,13 @@
 - REST API should be documented by OpenAPI/Swagger.
 - REST API should have URI prefix `/admin/test/` for all endpoints.
 - System should use org.apache.commons.logging.
-- 
+-
 ### 1. Data Ingestion
-- FR-1: REST endpoint `POST /admin/test/dataset` accepts name, source (CSV/Overpass) and actual path for CSV to a 
+- FR-1: REST endpoint `POST /admin/test/dataset` accepts name, source (CSV/Overpass) and actual path for CSV to a
   local CSV file or query for Overpass to create a new dataset and save in database.
-- FR-2-1: REST endpoint `POST /admin/test/csv/count` accepts a relative path to a local CSV file and counts the 
+- FR-2-1: REST endpoint `POST /admin/test/csv/count` accepts a relative path to a local CSV file and counts the
   number of rows by streaming it once to determine the total row count `N`.
-- FR-2-2: REST endpoint `POST /admin/test/retrieve` accepts a dataset object with a `source` and a 
+- FR-2-2: REST endpoint `POST /admin/test/retrieve` accepts a dataset object with a `source` and a
   `sizeLimit`, then stores a random sample in a dataset.
 - FR-2-3: UI opens a native file-chooser allowing selection of *.csv, *.gz, or *.tar.gz files for ingestion from
   configured directory on server.
@@ -19,7 +19,7 @@
 **CSV file assumptions (apply to uploaded files and temporary Overpass CSVs):**
 
 * A single **header row is always present** at line=1 and is used to derive column names.
-* The expected **character encoding is UTF-8 only**. Files with any other encoding SHALL be rejected with `HTTP 415 
+* The expected **character encoding is UTF-8 only**. Files with any other encoding SHALL be rejected with `HTTP 415
 Unsupported Media Type`.
 * The **field delimiter is a comma (`,`) without exception**; semicolon-delimited files SHALL be rejected with
   `HTTP 422 Unprocessable Entity`.
@@ -36,18 +36,18 @@ Unsupported Media Type`.
 - FR-6: The system SHALL allow **at most one ingestion job at a time**. If an ingestion is already in progress,
   additional ingestion requests SHALL respond with `HTTP 409 Conflict` (or be queued, if queuing is later
   implemented). **Ingestion and testing jobs are independent; one ingestion _can_ run in parallel with one test job**.
-- FR-7: REST endpoint `POST /admin/test/eval/{datasetId, addressExpression}` triggers address search tests for the specified 
-  dataset and returns a **`jobId`** identifying this execution and store input tests and corresponding results in `results` 
-  table. 
+- FR-7: REST endpoint `POST /admin/test/eval/{datasetId, addressExpression}` triggers address search tests for the specified
+  dataset and returns a **`jobId`** identifying this execution and store input tests and corresponding results in `results`
+  table.
 - FR-8-1: The test process SHALL include the following prerequisites for testing:
 	1. Before starting the test process, the system SHALL check that the dataset is **not already in the `RUNNING` state**.
-    2. Before starting the test process, the system SHALL request via UI the user to enter `addressExpression` to calculate address 
-       query for every record in `dataset_<name>` by using intermediate SQL: `SELECT dataset.*, {addressExpression} AS 
-       address FROM dataset_<name>` where `addressExpression` can include any of SQLite functions or dataset_<name> 
+    2. Before starting the test process, the system SHALL request via UI the user to enter `addressExpression` to calculate address
+       query for every record in `dataset_<name>` by using intermediate SQL: `SELECT dataset.*, {addressExpression} AS
+       address FROM dataset_<name>` where `addressExpression` can include any of SQLite functions or dataset_<name>
        fields and should be saved in `dataset_job` table.
-    3. `dataset_job` table contains metadata about the current test job including `jobId`, `datasetId`, `addressExpression`, 
+    3. `dataset_job` table contains metadata about the current test job including `jobId`, `datasetId`, `addressExpression`,
 	   `status`, `created`.
-- FR-8-2: The test process SHALL iterate over every record in intermediate SQL, invoke the existing Search addresses  
+- FR-8-2: The test process SHALL iterate over every record in intermediate SQL, invoke the existing Search addresses
   service with the free-form query, and capture the response to store it in `results` table (see FR-12).
 
 **Dataset prerequisites for testing:** Each dataset table **MUST** contain at least the following columns; otherwise
@@ -59,11 +59,11 @@ the server SHALL reject the test request with `HTTP 422 Unprocessable Entity`.
 | `address`             | Calculated address by intermediate SQL (e.g. `1600 Amphitheatre Pkwy Mountain View`)                                                                            | Supplied as the **query** parameter to `SearchService.search(...)`.                 |
 | `locale` *(optional)* | Global parameter, ISO locale code such as `en`, `de`                                                                                                            | If missing, the server defaults to the system locale or `en`.                       |
 
-- FR-9: The system SHALL permit **only one active test job globally**; within that job the rows MUST be processed  
-  sequentially. If a second test request arrives while another is running, the server SHALL respond with `HTTP 409 
+- FR-9: The system SHALL permit **only one active test job globally**; within that job the rows MUST be processed
+  sequentially. If a second test request arrives while another is running, the server SHALL respond with `HTTP 409
   Conflict` (or queue the job in future). This limit is separate from ingestion so that one ingestion job and one
   test job may operate concurrently on different datasets.
-- FR-10: Test execution SHALL be asynchronous; the endpoint returns a job identifier and progress can be polled via  
+- FR-10: Test execution SHALL be asynchronous; the endpoint returns a job identifier and progress can be polled via
   `GET /admin/test/eval/{jobId}`.
 
 **Test job status lifecycle:** A testing job transitions through the following states exposed by `GET /admin/test/eval/{jobId}`:
@@ -78,17 +78,17 @@ the server SHALL reject the test request with `HTTP 422 Unprocessable Entity`.
 
 - FR-11: REST endpoint `POST /admin/test/eval/cancel/{jobId}` SHALL cancel a running test job and respond with 202
   Accepted once cancellation is scheduled.
-- FR-12: Test results SHALL be persisted in table `results` with fields (`jobId`, `datasetId`, 
+- FR-12: Test results SHALL be persisted in table `results` with fields (`jobId`, `datasetId`,
   `status`, `durationMs`, `timestamp`).  **`jobId`** links every row to a specific execution. Additional columns:
     - all columns from the input dataset should be copied as-is.
     - `address` and `locale` are used as the **query** parameter to `SearchService.search(...)`.
-	- `minDistance` – distance is scoring marker (as less is better) in meters from input coordinates to closest 
-	  returned address; **NULL** means no match found. For complex input geometries (e.g., `LINESTRING` or `POLYGON`), this is 
-	  the distance from the closest point on that geometry to the result. 
+	- `minDistance` – distance is scoring marker (as less is better) in meters from input coordinates to closest
+	  returned address; **NULL** means no match found. For complex input geometries (e.g., `LINESTRING` or `POLYGON`), this is
+	  the distance from the closest point on that geometry to the result.
 	- `closestResult` – WKT geometry (or encoded polyline) of the nearest result.
 	- `actualPlace` – rank position from all results where the input address was found.
 	- `resultsCount` – total number of results returned by the search.
-- Note: The implementation uses the local Java class `SearchService` with method signature `public List<Feature> 
+- Note: The implementation uses the local Java class `SearchService` with method signature `public List<Feature>
 search(double lat, double lon, String query, String locale)` to execute address look-ups.
 
 ### 3. Reporting
@@ -106,26 +106,26 @@ search(double lat, double lon, String query, String locale)` to execute address 
 ### 4. User Interface (React SPA)
 
 - FR-15: The SPA SHALL provide a Datasets page displaying the list of datasets. Each row MUST include: *Name*, *Source*,
-  *Created*, and *Actions*. The row must also display a **status icon representing the result of the most recent test 
+  *Created*, and *Actions*. The row must also display a **status icon representing the result of the most recent test
   job** for that dataset.
     - Hovering over a `FAILED` status icon SHALL display a tooltip with the corresponding error message.
-    - Each dataset row MUST provide a mechanism (e.g., a toggle button) to expand and collapse a view of **all 
+    - Each dataset row MUST provide a mechanism (e.g., a toggle button) to expand and collapse a view of **all
       historical test runs** for that dataset, showing key metadata and the final status for each run.
-    - For each historical run, a **"Report" button** SHALL be present. This button will allow the user to either 
+    - For each historical run, a **"Report" button** SHALL be present. This button will allow the user to either
       **view the aggregated report** (per FR-13) or **download the raw results as a CSV file** (per FR-14).
-    - The page SHALL include a **search & filter toolbar** that debounce user input (≤300 ms) and triggers FR-18 
-      with the parameters `search` and `status`. Free-text search MUST match *Name* or *Source* columns  
+    - The page SHALL include a **search & filter toolbar** that debounce user input (≤300 ms) and triggers FR-18
+      with the parameters `search` and `status`. Free-text search MUST match *Name* or *Source* columns
       case-insensitively; a dropdown SHALL filter by the latest job status.
-    - The dataset list SHALL be rendered as a **tree view** where each dataset row acts as a parent node. When the 
-      user expands a dataset node, the SPA SHALL load its child nodes on-demand via FR-19. Child nodes MUST display  
-      *JobId*, *Created*, *Status icon*, and *Duration*, and expose context actions for viewing reports or 
+    - The dataset list SHALL be rendered as a **tree view** where each dataset row acts as a parent node. When the
+      user expands a dataset node, the SPA SHALL load its child nodes on-demand via FR-19. Child nodes MUST display
+      *JobId*, *Created*, *Status icon*, and *Duration*, and expose context actions for viewing reports or
       downloading raw results.
 - FR-16: Users SHALL be able to create, delete, and refresh datasets via modal dialogs linked to API endpoints FR-1
-  and FR-2 **and** via drag-and-drop CSV upload area in addition to the file picker. Deletion actions MUST present a 
-  **confirmation dialogue** (“Are you sure?”) before proceeding. **Any errors encountered during these UI operations 
-  (e.g., invalid file format, upload failure) SHALL be displayed in a modal dialog.** When a dataset is deleted, 
+  and FR-2 **and** via drag-and-drop CSV upload area in addition to the file picker. Deletion actions MUST present a
+  **confirmation dialogue** (“Are you sure?”) before proceeding. **Any errors encountered during these UI operations
+  (e.g., invalid file format, upload failure) SHALL be displayed in a modal dialog.** When a dataset is deleted,
   the backend MUST cascade-delete its SQLite table and all related records in `results` table.
-- FR-17: The SPA SHALL allow selecting a dataset and launching a test run; progress is shown in real-time via 
+- FR-17: The SPA SHALL allow selecting a dataset and launching a test run; progress is shown in real-time via
   **WebSocket** channel `admin/test/eval/ws/{jobId}`. The JSON message schema:
 ```json
 {
@@ -140,22 +140,22 @@ search(double lat, double lon, String query, String locale)` to execute address 
 - FR-17-1: The UI SHALL update in real-time based on WebSocket messages. When a job reaches a terminal state:
     - **`FAILED`**: The UI SHALL display a modal dialog containing the error message from the backend.
     - **`CANCELLED`**: The UI SHALL update the job's status icon and display without any special notification.
-- FR-18: REST endpoint `GET /admin/test/datasets` returns a **paginated** and **filterable** list of datasets. Query parameters:  
-    - `page` *(int, default=0)* – page index starting at 0.  
-    - `size` *(int, default=20)* – page size.  
-    - `search` *(string)* – case-insensitive substring filter applied to `name` **or** `source`.  
-    - `status` *(string)* – filter by latest job status (`NEW`, `RUNNING`, `FAILED`, `COMPLETED`).  
-    - `sort` *(string, default="created,desc")* – Spring-style sort definition.  
-    The response body SHALL include `content`, `totalElements`, `page`, and `size`. Each dataset item MUST contain 
+- FR-18: REST endpoint `GET /admin/test/datasets` returns a **paginated** and **filterable** list of datasets. Query parameters:
+    - `page` *(int, default=0)* – page index starting at 0.
+    - `size` *(int, default=20)* – page size.
+    - `search` *(string)* – case-insensitive substring filter applied to `name` **or** `source`.
+    - `status` *(string)* – filter by latest job status (`NEW`, `RUNNING`, `FAILED`, `COMPLETED`).
+    - `sort` *(string, default="created,desc")* – Spring-style sort definition.
+    The response body SHALL include `content`, `totalElements`, `page`, and `size`. Each dataset item MUST contain
       its most recent job's `status` and `jobId` so that the UI can show the status icon without extra requests.
-- FR-19: REST endpoint `GET /admin/test/datasets/{datasetId}/jobs` returns a **paginated list** of all jobs (test 
-  runs) for the specified dataset ordered by `created DESC`. Query parameters: `page`, `size`. Each job object 
-  includes (`jobId`, `datasetId`, `status`, `created`, `updated`, `duration`, `error`). The server SHALL NOT 
+- FR-19: REST endpoint `GET /admin/test/datasets/{datasetId}/jobs` returns a **paginated list** of all jobs (test
+  runs) for the specified dataset ordered by `created DESC`. Query parameters: `page`, `size`. Each job object
+  includes (`jobId`, `datasetId`, `status`, `created`, `updated`, `duration`, `error`). The server SHALL NOT
   return results rows here – only metadata.
 
 ### 5. Security & Permissions
 
-- FR-20: All API endpoints SHALL be protected with JWT-based authentication; token issuance is handled by the 
+- FR-20: All API endpoints SHALL be protected with JWT-based authentication; token issuance is handled by the
   existing `WebSecurityConfiguration`.
 - FR-21: The system SHALL restrict dataset deletion and test execution to users with role `ADMIN`.
 
@@ -166,15 +166,15 @@ search(double lat, double lon, String query, String locale)` to execute address 
 
 ### 7. Error Handling & Logging
 
-- FR-24: All API endpoints SHALL return meaningful HTTP status codes and JSON error bodies on failure **using the 
+- FR-24: All API endpoints SHALL return meaningful HTTP status codes and JSON error bodies on failure **using the
   Problem Details format (RFC 7807)**.
-- FR-25: The system SHALL log ingest, test, and report operations with correlation IDs for traceability **and adhere 
+- FR-25: The system SHALL log ingest, test, and report operations with correlation IDs for traceability **and adhere
   to standard log levels (TRACE, DEBUG, INFO, WARN, ERROR)**.
 
 ### 8. Non-Functional Requirements
 
 - NFR-1: The application SHALL be container-ready (Dockerfile & docker-compose) for local and CI deployments.
-- NFR-2: Code MUST follow Java 17, Spring Boot 3.x, and HTML/CSS with TypeScript best practices and include unit & 
+- NFR-2: Code MUST follow Java 17, Spring Boot 3.x, and HTML/CSS with TypeScript best practices and include unit &
   integration tests (≥90 % coverage).
 - NFR-3: The system SHALL support Windows 10 and Linux environments.
 
@@ -185,18 +185,18 @@ If the client omits the parameter, the server SHALL apply a **default value of `
 
 ### 4. User Experience (UX)
 
-- UX-1: The user interface (UI) of the Single Page Application (SPA) should be designed with a primary focus on 
-  clarity, simplicity, and ease of use. The layout, navigation, and interactive elements should be intuitive, 
-  requiring minimal explanation for a user to understand how to perform key tasks such as ingesting data, running 
+- UX-1: The user interface (UI) of the Single Page Application (SPA) should be designed with a primary focus on
+  clarity, simplicity, and ease of use. The layout, navigation, and interactive elements should be intuitive,
+  requiring minimal explanation for a user to understand how to perform key tasks such as ingesting data, running
   tests, and viewing results.
-- UX-2: The SPA must be responsive and function correctly on modern web browsers (e.g., Chrome, Firefox, Safari, 
-  Edge). The layout should adapt gracefully to different screen sizes, ensuring a consistent and usable experience on 
+- UX-2: The SPA must be responsive and function correctly on modern web browsers (e.g., Chrome, Firefox, Safari,
+  Edge). The layout should adapt gracefully to different screen sizes, ensuring a consistent and usable experience on
   both desktop and tablet devices.
-- UX-3: All interactive elements, such as buttons, links, and input fields, must provide clear visual feedback to 
-  the user. This includes hover effects, active states, and loading indicators to signify that the system is 
+- UX-3: All interactive elements, such as buttons, links, and input fields, must provide clear visual feedback to
+  the user. This includes hover effects, active states, and loading indicators to signify that the system is
   processing a request. This feedback is crucial for preventing user uncertainty and duplicate actions.
-- UX-4: The application's design, including color schemes, typography, and component styling, should align with the 
-  established brand identity of OsmAnd. Consistency in visual design helps reinforce brand recognition and provides a 
+- UX-4: The application's design, including color schemes, typography, and component styling, should align with the
+  established brand identity of OsmAnd. Consistency in visual design helps reinforce brand recognition and provides a
   cohesive user experience.
 
 ### 📑 SQLite Database Schema (DDL)
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS dataset (
 -- The concrete schema is derived at runtime from the CSV / Overpass header so only the
 -- surrogate primary key is fixed here.
 CREATE TABLE IF NOT EXISTS dataset_<name> (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,    
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   -- , <dynamic columns …>
 );
 
@@ -239,9 +239,9 @@ CREATE TABLE IF NOT EXISTS eval_job (
   error VARCHAR(255)
 );
 
--- Results of address search evaluation (one row per source record per job)
+-- Results of output search evaluation (one row per source record per job)
 CREATE TABLE IF NOT EXISTS eval_result (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,    
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   job_id INTEGER NOT NULL REFERENCES dataset_job(job_id) ON DELETE CASCADE,
   dataset_id INTEGER NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
   lat DOUBLE NOT NULL,

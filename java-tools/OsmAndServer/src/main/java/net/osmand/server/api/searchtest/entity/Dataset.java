@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "dataset")
-public class Dataset extends Config {
+public class Dataset {
 	public enum ConfigStatus {
 		UNKNOWN, OK, ERROR
 	}
@@ -23,7 +23,7 @@ public class Dataset extends Config {
 	public String name;
 
 	@Column()
-	public String tags;
+	public String labels;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
@@ -31,6 +31,9 @@ public class Dataset extends Config {
 
 	@Column(nullable = false, columnDefinition = "TEXT")
 	public String source; // Overpass query or file path
+
+	@Column(columnDefinition = "TEXT")
+	protected String error;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "source_status", nullable = false)

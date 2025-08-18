@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
-import net.osmand.server.api.searchtest.dto.EvalStarter;
+import net.osmand.server.api.searchtest.dto.RunStarter;
 import net.osmand.server.api.searchtest.dto.Script;
 import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.entity.EvalJob;
-import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
+import net.osmand.server.api.searchtest.entity.TestCase;
+import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
@@ -32,60 +32,60 @@ import java.util.concurrent.CompletableFuture;
 public class SearchTestService extends DataService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 	private final SearchService searchService;
-	private final DatasetJobRepository datasetJobRepository;
+	private final TestCaseRepository testCaseRepo;
 
 	@Autowired
 	public SearchTestService(EntityManager em, DatasetRepository datasetRepository,
-							 DatasetJobRepository datasetJobRepository,
+							 TestCaseRepository testCaseRepo,
 							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
 							 SearchService searchService, WebClient.Builder webClientBuilder,
 							 ObjectMapper objectMapper) {
 		super(em, datasetRepository, jdbcTemplate, webClientBuilder, objectMapper);
-		this.datasetJobRepository = datasetJobRepository;
+		this.testCaseRepo = testCaseRepo;
 		this.searchService = searchService;
 	}
 
-	public Page<EvalJob> getDatasetJobs(Long datasetId, Pageable pageable) {
-		return datasetJobRepository.findByDatasetIdOrderByIdDesc(datasetId, pageable);
+	public Page<TestCase> getTestCases(Long datasetId, Pageable pageable) {
+		return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
 	}
 
-	public EvalJob startEvaluation(Long datasetId, EvalStarter payload) {
-		Dataset dataset = datasetRepository.findById(datasetId)
-				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + datasetId));
+	public TestCase startTestCase(Long caseId, RunStarter payload) {
+		TestCase test = testCaseRepo.findById(caseId)
+				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
-		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
+		if (test.getStatus() != Dataset.ConfigStatus.OK) {
 			throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", datasetId,
 					dataset.getSourceStatus()));
 		}
-		EvalJob job = new EvalJob();
-		job.datasetId = datasetId;
-		job.created = new java.sql.Timestamp(System.currentTimeMillis());
+
+		test.datasetId = datasetId;
+		test.created = new java.sql.Timestamp(System.currentTimeMillis());
 		// Optional job name provided by client
-		job.name = payload.name();
+		test.name = payload.name();
 
 		String locale = payload.locale();
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
 		}
-		job.locale = locale;
-		job.setNorthWest(payload.northWest());
-		job.setSouthEast(payload.southEast());
-		job.baseSearch = payload.baseSearch();
+		test.locale = locale;
+		test.setNorthWest(payload.northWest());
+		test.setSouthEast(payload.southEast());
+		test.baseSearch = payload.baseSearch();
 		// Persist optional lat/lon overrides if provided
-		job.lat = payload.lat();
-		job.lon = payload.lon();
+		test.lat = payload.lat();
+		test.lon = payload.lon();
 
-		job.fileName = dataset.fileName;
-		job.function = payload.functionName();
+		test.fileName = dataset.fileName;
+		test.function = payload.functionName();
 		try {
-			job.selCols = objectMapper.writeValueAsString(payload.columns());
-			job.params = objectMapper.writeValueAsString(payload.paramValues());
+			test.selCols = objectMapper.writeValueAsString(payload.columns());
+			test.params = objectMapper.writeValueAsString(payload.paramValues());
 		} catch (JsonProcessingException e) {
 			throw new RuntimeException(e);
 		}
 
-		dataset.selCols = job.selCols;
-		dataset.params = job.params;
+		dataset.selCols = test.selCols;
+		dataset.params = test.params;
 		dataset.function = payload.functionName();
 		dataset.locale = locale;
 		dataset.setNorthWest(payload.northWest());
@@ -95,26 +95,19 @@ public class SearchTestService extends DataService {
 		dataset.lon = payload.lon();
 
 		datasetRepository.save(dataset);
-		job.status = EvalJob.Status.RUNNING;
-		return datasetJobRepository.save(job);
+		test.status = TestCase.Status.RUNNING;
+		return testCaseRepo.save(test);
 	}
 
-	@Async
-	public void processEvaluation(Long jobId) {
-		Optional<EvalJob> jobOptional = datasetJobRepository.findById(jobId);
-		EvalJob job = jobOptional.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
-
-		if (job.status != EvalJob.Status.RUNNING) {
-			LOGGER.info("Job {} is not in RUNNING state ({}). Skipping processing request.", jobId, job.status);
-			return; // do not process cancelled/completed jobs
-		}
-
-		Dataset dataset = datasetRepository.findById(job.datasetId)
-				.orElseThrow(() -> new RuntimeException("Dataset not found for job id: " + jobId));
+	public void generateTestCase(Long id) {
+		Optional<TestCase> testOptional = testCaseRepo.findById(id);
+		TestCase test = testOptional.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + id));
+		Dataset dataset = datasetRepository.findById(test.datasetId)
+				.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + id));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		try {
-			String[] selCols = objectMapper.readValue(job.selCols, String[].class);
+			String[] selCols = objectMapper.readValue(test.selCols, String[].class);
 			List<String> columns =  new ArrayList<>(), delCols = new ArrayList<>();
 			Collections.addAll(columns, selCols);
 			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
@@ -133,25 +126,49 @@ public class SearchTestService extends DataService {
 			Script script = objectMapper.readValue(dataset.script, Script.class);
 
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<RowAddress> examples = execute(script.code(), job.function, delCols, rows, job.selCols,
-					objectMapper.readValue(job.params, String[].class));
+			List<RowAddress> examples = execute(script.code(), test.function, delCols, rows, test.selCols,
+					objectMapper.readValue(test.params, String[].class));
 			for (RowAddress example : examples) {
+				saveCaseResults(test, example, 0, null);
+			}
+		} catch (Exception e) {
+			LOGGER.error("Evaluation failed for job {} on dataset {}", test.id, dataset.id, e);
+			test.setError(e.getMessage());
+			test.status = TestCase.Status.INVALID;
+		} finally {
+			test.updated = new java.sql.Timestamp(System.currentTimeMillis());
+			testCaseRepo.save(test);
+		}
+	}
+
+	@Async
+	public void runTestCase(Long id) {
+		Optional<TestCase> testOptional = testCaseRepo.findById(id);
+		TestCase test = testOptional.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + id));
+		if (test.status != TestCase.Status.RUNNING) {
+			LOGGER.info("Test-case {} is not in RUNNING state ({}). Skipping processing request.", id, test.status);
+			return; // do not process cancelled/completed jobs
+		}
+
+		try {
+			String sql = String.format("SELECT lat, lon, output FROM case_result WHERE case_id = %d", id);
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			for (Map<String, Object> row : rows) {
 				String status;
 				try {
-					status = jdbcTemplate.queryForObject("SELECT status FROM eval_job WHERE id = ?", String.class, jobId);
+					status = jdbcTemplate.queryForObject("SELECT status FROM test_case WHERE id = ?", String.class, id);
 				} catch (EmptyResultDataAccessException ex) {
-					job = null;
-					LOGGER.info("Job {} was deleted. Stopping execution.", jobId);
+					test = null;
+					LOGGER.info("Job {} was deleted. Stopping execution.", id);
 					return;
 				}
-				if (!EvalJob.Status.RUNNING.name().equals(status)) {
-					job.status = EvalJob.Status.valueOf(status);
-					LOGGER.info("Job {} was cancelled. Stopping execution.", jobId);
+				if (!TestCase.Status.RUNNING.name().equals(status)) {
+					test.status = TestCase.Status.valueOf(status);
+					LOGGER.info("Job {} was cancelled. Stopping execution.", id);
 					break; // Exit the loop if the job has been cancelled
 				}
 
 				long startTime = System.currentTimeMillis();
-				Map<String, Object> row = example.row();
 				String lat = (String) row.get("lat");
 				String lon = (String) row.get("lon");
 				LatLon expectedPoint = parseLatLon(lat, lon);
@@ -161,52 +178,52 @@ public class SearchTestService extends DataService {
 				}
 
 				LatLon point;
-				if (job.lat == null || job.lon == null) {
+				if (test.lat == null || test.lon == null) {
 					point = expectedPoint;
 				} else {
-					point = new LatLon(job.lat, job.lon);
+					point = new LatLon(test.lat, test.lon);
 				}
 
-				String address = example.address();
-				try {
-					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-							address, job.locale, job.baseSearch, job.getNorthWest(), job.getSouthEast());
-					saveResults(job, address, row, searchResults, expectedPoint,
-							System.currentTimeMillis() - startTime, null);
-				} catch (Exception e) {
-					LOGGER.warn("Failed to process row for job {}.", job.id, e);
-					saveResults(job, address, row, Collections.emptyList(), expectedPoint,
-							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
-									e.getMessage());
-				}
+				String json = (String) row.get("output");
+				for (String address : objectMapper.readValue(json, String[].class))
+					try {
+						List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+								address, test.locale, test.baseSearch, test.getNorthWest(), test.getSouthEast());
+						saveRunResults(test, address, row, searchResults, expectedPoint,
+								System.currentTimeMillis() - startTime, null);
+					} catch (Exception e) {
+						LOGGER.warn("Failed to process row for test-case {}.", test.id, e);
+						saveRunResults(test, address, row, Collections.emptyList(), expectedPoint,
+								System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
+										e.getMessage());
+					}
 			}
-
-			if (job.status != EvalJob.Status.CANCELED && job.status != EvalJob.Status.FAILED) {
-				job.status = EvalJob.Status.COMPLETED;
+			if (test.status != TestCase.Status.CANCELED && test.status != TestCase.Status.FAILED) {
+				test.status = TestCase.Status.COMPLETED;
 			}
 		} catch (Exception e) {
-			LOGGER.error("Evaluation failed for job {} on dataset {}", job.id, dataset.id, e);
-			job.setError(e.getMessage());
+			LOGGER.error("Evaluation failed for test-case {}", test.id, e);
+			test.setError(e.getMessage());
 		} finally {
-			if (job != null) {
-				job.updated = new java.sql.Timestamp(System.currentTimeMillis());
-				datasetJobRepository.save(job);
+			if (test != null) {
+				test.updated = new java.sql.Timestamp(System.currentTimeMillis());
+				testCaseRepo.save(test);
 			}
 		}
 	}
 
 	@Async
-	public CompletableFuture<EvalJob> cancelEvaluation(Long jobId) {
+	public CompletableFuture<TestCase> cancelRun(Long id) {
 		return CompletableFuture.supplyAsync(() -> {
-			EvalJob job = datasetJobRepository.findById(jobId)
-					.orElseThrow(() -> new RuntimeException("Job not found with id: " + jobId));
+			TestCase job = testCaseRepo.findById(id)
+					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + id));
 
-			if (job.status == EvalJob.Status.RUNNING) {
-				String sql = "UPDATE eval_job SET status = ?, updated = ? WHERE id = ?";
+			if (job.status == TestCase.Status.RUNNING) {
+				String sql = "UPDATE test_case SET status = ?, updated = ? WHERE id = ?";
 				Timestamp updated = new Timestamp(System.currentTimeMillis());
-				jdbcTemplate.update(sql, EvalJob.Status.CANCELED, updated, jobId);
+				jdbcTemplate.update(sql, TestCase.Status.CANCELED, updated, id);
 
-				job.status = EvalJob.Status.CANCELED;
+				job.status = TestCase.Status.CANCELED;
 				job.updated = updated;
 				return job;
 			}
@@ -215,21 +232,21 @@ public class SearchTestService extends DataService {
 	}
 
 	@Async
-	public CompletableFuture<Void> deleteJob(Long jobId) {
+	public CompletableFuture<Void> deleteTestCase(Long id) {
 		return CompletableFuture.runAsync(() -> {
-			if (!datasetJobRepository.existsById(jobId)) {
-				throw new RuntimeException("Job not found with id: " + jobId);
+			if (!testCaseRepo.existsById(id)) {
+				throw new RuntimeException("Test-case not found with id: " + id);
 			}
 
-			String sql = "DELETE FROM eval_result WHERE job_id = ?";
-			jdbcTemplate.update(sql, jobId);
+			String sql = "DELETE FROM run_result WHERE job_id = ?";
+			jdbcTemplate.update(sql, id);
 
-			datasetJobRepository.deleteById(jobId);
-			LOGGER.info("Deleted job with id: {}", jobId);
+			testCaseRepo.deleteById(id);
+			LOGGER.info("Deleted test-case with id: {}", id);
 		});
 	}
 
-	public Optional<EvalJob> getJob(Long jobId) {
-		return datasetJobRepository.findById(jobId);
+	public Optional<TestCase> getTestCase(Long id) {
+		return testCaseRepo.findById(id);
 	}
 }

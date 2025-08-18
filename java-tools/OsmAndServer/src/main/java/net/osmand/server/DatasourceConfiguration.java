@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 
 import jakarta.persistence.EntityManagerFactory;
-import net.osmand.server.api.searchtest.repo.DatasetJobRepository;
+import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,24 +26,24 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableJpaRepositories(
         basePackages = "net.osmand.server",
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                classes = {DatasetRepository.class, DatasetJobRepository.class}),
+                classes = {DatasetRepository.class, TestCaseRepository.class}),
         entityManagerFactoryRef = "entityManagerFactory")
 public class DatasourceConfiguration {
-	
+
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
 	private boolean wikiInitialzed;
 	private boolean monitorInitialzed;
 	private boolean changesetInitialzed;
 	private boolean osmgpxInitialzed;
-	
-	
+
+
     @Bean
 	@ConfigurationProperties(prefix="spring.datasource")
     public DataSourceProperties primaryDataSourceProperties() {
         return new DataSourceProperties();
     }
-    
-    
+
+
     @Bean
 	@ConfigurationProperties(prefix="spring.wikidatasource")
     public DataSourceProperties wikiDataSourceProperties() {
@@ -55,19 +55,19 @@ public class DatasourceConfiguration {
 	public DataSourceProperties osmgpxDataSourceProperties() {
 		return new DataSourceProperties();
 	}
-    
+
     @Bean
 	@ConfigurationProperties(prefix="spring.changesetdatasource")
     public DataSourceProperties changesetSourceProperties() {
         return new DataSourceProperties();
     }
-    
+
     @Bean
 	@ConfigurationProperties(prefix="spring.monitordatasource")
     public DataSourceProperties monitorDataSourceProperties() {
         return new DataSourceProperties();
     }
-    
+
 	@Bean
 	@Primary
 	public DataSource primaryDataSource() {
@@ -81,15 +81,15 @@ public class DatasourceConfiguration {
 	public boolean wikiInitialized() {
 		return wikiInitialzed;
 	}
-	
+
 	public boolean monitorInitialized() {
 		return monitorInitialzed;
 	}
-	
+
 	public boolean changesetInitialized() {
 		return changesetInitialzed;
 	}
-	
+
 	@Bean
 	public DataSource wikiDataSource() {
 		try {
@@ -113,7 +113,7 @@ public class DatasourceConfiguration {
 		}
 		return emptyDataSource();
 	}
-	
+
 	@Bean
 	public DataSource monitorDataSource() {
 		try {
@@ -125,8 +125,8 @@ public class DatasourceConfiguration {
 		}
 		return emptyDataSource();
 	}
-	
-	
+
+
 	@Bean
 	public DataSource changesetDataSource() {
 		try {
@@ -142,20 +142,20 @@ public class DatasourceConfiguration {
 
 	private DataSource emptyDataSource() {
 		return new AbstractDataSource() {
-			
+
 			@Override
 			public Connection getConnection(String username, String password) throws SQLException {
 				return null;
 			}
-			
+
 			@Override
 			public Connection getConnection() throws SQLException {
 				return null;
 			}
 		};
 	}
-    
-	
+
+
 	@Bean
 	@Primary
 	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
@@ -164,7 +164,7 @@ public class DatasourceConfiguration {
 		}
 		return new JdbcTemplate(dataSource);
 	}
-	
+
 	@Bean
 	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
 		if (dataSource == null) {
@@ -188,7 +188,7 @@ public class DatasourceConfiguration {
 		}
 		return new JdbcTemplate(dataSource);
 	}
-	
+
 	@Bean
 	public JdbcTemplate monitorJdbcTemplate(@Qualifier("monitorDataSource") DataSource dataSource) {
 		if (dataSource == null) {

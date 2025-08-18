@@ -14,10 +14,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.sql.Timestamp;
 
 @Entity
-@Table(name = "eval_job")
-public class EvalJob extends Config {
+@Table(name = "test_case")
+public class TestCase extends Config {
 	public enum Status {
-		NEW, RUNNING, CANCELED, FAILED, COMPLETED
+		NEW, GENERATED, INVALID, FAILED, RUNNING, COMPLETED, CANCELED
 	}
 
 	@Id
@@ -27,6 +27,9 @@ public class EvalJob extends Config {
 
 	@Column()
 	public String name;
+
+	@Column()
+	public String labels;
 
 	@Column(name = "dataset_id", nullable = false)
 	public Long datasetId;
@@ -47,7 +50,7 @@ public class EvalJob extends Config {
 
 	public void setError(String error) {
 		if (error != null) {
-			status = EvalJob.Status.FAILED;
+			status = TestCase.Status.FAILED;
 		}
 		this.error = error;
 	}

@@ -14,7 +14,7 @@ public abstract class Config {
 	@Column(columnDefinition = "TEXT")
 	public String script; // JS script with functions
 
-	public String function; // Selected JS function name to calculate address
+	public String function; // Selected JS function name to calculate output
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name="all_cols", columnDefinition = "TEXT")

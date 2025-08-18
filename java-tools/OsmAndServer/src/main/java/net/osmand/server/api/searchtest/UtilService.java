@@ -304,14 +304,10 @@ public abstract class UtilService {
 						}
 					}
 
-					String[] addresses = execute(context, functionName, args);
-					if (addresses.length == 0) {
-						results.add(new RowAddress(origRow, ""));
-					} else {
-						for (String address : addresses) {
-							results.add(new RowAddress(origRow, address));
-						}
-					}
+					String outJson = execute(context, functionName, args);
+					String lat = (String) origRow.get("lat");
+					String lon = (String) origRow.get("lon");
+					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outJson));
 				}
 				return results;
 			}
@@ -328,7 +324,7 @@ public abstract class UtilService {
 		}
 	}
 
-	private String[] execute(Context context, String functionName, List<Object> args) throws IOException {
+	private String execute(Context context, String functionName, List<Object> args) throws IOException {
 		// 3) Resolve and invoke the target function
 		org.graalvm.polyglot.Value fn = context.getBindings("js").getMember(functionName);
 		if (fn == null || !fn.canExecute()) {
@@ -336,24 +332,13 @@ public abstract class UtilService {
 		}
 		org.graalvm.polyglot.Value result = fn.execute(args.toArray());
 
-		// 4) Convert result array to String[]
-		String[] out;
 		if (result.hasArrayElements()) {
 			org.graalvm.polyglot.Value stringify = context.eval("js", "JSON.stringify");
-			String jsonArr = stringify.execute(result).asString();
-
-			List<Object> list = objectMapper.readValue(jsonArr, List.class);
-			out = new String[list.size()];
-			for (int i = 0; i < list.size(); i++) {
-				Object v = list.get(i);
-				out[i] = v == null ? null : String.valueOf(v);
-			}
-		} else {
-			out = new String[]{result.asString()};
+			return stringify.execute(result).asString();
 		}
-		return out;
+		return objectMapper.writeValueAsString(new String[] {result.asString()});
 	}
 
-	protected record RowAddress(Map<String, Object> row, String address) {
+	protected record RowAddress(LatLon point, Map<String, Object> row, String output) {
 	}
 }

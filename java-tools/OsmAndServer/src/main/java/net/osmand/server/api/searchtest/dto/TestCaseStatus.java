@@ -1,11 +1,11 @@
 package net.osmand.server.api.searchtest.dto;
 
-import net.osmand.server.api.searchtest.entity.EvalJob;
+import net.osmand.server.api.searchtest.entity.TestCase;
 
 import java.util.Map;
 
-public record EvalJobStatus(
-		EvalJob.Status status,
+public record TestCaseStatus(
+		TestCase.Status status,
 		long noResult,
 		long processed,
 		long failed,

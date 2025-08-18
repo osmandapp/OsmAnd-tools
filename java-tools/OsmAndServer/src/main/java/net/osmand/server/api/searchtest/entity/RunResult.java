@@ -8,15 +8,15 @@ import java.sql.Timestamp;
 import java.util.Map;
 
 @Entity
-@Table(name = "eval_result")
-public class EvalResult {
+@Table(name = "run_result")
+public class RunResult {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(columnDefinition = "INTEGER")
 	public Long id;
 
-	@Column(name = "job_id", nullable = false)
-	public Long jobId;
+	@Column(name = "case_id", nullable = false)
+	public Long caseId;
 
 	@Column(name = "dataset_id", nullable = false)
 	public Long datasetId;
