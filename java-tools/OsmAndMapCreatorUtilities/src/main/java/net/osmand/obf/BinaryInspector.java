@@ -1499,8 +1499,7 @@ public class BinaryInspector {
 				}
 				singleValues.get(key).add(st.name);
 			} else {
-				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(),
-						st.possibleValues.size() > 50 ? st.possibleValues.subList(0, 50) + "..." : st.possibleValues));
+				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), st.possibleValues));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
