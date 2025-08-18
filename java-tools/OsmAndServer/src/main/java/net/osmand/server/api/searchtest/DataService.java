@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.EvalJobMetric;
+import net.osmand.server.api.searchtest.dto.EvalJobStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
@@ -14,6 +14,7 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -357,11 +358,11 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<EvalJobMetric> getEvaluationProgress(Long jobId) {
+	public Optional<EvalJobStatus> getEvaluationStatus(Long jobId) {
 		String sql = """
-				SELECT (select status from eval_job where id = job_id) AS status,
+				SELECT (select status from eval_job where id = ?) AS status,
 				    count(*) AS total,
-				    count(*) FILTER (WHERE error IS NOT NULL) AS error,
+				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
 				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
 				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
@@ -372,25 +373,35 @@ public abstract class DataService extends UtilService {
 				    job_id = ?
 				""";
 
-		Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId);
-		long total = ((Number) result.get("total")).longValue();
-		if (total == 0) {
+		try {
+			Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId, jobId);
+			long total = ((Number) result.get("total")).longValue();
+
+			String status = (String) result.get("status");
+			if (status == null)
+				status = EvalJob.Status.NEW.name();
+
+			Number number = ((Number) result.get("failed"));
+			long failed = number == null ? 0 : number.longValue();
+
+			number = ((Number) result.get("duration"));
+			long duration = number == null ? 0 : number.longValue();
+
+			number = ((Number) result.get("average_place"));
+			double averagePlace = number == null ? 0.0 : number.doubleValue();
+
+			number = ((Number) result.get("no_result"));
+			long noResult = number == null ? 0 : number.longValue();
+
+			EvalJobStatus report = new EvalJobStatus(EvalJob.Status.valueOf(status), noResult, total, failed, duration, averagePlace, null);
+			return Optional.of(report);
+		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
 		}
-
-		EvalJob.Status status = EvalJob.Status.valueOf((String)result.get("status"));
-		long error = ((Number) result.get("error")).longValue();
-		long duration = ((Number) result.get("duration")).longValue();
-		Number number = ((Number) result.get("average_place"));
-		double averagePlace = number == null ? 0.0 : number.doubleValue();
-		long noResult = ((Number) result.get("no_result")).longValue();
-
-		EvalJobMetric report = new EvalJobMetric(status, noResult, total, error, duration, averagePlace, null);
-		return Optional.of(report);
 	}
 
-	public Optional<EvalJobMetric> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
-		Optional<EvalJobMetric> opt = getEvaluationProgress(jobId);
+	public Optional<EvalJobStatus> getEvaluationReport(Long jobId, int placeLimit, int distLimit) {
+		Optional<EvalJobStatus> opt = getEvaluationStatus(jobId);
 		if (opt.isEmpty()) {
 			return Optional.empty();
 		}
@@ -407,9 +418,9 @@ public abstract class DataService extends UtilService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		EvalJobMetric metric = opt.get();
-		metric = new EvalJobMetric(metric.status(), metric.noResult(), metric.processed(),
-				metric.error(), metric.duration(), metric.averagePlace(), distanceHistogram);
+		EvalJobStatus metric = opt.get();
+		metric = new EvalJobStatus(metric.status(), metric.noResult(), metric.processed(),
+				metric.failed(), metric.duration(), metric.averagePlace(), distanceHistogram);
 		return Optional.of(metric);
 	}
 

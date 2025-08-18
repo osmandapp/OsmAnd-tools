@@ -9,6 +9,7 @@ import net.osmand.server.controllers.pub.GeojsonClasses;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,7 @@ public abstract class UtilService {
 	private WebClient webClient;
 	@Value("${testsearch.overpass.url}")
 	private String overpassApiUrl;
+	private Engine polyglotEngine;
 
 	public UtilService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
 		this.webClientBuilder = webClientBuilder;
@@ -130,9 +132,31 @@ public abstract class UtilService {
 	}
 
 	@PostConstruct
-	protected void initWebClient() {
+	protected void init() {
 		this.webClient =
 				webClientBuilder.baseUrl(overpassApiUrl).exchangeStrategies(ExchangeStrategies.builder().codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+
+		// Initialize GraalVM Polyglot Engine and redirect logs.
+		// We disable the interpreter-only warning and send Truffle logs to a temp file.
+		try {
+			Path logPath = Path.of(System.getProperty("java.io.tmpdir"), "osmand-polyglot.log");
+			try {
+				Files.createDirectories(logPath.getParent());
+			} catch (IOException ignore) {
+				// Directory usually exists; ignore if creation fails, Engine will still initialize.
+			}
+			this.polyglotEngine = Engine.newBuilder()
+					.option("engine.WarnInterpreterOnly", "false")
+					.option("log.file", logPath.toString())
+					.build();
+			LOGGER.info("Initialized GraalVM Polyglot Engine. Truffle logs -> {}", logPath.toAbsolutePath());
+		} catch (Throwable t) {
+			// Fall back to an Engine that only disables the warning, if log redirection fails.
+			LOGGER.warn("Failed to initialize Polyglot Engine logging; continuing without log.file redirection", t);
+			this.polyglotEngine = Engine.newBuilder()
+					.option("engine.WarnInterpreterOnly", "false")
+					.build();
+		}
 	}
 
 	protected Path queryOverpass(String query) {
@@ -169,8 +193,9 @@ public abstract class UtilService {
 		});
 
 		int rowCount = 0;
-		try (OutputStream outStream = new BufferedOutputStream(Files.newOutputStream(outputPath)); CSVPrinter csvPrinter = new CSVPrinter(new OutputStreamWriter(outStream), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
-
+		try (OutputStream outStream = new BufferedOutputStream(Files.newOutputStream(outputPath));
+			 CSVPrinter csvPrinter = new CSVPrinter(new OutputStreamWriter(outStream),
+					 CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])))) {
 			for (JsonNode element : elementList) {
 				List<String> record = new ArrayList<>();
 				for (String header : headers) {
@@ -217,10 +242,10 @@ public abstract class UtilService {
 			}
 		});
 	}
-	protected record RowAddress(Map<String, Object> row, String address) {}
 
-	protected List<RowAddress> execute(String script, String functionName, List<String> delCols, List<Map<String, Object>> rows, String columnsJson,
-							   String[] otherParams) {
+	protected List<RowAddress> execute(String script, String functionName, List<String> delCols, List<Map<String,
+											   Object>> rows, String columnsJson,
+									   String[] otherParams) {
 		if (script == null || script.trim().isEmpty()) {
 			throw new IllegalArgumentException("Script must not be null or empty");
 		}
@@ -231,8 +256,8 @@ public abstract class UtilService {
 			// Execute with GraalVM JavaScript (Polyglot API)
 			List<RowAddress> results = new ArrayList<>();
 			try (Context context =
-						 Context.newBuilder("js").option("js.ecmascript-version", "2022").allowAllAccess(false).build()) {
-
+						 Context.newBuilder("js").engine(polyglotEngine).option("js.ecmascript-version", "2022")
+								 .allowAllAccess(false).build()) {
 				// 1) Evaluate user script (should define the target function)
 				context.eval("js", script);
 
@@ -324,8 +349,11 @@ public abstract class UtilService {
 				out[i] = v == null ? null : String.valueOf(v);
 			}
 		} else {
-			out = new String[] { result.asString() };
+			out = new String[]{result.asString()};
 		}
 		return out;
+	}
+
+	protected record RowAddress(Map<String, Object> row, String address) {
 	}
 }

@@ -2,7 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import net.osmand.server.api.searchtest.dto.EvalJobMetric;
+import net.osmand.server.api.searchtest.dto.EvalJobStatus;
 import net.osmand.server.api.searchtest.dto.EvalStarter;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.EvalJob;
@@ -55,16 +55,16 @@ public class SearchTestController {
 
 	@GetMapping(value = "/reports/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJobMetric> getEvaluationReport(@PathVariable Long jobId,
+	public ResponseEntity<EvalJobStatus> getEvaluationReport(@PathVariable Long jobId,
 															 @RequestParam(defaultValue = "10") Integer placeLimit,
 															 @RequestParam(defaultValue = "50") Integer distLimit) {
 		return testSearchService.getEvaluationReport(jobId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
-	@GetMapping(value = "/progress/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/status/{jobId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<EvalJobMetric> getEvaluationProgress(@PathVariable Long jobId) {
-		return testSearchService.getEvaluationProgress(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	public ResponseEntity<EvalJobStatus> getEvaluationProgress(@PathVariable Long jobId) {
+		return testSearchService.getEvaluationStatus(jobId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/reports/{jobId}/download")
