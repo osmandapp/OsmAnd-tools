@@ -17,6 +17,7 @@ _array_map['@'] = _array_map['~']  # backwards compatibility
 
 # Retrieve environment variables
 batch_size = 10000
+USE_EXISTING_TOP_PLACES_ROUNDS = os.getenv('USE_EXISTING_TOP_PLACES_ROUNDS', 'false')
 ROUNDS_ARRAY = [int(x) for x in os.getenv('ROUNDS', '3').split(',')]
 SLEEP = int(os.getenv('SLEEP', '1'))
 FILTER_QUAD_TREE = os.getenv('FILTER_QUAD_TREE', '')
@@ -225,6 +226,10 @@ def run_rounds(data, shortlink, series, llm_executor):
     round_num = 1
     place_ind = 0
 
+    if USE_EXISTING_TOP_PLACES_ROUNDS == 'true':
+        client.disconnect()
+        return
+
     while rounds < series:
         ELO_RANDOM_DIFF = 300
         for place in data:
@@ -364,15 +369,6 @@ for row in categories_result:
 topics_dict = {row[0]: min(row[2], OTHER_TOPIC) if row[2] > 0 else OTHER_TOPIC for row in categories_result}
 
 # 3. Update elo_rating table (Dropping and recreating is often faster than updating for large tables)
-client.execute("DROP TABLE IF EXISTS wiki.elo_rating")
-client.execute("""
-    CREATE TABLE wiki.elo_rating (
-        `wikiTitle` String, `id` UInt32, `lat` Float64, `lon` Float64, `shortlink` String,
-        `poitype` String, `poisubtype` String, `osmid` UInt64, `osmtype` UInt8, `osmcnt` UInt32,
-        `qrank` UInt64, `elo` Float64, `rounds` UInt32, `rounds_win` UInt32,
-        `topic` UInt32, `categories` Array(String)
-    ) ENGINE = MergeTree() ORDER BY id;
-""")
 
 data = sorted(data, key=lambda x: x['elo'], reverse=True)
 batch_data = []
@@ -392,6 +388,17 @@ for place in data:
         topic if topic > 0 else UNDEFINED_TOPIC,
         categories_dict.get(place['id'], [OTHER_CATEGORY])  # Use the retrieved categories
     ))
+
+if len(batch_data) > 0:
+    client.execute("DROP TABLE IF EXISTS wiki.elo_rating")
+    client.execute("""
+        CREATE TABLE wiki.elo_rating (
+            `wikiTitle` String, `id` UInt32, `lat` Float64, `lon` Float64, `shortlink` String,
+            `poitype` String, `poisubtype` String, `osmid` UInt64, `osmtype` UInt8, `osmcnt` UInt32,
+            `qrank` UInt64, `elo` Float64, `rounds` UInt32, `rounds_win` UInt32,
+            `topic` UInt32, `categories` Array(String)
+        ) ENGINE = MergeTree() ORDER BY id;
+    """)
 
 # Split the data into batches and insert
 for i in range(0, len(batch_data), batch_size):
