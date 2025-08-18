@@ -364,7 +364,20 @@ for row in categories_result:
 topics_dict = {row[0]: min(row[2], OTHER_TOPIC) if row[2] > 0 else OTHER_TOPIC for row in categories_result}
 
 # 3. Update elo_rating table (Dropping and recreating is often faster than updating for large tables)
-client.execute("DROP TABLE IF EXISTS wiki.elo_rating")
+# Make DROP safer: if wiki.elo_rating exists and has rows, rename it to backup instead of dropping
+try:
+    row_cnt = client.execute("SELECT count() FROM wiki.elo_rating")[0][0]
+    if row_cnt > 0:
+        # Ensure previous backup is removed to allow rename
+        client.execute("DROP TABLE IF EXISTS wiki.elo_rating_bak")
+        client.execute("RENAME TABLE wiki.elo_rating TO wiki.elo_rating_bak")
+        print(f"Renamed existing wiki.elo_rating ({row_cnt} rows) to wiki.elo_rating_bak")
+    else:
+        client.execute("DROP TABLE wiki.elo_rating")
+        print("Dropped empty wiki.elo_rating")
+except Exception as e:
+    print(f"Warning: failed to prepare old wiki.elo_rating for recreation: {e}")
+
 client.execute("""
     CREATE TABLE wiki.elo_rating (
         `wikiTitle` String, `id` UInt32, `lat` Float64, `lon` Float64, `shortlink` String,
