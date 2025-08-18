@@ -901,37 +901,28 @@ public class AdminController {
 			String periodId = period == MONTH ? s.startPeriodMonth
 					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
 			processSub(s, periodId);
-			if (s.currentPeriod == 0 && period == MONTH) {
+			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
 				Calendar c = Calendar.getInstance();
 				c.setTimeInMillis(s.startPeriodTime);
-				for (int k = 0; k < s.totalMonths; k++) {
+				String fperiodId = dateFormat.format(c.getTime());
+				boolean last = false;
+				for (int k = 0; k <= s.totalMonths && !last; k++) {
 					c.add(Calendar.MONTH, 1);
-					String nperiodId = dateFormat.format(c.getTime());
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
-					if (vls != null) {
-						for (int i = 0; i < columns.size(); i++) {
-							if (columns.get(i).filter(s)) {
-								vls.get(i).active++;
-							}
-						}
+					if (c.getTimeInMillis() > s.endTime) {
+						c.setTimeInMillis(s.endTime);
+						last = true;
 					}
-				}
-			} else if (s.currentPeriod == 0 && period == YEAR) {
-				Calendar c = Calendar.getInstance();
-				c.setTimeInMillis(s.startPeriodTime);
-				for (int k = 0; k < s.totalMonths; k+= 12) {
-					c.add(Calendar.YEAR, 1);
 					String nperiodId = dateFormat.format(c.getTime());
-					List<AdminGenericSubReportColumnValue> vls = values.get(nperiodId);
+					if (fperiodId.equals(nperiodId)) {
+						continue;
+					}
+					fperiodId = nperiodId;
+					List<AdminGenericSubReportColumnValue> vls = values.get(fperiodId);
 					if (vls != null) {
 						for (int i = 0; i < columns.size(); i++) {
 							if (columns.get(i).filter(s)) {
 								vls.get(i).active++;
-								if (k + 12 >= s.totalMonths) {
-									if (s.valid && s.autorenewing) {
-										vls.get(i).activeRenew++;
-									}
-								} else {
+								if (s.valid && s.autorenewing) {
 									vls.get(i).activeRenew++;
 								}
 							}
@@ -1058,13 +1049,10 @@ public class AdminController {
 						s.introCycles = rs.getInt(9);
 						setDefaultSkuValues(s, subMap);
 						c.setTimeInMillis(s.startTime);
+						c.add(Calendar.DAY_OF_YEAR, 20); // sometimes end time shifts 3-5 days first month make 20 days
 						while (c.getTimeInMillis() < s.endTime) {
+							s.totalMonths++; 
 							c.add(Calendar.MONTH, 1);
-							s.totalMonths++;
-						}
-						// we rolled up more than 14 days in future
-						if (c.getTimeInMillis() - s.endTime > 1000 * 60 * 60 * 24 * 14) {
-							s.totalMonths--;
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
 						s.buildUp(new Date(s.startTime), 0, rates);
@@ -1342,7 +1330,6 @@ public class AdminController {
 		public void buildUp(Date time, int period, ExchangeRates rts) {
 			this.startPeriodTime = time.getTime();
 			this.startPeriodDay = dayFormat.format(time.getTime());
-			LOGGER.info("Formatting date: " + time);
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.startPeriodYear = yearFormat.format(time.getTime());
 			this.currentPeriod = period;

@@ -1583,7 +1583,7 @@ public class BinaryMapIndexWriter {
 
 	}
 
-	public void writePoiSubtypesTable(PoiCreatorCategories cs, Map<String, HashSet<String>> topIndexAdditional) throws IOException {
+	public void writePoiSubtypesTable(PoiCreatorCategories cs, Map<String, Set<String>> topIndexAdditional) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		int subcatId = 0;
 		OsmAndSubtypesTable.Builder builder = OsmandOdb.OsmAndSubtypesTable.newBuilder();
@@ -1591,7 +1591,7 @@ public class BinaryMapIndexWriter {
 		for (PoiAdditionalType rt : cs.additionalAttributes) {
 			if (!rt.isText()) {
 				if (topIndexAdditional.containsKey(rt.getTag())) {
-					HashSet<String> topIndexSet = topIndexAdditional.get(rt.getTag());
+					Set<String> topIndexSet = topIndexAdditional.get(rt.getTag());
 					if (!topIndexSet.contains(rt.getValue())) {
 						continue;
 					}
@@ -1739,19 +1739,6 @@ public class BinaryMapIndexWriter {
 		return res;
 	}
 
-	private String retrieveAdditionalType(String key, Map<PoiAdditionalType, String> additionalNames) {
-		PoiAdditionalType k = null;
-		for (PoiAdditionalType t : additionalNames.keySet()) {
-			if (Algorithms.objectEquals(t.getTag(), key)) {
-				k = t;
-				break;
-			}
-		}
-		if (k == null) {
-			return null;
-		}
-		return additionalNames.remove(k);
-	}
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
 								 String type, String subtype, Map<PoiAdditionalType, String> additionalNames,

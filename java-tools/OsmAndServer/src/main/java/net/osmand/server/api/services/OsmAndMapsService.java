@@ -91,11 +91,11 @@ import net.osmand.server.tileManager.TileServerConfig;
 public class OsmAndMapsService {
 	private static final Log LOGGER = LogFactory.getLog(OsmAndMapsService.class);
 
-	private static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
+	protected static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 
-	private static final long INTERVAL_TO_MONITOR_ZIP = 15 * 60 * 1000;
+	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 5 * 60 * 1000;
 
 	// counts only files open for Java (doesn't fit for rendering / routing)
@@ -501,8 +501,9 @@ public class OsmAndMapsService {
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
-	public void checkZippedFiles() throws IOException {
+	public synchronized void checkZippedFiles() throws IOException {
 		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
+			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
 			for (File zipFile : new File(tileConfig.obfZipLocation).listFiles()) {
 				if (zipFile.getName().endsWith(".obf.zip")) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());

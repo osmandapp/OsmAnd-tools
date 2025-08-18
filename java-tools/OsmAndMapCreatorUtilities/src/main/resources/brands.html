@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brand Analysis by Region</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.5em;
+            flex-basis: 100%;
+        }
+        .search-container {
+            flex-grow: 1;
+        }
+        .search-container label, .filter-container label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        #regionSearch, #brandSearch {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 4px;
+            justify-content: center;
+            min-height: 24px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .stat {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .stat-value {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .filter-container {
+            display: flex;
+            align-items: center;
+        }
+        #countFilter {
+            width: 70px;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .nav-container {
+            background-color: #ffffff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #breadcrumbs a {
+            color: #007bff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        #breadcrumbs a:hover {
+            text-decoration: underline;
+        }
+        #breadcrumbs span {
+            color: #6c757d;
+        }
+        .content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #regionTitle {
+            margin-top: 0;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #f1f3f5;
+        }
+        .clickable-row {
+            cursor: pointer;
+        }
+        .not-included {
+            color: #6c757d;
+        }
+        .owner-brand {
+            font-weight: bold;
+            color: #000000 !important; /* Override other color styles */
+        }
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        .sortable:hover {
+            color: #0056b3;
+        }
+        .emoji-cell {
+            width: 20px;
+            text-align: center;
+        }
+        .clickable-text {
+            cursor: pointer;
+        }
+        .clickable-text:hover {
+            text-decoration: underline;
+        }
+        #subregions-container {
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        #subregions-container a {
+            color: #007bff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        #subregions-container a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Brand Analysis</h1>
+            <div class="search-container">
+                <label for="regionSearch">Select a Region:</label>
+                <input type="text" id="regionSearch" list="regionList" placeholder="Type to search or clear for overview">
+                <datalist id="regionList"></datalist>
+            </div>
+            <div class="search-container">
+                <label for="brandSearch">Select a Brand:</label>
+                <input type="text" id="brandSearch" list="brandList" placeholder="Enter 3 symbols to search">
+                <datalist id="brandList"></datalist>
+            </div>
+             <div class="filter-container" id="filter-container">
+                <label for="countFilter">Filter</label>
+                <input type="number" id="countFilter" value="7" min="0">
+            </div>
+        </div>
+
+        <div class="nav-container" id="nav-container">
+            <strong>Path:</strong>
+            <span id="breadcrumbs">Global Overview</span>
+            <div id="subregions-container"></div>
+        </div>
+
+        <div class="content" id="content-area">
+            <h2 id="regionTitle">All Regions Overview</h2>
+            <div id="stats" class="stats-container">
+                <!-- Statistics will be loaded here -->
+            </div>
+            <div id="brand-list-container" style="overflow-x:auto;">
+                <table id="mainTable">
+                    <thead>
+                        <!-- Headers will be loaded here -->
+                    </thead>
+                    <tbody>
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="brands-data.js"></script>
+    <script>
+        // BRAND_DATA_PLACEHOLDER
+        // BRAND_DATA_PLACEHOLDER
+
+        let sortState = { column: 'included', direction: 'desc' };
+        let currentView = { type: 'global' };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const regionSearch = document.getElementById('regionSearch');
+            const regionList = document.getElementById('regionList');
+            const brandSearch = document.getElementById('brandSearch');
+            const brandList = document.getElementById('brandList');
+            const countFilter = document.getElementById('countFilter');
+
+            const allRegionNames = Object.keys(brandsRegionData).sort();
+            const allBrands = Object.entries(brandsData).map(([id, data]) => ({ id: parseInt(id, 10), name: data.name })).sort((a, b) => a.name.localeCompare(b.name));
+            const brandNameToId = new Map(allBrands.map(b => [b.name, b.id]));
+
+            const updateRegionDatalist = (filter = '') => {
+                regionList.innerHTML = '';
+                const lowerCaseFilter = filter.toLowerCase();
+                const filteredRegions = allRegionNames.filter(name => name.toLowerCase().includes(lowerCaseFilter));
+                
+                const limit = Math.min(filteredRegions.length, 10);
+                for (let i = 0; i < limit; i++) {
+                    const option = document.createElement('option');
+                    option.value = filteredRegions[i];
+                    regionList.appendChild(option);
+                }
+            };
+            updateRegionDatalist();
+
+            const updateBrandDatalist = (filter = '') => {
+                brandList.innerHTML = '';
+                if (filter.length < 3) return;
+                const lowerCaseFilter = filter.toLowerCase();
+                const filteredBrands = allBrands.filter(brand => brand.name.toLowerCase().includes(lowerCaseFilter));
+                
+                const limit = Math.min(filteredBrands.length, 10);
+                for (let i = 0; i < limit; i++) {
+                    const option = document.createElement('option');
+                    option.value = filteredBrands[i].name;
+                    brandList.appendChild(option);
+                }
+            };
+
+            regionSearch.addEventListener('input', e => updateRegionDatalist(e.target.value));
+            brandSearch.addEventListener('input', e => updateBrandDatalist(e.target.value));
+
+            regionSearch.addEventListener('change', () => {
+                const selectedRegion = regionSearch.value;
+                if (brandsRegionData[selectedRegion]) {
+                    window.location.hash = `region/${selectedRegion}`;
+                } else if (!selectedRegion) {
+                    window.location.hash = '';
+                }
+            });
+
+            brandSearch.addEventListener('change', () => {
+                const selectedBrandName = brandSearch.value;
+                if (brandNameToId.has(selectedBrandName)) {
+                    window.location.hash = `brand/${encodeURIComponent(selectedBrandName)}`;
+                } else if (!selectedBrandName) {
+                    window.location.hash = '';
+                }
+            });
+
+            countFilter.addEventListener('input', refreshView);
+            
+            window.addEventListener('hashchange', () => handleHashChange(brandNameToId));
+            handleHashChange(brandNameToId);
+        });
+
+        function handleHashChange(brandNameToId) {
+            const hash = window.location.hash.substring(1);
+            const parts = hash.split('/');
+
+            if (parts[0] === 'region' && parts[1]) {
+                const regionName = decodeURIComponent(parts[1]);
+                if (brandsRegionData[regionName]) {
+                    currentView = { type: 'region', name: regionName };
+                } else {
+                    currentView = { type: 'global' };
+                    window.location.hash = '';
+                }
+            } else if (parts[0] === 'brand' && parts[1]) {
+                const brandName = decodeURIComponent(parts[1]);
+                const brandId = brandNameToId.get(brandName);
+                if (brandId) {
+                    currentView = { type: 'brand', id: brandId };
+                } else {
+                    currentView = { type: 'global' };
+                    window.location.hash = '';
+                }
+            } else {
+                currentView = { type: 'global' };
+            }
+            refreshView();
+        }
+
+        function refreshView() {
+            switch(currentView.type) {
+                case 'global':
+                    displayGlobalStatsView();
+                    break;
+                case 'region':
+                    displayRegionDetailView(currentView.name);
+                    break;
+                case 'brand':
+                    displayBrandDetailView(currentView.id);
+                    break;
+            }
+        }
+
+        function switchView(isDetailView) {
+            document.getElementById('nav-container').style.display = isDetailView ? 'block' : 'none';
+        }
+        
+        function truncateText(text, maxLength = 30) {
+            if (!text) return '';
+            return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+        }
+
+        function displayGlobalStatsView() {
+            switchView(false);
+            document.getElementById('regionSearch').value = '';
+            document.getElementById('brandSearch').value = '';
+
+            const filterValue = parseInt(document.getElementById('countFilter').value, 10) || 0;
+            const regionTitle = document.getElementById('regionTitle');
+            const statsContainer = document.getElementById('stats');
+            const table = document.getElementById('mainTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+
+            regionTitle.textContent = 'All Regions Overview';
+            
+            const allRegions = Object.entries(brandsRegionData).map(([name, data]) => ({
+                name,
+                included: parseInt(data.included, 10),
+                total: data.brands.length,
+                parent: data.parent
+            }));
+
+            const filteredRegions = allRegions.filter(r => r.included > filterValue);
+
+            statsContainer.innerHTML = `<div class="stat">Total Regions: <span class="stat-value">${allRegions.length} (filtered ${filteredRegions.length})</span></div>`;
+
+            thead.innerHTML = `
+                <tr>
+                    <th class="sortable" data-sort="name"># Region Name</th>
+                    <th class="sortable" data-sort="included">Included Brands</th>
+                    <th class="sortable" data-sort="total">Total Brands</th>
+                    <th class="sortable" data-sort="parent">Parent</th>
+                </tr>
+            `;
+
+            filteredRegions.sort((a, b) => {
+                const valA = a[sortState.column];
+                const valB = b[sortState.column];
+                const compare = typeof valA === 'string' ? valA.localeCompare(valB) : valA - valB;
+                return sortState.direction === 'asc' ? compare : -compare;
+            });
+
+            tbody.innerHTML = '';
+            filteredRegions.forEach((region, index) => {
+                const row = document.createElement('tr');
+                row.className = 'clickable-row';
+                row.innerHTML = `
+                    <td>${index + 1}. ${region.name}</td>
+                    <td>${region.included.toLocaleString()}</td>
+                    <td>${region.total.toLocaleString()}</td>
+                    <td>${region.parent || 'N/A'}</td>
+                `;
+                row.addEventListener('click', () => {
+                    window.location.hash = `region/${region.name}`;
+                });
+                tbody.appendChild(row);
+            });
+
+            thead.querySelectorAll('.sortable').forEach(header => {
+                header.addEventListener('click', () => {
+                    const column = header.dataset.sort;
+                    sortState.column = column;
+                    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+                    displayGlobalStatsView();
+                });
+            });
+        }
+
+        function displayBrandDetailView(brandId) {
+            switchView(true);
+            const brandInfo = brandsData[brandId];
+            if (!brandInfo) return;
+
+            document.getElementById('brandSearch').value = brandInfo.name;
+            document.getElementById('regionSearch').value = '';
+
+            const regionTitle = document.getElementById('regionTitle');
+            const table = document.getElementById('mainTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            const filterValue = parseInt(document.getElementById('countFilter').value, 10) || 0;
+
+            regionTitle.textContent = `Brand: ${brandInfo.name}`;
+            generateBreadcrumbs(null, brandInfo.name);
+            updateStats(null, brandId);
+
+            thead.innerHTML = `
+                <tr>
+                    <th># Region Name</th>
+                    <th>Count</th>
+                    <th>Owner</th>
+                    <th>Ownership Details</th>
+                    <th>Reason</th>
+                </tr>
+            `;
+
+            const regionsWithBrand = [];
+            for (const regionName in brandsRegionData) {
+                const region = brandsRegionData[regionName];
+                const brandInRegion = region.brands.find(b => b.id == brandId);
+                if (brandInRegion) {
+                    regionsWithBrand.push({ name: regionName, count: brandInRegion.count });
+                }
+            }
+
+            regionsWithBrand.sort((a, b) => b.count - a.count);
+            const filteredRegions = regionsWithBrand.filter(r => r.count > filterValue);
+
+            tbody.innerHTML = '';
+            if (filteredRegions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5">This brand is not present in any region with count > ${filterValue}.</td></tr>`;
+                return;
+            }
+
+            filteredRegions.forEach((region, index) => {
+                const row = document.createElement('tr');
+                
+                const regionNameCell = row.insertCell();
+                const regionSpan = document.createElement('span');
+                regionSpan.className = 'clickable-text';
+                regionSpan.textContent = `${index + 1}. ${region.name}`;
+                regionSpan.onclick = () => {
+                    window.location.hash = `region/${region.name}`;
+                };
+                regionNameCell.appendChild(regionSpan);
+
+                row.insertCell().textContent = region.count.toLocaleString();
+
+                const ownerCell = row.insertCell();
+                if (brandsRegionData[brandInfo.owner]) {
+                    const ownerSpan = document.createElement('span');
+                    ownerSpan.className = 'clickable-text';
+                    ownerSpan.textContent = brandInfo.owner;
+                    ownerSpan.onclick = () => {
+                        window.location.hash = `region/${brandInfo.owner}`;
+                    };
+                    ownerCell.appendChild(ownerSpan);
+                } else {
+                    ownerCell.textContent = brandInfo.owner;
+                }
+
+                row.insertCell().textContent = `${brandInfo.ownerCount.toLocaleString()} / ${brandInfo.globalCount.toLocaleString()} (${brandInfo.ownerPercent}%)`;
+                row.insertCell().textContent = truncateText(brandInfo.includeReason);
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function displayRegionDetailView(regionName) {
+            switchView(true);
+            const region = brandsRegionData[regionName];
+            if (!region) return;
+
+            document.getElementById('regionSearch').value = regionName;
+            document.getElementById('brandSearch').value = '';
+
+            const regionTitle = document.getElementById('regionTitle');
+            const table = document.getElementById('mainTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            const filterValue = parseInt(document.getElementById('countFilter').value, 10) || 0;
+
+            regionTitle.textContent = regionName;
+            generateBreadcrumbs(regionName);
+            updateStats(regionName);
+            
+            thead.innerHTML = `
+                <tr>
+                    <th class="emoji-cell"></th>
+                    <th># Brand Name</th>
+                    <th>Count</th>
+                    <th>Owner</th>
+                    <th>Ownership Details</th>
+                    <th>Reason</th>
+                </tr>
+            `;
+
+            tbody.innerHTML = '';
+            const filteredBrands = region.brands.filter(b => b.count > filterValue);
+
+            if (filteredBrands.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="6">No brands match the filter > ${filterValue}.</td></tr>`;
+                 return;
+            }
+
+            filteredBrands.forEach((brand, index) => {
+                const brandInfo = brandsData[brand.id];
+                if (!brandInfo) return;
+
+                const row = document.createElement('tr');
+                if (!brandInfo.include) row.classList.add('not-included');
+                
+                const isOwner = brandInfo.owner === regionName;
+
+                row.insertCell().textContent = brandInfo.include ? '✅' : '❌';
+                
+                const brandNameCell = row.insertCell();
+                brandNameCell.className = isOwner ? 'owner-brand' : '';
+                const brandSpan = document.createElement('span');
+                brandSpan.className = 'clickable-text';
+                brandSpan.textContent = `${index + 1}. ${truncateText(brandInfo.name)}`;
+                brandSpan.onclick = () => {
+                    window.location.hash = `brand/${encodeURIComponent(brandInfo.name)}`;
+                };
+                brandNameCell.appendChild(brandSpan);
+
+                row.insertCell().textContent = brand.count.toLocaleString();
+
+                const ownerCell = row.insertCell();
+                if (brandsRegionData[brandInfo.owner]) {
+                    const ownerSpan = document.createElement('span');
+                    ownerSpan.className = 'clickable-text';
+                    ownerSpan.textContent = brandInfo.owner;
+                    ownerSpan.onclick = () => {
+                        window.location.hash = `region/${brandInfo.owner}`;
+                    };
+                    ownerCell.appendChild(ownerSpan);
+                } else {
+                    ownerCell.textContent = brandInfo.owner;
+                }
+
+                row.insertCell().textContent = `${brandInfo.ownerCount.toLocaleString()} / ${brandInfo.globalCount.toLocaleString()} (${brandInfo.ownerPercent}%)`;
+                row.insertCell().textContent = truncateText(brandInfo.includeReason);
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function findSubregions(parentRegionName) {
+            const subregions = [];
+            for (const regionName in brandsRegionData) {
+                if (brandsRegionData[regionName].parent === parentRegionName) {
+                    subregions.push({ name: regionName, ...brandsRegionData[regionName] });
+                }
+            }
+            return subregions;
+        }
+        
+        function generateBreadcrumbs(regionName, brandName = null) {
+            const breadcrumbsContainer = document.getElementById('breadcrumbs');
+            breadcrumbsContainer.innerHTML = '';
+            const subregionsContainer = document.getElementById('subregions-container');
+            subregionsContainer.innerHTML = '';
+
+            const globalLink = document.createElement('a');
+            globalLink.textContent = 'Global Overview';
+            globalLink.onclick = () => {
+                window.location.hash = '';
+            };
+            breadcrumbsContainer.appendChild(globalLink);
+
+            if (brandName) {
+                breadcrumbsContainer.append(' > ');
+                breadcrumbsContainer.append(`Brand: ${brandName}`);
+                return;
+            }
+
+            if (regionName) {
+                const path = [];
+                let currentRegionName = regionName;
+                while (currentRegionName && currentRegionName !== 'null' && brandsRegionData[currentRegionName]) {
+                    path.unshift(currentRegionName);
+                    currentRegionName = brandsRegionData[currentRegionName].parent;
+                }
+                
+                path.forEach(name => {
+                    breadcrumbsContainer.append(' > ');
+                    if (name !== regionName) {
+                        const link = document.createElement('a');
+                        link.textContent = name;
+                        link.onclick = () => {
+                            window.location.hash = `region/${name}`;
+                        };
+                        breadcrumbsContainer.appendChild(link);
+                    } else {
+                        breadcrumbsContainer.append(name);
+                    }
+                });
+
+                const subregions = findSubregions(regionName);
+                if (subregions.length > 0) {
+                    subregions.sort((a, b) => b.brands.length - a.brands.length);
+                    
+                    const displaySubregions = (list) => {
+                        subregionsContainer.innerHTML = '<strong>Subregions:</strong> ';
+                        list.forEach((sr, index) => {
+                            const link = document.createElement('a');
+                            link.textContent = sr.name;
+                            link.onclick = () => {
+                                window.location.hash = `region/${sr.name}`;
+                            };
+                            subregionsContainer.appendChild(link);
+                            if (index < list.length - 1) {
+                                subregionsContainer.append(', ');
+                            }
+                        });
+                    };
+
+                    if (subregions.length > 4) {
+                        displaySubregions(subregions.slice(0, 4));
+                        const moreLink = document.createElement('a');
+                        moreLink.textContent = ` ... and ${subregions.length - 4} more`;
+                        moreLink.style.marginLeft = '5px';
+                        moreLink.onclick = () => {
+                            displaySubregions(subregions);
+                        };
+                        subregionsContainer.appendChild(moreLink);
+                    } else {
+                        displaySubregions(subregions);
+                    }
+                }
+            }
+        }
+
+        function updateStats(regionName, brandId = null) {
+            const statsContainer = document.getElementById('stats');
+            const filterValue = parseInt(document.getElementById('countFilter').value, 10) || 0;
+
+            if (brandId) {
+                const brandInfo = brandsData[brandId];
+                let regionCount = 0;
+                let filteredRegionCount = 0;
+                for (const rName in brandsRegionData) {
+                    const brandInRegion = brandsRegionData[rName].brands.find(b => b.id == brandId);
+                    if (brandInRegion) {
+                        regionCount++;
+                        if (brandInRegion.count > filterValue) {
+                            filteredRegionCount++;
+                        }
+                    }
+                }
+                statsContainer.innerHTML = `
+                    <div class="stat">Owner: <span class="stat-value">${brandInfo.owner}</span></div>
+                    <div class="stat">Global Count: <span class="stat-value">${brandInfo.globalCount.toLocaleString()}</span></div>
+                    <div class="stat">Present in Regions: <span class="stat-value">${regionCount} (filtered ${filteredRegionCount})</span></div>
+                `;
+                return;
+            }
+            
+            const region = brandsRegionData[regionName];
+            const totalBrands = region.brands.length;
+            const filteredBrands = region.brands.filter(b => b.count > filterValue).length;
+
+            const totalOwned = region.brands.filter(b => brandsData[b.id]?.owner === regionName).length;
+            const filteredOwned = region.brands.filter(b => brandsData[b.id]?.owner === regionName && b.count > filterValue).length;
+            
+            const totalIncluded = region.brands.filter(b => brandsData[b.id]?.include).length;
+            const filteredIncluded = region.brands.filter(b => brandsData[b.id]?.include && b.count > filterValue).length;
+
+            statsContainer.innerHTML = `
+                <div class="stat">All: <span class="stat-value">${totalBrands} (filter ${filteredBrands})</span></div>
+                <div class="stat">Included: <span class="stat-value">${totalIncluded} (filter ${filteredIncluded})</span></div>
+                <div class="stat">Owned by Region: <span class="stat-value">${totalOwned} (filter ${filteredOwned})</span></div>
+            `;
+        }
+    </script>
+</body>
+</html>

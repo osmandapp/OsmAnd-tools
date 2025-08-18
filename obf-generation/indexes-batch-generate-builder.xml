@@ -20,7 +20,7 @@
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
 				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
-				
+				<parameter k="env_4" v="POI_TOP_INDEXES_URL=https://builder.osmand.net/basemap/brands/brands.lst"/>
 				<filter exclude="world_seamarks" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker" 
@@ -32,6 +32,7 @@
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx24000M "/> 
 				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+				<parameter k="env_4" v="POI_TOP_INDEXES_URL=https://builder.osmand.net/basemap/brands/brands.lst"/>
 				<filter exclude="world_seamarks" />
 			</job>
 		</external>

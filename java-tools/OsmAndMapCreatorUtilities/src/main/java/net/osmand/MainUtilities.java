@@ -72,6 +72,8 @@ public class MainUtilities {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
+			} else if (utl.equals("brand-analyzer") || utl.equals("tag-value-analyzer")) {
+				TopTagValuesAnalyzer.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
@@ -310,6 +312,9 @@ public class MainUtilities {
 				it.remove();
 			} else if (s.startsWith("--wikimapping=")) {
 				settings.wikidataMappingUrl = s.substring(s.indexOf('=') + 1);
+				it.remove();
+			} else if (s.startsWith("--poi-top-index-list=")) {
+				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
