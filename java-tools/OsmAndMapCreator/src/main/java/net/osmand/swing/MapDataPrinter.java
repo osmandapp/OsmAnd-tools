@@ -28,7 +28,7 @@ public class MapDataPrinter {
 	private int numSearchAttempts = 1;
 	private final MapPanel panel;
 	private final Log log;
-	private List<Amenity> amenities = new ArrayList<>();
+	private List<Node> nodes = new ArrayList<>();
 	private int zoom;
 
 	public MapDataPrinter(MapPanel panel, Log log) {
@@ -38,6 +38,9 @@ public class MapDataPrinter {
 	}
 
 	public void searchAndPrintObjects(MouseEvent e) {
+		if (panel.getZoom() < 14)
+			return;
+
 		double dx = e.getX() - panel.getCenterPointX();
 		double dy = e.getY() - panel.getCenterPointY();
 		double tileOffsetX = dx / panel.getTileSize();
@@ -115,6 +118,7 @@ public class MapDataPrinter {
 	}
 
 	public void searchPOIs(boolean refresh) {
+		DataTileManager<Entity> points = panel.getPoints();
 		if (refresh) {
 			Point popupMenuPoint = panel.getPopupMenuPoint();
 			double fy = (popupMenuPoint.y - panel.getCenterPointY()) / panel.getTileSize();
@@ -162,20 +166,27 @@ public class MapDataPrinter {
 			for (Amenity object : objects) {
 				printAmenity(object);
 			}
-			amenities = objects;
-		}
 
-		if (refresh || zoom != panel.getZoom()) {
-			DataTileManager<Entity> points = new DataTileManager<>(15);
-			for (Amenity poi : amenities) {
+			List<Node> poiNodes = new ArrayList<>();
+			for (Amenity poi : objects) {
 				LatLon loc = poi.getLocation();
 				Node n = new Node(loc.getLatitude(), loc.getLongitude(), poi.getId());
 				n.putTag(OSMSettings.OSMTagKey.NAME.getValue(), panel.getZoom() <= 16 ? "" : displayString(poi));
+				poiNodes.add(n);
+			}
 
+			for (Node n: nodes) {
+				LatLon ll = n.getLatLon();
+				points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+			}
+			nodes = poiNodes;
+			for (Node n: nodes) {
 				LatLon ll = n.getLatLon();
 				points.registerObject(ll.getLatitude(), ll.getLongitude(), n);
 			}
+		}
 
+		if (refresh || zoom != panel.getZoom()) {
 			zoom = panel.getZoom();
 			panel.setPoints(points);
 			panel.repaint();
@@ -183,8 +194,12 @@ public class MapDataPrinter {
 	}
 
 	public void clearPOIs() {
-		amenities.clear();
-		DataTileManager<Entity> points = new DataTileManager<>(15);
+		DataTileManager<Entity> points = panel.getPoints();
+		for(Node n : nodes) {
+			LatLon ll = n.getLatLon();
+			points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+		}
+		nodes.clear();
 
 		zoom = panel.getZoom();
 		panel.setPoints(points);
