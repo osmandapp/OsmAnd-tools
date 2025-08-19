@@ -561,7 +561,7 @@ public class WikiService {
 		} else if (hasCategory) {
 			// Retrieve images based on the category name
 			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
-					+ " FROM wiki.categoryimages c WHERE c.catName = ? "
+					+ " FROM wiki.categoryimages_final c WHERE c.catName = ? "
 					+ " ORDER BY views DESC LIMIT "+ LIMIT_PHOTOS_QUERY;
 			params.add(categoryName.replace(' ', '_'));
 		} else {
