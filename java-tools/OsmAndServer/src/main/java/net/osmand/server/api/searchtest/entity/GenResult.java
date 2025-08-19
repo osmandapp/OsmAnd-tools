@@ -8,8 +8,8 @@ import java.sql.Timestamp;
 import java.util.Map;
 
 @Entity
-@Table(name = "case_result")
-public class CaseResult {
+@Table(name = "gen_result")
+public class GenResult {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(columnDefinition = "INTEGER")

@@ -21,9 +21,12 @@ public class RunResult {
 	@Column(name = "dataset_id", nullable = false)
 	public Long datasetId;
 
+	@Column(nullable = false)
+	public Integer sequence;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column
-	public Map<String, String> original;
+	public Map<String, String> row;
 
 	@Column(columnDefinition = "TEXT")
 	public String error;

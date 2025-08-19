@@ -9,6 +9,7 @@ import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
+import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -34,26 +35,52 @@ import java.util.stream.Stream;
 
 public abstract class DataService extends UtilService {
 	protected final DatasetRepository datasetRepository;
+	protected final TestCaseRepository testCaseRepo;
 	protected final JdbcTemplate jdbcTemplate;
 	protected final EntityManager em;
+	final String REPORT_SQL = "WITH result AS (" +
+			"    SELECT" +
+			"        UPPER(COALESCE(json_extract(original, '$.web_type'), ''))               AS web_type," +
+			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, original," +
+			"        actual_place <= ?                                                       AS is_place," +
+			"        min_distance <= ?                                                       AS is_dist," +
+			"        CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER)            AS id," +
+			"        COALESCE(json_extract(original, '$.web_name'), '')                      AS web_name," +
+			"        COALESCE(json_extract(original, '$.web_address1'), '')                  AS web_address1," +
+			"        COALESCE(json_extract(original, '$.web_address2'), '')                  AS web_address2," +
+			"        CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
+			"        (address LIKE '%' || COALESCE(json_extract(original, '$.web_name'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address1'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address2'), '') || '%')" +
+			"                                                                                AS is_addr_match," +
+			"        ((CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
+			"         CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
+			"    FROM eval_result AS r WHERE job_id = ? ORDER BY actual_place, min_distance" +
+			") " +
+			"SELECT" +
+			"    CASE" +
+			"        WHEN address IS NULL OR trim(address) = '' THEN 'Empty'" +
+			"        WHEN is_place AND is_dist THEN 'Found'" +
+			"        WHEN NOT is_place AND is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND " +
+			"is_addr_match)" +
+			"            THEN 'Near'" +
+			"        WHEN is_place AND NOT is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND " +
+			"is_addr_match)" +
+			"            THEN 'Too Far'" +
+			"        ELSE 'Not Found'" +
+			"END AS \"group\", web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count," +
+			" original " +
+			"FROM result";
 
-	public DataService(EntityManager em, DatasetRepository datasetRepository,
+	public DataService(EntityManager em, DatasetRepository datasetRepository, TestCaseRepository testCaseRepo,
 					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 					   ObjectMapper objectMapper) {
 		super(webClientBuilder, objectMapper);
 
 		this.em = em;
+		this.testCaseRepo = testCaseRepo;
 		this.datasetRepository = datasetRepository;
 		this.jdbcTemplate = jdbcTemplate;
-	}
-
-	@Async
-	public CompletableFuture<Dataset> refreshDataset(Long datasetId, boolean reload) {
-		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
-					new RuntimeException("Dataset not found with id: " + datasetId));
-			return checkDatasetInternal(dataset, reload);
-		});
 	}
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
@@ -86,12 +113,18 @@ public abstract class DataService extends UtilService {
 							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 			String[] headers =
 					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
-			updateColumns(dataset, headers);
+			dataset.allCols = objectMapper.writeValueAsString(headers);
 			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
-				dataset.setError("Header doesn't include mandatory 'lat' or 'lon' fields.");
+				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
+				LOGGER.error("{} Header: {}", error, String.join(",", headers));
+				dataset.setError(error);
 				datasetRepository.save(dataset);
 				return dataset;
 			}
+
+			headers = Arrays.stream(headers).filter(s -> s.startsWith("road") || s.startsWith("city")
+					|| s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new);
+			dataset.selCols = objectMapper.writeValueAsString(headers);
 
 			if (reload) {
 				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
@@ -137,15 +170,18 @@ public abstract class DataService extends UtilService {
 					dataset.script = null;
 				}
 			}
-			return datasetRepository.save(dataset);
+
+			dataset.created = LocalDateTime.now();
+			dataset.updated = dataset.created;
+			return checkDatasetInternal(datasetRepository.save(dataset), true);
 		});
 	}
 
 	@Async
-	public CompletableFuture<Dataset> updateDataset(Long datasetId, Map<String, String> updates) {
+	public CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
-					new RuntimeException("Dataset not found with id: " + datasetId));
+			Dataset dataset = datasetRepository.findById(id).orElseThrow(() ->
+					new RuntimeException("Dataset not found with id: " + id));
 
 			updates.forEach((key, value) -> {
 				switch (key) {
@@ -153,33 +189,38 @@ public abstract class DataService extends UtilService {
 					case "type" -> dataset.type = Dataset.Source.valueOf(value);
 					case "source" -> dataset.source = value;
 					case "sizeLimit" -> dataset.sizeLimit = Integer.valueOf(value);
-					case "fileName" -> dataset.fileName = value;
-					case "script" -> dataset.script = value;
+					case "labels" -> dataset.labels = value;
 				}
 			});
 
 			dataset.updated = LocalDateTime.now();
 			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
 			datasetRepository.save(dataset);
-			return checkDatasetInternal(dataset, false);
+			return checkDatasetInternal(dataset, reload);
 		});
 	}
 
-	private void updateColumns(Dataset dataset, String[] headers) {
-		try {
-			dataset.allCols = objectMapper.writeValueAsString(headers);
-			headers = Arrays.stream(headers).filter(s -> s.startsWith("road") || s.startsWith("city")
-					|| s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new);
-			dataset.selCols = objectMapper.writeValueAsString(headers);
-		} catch (JsonProcessingException e) {
-			LOGGER.error("Failed to parse script: {}", dataset.script, e);
-			throw new RuntimeException("Failed to parse script: " + e.getMessage(), e);
-		}
+	@Async
+	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates) {
+		return CompletableFuture.supplyAsync(() -> {
+			TestCase test = testCaseRepo.findById(id).orElseThrow(() ->
+					new RuntimeException("Test case not found with id: " + id));
+
+			updates.forEach((key, value) -> {
+				switch (key) {
+					case "name" -> test.name = value;
+					case "labels" -> test.labels = value;
+				}
+			});
+
+			test.updated = LocalDateTime.now();
+			return testCaseRepo.save(test);
+		});
 	}
 
 	protected void saveCaseResults(TestCase test, RowAddress data, long duration, String error) throws IOException {
 		String sql =
-				"INSERT INTO case_result (job_id, dataset_id, row, output, error, duration, lat, lon, timestamp) " +
+				"INSERT INTO gen_result (case_id, dataset_id, row, output, error, duration, lat, lon, timestamp) " +
 						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(data.row());
 		jdbcTemplate.update(sql, test.id, test.datasetId, rowJson, data.output(), error, duration,
@@ -187,7 +228,7 @@ public abstract class DataService extends UtilService {
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
 
-	protected void saveRunResults(TestCase test, String address, Map<String, Object> row,
+	protected void saveRunResults(TestCase test, int sequence, String output, Map<String, Object> row,
 								  List<Feature> searchResults, LatLon originalPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
@@ -227,12 +268,12 @@ public abstract class DataService extends UtilService {
 		}
 
 		String insertSql =
-				"INSERT INTO case_result (case_id, dataset_id, original, error, duration, results_count, " +
-						"min_distance, closest_result, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
-						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"INSERT INTO run_result (case_id, dataset_id, row, error, duration, results_count, " +
+						"min_distance, closest_result, sequence, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
+						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(row);
 		jdbcTemplate.update(insertSql, test.id, test.datasetId, rowJson, error, duration, resultsCount, minDistance,
-				closestResult, address, originalPoint == null ? null : originalPoint.getLatitude(),
+				closestResult, sequence, output, originalPoint == null ? null : originalPoint.getLatitude(),
 				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
@@ -278,10 +319,13 @@ public abstract class DataService extends UtilService {
 		String tableName = "dataset_" + sanitize(dsOpt.get().name);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
 
-		String deleteSql = "DELETE FROM eval_result WHERE dataset_id = ?";
+		String deleteSql = "DELETE FROM run_result WHERE dataset_id = ?";
 		jdbcTemplate.update(deleteSql, datasetId);
 
-		deleteSql = "DELETE FROM eval_job WHERE dataset_id = ?";
+		deleteSql = "DELETE FROM gen_result WHERE dataset_id = ?";
+		jdbcTemplate.update(deleteSql, datasetId);
+
+		deleteSql = "DELETE FROM test_case WHERE dataset_id = ?";
 		jdbcTemplate.update(deleteSql, datasetId);
 
 		Dataset ds = dsOpt.get();
@@ -322,37 +366,6 @@ public abstract class DataService extends UtilService {
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
 
-	final String REPORT_SQL = "WITH result AS (" +
-			"    SELECT" +
-			"        UPPER(COALESCE(json_extract(original, '$.web_type'), ''))               AS web_type," +
-			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, original," +
-			"        actual_place <= ?                                                       AS is_place," +
-			"        min_distance <= ?                                                       AS is_dist," +
-			"        CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER)            AS id," +
-			"        COALESCE(json_extract(original, '$.web_name'), '')                      AS web_name," +
-			"        COALESCE(json_extract(original, '$.web_address1'), '')                  AS web_address1," +
-			"        COALESCE(json_extract(original, '$.web_address2'), '')                  AS web_address2," +
-			"        CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
-			"        (address LIKE '%' || COALESCE(json_extract(original, '$.web_name'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address1'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address2'), '') || '%')" +
-			"                                                                                AS is_addr_match," +
-			"        ((CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
-			"         CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
-			"    FROM eval_result AS r WHERE job_id = ? ORDER BY actual_place, min_distance" +
-			") " +
-			"SELECT" +
-			"    CASE" +
-			"        WHEN address IS NULL OR trim(address) = '' THEN 'Empty'" +
-			"        WHEN is_place AND is_dist THEN 'Found'" +
-			"        WHEN NOT is_place AND is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND is_addr_match)" +
-			"            THEN 'Near'" +
-			"        WHEN is_place AND NOT is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND is_addr_match)" +
-			"            THEN 'Too Far'" +
-			"        ELSE 'Not Found'" +
-			"END AS \"group\", web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count, original " +
-			"FROM result";
-
 	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long jobId, String format) throws IOException {
 		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, jobId);
 		if ("csv".equalsIgnoreCase(format)) {
@@ -364,9 +377,9 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<TestCaseStatus> getTestCaseStatus(Long jobId) {
+	public Optional<TestCaseStatus> getTestCaseStatus(Long caseId) {
 		String sql = """
-				SELECT (select status from eval_job where id = ?) AS status,
+				SELECT (select status from test_case where id = ?) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
@@ -374,13 +387,13 @@ public abstract class DataService extends UtilService {
 				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
 				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS no_result
 				FROM
-				    eval_result
+				    run_result
 				WHERE
-				    job_id = ?
+				    case_id = ?
 				""";
 
 		try {
-			Map<String, Object> result = jdbcTemplate.queryForMap(sql, jobId, jobId);
+			Map<String, Object> result = jdbcTemplate.queryForMap(sql, caseId, caseId);
 			long total = ((Number) result.get("total")).longValue();
 
 			String status = (String) result.get("status");
@@ -399,15 +412,16 @@ public abstract class DataService extends UtilService {
 			number = ((Number) result.get("no_result"));
 			long noResult = number == null ? 0 : number.longValue();
 
-			TestCaseStatus report = new TestCaseStatus(TestCase.Status.valueOf(status), noResult, total, failed, duration, averagePlace, null);
+			TestCaseStatus report = new TestCaseStatus(TestCase.Status.valueOf(status), noResult, total, failed,
+					duration, averagePlace, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
 		}
 	}
 
-	public Optional<TestCaseStatus> getRunReport(Long jobId, int placeLimit, int distLimit) {
-		Optional<TestCaseStatus> opt = getTestCaseStatus(jobId);
+	public Optional<TestCaseStatus> getRunReport(Long caseId, int placeLimit, int distLimit) {
+		Optional<TestCaseStatus> opt = getTestCaseStatus(caseId);
 		if (opt.isEmpty()) {
 			return Optional.empty();
 		}
@@ -418,8 +432,10 @@ public abstract class DataService extends UtilService {
 		distanceHistogram.put("Near", 0);
 		distanceHistogram.put("Too Far", 0);
 		distanceHistogram.put("Not Found", 0);
-		List<Map<String, Object>> results = jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY \"group\"",
-				placeLimit, distLimit, jobId);
+		List<Map<String, Object>> results =
+				jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
+								"\"group\"",
+				placeLimit, distLimit, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}

@@ -1,6 +1,8 @@
 package net.osmand.server.api.searchtest.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -34,6 +36,18 @@ public class Dataset {
 
 	@Column(columnDefinition = "TEXT")
 	protected String error;
+
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name="all_cols", columnDefinition = "TEXT")
+	public String allCols;
+
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name="sel_cols", columnDefinition = "TEXT")
+	public String selCols; // selected column names as JSON string array
+
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "TEXT")
+	public String script;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "source_status", nullable = false)

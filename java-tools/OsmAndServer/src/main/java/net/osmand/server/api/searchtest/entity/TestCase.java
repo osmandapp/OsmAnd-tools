@@ -8,16 +8,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import net.osmand.server.api.searchtest.dto.GenParam;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "test_case")
 public class TestCase extends Config {
 	public enum Status {
-		NEW, GENERATED, INVALID, FAILED, RUNNING, COMPLETED, CANCELED
+		NEW, GENERATED, INVALID, RUNNING, COMPLETED, CANCELED, FAILED
 	}
 
 	@Id
@@ -39,10 +41,10 @@ public class TestCase extends Config {
 	public Status status;
 
 	@CreationTimestamp
-	public Timestamp created;
+	public LocalDateTime created;
 
 	@UpdateTimestamp
-	public Timestamp updated;
+	public LocalDateTime updated;
 
 	public String getError() {
 		return error;
