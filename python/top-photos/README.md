@@ -47,7 +47,7 @@ to destroy job hanging illusion.
 # 1. How to use TopPlaces job
 
 - Frontend URL: https://maptile.osmand.net:4000/
-- Jenkins job URL: https://maptile.osmand.net:8080/view/Wiki/job/Wiki_TopPlacePhotos/
+- Jenkins job URL: https://data.osmand.net:8080/view/Wiki/job/Wiki_TopPlacePhotos/
 - Set required environment variables (e.g., `MODEL`, `MAX_PLACES_PER_QUAD`, `PARALLEL`, `PHOTOS_PER_PLACE`, `MIN_ELO`, `SAVE_SCORE_ENV`) are described above.
 - Either `QUAD` or `SELECTED_PLACE_IDS` must be provided.
 - QUAD is used to filter places based on 'shortlink' field from ELO_RATING table.
@@ -83,7 +83,7 @@ to destroy job hanging illusion.
 
 # 3. How to build Final scoring
 
-- Jenkins job URL: https://maptile.osmand.net:8080/view/Wiki/job/Wiki_TopPhotos_GenFinal
+- Jenkins job URL: https://data.osmand.net:8080/view/Wiki/job/Wiki_TopPhotos_GenFinal/
 - Be sure all required photos are scored by using TopPlaces job in SAVE_SCORE_ENV=0 (Production)
 - Be sure all required duplications are processed by using TopPlaces_Duplicates job
 - Run Wiki_TopPhotos_GenFinal job
