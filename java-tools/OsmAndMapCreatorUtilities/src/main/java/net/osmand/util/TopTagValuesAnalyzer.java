@@ -420,7 +420,7 @@ public class TopTagValuesAnalyzer {
 			if (count > 0) {
 				String[] splitValues = allValues.split(";");
 				for(String tagValueKey : splitValues) {
-					tagValueKey = tagValueKey.toLowerCase().trim();
+					tagValueKey = normalizeTagValue(tagValueKey);
 					int existing = region.tagValues.getOrDefault(tag + KEY_SEP + tagValueKey, 0);
 					region.tagValues.put(tag + KEY_SEP + tagValueKey, count + existing);
 				}
@@ -429,6 +429,10 @@ public class TopTagValuesAnalyzer {
 		r.close();
 		finishReading(regions);
 		return regions;
+	}
+
+	public static String normalizeTagValue(String tagValueKey) {
+		return tagValueKey.toLowerCase().trim().replaceAll("[`’‘ʼ]", "'");
 	}
 
 	private void finishReading(Map<String, TagValueRegion> regions) {
