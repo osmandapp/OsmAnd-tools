@@ -10,8 +10,9 @@ def processType(tp, uniqueset, tags) {
     boolean skipTag = (
         tg.contains("osmand") || 
         tp.@"no_edit" == "true" || 
+        tp.@"seq".length() > 0 ||
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
@@ -37,7 +38,8 @@ def processEntityConvert(tp, uniqueset, tags) {
     boolean skipTag = (
         tg.contains("osmand") || 
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"seq".length() > 0 ||
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
@@ -79,7 +81,8 @@ def processTag(tag, value, name, tp, uniqueset, tags) {
         tag.contains("osmand") || 
         tp.@"no_edit" == "true" || 
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"seq".length() > 0 ||
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
@@ -150,6 +153,10 @@ def uniqueset = [:]
 renderingTypes.type.each {
 	tp -> processType(tp, uniqueset, tags)
 }
+renderingTypes.routing_type.each {
+	tp -> processType(tp, uniqueset, tags)
+}
+
 renderingTypes.entity_convert.each {
 	tp -> processEntityConvert(tp, uniqueset, tags)
 }
