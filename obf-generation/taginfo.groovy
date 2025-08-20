@@ -164,6 +164,9 @@ renderingTypes.category.each {
 	c -> c.type.each {
 		tp -> processType(tp, uniqueset, tags)
 	}
+    c -> c.routing_type.each {
+		tp -> processType(tp, uniqueset, tags)
+	}
 	c.entity_convert.each {
 		tp -> processEntityConvert(tp, uniqueset, tags)
 	}
