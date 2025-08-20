@@ -25,7 +25,7 @@ public class ObfDiffMerger {
 	}
 	private static final String OSMAND_CHANGE_VALUE = "delete";
 	private static final String OSMAND_CHANGE_TAG = "osmand_change";
-	
+
 	public static void main(String[] args) {
 		try {
 			if(args.length == 1 && args[0].equals("test")) {
@@ -45,7 +45,7 @@ public class ObfDiffMerger {
 				args = s.toArray(new String[0]);
 				mergeRelationOsmLive(args);
 				return;
-			} 
+			}
 			ObfDiffMerger merger = new ObfDiffMerger();
 			merger.mergeChanges(args);
 		} catch (Exception e) {
@@ -53,8 +53,8 @@ public class ObfDiffMerger {
 			System.exit(1);
 		}
 	}
-	
-	
+
+
 	public static void mergeBulkOsmLiveDay(String[] args) {
 		try {
 			String location = args[0];
@@ -75,7 +75,7 @@ public class ObfDiffMerger {
 					if (!date.isDirectory()) {
 						continue;
 					}
-					
+
 					File flToMerge = new File(region, regionName + "_" + date.getName() + ".obf.gz");
 					boolean processed = new ObfDiffMerger().process(flToMerge, Arrays.asList(date), true);
 					if(processed) {
@@ -116,8 +116,13 @@ public class ObfDiffMerger {
 
 		// Map section
 		BinaryMapIndexReader.MapIndex mi = commonObf.getMapIndex();
-		Integer rl = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
-		int deleteId = rl == null ? -1 : rl;
+		Integer commonDelIdRule = mi.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+		int commDelRule = commonDelIdRule == null ? -1 : commonDelIdRule;
+
+        BinaryMapIndexReader.MapIndex mi2 = relObf.getMapIndex();
+        Integer relDelIdRule = mi2.getRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+        int relDelRule = relDelIdRule == null ? -1 : relDelIdRule;
+
 		int cnt = 0;
 		for (MapZooms.MapZoomPair mz : relObf.getZooms()) {
 			TLongObjectHashMap<BinaryMapDataObject> relMapData = relObf.get(mz);
@@ -126,14 +131,16 @@ public class ObfDiffMerger {
 				BinaryMapDataObject relObj = relMapData.get(id);
 				BinaryMapDataObject commonObj = commonMapData.get(id);
 				if (commonObj == null) {
-					commonMapData.put(id, mi.adoptMapObject(relObj));
-					cnt++;
-				} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+                    if (relDelRule == -1 || !relObj.containsType(relDelRule)) {
+                        commonMapData.put(id, mi.adoptMapObject(relObj));
+                        cnt++;
+                    }
+				} else if (commDelRule == -1 || !commonObj.containsType(commDelRule)) {
 					commonMapData.remove(id);
 					commonMapData.put(id, mi.adoptMapObject(relObj));
 					cnt++;
 				}
-				if (commonObj != null && commonObj.containsType(deleteId)) {
+				if (commonObj != null && commonObj.containsType(commDelRule)) {
 					System.out.println("Map id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
 				}
 			}
@@ -142,7 +149,11 @@ public class ObfDiffMerger {
 
 		//Route section
 		BinaryMapRouteReaderAdapter.RouteRegion ri = commonObf.getRouteIndex();
-		deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+        commDelRule = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+
+        BinaryMapRouteReaderAdapter.RouteRegion ri2 = commonObf.getRouteIndex();
+        relDelRule = ri2.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
+
 		TLongObjectHashMap<RouteDataObject> relRouteData = relObf.getRoutingData();
 		TLongObjectHashMap<RouteDataObject> commonRouteData = commonObf.getRoutingData();
 		cnt = 0;
@@ -150,14 +161,16 @@ public class ObfDiffMerger {
 			RouteDataObject relObj = relRouteData.get(id);
 			RouteDataObject commonObj = commonRouteData.get(id);
 			if (commonObj == null) {
-				commonRouteData.put(id, ri.adopt(relObj));
-				cnt++;
-			} else if (deleteId == -1 || !commonObj.containsType(deleteId)) {
+                if (relDelRule == -1 || !relObj.containsType(relDelRule)) {
+                    commonRouteData.put(id, ri.adopt(relObj));
+                    cnt++;
+                }
+			} else if (commDelRule == -1 || !commonObj.containsType(commDelRule)) {
 				commonRouteData.remove(id);
 				commonRouteData.put(id, ri.adopt(relObj));
 				cnt++;
 			}
-			if (commonObj != null && commonObj.containsType(deleteId)) {
+			if (commonObj != null && commonObj.containsType(commDelRule)) {
 				System.out.println("Route id:" + relObj.getId() + " has osmand_change=delete tag (" + relObj.toString() + ")");
 			}
 		}
@@ -203,7 +216,7 @@ public class ObfDiffMerger {
 			throwables.printStackTrace();
 		}
 	}
-	
+
 	private static List<File> getSortedFiles(File region) {
 		List<File> f = new ArrayList<>();
 		for(File l : region.listFiles()) {
@@ -215,9 +228,9 @@ public class ObfDiffMerger {
 			public int compare(File o1, File o2) {
 				return o1.getName().compareTo(o2.getName());
 			}
-			
+
 		});
-		
+
 		return f;
 	}
 
@@ -235,7 +248,7 @@ public class ObfDiffMerger {
 			allowedMonths.add(pdate.substring(0, pdate.length() - 2) +"00");
 			allowedMonths.add(ppdate.substring(0, ppdate.length() - 2) +"00");
 			System.out.println("Process following months: " +  allowedMonths);
-			
+
 			File folder = new File(location);
 			for (File region : getSortedFiles(folder)) {
 				if (!region.isDirectory()) {
@@ -246,7 +259,7 @@ public class ObfDiffMerger {
 					continue;
 				}
 				List<File> days = getSortedFiles(region);
-				
+
 				Map<String, List<File>> fls = groupFilesByMonth(regionName, days, cdate, allowedMonths);
 				for (String fl : fls.keySet()) {
 					File flToMerge = new File(region, fl);
@@ -263,9 +276,9 @@ public class ObfDiffMerger {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
-		}		
+		}
 	}
-	
+
 	private static Map<String, List<File>> groupFilesByMonth(String regionName, List<File> days, String cdate,
 			Set<String> allowedMonths) {
 		Map<String, List<File>> grpFiles = new LinkedHashMap<String, List<File>>();
@@ -369,6 +382,6 @@ public class ObfDiffMerger {
 	}
 
 
-	
-	
+
+
 }
