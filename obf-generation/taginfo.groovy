@@ -162,14 +162,14 @@ renderingTypes.entity_convert.each {
 }
 renderingTypes.category.each {
 	c -> c.type.each {
-		tp -> processType(tp, uniqueset, tags)
-	}
-    c -> c.routing_type.each {
-		tp -> processType(tp, uniqueset, tags)
-	}
-	c.entity_convert.each {
-		tp -> processEntityConvert(tp, uniqueset, tags)
-	}
+		    tp -> processType(tp, uniqueset, tags)
+	    }
+        c.routing_type.each {
+		    tp -> processType(tp, uniqueset, tags)
+	    }
+	    c.entity_convert.each {
+		    tp -> processEntityConvert(tp, uniqueset, tags)
+	    }
 }
 
 processPOIGroup(poiTypes, uniqueset, tags); 
