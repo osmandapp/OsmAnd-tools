@@ -1,6 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.TestCaseStatus;
@@ -17,10 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -56,36 +53,28 @@ public class SearchTestController {
 
 	@PostMapping(value = "/datasets/{datasetId:\\d+}/gen", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Void> genTestCase(@PathVariable Long datasetId, @RequestBody GenParam payload) {
-		testSearchService.genTestCase(datasetId, payload);
-		return ResponseEntity.accepted().build();
-	}
-
-	/**
-	 * Step 1 – create a new evaluation job (synchronous).
-	 * Returns the freshly created {@link TestCase} in PENDING/RUNNING state.
-	 */
-	@PostMapping(value = "/cases/{caseId:\\d+}/start", consumes = MediaType.APPLICATION_JSON_VALUE, produces =
-			MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<TestCase> createRun(@PathVariable Long caseId, @RequestBody RunParam payload,
-											  HttpServletRequest request) {
-		String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request).replacePath(null).build().toUriString();
-		TestCase test = testSearchService.startTestCase(caseId, payload);
-		URI location =
-				ServletUriComponentsBuilder.fromUriString(baseUrl).path("/admin/test/eval/{caseId:\\d+}").buildAndExpand(test.id).toUri();
-		return ResponseEntity.accepted().location(location).body(test);
+	public CompletableFuture<ResponseEntity<TestCase>> genTestCase(@PathVariable Long datasetId, @RequestBody GenParam payload) {
+		return testSearchService.createTestCase(datasetId, payload).thenApply(ResponseEntity::ok);
 	}
 
 	/**
 	 * Step 2 – continue processing of an existing job asynchronously.
 	 * The call returns immediately with 202 while the heavy work happens in the background.
 	 */
-	@PostMapping(value = "/cases/{caseId:\\d+}/process", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/cases/{caseId:\\d+}/run", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Void> processRun(@PathVariable Long caseId) {
-		testSearchService.runTestCase(caseId); // @Async – returns immediately
+	public ResponseEntity<Void> runTestCase(@PathVariable Long caseId, @RequestBody RunParam payload) {
+		testSearchService.runTestCase(caseId, payload); // @Async – returns immediately
 		return ResponseEntity.accepted().build();
+	}
+
+	@PutMapping(value = "/cases/{caseId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<TestCase>> updateTestCase(@PathVariable Long caseId,
+																	 @RequestBody Map<String, String> updatesPayload,
+																	 @RequestParam("regen") Boolean regen,
+																	 @RequestParam("rerun") Boolean rerun) {
+		return testSearchService.updateTestCase(caseId, updatesPayload, regen, rerun).thenApply(ResponseEntity::ok);
 	}
 
 	@PostMapping(value = "/cases/{caseId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)

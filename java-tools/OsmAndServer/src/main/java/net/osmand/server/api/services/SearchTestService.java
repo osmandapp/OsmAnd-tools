@@ -23,7 +23,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
@@ -51,15 +50,10 @@ public class SearchTestService extends DataService {
 	}
 
 	@Async
-	public CompletableFuture<TestCase> genTestCase(Long datasetId, GenParam param) {
+	public CompletableFuture<TestCase> createTestCase(Long datasetId, GenParam param) {
 		return CompletableFuture.supplyAsync(() -> {
 			Dataset dataset = datasetRepository.findById(datasetId)
 					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + datasetId));
-			if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
-				LOGGER.info("Dataset {} is not in OK state ({}).", datasetId, dataset.getSourceStatus());
-				return null;
-			}
-
 			TestCase test = new TestCase();
 			test.datasetId = datasetId;
 			test.name = param.name();
@@ -84,32 +78,7 @@ public class SearchTestService extends DataService {
 				test = testCaseRepo.save(test);
 				datasetRepository.saveAndFlush(dataset);
 
-				String tableName = "dataset_" + sanitize(dataset.name);
-
-				String[] selCols = objectMapper.readValue(test.selCols, String[].class);
-				List<String> columns = new ArrayList<>(), delCols = new ArrayList<>();
-				Collections.addAll(columns, selCols);
-				if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
-					columns.add("lon");
-					delCols.add("lon");
-				}
-				if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
-					columns.add("lat");
-					delCols.add("lat");
-				}
-				if (Arrays.stream(selCols).noneMatch("id"::equals)) {
-					columns.add("id");
-					delCols.add("id");
-				}
-				String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
-
-				List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-				List<RowAddress> examples = execute(dataset.script, test.function, delCols, rows, test.selCols,
-						objectMapper.readValue(test.params, String[].class));
-				for (RowAddress example : examples) {
-					saveCaseResults(test, example, 0, null);
-				}
-				test.status = TestCase.Status.GENERATED;
+				test = generate(dataset, test);
 			} catch (Exception e) {
 				LOGGER.error("Generation of test-case failed for on dataset {}", datasetId, e);
 				test.setError(e.getMessage());
@@ -121,69 +90,137 @@ public class SearchTestService extends DataService {
 		});
 	}
 
-	public TestCase startTestCase(Long caseId, RunParam payload) {
-		TestCase test = testCaseRepo.findById(caseId)
-				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
-
-		Dataset ds = datasetRepository.findById(test.datasetId)
-				.orElseThrow(() -> new RuntimeException("Dataset not found with id: " + test.datasetId));
-		if (ds.getSourceStatus() != Dataset.ConfigStatus.OK) {
-			throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", ds.id,
-					ds.getSourceStatus()));
-		}
-		if (test.status != TestCase.Status.GENERATED) {
-			throw new RuntimeException(String.format("Test-case %s is not in GENERATED state (%s)", test.id,
-					test.status));
+	private TestCase generate(Dataset dataset, TestCase test) {
+		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
+			test.status = TestCase.Status.INVALID;
+			LOGGER.info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
+			return test;
 		}
 
-		String locale = payload.locale();
-		if (locale == null || locale.trim().isEmpty()) {
-			locale = "en";
+		try {
+			String tableName = "dataset_" + sanitize(dataset.name);
+
+			String[] selCols = objectMapper.readValue(test.selCols, String[].class);
+			List<String> columns = new ArrayList<>(), delCols = new ArrayList<>();
+			Collections.addAll(columns, selCols);
+			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
+				columns.add("lon");
+				delCols.add("lon");
+			}
+			if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
+				columns.add("lat");
+				delCols.add("lat");
+			}
+			if (Arrays.stream(selCols).noneMatch("id"::equals)) {
+				columns.add("id");
+				delCols.add("id");
+			}
+
+			String sql = "DELETE FROM gen_result WHERE case_id = ?";
+			jdbcTemplate.update(sql, test.id);
+
+			sql = "DELETE FROM run_result WHERE case_id = ?";
+			jdbcTemplate.update(sql, test.id);
+
+			sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			List<RowAddress> examples = execute(dataset.script, test.function, delCols, rows, test.selCols,
+					objectMapper.readValue(test.params, String[].class));
+			for (RowAddress example : examples) {
+				saveCaseResults(test, example, 0, null);
+			}
+			test.status = TestCase.Status.GENERATED;
+		} catch (Exception e) {
+			LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
+			test.setError(e.getMessage());
+			test.status = TestCase.Status.INVALID;
+		} finally {
+			test.updated = LocalDateTime.now();
 		}
-		test.locale = locale;
-		test.setNorthWest(payload.northWest());
-		test.setSouthEast(payload.southEast());
-		test.baseSearch = payload.baseSearch();
-		// Persist optional lat/lon overrides if provided
-		test.lat = payload.lat();
-		test.lon = payload.lon();
-
-		test.locale = locale;
-		test.setNorthWest(payload.northWest());
-		test.setSouthEast(payload.southEast());
-		test.baseSearch = payload.baseSearch();
-		test.lat = payload.lat();
-		test.lon = payload.lon();
-
-		testCaseRepo.save(test);
-		test.status = TestCase.Status.RUNNING;
 		return testCaseRepo.save(test);
 	}
 
 	@Async
-	public void runTestCase(Long id) {
-		Optional<TestCase> testOptional = testCaseRepo.findById(id);
-		TestCase test = testOptional.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + id));
-		if (test.status != TestCase.Status.RUNNING) {
-			LOGGER.info("Test-case {} is not in RUNNING state ({}). Skipping processing request.", id, test.status);
-			return; // do not process cancelled/completed test-cases
-		}
+	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates, boolean regen, boolean rerun) {
+		return CompletableFuture.supplyAsync(() -> {
+			TestCase test = testCaseRepo.findById(id).orElseThrow(() ->
+					new RuntimeException("Test case not found with id: " + id));
 
+			updates.forEach((key, value) -> {
+				switch (key) {
+					case "name" -> test.name = value;
+					case "labels" -> test.labels = value;
+				}
+			});
+			TestCase updated = null;
+			if (regen) {
+				Dataset dataset = datasetRepository.findById(test.datasetId)
+						.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + test.datasetId));
+				updated = generate(dataset, test);
+			}
+			if (rerun) {
+				updated = run(test);
+			}
+			return updated != null ? updated : testCaseRepo.save(test);
+		});
+	}
+
+	@Async
+	public void runTestCase(Long caseId, RunParam payload) {
+		CompletableFuture.runAsync(() -> {
+			TestCase test = testCaseRepo.findById(caseId)
+					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
+
+			final Long dsId = test.datasetId;
+			Dataset ds = datasetRepository.findById(dsId)
+					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + dsId));
+			if (ds.getSourceStatus() != Dataset.ConfigStatus.OK) {
+				throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", ds.id,
+						ds.getSourceStatus()));
+			}
+			if (test.status != TestCase.Status.GENERATED) {
+				throw new RuntimeException(String.format("Test-case %s is not in GENERATED state (%s)", test.id,
+						test.status));
+			}
+
+			String locale = payload.locale();
+			if (locale == null || locale.trim().isEmpty()) {
+				locale = "en";
+			}
+			test.locale = locale;
+			test.setNorthWest(payload.northWest());
+			test.setSouthEast(payload.southEast());
+			test.baseSearch = payload.baseSearch();
+			// Persist optional lat/lon overrides if provided
+			test.lat = payload.lat();
+			test.lon = payload.lon();
+
+			test.status = TestCase.Status.RUNNING;
+			test = testCaseRepo.save(test);
+
+			run(test);
+		});
+	}
+
+	private TestCase run(TestCase test) {
 		try {
-			String sql = String.format("SELECT lat, lon, output FROM gen_result WHERE case_id = %d", id);
+			String sql = "DELETE FROM run_result WHERE case_id = ?";
+			jdbcTemplate.update(sql, test.id);
+
+			sql = String.format("SELECT lat, lon, output FROM gen_result WHERE case_id = %d", test.id);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			for (Map<String, Object> row : rows) {
 				String status;
 				try {
-					status = jdbcTemplate.queryForObject("SELECT status FROM test_case WHERE id = ?", String.class,	id);
+					status = jdbcTemplate.queryForObject("SELECT status FROM test_case WHERE id = ?", String.class,	test.id);
 				} catch (EmptyResultDataAccessException ex) {
+					LOGGER.info("Job {} was deleted. Stopping execution.", test.id);
 					test = null;
-					LOGGER.info("Job {} was deleted. Stopping execution.", id);
-					return;
+					break;
 				}
 				if (!TestCase.Status.RUNNING.name().equals(status)) {
 					test.status = TestCase.Status.valueOf(status);
-					LOGGER.info("Job {} was cancelled. Stopping execution.", id);
+					LOGGER.info("Job {} was cancelled. Stopping execution.", test.id);
 					break; // Exit the loop if the test-case has been cancelled
 				}
 
@@ -206,7 +243,7 @@ public class SearchTestService extends DataService {
 										e.getMessage());
 					}
 			}
-			if (test.status != TestCase.Status.CANCELED && test.status != TestCase.Status.FAILED) {
+			if (test != null && test.status != TestCase.Status.CANCELED && test.status != TestCase.Status.FAILED) {
 				test.status = TestCase.Status.COMPLETED;
 			}
 		} catch (Exception e) {
@@ -215,21 +252,22 @@ public class SearchTestService extends DataService {
 		} finally {
 			if (test != null) {
 				test.updated = LocalDateTime.now();
-				testCaseRepo.save(test);
+				test = testCaseRepo.save(test);
 			}
 		}
+		return test;
 	}
 
 	@Async
-	public CompletableFuture<TestCase> cancelRun(Long id) {
+	public CompletableFuture<TestCase> cancelRun(Long caseId) {
 		return CompletableFuture.supplyAsync(() -> {
-			TestCase test = testCaseRepo.findById(id)
-					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + id));
+			TestCase test = testCaseRepo.findById(caseId)
+					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
 			if (test.status == TestCase.Status.RUNNING) {
 				String sql = "UPDATE test_case SET status = ?, updated = ? WHERE id = ?";
 				Timestamp updated = new Timestamp(System.currentTimeMillis());
-				jdbcTemplate.update(sql, TestCase.Status.CANCELED, updated, id);
+				jdbcTemplate.update(sql, TestCase.Status.CANCELED, updated, caseId);
 
 				test.status = TestCase.Status.CANCELED;
 				test.updated = updated.toLocalDateTime();

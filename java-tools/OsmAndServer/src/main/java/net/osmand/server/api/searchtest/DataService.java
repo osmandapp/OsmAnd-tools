@@ -200,24 +200,6 @@ public abstract class DataService extends UtilService {
 		});
 	}
 
-	@Async
-	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates) {
-		return CompletableFuture.supplyAsync(() -> {
-			TestCase test = testCaseRepo.findById(id).orElseThrow(() ->
-					new RuntimeException("Test case not found with id: " + id));
-
-			updates.forEach((key, value) -> {
-				switch (key) {
-					case "name" -> test.name = value;
-					case "labels" -> test.labels = value;
-				}
-			});
-
-			test.updated = LocalDateTime.now();
-			return testCaseRepo.save(test);
-		});
-	}
-
 	protected void saveCaseResults(TestCase test, RowAddress data, long duration, String error) throws IOException {
 		String sql =
 				"INSERT INTO gen_result (case_id, dataset_id, row, output, error, duration, lat, lon, timestamp) " +
