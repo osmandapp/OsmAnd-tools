@@ -49,6 +49,10 @@ public class Dataset {
 	@Column(columnDefinition = "TEXT")
 	public String script;
 
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "TEXT")
+	public String meta; // JS script with functions meta-info
+
 	@Enumerated(EnumType.STRING)
 	@Column(name = "source_status", nullable = false)
 	private ConfigStatus sourceStatus = ConfigStatus.UNKNOWN;

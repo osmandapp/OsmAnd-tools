@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
+import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import org.apache.commons.csv.CSVFormat;

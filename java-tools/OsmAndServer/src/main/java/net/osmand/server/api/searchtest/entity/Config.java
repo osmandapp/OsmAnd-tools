@@ -10,10 +10,6 @@ public abstract class Config {
 	@Column(name = "file_name")
 	public String fileName = "Default"; // Uploaded JS file name
 
-	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(columnDefinition = "TEXT")
-	public String script; // JS script with functions
-
 	public String function; // Selected JS function name to calculate output
 
 	@JdbcTypeCode(SqlTypes.JSON)

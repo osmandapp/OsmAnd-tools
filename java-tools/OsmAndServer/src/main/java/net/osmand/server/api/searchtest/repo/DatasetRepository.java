@@ -18,13 +18,15 @@ public interface DatasetRepository extends JpaRepository<Dataset, Long> {
     @Query(value = "SELECT d.*, ej.status as last_job_status, ej.error as last_job_error FROM dataset d " +
             "LEFT JOIN (SELECT dataset_id, MAX(id) as max_id FROM test_case GROUP BY dataset_id) as latest_job ON d.id = latest_job.dataset_id " +
             "LEFT JOIN test_case ej ON latest_job.max_id = ej.id " +
-            "WHERE (COALESCE(:search, '') = '' OR lower(d.name) LIKE '%' || lower(:search) || '%' OR lower(d.source) LIKE '%' || lower(:search) || '%') " +
+            "WHERE (COALESCE(:name, '') = '' OR lower(d.name) LIKE '%' || lower(:name) || '%' OR lower(d.source) LIKE '%' || lower(:name) || '%') " +
+            "AND (COALESCE(:labels, '') = '' OR lower(d.labels) LIKE '%' || lower(:labels) || '%') " +
             "AND (COALESCE(:status, '') = '' OR ej.status = :status)",
             countQuery = "SELECT count(d.id) FROM dataset d " +
                     "LEFT JOIN (SELECT dataset_id, MAX(id) as max_id FROM test_case GROUP BY dataset_id) as latest_job ON d.id = latest_job.dataset_id " +
                     "LEFT JOIN test_case ej ON latest_job.max_id = ej.id " +
-                    "WHERE (COALESCE(:search, '') = '' OR lower(d.name) LIKE '%' || lower(:search) || '%' OR lower(d.source) LIKE '%' || lower(:search) || '%') " +
+                    "WHERE (COALESCE(:name, '') = '' OR lower(d.name) LIKE '%' || lower(:name) || '%' OR lower(d.source) LIKE '%' || lower(:name) || '%') " +
+                    "AND (COALESCE(:labels, '') = '' OR lower(d.labels) LIKE '%' || lower(:labels) || '%') " +
                     "AND (COALESCE(:status, '') = '' OR ej.status = :status)",
             nativeQuery = true)
-    Page<Dataset> findAllDatasets(@Param("search") String search, @Param("status") String status, Pageable pageable);
+    Page<Dataset> findAllDatasets(@Param("name") String name, @Param("labels") String labels, @Param("status") String status, Pageable pageable);
 }

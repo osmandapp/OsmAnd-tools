@@ -18,6 +18,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,8 +36,10 @@ public class SearchTestController {
 
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Page<TestCase>> getTestCases(@PathVariable Long datasetId, Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, pageable));
+	public ResponseEntity<Page<TestCase>> getTestCases(@PathVariable Long datasetId,
+													   @RequestParam(required = false) String status,
+													   Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, status, pageable));
 	}
 
 	@GetMapping(value = "/cases/{caseId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -71,10 +74,10 @@ public class SearchTestController {
 	@PutMapping(value = "/cases/{caseId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<TestCase>> updateTestCase(@PathVariable Long caseId,
-																	 @RequestBody Map<String, String> updatesPayload,
+																	 @RequestBody Map<String, String> payload,
 																	 @RequestParam("regen") Boolean regen,
 																	 @RequestParam("rerun") Boolean rerun) {
-		return testSearchService.updateTestCase(caseId, updatesPayload, regen, rerun).thenApply(ResponseEntity::ok);
+		return testSearchService.updateTestCase(caseId, payload, regen, rerun).thenApply(ResponseEntity::ok);
 	}
 
 	@PostMapping(value = "/cases/{caseId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -140,18 +143,26 @@ public class SearchTestController {
 		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, caseId, format);
 	}
 
+	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<String[]> getLabels() {
+		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
+	}
+
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Page<Dataset>> getDatasets(@RequestParam(required = false) String search,
+	public ResponseEntity<Page<Dataset>> getDatasets(@RequestParam(required = false) String name,
+													 @RequestParam(required = false) String labels,
 													 @RequestParam(required = false) String status,
 													 Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getDatasets(search, status, pageable));
+		return ResponseEntity.ok(testSearchService.getDatasets(name, labels, status, pageable));
 	}
 
 	@PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId, @RequestParam("reload") Boolean reload,
+	public CompletableFuture<ResponseEntity<Dataset>> updateDataset(@PathVariable Long datasetId,
+																	@RequestParam("reload") Boolean reload,
 																	@RequestBody Map<String, String> updatesPayload) {
 		return testSearchService.updateDataset(datasetId, reload, updatesPayload).thenApply(ResponseEntity::ok);
 	}

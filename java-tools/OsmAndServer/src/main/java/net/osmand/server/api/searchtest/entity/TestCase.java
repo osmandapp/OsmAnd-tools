@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @Table(name = "test_case")
 public class TestCase extends Config {
 	public enum Status {
-		NEW, GENERATED, INVALID, RUNNING, COMPLETED, CANCELED, FAILED
+		NEW, GENERATED, RUNNING, COMPLETED, CANCELED, FAILED
 	}
 
 	@Id

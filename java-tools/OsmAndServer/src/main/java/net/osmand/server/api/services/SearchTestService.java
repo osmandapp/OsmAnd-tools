@@ -49,6 +49,19 @@ public class SearchTestService extends DataService {
 		return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
 	}
 
+	public Page<TestCase> getTestCases(Long datasetId, String status, Pageable pageable) {
+		if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+			try {
+				TestCase.Status st = TestCase.Status.valueOf(status.toUpperCase());
+				return testCaseRepo.findByDatasetIdAndStatusOrderByIdDesc(datasetId, st, pageable);
+			} catch (IllegalArgumentException ex) {
+				// Fallback to no-status filtering if invalid status is provided
+				return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
+			}
+		}
+		return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
+	}
+
 	@Async
 	public CompletableFuture<TestCase> createTestCase(Long datasetId, GenParam param) {
 		return CompletableFuture.supplyAsync(() -> {
@@ -61,13 +74,6 @@ public class SearchTestService extends DataService {
 			test.function = param.functionName();
 			test.status = TestCase.Status.NEW;
 			try {
-				if (param.functions() == null || param.functions().length == 0) {
-					Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "meta-info.json");
-					test.script = Files.readString(scriptPath);
-				} else {
-					test.script = objectMapper.writeValueAsString(param.functions());
-				}
-
 				test.params = objectMapper.writeValueAsString(param.paramValues());
 				test.selCols = objectMapper.writeValueAsString(param.columns());
 				dataset.selCols = test.selCols;
@@ -82,7 +88,7 @@ public class SearchTestService extends DataService {
 			} catch (Exception e) {
 				LOGGER.error("Generation of test-case failed for on dataset {}", datasetId, e);
 				test.setError(e.getMessage());
-				test.status = TestCase.Status.INVALID;
+				test.status = TestCase.Status.FAILED;
 			} finally {
 				test.updated = LocalDateTime.now();
 			}
@@ -92,7 +98,7 @@ public class SearchTestService extends DataService {
 
 	private TestCase generate(Dataset dataset, TestCase test) {
 		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
-			test.status = TestCase.Status.INVALID;
+			test.status = TestCase.Status.FAILED;
 			LOGGER.info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
 			return test;
 		}
@@ -133,7 +139,7 @@ public class SearchTestService extends DataService {
 		} catch (Exception e) {
 			LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
 			test.setError(e.getMessage());
-			test.status = TestCase.Status.INVALID;
+			test.status = TestCase.Status.FAILED;
 		} finally {
 			test.updated = LocalDateTime.now();
 		}
@@ -175,12 +181,9 @@ public class SearchTestService extends DataService {
 			Dataset ds = datasetRepository.findById(dsId)
 					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + dsId));
 			if (ds.getSourceStatus() != Dataset.ConfigStatus.OK) {
+				LOGGER.info("Dataset {} is not in OK state ({})", ds.id, ds.getSourceStatus());
 				throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", ds.id,
 						ds.getSourceStatus()));
-			}
-			if (test.status != TestCase.Status.GENERATED) {
-				throw new RuntimeException(String.format("Test-case %s is not in GENERATED state (%s)", test.id,
-						test.status));
 			}
 
 			String locale = payload.locale();

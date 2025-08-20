@@ -40,22 +40,22 @@ public abstract class DataService extends UtilService {
 	protected final EntityManager em;
 	final String REPORT_SQL = "WITH result AS (" +
 			"    SELECT" +
-			"        UPPER(COALESCE(json_extract(original, '$.web_type'), ''))               AS web_type," +
-			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, original," +
+			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS web_type," +
+			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, row," +
 			"        actual_place <= ?                                                       AS is_place," +
 			"        min_distance <= ?                                                       AS is_dist," +
-			"        CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER)            AS id," +
-			"        COALESCE(json_extract(original, '$.web_name'), '')                      AS web_name," +
-			"        COALESCE(json_extract(original, '$.web_address1'), '')                  AS web_address1," +
-			"        COALESCE(json_extract(original, '$.web_address2'), '')                  AS web_address2," +
-			"        CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
-			"        (address LIKE '%' || COALESCE(json_extract(original, '$.web_name'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address1'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(original, '$.web_address2'), '') || '%')" +
+			"        CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id," +
+			"        COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name," +
+			"        COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1," +
+			"        COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2," +
+			"        CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
+			"        (address LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'" +
+			"            AND address LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')" +
 			"                                                                                AS is_addr_match," +
-			"        ((CAST(COALESCE(json_extract(original, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
-			"         CAST(COALESCE(json_extract(original, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
-			"    FROM eval_result AS r WHERE job_id = ? ORDER BY actual_place, min_distance" +
+			"        ((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
+			"         CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
+			"    FROM run_result AS r WHERE case_id = ? ORDER BY actual_place, min_distance" +
 			") " +
 			"SELECT" +
 			"    CASE" +
@@ -69,7 +69,7 @@ public abstract class DataService extends UtilService {
 			"            THEN 'Too Far'" +
 			"        ELSE 'Not Found'" +
 			"END AS \"group\", web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count," +
-			" original " +
+			" row " +
 			"FROM result";
 
 	public DataService(EntityManager em, DatasetRepository datasetRepository, TestCaseRepository testCaseRepo,
@@ -122,10 +122,9 @@ public abstract class DataService extends UtilService {
 				return dataset;
 			}
 
-			headers = Arrays.stream(headers).filter(s -> s.startsWith("road") || s.startsWith("city")
-					|| s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new);
-			dataset.selCols = objectMapper.writeValueAsString(headers);
-
+			dataset.selCols = objectMapper.writeValueAsString(Arrays.stream(headers).filter(s ->
+					s.startsWith("road") || s.startsWith("city") ||
+							s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new));
 			if (reload) {
 				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
 				insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
@@ -165,9 +164,12 @@ public abstract class DataService extends UtilService {
 				Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "default.js");
 				try {
 					dataset.script = Files.readString(scriptPath);
+					Path metPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "meta-info.json");
+					dataset.meta = Files.readString(metPath);
 				} catch (IOException e) {
 					LOGGER.error("Failed to read default script from {}", scriptPath, e);
 					dataset.script = null;
+					dataset.meta = null;
 				}
 			}
 
@@ -211,13 +213,13 @@ public abstract class DataService extends UtilService {
 	}
 
 	protected void saveRunResults(TestCase test, int sequence, String output, Map<String, Object> row,
-								  List<Feature> searchResults, LatLon originalPoint, long duration, String error) throws IOException {
+								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
 		Integer minDistance = null, actualPlace = null;
 		String closestResult = null;
 
-		if (originalPoint != null && !searchResults.isEmpty()) {
+		if (targetPoint != null && !searchResults.isEmpty()) {
 			double minDistanceMeters = Double.MAX_VALUE;
 			LatLon closestPoint = null;
 			int place = 0;
@@ -228,7 +230,7 @@ public abstract class DataService extends UtilService {
 					continue;
 				}
 				LatLon foundPoint = getLatLon(feature);
-				double distance = MapUtils.getDistance(originalPoint.getLatitude(), originalPoint.getLongitude(),
+				double distance = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
 						foundPoint.getLatitude(), foundPoint.getLongitude());
 				if (distance < minDistanceMeters) {
 					minDistanceMeters = distance;
@@ -255,13 +257,13 @@ public abstract class DataService extends UtilService {
 						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(row);
 		jdbcTemplate.update(insertSql, test.id, test.datasetId, rowJson, error, duration, resultsCount, minDistance,
-				closestResult, sequence, output, originalPoint == null ? null : originalPoint.getLatitude(),
-				originalPoint == null ? null : originalPoint.getLongitude(), actualPlace,
+				closestResult, sequence, output, targetPoint == null ? null : targetPoint.getLatitude(),
+				targetPoint == null ? null : targetPoint.getLongitude(), actualPlace,
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
 
-	public Page<Dataset> getDatasets(String search, String status, Pageable pageable) {
-		return datasetRepository.findAllDatasets(search, status, pageable);
+	public Page<Dataset> getDatasets(String name, String labels, String status, Pageable pageable) {
+		return datasetRepository.findAllDatasets(name, labels, status, pageable);
 	}
 
 	public String getDatasetSample(Long datasetId) {
@@ -348,8 +350,8 @@ public abstract class DataService extends UtilService {
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
 
-	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long jobId, String format) throws IOException {
-		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, jobId);
+	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, String format) throws IOException {
+		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, caseId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeAsCsv(writer, results);
 		} else if ("json".equalsIgnoreCase(format)) {
@@ -431,23 +433,23 @@ public abstract class DataService extends UtilService {
 	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
 		List<Map<String, Object>> expanded = results.stream().map(row -> {
 			Map<String, Object> out = new LinkedHashMap<>();
-			// copy base fields except 'original'
+			// copy base fields except 'row'
 			for (Map.Entry<String, Object> e : row.entrySet()) {
-				if (!"original".equals(e.getKey())) {
+				if (!"row".equals(e.getKey())) {
 					out.put(e.getKey(), e.getValue());
 				}
 			}
-			Object originalObj = row.get("original");
-			if (originalObj != null) {
+			Object rowObj = row.get("row");
+			if (rowObj != null) {
 				try {
-					JsonNode originalNode = objectMapper.readTree(originalObj.toString());
+					JsonNode rowNode = objectMapper.readTree(rowObj.toString());
 					// For consistency with CSV, serialize values as text
-					originalNode.fieldNames().forEachRemaining(fn -> {
-						JsonNode v = originalNode.get(fn);
+					rowNode.fieldNames().forEachRemaining(fn -> {
+						JsonNode v = rowNode.get(fn);
 						out.put(fn, v == null || v.isNull() ? null : v.asText());
 					});
 				} catch (IOException e) {
-					// ignore invalid JSON in 'original'
+					// ignore invalid JSON in 'row'
 				}
 			}
 			return out;
@@ -463,22 +465,22 @@ public abstract class DataService extends UtilService {
 
 		Set<String> headers = new LinkedHashSet<>();
 		results.get(0).keySet().stream()
-				.filter(k -> !k.equals("original"))
+				.filter(k -> !k.equals("row"))
 				.forEach(headers::add);
 
-		Set<String> originalHeaders = new LinkedHashSet<>();
+		Set<String> rowHeaders = new LinkedHashSet<>();
 		for (Map<String, Object> row : results) {
-			Object originalObj = row.get("original");
-			if (originalObj != null) {
+			Object rowObj = row.get("row");
+			if (rowObj != null) {
 				try {
-					JsonNode originalNode = objectMapper.readTree(originalObj.toString());
-					originalNode.fieldNames().forEachRemaining(originalHeaders::add);
+					JsonNode rowNode = objectMapper.readTree(rowObj.toString());
+					rowNode.fieldNames().forEachRemaining(rowHeaders::add);
 				} catch (IOException e) {
-					// ignore invalid JSON in 'original'
+					// ignore invalid JSON in 'row'
 				}
 			}
 		}
-		headers.addAll(originalHeaders);
+		headers.addAll(rowHeaders);
 
 		CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
 				.setHeader(headers.toArray(new String[0])).setDelimiter(";")
@@ -487,13 +489,13 @@ public abstract class DataService extends UtilService {
 		try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
 			for (Map<String, Object> row : results) {
 				List<String> record = new ArrayList<>();
-				JsonNode originalNode = null;
-				Object originalObj = row.get("original");
-				if (originalObj != null) {
+				JsonNode rowNode = null;
+				Object rowObj = row.get("row");
+				if (rowObj != null) {
 					try {
-						originalNode = objectMapper.readTree(originalObj.toString());
+						rowNode = objectMapper.readTree(rowObj.toString());
 					} catch (IOException e) {
-						// keep originalNode null
+						// keep rowNode null
 					}
 				}
 
@@ -501,14 +503,43 @@ public abstract class DataService extends UtilService {
 					if (row.containsKey(header)) {
 						Object value = row.get(header);
 						record.add(value != null ? value.toString().trim() : null);
-					} else if (originalNode != null && originalNode.has(header)) {
-						record.add(originalNode.get(header).asText());
+					} else if (rowNode != null && rowNode.has(header)) {
+						record.add(rowNode.get(header).asText());
 					} else {
 						record.add(null);
 					}
 				}
 				printer.printRecord(record);
 			}
+		}
+	}
+
+	public List<String> getAllLabels() {
+		try {
+			String sql = "SELECT labels FROM dataset";
+			List<String> rows = jdbcTemplate.queryForList(sql, String.class);
+			sql = "SELECT labels FROM test_case";
+			rows.addAll(jdbcTemplate.queryForList(sql, String.class));
+
+			Set<String> set = new LinkedHashSet<>();
+			for (String label : rows) {
+				if (label == null) {
+					continue;
+				}
+				for (String l : label.split("[#,]+")) { // split by '#' or ',', treat consecutive as one
+					String t = l.trim();
+					if (!t.isEmpty()) {
+						set.add(t);
+					}
+				}
+			}
+
+			List<String> results = new ArrayList<>(set);
+			results.sort(null);
+			return results;
+		} catch (Exception e) {
+			LOGGER.error("Failed to retrieve labels", e);
+			throw new RuntimeException("Failed to retrieve labels: " + e.getMessage(), e);
 		}
 	}
 }

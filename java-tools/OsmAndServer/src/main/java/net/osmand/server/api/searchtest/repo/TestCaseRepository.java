@@ -19,6 +19,8 @@ public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
 
     Page<TestCase> findByDatasetIdOrderByIdDesc(Long datasetId, Pageable pageable);
 
+    Page<TestCase> findByDatasetIdAndStatusOrderByIdDesc(Long datasetId, TestCase.Status status, Pageable pageable);
+
     @Query(value = "SELECT * FROM eval_job WHERE dataset_id = :datasetId ORDER BY id DESC LIMIT 1", nativeQuery = true)
     Optional<TestCase> findTopByDatasetIdOrderByIdDesc(@Param("datasetId") Long datasetId);
 }
