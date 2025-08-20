@@ -10,7 +10,7 @@ def processType(tp, uniqueset, tags) {
     boolean skipTag = (
         tg.contains("osmand") || 
         tp.@"no_edit" == "true" || 
-        tp.@"seq".toString().length() == 0 ||
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
         tp.@"notosm" == "true"  
     )
@@ -37,7 +37,7 @@ def processEntityConvert(tp, uniqueset, tags) {
 
     boolean skipTag = (
         tg.contains("osmand") || 
-        tp.@"seq".toString().length() == 0 ||
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
         tp.@"notosm" == "true"  
     )
@@ -80,7 +80,7 @@ def processTag(tag, value, name, tp, uniqueset, tags) {
     boolean skipTag = (
         tag.contains("osmand") || 
         tp.@"no_edit" == "true" || 
-        tp.@"seq".toString().length() == 0 ||
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
         tp.@"notosm" == "true"  
     )
