@@ -18,13 +18,14 @@ def processType(tp, uniqueset, tags) {
         return
     }
 
+    def taginfop = [:]
+    taginfop["key"] = tg
     if (value != "") {
-        def taginfop = [:]
-        taginfop["key"] = tg
         taginfop["value"] = value
-        taginfop["description"] = "Used to create maps"
-        tags << taginfop
     }
+    taginfop["description"] = "Used to create maps"
+    tags << taginfop
+    
 }
 
 def processEntityConvert(tp, uniqueset, tags) {
