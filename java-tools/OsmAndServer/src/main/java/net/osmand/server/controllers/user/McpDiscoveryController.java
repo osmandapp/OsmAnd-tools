@@ -3,6 +3,8 @@ package net.osmand.server.controllers.user;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +20,8 @@ import net.osmand.server.api.services.OrderManagementService;
 @RestController
 @RequestMapping("/admin/mcp/")
 public class McpDiscoveryController {
+
+	protected static final Log LOG = LogFactory.getLog(McpDiscoveryController.class);
 
 	@Autowired
 	OrderManagementService orderManagementService;
@@ -49,11 +53,11 @@ public class McpDiscoveryController {
 		if ("tools/call".equals(method)) {
 			@SuppressWarnings("unchecked")
 			Map<String, Object> params = (Map<String, Object>) request.get("params");
+			@SuppressWarnings("unchecked")
+			Map<String, Object> args = (Map<String, Object>) params.get("arguments");
 			String toolName = (String) params.get("name");
-
+			LOG.info(String.format("MCP tool call %s : %s", toolName, args));
 			if ("get-osmand-orders".equals(toolName)) {
-				@SuppressWarnings("unchecked")
-				Map<String, Object> args = (Map<String, Object>) params.get("arguments");
 				String email = (String) args.get("email");
 
 				List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(email, 25);
