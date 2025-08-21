@@ -15,7 +15,7 @@ import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.api.services.OrderManagementService;
 
 @RestController
-@RequestMapping("/.well-known/mcp")
+@RequestMapping("/admin/mcp")
 public class McpDiscoveryController {
 
 	@Autowired
