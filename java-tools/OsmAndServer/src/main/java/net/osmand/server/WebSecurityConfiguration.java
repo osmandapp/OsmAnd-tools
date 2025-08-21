@@ -241,7 +241,10 @@ public class WebSecurityConfiguration {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/.well-known/mcp/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						
 //						.requestMatchers("/admin/issues/**").permitAll()
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
