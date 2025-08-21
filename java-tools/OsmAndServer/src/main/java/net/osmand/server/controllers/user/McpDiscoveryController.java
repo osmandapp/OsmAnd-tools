@@ -8,33 +8,44 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.gson.Gson;
+
 import net.osmand.server.api.services.AdminService;
-import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.api.services.OrderManagementService;
 
 @RestController
-@RequestMapping("/admin/mcp")
+@RequestMapping("/admin/mcp/")
 public class McpDiscoveryController {
 
 	@Autowired
 	OrderManagementService orderManagementService;
+	Gson gson = new Gson();
 
 	@PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
 	public Map<String, Object> handleRpc(@RequestBody Map<String, Object> request) {
 		String method = (String) request.get("method");
 		Object id = request.get("id");
-
+		System.out.println(request);
 		if ("tools/list".equals(method)) {
-			return Map.of("jsonrpc", "2.0", "id", id, "result", Map.of("tools", List.of(Map.of("name",
-					"get-osmand-orders", "description", "Fetch list of orders from the system by email", "input_schema",
-					Map.of("type", "object", "properties",
-							Map.of("email", Map.of("type", "string", "description", "Email address or user name")),
-							"required", List.of("email"))))));
+			return Map.of("jsonrpc", "2.0", "id", id, "result",
+					Map.of("tools", List.of(Map.of("name", "get-osmand-orders", "description",
+							"Fetch list of orders from the system by email", "inputSchema", Map.of( 
+									"type", "object", "properties",
+									Map.of("email",
+											Map.of("type", "string", "description", "Email address or user name")),
+									"required", List.of("email"))))));
 		}
-
+		if ("notifications/initialized".equals(method)) {
+			return Map.of("jsonrpc", "2.0", "result", Map.of("status", "ok"));
+		}
+		if ("initialize".equals(method)) {
+			return Map.of("jsonrpc", "2.0", "id", id, "result",
+					Map.of("protocolVersion", "2025-06-18", "capabilities",
+							Map.of("tools", Map.of("listChanged", true)), "serverInfo",
+							Map.of("name", "osmand-mcp-server", "version", "0.0.1")));
+		}
 		if ("tools/call".equals(method)) {
 			@SuppressWarnings("unchecked")
 			Map<String, Object> params = (Map<String, Object>) request.get("params");
@@ -51,13 +62,12 @@ public class McpDiscoveryController {
 						p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
 					}
 				}
-
-				return Map.of("jsonrpc", "2.0", "id", id, "result",
-						Map.of("content", List.of(Map.of("type", "json", "data", purchases))));
+				return Map.of("jsonrpc", "2.0", "id", id, "result", Map.of("content", List.of(Map.of("type", "text", 
+						"text", gson.toJson(purchases) 
+				))));
 			}
 		}
 
-		// Unknown method
 		return Map.of("jsonrpc", "2.0", "id", id, "error",
 				Map.of("code", -32601, "message", "Method not found: " + method));
 	}
