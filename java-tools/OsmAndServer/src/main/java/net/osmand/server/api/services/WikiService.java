@@ -559,10 +559,11 @@ public class WikiService {
 					" ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(articleId);
 		} else if (hasCategory) {
-			// Retrieve images based on the category name
+			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
 			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
-					+ " FROM wiki.categoryimages c WHERE c.catName = ? "
-					+ " ORDER BY views DESC LIMIT "+ LIMIT_PHOTOS_QUERY;
+					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
+					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
+					+ " ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(categoryName.replace(' ', '_'));
 		} else {
 			return;
