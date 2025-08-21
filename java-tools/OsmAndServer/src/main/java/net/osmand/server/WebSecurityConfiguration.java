@@ -282,7 +282,7 @@ public class WebSecurityConfiguration {
 	@Bean
 	public AuthenticationManager authenticationManager(PasswordEncoder passwordEncoder) {
 		DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-		provider.setUserDetailsService(userDetailsServiceByEmail());
+		provider.setUserDetailsService(userDetailsService());
 		provider.setPasswordEncoder(passwordEncoder);
 		return new ProviderManager(provider);
 	}
