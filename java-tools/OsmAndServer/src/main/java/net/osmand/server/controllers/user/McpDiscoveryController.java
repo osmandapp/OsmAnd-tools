@@ -35,11 +35,11 @@ public class McpDiscoveryController {
 		if ("tools/list".equals(method)) {
 			return Map.of("jsonrpc", "2.0", "id", id, "result",
 					Map.of("tools", List.of(Map.of("name", "get-osmand-orders", "description",
-							"Fetch list of orders from the system by email", "inputSchema", Map.of( 
+							"Fetch list of orders from the system by email, transaction or user name", "inputSchema", Map.of( 
 									"type", "object", "properties",
 									Map.of("query",
 											Map.of("type", "string", "description", "Email address, transaction number or user name")),
-									"required", List.of("email"))))));
+									"required", List.of("query"))))));
 		}
 		if ("notifications/initialized".equals(method)) {
 			return Map.of("jsonrpc", "2.0", "result", Map.of("status", "ok"));
