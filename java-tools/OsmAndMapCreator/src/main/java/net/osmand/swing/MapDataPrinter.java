@@ -175,14 +175,18 @@ public class MapDataPrinter {
 				poiNodes.add(n);
 			}
 
-			for (Node n: nodes) {
-				LatLon ll = n.getLatLon();
-				points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+			if (points != null) {
+				for (Node n : nodes) {
+					LatLon ll = n.getLatLon();
+					points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+				}
 			}
 			nodes = poiNodes;
-			for (Node n: nodes) {
-				LatLon ll = n.getLatLon();
-				points.registerObject(ll.getLatitude(), ll.getLongitude(), n);
+			if (points != null) {
+				for (Node n : nodes) {
+					LatLon ll = n.getLatLon();
+					points.registerObject(ll.getLatitude(), ll.getLongitude(), n);
+				}
 			}
 		}
 
@@ -195,9 +199,11 @@ public class MapDataPrinter {
 
 	public void clearPOIs() {
 		DataTileManager<Entity> points = panel.getPoints();
-		for(Node n : nodes) {
-			LatLon ll = n.getLatLon();
-			points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+		if (points != null) {
+			for (Node n : nodes) {
+				LatLon ll = n.getLatLon();
+				points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+			}
 		}
 		nodes.clear();
 
