@@ -1,10 +1,12 @@
 package net.osmand.server.controllers.user;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,45 +22,55 @@ public class McpDiscoveryController {
 	@Autowired
 	OrderManagementService orderManagementService;
 
-	@RequestMapping("/tools")
-	public ResponseEntity<String> getTools() {
-		String json = """
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "tools": [
-      {
-        "name": "get-osmand-orders",
-        "description": "Fetch list of orders from the system by email",
-        "input_schema": {
-          "type": "object",
-          "properties": {
-            "email": {
-              "type": "string",
-              "description": "Email address or user name"
-            }
-          },
-          "required": ["email"]
-        }
-      }
-    ]
-  }
-}
-				""";
+	@PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+	public Map<String, Object> handleRpc(@RequestBody Map<String, Object> request) {
+		String method = (String) request.get("method");
+		Object id = request.get("id");
 
-		return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json);
-	}
+		if ("tools/list".equals(method)) {
+			return Map.of("jsonrpc", "2.0", "id", id, "result", Map.of("tools", List.of(Map.of("name",
+					"get-osmand-orders", "description", "Fetch list of orders from the system by email", "input_schema",
+					Map.of("type", "object", "properties",
+							Map.of("email", Map.of("type", "string", "description", "Email address or user name")),
+							"required", List.of("email"))))));
+		}
 
-	@RequestMapping(value = "/tools/get-osmand-orders", produces = MediaType.APPLICATION_JSON_VALUE)
-	public List<AdminService.Purchase> callTool(@RequestParam(name = "text", required = true) String user) {
-		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(user, 25);
-		for (Purchase p : purchases) {
-			if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
-				p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
+		if ("tools/call".equals(method)) {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> params = (Map<String, Object>) request.get("params");
+			String toolName = (String) params.get("name");
+
+			if ("get-osmand-orders".equals(toolName)) {
+				@SuppressWarnings("unchecked")
+				Map<String, Object> args = (Map<String, Object>) params.get("arguments");
+				String email = (String) args.get("email");
+
+				List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(email, 25);
+				for (AdminService.Purchase p : purchases) {
+					if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
+						p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
+					}
+				}
+
+				return Map.of("jsonrpc", "2.0", "id", id, "result",
+						Map.of("content", List.of(Map.of("type", "json", "data", purchases))));
 			}
 		}
 
-		return purchases;
+		// Unknown method
+		return Map.of("jsonrpc", "2.0", "id", id, "error",
+				Map.of("code", -32601, "message", "Method not found: " + method));
 	}
+
+//	@RequestMapping(value = "/tools/get-osmand-orders", produces = MediaType.APPLICATION_JSON_VALUE)
+//	public List<AdminService.Purchase> callTool(@RequestParam(name = "text", required = true) String user) {
+//		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(user, 25);
+//		for (Purchase p : purchases) {
+//			if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
+//				p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
+//			}
+//		}
+//
+//		return purchases;
+//	}
 }
