@@ -160,19 +160,6 @@ public abstract class DataService extends UtilService {
 				throw new RuntimeException("Dataset is already created: " + dataset.name);
 			}
 
-			if (dataset.script == null) {
-				Path scriptPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "default.js");
-				try {
-					dataset.script = Files.readString(scriptPath);
-					Path metPath = Path.of(webLocation, "js", "search-test", "modules", "lib", "meta-info.json");
-					dataset.meta = Files.readString(metPath);
-				} catch (IOException e) {
-					LOGGER.error("Failed to read default script from {}", scriptPath, e);
-					dataset.script = null;
-					dataset.meta = null;
-				}
-			}
-
 			dataset.created = LocalDateTime.now();
 			dataset.updated = dataset.created;
 			return checkDatasetInternal(datasetRepository.save(dataset), true);

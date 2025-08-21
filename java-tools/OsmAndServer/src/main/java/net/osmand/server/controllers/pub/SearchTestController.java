@@ -1,9 +1,10 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.dto.RunParam;
+import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.services.SearchTestService;
@@ -18,7 +19,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -54,9 +54,19 @@ public class SearchTestController {
 		return testSearchService.getTestCaseStatus(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
+	@GetMapping(value = "/cases", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Page<TestCaseItem>> getAllTestCases(@RequestParam(required = false) String name,
+															  @RequestParam(required = false) String labels,
+															  @RequestParam(required = false) String status,
+															  Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getAllTestCases(name, labels, status, pageable));
+	}
+
 	@PostMapping(value = "/datasets/{datasetId:\\d+}/gen", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public CompletableFuture<ResponseEntity<TestCase>> genTestCase(@PathVariable Long datasetId, @RequestBody GenParam payload) {
+	public CompletableFuture<ResponseEntity<TestCase>> genTestCase(@PathVariable Long datasetId,
+																   @RequestBody GenParam payload) {
 		return testSearchService.createTestCase(datasetId, payload).thenApply(ResponseEntity::ok);
 	}
 
@@ -74,9 +84,9 @@ public class SearchTestController {
 	@PutMapping(value = "/cases/{caseId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<TestCase>> updateTestCase(@PathVariable Long caseId,
-																	 @RequestBody Map<String, String> payload,
-																	 @RequestParam("regen") Boolean regen,
-																	 @RequestParam("rerun") Boolean rerun) {
+																	  @RequestBody Map<String, String> payload,
+																	  @RequestParam("regen") Boolean regen,
+																	  @RequestParam("rerun") Boolean rerun) {
 		return testSearchService.updateTestCase(caseId, payload, regen, rerun).thenApply(ResponseEntity::ok);
 	}
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
+import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.RunParam;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -17,14 +18,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -71,7 +71,7 @@ public class SearchTestService extends DataService {
 			test.datasetId = datasetId;
 			test.name = param.name();
 			test.labels = param.labels();
-			test.function = param.functionName();
+			test.selectFun = param.selectFun();
 			test.status = TestCase.Status.NEW;
 			try {
 				test.params = objectMapper.writeValueAsString(param.paramValues());
@@ -130,7 +130,7 @@ public class SearchTestService extends DataService {
 
 			sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<RowAddress> examples = execute(dataset.script, test.function, delCols, rows, test.selCols,
+			List<RowAddress> examples = execute(dataset.script, test.selectFun, delCols, rows, test.selCols,
 					objectMapper.readValue(test.params, String[].class));
 			for (RowAddress example : examples) {
 				saveCaseResults(test, example, 0, null);
@@ -301,4 +301,65 @@ public class SearchTestService extends DataService {
 	public Optional<TestCase> getTestCase(Long id) {
 		return testCaseRepo.findById(id);
 	}
+
+    public Page<TestCaseItem> getAllTestCases(String name, String labels, String status, Pageable pageable) {
+        String normalizedStatus = null;
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+            normalizedStatus = status.toUpperCase();
+        } else {
+            // Use empty string to disable status filtering in native query
+            normalizedStatus = "";
+        }
+        Page<TestCase> page = testCaseRepo.findAllCasesFiltered(name, labels, normalizedStatus, pageable);
+        List<TestCase> content = page.getContent();
+
+        // Collect dataset IDs and fetch names in batch
+        Set<Long> dsIds = new HashSet<>();
+        // Collect case IDs for stats
+        List<Long> caseIds = new ArrayList<>(content.size());
+        for (TestCase tc : content) {
+            if (tc.datasetId != null) dsIds.add(tc.datasetId);
+            if (tc.id != null) caseIds.add(tc.id);
+        }
+
+        Map<Long, String> dsNames = new HashMap<>();
+        if (!dsIds.isEmpty()) {
+            for (Dataset ds : datasetRepository.findAllById(dsIds)) {
+                if (ds != null && ds.id != null) {
+                    dsNames.put(ds.id.longValue(), ds.name);
+                }
+            }
+        }
+
+        // Batch load run_result stats for listed case IDs
+        Map<Long, long[]> statsByCase = new HashMap<>(); // caseId -> [total, failed, duration]
+        if (!caseIds.isEmpty()) {
+            String placeholders = String.join(", ", Collections.nCopies(caseIds.size(), "?"));
+            String sql = "SELECT case_id, COUNT(*) AS total, " +
+                    "COUNT(*) FILTER (WHERE error IS NOT NULL) AS failed, " +
+                    "COALESCE(SUM(duration), 0) AS duration " +
+                    "FROM run_result WHERE case_id IN (" + placeholders + ") GROUP BY case_id";
+            Object[] args = caseIds.toArray();
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args);
+            for (Map<String, Object> r : rows) {
+                Long cid = ((Number) r.get("case_id")).longValue();
+                long total = ((Number) r.get("total")).longValue();
+                Number nf = (Number) r.get("failed");
+                long failed = nf == null ? 0 : nf.longValue();
+                Number nd = (Number) r.get("duration");
+                long duration = nd == null ? 0 : nd.longValue();
+                statsByCase.put(cid, new long[]{total, failed, duration});
+            }
+        }
+
+        List<TestCaseItem> items = new ArrayList<>(content.size());
+        for (TestCase tc : content) {
+            String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
+            long[] s = statsByCase.getOrDefault(tc.id, new long[]{0L, 0L, 0L});
+            items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
+                    tc.status, tc.updated, tc.getError(), s[0], s[1], s[2]));
+        }
+
+        return new PageImpl<>(items, pageable, page.getTotalElements());
+    }
 }

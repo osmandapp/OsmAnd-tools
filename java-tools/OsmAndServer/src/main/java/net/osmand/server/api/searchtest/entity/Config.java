@@ -7,10 +7,10 @@ import org.hibernate.type.SqlTypes;
 
 @MappedSuperclass
 public abstract class Config {
-	@Column(name = "file_name")
-	public String fileName = "Default"; // Uploaded JS file name
-
-	public String function; // Selected JS function name to calculate output
+	@Column(name = "select_fun")
+	public String selectFun; // Selected JS function name to calculate output
+	@Column(name = "where_fun")
+	public String whereFun; // Selected JS function name to calculate output
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name="all_cols", columnDefinition = "TEXT")
