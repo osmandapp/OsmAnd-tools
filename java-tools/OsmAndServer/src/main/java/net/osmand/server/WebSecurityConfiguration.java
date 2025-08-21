@@ -79,6 +79,9 @@ public class WebSecurityConfiguration {
 
 
 	@Autowired
+	UserdataService userdataService;
+	
+	@Autowired
 	protected CloudUsersRepository usersRepository;
     
     @Autowired
@@ -138,7 +141,6 @@ public class WebSecurityConfiguration {
 		}
 	}
 
-	@Bean
 	public UserDetailsService userDetailsServiceByAccessToken() {
 		return username -> {
 			CloudUserDevice pud = devicesRepository.findByAccesstoken(username);
@@ -230,7 +232,7 @@ public class WebSecurityConfiguration {
 								if (request.getPathInfo() != null) {
 									url += request.getPathInfo();
 								}
-								return !(url.startsWith("/api/") || url.startsWith("/subscription/") || url.startsWith("/mapapi/"));
+								return !(url.startsWith("/api/") || url.startsWith("/subscription/"));
 							}
 							return false;
 						})
