@@ -563,7 +563,7 @@ public class WikiService {
 			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
 					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
 					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
-					+ " ORDER BY views DESC LIMIT " + LIMIT_PHOTOS_QUERY;
+					+ " ORDER BY views DESC, imgName ASC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(categoryName.replace(' ', '_'));
 		} else {
 			return;
