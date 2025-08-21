@@ -556,7 +556,7 @@ public class WikiService {
 		if (hasArticleId) {
 			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
 					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF + 
-					" ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY;
+					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(articleId);
 		} else if (hasCategory) {
 			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
