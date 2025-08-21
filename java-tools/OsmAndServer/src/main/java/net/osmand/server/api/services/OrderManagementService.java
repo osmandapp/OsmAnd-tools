@@ -61,6 +61,10 @@ public class OrderManagementService {
 		String order = q + "%";
 		String sku = "%" + q + "%";
 		String purchaseToken = q;
+		if (q.startsWith("GPA") && q.contains("..")) {
+			// remove postfix
+			q = q.substring(0, q.indexOf(".."));
+		}
 
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
