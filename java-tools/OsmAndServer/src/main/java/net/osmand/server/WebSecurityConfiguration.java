@@ -153,7 +153,7 @@ public class WebSecurityConfiguration {
 	}
 	
 	@Bean
-	public UserDetailsService userDetailsServiceByEmail() {
+	public UserDetailsService userDetailsService() {
 		return username -> {
 			CloudUser pu = usersRepository.findByEmailIgnoreCase(username);
 			if (pu == null) throw new UsernameNotFoundException(username);
