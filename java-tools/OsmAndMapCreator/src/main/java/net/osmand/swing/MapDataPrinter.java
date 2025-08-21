@@ -119,6 +119,9 @@ public class MapDataPrinter {
 
 	public void searchPOIs(boolean refresh) {
 		DataTileManager<Entity> points = panel.getPoints();
+		if (points == null)
+			points = new DataTileManager<>(15);
+
 		if (refresh) {
 			Point popupMenuPoint = panel.getPopupMenuPoint();
 			double fy = (popupMenuPoint.y - panel.getCenterPointY()) / panel.getTileSize();
@@ -175,19 +178,15 @@ public class MapDataPrinter {
 				poiNodes.add(n);
 			}
 
-			if (points != null) {
-				for (Node n : nodes) {
-					LatLon ll = n.getLatLon();
-					points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
-				}
+			for (Node n : nodes) {
+				LatLon ll = n.getLatLon();
+				points.unregisterObject(ll.getLatitude(), ll.getLongitude(), n);
+			}
+			for (Node n : poiNodes) {
+				LatLon ll = n.getLatLon();
+				points.registerObject(ll.getLatitude(), ll.getLongitude(), n);
 			}
 			nodes = poiNodes;
-			if (points != null) {
-				for (Node n : nodes) {
-					LatLon ll = n.getLatLon();
-					points.registerObject(ll.getLatitude(), ll.getLongitude(), n);
-				}
-			}
 		}
 
 		if (refresh || zoom != panel.getZoom()) {
@@ -208,8 +207,10 @@ public class MapDataPrinter {
 		nodes.clear();
 
 		zoom = panel.getZoom();
-		panel.setPoints(points);
-		panel.repaint();
+		if (points != null) {
+			panel.setPoints(points);
+			panel.repaint();
+		}
 	}
 
 	private static String displayString(Amenity object) {
