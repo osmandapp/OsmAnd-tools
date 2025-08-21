@@ -55,12 +55,14 @@ import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.UserdataService;
 
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 @Configuration
 @EnableOAuth2Client
 public class WebSecurityConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(WebSecurityConfiguration.class);
-	public static final String ROLE_PRO_USER = "ROLE_PRO_USER";
+	public static final String ROLE_PRO_USER = "ROLE_PRO_USER"; // actually it's logged in user not necessarily pro
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
 	public static final String ROLE_USER = "ROLE_USER";
@@ -82,8 +84,6 @@ public class WebSecurityConfiguration {
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
 	
-	@Autowired
-	UserdataService userdataService;
 
 	@Autowired
 	private WebAccessConfig webAccessConfig;
@@ -139,18 +139,37 @@ public class WebSecurityConfiguration {
 	}
 
 	@Bean
-	public UserDetailsService userDetailsService() {
+	public UserDetailsService userDetailsServiceByAccessToken() {
+		return username -> {
+			CloudUserDevice pud = devicesRepository.findByAccesstoken(username);
+			if (pud != null) {
+				CloudUser pu = usersRepository.findById(pud.userid);
+				if (pu != null) {
+					return createOsmAndProUser(pu.email, pud);
+				}
+			}
+			throw new UsernameNotFoundException(username);
+		};
+	}
+	
+	@Bean
+	public UserDetailsService userDetailsServiceByEmail() {
 		return username -> {
 			CloudUser pu = usersRepository.findByEmailIgnoreCase(username);
 			if (pu == null) throw new UsernameNotFoundException(username);
-
 			CloudUserDevice pud = devicesRepository
 					.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id, UserdataService.TOKEN_DEVICE_WEB);
 			if (pud == null) throw new UsernameNotFoundException(username);
+			return createOsmAndProUser(username, pud);
+		};
+	}
 
-			Set<GrantedAuthority> auths = new LinkedHashSet<>();
-			auths.add(new SimpleGrantedAuthority(ROLE_PRO_USER));
+	private OsmAndProUser createOsmAndProUser(String username, CloudUserDevice pud) {
+		Set<GrantedAuthority> auths = new LinkedHashSet<>();
+		auths.add(new SimpleGrantedAuthority(ROLE_PRO_USER));
 
+		CloudUser pu = usersRepository.findById(pud.userid);
+		if (pu != null) {
 			String email = pu.email;
 			if (webAccessConfig.getAdmins().contains(email)) {
 				auths.add(new SimpleGrantedAuthority(ROLE_ADMIN));
@@ -158,11 +177,15 @@ public class WebSecurityConfiguration {
 			if (webAccessConfig.getSupport().contains(email)) {
 				auths.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
 			}
+		}
 
-			return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
-		};
+		return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
 	}
 
+	@Bean
+	public BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter() {
+		return new BearerTokenAuthenticationFilter(userDetailsServiceByAccessToken());
+	}
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -183,6 +206,7 @@ public class WebSecurityConfiguration {
 					}
 				};
 		http
+				.addFilterBefore(bearerTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
 				.sessionManagement(session -> session
 						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
 						.maximumSessions(1)
@@ -206,7 +230,7 @@ public class WebSecurityConfiguration {
 								if (request.getPathInfo() != null) {
 									url += request.getPathInfo();
 								}
-								return !(url.startsWith("/api/") || url.startsWith("/subscription/"));
+								return !(url.startsWith("/api/") || url.startsWith("/subscription/") || url.startsWith("/mapapi/"));
 							}
 							return false;
 						})
@@ -258,7 +282,7 @@ public class WebSecurityConfiguration {
 	@Bean
 	public AuthenticationManager authenticationManager(PasswordEncoder passwordEncoder) {
 		DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-		provider.setUserDetailsService(userDetailsService());
+		provider.setUserDetailsService(userDetailsServiceByEmail());
 		provider.setPasswordEncoder(passwordEncoder);
 		return new ProviderManager(provider);
 	}
