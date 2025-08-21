@@ -23,24 +23,28 @@ public class McpDiscoveryController {
 	@RequestMapping("/tools")
 	public ResponseEntity<String> getTools() {
 		String json = """
-				{
-				  "tools": [
-				    {
-				      "name": "get-osmand-orders",
-				      "description": "Fetch list of orders from the system by email",
-				      "input_schema": {
-				        "type": "object",
-				        "properties": {
-				          "user": {
-				            "type": "string",
-				            "description": "Email address or user name"
-				          }
-				        },
-				        "required": ["email"]
-				      }
-				    }
-				  ]
-				}
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "get-osmand-orders",
+        "description": "Fetch list of orders from the system by email",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Email address or user name"
+            }
+          },
+          "required": ["email"]
+        }
+      }
+    ]
+  }
+}
 				""";
 
 		return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json);
