@@ -37,8 +37,8 @@ public class McpDiscoveryController {
 					Map.of("tools", List.of(Map.of("name", "get-osmand-orders", "description",
 							"Fetch list of orders from the system by email", "inputSchema", Map.of( 
 									"type", "object", "properties",
-									Map.of("email",
-											Map.of("type", "string", "description", "Email address or user name")),
+									Map.of("query",
+											Map.of("type", "string", "description", "Email address, transaction number or user name")),
 									"required", List.of("email"))))));
 		}
 		if ("notifications/initialized".equals(method)) {
@@ -58,9 +58,9 @@ public class McpDiscoveryController {
 			String toolName = (String) params.get("name");
 			LOG.info(String.format("MCP tool call %s : %s", toolName, args));
 			if ("get-osmand-orders".equals(toolName)) {
-				String email = (String) args.get("email");
+				String query = (String) args.get("query");
 
-				List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(email, 25);
+				List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(query, 25);
 				for (AdminService.Purchase p : purchases) {
 					if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
 						p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
