@@ -14,14 +14,13 @@ public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
     @Query("SELECT d FROM TestCase d WHERE d.name = :name")
     Optional<TestCase> findByName(@Param("name") String name);
 
-    @Query("SELECT j FROM TestCase j WHERE j.datasetId = :datasetId")
-    Page<TestCase> findByDatasetId(@Param("datasetId") Long datasetId, Pageable pageable);
-
+    @Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId ORDER BY updated DESC", nativeQuery = true)
     Page<TestCase> findByDatasetIdOrderByIdDesc(Long datasetId, Pageable pageable);
 
+    @Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId AND status = :status ORDER BY id DESC", nativeQuery = true)
     Page<TestCase> findByDatasetIdAndStatusOrderByIdDesc(Long datasetId, TestCase.Status status, Pageable pageable);
 
-    @Query(value = "SELECT * FROM eval_job WHERE dataset_id = :datasetId ORDER BY id DESC LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId ORDER BY id DESC LIMIT 1", nativeQuery = true)
     Optional<TestCase> findTopByDatasetIdOrderByIdDesc(@Param("datasetId") Long datasetId);
 
     @Query(value = "SELECT * FROM test_case j " +

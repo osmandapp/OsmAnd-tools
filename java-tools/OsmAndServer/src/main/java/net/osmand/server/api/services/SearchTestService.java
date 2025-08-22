@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
@@ -7,9 +8,12 @@ import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.RunParam;
+import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
+import net.osmand.server.api.searchtest.repo.RunRepository;
 import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
@@ -29,6 +33,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 @Service
 public class SearchTestService extends DataService {
@@ -37,11 +42,11 @@ public class SearchTestService extends DataService {
 
 	@Autowired
 	public SearchTestService(EntityManager em, DatasetRepository datasetRepository,
-							 TestCaseRepository testCaseRepo,
+							 TestCaseRepository testCaseRepo, RunRepository runRepo,
 							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
 							 SearchService searchService, WebClient.Builder webClientBuilder,
 							 ObjectMapper objectMapper) {
-		super(em, datasetRepository, testCaseRepo, jdbcTemplate, webClientBuilder, objectMapper);
+		super(em, datasetRepository, testCaseRepo, runRepo, jdbcTemplate, webClientBuilder, objectMapper);
 		this.searchService = searchService;
 	}
 
@@ -65,16 +70,18 @@ public class SearchTestService extends DataService {
 	@Async
 	public CompletableFuture<TestCase> createTestCase(Long datasetId, GenParam param) {
 		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset = datasetRepository.findById(datasetId)
+			Dataset dataset = datasetRepo.findById(datasetId)
 					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + datasetId));
 			TestCase test = new TestCase();
 			test.datasetId = datasetId;
 			test.name = param.name();
 			test.labels = param.labels();
 			test.selectFun = param.selectFun();
+			test.whereFun = param.whereFun();
 			test.status = TestCase.Status.NEW;
 			try {
-				test.params = objectMapper.writeValueAsString(param.paramValues());
+				test.selectParams = objectMapper.writeValueAsString(param.selectParamValues());
+				test.whereParams = objectMapper.writeValueAsString(param.whereParamValues());
 				test.selCols = objectMapper.writeValueAsString(param.columns());
 				dataset.selCols = test.selCols;
 				test.allCols = dataset.allCols;
@@ -82,7 +89,7 @@ public class SearchTestService extends DataService {
 				test.created = LocalDateTime.now();
 				test.updated = test.created;
 				test = testCaseRepo.save(test);
-				datasetRepository.saveAndFlush(dataset);
+				datasetRepo.saveAndFlush(dataset);
 
 				test = generate(dataset, test);
 			} catch (Exception e) {
@@ -122,16 +129,9 @@ public class SearchTestService extends DataService {
 				delCols.add("id");
 			}
 
-			String sql = "DELETE FROM gen_result WHERE case_id = ?";
-			jdbcTemplate.update(sql, test.id);
-
-			sql = "DELETE FROM run_result WHERE case_id = ?";
-			jdbcTemplate.update(sql, test.id);
-
-			sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
+			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<RowAddress> examples = execute(dataset.script, test.selectFun, delCols, rows, test.selCols,
-					objectMapper.readValue(test.params, String[].class));
+			List<RowAddress> examples = execute(dataset.script, test, delCols, rows);
 			for (RowAddress example : examples) {
 				saveCaseResults(test, example, 0, null);
 			}
@@ -147,7 +147,7 @@ public class SearchTestService extends DataService {
 	}
 
 	@Async
-	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates, boolean regen, boolean rerun) {
+	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates, boolean regen) {
 		return CompletableFuture.supplyAsync(() -> {
 			TestCase test = testCaseRepo.findById(id).orElseThrow(() ->
 					new RuntimeException("Test case not found with id: " + id));
@@ -160,123 +160,125 @@ public class SearchTestService extends DataService {
 			});
 			TestCase updated = null;
 			if (regen) {
-				Dataset dataset = datasetRepository.findById(test.datasetId)
+				Dataset dataset = datasetRepo.findById(test.datasetId)
 						.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + test.datasetId));
 				updated = generate(dataset, test);
-			}
-			if (rerun) {
-				updated = run(test);
 			}
 			return updated != null ? updated : testCaseRepo.save(test);
 		});
 	}
 
 	@Async
-	public void runTestCase(Long caseId, RunParam payload) {
-		CompletableFuture.runAsync(() -> {
-			TestCase test = testCaseRepo.findById(caseId)
-					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
+	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
+		TestCase test = testCaseRepo.findById(caseId)
+				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
-			final Long dsId = test.datasetId;
-			Dataset ds = datasetRepository.findById(dsId)
-					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + dsId));
-			if (ds.getSourceStatus() != Dataset.ConfigStatus.OK) {
-				LOGGER.info("Dataset {} is not in OK state ({})", ds.id, ds.getSourceStatus());
-				throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", ds.id,
-						ds.getSourceStatus()));
-			}
+		final Long dsId = test.datasetId;
+		Dataset ds = datasetRepo.findById(dsId)
+				.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + dsId));
+		if (ds.getSourceStatus() != Dataset.ConfigStatus.OK) {
+			LOGGER.info("Dataset {} is not in OK state ({})", ds.id, ds.getSourceStatus());
+			throw new RuntimeException(String.format("Dataset %s is not in OK state (%s)", ds.id,
+					ds.getSourceStatus()));
+		}
+		if (test.status != TestCase.Status.GENERATED) {
+			LOGGER.info("TestCase {} is not in GENERATED state ({})", caseId, test.status);
+			throw new RuntimeException(String.format("TestCase %s is not in GENERATED state (%s)", caseId,
+					test.status));
+		}
 
-			String locale = payload.locale();
-			if (locale == null || locale.trim().isEmpty()) {
-				locale = "en";
-			}
-			test.locale = locale;
-			test.setNorthWest(payload.northWest());
-			test.setSouthEast(payload.southEast());
-			test.baseSearch = payload.baseSearch();
-			// Persist optional lat/lon overrides if provided
-			test.lat = payload.lat();
-			test.lon = payload.lon();
+		Run run = new Run();
+		run.status = Run.Status.RUNNING;
+		run.caseId = caseId;
+		String locale = payload.locale();
+		if (locale == null || locale.trim().isEmpty()) {
+			locale = "en";
+		}
+		run.locale = locale;
+		run.setNorthWest(payload.northWest());
+		run.setSouthEast(payload.southEast());
+		run.baseSearch = payload.baseSearch();
+		// Persist optional lat/lon overrides if provided
+		run.lat = payload.lat();
+		run.lon = payload.lon();
+		run.created = LocalDateTime.now();
+		run.updated = run.created;
+		run = runRepo.save(run);
 
-			test.status = TestCase.Status.RUNNING;
-			test = testCaseRepo.save(test);
-
-			run(test);
-		});
+		Run finalRun = run;
+		CompletableFuture.runAsync(() -> run(finalRun));
+		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private TestCase run(TestCase test) {
+	private void run(Run run) {
+		String sql = String.format("SELECT id, lat, lon, row, output FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
 		try {
-			String sql = "DELETE FROM run_result WHERE case_id = ?";
-			jdbcTemplate.update(sql, test.id);
-
-			sql = String.format("SELECT lat, lon, output FROM gen_result WHERE case_id = %d", test.id);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			for (Map<String, Object> row : rows) {
 				String status;
 				try {
-					status = jdbcTemplate.queryForObject("SELECT status FROM test_case WHERE id = ?", String.class,	test.id);
+					status = jdbcTemplate.queryForObject("SELECT status FROM run WHERE id = ?", String.class, run.id);
 				} catch (EmptyResultDataAccessException ex) {
-					LOGGER.info("Job {} was deleted. Stopping execution.", test.id);
-					test = null;
+					LOGGER.info("Run {} was deleted. Stopping execution.", run.id);
+					run = null;
 					break;
 				}
-				if (!TestCase.Status.RUNNING.name().equals(status)) {
-					test.status = TestCase.Status.valueOf(status);
-					LOGGER.info("Job {} was cancelled. Stopping execution.", test.id);
+				if (!Run.Status.RUNNING.name().equals(status)) {
+					run.status = Run.Status.valueOf(status);
+					LOGGER.info("Run {} was cancelled. Stopping execution.", run.id);
 					break; // Exit the loop if the test-case has been cancelled
 				}
 
 				long startTime = System.currentTimeMillis();
-				LatLon expectedPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
-				LatLon point = (test.lat == null || test.lon == null) ? expectedPoint : new LatLon(test.lat, test.lon);
+				LatLon point = (run.lat == null || run.lon == null) ?
+						new LatLon((Double) row.get("lat"), (Double) row.get("lon")) :
+						new LatLon(run.lat, run.lon);
 
-				String json = (String) row.get("output");
-				int sequence = 0;
-				for (String address : objectMapper.readValue(json, String[].class))
-					try {
-						List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-								address, test.locale, test.baseSearch, test.getNorthWest(), test.getSouthEast());
-						saveRunResults(test, sequence++, address, row, searchResults, expectedPoint,
-								System.currentTimeMillis() - startTime, null);
-					} catch (Exception e) {
-						LOGGER.warn("Failed to process row for test-case {}.", test.id, e);
-						saveRunResults(test, sequence, address, row, Collections.emptyList(), expectedPoint,
-								System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
-										e.getMessage());
-					}
+				Long id = (Long) row.get("id");
+				String output = (String) row.get("output");
+				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
+				try {
+					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+							output, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
+					saveRunResults(id, run, output, mapRow, searchResults, point,
+							System.currentTimeMillis() - startTime, null);
+				} catch (Exception e) {
+					LOGGER.warn("Failed to process row for run {}.", run.id, e);
+					saveRunResults(id, run, output, mapRow, Collections.emptyList(), point,
+							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
+									e.getMessage());
+				}
 			}
-			if (test != null && test.status != TestCase.Status.CANCELED && test.status != TestCase.Status.FAILED) {
-				test.status = TestCase.Status.COMPLETED;
+			if (run != null && run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
+				run.status = Run.Status.COMPLETED;
 			}
 		} catch (Exception e) {
-			LOGGER.error("Evaluation failed for test-case {}", test.id, e);
-			test.setError(e.getMessage());
+			LOGGER.error("Evaluation failed for test-case {}", run.id, e);
+			run.setError(e.getMessage());
 		} finally {
-			if (test != null) {
-				test.updated = LocalDateTime.now();
-				test = testCaseRepo.save(test);
+			if (run != null) {
+				run.timestamp = LocalDateTime.now();
+				runRepo.save(run);
 			}
 		}
-		return test;
 	}
 
 	@Async
-	public CompletableFuture<TestCase> cancelRun(Long caseId) {
+	public CompletableFuture<Run> cancelRun(Long runId) {
 		return CompletableFuture.supplyAsync(() -> {
-			TestCase test = testCaseRepo.findById(caseId)
-					.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
+			Run run = runRepo.findById(runId)
+					.orElseThrow(() -> new RuntimeException("Run not found with id: " + runId));
 
-			if (test.status == TestCase.Status.RUNNING) {
-				String sql = "UPDATE test_case SET status = ?, updated = ? WHERE id = ?";
+			if (run.status == Run.Status.RUNNING) {
+				String sql = "UPDATE run SET status = ?, updated = ? WHERE id = ?";
 				Timestamp updated = new Timestamp(System.currentTimeMillis());
-				jdbcTemplate.update(sql, TestCase.Status.CANCELED, updated, caseId);
+				jdbcTemplate.update(sql, Run.Status.CANCELED, updated, runId);
 
-				test.status = TestCase.Status.CANCELED;
-				test.updated = updated.toLocalDateTime();
-				return test;
+				run.status = Run.Status.CANCELED;
+				run.updated = updated.toLocalDateTime();
+				return run;
 			}
-			return test;
+			return run;
 		});
 	}
 
@@ -288,6 +290,9 @@ public class SearchTestService extends DataService {
 			}
 
 			String sql = "DELETE FROM run_result WHERE case_id = ?";
+			jdbcTemplate.update(sql, id);
+
+			sql = "DELETE FROM run WHERE case_id = ?";
 			jdbcTemplate.update(sql, id);
 
 			sql = "DELETE FROM gen_result WHERE case_id = ?";
@@ -315,51 +320,40 @@ public class SearchTestService extends DataService {
 
         // Collect dataset IDs and fetch names in batch
         Set<Long> dsIds = new HashSet<>();
-        // Collect case IDs for stats
-        List<Long> caseIds = new ArrayList<>(content.size());
         for (TestCase tc : content) {
             if (tc.datasetId != null) dsIds.add(tc.datasetId);
-            if (tc.id != null) caseIds.add(tc.id);
         }
 
         Map<Long, String> dsNames = new HashMap<>();
         if (!dsIds.isEmpty()) {
-            for (Dataset ds : datasetRepository.findAllById(dsIds)) {
+            for (Dataset ds : datasetRepo.findAllById(dsIds)) {
                 if (ds != null && ds.id != null) {
-                    dsNames.put(ds.id.longValue(), ds.name);
+                    dsNames.put(ds.id, ds.name);
                 }
-            }
-        }
-
-        // Batch load run_result stats for listed case IDs
-        Map<Long, long[]> statsByCase = new HashMap<>(); // caseId -> [total, failed, duration]
-        if (!caseIds.isEmpty()) {
-            String placeholders = String.join(", ", Collections.nCopies(caseIds.size(), "?"));
-            String sql = "SELECT case_id, COUNT(*) AS total, " +
-                    "COUNT(*) FILTER (WHERE error IS NOT NULL) AS failed, " +
-                    "COALESCE(SUM(duration), 0) AS duration " +
-                    "FROM run_result WHERE case_id IN (" + placeholders + ") GROUP BY case_id";
-            Object[] args = caseIds.toArray();
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args);
-            for (Map<String, Object> r : rows) {
-                Long cid = ((Number) r.get("case_id")).longValue();
-                long total = ((Number) r.get("total")).longValue();
-                Number nf = (Number) r.get("failed");
-                long failed = nf == null ? 0 : nf.longValue();
-                Number nd = (Number) r.get("duration");
-                long duration = nd == null ? 0 : nd.longValue();
-                statsByCase.put(cid, new long[]{total, failed, duration});
             }
         }
 
         List<TestCaseItem> items = new ArrayList<>(content.size());
         for (TestCase tc : content) {
             String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
-            long[] s = statsByCase.getOrDefault(tc.id, new long[]{0L, 0L, 0L});
-            items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
-                    tc.status, tc.updated, tc.getError(), s[0], s[1], s[2]));
+            Optional<RunStatus> tcOpt = getTestCaseStatus(tc.id);
+			if (tcOpt.isEmpty())
+				continue;
+
+			RunStatus tcStatus = tcOpt.get();
+            items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, tc.status, tc.updated,
+					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
         }
 
         return new PageImpl<>(items, pageable, page.getTotalElements());
     }
+
+	public Page<Run> getRuns(Long caseId, Pageable pageable) {
+		return runRepo.findByCaseId(caseId, pageable);
+	}
+
+	@Async
+	public CompletableFuture<Void> deleteRun(Long id) {
+		return CompletableFuture.runAsync(() -> runRepo.deleteById(id));
+	}
 }

@@ -4,8 +4,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.RunParam;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
+import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.services.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, status, pageable));
 	}
 
+	@GetMapping(value = "/cases/{caseId}/runs", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Page<Run>> getRuns(@PathVariable Long caseId, Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getRuns(caseId, pageable));
+	}
+
 	@GetMapping(value = "/cases/{caseId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<TestCase> getTestCase(@PathVariable Long caseId) {
@@ -50,8 +57,14 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<TestCaseStatus> getTestCaseStatus(@PathVariable Long caseId) {
+	public ResponseEntity<RunStatus> getTestCaseStatus(@PathVariable Long caseId) {
 		return testSearchService.getTestCaseStatus(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<RunStatus> getRunStatus(@PathVariable Long runId) {
+		return testSearchService.getRunStatus(runId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/cases", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -71,35 +84,38 @@ public class SearchTestController {
 	}
 
 	/**
-	 * Step 2 – continue processing of an existing job asynchronously.
-	 * The call returns immediately with 202 while the heavy work happens in the background.
+	 * The call create Run entity and do other heavy work asynchronously.
 	 */
 	@PostMapping(value = "/cases/{caseId:\\d+}/run", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Void> runTestCase(@PathVariable Long caseId, @RequestBody RunParam payload) {
-		testSearchService.runTestCase(caseId, payload); // @Async – returns immediately
-		return ResponseEntity.accepted().build();
+	public CompletableFuture<ResponseEntity<Run>> runTestCase(@PathVariable Long caseId, @RequestBody RunParam payload) {
+		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
 	}
 
 	@PutMapping(value = "/cases/{caseId:\\d+}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<TestCase>> updateTestCase(@PathVariable Long caseId,
 																	  @RequestBody Map<String, String> payload,
-																	  @RequestParam("regen") Boolean regen,
-																	  @RequestParam("rerun") Boolean rerun) {
-		return testSearchService.updateTestCase(caseId, payload, regen, rerun).thenApply(ResponseEntity::ok);
+																	  @RequestParam("regen") Boolean regen) {
+		return testSearchService.updateTestCase(caseId, payload, regen).thenApply(ResponseEntity::ok);
 	}
 
-	@PostMapping(value = "/cases/{caseId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/runs/{runId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public CompletableFuture<ResponseEntity<TestCase>> cancelRun(@PathVariable Long caseId) {
-		return testSearchService.cancelRun(caseId).thenApply(ResponseEntity::ok);
+	public CompletableFuture<ResponseEntity<Run>> cancelRun(@PathVariable Long runId) {
+		return testSearchService.cancelRun(runId).thenApply(ResponseEntity::ok);
 	}
 
 	@DeleteMapping(value = "/cases/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Void>> deleteTestCase(@PathVariable Long id) {
 		return testSearchService.deleteTestCase(id).thenApply(v -> ResponseEntity.noContent().build());
+	}
+
+	@DeleteMapping(value = "/runs/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<Void>> deleteRun(@PathVariable Long id) {
+		return testSearchService.deleteRun(id).thenApply(v -> ResponseEntity.noContent().build());
 	}
 
 	@PostMapping(value = "/csv/count", consumes = MediaType.APPLICATION_JSON_VALUE, produces =
@@ -133,9 +149,9 @@ public class SearchTestController {
 
 	@GetMapping(value = "/reports/{caseId}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<TestCaseStatus> getRunReport(@PathVariable Long caseId,
-													   @RequestParam(defaultValue = "10") Integer placeLimit,
-													   @RequestParam(defaultValue = "50") Integer distLimit) {
+	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long caseId,
+												  @RequestParam(defaultValue = "10") Integer placeLimit,
+												  @RequestParam(defaultValue = "50") Integer distLimit) {
 		return testSearchService.getRunReport(caseId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 

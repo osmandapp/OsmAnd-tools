@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import org.apache.commons.csv.CSVFormat;
@@ -146,17 +146,13 @@ public abstract class UtilService {
 			} catch (IOException ignore) {
 				// Directory usually exists; ignore if creation fails, Engine will still initialize.
 			}
-			this.polyglotEngine = Engine.newBuilder()
-					.option("engine.WarnInterpreterOnly", "false")
-					.option("log.file", logPath.toString())
-					.build();
+			this.polyglotEngine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").option("log.file",
+					logPath.toString()).build();
 			LOGGER.info("Initialized GraalVM Polyglot Engine. Truffle logs -> {}", logPath.toAbsolutePath());
 		} catch (Throwable t) {
 			// Fall back to an Engine that only disables the warning, if log redirection fails.
 			LOGGER.warn("Failed to initialize Polyglot Engine logging; continuing without log.file redirection", t);
-			this.polyglotEngine = Engine.newBuilder()
-					.option("engine.WarnInterpreterOnly", "false")
-					.build();
+			this.polyglotEngine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
 		}
 	}
 
@@ -164,7 +160,8 @@ public abstract class UtilService {
 		Path tempFile;
 		try {
 			String overpassResponse =
-					webClient.post().uri("").bodyValue("[out:json][timeout:25];" + query + ";out;").retrieve().bodyToMono(String.class).toFuture().join();
+					webClient.post().uri("").bodyValue("[out:json][timeout:25];" + query +
+							";out;").retrieve().bodyToMono(String.class).toFuture().join();
 			tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
@@ -244,21 +241,25 @@ public abstract class UtilService {
 		});
 	}
 
-	protected List<RowAddress> execute(String script, String functionName, List<String> delCols, List<Map<String,
-											   Object>> rows, String columnsJson,
-									   String[] otherParams) {
+	protected List<RowAddress> execute(String script, TestCase test, List<String> delCols,
+									   List<Map<String, Object>> rows) throws Exception {
+		String selectFun = test.selectFun;
+		String whereFun = test.whereFun;
+		String columnsJson = test.selCols;
+		String[] selectParams = objectMapper.readValue(test.selectParams, String[].class);
+		String[] whereParams = objectMapper.readValue(test.whereParams, String[].class);
+
 		if (script == null || script.trim().isEmpty()) {
 			throw new IllegalArgumentException("Script must not be null or empty");
 		}
-		if (functionName == null || functionName.trim().isEmpty()) {
-			throw new IllegalArgumentException("Function name must not be null or empty");
+		if (selectFun == null || selectFun.trim().isEmpty()) {
+			throw new IllegalArgumentException("Function name must not be null or empty: " + selectFun);
 		}
 		try {
 			// Execute with GraalVM JavaScript (Polyglot API)
 			List<RowAddress> results = new ArrayList<>();
-			try (Context context =
-						 Context.newBuilder("js").engine(polyglotEngine).option("js.ecmascript-version", "2022")
-								 .allowAllAccess(false).build()) {
+			try (Context context = Context.newBuilder("js").engine(polyglotEngine).option("js.ecmascript-version",
+					"2022").allowAllAccess(false).build()) {
 				// 1) Evaluate user script (should define the target function)
 				context.eval("js", script);
 
@@ -271,44 +272,33 @@ public abstract class UtilService {
 							row.remove(key);
 						}
 					}
+
 					String rowJson = objectMapper.writeValueAsString(row);
 					org.graalvm.polyglot.Value jsonParse = context.eval("js", "JSON.parse");
 					org.graalvm.polyglot.Value jsRow = jsonParse.execute(rowJson);
 					org.graalvm.polyglot.Value jsColumns = jsonParse.execute(columnsJson);
 
-					List<Object> args = new ArrayList<>();
-					args.add(jsRow);
-					args.add(jsColumns);
-					if (otherParams != null) {
-						for (String p : otherParams) {
-							if (p == null) {
-								args.add(null);
-								continue;
-							}
-							String t = p.trim();
-							// Convert to number if it looks numeric; otherwise pass as string
-							if (t.matches("^-?\\d+$")) {
-								try {
-									args.add(Long.parseLong(t));
-								} catch (NumberFormatException ex) {
-									args.add(t);
-								}
-							} else if (t.matches("^-?\\d*\\.\\d+(?:[eE]-?\\d+)?$")) {
-								try {
-									args.add(Double.parseDouble(t));
-								} catch (NumberFormatException ex) {
-									args.add(t);
-								}
-							} else {
-								args.add(p);
-							}
-						}
-					}
+					List<Object> selectArgs = getArgs(selectParams);
+					selectArgs.add(0, jsColumns);
+					selectArgs.add(0, jsRow);
 
-					String outJson = execute(context, functionName, args);
 					String lat = (String) origRow.get("lat");
 					String lon = (String) origRow.get("lon");
-					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outJson));
+					boolean where = false;
+					if (whereFun != null && !whereFun.trim().isEmpty()) {
+						List<Object> whereArgs = getArgs(whereParams);
+						whereArgs.add(0, jsColumns);
+						whereArgs.add(0, jsRow);
+
+						String boolJson = execute(context, whereFun, whereArgs);
+						where = Boolean.parseBoolean(boolJson);
+					}
+
+					String outputJson = null;
+					if (where) {
+						outputJson = execute(context, selectFun, selectArgs);
+					}
+					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outputJson));
 				}
 				return results;
 			}
@@ -321,8 +311,39 @@ public abstract class UtilService {
 		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to execute script function '" + functionName + "': " + (e.getMessage() == null ? e.toString() : e.getMessage()), e);
+			throw new RuntimeException("Failed to execute script function '" + selectFun + "': " +
+					(e.getMessage() == null ? e.toString() : e.getMessage()), e);
 		}
+	}
+
+	private List<Object> getArgs(String[] selectParams) {
+		List<Object> args = new ArrayList<>();
+		if (selectParams != null) {
+			for (String p : new ArrayList<>(Arrays.asList(selectParams)).subList(Math.min(2, selectParams.length), selectParams.length)) {
+				if (p == null) {
+					args.add(null);
+					continue;
+				}
+				String t = p.trim();
+				// Convert to number if it looks numeric; otherwise pass as string
+				if (t.matches("^-?\\d+$")) {
+					try {
+						args.add(Long.parseLong(t));
+					} catch (NumberFormatException ex) {
+						args.add(t);
+					}
+				} else if (t.matches("^-?\\d*\\.\\d+(?:[eE]-?\\d+)?$")) {
+					try {
+						args.add(Double.parseDouble(t));
+					} catch (NumberFormatException ex) {
+						args.add(t);
+					}
+				} else {
+					args.add(p);
+				}
+			}
+		}
+		return args;
 	}
 
 	private String execute(Context context, String functionName, List<Object> args) throws IOException {
@@ -332,12 +353,15 @@ public abstract class UtilService {
 			throw new IllegalArgumentException("Function not found or not executable: " + functionName);
 		}
 		org.graalvm.polyglot.Value result = fn.execute(args.toArray());
+		if (result.isBoolean()) {
+			return String.valueOf(result.asBoolean());
+		}
 
 		if (result.hasArrayElements()) {
 			org.graalvm.polyglot.Value stringify = context.eval("js", "JSON.stringify");
 			return stringify.execute(result).asString();
 		}
-		return objectMapper.writeValueAsString(new String[] {result.asString()});
+		return objectMapper.writeValueAsString(new String[]{result.asString()});
 	}
 
 	protected record RowAddress(LatLon point, Map<String, Object> row, String output) {

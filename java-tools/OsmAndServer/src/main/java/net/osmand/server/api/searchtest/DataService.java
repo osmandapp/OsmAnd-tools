@@ -1,14 +1,15 @@
 package net.osmand.server.api.searchtest;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
+import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
+import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
+import net.osmand.server.api.searchtest.repo.RunRepository;
 import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
@@ -34,10 +35,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public abstract class DataService extends UtilService {
-	protected final DatasetRepository datasetRepository;
+	protected final DatasetRepository datasetRepo;
 	protected final TestCaseRepository testCaseRepo;
+	protected final RunRepository runRepo;
 	protected final JdbcTemplate jdbcTemplate;
 	protected final EntityManager em;
+
 	final String REPORT_SQL = "WITH result AS (" +
 			"    SELECT" +
 			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS web_type," +
@@ -55,7 +58,7 @@ public abstract class DataService extends UtilService {
 			"                                                                                AS is_addr_match," +
 			"        ((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
 			"         CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
-			"    FROM run_result AS r WHERE case_id = ? ORDER BY actual_place, min_distance" +
+			"    FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance" +
 			") " +
 			"SELECT" +
 			"    CASE" +
@@ -72,14 +75,15 @@ public abstract class DataService extends UtilService {
 			" row " +
 			"FROM result";
 
-	public DataService(EntityManager em, DatasetRepository datasetRepository, TestCaseRepository testCaseRepo,
+	public DataService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo, RunRepository runRepo,
 					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 					   ObjectMapper objectMapper) {
 		super(webClientBuilder, objectMapper);
 
 		this.em = em;
 		this.testCaseRepo = testCaseRepo;
-		this.datasetRepository = datasetRepository;
+		this.datasetRepo = datasetRepo;
+		this.runRepo = runRepo;
 		this.jdbcTemplate = jdbcTemplate;
 	}
 
@@ -96,7 +100,7 @@ public abstract class DataService extends UtilService {
 			}
 			if (!Files.exists(fullPath)) {
 				dataset.setError("File is not existed.");
-				datasetRepository.save(dataset);
+				datasetRepo.save(dataset);
 				return dataset;
 			}
 
@@ -104,7 +108,7 @@ public abstract class DataService extends UtilService {
 			String header = getHeader(fullPath);
 			if (header == null || header.trim().isEmpty()) {
 				dataset.setError("File doesn't have header.");
-				datasetRepository.save(dataset);
+				datasetRepo.save(dataset);
 				return dataset;
 			}
 
@@ -118,7 +122,7 @@ public abstract class DataService extends UtilService {
 				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
 				LOGGER.error("{} Header: {}", error, String.join(",", headers));
 				dataset.setError(error);
-				datasetRepository.save(dataset);
+				datasetRepo.save(dataset);
 				return dataset;
 			}
 
@@ -133,12 +137,12 @@ public abstract class DataService extends UtilService {
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
-			return datasetRepository.save(dataset);
+			return datasetRepo.save(dataset);
 		} catch (Exception e) {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
 
 			LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
-			return datasetRepository.save(dataset);
+			return datasetRepo.save(dataset);
 		} finally {
 			if (dataset.type == Dataset.Source.Overpass) {
 				try {
@@ -155,21 +159,21 @@ public abstract class DataService extends UtilService {
 	@Async
 	public CompletableFuture<Dataset> createDataset(Dataset dataset) {
 		return CompletableFuture.supplyAsync(() -> {
-			Optional<Dataset> datasetOptional = datasetRepository.findByName(dataset.name);
+			Optional<Dataset> datasetOptional = datasetRepo.findByName(dataset.name);
 			if (datasetOptional.isPresent()) {
 				throw new RuntimeException("Dataset is already created: " + dataset.name);
 			}
 
 			dataset.created = LocalDateTime.now();
 			dataset.updated = dataset.created;
-			return checkDatasetInternal(datasetRepository.save(dataset), true);
+			return checkDatasetInternal(datasetRepo.save(dataset), true);
 		});
 	}
 
 	@Async
 	public CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset = datasetRepository.findById(id).orElseThrow(() ->
+			Dataset dataset = datasetRepo.findById(id).orElseThrow(() ->
 					new RuntimeException("Dataset not found with id: " + id));
 
 			updates.forEach((key, value) -> {
@@ -184,22 +188,26 @@ public abstract class DataService extends UtilService {
 
 			dataset.updated = LocalDateTime.now();
 			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
-			datasetRepository.save(dataset);
+			datasetRepo.save(dataset);
 			return checkDatasetInternal(dataset, reload);
 		});
 	}
 
 	protected void saveCaseResults(TestCase test, RowAddress data, long duration, String error) throws IOException {
 		String sql =
-				"INSERT INTO gen_result (case_id, dataset_id, row, output, error, duration, lat, lon, timestamp) " +
-						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"INSERT INTO gen_result (sequence, case_id, dataset_id, row, query, error, duration, lat, lon, timestamp) " +
+						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(data.row());
-		jdbcTemplate.update(sql, test.id, test.datasetId, rowJson, data.output(), error, duration,
-				data.point().getLatitude(), data.point().getLongitude(),
-				new java.sql.Timestamp(System.currentTimeMillis()));
+		String[] outputArray = objectMapper.readValue(data.output(), String[].class);
+		int sequence = 0;
+		for (String query : outputArray) {
+			jdbcTemplate.update(sql, sequence++, test.id, test.datasetId, rowJson, query, error, duration,
+					data.point().getLatitude(), data.point().getLongitude(),
+					new java.sql.Timestamp(System.currentTimeMillis()));
+		}
 	}
 
-	protected void saveRunResults(TestCase test, int sequence, String output, Map<String, Object> row,
+	protected void saveRunResults(long resultId, Run run, String output, Map<String, Object> row,
 								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
@@ -238,23 +246,31 @@ public abstract class DataService extends UtilService {
 				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
 		}
 
-		String insertSql =
-				"INSERT INTO run_result (case_id, dataset_id, row, error, duration, results_count, " +
-						"min_distance, closest_result, sequence, address, lat, lon, actual_place, timestamp) VALUES (?, ?, ?, ?,"
-						+ " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String sql = "INSERT INTO run_result (gen_id, run_id, case_id, query, row, error, duration, results_count, " +
+						"min_distance, closest_result, actual_place, lat, lon, timestamp) "+
+						"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
 		String rowJson = objectMapper.writeValueAsString(row);
-		jdbcTemplate.update(insertSql, test.id, test.datasetId, rowJson, error, duration, resultsCount, minDistance,
-				closestResult, sequence, output, targetPoint == null ? null : targetPoint.getLatitude(),
-				targetPoint == null ? null : targetPoint.getLongitude(), actualPlace,
+		jdbcTemplate.update(sql, resultId, run.id, run.caseId, output, rowJson, error, duration, resultsCount,
+				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
+				targetPoint == null ? null : targetPoint.getLongitude(),
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
 
+	/**
+	 * Find all datasets matching the given filters.
+	 * @param name Case-insensitive search for the dataset name.
+	 * @param labels Case-insensitive search for comma-separated labels associated with the dataset.
+	 * @param status Limits the results to datasets with the given status.
+	 * @param pageable Pageable request defining the page number and size.
+	 * @return Page of matching datasets.
+	 */
 	public Page<Dataset> getDatasets(String name, String labels, String status, Pageable pageable) {
-		return datasetRepository.findAllDatasets(name, labels, status, pageable);
+		return datasetRepo.findAllDatasets(name, labels, status, pageable);
 	}
 
 	public String getDatasetSample(Long datasetId) {
-		Dataset dataset = datasetRepository.findById(datasetId).orElseThrow(() ->
+		Dataset dataset = datasetRepo.findById(datasetId).orElseThrow(() ->
 				new RuntimeException("Dataset not found with id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
@@ -283,7 +299,7 @@ public abstract class DataService extends UtilService {
 	}
 
 	public boolean deleteDataset(Long datasetId) {
-		Optional<Dataset> dsOpt = datasetRepository.findById(datasetId);
+		Optional<Dataset> dsOpt = datasetRepo.findById(datasetId);
 		if (dsOpt.isEmpty()) {
 			return false;
 		}
@@ -293,14 +309,11 @@ public abstract class DataService extends UtilService {
 		String deleteSql = "DELETE FROM run_result WHERE dataset_id = ?";
 		jdbcTemplate.update(deleteSql, datasetId);
 
-		deleteSql = "DELETE FROM gen_result WHERE dataset_id = ?";
-		jdbcTemplate.update(deleteSql, datasetId);
-
 		deleteSql = "DELETE FROM test_case WHERE dataset_id = ?";
 		jdbcTemplate.update(deleteSql, datasetId);
 
 		Dataset ds = dsOpt.get();
-		datasetRepository.delete(ds);
+		datasetRepo.delete(ds);
 		return true;
 	}
 
@@ -348,28 +361,25 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<TestCaseStatus> getTestCaseStatus(Long caseId) {
+	public Optional<RunStatus> getTestCaseStatus(Long cased) {
 		String sql = """
-				SELECT (select status from test_case where id = ?) AS status,
+				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
-				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
-				    count(*) FILTER (WHERE address IS NULL or trim(address) = '') AS empty,
-				    count(*) FILTER (WHERE min_distance IS NULL and address IS NOT NULL and trim(address) != '') AS no_result
+				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS empty
 				FROM
-				    run_result
+				    gen_result
 				WHERE
 				    case_id = ?
 				""";
-
 		try {
-			Map<String, Object> result = jdbcTemplate.queryForMap(sql, caseId, caseId);
-			long total = ((Number) result.get("total")).longValue();
-
+			Map<String, Object> result = jdbcTemplate.queryForMap(sql, cased);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
+
+			long total = ((Number) result.get("total")).longValue();
 
 			Number number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
@@ -377,13 +387,48 @@ public abstract class DataService extends UtilService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("average_place"));
+			RunStatus report = new RunStatus(TestCase.Status.valueOf(status), 0, total, failed,	duration, 0.0, null);
+			return Optional.of(report);
+		} catch (EmptyResultDataAccessException ee) {
+			return Optional.empty();
+		}
+	}
+
+	public Optional<RunStatus> getRunStatus(Long runId) {
+		String sql = """
+				SELECT (select status from test_case where id = case_id) AS status,
+				    count(*) AS total,
+				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
+				    sum(duration) AS duration,
+				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
+				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS empty,
+				    count(*) FILTER (WHERE min_distance IS NULL and query IS NOT NULL and trim(query) != '') AS no_result
+				FROM
+				    run_result
+				WHERE
+				    run_id = ?
+				""";
+		try {
+			Map<String, Object> result = jdbcTemplate.queryForMap(sql, runId);
+			String status = (String) result.get("status");
+			if (status == null)
+				status = TestCase.Status.NEW.name();
+
+			Number number = ((Number) result.get("average_place"));
 			double averagePlace = number == null ? 0.0 : number.doubleValue();
 
 			number = ((Number) result.get("no_result"));
 			long noResult = number == null ? 0 : number.longValue();
 
-			TestCaseStatus report = new TestCaseStatus(TestCase.Status.valueOf(status), noResult, total, failed,
+			long total = ((Number) result.get("total")).longValue();
+
+			number = ((Number) result.get("failed"));
+			long failed = number == null ? 0 : number.longValue();
+
+			number = ((Number) result.get("duration"));
+			long duration = number == null ? 0 : number.longValue();
+
+			RunStatus report = new RunStatus(TestCase.Status.valueOf(status), noResult, total, failed,
 					duration, averagePlace, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
@@ -391,8 +436,8 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	public Optional<TestCaseStatus> getRunReport(Long caseId, int placeLimit, int distLimit) {
-		Optional<TestCaseStatus> opt = getTestCaseStatus(caseId);
+	public Optional<RunStatus> getRunReport(Long caseId, int placeLimit, int distLimit) {
+		Optional<RunStatus> opt = getRunStatus(caseId);
 		if (opt.isEmpty()) {
 			return Optional.empty();
 		}
@@ -411,8 +456,8 @@ public abstract class DataService extends UtilService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		TestCaseStatus metric = opt.get();
-		metric = new TestCaseStatus(metric.status(), metric.noResult(), metric.processed(),
+		RunStatus metric = opt.get();
+		metric = new RunStatus(metric.status(), metric.noResult(), metric.processed(),
 				metric.failed(), metric.duration(), metric.averagePlace(), distanceHistogram);
 		return Optional.of(metric);
 	}

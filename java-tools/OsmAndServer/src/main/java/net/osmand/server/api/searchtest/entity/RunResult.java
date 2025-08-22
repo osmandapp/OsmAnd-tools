@@ -1,44 +1,18 @@
 package net.osmand.server.api.searchtest.entity;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.sql.Timestamp;
-import java.util.Map;
 
 @Entity
 @Table(name = "run_result")
-public class RunResult {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(columnDefinition = "INTEGER")
-	public Long id;
+public class RunResult extends Result {
 
-	@Column(name = "case_id", nullable = false)
-	public Long caseId;
+	@Column(name = "run_id", nullable = false)
+	public Long runId;
 
-	@Column(name = "dataset_id", nullable = false)
-	public Long datasetId;
-
-	@Column(nullable = false)
-	public Integer sequence;
-
-	@JdbcTypeCode(SqlTypes.JSON)
-	@Column
-	public Map<String, String> row;
-
-	@Column(columnDefinition = "TEXT")
-	public String error;
-
-	@Column
-	public Integer duration;
-
-	@Column(nullable = false)
-	public Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-
-	@Column(length = 512)
-	public String address;
+	@Column(name = "gen_id", nullable = false)
+	public Long genId;
 
 	@Column(name = "min_distance")
 	public Integer minDistance;
@@ -51,10 +25,4 @@ public class RunResult {
 
 	@Column(name = "results_count")
 	public Integer resultsCount;
-
-	@Column
-	public Double lat;
-
-	@Column
-	public Double lon;
 }

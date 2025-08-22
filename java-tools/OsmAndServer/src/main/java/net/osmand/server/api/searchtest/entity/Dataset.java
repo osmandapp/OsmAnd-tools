@@ -35,7 +35,7 @@ public class Dataset {
 	public String source; // Overpass query or file path
 
 	@Column(columnDefinition = "TEXT")
-	protected String error;
+	private String error;
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name="all_cols", columnDefinition = "TEXT")
@@ -78,7 +78,7 @@ public class Dataset {
 		if (error != null) {
 			sourceStatus = ConfigStatus.ERROR;
 		}
-		this.error = error;
+		this.error = error == null ? null : error.substring(0, 256);
 	}
 
 	public ConfigStatus getSourceStatus() {

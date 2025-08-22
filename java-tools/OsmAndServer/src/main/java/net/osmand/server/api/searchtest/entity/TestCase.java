@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @Table(name = "test_case")
 public class TestCase extends Config {
 	public enum Status {
-		NEW, GENERATED, RUNNING, COMPLETED, CANCELED, FAILED
+		NEW, GENERATED, FAILED
 	}
 
 	@Id
@@ -54,6 +54,6 @@ public class TestCase extends Config {
 		if (error != null) {
 			status = TestCase.Status.FAILED;
 		}
-		this.error = error;
+		this.error = error == null ? null : error.substring(0, 256);
 	}
 }

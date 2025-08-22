@@ -4,7 +4,7 @@ import net.osmand.server.api.searchtest.entity.TestCase;
 
 import java.util.Map;
 
-public record TestCaseStatus(
+public record RunStatus(
 		TestCase.Status status,
 		long noResult,
 		long processed,

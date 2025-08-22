@@ -7,9 +7,6 @@ public record GenParam(
         String selectFun,
         String whereFun,
         String[] columns,
-        // Legacy single params array (maps to select function when used)
-        String[] paramValues,
-        // New fields: separate params for select/where
         String[] selectParamValues,
         String[] whereParamValues
 ) {
