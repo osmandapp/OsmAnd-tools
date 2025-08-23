@@ -8,6 +8,7 @@ import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
+import net.osmand.server.api.searchtest.dto.TestStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.RunParam;
@@ -345,11 +346,11 @@ public class SearchTestService extends DataService {
 		List<TestCaseItem> items = new ArrayList<>(content.size());
 		for (TestCase tc : content) {
 			String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
-			Optional<RunStatus> tcOpt = getTestCaseStatus(tc.id);
+			Optional<TestStatus> tcOpt = getTestCaseStatus(tc.id);
 			if (tcOpt.isEmpty())
 				continue;
 
-			RunStatus tcStatus = tcOpt.get();
+			TestStatus tcStatus = tcOpt.get();
 			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, tc.status, tc.updated,
 					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
 		}

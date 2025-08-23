@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
+import net.osmand.server.api.searchtest.dto.TestStatus;
 import net.osmand.server.api.searchtest.entity.RunParam;
 import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -63,7 +64,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getTestCaseStatus(@PathVariable Long caseId) {
+	public ResponseEntity<TestStatus> getTestCaseStatus(@PathVariable Long caseId) {
 		return testSearchService.getTestCaseStatus(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.dto.RunStatus;
+import net.osmand.server.api.searchtest.dto.TestStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
@@ -44,7 +45,7 @@ public abstract class DataService extends BaseService {
 	final String REPORT_SQL = "WITH result AS (" +
 			"    SELECT" +
 			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS web_type," +
-			"        lat, lon, address, closest_result, min_distance, actual_place, results_count, row," +
+			"        lat, lon, query, closest_result, min_distance, actual_place, results_count, row," +
 			"        actual_place <= ?                                                       AS is_place," +
 			"        min_distance <= ?                                                       AS is_dist," +
 			"        CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id," +
@@ -52,9 +53,9 @@ public abstract class DataService extends BaseService {
 			"        COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1," +
 			"        COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2," +
 			"        CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
-			"        (address LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'" +
-			"            AND address LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')" +
+			"        (query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'" +
+			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'" +
+			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')" +
 			"                                                                                AS is_addr_match," +
 			"        ((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
 			"         CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
@@ -62,7 +63,7 @@ public abstract class DataService extends BaseService {
 			") " +
 			"SELECT" +
 			"    CASE" +
-			"        WHEN address IS NULL OR trim(address) = '' THEN 'Empty'" +
+			"        WHEN query IS NULL OR trim(query) = '' THEN 'Empty'" +
 			"        WHEN is_place AND is_dist THEN 'Found'" +
 			"        WHEN NOT is_place AND is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND " +
 			"is_addr_match)" +
@@ -71,7 +72,7 @@ public abstract class DataService extends BaseService {
 			"is_addr_match)" +
 			"            THEN 'Too Far'" +
 			"        ELSE 'Not Found'" +
-			"END AS \"group\", web_type, lat, lon, address, actual_place, closest_result, min_distance, results_count," +
+			"END AS \"group\", web_type, lat, lon, query, actual_place, closest_result, min_distance, results_count," +
 			" row " +
 			"FROM result";
 
@@ -361,13 +362,13 @@ public abstract class DataService extends BaseService {
 		}
 	}
 
-	public Optional<RunStatus> getTestCaseStatus(Long cased) {
+	public Optional<TestStatus> getTestCaseStatus(Long cased) {
 		String sql = """
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS empty
+				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS noResult
 				FROM
 				    gen_result
 				WHERE
@@ -387,7 +388,10 @@ public abstract class DataService extends BaseService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			RunStatus report = new RunStatus(TestCase.Status.valueOf(status), 0, total, failed,	duration, 0.0, null);
+			number = ((Number) result.get("noResult"));
+			long noResult = number == null ? 0 : number.longValue();
+
+			TestStatus report = new TestStatus(TestCase.Status.valueOf(status), noResult, total, failed, duration);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
@@ -396,7 +400,7 @@ public abstract class DataService extends BaseService {
 
 	public Optional<RunStatus> getRunStatus(Long runId) {
 		String sql = """
-				SELECT (select status from test_case where id = case_id) AS status,
+				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
@@ -428,8 +432,11 @@ public abstract class DataService extends BaseService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			RunStatus report = new RunStatus(TestCase.Status.valueOf(status), noResult, total, failed,
-					duration, averagePlace, null);
+			number = ((Number) result.get("empty"));
+			long empty = number == null ? 0 : number.longValue();
+
+			RunStatus report = new RunStatus(Run.Status.valueOf(status), noResult, total, failed,
+					duration, averagePlace, empty, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
@@ -456,10 +463,10 @@ public abstract class DataService extends BaseService {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		RunStatus metric = opt.get();
-		metric = new RunStatus(metric.status(), metric.noResult(), metric.processed(),
-				metric.failed(), metric.duration(), metric.averagePlace(), distanceHistogram);
-		return Optional.of(metric);
+		RunStatus status = opt.get();
+		status = new RunStatus(status.status(), status.noResult(), status.processed(),
+				status.failed(), status.duration(), status.averagePlace(), status.empty(), distanceHistogram);
+		return Optional.of(status);
 	}
 
 	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {

@@ -1,13 +1,16 @@
 package net.osmand.server.api.searchtest.dto;
 
+import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
 
 import java.util.Map;
 
 public record RunStatus(
-		TestCase.Status status,
+		Run.Status status,
 		long noResult,
 		long processed,
 		long failed,
 		long duration,
-		double averagePlace, Map<String, Number> distanceHistogram) {}
+		double averagePlace,
+		long empty,
+		Map<String, Number> distanceHistogram) {}
