@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public abstract class DataService extends UtilService {
+public abstract class DataService extends BaseService {
 	protected final DatasetRepository datasetRepo;
 	protected final TestCaseRepository testCaseRepo;
 	protected final RunRepository runRepo;
@@ -207,7 +207,7 @@ public abstract class DataService extends UtilService {
 		}
 	}
 
-	protected void saveRunResults(long resultId, Run run, String output, Map<String, Object> row,
+	protected void saveRunResults(long resultId, int sequence, Run run, String output, Map<String, Object> row,
 								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
@@ -246,12 +246,12 @@ public abstract class DataService extends UtilService {
 				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
 		}
 
-		String sql = "INSERT INTO run_result (gen_id, run_id, case_id, query, row, error, duration, results_count, " +
+		String sql = "INSERT INTO run_result (gen_id, sequence, dataset_id, run_id, case_id, query, row, error, duration, results_count, " +
 						"min_distance, closest_result, actual_place, lat, lon, timestamp) "+
-						"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+						"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = objectMapper.writeValueAsString(row);
-		jdbcTemplate.update(sql, resultId, run.id, run.caseId, output, rowJson, error, duration, resultsCount,
+		jdbcTemplate.update(sql, resultId, sequence, run.datasetId, run.id, run.caseId, output, rowJson, error, duration, resultsCount,
 				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
 				targetPoint == null ? null : targetPoint.getLongitude(),
 				new java.sql.Timestamp(System.currentTimeMillis()));

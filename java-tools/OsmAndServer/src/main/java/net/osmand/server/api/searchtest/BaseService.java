@@ -27,7 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
-public abstract class UtilService {
+public abstract class BaseService {
 	protected static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 	protected final ObjectMapper objectMapper;
 	private final WebClient.Builder webClientBuilder;
@@ -40,7 +40,7 @@ public abstract class UtilService {
 	private String overpassApiUrl;
 	private Engine polyglotEngine;
 
-	public UtilService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+	public BaseService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
 		this.webClientBuilder = webClientBuilder;
 		this.objectMapper = objectMapper;
 	}

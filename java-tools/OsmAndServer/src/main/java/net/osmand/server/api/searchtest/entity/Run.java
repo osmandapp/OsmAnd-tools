@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "run")
-public class Run {
+public class Run extends RunParam {
 	public enum Status {
 		NEW, RUNNING, COMPLETED, CANCELED, FAILED
 	}
@@ -21,6 +21,9 @@ public class Run {
 	@Column(name = "case_id", nullable = false)
 	public Long caseId;
 
+	@Column(name = "dataset_id", nullable = false)
+	public Long datasetId;
+
 	@CreationTimestamp
 	public LocalDateTime timestamp;
 
@@ -28,23 +31,6 @@ public class Run {
 	@Column(nullable = false)
 	public Status status;
 
-	@Column
-	public String locale;
-
-	@Column(name = "base_search")
-	public Boolean baseSearch;
-
-	@Column(name = "north_west")
-	private String northWest;
-
-	@Column(name = "south_east")
-	private String southEast;
-
-	@Column()
-	public Double lat;
-
-	@Column()
-	public Double lon;
 
 	@CreationTimestamp
 	public LocalDateTime created;
@@ -64,21 +50,5 @@ public class Run {
 			status = Status.FAILED;
 		}
 		this.error = error == null ? null : error.substring(0, 256);
-	}
-
-	public String getNorthWest() {
-		return northWest;
-	}
-
-	public void setNorthWest(String val) {
-		this.northWest = val != null && val.trim().isEmpty() ? null : val;
-	}
-
-	public String getSouthEast() {
-		return southEast;
-	}
-
-	public void setSouthEast(String val) {
-		this.southEast = val != null && val.trim().isEmpty() ? null : val;
 	}
 }

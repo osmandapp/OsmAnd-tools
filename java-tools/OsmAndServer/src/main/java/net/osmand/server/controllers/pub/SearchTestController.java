@@ -3,7 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.RunParam;
+import net.osmand.server.api.searchtest.entity.RunParam;
 import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
@@ -49,6 +49,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getRuns(caseId, pageable));
 	}
 
+	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<RunStatus> getRunStatus(@PathVariable Long runId) {
+		return testSearchService.getRunStatus(runId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
 	@GetMapping(value = "/cases/{caseId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<TestCase> getTestCase(@PathVariable Long caseId) {
@@ -59,12 +65,6 @@ public class SearchTestController {
 	@ResponseBody
 	public ResponseEntity<RunStatus> getTestCaseStatus(@PathVariable Long caseId) {
 		return testSearchService.getTestCaseStatus(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
-	}
-
-	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<RunStatus> getRunStatus(@PathVariable Long runId) {
-		return testSearchService.getRunStatus(runId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/cases", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 
 import jakarta.persistence.EntityManagerFactory;
+import net.osmand.server.api.searchtest.repo.RunRepository;
 import net.osmand.server.api.searchtest.repo.TestCaseRepository;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import org.apache.commons.logging.Log;
@@ -26,7 +27,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableJpaRepositories(
         basePackages = "net.osmand.server",
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                classes = {DatasetRepository.class, TestCaseRepository.class}),
+                classes = {DatasetRepository.class, TestCaseRepository.class, RunRepository.class}),
         entityManagerFactoryRef = "entityManagerFactory")
 public class DatasourceConfiguration {
 

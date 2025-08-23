@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
-import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.RunParam;
 import net.osmand.server.api.searchtest.dto.RunStatus;
+import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
+import net.osmand.server.api.searchtest.entity.RunParam;
 import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.searchtest.repo.DatasetRepository;
 import net.osmand.server.api.searchtest.repo.RunRepository;
@@ -33,7 +33,6 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 @Service
 public class SearchTestService extends DataService {
@@ -190,20 +189,30 @@ public class SearchTestService extends DataService {
 		Run run = new Run();
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
-		String locale = payload.locale();
+		run.datasetId = test.datasetId;
+		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
 		}
 		run.locale = locale;
-		run.setNorthWest(payload.northWest());
-		run.setSouthEast(payload.southEast());
-		run.baseSearch = payload.baseSearch();
+		run.setNorthWest(payload.getNorthWest());
+		run.setSouthEast(payload.getSouthEast());
+		run.baseSearch = payload.baseSearch;
 		// Persist optional lat/lon overrides if provided
-		run.lat = payload.lat();
-		run.lon = payload.lon();
+		run.lat = payload.lat;
+		run.lon = payload.lon;
 		run.created = LocalDateTime.now();
 		run.updated = run.created;
 		run = runRepo.save(run);
+
+		test.lastRunId = run.id;
+		test.locale = run.locale;
+		test.setNorthWest(run.getNorthWest());
+		test.setSouthEast(run.getSouthEast());
+		test.baseSearch = run.baseSearch;
+		test.lat = run.lat;
+		test.lon = run.lon;
+		testCaseRepo.save(test);
 
 		Run finalRun = run;
 		CompletableFuture.runAsync(() -> run(finalRun));
@@ -211,7 +220,8 @@ public class SearchTestService extends DataService {
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, output FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
+		String sql = String.format("SELECT id, lat, lon, row, query, sequence FROM gen_result WHERE case_id = %d ORDER BY id",
+				run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			for (Map<String, Object> row : rows) {
@@ -220,8 +230,7 @@ public class SearchTestService extends DataService {
 					status = jdbcTemplate.queryForObject("SELECT status FROM run WHERE id = ?", String.class, run.id);
 				} catch (EmptyResultDataAccessException ex) {
 					LOGGER.info("Run {} was deleted. Stopping execution.", run.id);
-					run = null;
-					break;
+					return;
 				}
 				if (!Run.Status.RUNNING.name().equals(status)) {
 					run.status = Run.Status.valueOf(status);
@@ -234,32 +243,32 @@ public class SearchTestService extends DataService {
 						new LatLon((Double) row.get("lat"), (Double) row.get("lon")) :
 						new LatLon(run.lat, run.lon);
 
-				Long id = (Long) row.get("id");
+				Integer id = (Integer) row.get("id");
 				String output = (String) row.get("output");
-				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
+				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {
+				});
+				int sequence = (Integer) row.get("sequence");
 				try {
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
 							output, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
-					saveRunResults(id, run, output, mapRow, searchResults, point,
+					saveRunResults(id, sequence, run, output, mapRow, searchResults, point,
 							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(id, run, output, mapRow, Collections.emptyList(), point,
+					saveRunResults(id, sequence, run, output, mapRow, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}
 			}
-			if (run != null && run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
+			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
 				run.status = Run.Status.COMPLETED;
 			}
 		} catch (Exception e) {
 			LOGGER.error("Evaluation failed for test-case {}", run.id, e);
 			run.setError(e.getMessage());
 		} finally {
-			if (run != null) {
-				run.timestamp = LocalDateTime.now();
-				runRepo.save(run);
-			}
+			run.timestamp = LocalDateTime.now();
+			runRepo.save(run);
 		}
 	}
 
@@ -307,46 +316,46 @@ public class SearchTestService extends DataService {
 		return testCaseRepo.findById(id);
 	}
 
-    public Page<TestCaseItem> getAllTestCases(String name, String labels, String status, Pageable pageable) {
-        String normalizedStatus = null;
-        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
-            normalizedStatus = status.toUpperCase();
-        } else {
-            // Use empty string to disable status filtering in native query
-            normalizedStatus = "";
-        }
-        Page<TestCase> page = testCaseRepo.findAllCasesFiltered(name, labels, normalizedStatus, pageable);
-        List<TestCase> content = page.getContent();
+	public Page<TestCaseItem> getAllTestCases(String name, String labels, String status, Pageable pageable) {
+		String normalizedStatus = null;
+		if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+			normalizedStatus = status.toUpperCase();
+		} else {
+			// Use empty string to disable status filtering in native query
+			normalizedStatus = "";
+		}
+		Page<TestCase> page = testCaseRepo.findAllCasesFiltered(name, labels, normalizedStatus, pageable);
+		List<TestCase> content = page.getContent();
 
-        // Collect dataset IDs and fetch names in batch
-        Set<Long> dsIds = new HashSet<>();
-        for (TestCase tc : content) {
-            if (tc.datasetId != null) dsIds.add(tc.datasetId);
-        }
+		// Collect dataset IDs and fetch names in batch
+		Set<Long> dsIds = new HashSet<>();
+		for (TestCase tc : content) {
+			if (tc.datasetId != null) dsIds.add(tc.datasetId);
+		}
 
-        Map<Long, String> dsNames = new HashMap<>();
-        if (!dsIds.isEmpty()) {
-            for (Dataset ds : datasetRepo.findAllById(dsIds)) {
-                if (ds != null && ds.id != null) {
-                    dsNames.put(ds.id, ds.name);
-                }
-            }
-        }
+		Map<Long, String> dsNames = new HashMap<>();
+		if (!dsIds.isEmpty()) {
+			for (Dataset ds : datasetRepo.findAllById(dsIds)) {
+				if (ds != null && ds.id != null) {
+					dsNames.put(ds.id, ds.name);
+				}
+			}
+		}
 
-        List<TestCaseItem> items = new ArrayList<>(content.size());
-        for (TestCase tc : content) {
-            String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
-            Optional<RunStatus> tcOpt = getTestCaseStatus(tc.id);
+		List<TestCaseItem> items = new ArrayList<>(content.size());
+		for (TestCase tc : content) {
+			String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
+			Optional<RunStatus> tcOpt = getTestCaseStatus(tc.id);
 			if (tcOpt.isEmpty())
 				continue;
 
 			RunStatus tcStatus = tcOpt.get();
-            items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, tc.status, tc.updated,
+			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, tc.status, tc.updated,
 					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
-        }
+		}
 
-        return new PageImpl<>(items, pageable, page.getTotalElements());
-    }
+		return new PageImpl<>(items, pageable, page.getTotalElements());
+	}
 
 	public Page<Run> getRuns(Long caseId, Pageable pageable) {
 		return runRepo.findByCaseId(caseId, pageable);

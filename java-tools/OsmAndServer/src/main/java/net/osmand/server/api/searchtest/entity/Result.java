@@ -34,7 +34,7 @@ public abstract class Result {
 	public Integer sequence;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(nullable = false, columnDefinition = "TEXT")
+	@Column(columnDefinition = "TEXT")
 	public String query;
 
 	@Column(nullable = false)
