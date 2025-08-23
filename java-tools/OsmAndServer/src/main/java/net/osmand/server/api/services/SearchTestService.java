@@ -6,7 +6,6 @@ import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
 import net.osmand.server.api.searchtest.dto.TestStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -132,8 +131,9 @@ public class SearchTestService extends DataService {
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			List<RowAddress> examples = execute(dataset.script, test, delCols, rows);
+			int sequence = 0;
 			for (RowAddress example : examples) {
-				saveCaseResults(test, example, 0, null);
+				saveCaseResults(test, sequence++, example);
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {
@@ -351,7 +351,8 @@ public class SearchTestService extends DataService {
 				continue;
 
 			TestStatus tcStatus = tcOpt.get();
-			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, tc.status, tc.updated,
+			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
+					tc.lastRunId, tc.status, tc.updated,
 					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
 		}
 
@@ -365,5 +366,9 @@ public class SearchTestService extends DataService {
 	@Async
 	public CompletableFuture<Void> deleteRun(Long id) {
 		return CompletableFuture.runAsync(() -> runRepo.deleteById(id));
+	}
+
+	public Optional<Run> getRun(Long id) {
+		return runRepo.findById(id);
 	}
 }

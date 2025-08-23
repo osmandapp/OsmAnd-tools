@@ -56,16 +56,16 @@ public class SearchTestController {
 		return testSearchService.getRunStatus(runId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
-	@GetMapping(value = "/cases/{caseId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<TestCase> getTestCase(@PathVariable Long caseId) {
-		return testSearchService.getTestCase(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
-	}
-
 	@GetMapping(value = "/cases/{caseId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<TestStatus> getTestCaseStatus(@PathVariable Long caseId) {
 		return testSearchService.getTestCaseStatus(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/cases/{caseId:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<TestCase> getTestCase(@PathVariable Long caseId) {
+		return testSearchService.getTestCase(caseId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/cases", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -148,26 +148,54 @@ public class SearchTestController {
 		}
 	}
 
-	@GetMapping(value = "/reports/{caseId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long caseId,
+	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId,
 												  @RequestParam(defaultValue = "10") Integer placeLimit,
 												  @RequestParam(defaultValue = "50") Integer distLimit) {
-		return testSearchService.getRunReport(caseId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+		return testSearchService.getRunReport(caseId, tc.lastRunId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
-	@GetMapping(value = "/reports/{caseId}/download")
-	public void downloadReport(@PathVariable Long caseId,
+	@GetMapping(value = "/runs/{runId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId,
+												  @RequestParam(defaultValue = "10") Integer placeLimit,
+												  @RequestParam(defaultValue = "50") Integer distLimit) {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		return testSearchService.getRunReport(run.caseId, runId, placeLimit, distLimit).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}/download")
+	public void downloadRunReport(@PathVariable Long runId,
 							   @RequestParam(defaultValue = "10") Integer placeLimit,
 							   @RequestParam(defaultValue = "50") Integer distLimit,
 							   @RequestParam(defaultValue = "csv") String format,
 							   HttpServletResponse response) throws IOException {
-
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
 		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
 		response.setContentType(contentType);
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, caseId, format);
+		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, run.caseId, runId, format);
+	}
+
+	@GetMapping(value = "/cases/{caseId}/download")
+	public void downloadTestCaseReport(@PathVariable Long caseId,
+							   @RequestParam(defaultValue = "10") Integer placeLimit,
+							   @RequestParam(defaultValue = "50") Integer distLimit,
+							   @RequestParam(defaultValue = "csv") String format,
+							   HttpServletResponse response) throws IOException {
+		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
+		response.setContentType(contentType);
+		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
+
+		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, caseId, tc.lastRunId, format);
 	}
 
 	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)

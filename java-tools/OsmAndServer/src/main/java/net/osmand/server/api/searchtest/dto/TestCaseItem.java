@@ -13,6 +13,7 @@ public class TestCaseItem {
     public String labels;
     public Long datasetId;
     public String datasetName;
+    public Long lastRunId;
     public TestCase.Status status;
     public LocalDateTime updated;
     public String error;
@@ -23,13 +24,14 @@ public class TestCaseItem {
     public TestCaseItem() {}
 
     public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-                        TestCase.Status status, LocalDateTime updated, String error,
+                        Long lastRunId, TestCase.Status status, LocalDateTime updated, String error,
                         long total, long failed, long duration) {
         this.id = id;
         this.name = name;
         this.labels = labels;
         this.datasetId = datasetId;
         this.datasetName = datasetName;
+        this.lastRunId = lastRunId;
         this.status = status;
         this.updated = updated;
         this.error = error;

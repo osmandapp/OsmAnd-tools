@@ -73,8 +73,8 @@ public abstract class DataService extends BaseService {
 			"            THEN 'Too Far'" +
 			"        ELSE 'Not Found'" +
 			"END AS \"group\", web_type, lat, lon, query, actual_place, closest_result, min_distance, results_count," +
-			" row " +
-			"FROM result";
+			" row, id " +
+			"FROM result UNION SELECT 'Generated' AS \"group\", '', lat, lon, query, 0, '', 0, 0, row, id FROM gen_result WHERE case_id = ? ORDER BY id";
 
 	public DataService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo, RunRepository runRepo,
 					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
@@ -194,15 +194,14 @@ public abstract class DataService extends BaseService {
 		});
 	}
 
-	protected void saveCaseResults(TestCase test, RowAddress data, long duration, String error) throws IOException {
+	protected void saveCaseResults(TestCase test, int sequence, RowAddress data) throws IOException {
 		String sql =
 				"INSERT INTO gen_result (sequence, case_id, dataset_id, row, query, error, duration, lat, lon, timestamp) " +
 						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(data.row());
 		String[] outputArray = objectMapper.readValue(data.output(), String[].class);
-		int sequence = 0;
 		for (String query : outputArray) {
-			jdbcTemplate.update(sql, sequence++, test.id, test.datasetId, rowJson, query, error, duration,
+			jdbcTemplate.update(sql, sequence, test.id, test.datasetId, rowJson, query, data.error(), data.duration(),
 					data.point().getLatitude(), data.point().getLongitude(),
 					new java.sql.Timestamp(System.currentTimeMillis()));
 		}
@@ -351,8 +350,8 @@ public abstract class DataService extends BaseService {
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
 
-	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, String format) throws IOException {
-		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, caseId);
+	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId, String format) throws IOException {
+		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, runId, caseId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeAsCsv(writer, results);
 		} else if ("json".equalsIgnoreCase(format)) {
@@ -443,13 +442,14 @@ public abstract class DataService extends BaseService {
 		}
 	}
 
-	public Optional<RunStatus> getRunReport(Long caseId, int placeLimit, int distLimit) {
-		Optional<RunStatus> opt = getRunStatus(caseId);
+	public Optional<RunStatus> getRunReport(Long caseId, Long runId, int placeLimit, int distLimit) {
+		Optional<RunStatus> opt = getRunStatus(runId);
 		if (opt.isEmpty()) {
 			return Optional.empty();
 		}
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
+		distanceHistogram.put("Generated", 0);
 		distanceHistogram.put("Empty", 0);
 		distanceHistogram.put("Found", 0);
 		distanceHistogram.put("Near", 0);
@@ -458,7 +458,7 @@ public abstract class DataService extends BaseService {
 		List<Map<String, Object>> results =
 				jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
 								"\"group\"",
-				placeLimit, distLimit, caseId);
+				placeLimit, distLimit, runId, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}

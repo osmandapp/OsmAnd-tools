@@ -265,6 +265,7 @@ public abstract class BaseService {
 
 				// 2) Prepare JS-native arguments
 				for (Map<String, Object> origRow : rows) {
+					long start = System.currentTimeMillis();
 					Map<String, Object> row = origRow;
 					if (!delCols.isEmpty()) {
 						row = new HashMap<>(origRow);
@@ -285,20 +286,33 @@ public abstract class BaseService {
 					String lat = (String) origRow.get("lat");
 					String lon = (String) origRow.get("lon");
 					boolean where = false;
+					String errorMessage = null;
 					if (whereFun != null && !whereFun.trim().isEmpty()) {
 						List<Object> whereArgs = getArgs(whereParams);
 						whereArgs.add(0, jsColumns);
 						whereArgs.add(0, jsRow);
-
-						String boolJson = execute(context, whereFun, whereArgs);
-						where = Boolean.parseBoolean(boolJson);
+						try {
+							String boolJson = execute(context, whereFun, whereArgs);
+							where = Boolean.parseBoolean(boolJson);
+						} catch (PolyglotException pe) {
+							// Capture JS error from where() and continue processing this row
+							errorMessage = extractJsErrorMessage(pe);
+						}
 					}
 
-					String outputJson = null;
+					String outputJson = "[]"; // safe default: no outputs
 					if (where) {
-						outputJson = execute(context, selectFun, selectArgs);
+						try {
+							outputJson = execute(context, selectFun, selectArgs);
+						} catch (PolyglotException pe) {
+							// Capture JS error from select() and persist a failed record with empty query
+							errorMessage = extractJsErrorMessage(pe);
+						}
+					} else {
+						outputJson = null;
 					}
-					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outputJson));
+					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outputJson, errorMessage,
+							System.currentTimeMillis() - start));
 				}
 				return results;
 			}
@@ -319,7 +333,8 @@ public abstract class BaseService {
 	private List<Object> getArgs(String[] selectParams) {
 		List<Object> args = new ArrayList<>();
 		if (selectParams != null) {
-			for (String p : new ArrayList<>(Arrays.asList(selectParams)).subList(Math.min(2, selectParams.length), selectParams.length)) {
+			for (String p : new ArrayList<>(Arrays.asList(selectParams)).subList(Math.min(2, selectParams.length),
+					selectParams.length)) {
 				if (p == null) {
 					args.add(null);
 					continue;
@@ -364,6 +379,33 @@ public abstract class BaseService {
 		return objectMapper.writeValueAsString(new String[]{result.asString()});
 	}
 
-	protected record RowAddress(LatLon point, Map<String, Object> row, String output) {
+	/**
+	 * Extracts a concise error message from a PolyglotException thrown by guest JS code.
+	 * If the guest object has a 'message' property, it is preferred; otherwise, the first line
+	 * of the exception message is returned.
+	 */
+	private String extractJsErrorMessage(PolyglotException pe) {
+		try {
+			if (pe.isGuestException()) {
+				org.graalvm.polyglot.Value guest = pe.getGuestObject();
+				if (guest != null && guest.hasMembers()) {
+					org.graalvm.polyglot.Value msg = guest.getMember("message");
+					if (msg != null && msg.isString()) {
+						return msg.asString();
+					}
+				}
+			}
+			String raw = pe.getMessage();
+			if (raw == null) {
+				return pe.toString();
+			}
+			int nl = raw.indexOf('\n');
+			return nl > 0 ? raw.substring(0, nl) : raw;
+		} catch (Throwable t) {
+			return pe.getMessage() == null ? pe.toString() : pe.getMessage();
+		}
+	}
+
+	protected record RowAddress(LatLon point, Map<String, Object> row, String output, String error, long duration) {
 	}
 }
