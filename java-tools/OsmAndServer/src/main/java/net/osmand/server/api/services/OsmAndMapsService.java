@@ -317,8 +317,6 @@ public class OsmAndMapsService {
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
-			if (ref == null)
-				continue;
 			BinaryMapIndexReader reader = null;
 			try {
 				reader = ref.getReader(cacheFiles, 1000);
