@@ -255,7 +255,7 @@ public class SubscriptionController {
         // empty means deleted (keep it)
         if (bitcoinAddress != null && bitcoinAddress.length() > 0 &&
         		!BTCAddrValidator.validate(bitcoinAddress) ) {
-        	return userSubService.error("Please validate bitcoin output.");
+        	return userSubService.error("Please validate bitcoin address.");
         }
         String osmUser = request.getParameter("osm_usr");
         if (isEmpty(osmUser)) {
@@ -267,7 +267,7 @@ public class SubscriptionController {
         }
         String email = request.getParameter("email");
         if (isEmpty(email) || !email.contains("@")) {
-        	return userSubService.error("Please validate your email output.");
+        	return userSubService.error("Please validate your email address.");
         }
         String username = processOsmUsername(osmUser);
         String credentials = encodeCredentialsToBase64(username, osmPassword);
