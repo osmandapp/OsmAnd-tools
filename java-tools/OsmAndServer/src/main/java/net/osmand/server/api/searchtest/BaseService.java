@@ -241,8 +241,8 @@ public abstract class BaseService {
 		});
 	}
 
-	protected List<RowAddress> execute(String script, TestCase test, List<String> delCols,
-									   List<Map<String, Object>> rows) throws Exception {
+	protected List<GenRow> execute(String script, TestCase test, List<String> delCols,
+								   List<Map<String, Object>> rows) throws Exception {
 		String selectFun = test.selectFun;
 		String whereFun = test.whereFun;
 		String columnsJson = test.selCols;
@@ -257,7 +257,7 @@ public abstract class BaseService {
 		}
 		try {
 			// Execute with GraalVM JavaScript (Polyglot API)
-			List<RowAddress> results = new ArrayList<>();
+			List<GenRow> results = new ArrayList<>();
 			try (Context context = Context.newBuilder("js").engine(polyglotEngine).option("js.ecmascript-version",
 					"2022").allowAllAccess(false).build()) {
 				// 1) Evaluate user script (should define the target function)
@@ -292,26 +292,26 @@ public abstract class BaseService {
 						whereArgs.add(0, jsColumns);
 						whereArgs.add(0, jsRow);
 						try {
-							String boolJson = execute(context, whereFun, whereArgs);
-							where = Boolean.parseBoolean(boolJson);
+							where = (Boolean) execute(context, whereFun, whereArgs);
 						} catch (PolyglotException pe) {
 							// Capture JS error from where() and continue processing this row
 							errorMessage = extractJsErrorMessage(pe);
 						}
 					}
 
-					String outputJson = "[]"; // safe default: no outputs
+					int count = -1;
+					String[] output = null;
 					if (where) {
 						try {
-							outputJson = execute(context, selectFun, selectArgs);
+							output = (String[]) execute(context, selectFun, selectArgs);
+							count = output.length;
 						} catch (PolyglotException pe) {
 							// Capture JS error from select() and persist a failed record with empty query
 							errorMessage = extractJsErrorMessage(pe);
 						}
-					} else {
-						outputJson = null;
 					}
-					results.add(new RowAddress(parseLatLon(lat, lon), origRow, outputJson, errorMessage,
+					String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
+					results.add(new GenRow(parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
 							System.currentTimeMillis() - start));
 				}
 				return results;
@@ -361,7 +361,7 @@ public abstract class BaseService {
 		return args;
 	}
 
-	private String execute(Context context, String functionName, List<Object> args) throws IOException {
+	private Object execute(Context context, String functionName, List<Object> args) throws IOException {
 		// 3) Resolve and invoke the target function
 		org.graalvm.polyglot.Value fn = context.getBindings("js").getMember(functionName);
 		if (fn == null || !fn.canExecute()) {
@@ -369,14 +369,14 @@ public abstract class BaseService {
 		}
 		org.graalvm.polyglot.Value result = fn.execute(args.toArray());
 		if (result.isBoolean()) {
-			return String.valueOf(result.asBoolean());
+			return result.asBoolean();
 		}
 
 		if (result.hasArrayElements()) {
 			org.graalvm.polyglot.Value stringify = context.eval("js", "JSON.stringify");
 			return stringify.execute(result).asString();
 		}
-		return objectMapper.writeValueAsString(new String[]{result.asString()});
+		return new String[]{result.asString()};
 	}
 
 	/**
@@ -406,6 +406,7 @@ public abstract class BaseService {
 		}
 	}
 
-	protected record RowAddress(LatLon point, Map<String, Object> row, String output, String error, long duration) {
+	protected record GenRow(LatLon point, Map<String, Object> row, String output, int count, String error,
+							long duration) {
 	}
 }

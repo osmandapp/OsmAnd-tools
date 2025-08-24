@@ -44,10 +44,10 @@ public abstract class DataService extends BaseService {
 
 	final String REPORT_SQL = "WITH result AS (" +
 			"    SELECT" +
-			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS web_type," +
-			"        lat, lon, query, closest_result, min_distance, actual_place, results_count, row," +
-			"        actual_place <= ?                                                       AS is_place," +
-			"        min_distance <= ?                                                       AS is_dist," +
+			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type," +
+			"        count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row," +
+			"        actual_place <= ?                                                  AS is_place," +
+			"        min_distance <= ?                                                  AS is_dist," +
 			"        CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id," +
 			"        COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name," +
 			"        COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1," +
@@ -56,27 +56,28 @@ public abstract class DataService extends BaseService {
 			"        (query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'" +
 			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'" +
 			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')" +
-			"                                                                                AS is_addr_match," +
+			"                                                                           AS is_addr_match," +
 			"        ((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
 			"         CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
 			"    FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance" +
 			") " +
-			"SELECT" +
-			"    CASE" +
-			"        WHEN query IS NULL OR trim(query) = '' THEN 'Empty'" +
+			"SELECT CASE" +
+			"        WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'" +
 			"        WHEN is_place AND is_dist THEN 'Found'" +
-			"        WHEN NOT is_place AND is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND " +
+			"        WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND " +
 			"is_addr_match)" +
 			"            THEN 'Near'" +
-			"        WHEN is_place AND NOT is_dist AND (web_type = 'POI' AND is_poi_match OR web_type <> 'POI' AND " +
+			"        WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND " +
 			"is_addr_match)" +
-			"            THEN 'Too Far'" +
-			"        ELSE 'Not Found'" +
-			"END AS \"group\", web_type, lat, lon, query, actual_place, closest_result, min_distance, results_count," +
-			" row, id " +
-			"FROM result UNION SELECT 'Generated' AS \"group\", '', lat, lon, query, 0, '', 0, 0, row, id FROM gen_result WHERE case_id = ? ORDER BY id";
+			"            THEN 'Too Far' ELSE 'Not Found'" +
+			"END AS \"group\", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row " +
+			"FROM result UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM " +
+			"(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'" +
+			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Applied' END as c2, lat, lon, query, row, id FROM" +
+			" gen_result WHERE case_id = ? ORDER BY id)";
 
-	public DataService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo, RunRepository runRepo,
+	public DataService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo,
+					   RunRepository runRepo,
 					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 					   ObjectMapper objectMapper) {
 		super(webClientBuilder, objectMapper);
@@ -194,20 +195,23 @@ public abstract class DataService extends BaseService {
 		});
 	}
 
-	protected void saveCaseResults(TestCase test, int sequence, RowAddress data) throws IOException {
+	protected void saveCaseResults(TestCase test, GenRow data) throws IOException {
 		String sql =
-				"INSERT INTO gen_result (sequence, case_id, dataset_id, row, query, error, duration, lat, lon, timestamp) " +
-						"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
+						"timestamp)" +
+						" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(data.row());
-		String[] outputArray = objectMapper.readValue(data.output(), String[].class);
+		String[] outputArray = data.output() == null || data.count() <= 0 ? new String[]{null} :
+				objectMapper.readValue(data.output(), String[].class);
 		for (String query : outputArray) {
-			jdbcTemplate.update(sql, sequence, test.id, test.datasetId, rowJson, query, data.error(), data.duration(),
+			jdbcTemplate.update(sql, data.count(), test.id, test.datasetId, rowJson, query, data.error(),
+					data.duration(),
 					data.point().getLatitude(), data.point().getLongitude(),
 					new java.sql.Timestamp(System.currentTimeMillis()));
 		}
 	}
 
-	protected void saveRunResults(long resultId, int sequence, Run run, String output, Map<String, Object> row,
+	protected void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
 								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
@@ -246,12 +250,15 @@ public abstract class DataService extends BaseService {
 				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
 		}
 
-		String sql = "INSERT INTO run_result (gen_id, sequence, dataset_id, run_id, case_id, query, row, error, duration, results_count, " +
-						"min_distance, closest_result, actual_place, lat, lon, timestamp) "+
-						"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String sql = "INSERT INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
+				"duration," +
+				" results_count, " +
+				"min_distance, closest_result, actual_place, lat, lon, timestamp) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = objectMapper.writeValueAsString(row);
-		jdbcTemplate.update(sql, resultId, sequence, run.datasetId, run.id, run.caseId, output, rowJson, error, duration, resultsCount,
+		jdbcTemplate.update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
+				resultsCount,
 				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
 				targetPoint == null ? null : targetPoint.getLongitude(),
 				new java.sql.Timestamp(System.currentTimeMillis()));
@@ -259,9 +266,10 @@ public abstract class DataService extends BaseService {
 
 	/**
 	 * Find all datasets matching the given filters.
-	 * @param name Case-insensitive search for the dataset name.
-	 * @param labels Case-insensitive search for comma-separated labels associated with the dataset.
-	 * @param status Limits the results to datasets with the given status.
+	 *
+	 * @param name     Case-insensitive search for the dataset name.
+	 * @param labels   Case-insensitive search for comma-separated labels associated with the dataset.
+	 * @param status   Limits the results to datasets with the given status.
 	 * @param pageable Pageable request defining the page number and size.
 	 * @return Page of matching datasets.
 	 */
@@ -350,8 +358,10 @@ public abstract class DataService extends BaseService {
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
 
-	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId, String format) throws IOException {
-		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, runId, caseId);
+	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
+								   String format) throws IOException {
+		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, runId,
+				caseId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeAsCsv(writer, results);
 		} else if ("json".equalsIgnoreCase(format)) {
@@ -366,8 +376,9 @@ public abstract class DataService extends BaseService {
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS noResult
+				    count(*) FILTER (WHERE (count = -1 or query IS NULL) and error IS NULL) AS filtered,
+				    count(*) FILTER (WHERE count = 0 or trim(query) = '') AS empty,
+				    sum(duration) AS duration
 				FROM
 				    gen_result
 				WHERE
@@ -387,10 +398,14 @@ public abstract class DataService extends BaseService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("noResult"));
-			long noResult = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("filtered"));
+			long filtered = number == null ? 0 : number.longValue();
 
-			TestStatus report = new TestStatus(TestCase.Status.valueOf(status), noResult, total, failed, duration);
+			number = ((Number) result.get("empty"));
+			long empty = number == null ? 0 : number.longValue();
+
+			TestStatus report = new TestStatus(TestCase.Status.valueOf(status), total, failed, filtered, empty,
+					duration);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
@@ -402,10 +417,9 @@ public abstract class DataService extends BaseService {
 				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
 				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
-				    count(*) FILTER (WHERE query IS NULL or trim(query) = '') AS empty,
-				    count(*) FILTER (WHERE min_distance IS NULL and query IS NOT NULL and trim(query) != '') AS no_result
+				    sum(duration) AS duration,
+				    count(*) FILTER (WHERE actual_place <= 10 and min_distance <= 50) AS found
 				FROM
 				    run_result
 				WHERE
@@ -420,9 +434,6 @@ public abstract class DataService extends BaseService {
 			Number number = ((Number) result.get("average_place"));
 			double averagePlace = number == null ? 0.0 : number.doubleValue();
 
-			number = ((Number) result.get("no_result"));
-			long noResult = number == null ? 0 : number.longValue();
-
 			long total = ((Number) result.get("total")).longValue();
 
 			number = ((Number) result.get("failed"));
@@ -431,11 +442,11 @@ public abstract class DataService extends BaseService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("empty"));
-			long empty = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("found"));
+			long found = number == null ? 0 : number.longValue();
 
-			RunStatus report = new RunStatus(Run.Status.valueOf(status), noResult, total, failed,
-					duration, averagePlace, empty, null);
+			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, failed,
+					duration, averagePlace, found, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			return Optional.empty();
@@ -450,22 +461,21 @@ public abstract class DataService extends BaseService {
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
 		distanceHistogram.put("Generated", 0);
-		distanceHistogram.put("Empty", 0);
+		distanceHistogram.put("Not Processed", 0);
 		distanceHistogram.put("Found", 0);
 		distanceHistogram.put("Near", 0);
 		distanceHistogram.put("Too Far", 0);
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
-								"\"group\"",
-				placeLimit, distLimit, runId, caseId);
+								"\"group\"", placeLimit, distLimit, runId, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
 		RunStatus status = opt.get();
-		status = new RunStatus(status.status(), status.noResult(), status.processed(),
-				status.failed(), status.duration(), status.averagePlace(), status.empty(), distanceHistogram);
+		status = new RunStatus(status.status(), status.processed(), status.failed(), status.duration(),
+				status.averagePlace(), status.found(), distanceHistogram);
 		return Optional.of(status);
 	}
 

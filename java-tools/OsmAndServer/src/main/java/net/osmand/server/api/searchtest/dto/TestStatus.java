@@ -6,7 +6,8 @@ import java.util.Map;
 
 public record TestStatus(
 		TestCase.Status status,
-		long noResult,
 		long processed,
 		long failed,
+		long filtered,
+		long empty,
 		long duration) {}

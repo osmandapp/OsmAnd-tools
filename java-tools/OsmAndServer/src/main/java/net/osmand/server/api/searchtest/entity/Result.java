@@ -31,7 +31,7 @@ public abstract class Result {
 	public Integer duration;
 
 	@Column(nullable = false)
-	public Integer sequence;
+	public Integer count;
 
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")

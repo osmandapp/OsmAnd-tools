@@ -7,10 +7,9 @@ import java.util.Map;
 
 public record RunStatus(
 		Run.Status status,
-		long noResult,
 		long processed,
 		long failed,
 		long duration,
 		double averagePlace,
-		long empty,
+		long found,
 		Map<String, Number> distanceHistogram) {}

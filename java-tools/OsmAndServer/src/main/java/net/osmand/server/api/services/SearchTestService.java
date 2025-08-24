@@ -130,10 +130,9 @@ public class SearchTestService extends DataService {
 
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<RowAddress> examples = execute(dataset.script, test, delCols, rows);
-			int sequence = 0;
-			for (RowAddress example : examples) {
-				saveCaseResults(test, sequence++, example);
+			List<GenRow> examples = execute(dataset.script, test, delCols, rows);
+			for (GenRow example : examples) {
+				saveCaseResults(test, example);
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {
@@ -221,7 +220,7 @@ public class SearchTestService extends DataService {
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, sequence FROM gen_result WHERE case_id = %d ORDER BY id",
+		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY id",
 				run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
@@ -245,18 +244,18 @@ public class SearchTestService extends DataService {
 						new LatLon(run.lat, run.lon);
 
 				Integer id = (Integer) row.get("id");
-				String output = (String) row.get("output");
+				String query = (String) row.get("query");
 				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {
 				});
-				int sequence = (Integer) row.get("sequence");
+				int count = (Integer) row.get("count");
 				try {
 					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-							output, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
-					saveRunResults(id, sequence, run, output, mapRow, searchResults, point,
+							query, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
+					saveRunResults(id, count, run, query, mapRow, searchResults, point,
 							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(id, sequence, run, output, mapRow, Collections.emptyList(), point,
+					saveRunResults(id, count, run, query, mapRow, Collections.emptyList(), point,
 							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
 									e.getMessage());
 				}

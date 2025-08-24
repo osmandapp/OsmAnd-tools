@@ -81,6 +81,6 @@ public class TestCase extends RunParam {
 		if (error != null) {
 			status = TestCase.Status.FAILED;
 		}
-		this.error = error == null ? null : error.substring(0, 256);
+		this.error = error == null ? null : error.substring(0, Math.min(error.length(), 255));
 	}
 }
