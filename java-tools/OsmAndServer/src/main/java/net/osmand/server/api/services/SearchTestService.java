@@ -249,8 +249,10 @@ public class SearchTestService extends ReportService {
 				});
 				int count = (Integer) row.get("count");
 				try {
-					List<Feature> searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-							query, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
+					List<Feature> searchResults = Collections.emptyList();
+					if (query != null && !query.trim().isEmpty())
+						searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+								query, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
 					saveRunResults(id, count, run, query, mapRow, searchResults, point,
 							System.currentTimeMillis() - startTime, null);
 				} catch (Exception e) {
