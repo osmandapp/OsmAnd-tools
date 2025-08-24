@@ -55,7 +55,7 @@ public abstract class ReportService extends DataService {
 			"END AS \"group\", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row " +
 			"FROM result UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM " +
 			"(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'" +
-			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Applied' END as c2, lat, lon, query, row, id FROM" +
+			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id FROM" +
 			" gen_result WHERE case_id = ? ORDER BY id)";
 
 	public ReportService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo,
@@ -123,6 +123,7 @@ public abstract class ReportService extends DataService {
 		String sql = """
 				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
+				    count(*) FILTER (WHERE count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
 				    sum(duration) AS duration,
@@ -141,7 +142,11 @@ public abstract class ReportService extends DataService {
 			Number number = ((Number) result.get("average_place"));
 			double averagePlace = number == null ? 0.0 : number.doubleValue();
 
-			long total = ((Number) result.get("total")).longValue();
+			number = ((Number) result.get("total"));
+			long total = number == null ? 0 : number.longValue();
+
+			number = ((Number) result.get("processed"));
+			long processed = number == null ? 0 : number.longValue();
 
 			number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
@@ -152,7 +157,7 @@ public abstract class ReportService extends DataService {
 			number = ((Number) result.get("found"));
 			long found = number == null ? 0 : number.longValue();
 
-			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, failed,
+			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
 					duration, averagePlace, found, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
@@ -161,7 +166,7 @@ public abstract class ReportService extends DataService {
 	}
 
 	public Optional<RunStatus> getRunReport(Long caseId, Long runId, int placeLimit, int distLimit) {
-		Optional<TestCaseStatus> optCase = getTestCaseStatus(runId);
+		Optional<TestCaseStatus> optCase = getTestCaseStatus(caseId);
 		if (optCase.isEmpty()) {
 			return Optional.empty();
 		}
@@ -185,7 +190,7 @@ public abstract class ReportService extends DataService {
 		}
 
 		RunStatus status = opt.get();
-		status = new RunStatus(status.status(), status.processed(), status.failed(), status.duration(),
+		status = new RunStatus(status.status(), status.total(), status.processed(), status.failed(), status.duration(),
 				status.averagePlace(), status.found(), distanceHistogram, optCase.get());
 		return Optional.of(status);
 	}

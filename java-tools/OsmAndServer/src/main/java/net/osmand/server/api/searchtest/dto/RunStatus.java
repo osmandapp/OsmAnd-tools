@@ -6,6 +6,7 @@ import java.util.Map;
 
 public record RunStatus(
 		Run.Status status,
+		long total,
 		long processed,
 		long failed,
 		long duration,
