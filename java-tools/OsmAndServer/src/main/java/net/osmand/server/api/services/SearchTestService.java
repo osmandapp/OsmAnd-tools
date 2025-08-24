@@ -4,10 +4,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.DataService;
+import net.osmand.server.api.searchtest.ReportService;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
-import net.osmand.server.api.searchtest.dto.TestStatus;
+import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.RunParam;
@@ -35,7 +35,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 @Service
-public class SearchTestService extends DataService {
+public class SearchTestService extends ReportService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 	private final SearchService searchService;
 
@@ -345,11 +345,11 @@ public class SearchTestService extends DataService {
 		List<TestCaseItem> items = new ArrayList<>(content.size());
 		for (TestCase tc : content) {
 			String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
-			Optional<TestStatus> tcOpt = getTestCaseStatus(tc.id);
+			Optional<TestCaseStatus> tcOpt = getTestCaseStatus(tc.id);
 			if (tcOpt.isEmpty())
 				continue;
 
-			TestStatus tcStatus = tcOpt.get();
+			TestCaseStatus tcStatus = tcOpt.get();
 			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
 					tc.lastRunId, tc.status, tc.updated,
 					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
