@@ -86,8 +86,10 @@ spring:
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:50MB}
       enabled: true
   jpa:
-    properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
-    properties.hibernate.jdbc.lob.non_contextual_creation: true
+    properties.hibernate:
+		dialect: org.hibernate.dialect.PostgreSQLDialect
+		lob.non_contextual_creation: true
+		physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     hibernate.ddl-auto: update
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
@@ -106,6 +108,9 @@ spring:
     url: ${OSM_GPX_DB_CONN:}
     username: ${OSM_GPX_DB_USER:}
     password: ${OSM_GPX_DB_PWD:}
+  searchtestdatasource:
+	url:
+	driverClassname:
   monitordatasource:
     url:
     username:
@@ -139,6 +144,9 @@ monitoring:
 
 geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
+
+overpass.url: ${OVERPASS_URL} # used by search test
+searchtest.csv.dir:
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
