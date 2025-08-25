@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Controller
-@RequestMapping(path = "/admin/search_test")
+@RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
 
 	@Autowired
@@ -33,7 +33,7 @@ public class SearchTestController {
 
 	@GetMapping
 	public String index(Model model) throws IOException {
-		return "admin/search_test";
+		return "admin/search-test";
 	}
 
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -5,6 +5,7 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
+import jakarta.persistence.EntityManagerFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,11 +16,13 @@ import org.springframework.context.annotation.*;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.AbstractDataSource;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @EnableJpaRepositories(
-		basePackages = "net.osmand.server",
+		basePackages = Application.PACKAGE_NAME,
 		excludeFilters = @ComponentScan.Filter(
 				type = FilterType.ANNOTATION, classes = SearchTestRepository.class))
 public class DatasourceConfiguration {
@@ -198,8 +201,14 @@ public class DatasourceConfiguration {
 			@Qualifier("primaryDataSource") DataSource dataSource) {
 		return builder
 				.dataSource(dataSource)
-				.packages("net.osmand.server")
+				.packages(Application.PACKAGE_NAME)
 				.persistenceUnit("default")
 				.build();
+	}
+
+	@Bean(name = "transactionManager")
+	public PlatformTransactionManager transactionManager(
+			@Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
+		return new JpaTransactionManager(entityManagerFactory);
 	}
 }

@@ -40,6 +40,7 @@ import static org.apache.commons.io.FileUtils.copyDirectory;
 @EnableJpaAuditing
 @ServletComponentScan
 public class Application  {
+	public static final String PACKAGE_NAME = "net.osmand.server";
 
 	@Autowired
 	TelegramBotManager telegram;

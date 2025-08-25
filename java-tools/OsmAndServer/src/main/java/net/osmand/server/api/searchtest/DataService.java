@@ -38,7 +38,7 @@ public abstract class DataService extends BaseService {
 	protected SearchTestCaseRepository testCaseRepo;
 	@Autowired
 	protected SearchTestRunRepository runRepo;
-	@Autowired @Qualifier("testJdbcTemplate")
+	@Autowired @Qualifier("searchTestJdbcTemplate")
 	protected JdbcTemplate jdbcTemplate;
 	@Autowired
 	protected EntityManager em;

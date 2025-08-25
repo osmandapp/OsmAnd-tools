@@ -27,50 +27,47 @@ import java.util.Map;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-		basePackages = "net.osmand.server",
+		basePackages = Application.PACKAGE_NAME,
 		includeFilters = @ComponentScan.Filter(
 				type = FilterType.ANNOTATION, classes = SearchTestRepository.class),
-		entityManagerFactoryRef = "testEntityManagerFactory",
-		transactionManagerRef = "testTransactionManager"
+		entityManagerFactoryRef = "searchTestEntityManagerFactory",
+		transactionManagerRef = "searchTestTransactionManager"
 )
 public class SearchTestRepositoryConfiguration {
 	protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
 	@Bean
 	@ConfigurationProperties(prefix = "spring.searchtestdatasource")
-	public DataSourceProperties testDataSourceProperties() {
+	public DataSourceProperties searchTestDataSourceProperties() {
 		return new DataSourceProperties();
 	}
 
-	@Bean(name = "testDataSource")
-	public DataSource testDataSource() {
-		return testDataSourceProperties().initializeDataSourceBuilder().build();
+	@Bean(name = "searchTestDataSource")
+	public DataSource searchTestDataSource() {
+		return searchTestDataSourceProperties().initializeDataSourceBuilder().build();
 	}
 
-	@Bean(name = "testJdbcTemplate")
-	public JdbcTemplate testJdbcTemplate(@Qualifier("testDataSource") DataSource ds) {
+	@Bean(name = "searchTestJdbcTemplate")
+	public JdbcTemplate searchTestJdbcTemplate(@Qualifier("searchTestDataSource") DataSource ds) {
 		return new JdbcTemplate(ds);
 	}
 
-	@Bean(name = "testEntityManagerFactory")
+	@Bean(name = "searchTestEntityManagerFactory")
 	public LocalContainerEntityManagerFactoryBean testEntityManagerFactory(
-			@Qualifier("testDataSource") DataSource dataSource,
+			@Qualifier("searchTestDataSource") DataSource dataSource,
 			EntityManagerFactoryBuilder builder) {
 		return builder
 				.dataSource(dataSource)
 				.packages("net.osmand.server.api.searchtest.entity")
-				.persistenceUnit("test")
+				.persistenceUnit("searchTest")
 				.properties(Map.of(
-						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
-						"hibernate.hbm2ddl.auto", "update",
-						"hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming" +
-								".CamelCaseToUnderscoresNamingStrategy"))
+						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect"))
 				.build();
 	}
 
-	@Bean(name = "testTransactionManager")
-	public PlatformTransactionManager testTransactionManager(
-			@Qualifier("testEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+	@Bean(name = "searchTestTransactionManager")
+	public PlatformTransactionManager searchTestTransactionManager(
+			@Qualifier("searchTestEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
 		return new JpaTransactionManager(entityManagerFactory);
 	}
 }
