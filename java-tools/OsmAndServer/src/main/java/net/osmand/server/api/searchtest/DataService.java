@@ -63,7 +63,6 @@ public abstract class DataService extends BaseService {
 			}
 			if (!Files.exists(fullPath)) {
 				dataset.setError("File is not existed.");
-				datasetRepo.save(dataset);
 				return dataset;
 			}
 
@@ -71,12 +70,10 @@ public abstract class DataService extends BaseService {
 			String header = getHeader(fullPath);
 			if (header == null || header.trim().isEmpty()) {
 				dataset.setError("File doesn't have header.");
-				datasetRepo.save(dataset);
 				return dataset;
 			}
 
-			String del =
-					header.chars().filter(ch -> ch == ',').count() <
+			String del = header.chars().filter(ch -> ch == ',').count() <
 							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 			String[] headers =
 					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
@@ -85,7 +82,6 @@ public abstract class DataService extends BaseService {
 				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
 				LOGGER.error("{} Header: {}", error, String.join(",", headers));
 				dataset.setError(error);
-				datasetRepo.save(dataset);
 				return dataset;
 			}
 
@@ -105,7 +101,7 @@ public abstract class DataService extends BaseService {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
 
 			LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
-			return datasetRepo.save(dataset);
+			return dataset;
 		} finally {
 			if (dataset.type == Dataset.Source.Overpass) {
 				try {
@@ -124,12 +120,13 @@ public abstract class DataService extends BaseService {
 		return CompletableFuture.supplyAsync(() -> {
 			Optional<Dataset> datasetOptional = datasetRepo.findByName(dataset.name);
 			if (datasetOptional.isPresent()) {
-				throw new RuntimeException("Dataset is already created: " + dataset.name);
+				dataset.setError("Dataset is already created: " + dataset.name);
+				return dataset;
 			}
 
 			dataset.created = LocalDateTime.now();
 			dataset.updated = dataset.created;
-			return checkDatasetInternal(datasetRepo.save(dataset), true);
+			return checkDatasetInternal(dataset, true);
 		});
 	}
 
@@ -151,7 +148,6 @@ public abstract class DataService extends BaseService {
 
 			dataset.updated = LocalDateTime.now();
 			dataset.setSourceStatus(Dataset.ConfigStatus.OK);
-			datasetRepo.save(dataset);
 			return checkDatasetInternal(dataset, reload);
 		});
 	}
@@ -159,8 +155,7 @@ public abstract class DataService extends BaseService {
 	protected void saveCaseResults(TestCase test, GenRow data) throws IOException {
 		String sql =
 				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
-						"timestamp)" +
-						" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = objectMapper.writeValueAsString(data.row());
 		String[] outputArray = data.output() == null || data.count() <= 0 ? new String[]{null} :
 				objectMapper.readValue(data.output(), String[].class);
@@ -247,7 +242,6 @@ public abstract class DataService extends BaseService {
 		try {
 			StringWriter stringWriter = new StringWriter();
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-
 			if (rows.isEmpty()) {
 				return "";
 			}
