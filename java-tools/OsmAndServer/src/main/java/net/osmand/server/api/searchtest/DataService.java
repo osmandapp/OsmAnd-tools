@@ -6,9 +6,9 @@ import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.DatasetRepository;
-import net.osmand.server.api.searchtest.repo.RunRepository;
-import net.osmand.server.api.searchtest.repo.TestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -31,14 +31,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public abstract class DataService extends BaseService {
-	protected final DatasetRepository datasetRepo;
-	protected final TestCaseRepository testCaseRepo;
-	protected final RunRepository runRepo;
+	protected final SearchTestDatasetRepository datasetRepo;
+	protected final SearchTestCaseRepository testCaseRepo;
+	protected final SearchTestRunRepository runRepo;
 	protected final JdbcTemplate jdbcTemplate;
 	protected final EntityManager em;
 
-	public DataService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo,
-					   RunRepository runRepo,
+	public DataService(EntityManager em, SearchTestDatasetRepository datasetRepo, SearchTestCaseRepository testCaseRepo,
+					   SearchTestRunRepository runRepo,
 					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 					   ObjectMapper objectMapper) {
 		super(webClientBuilder, objectMapper);

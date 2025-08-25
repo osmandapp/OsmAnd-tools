@@ -2,9 +2,9 @@ package net.osmand.server;
 
 import jakarta.persistence.EntityManagerFactory;
 import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.repo.DatasetRepository;
-import net.osmand.server.api.searchtest.repo.RunRepository;
-import net.osmand.server.api.searchtest.repo.TestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,9 +31,9 @@ import java.util.Map;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-		basePackageClasses = {DatasetRepository.class, TestCaseRepository.class, RunRepository.class},
+		basePackageClasses = {SearchTestDatasetRepository.class, SearchTestCaseRepository.class, SearchTestRunRepository.class},
 		includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
-				{DatasetRepository.class, TestCaseRepository.class, RunRepository.class}),
+				{SearchTestDatasetRepository.class, SearchTestCaseRepository.class, SearchTestRunRepository.class}),
 		entityManagerFactoryRef = "testEntityManagerFactory",
 		transactionManagerRef = "testTransactionManager"
 )

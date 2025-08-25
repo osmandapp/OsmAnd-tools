@@ -7,9 +7,9 @@ import net.osmand.server.api.searchtest.dto.RunStatus;
 import net.osmand.server.api.searchtest.dto.TestCaseStatus;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.DatasetRepository;
-import net.osmand.server.api.searchtest.repo.RunRepository;
-import net.osmand.server.api.searchtest.repo.TestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -60,8 +60,8 @@ public abstract class ReportService extends DataService {
 			"FROM" +
 			" gen_result WHERE case_id = ? ORDER BY id)";
 
-	public ReportService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo,
-						 RunRepository runRepo,
+	public ReportService(EntityManager em, SearchTestDatasetRepository datasetRepo, SearchTestCaseRepository testCaseRepo,
+						 SearchTestRunRepository runRepo,
 						 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
 						 ObjectMapper objectMapper) {
 		super(em, datasetRepo, testCaseRepo, runRepo, jdbcTemplate, webClientBuilder, objectMapper);

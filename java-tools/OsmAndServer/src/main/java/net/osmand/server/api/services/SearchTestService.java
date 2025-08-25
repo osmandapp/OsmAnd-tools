@@ -12,9 +12,9 @@ import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.RunParam;
 import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.DatasetRepository;
-import net.osmand.server.api.searchtest.repo.RunRepository;
-import net.osmand.server.api.searchtest.repo.TestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +40,8 @@ public class SearchTestService extends ReportService {
 	private final SearchService searchService;
 
 	@Autowired
-	public SearchTestService(EntityManager em, DatasetRepository datasetRepository,
-							 TestCaseRepository testCaseRepo, RunRepository runRepo,
+	public SearchTestService(EntityManager em, SearchTestDatasetRepository datasetRepository,
+							 SearchTestCaseRepository testCaseRepo, SearchTestRunRepository runRepo,
 							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
 							 SearchService searchService, WebClient.Builder webClientBuilder,
 							 ObjectMapper objectMapper) {

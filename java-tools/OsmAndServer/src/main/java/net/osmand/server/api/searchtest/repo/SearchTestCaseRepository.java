@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
+public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> {
 	@Query("SELECT d FROM TestCase d WHERE d.name = :name")
 	Optional<TestCase> findByName(@Param("name") String name);
 

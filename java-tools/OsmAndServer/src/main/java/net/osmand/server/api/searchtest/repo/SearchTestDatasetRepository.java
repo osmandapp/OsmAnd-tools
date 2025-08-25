@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface DatasetRepository extends JpaRepository<Dataset, Long> {
+public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long> {
 	@Query("SELECT d FROM Dataset d WHERE d.name = :name")
 	Optional<Dataset> findByName(@Param("name") String name);
 
