@@ -52,10 +52,12 @@ public abstract class ReportService extends DataService {
 			"        WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND " +
 			"is_addr_match)" +
 			"            THEN 'Too Far' ELSE 'Not Found'" +
-			"END AS \"group\", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row " +
+			"END AS \"group\", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row" +
+			" " +
 			"FROM result UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM " +
 			"(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'" +
-			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id FROM" +
+			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id " +
+			"FROM" +
 			" gen_result WHERE case_id = ? ORDER BY id)";
 
 	public ReportService(EntityManager em, DatasetRepository datasetRepo, TestCaseRepository testCaseRepo,
@@ -170,10 +172,15 @@ public abstract class ReportService extends DataService {
 		if (optCase.isEmpty()) {
 			return Optional.empty();
 		}
-		Optional<RunStatus> opt = getRunStatus(runId);
-		if (opt.isEmpty()) {
-			return Optional.empty();
-		}
+
+		final RunStatus status;
+		if (runId != null) {
+			Optional<RunStatus> opt = getRunStatus(runId);
+			if (opt.isEmpty())
+				return Optional.empty();
+			status = opt.get();
+		} else
+			status = null;
 
 		Map<String, Number> distanceHistogram = new LinkedHashMap<>();
 		distanceHistogram.put("Generated", 0);
@@ -184,15 +191,21 @@ public abstract class ReportService extends DataService {
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
-								"\"group\"", placeLimit, distLimit, runId, caseId);
+						"\"group\"", placeLimit, distLimit, runId, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		RunStatus status = opt.get();
-		status = new RunStatus(status.status(), status.total(), status.processed(), status.failed(), status.duration(),
-				status.averagePlace(), status.found(), distanceHistogram, optCase.get());
-		return Optional.of(status);
+		RunStatus finalStatus;
+		if (status == null) {
+			TestCaseStatus caseStatus = optCase.get();
+			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
+					caseStatus.failed(), caseStatus.duration(), 0.0, 0, distanceHistogram, caseStatus);
+		} else {
+			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
+					status.duration(), status.averagePlace(), status.found(), distanceHistogram, optCase.get());
+		}
+		return Optional.of(finalStatus);
 	}
 
 	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
