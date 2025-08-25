@@ -86,14 +86,10 @@ spring:
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:50MB}
       enabled: true
   jpa:
-    properties:
-      hibernate:
-        ddl-auto: update
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
-        jdbc:
-          lob:
-            non_contextual_creation: true
+    properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+    properties.hibernate.jdbc.lob.non_contextual_creation: true
+    properties.hibernate.physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
@@ -117,7 +113,7 @@ spring:
     password:
     driverClassname:
   searchtestdatasource:
-    url: jdbc:sqlite:${osmand.files.location}/search_test.db
+    url: jdbc:sqlite:${SEARCH_TEST_DB
     driverClassname: org.sqlite.JDBC
   web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
@@ -150,8 +146,8 @@ geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
 # Directory for storing downloaded CSV samples and Overpass API endpoint used by TestSearchService
 testsearch:
-  tiger.csv.dir: ${osmand.files.location}/uploads/csv
-  overpass.url: https://overpass-api.de/api/interpreter
+  csv.dir: ${CSV_DIR}
+  overpass.url: ${OVERPASS_URL}
 
 ---
 spring.jpa.hibernate.ddl-auto: validate

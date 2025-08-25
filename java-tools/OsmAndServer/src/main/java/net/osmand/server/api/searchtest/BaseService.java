@@ -31,7 +31,7 @@ public abstract class BaseService {
 	protected static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 	protected final ObjectMapper objectMapper;
 	private final WebClient.Builder webClientBuilder;
-	@Value("${testsearch.tiger.csv.dir}")
+	@Value("${testsearch.csv.dir}")
 	protected String csvDownloadingDir;
 	@Value("${osmand.web.location}")
 	protected String webLocation;
