@@ -1,10 +1,6 @@
 package net.osmand.server;
 
 import jakarta.persistence.EntityManagerFactory;
-import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,9 +8,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -60,13 +54,13 @@ public class SearchTestRepositoryConfiguration {
 			EntityManagerFactoryBuilder builder) {
 		return builder
 				.dataSource(dataSource)
-				.packages(Dataset.class.getPackage().getName())
+				.packages("net.osmand.server.api.searchtest.entity")
 				.persistenceUnit("test")
 				.properties(Map.of(
 						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
 						"hibernate.hbm2ddl.auto", "update",
 						"hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming" +
-                                ".CamelCaseToUnderscoresNamingStrategy"))
+								".CamelCaseToUnderscoresNamingStrategy"))
 				.build();
 	}
 
