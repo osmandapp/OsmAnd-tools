@@ -113,7 +113,7 @@ spring:
     password:
     driverClassname:
   searchtestdatasource:
-    url: jdbc:sqlite:${SEARCH_TEST_DB
+    url: jdbc:sqlite:${SEARCH_TEST_DB}
     driverClassname: org.sqlite.JDBC
   web.resources.static-locations: file:${osmand.web.location}
   thymeleaf:
