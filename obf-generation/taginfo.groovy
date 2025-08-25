@@ -10,20 +10,22 @@ def processType(tp, uniqueset, tags) {
     boolean skipTag = (
         tg.contains("osmand") || 
         tp.@"no_edit" == "true" || 
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
     }
 
+    def taginfop = [:]
+    taginfop["key"] = tg
     if (value != "") {
-        def taginfop = [:]
-        taginfop["key"] = tg
         taginfop["value"] = value
-        taginfop["description"] = "Used to create maps"
-        tags << taginfop
     }
+    taginfop["description"] = "Used to create maps"
+    tags << taginfop
+    
 }
 
 def processEntityConvert(tp, uniqueset, tags) {
@@ -36,8 +38,9 @@ def processEntityConvert(tp, uniqueset, tags) {
 
     boolean skipTag = (
         tg.contains("osmand") || 
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
@@ -78,8 +81,9 @@ def processTag(tag, value, name, tp, uniqueset, tags) {
     boolean skipTag = (
         tag.contains("osmand") || 
         tp.@"no_edit" == "true" || 
+        tp.@"seq".toString().length() > 0 ||
         tp.@"hidden" == "true" ||
-        tp.@"notosm" == "true"  // Добавлена проверка notosm
+        tp.@"notosm" == "true"  
     )
     if (skipTag) {
         return
@@ -131,7 +135,7 @@ def builder = new groovy.json.JsonBuilder()
 
 def json = [:]
 json["data_format"] = 1; 
-json["data_url"] = "https://creator.osmand.net/taginfo.json"
+json["data_url"] = "https://builder.osmand.net/taginfo.json"
 json["data_updated"] = new Date().format("yyyyMMdd'T'HHmmss'Z'")
 json["project"] = [
 	"name": "OsmAnd",
@@ -150,16 +154,23 @@ def uniqueset = [:]
 renderingTypes.type.each {
 	tp -> processType(tp, uniqueset, tags)
 }
+renderingTypes.routing_type.each {
+	tp -> processType(tp, uniqueset, tags)
+}
+
 renderingTypes.entity_convert.each {
 	tp -> processEntityConvert(tp, uniqueset, tags)
 }
 renderingTypes.category.each {
 	c -> c.type.each {
-		tp -> processType(tp, uniqueset, tags)
-	}
-	c.entity_convert.each {
-		tp -> processEntityConvert(tp, uniqueset, tags)
-	}
+		    tp -> processType(tp, uniqueset, tags)
+	    }
+        c.routing_type.each {
+		    tp -> processType(tp, uniqueset, tags)
+	    }
+	    c.entity_convert.each {
+		    tp -> processEntityConvert(tp, uniqueset, tags)
+	    }
 }
 
 processPOIGroup(poiTypes, uniqueset, tags); 

@@ -53,21 +53,23 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
-//					"-vmap", "-vmapobjects",
+//					"-vpoi",
+					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-//					"-zoom=5",
+					"-zoom=10",
 					// road
-					"-latlon=50.441932,30.510840,0.0005",
+//					"-latlon=50.441932,30.510840,0.0005",
 					//"-xyz=12071,26142,16",
-//					"-osm="+System.getProperty("maps.dir")+"Routing_test.obf.osm",
 //					"-c",
-					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf"
+					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					System.getProperty("maps.dir") + "lightsector/World_lightsectors_src_0.obf"
+//					"-osm="+System.getProperty("maps.dir")+"lightsectors-0.osm",
+//					System.getProperty("maps.dir") + "lightsector/original/lightsectors-0.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -248,7 +250,7 @@ public class BinaryInspector {
 		}
 	}
 
-	public class FileExtractFrom {
+	public static class FileExtractFrom {
 		public List<File> from = new ArrayList<File>();
 		public Set<Integer> excludeParts;
 		public Set<Integer> includeParts;
@@ -382,13 +384,13 @@ public class BinaryInspector {
 		//written += 4;
 	}
 
-	public  static int combineParts(File fileToExtract, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
+	public  static int combineParts(File fileToCreate, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
 		Set<String> uniqueNames = new LinkedHashSet<String>();
 
 		int version = IndexConstants.BINARY_MAP_VERSION;
 
 		// write files
-		FileOutputStream fout = new FileOutputStream(fileToExtract);
+		FileOutputStream fout = new FileOutputStream(fileToCreate);
 		CodedOutputStream ous = CodedOutputStream.newInstance(fout, BUFFER_SIZE);
 		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
 
@@ -409,7 +411,7 @@ public class BinaryInspector {
 		int parts = 0;
 		for (FileExtractFrom extract : partsToExtractFrom) {
 			for (File f : extract.from) {
-				if (f.getAbsolutePath().equals(fileToExtract.getAbsolutePath())) {
+				if (f.getAbsolutePath().equals(fileToCreate.getAbsolutePath())) {
 					System.err.println("Error : Input file is equal to output file " + f.getAbsolutePath());
 					continue;
 				}
@@ -1497,8 +1499,7 @@ public class BinaryInspector {
 				}
 				singleValues.get(key).add(st.name);
 			} else {
-				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(),
-						st.possibleValues.size() > 50 ? st.possibleValues.subList(0, 50) + "..." : st.possibleValues));
+				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), st.possibleValues));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();

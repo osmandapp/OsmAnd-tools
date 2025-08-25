@@ -42,6 +42,7 @@ import net.osmand.data.QuadPointDouble;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
 import net.osmand.data.RotatedTileBox.RotatedTileBoxBuilder;
+import net.osmand.render.RenderingClass;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRuleStorageProperties;
@@ -305,6 +306,25 @@ public class NativeJavaRendering extends NativeLibrary {
 			}
 		}
 		request.setIntFilter(request.ALL.R_MINZOOM, renderingImageContext.zoom);
+		
+		Map<String, Boolean> parentsStates = new HashMap<>();
+		Map<String, RenderingClass> renderingClasses = storage.getRenderingClasses();
+		
+		for (Map.Entry<String, RenderingClass> entry : renderingClasses.entrySet()) {
+			String name = entry.getKey();
+			RenderingClass renderingClass = entry.getValue();
+
+			boolean enabled = renderingClass.isEnabledByDefault();
+			
+			String parentName = renderingClass.getParentName();
+			if (parentName != null && parentsStates.containsKey(parentName) && !parentsStates.get(parentName)) {
+				enabled = false;
+			}
+			
+			request.setClassProperty(name, String.valueOf(enabled));
+			parentsStates.put(name, enabled);
+		}
+		
 		request.saveState();
 		NativeSearchResult res = searchObjectsForRendering(renderingImageContext.sleft, renderingImageContext.sright, renderingImageContext.stop, renderingImageContext.sbottom, renderingImageContext.zoom, request, true,
 					renderingContext, "Nothing found");

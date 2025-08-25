@@ -15,7 +15,7 @@ task collectFonts(type: Sync) {
 
 
 task downloadCoreJni(type: Download)  {
-		src 'https://creator.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
+		src 'https://builder.osmand.net/binaries/amd64-linux-clang/OsmAndCore_JavaSample1.jar'
 		dest 'lib-gl/OsmAndCore_jni.jar'
 		onlyIfModified true
 }

@@ -429,11 +429,11 @@ process_tiff ()
 	fi
 }
 export -f process_tiff
-find "$indir" -maxdepth 1 -type f -name "$TILES_PREFIX*.tif" | sort -R | parallel -P $threads_number_0 --bar process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice --bar time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice --bar time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice --bar time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice --bar time process_tiff '{}'
+find "$indir" -maxdepth 1 -type f -name "$TILES_PREFIX*.tif" | sort -R | parallel -P $threads_number_0 process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice time process_tiff '{}'
+# find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice time process_tiff '{}'
 rm -rf $outdir/processing || true
 rm -rf $outdir/symbology-style.db || true
 rm -rf $XDG_RUNTIME_DIR || true

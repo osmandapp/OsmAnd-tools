@@ -72,6 +72,8 @@ public class MainUtilities {
 				BinaryComparator.main(subArgsArray);
 			} else if (utl.equals("merge-index")) {
 				BinaryMerger.main(subArgsArray);
+			} else if (utl.equals("brand-analyzer") || utl.equals("tag-value-analyzer")) {
+				TopTagValuesAnalyzer.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
@@ -164,6 +166,8 @@ public class MainUtilities {
 				generateObf(subArgs, settings);
 			} else if (utl.equals("convert-gpx-to-obf")) {
 				OsmGpxWriteContext.generateObfFromGpx(subArgs);
+			} else if (utl.equals("generate-lightsectors")) {
+				LightSectorProcessor.main(subArgsArray);
 			} else if (utl.equals("generate-map")) {
 				IndexCreatorSettings settings = new IndexCreatorSettings();
 				settings.indexMap = true;
@@ -281,7 +285,7 @@ public class MainUtilities {
 		private final List<String> strings = new ArrayList<>(); // other args not parsed as opts
 	}
 
-	private static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {
+	public static void parseIndexCreatorArgs(List<String> subArgs, IndexCreatorSettings settings) {
 		Iterator<String> it = subArgs.iterator();
 		while (it.hasNext()) {
 			String s = it.next();
@@ -290,6 +294,12 @@ public class MainUtilities {
 				it.remove();
 			} else if (s.equals("--keep-only-sea-objects")) {
 				settings.keepOnlySeaObjects = true;
+				it.remove();
+			} else if (s.equals("--no-address")) {
+				settings.indexAddress = false;
+				it.remove();
+			} else if (s.equals("--no-transport")) {
+				settings.indexTransport = false;
 				it.remove();
 			} else if (s.equals("--ram-process")) {
 				settings.processInRam = true;
@@ -302,6 +312,9 @@ public class MainUtilities {
 				it.remove();
 			} else if (s.startsWith("--wikimapping=")) {
 				settings.wikidataMappingUrl = s.substring(s.indexOf('=') + 1);
+				it.remove();
+			} else if (s.startsWith("--poi-top-index-list=")) {
+				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
@@ -333,7 +346,12 @@ public class MainUtilities {
 	}
 
 	
-	private static void generateObf(List<String> subArgs, IndexCreatorSettings settings) throws IOException, SQLException,
+	public static void generateObf(List<String> subArgs, IndexCreatorSettings settings)
+			throws IOException, SQLException, InterruptedException, XmlPullParserException {
+		generateObf(subArgs, MapZooms.getDefault(), settings);
+	}
+	
+	public static void generateObf(List<String> subArgs, MapZooms zooms, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
 		String fl = subArgs.get(0);
 		File fileToGen = new File(fl);
@@ -361,7 +379,7 @@ public class MainUtilities {
 		ic.setLastModifiedDate(fileToGen.lastModified());
 		String regionName = fileToGen.getName();
 		MapRenderingTypesEncoder types = new MapRenderingTypesEncoder(settings.renderingTypesFile, regionName);
-		File res = ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, MapZooms.getDefault(), types, log);
+		File res = ic.generateIndexes(fileToGen, new ConsoleProgressImplementation(), null, zooms, types, log);
 		for(int i = 1; i < subArgs.size(); i++) {
 			String arg = subArgs.get(i);
 			if (arg.equals("--upload") && i < subArgs.size() - 1) {

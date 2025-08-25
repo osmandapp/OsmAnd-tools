@@ -10,11 +10,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
@@ -25,7 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
@@ -49,6 +51,7 @@ import com.github.dockerjava.api.command.InspectContainerResponse.ContainerState
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
+import com.sun.management.OperatingSystemMXBean;
 
 import net.osmand.IndexConstants;
 import net.osmand.MapCreatorVersion;
@@ -79,11 +82,11 @@ public class IndexBatchCreator {
 	private static final int INMEM_LIMIT = 2000;
 	private static final long TIMEOUT_TO_CHECK_AWS = 15000;
 	private static final long TIMEOUT_TO_CHECK_DOCKER = 15000;
+	private static final long MAX_TO_START_PER_TIMEOUT = 2;
 
 	protected static final Log log = PlatformUtil.getLog(IndexBatchCreator.class);
 
 	public static final String GEN_LOG_EXT = ".gen.log";
-
 
 
 	public static class RegionCountries {
@@ -101,6 +104,9 @@ public class IndexBatchCreator {
 		String queue;
 		// Docker
 		int slotsPerJob = 1;
+		int freeRamToStartPerc = 0;
+		int freeRamToStopPerc = 0;
+		int order = 0;
 		// AWS
 		String definition;
 		
@@ -108,6 +114,9 @@ public class IndexBatchCreator {
 		int sizeUpToMB = -1;
 		Set<String> excludedRegions = new TreeSet<>();
 		List<String> excludePatterns = new ArrayList<>();
+		
+		
+		List<DockerPendingGeneration> pendingGenerations = new ArrayList<>();
 
 	}
 
@@ -171,8 +180,8 @@ public class IndexBatchCreator {
 	/// DOCKER gen block
 	DockerClient dockerClient;
 	int dockerSlots = 4;
-	Map<ExternalJobDefinition, List<DockerPendingGeneration>> dockerPendingGenerations = new ConcurrentHashMap<>();
-	Set<String> dockerRetryGenerations = new TreeSet<String>();
+	List<DockerPendingGeneration> dockerRunningGenerations = new ArrayList<>();
+	List<DockerPendingGeneration> dockerRescheduledGenerations = new ArrayList<>();
 	List<DockerPendingGeneration> dockerFailedGenerations = new ArrayList<>();
 	
 	boolean indexPOI = false;
@@ -286,6 +295,15 @@ public class IndexBatchCreator {
 				jd.definition = jbe.getAttribute("definition");
 				if (!Algorithms.isEmpty(jbe.getAttribute("slotsPerJob"))) {
 					jd.slotsPerJob = Integer.parseInt(jbe.getAttribute("slotsPerJob"));
+				}
+				if (!Algorithms.isEmpty(jbe.getAttribute("order"))) {
+					jd.order = Integer.parseInt(jbe.getAttribute("order"));
+				}
+				if (!Algorithms.isEmpty(jbe.getAttribute("freeRamToStartPerc"))) {
+					jd.freeRamToStartPerc = Integer.parseInt(jbe.getAttribute("freeRamToStartPerc"));
+				}
+				if (!Algorithms.isEmpty(jbe.getAttribute("freeRamToStopPerc"))) {
+					jd.freeRamToStopPerc = Integer.parseInt(jbe.getAttribute("freeRamToStopPerc"));
 				}
 				jd.name = jbe.getAttribute("name");
 				jd.type = jbe.getAttribute("type");
@@ -429,23 +447,26 @@ public class IndexBatchCreator {
 		}
 		generateLocalFolderIndexes(alreadyGeneratedFiles);
 		// run check in parallel
+		if (awsPendingGenerations.size() > 0) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
+				}
+			}).start();
+		}
+		// run check in parallel until it reaches main loop
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS * 4);
-			}
-		}).start();
-		// run check in parallel
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER * 2);
+				waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 			}
 		}).start();
 		log.info("Generate local " + localPendingGenerations.size() + " maps");
 		for (LocalPendingGeneration lp : localPendingGenerations) {
 			generateLocalIndex(lp.file, lp.regionName, lp.mapFileName, lp.rdata, alreadyGeneratedFiles);
 		}
+		
 		waitAwsJobsToFinish(TIMEOUT_TO_CHECK_AWS);
 		waitDockerJobsToFinish(TIMEOUT_TO_CHECK_DOCKER);
 		log.info("GENERATING INDEXES FINISHED ");
@@ -458,88 +479,82 @@ public class IndexBatchCreator {
 	}
 
 
+	private AtomicLong lastRunWaitDockerMs = new AtomicLong(0l); 
 	private void waitDockerJobsToFinish(long timeout) {
 		while (true) {
-			int total = 0;
-			List<String> names = new ArrayList<String>();
-			for (List<DockerPendingGeneration> l : dockerPendingGenerations.values()) {
-				total += l.size();
-				for (DockerPendingGeneration d : l) {
-					if (d.container != null) {
-						names.add(d.name);
-					}
-				}
-			}
-			if (total == 0) {
-				return;
-			}
-			log.warn(String.format("Waiting %d docker jobs to complete, running %d: %s", total, names.size(), names));
-
-			waitDockerJobsIteration();
 			try {
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 			}
-		}
+			if (System.currentTimeMillis() - lastRunWaitDockerMs.get() < timeout / 2) {
+				continue;
+			}
+			lastRunWaitDockerMs.set(System.currentTimeMillis());
+			int pending = 0;
+			for (ExternalJobDefinition jd : externalJobQueues) {
+				pending += jd.pendingGenerations.size();
+			}
+			int rescheduled = dockerRescheduledGenerations.size();
+			int running = dockerRunningGenerations.size();
+			int total = pending + rescheduled + running;
 
+			if (total == 0) {
+				return;
+			}
+
+			List<String> names = new ArrayList<String>();
+			for (DockerPendingGeneration d : dockerRunningGenerations) {
+				names.add(d.name);
+			}
+
+			long freeRamPerc = getFreeRamPercentage();
+			log.warn(String.format("Waiting %d docker jobs to complete (Ram free %d). Pending: %d, Rescheduled: %d, Running: %d: %s", 
+					total, freeRamPerc, pending, rescheduled, running, names));
+
+			waitDockerJobsIteration(freeRamPerc);
+		}
 	}
 
-	@SuppressWarnings("deprecation")
-	private synchronized void waitDockerJobsIteration() {
-		if (dockerClient == null) {
-			dockerClient = DockerClientBuilder.getInstance().build();
-		}
-		int allocation = dockerSlots;
-		List<List<DockerPendingGeneration>> all = new ArrayList<>(dockerPendingGenerations.values());
-		List<DockerPendingGeneration> queue = createQueueEquallyDistributed(all);
-
-		Iterator<DockerPendingGeneration> it = queue.iterator();
-		while (it.hasNext() && allocation > 0) {
-			DockerPendingGeneration p = it.next();
-			allocation -= p.jd.slotsPerJob;
-			if (p.container == null) {
-				// start container
-				p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
-						.withName(p.name).exec();
-				dockerClient.startContainerCmd(p.container.getId()).exec();
-			} else {
-				// check if it's complete
-				try {
-					InspectContainerResponse res = dockerClient.inspectContainerCmd(p.container.getId()).exec();
-					if (!res.getState().getRunning()) {
-						Long l = res.getState().getExitCodeLong();
-						if (l == null || l.longValue() != 0) {
-							if (dockerRetryGenerations.contains(p.name)) {
-								log.info(String.format("FAILED 2nd GENERATION %s - container %s", p.name, p.container.getId()));
-								dockerFailedGenerations.add(p);
-							} else {
-								log.info(String.format("FAILED GENERATION %s - container %s retry last", p.name, p.container.getId()));
-								dockerFailedGenerations.add(p);
-								// TODO not tested
-//								dockerRetryGenerations.add(p.name);
-//								p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd).withEnv(p.envs)
-//										.withName(p.name).exec();
-//								dockerClient.startContainerCmd(p.container.getId()).exec();
-							}
-						} else {
-							log.info(String.format("Finished %s container %s at %s (started %s).",
-									getDuration(res.getState()), res.getName(), res.getState().getFinishedAt(),
-									res.getState().getStartedAt()));
-							dockerClient.removeContainerCmd(p.container.getId()).exec();
-						}
-						allocation += p.jd.slotsPerJob;
-						it.remove();
-						dockerPendingGenerations.get(p.jd).remove(p);
+	private long getFreeRamPercentage() {
+		// Try Linux-specific method first by reading /proc/meminfo
+		File meminfo = new File("/proc/meminfo");
+		if (meminfo.exists()) {
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(meminfo)))) {
+				String line;
+				long totalMem = -1;
+				long availableMem = -1;
+				while ((line = reader.readLine()) != null) {
+					if (line.startsWith("MemTotal:")) {
+						totalMem = Long.parseLong(line.split("\\s+")[1]);
+					} else if (line.startsWith("MemAvailable:")) {
+						availableMem = Long.parseLong(line.split("\\s+")[1]);
 					}
-				} catch (RuntimeException e) {
-					log.error(e.getMessage(), e);
-					dockerPendingGenerations.get(p.jd).remove(p);
 				}
+				if (totalMem > 0 && availableMem > 0) {
+					return (availableMem * 100) / totalMem;
+				}
+			} catch (IOException | NumberFormatException e) {
+				log.warn("Could not read or parse /proc/meminfo, falling back to MXBean.", e);
 			}
 		}
-	}
 
-	private List<DockerPendingGeneration> createQueueEquallyDistributed(List<List<DockerPendingGeneration>> all) {
+		// Fallback to MXBean for non-Linux or if /proc/meminfo fails
+		try {
+			OperatingSystemMXBean osBean = ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+			long freeMemory = osBean.getFreeMemorySize();
+			long totalMemory = osBean.getTotalMemorySize();
+			if (totalMemory > 0) {
+				return (freeMemory * 100) / totalMemory;
+			}
+		} catch (Exception e) {
+			log.warn("Could not determine free RAM percentage using OperatingSystemMXBean.", e);
+		}
+
+		log.warn("Could not determine free RAM percentage. Assuming 100%.");
+		return 100; // Assume enough RAM if all checks fail
+	}
+	
+	protected List<DockerPendingGeneration> createQueueEquallyDistributed(List<List<DockerPendingGeneration>> all) {
 		List<DockerPendingGeneration> queue = new ArrayList<IndexBatchCreator.DockerPendingGeneration>();
 		boolean added = true;
 		int ind = 0;
@@ -557,6 +572,137 @@ public class IndexBatchCreator {
 		return queue;
 	}
 
+	private void checkStatusRunningContainers() {
+		Iterator<DockerPendingGeneration> runningIt = dockerRunningGenerations.iterator();
+		while (runningIt.hasNext()) {
+			DockerPendingGeneration p = runningIt.next();
+			try {
+				InspectContainerResponse res = dockerClient.inspectContainerCmd(p.container.getId()).exec();
+				if (!res.getState().getRunning()) {
+					Long l = res.getState().getExitCodeLong();
+					if (l == null || l.longValue() != 0) {
+						log.info(String.format("FAILED GENERATION %s - container %s", p.name, p.container.getId()));
+						if (!dockerFailedGenerations.contains(p)) {
+							dockerRescheduledGenerations.add(p);
+							dockerFailedGenerations.add(p);
+							dockerClient.removeContainerCmd(p.container.getId()).exec();
+						}
+					} else {
+						log.info(String.format("Finished %s container %s at %s (started %s).",
+								getDuration(res.getState()), res.getName(), res.getState().getFinishedAt(),
+								res.getState().getStartedAt()));
+						// remove if it's failed before
+						dockerFailedGenerations.remove(p);
+						dockerClient.removeContainerCmd(p.container.getId()).exec();
+					}
+					runningIt.remove();
+				}
+			} catch (RuntimeException e) {
+				log.error("Error inspecting container " + p.name + ": " + e.getMessage(), e);
+				runningIt.remove(); // Assume it's gone
+			}
+		}
+	}
+	
+	private boolean stopIfNotEnoughRam(long freeRamPerc) {
+		DockerPendingGeneration lastStarted = null;
+		if (!dockerRunningGenerations.isEmpty()) {
+			// The last one added to the list is the most recently started
+			lastStarted = dockerRunningGenerations.get(dockerRunningGenerations.size() - 1);
+		}
+		if (lastStarted != null && lastStarted.jd.freeRamToStopPerc > 0
+				&& freeRamPerc < lastStarted.jd.freeRamToStopPerc) {
+			log.warn(String.format("Low RAM detected (%d%% free). Stopping last started container %s to reschedule.",
+					freeRamPerc, lastStarted.name));
+			try {
+				dockerClient.stopContainerCmd(lastStarted.container.getId()).exec();
+				dockerClient.removeContainerCmd(lastStarted.container.getId()).exec();
+			} catch (Exception e) {
+				log.error("Failed to stop container for rescheduling: " + lastStarted.name, e);
+			}
+			lastStarted.container = null; // Mark as pending
+			dockerRunningGenerations.remove(lastStarted);
+			dockerRescheduledGenerations.add(lastStarted);
+			return true; // Only stop one container per check
+		}
+		return false;
+	}
+	
+	private List<DockerPendingGeneration> getQueueToRun() {
+		// Build a list of jobs to potentially start, giving priority to rescheduled
+		List<DockerPendingGeneration> queueToRun = new ArrayList<>(dockerRescheduledGenerations);
+		// Find the first queue with pending jobs and add them
+		Collections.sort(externalJobQueues, new Comparator<ExternalJobDefinition>() {
+
+			@Override
+			public int compare(ExternalJobDefinition o1, ExternalJobDefinition o2) {
+				return Integer.compare(o1.order, o2.order);
+			}
+		});
+		for (ExternalJobDefinition jd : externalJobQueues) {
+			queueToRun.addAll(jd.pendingGenerations);
+		}
+		return queueToRun;
+	}
+	
+	@SuppressWarnings("deprecation")
+	private void startContainers(List<DockerPendingGeneration> queue, long freeRamPerc) {
+		Iterator<DockerPendingGeneration> startIt = queue.iterator();
+		int slotsLeft = dockerSlots;
+		for (DockerPendingGeneration running : dockerRunningGenerations) {
+			slotsLeft -= running.jd.slotsPerJob;
+		}
+		int start = 0;
+		while (startIt.hasNext() && slotsLeft > 0) {
+			DockerPendingGeneration p = startIt.next();
+			if (slotsLeft >= p.jd.slotsPerJob) {
+				// Check if we have enough RAM to start
+				if (p.jd.freeRamToStartPerc > 0 && freeRamPerc < p.jd.freeRamToStartPerc) {
+					log.warn(String.format("Delaying start of %s due to low RAM. Free: %d%%, Required: >%d%%", p.name,
+							freeRamPerc, p.jd.freeRamToStartPerc));
+					return;
+				}
+				try {
+					// In future: we can find & remove container if it exists with same name
+					p.jd.pendingGenerations.remove(p);
+					dockerRescheduledGenerations.remove(p);
+					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
+							.withEnv(p.envs).withName(p.name).exec();
+					dockerClient.startContainerCmd(p.container.getId()).exec();
+					log.info("Started container " + p.name);
+					dockerRunningGenerations.add(p);
+					slotsLeft -= p.jd.slotsPerJob;
+					start++;
+					if (start >= MAX_TO_START_PER_TIMEOUT) {
+						break;
+					}
+				} catch (Exception e) {
+					log.error("Failed to start container " + p.name, e);
+					if (!dockerFailedGenerations.contains(p)) {
+						dockerFailedGenerations.add(p);
+						dockerRescheduledGenerations.add(p);
+					}
+					return;
+				}
+			}
+		}
+	}
+
+	private synchronized void waitDockerJobsIteration(long freeRamPerc) {
+		if (dockerClient == null) {
+			dockerClient = DockerClientBuilder.getInstance().build();
+		}
+		// 1. Check status of running containers
+		checkStatusRunningContainers();
+		// 2. Check for low RAM and stop the last started container if necessary
+		if(stopIfNotEnoughRam(freeRamPerc)) {
+			// Only stop one container per check
+			return;
+		}
+		// 3. Start new containers from queues sequentially
+		startContainers(getQueueToRun(), freeRamPerc);
+	}
+
 	private String getDuration(ContainerState state) {
 		if (sdf == null) {
 			sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -572,14 +718,19 @@ public class IndexBatchCreator {
 		}
 	}
 
+	private AtomicLong lastRunWaitAwsMs = new AtomicLong(0l);
 	private void waitAwsJobsToFinish(long timeout) {
 		log.info(String.format("Waiting %d aws jobs to complete...", awsPendingGenerations.size()));
 		while (awsPendingGenerations.size() > 0) {
-			waitAwsJobsIteration();
 			try {
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 			}
+			if (System.currentTimeMillis() - lastRunWaitAwsMs.get() < timeout / 2) {
+				continue;
+			}
+			lastRunWaitAwsMs.set(System.currentTimeMillis());
+			waitAwsJobsIteration();
 		}
 	}
 
@@ -750,8 +901,8 @@ public class IndexBatchCreator {
 		} catch (InterruptedException e) {
 			log.error("Interrupted exception " + toSave.getName() + " downloading from " + url + "using wget: " + wget, e); //$NON-NLS-1$ //$NON-NLS-2$ $NON-NLS-3$
 		} finally {
-			safeClose(wgetOutput, ""); //$NON-NLS-1$
 			safeClose(wgetInput, ""); //$NON-NLS-1$
+			safeClose(wgetOutput, ""); //$NON-NLS-1$
 			if (wgetProc != null) {
 				wgetProc.destroy();
 			}
@@ -856,7 +1007,7 @@ public class IndexBatchCreator {
 			}
 			if (jd.type.equals("aws")) {
 				log.warn("-------------------------------------------");
-				log.warn("----------- Generate on AWS " + file.getName() + "\n\n\n");
+				log.warn("----------- Generate on AWS " + file.getName() + " " + jd.queue +  "\n\n\n");
 				try {
 					generateAwsIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 					return true;
@@ -865,7 +1016,7 @@ public class IndexBatchCreator {
 				}
 			} else if (jd.type.equals("docker")) {
 				log.warn("-------------------------------------------");
-				log.warn("----------- Generate on Docker " + file.getName() + "\n\n\n");
+				log.warn("----------- Generate on Docker " + file.getName() + " " + jd.queue + " \n\n\n");
 				try {
 					generateDockerIndex(jd, file, targetMapFileName, rdata, alreadyGeneratedFiles);
 					return true;
@@ -926,12 +1077,7 @@ public class IndexBatchCreator {
 		
 		
 		// to avoid concurrency issues
-		List<DockerPendingGeneration> lst = new ArrayList<DockerPendingGeneration>();
-		if (dockerPendingGenerations.containsKey(jd)) {
-			lst.addAll(dockerPendingGenerations.get(jd));
-		}
-		lst.add(p);
-		dockerPendingGenerations.put(jd, lst);
+		jd.pendingGenerations.add(p);
 	}
 	
 	private void generateAwsIndex(ExternalJobDefinition jd, File file, String targetFileName,
@@ -1008,6 +1154,10 @@ public class IndexBatchCreator {
 			boolean worldMaps = regionName.toLowerCase().contains("world") ;
 			if (worldMaps) {
 				if (regionName.toLowerCase().contains("basemap")) {
+					return;
+				}
+				if (regionName.toLowerCase().contains("seamarks")) {
+					// for now it's processed separately
 					return;
 				}
 				if (regionName.toLowerCase().contains("seamarks")) {

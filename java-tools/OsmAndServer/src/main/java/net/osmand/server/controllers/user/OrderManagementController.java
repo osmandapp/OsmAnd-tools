@@ -5,6 +5,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.AdminService;
+import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,11 @@ public class OrderManagementController {
 			return Collections.emptyList();
 		}
 		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(trimmed, limit);
+		for (Purchase p : purchases) {
+			if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
+				p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
+			}
+		}
 		if (purchases.isEmpty()) {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(text, PageRequest.of(0, limit));
 			if (!users.isEmpty()) {

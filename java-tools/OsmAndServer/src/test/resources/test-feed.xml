@@ -1,0 +1,1222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:/organizations/osmandapp/vshcherb</id>
+  <link type="text/html" rel="alternate" href="https://github.com/organizations/osmandapp/vshcherb"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/organizations/osmandapp/"/>
+  <title>Private Feed for the osmandapp Organization</title>
+  <updated>2025-08-12T16:19:50Z</updated>
+  <entry>
+    <id>tag:github.com,2008:push/3802349365</id>
+    <published>2025-08-12 16:19:50 UTC</published>
+    <updated>2025-08-12 16:19:50 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/compare/bafcb4abc0...b030fd1ebd"/>
+    <title type="html">vshcherb pushed OsmAnd-tools</title>
+    <author>
+      <name>vshcherb</name>
+      <uri>https://github.com/vshcherb</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1042025?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/1042025?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@vshcherb&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;vshcherb&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T16:19:50Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 16:19&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;master&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-tools/tree/b030fd1ebd804ce19e9514c8d6cc67931b30d3ca&quot; rel=&quot;noreferrer&quot;&gt;b030fd1&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:issue_created/2880998990</id>
+    <published>2025-08-12 09:09:21 -0700</published>
+    <updated>2025-08-12 09:09:21 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd/issues/23244"/>
+    <title type="html">vshcherb opened an issue in OsmAnd</title>
+    <author>
+      <name>vshcherb</name>
+      <uri>https://github.com/vshcherb</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1042025?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;issues_opened js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- issues --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;d-flex flex-items-baseline mb-2&quot;&gt;
+      &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/1042025?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@vshcherb&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;vshcherb&lt;/a&gt;
+          
+          ACTION_CREATED
+          an issue in
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd&lt;/a&gt;
+        &lt;span&gt;
+          · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T09:09:21-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 09:09&lt;/relative-time&gt;
+        &lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 wb-break-all color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Issue&quot; class=&quot;octicon octicon-issue-opened open d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z&quot;&gt;&lt;/path&gt;&lt;path d=&quot;M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;
+          &lt;a title=&quot;#&amp;lt;Issue:0x00007fc1c4b85f00&amp;gt;&quot; class=&quot;color-fg-default&quot; aria-label=&quot;#&amp;lt;Issue:0x00007fc1c4b85f00&amp;gt;&quot; href=&quot;/osmandapp/OsmAnd/issues/23244&quot; rel=&quot;noreferrer&quot;&gt;#&amp;lt;Issue:0x00007fc1c4b85f00&amp;gt;&lt;/a&gt;
+        &lt;/span&gt;
+        &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#23244&lt;/span&gt;
+          &lt;div class=&quot;dashboard-break-word lh-condensed mb-2 mt-1&quot;&gt;
+            **Some formatting** and some comment 
+          &lt;/div&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3802011955</id>
+    <published>2025-08-12 16:03:52 UTC</published>
+    <updated>2025-08-12 16:03:52 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/compare/574579be58...ed7e219cfb"/>
+    <title type="html">vshcherb pushed OsmAnd-tools</title>
+    <author>
+      <name>vshcherb</name>
+      <uri>https://github.com/vshcherb</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1042025?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/1042025?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@vshcherb&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;vshcherb&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T16:03:52Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 16:03&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;master&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-tools/tree/ed7e219cfb831a6094c3cf67dcfe794968b8323f&quot; rel=&quot;noreferrer&quot;&gt;ed7e219&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_created/2879710148</id>
+    <published>2025-08-12 08:14:24 -0700</published>
+    <updated>2025-08-12 08:14:24 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/pull/949"/>
+    <title type="html">alisa911 opened a pull request in web</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-pull-request js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+          
+          opened
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/web#949&quot; href=&quot;https://github.com/osmandapp/web/pull/949&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#949&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T08:14:24-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 08:14&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request pull-request d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;fix catch error&quot; href=&quot;https://github.com/osmandapp/web/pull/949&quot; rel=&quot;noreferrer&quot;&gt;fix catch error&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#949&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+2&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-7&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3800890409</id>
+    <published>2025-08-12 15:14:04 UTC</published>
+    <updated>2025-08-12 15:14:04 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/compare/0000000000...7f3e514309"/>
+    <title type="html">alisa911 pushed a branch</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-branch js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- create --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+        &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+          &lt;div class=&quot;color-fg-muted&quot;&gt;
+                &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+              &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+              
+              created a
+              branch
+              in
+              &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+
+            &lt;span&gt;
+              · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T15:14:04Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 15:14&lt;/relative-time&gt;
+            &lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 mt-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;div&gt;
+        &lt;div class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;
+          &lt;div class=&quot;d-inline-block&quot;&gt;
+            &lt;div class=&quot;d-flex&quot;&gt;
+              &lt;div class=&quot;mr-2&quot;&gt;
+                &lt;a class=&quot;d-flex&quot; data-hovercard-type=&quot;organization&quot; data-hovercard-url=&quot;/orgs/osmandapp/hovercard&quot; data-octo-click=&quot;hovercard-link-click&quot; data-octo-dimensions=&quot;link_type:self&quot; href=&quot;/osmandapp&quot; rel=&quot;noreferrer&quot;&gt;&lt;img src=&quot;https://avatars.githubusercontent.com/u/566635?s=40&amp;amp;v=4&quot; alt=&quot;@osmandapp&quot; size=&quot;20&quot; height=&quot;20&quot; width=&quot;20&quot; data-view-component=&quot;true&quot; class=&quot;avatar avatar-small&quot;&gt;&lt;/a&gt;
+              &lt;/div&gt;
+                  &lt;div class=&quot;d-inline-block&quot;&gt;
+                    &lt;a class=&quot;css-truncate css-truncate-target branch-name v-align-middle&quot; title=&quot;refs/heads/120825_3&quot; href=&quot;/osmandapp/web/tree/refs/heads/120825_3&quot; rel=&quot;noreferrer&quot;&gt;refs/heads/120825_3&lt;/a&gt; in &lt;a class=&quot;Link--primary text-bold no-underline wb-break-all d-inline-block&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+                  &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+
+          &lt;p class=&quot;f6 color-fg-muted mt-2 mb-0&quot;&gt;
+            &lt;span&gt;Updated Aug 12&lt;/span&gt;
+          &lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:issue_commented/2879461587</id>
+    <published>2025-08-12 08:03:20 -0700</published>
+    <updated>2025-08-12 08:03:20 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-iOS/issues/4808#issuecomment-3179740591"/>
+    <title type="html">alex-dev-neo commented on an issue in OsmAnd-iOS</title>
+    <author>
+      <name>alex-dev-neo</name>
+      <uri>https://github.com/alex-dev-neo</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/207013518?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;issues_comment js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- issue_comment --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline mb-2&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+            &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/207013518?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alex-dev-neo&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;alex-dev-neo&lt;/a&gt;
+          
+          commented on
+          &lt;a class=&quot;Link--primary&quot; title=&quot;No layer available to add as overlay or underlay&quot; href=&quot;/osmandapp/OsmAnd-iOS/issues/4808#issuecomment-3179740591&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-iOS#4808&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T08:03:20-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 08:03&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;div class=&quot;message markdown-body Box p-3 wb-break-all color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;div class=&quot;f6 mb-1&quot;&gt;
+        &lt;a title=&quot;No layer available to add as overlay or underlay&quot; class=&quot;Link--secondary&quot; href=&quot;/osmandapp/OsmAnd-iOS/issues/4808#issuecomment-3179740591&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar mr-1 avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/207013518?s=32&amp;amp;v=4&quot; width=&quot;16&quot; height=&quot;16&quot; alt=&quot;@alex-dev-neo&quot;&gt; &lt;span class=&quot;Link--primary text-bold&quot;&gt;alex-dev-neo&lt;/span&gt; commented &lt;relative-time datetime=&quot;2025-08-12T15:03:20Z&quot; class=&quot;no-wrap&quot;&gt;Aug 12, 2025&lt;/relative-time&gt;&lt;/a&gt;
+      &lt;/div&gt;
+        https://github.com/osmandapp/web/commit/a942aecf4f568ad75b297825f7738abe34ab1e91
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3800376611</id>
+    <published>2025-08-12 14:52:51 UTC</published>
+    <updated>2025-08-12 14:52:51 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/compare/fb73a9f0f8...a942aecf4f"/>
+    <title type="html">alex-dev-neo pushed web</title>
+    <author>
+      <name>alex-dev-neo</name>
+      <uri>https://github.com/alex-dev-neo</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/207013518?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/207013518?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alex-dev-neo&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;alex-dev-neo&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T14:52:51Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 14:52&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;main&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/web/tree/a942aecf4f568ad75b297825f7738abe34ab1e91&quot; rel=&quot;noreferrer&quot;&gt;a942aec&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2878872331</id>
+    <published>2025-08-12 07:38:04 -0700</published>
+    <updated>2025-08-12 07:38:04 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd/pull/23239"/>
+    <title type="html">RZR-UA contributed to osmandapp/OsmAnd</title>
+    <author>
+      <name>RZR-UA</name>
+      <uri>https://github.com/RZR-UA</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/90444451?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/90444451?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@RZR-UA&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;RZR-UA&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/OsmAnd#23239&quot; href=&quot;https://github.com/osmandapp/OsmAnd/pull/23239&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd#23239&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T07:38:04-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 07:38&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Update links from creator to builder&quot; href=&quot;https://github.com/osmandapp/OsmAnd/pull/23239&quot; rel=&quot;noreferrer&quot;&gt;Update links from creator to builder&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#23239&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+4&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-4&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3800015551</id>
+    <published>2025-08-12 14:37:54 UTC</published>
+    <updated>2025-08-12 14:37:54 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-iOS/compare/77ab778489...d4ddc2f7c5"/>
+    <title type="html">vshcherb pushed OsmAnd-iOS</title>
+    <author>
+      <name>vshcherb</name>
+      <uri>https://github.com/vshcherb</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1042025?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/1042025?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@vshcherb&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;vshcherb&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-iOS&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-iOS&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T14:37:54Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 14:37&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;master&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-iOS/tree/d4ddc2f7c549046c8543b742476763167ddd32b7&quot; rel=&quot;noreferrer&quot;&gt;d4ddc2f&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2878867885</id>
+    <published>2025-08-12 07:37:52 -0700</published>
+    <updated>2025-08-12 07:37:52 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-iOS/pull/4809"/>
+    <title type="html">RZR-UA contributed to osmandapp/OsmAnd-iOS</title>
+    <author>
+      <name>RZR-UA</name>
+      <uri>https://github.com/RZR-UA</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/90444451?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/90444451?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@RZR-UA&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;RZR-UA&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/OsmAnd-iOS#4809&quot; href=&quot;https://github.com/osmandapp/OsmAnd-iOS/pull/4809&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-iOS#4809&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T07:37:52-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 07:37&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Update links from creator to builder&quot; href=&quot;https://github.com/osmandapp/OsmAnd-iOS/pull/4809&quot; rel=&quot;noreferrer&quot;&gt;Update links from creator to builder&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#4809&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+5&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-5&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2878850709</id>
+    <published>2025-08-12 07:37:08 -0700</published>
+    <updated>2025-08-12 07:37:08 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-core/pull/895"/>
+    <title type="html">RZR-UA contributed to osmandapp/OsmAnd-core</title>
+    <author>
+      <name>RZR-UA</name>
+      <uri>https://github.com/RZR-UA</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/90444451?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/90444451?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@RZR-UA&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;RZR-UA&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/OsmAnd-core#895&quot; href=&quot;https://github.com/osmandapp/OsmAnd-core/pull/895&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-core#895&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T07:37:08-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 07:37&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Update links from creator to builder&quot; href=&quot;https://github.com/osmandapp/OsmAnd-core/pull/895&quot; rel=&quot;noreferrer&quot;&gt;Update links from creator to builder&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#895&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+9&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-9&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3799989236</id>
+    <published>2025-08-12 14:36:51 UTC</published>
+    <updated>2025-08-12 14:36:51 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/compare/959e1b64a0...0000000000"/>
+    <title type="html">vshcherb pushed</title>
+    <author>
+      <name>vshcherb</name>
+      <uri>https://github.com/vshcherb</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1042025?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-branch js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- delete --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/1042025?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@vshcherb&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/vshcherb&quot; rel=&quot;noreferrer&quot;&gt;vshcherb&lt;/a&gt;
+      
+      deleted
+      branch
+      &lt;span class=&quot;branch-name&quot;&gt;refs/heads/rzr-builder-2&lt;/span&gt;
+      in
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T14:36:51Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 14:36&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+      &lt;div class=&quot;Box p-3 mt-2 color-shadow-medium color-bg-overlay&quot;&gt;
+        &lt;div&gt;
+          &lt;div class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;
+            &lt;a class=&quot;Link--primary text-bold no-underline wb-break-all d-inline-block&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+          &lt;/div&gt;
+
+
+            &lt;p class=&quot;f6 color-fg-muted mt-2 mb-0&quot;&gt;
+              &lt;span&gt;Updated Aug 12&lt;/span&gt;
+            &lt;/p&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2878843868</id>
+    <published>2025-08-12 07:36:49 -0700</published>
+    <updated>2025-08-12 07:36:49 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/pull/1222"/>
+    <title type="html">RZR-UA contributed to osmandapp/OsmAnd-tools</title>
+    <author>
+      <name>RZR-UA</name>
+      <uri>https://github.com/RZR-UA</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/90444451?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/90444451?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@RZR-UA&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;RZR-UA&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/OsmAnd-tools#1222&quot; href=&quot;https://github.com/osmandapp/OsmAnd-tools/pull/1222&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools#1222&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T07:36:49-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 07:36&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Update creator to builder (obf-generation, etc)&quot; href=&quot;https://github.com/osmandapp/OsmAnd-tools/pull/1222&quot; rel=&quot;noreferrer&quot;&gt;Update creator to builder (obf-generation, etc)&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#1222&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+17&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-17&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3799879423</id>
+    <published>2025-08-12 14:32:32 UTC</published>
+    <updated>2025-08-12 14:32:32 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-iOS/compare/569e73c9ac...0f8ffea149"/>
+    <title type="html">Vladyslav-lys pushed OsmAnd-iOS</title>
+    <author>
+      <name>Vladyslav-lys</name>
+      <uri>https://github.com/Vladyslav-lys</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/66596645?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Vladyslav-lys&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/66596645?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Vladyslav-lys&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Vladyslav-lys&quot; rel=&quot;noreferrer&quot;&gt;Vladyslav-lys&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-iOS&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-iOS&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T14:32:32Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 14:32&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;unable_to_move_complex_widget&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-iOS/tree/0f8ffea149e28b4382f5e24e3ef8eac19b2bbaf4&quot; rel=&quot;noreferrer&quot;&gt;0f8ffea&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2878045833</id>
+    <published>2025-08-12 07:03:46 -0700</published>
+    <updated>2025-08-12 07:03:46 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/pull/948"/>
+    <title type="html">alisa911 contributed to osmandapp/web</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/web#948&quot; href=&quot;https://github.com/osmandapp/web/pull/948&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#948&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T07:03:46-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 07:03&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;fix saving favorites after update&quot; href=&quot;https://github.com/osmandapp/web/pull/948&quot; rel=&quot;noreferrer&quot;&gt;fix saving favorites after update&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#948&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+493&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-244&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3799043793</id>
+    <published>2025-08-12 13:59:36 UTC</published>
+    <updated>2025-08-12 13:59:36 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/compare/5f7ccec63f...00822e366a"/>
+    <title type="html">xmd5a2 pushed web</title>
+    <author>
+      <name>xmd5a2</name>
+      <uri>https://github.com/xmd5a2</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/5829014?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/xmd5a2&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/5829014?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@xmd5a2&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/xmd5a2&quot; rel=&quot;noreferrer&quot;&gt;xmd5a2&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T13:59:36Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 13:59&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;main&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/web/tree/00822e366a5ad222f1e8feaa0a5b20a6e0b71edd&quot; rel=&quot;noreferrer&quot;&gt;00822e3&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:issue_commented/2877710967</id>
+    <published>2025-08-12 06:50:13 -0700</published>
+    <updated>2025-08-12 06:50:13 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/issues/848#issuecomment-3179434486"/>
+    <title type="html">alisa911 commented on an issue in web</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;issues_comment js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- issue_comment --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline mb-2&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+            &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+          
+          commented on
+          &lt;a class=&quot;Link--primary&quot; title=&quot;Cloud sync issue: the appearance of favorites groups (on/off display) is not synced anymore (but it was before)&quot; href=&quot;/osmandapp/web/issues/848#issuecomment-3179434486&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#848&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T06:50:13-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 06:50&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;div class=&quot;message markdown-body Box p-3 wb-break-all color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;div class=&quot;f6 mb-1&quot;&gt;
+        &lt;a title=&quot;Cloud sync issue: the appearance of favorites groups (on/off display) is not synced anymore (but it was before)&quot; class=&quot;Link--secondary&quot; href=&quot;/osmandapp/web/issues/848#issuecomment-3179434486&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar mr-1 avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=32&amp;amp;v=4&quot; width=&quot;16&quot; height=&quot;16&quot; alt=&quot;@alisa911&quot;&gt; &lt;span class=&quot;Link--primary text-bold&quot;&gt;alisa911&lt;/span&gt; commented &lt;relative-time datetime=&quot;2025-08-12T13:50:13Z&quot; class=&quot;no-wrap&quot;&gt;Aug 12, 2025&lt;/relative-time&gt;&lt;/a&gt;
+      &lt;/div&gt;
+        Android - IOS - not work
+IOS - Android - OFF detected but not applied in app Android - WEB - not work
+WEB - Android - OFF detected but not applied …
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3798549183</id>
+    <published>2025-08-12 13:39:54 UTC</published>
+    <updated>2025-08-12 13:39:54 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/compare/0000000000...9c4426be57"/>
+    <title type="html">Dima-1 created a branch</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-branch js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- create --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+        &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+          &lt;div class=&quot;color-fg-muted&quot;&gt;
+                &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+              &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+              
+              created a
+              branch
+              in
+              &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+
+            &lt;span&gt;
+              · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T13:39:54Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 13:39&lt;/relative-time&gt;
+            &lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 mt-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;div&gt;
+        &lt;div class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;
+          &lt;div class=&quot;d-inline-block&quot;&gt;
+            &lt;div class=&quot;d-flex&quot;&gt;
+              &lt;div class=&quot;mr-2&quot;&gt;
+                &lt;a class=&quot;d-flex&quot; data-hovercard-type=&quot;organization&quot; data-hovercard-url=&quot;/orgs/osmandapp/hovercard&quot; data-octo-click=&quot;hovercard-link-click&quot; data-octo-dimensions=&quot;link_type:self&quot; href=&quot;/osmandapp&quot; rel=&quot;noreferrer&quot;&gt;&lt;img src=&quot;https://avatars.githubusercontent.com/u/566635?s=40&amp;amp;v=4&quot; alt=&quot;@osmandapp&quot; size=&quot;20&quot; height=&quot;20&quot; width=&quot;20&quot; data-view-component=&quot;true&quot; class=&quot;avatar avatar-small&quot;&gt;&lt;/a&gt;
+              &lt;/div&gt;
+                  &lt;div class=&quot;d-inline-block&quot;&gt;
+                    &lt;a class=&quot;css-truncate css-truncate-target branch-name v-align-middle&quot; title=&quot;refs/heads/2994-fix-cloud-kml&quot; href=&quot;/osmandapp/OsmAnd-tools/tree/refs/heads/2994-fix-cloud-kml&quot; rel=&quot;noreferrer&quot;&gt;refs/heads/2994-fix-cloud-kml&lt;/a&gt; in &lt;a class=&quot;Link--primary text-bold no-underline wb-break-all d-inline-block&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+                  &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+
+          &lt;p class=&quot;f6 color-fg-muted mt-2 mb-0&quot;&gt;
+            &lt;span&gt;Updated Aug 12&lt;/span&gt;
+          &lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3798415290</id>
+    <published>2025-08-12 13:34:36 UTC</published>
+    <updated>2025-08-12 13:34:36 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web-server-config/compare/c939f78fa7...7b7cd56c5c"/>
+    <title type="html">RZR-UA pushed web-server-config</title>
+    <author>
+      <name>RZR-UA</name>
+      <uri>https://github.com/RZR-UA</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/90444451?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/90444451?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@RZR-UA&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/RZR-UA&quot; rel=&quot;noreferrer&quot;&gt;RZR-UA&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web-server-config&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web-server-config&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T13:34:36Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 13:34&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;main&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/web-server-config/tree/7b7cd56c5c701ae0dd892551bdb60ea0fd806019&quot; rel=&quot;noreferrer&quot;&gt;7b7cd56&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3797802061</id>
+    <published>2025-08-12 13:10:28 UTC</published>
+    <updated>2025-08-12 13:10:28 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/compare/2a3b64f12e...a8fa5a594a"/>
+    <title type="html">alisa911 pushed web</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T13:10:28Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 13:10&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;120825_1&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/web/tree/a8fa5a594ae52c0a0c943a45adff309b17189944&quot; rel=&quot;noreferrer&quot;&gt;a8fa5a5&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_created/2876191177</id>
+    <published>2025-08-12 05:44:09 -0700</published>
+    <updated>2025-08-12 05:44:09 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/pull/948"/>
+    <title type="html">alisa911 contributed to osmandapp/web</title>
+    <author>
+      <name>alisa911</name>
+      <uri>https://github.com/alisa911</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/38911173?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/38911173?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alisa911&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alisa911&quot; rel=&quot;noreferrer&quot;&gt;alisa911&lt;/a&gt;
+          
+          opened
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/web#948&quot; href=&quot;https://github.com/osmandapp/web/pull/948&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#948&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T05:44:09-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 05:44&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;fix saving favorites after update&quot; href=&quot;https://github.com/osmandapp/web/pull/948&quot; rel=&quot;noreferrer&quot;&gt;fix saving favorites after update&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#948&lt;/span&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+493&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-244&lt;/span&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;d-inline-block f6 color-fg-muted ml-3&quot;&gt;
+            1 comment
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3796161084</id>
+    <published>2025-08-12 12:03:19 UTC</published>
+    <updated>2025-08-12 12:03:19 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-core/compare/be60c3f43e...a79046fcd5"/>
+    <title type="html">alex-dev-neo pushed OsmAnd-core</title>
+    <author>
+      <name>alex-dev-neo</name>
+      <uri>https://github.com/alex-dev-neo</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/207013518?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/207013518?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@alex-dev-neo&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/alex-dev-neo&quot; rel=&quot;noreferrer&quot;&gt;alex-dev-neo&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-core&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-core&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T12:03:19Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 12:03&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;master&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-core/tree/a79046fcd57c00617938feb493aeb5fd5b165681&quot; rel=&quot;noreferrer&quot;&gt;a79046f&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3795913853</id>
+    <published>2025-08-12 11:52:20 UTC</published>
+    <updated>2025-08-12 11:52:20 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-iOS/compare/e00776655e...569e73c9ac"/>
+    <title type="html">Vladyslav-lys pushed OsmAnd-iOS</title>
+    <author>
+      <name>Vladyslav-lys</name>
+      <uri>https://github.com/Vladyslav-lys</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/66596645?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Vladyslav-lys&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/66596645?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Vladyslav-lys&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Vladyslav-lys&quot; rel=&quot;noreferrer&quot;&gt;Vladyslav-lys&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-iOS&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-iOS&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T11:52:20Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 11:52&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;unable_to_move_complex_widget&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-iOS/tree/569e73c9acffbefdd24f0588cd6b9467613dac48&quot; rel=&quot;noreferrer&quot;&gt;569e73c&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:issue_reopened/2874982282</id>
+    <published>2025-08-12 04:44:10 -0700</published>
+    <updated>2025-08-12 04:44:10 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-Issues/issues/2994"/>
+    <title type="html">Dima-1 reopened an issue in OsmAnd-Issues</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;issues_reopened js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- issues --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;d-flex flex-items-baseline mb-2&quot;&gt;
+      &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+          
+          ACTION_REOPENED
+          an issue in
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-Issues&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-Issues&lt;/a&gt;
+        &lt;span&gt;
+          · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T04:44:10-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 04:44&lt;/relative-time&gt;
+        &lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 wb-break-all color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Issue&quot; class=&quot;octicon octicon-issue-opened open d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z&quot;&gt;&lt;/path&gt;&lt;path d=&quot;M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;
+          &lt;a title=&quot;#&amp;lt;Issue:0x00007fc1c4b86400&amp;gt;&quot; class=&quot;color-fg-default&quot; aria-label=&quot;#&amp;lt;Issue:0x00007fc1c4b86400&amp;gt;&quot; href=&quot;/osmandapp/OsmAnd-Issues/issues/2994&quot; rel=&quot;noreferrer&quot;&gt;#&amp;lt;Issue:0x00007fc1c4b86400&amp;gt;&lt;/a&gt;
+        &lt;/span&gt;
+        &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#2994&lt;/span&gt;
+          &lt;div class=&quot;dashboard-break-word lh-condensed mb-2 mt-1&quot;&gt;
+            ## Description
+We have user ask about if he can import his Maps.me bookmarks into OsmAnd. While testing I have discovered issues with iOS and Web v…
+          &lt;/div&gt;
+
+          &lt;div class=&quot;f6 color-fg-muted mt-1&quot;&gt;
+            5 comments
+          &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3795132471</id>
+    <published>2025-08-12 11:15:53 UTC</published>
+    <updated>2025-08-12 11:15:53 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/compare/743a28ac49...5f7ccec63f"/>
+    <title type="html">Dima-1 pushed web</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/web&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T11:15:53Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 11:15&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;main&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/web/tree/5f7ccec63f7239597bcacfe294c70ecc66e85d6b&quot; rel=&quot;noreferrer&quot;&gt;5f7ccec&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_merged/2874474608</id>
+    <published>2025-08-12 04:15:52 -0700</published>
+    <updated>2025-08-12 04:15:52 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/pull/947"/>
+    <title type="html">Dima-1 contributed to osmandapp/web</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+          
+          merged
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/web#947&quot; href=&quot;https://github.com/osmandapp/web/pull/947&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#947&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T04:15:52-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 04:15&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Revert &amp;quot;Fix upload  kml/kmz to the cloud&amp;quot;&quot; href=&quot;https://github.com/osmandapp/web/pull/947&quot; rel=&quot;noreferrer&quot;&gt;Revert &quot;Fix upload  kml/kmz to the cloud&quot;&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#947&lt;/span&gt;
+            &lt;div class=&quot;lh-condensed mb-2 mt-1&quot;&gt;
+              &lt;p dir=&quot;auto&quot;&gt;Reverts &lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;3312578894&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/osmandapp/web/issues/943&quot; data-hovercard-type=&quot;pull_request&quot; data-hovercard-url=&quot;/osmandapp/web/pull/943/hovercard&quot; href=&quot;https://github.com/osmandapp/web/pull/943&quot; rel=&quot;noreferrer&quot;&gt;#943&lt;/a&gt;&lt;/p&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+5&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-18&lt;/span&gt;
+          &lt;/div&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:pr_created/2874468759</id>
+    <published>2025-08-12 04:15:33 -0700</published>
+    <updated>2025-08-12 04:15:33 -0700</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/web/pull/947"/>
+    <title type="html">Dima-1 contributed to osmandapp/web</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;git-merge js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- pull_request --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div&gt;
+      &lt;div class=&quot;d-flex flex-items-baseline&quot;&gt;
+        &lt;div class=&quot;color-fg-muted&quot;&gt;
+          &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+          
+          opened
+          &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; aria-label=&quot;osmandapp/web#947&quot; href=&quot;https://github.com/osmandapp/web/pull/947&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/web#947&lt;/a&gt;
+          &lt;span&gt;
+            · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T04:15:33-07:00&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 04:15&lt;/relative-time&gt;
+          &lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;Box p-3 my-2 color-shadow-medium color-bg-overlay&quot;&gt;
+      &lt;svg height=&quot;16&quot; aria-label=&quot;Pull request&quot; class=&quot;octicon octicon-git-pull-request merge d-inline-block mt-1 float-left&quot; viewBox=&quot;0 0 16 16&quot; version=&quot;1.1&quot; width=&quot;16&quot; role=&quot;img&quot;&gt;&lt;path d=&quot;M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z&quot;&gt;&lt;/path&gt;&lt;/svg&gt;
+
+      &lt;div class=&quot;ml-4&quot;&gt;
+        &lt;div&gt;
+          &lt;span class=&quot;f4 lh-condensed text-bold color-fg-default&quot;&gt;&lt;a class=&quot;color-fg-default text-bold&quot; aria-label=&quot;Revert &amp;quot;Fix upload  kml/kmz to the cloud&amp;quot;&quot; href=&quot;https://github.com/osmandapp/web/pull/947&quot; rel=&quot;noreferrer&quot;&gt;Revert &quot;Fix upload  kml/kmz to the cloud&quot;&lt;/a&gt;&lt;/span&gt;
+          &lt;span class=&quot;f4 color-fg-muted ml-1&quot;&gt;#947&lt;/span&gt;
+            &lt;div class=&quot;lh-condensed mb-2 mt-1&quot;&gt;
+              &lt;p dir=&quot;auto&quot;&gt;Reverts &lt;a class=&quot;issue-link js-issue-link&quot; data-error-text=&quot;Failed to load title&quot; data-id=&quot;3312578894&quot; data-permission-text=&quot;Title is private&quot; data-url=&quot;https://github.com/osmandapp/web/issues/943&quot; data-hovercard-type=&quot;pull_request&quot; data-hovercard-url=&quot;/osmandapp/web/pull/943/hovercard&quot; href=&quot;https://github.com/osmandapp/web/pull/943&quot; rel=&quot;noreferrer&quot;&gt;#943&lt;/a&gt;&lt;/p&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+          &lt;div class=&quot;diffstat d-inline-block mt-1&quot;&gt;
+            &lt;span class=&quot;color-fg-success&quot;&gt;+5&lt;/span&gt;
+            &lt;span class=&quot;color-fg-danger&quot;&gt;-18&lt;/span&gt;
+          &lt;/div&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:push/3795118405</id>
+    <published>2025-08-12 11:15:15 UTC</published>
+    <updated>2025-08-12 11:15:15 UTC</updated>
+    <link type="text/html" rel="alternate" href="https://github.com/osmandapp/OsmAnd-tools/compare/b040ff4d9d...954c080c72"/>
+    <title type="html">Dima-1 pushed OsmAnd-tools</title>
+    <author>
+      <name>Dima-1</name>
+      <uri>https://github.com/Dima-1</uri>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/31807095?s=30&amp;v=4"/>
+    <content type="html">&lt;div class=&quot;repo-push js-feed-item-view&quot;&gt;&lt;div class=&quot;body&quot;&gt;
+&lt;!-- push --&gt;
+&lt;div class=&quot;d-flex flex-items-baseline py-4&quot;&gt;
+  &lt;div class=&quot;d-flex flex-column width-full&quot;&gt;
+    &lt;div class=&quot;color-fg-muted&quot;&gt;
+      &lt;span class=&quot;mr-2&quot;&gt;&lt;a class=&quot;d-inline-block&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;&lt;img class=&quot;avatar avatar-user&quot; src=&quot;https://avatars.githubusercontent.com/u/31807095?s=64&amp;amp;v=4&quot; width=&quot;32&quot; height=&quot;32&quot; alt=&quot;@Dima-1&quot;&gt;&lt;/a&gt;&lt;/span&gt;
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/Dima-1&quot; rel=&quot;noreferrer&quot;&gt;Dima-1&lt;/a&gt;
+      
+      pushed to
+      &lt;a class=&quot;Link--primary no-underline wb-break-all&quot; href=&quot;/osmandapp/OsmAnd-tools&quot; rel=&quot;noreferrer&quot;&gt;osmandapp/OsmAnd-tools&lt;/a&gt;
+      &lt;span&gt;
+        · &lt;relative-time tense=&quot;past&quot; datetime=&quot;2025-08-12T11:15:15Z&quot; data-view-component=&quot;true&quot;&gt;August 12, 2025 11:15&lt;/relative-time&gt;
+      &lt;/span&gt;
+
+        &lt;div&gt;
+          &lt;strong&gt;master&lt;/strong&gt; is now
+          &lt;code&gt;&lt;a href=&quot;/osmandapp/OsmAnd-tools/tree/954c080c7239249a35cb183860189dc6e1907295&quot; rel=&quot;noreferrer&quot;&gt;954c080&lt;/a&gt;&lt;/code&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+</feed>

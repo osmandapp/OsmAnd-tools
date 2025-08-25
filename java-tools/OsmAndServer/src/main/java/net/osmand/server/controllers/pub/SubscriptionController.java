@@ -303,7 +303,9 @@ public class SubscriptionController {
 					result.put("eligible_for_introductory_price", "true");
 					result.put("eligible_for_subscription_offer", "false");
 					result.put("result", false);
-					result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
+                    // Temporarily set to 0, since OsmAnd iOS has issue with processing such status
+					result.put("status", 0);
+					// result.put("status", NO_SUBSCRIPTIONS_FOUND_STATUS);
 				} else {
 					result.put("eligible_for_introductory_price",
 							isEligibleForIntroductoryPrice(inAppReceipts) ? "true" : "false");

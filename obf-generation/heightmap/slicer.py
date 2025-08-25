@@ -5,7 +5,8 @@ import sys
 import os
 from optparse import OptionParser
 from osgeo import gdal, gdalconst
-from gdal2tiles import GlobalMercator
+#from gdal2tiles import GlobalMercator
+from osgeo_utils.gdal2tiles import GlobalMercator
 
 # =============================================================================
 # =============================================================================

@@ -26,7 +26,10 @@ public interface CloudUserDevicesRepository extends JpaRepository<CloudUserDevic
     CloudUserDevice findTopByUseridAndDeviceidOrderByUdpatetimeDesc(int userid, String deviceid);
 
     List<CloudUserDevice> findByUserid(int userid);
+    
     List<CloudUserDevice> findByUseridAndDeviceid(int userid, String deviceid);
+    
+    CloudUserDevice findByAccesstoken(String accesstoken);
 
     int deleteByUserid(int userid);
 

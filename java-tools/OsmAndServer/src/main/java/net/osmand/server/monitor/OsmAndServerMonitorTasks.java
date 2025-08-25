@@ -26,6 +26,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.logging.Log;
@@ -72,28 +74,45 @@ public class OsmAndServerMonitorTasks {
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
-	private static final String[] HOSTS_TO_TEST = new String[] { "download.osmand.net",
-			 "dl2.osmand.net", "dl3.osmand.net",  "dl4.osmand.net",  "dl8.osmand.net",  "dl9.osmand.net", 
-			 "maptile.osmand.net", "data.osmand.net"};
-	private static final String[] JAVA_HOSTS_TO_TEST = new String[] { "test.osmand.net", "download.osmand.net",
-			"maptile.osmand.net" };
-	private static final String[] JAVA_HOSTS_TO_RESTART = new String[] {
-			"https://creator.osmand.net:8080/view/WebSite/job/WebSite_OsmAndServer/", // TODO add builder
+	private static final String[] HOSTS_TO_TEST = new String[]{
+			"download.osmand.net",
+			"maptile.osmand.net",
+			"data.osmand.net",
+			"test.osmand.net",
+			"dl2.osmand.net",
+			"dl3.osmand.net",
+			"dl4.osmand.net",
+			"dl8.osmand.net",
+			"dl9.osmand.net"
+	};
+	private static final String[] JAVA_HOSTS_TO_TEST = new String[]{
+			"download.osmand.net",
+			"builder.osmand.net",
+			"maptile.osmand.net"
+	};
+	private static final String[] JAVA_HOSTS_TO_RESTART = new String[]{
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
-			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/" };
+			"https://builder.osmand.net:8080/job/WebSite_OsmAndServer/",
+			"https://maptile.osmand.net:8080/job/UpdateOsmAndServer/"
+	};
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
 	
 	// Build Server
 	List<BuildServerCheckInfo> buildServers = new ArrayList<>();
 	{
-//		buildServers.add(new BuildServerCheckInfo("https://builder.osmand.net:8080", "builder")); // TODO no-anonymous
-		buildServers.add(new BuildServerCheckInfo("https://creator.osmand.net:8080", "creator"));
-		buildServers.add(new BuildServerCheckInfo("https://dl2.osmand.net:8080", "jenkins-dl2"));
-		buildServers.add(new BuildServerCheckInfo("https://osmand.net:8095", "jenkins-main"));
-		buildServers.add(new BuildServerCheckInfo("https://maptile.osmand.net:8080", "jenkins-maptile"));
-		buildServers.add(new BuildServerCheckInfo("https://data.osmand.net:8080", "jenkins-data"));
-		buildServers.add(new BuildServerCheckInfo("https://veles.osmand.net:8080", "jenkins-veles"));
+		buildServers.add(new BuildServerCheckInfo(
+				"builder", "https://builder.osmand.net:8080", "https://builder.osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"dl2", "https://dl2.osmand.net:8080", "https://dl2.osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"main", "https://osmand.net:8095", "https://osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"maptile", "https://maptile.osmand.net:8080", "https://maptile.osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"data", "https://data.osmand.net:8080", "https://data.osmand.net/jenkins_status.json"));
+		buildServers.add(new BuildServerCheckInfo(
+				"veles", "https://veles.osmand.net:8080", "https://veles.osmand.net/jenkins_status.json"));
 	}
 	
 
@@ -117,10 +136,10 @@ public class OsmAndServerMonitorTasks {
 		TIMESTAMP_FORMAT_OPR.setTimeZone(TimeZone.getTimeZone("UTC"));
 	}
 
-//	private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
-	// Formatter for the first pattern (e.g., "2025-08-09 12:21:49 -0700")
+//  private final static SimpleDateFormat XML_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+	// Formatter for the pattern "2025-08-09 12:21:49 -0700"
 	private static final SimpleDateFormat FORMAT_RFC822 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
-	// Formatter for the second pattern (e.g., "2025-08-09 18:20:24 UTC")
+	// Formatter for the pattern "2025-08-09 18:20:24 UTC"
 	private static final SimpleDateFormat FORMAT_ZONE_ID = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss zzz");
 
 	private static Date parseDate(String s) throws ParseException {
@@ -172,7 +191,6 @@ public class OsmAndServerMonitorTasks {
 		String title;
 		String author;
 		String link;
-		String linkTitle;
 	}
 
 
@@ -260,7 +278,7 @@ public class OsmAndServerMonitorTasks {
 				}
 			}
 		} catch (Exception e) {
-			sendBroadcastMessage("Exception while checking the java server status.");
+			sendBroadcastMessage("Exception while checking the Java server status.");
 			LOG.error(e.getMessage(), e);
 		}
 	}
@@ -276,13 +294,37 @@ public class OsmAndServerMonitorTasks {
 		}
 		for (BuildServerCheckInfo buildServer : buildServers) {
 			try {
+				JSONArray jobsArray = new JSONArray();
 				Set<String> jobsFailed = new TreeSet<String>();
-				URL url = new URL(buildServer.serverUrl + "/api/json");
-				InputStream is = url.openConnection().getInputStream();
-				JSONObject object = new JSONObject(new JSONTokener(is));
-				JSONArray jsonArray = object.getJSONArray("jobs");
-				for (int i = 0; i < jsonArray.length(); i++) {
-					JSONObject jb = jsonArray.getJSONObject(i);
+
+				URL url = new URL(buildServer.jenkinsUrl + "/api/json");
+				HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+				int code = connection.getResponseCode();
+
+				if (code == HttpURLConnection.HTTP_OK) {
+					InputStream is = connection.getInputStream();
+					JSONObject object = new JSONObject(new JSONTokener(is));
+					jobsArray = object.getJSONArray("jobs");
+					is.close();
+				} else if (code != HttpURLConnection.HTTP_UNAUTHORIZED && code != HttpURLConnection.HTTP_FORBIDDEN) {
+					sendBroadcastMessage(String.format("Jenkins %s got bad response (%d)", buildServer.jenkinsUrl, code));
+				}
+
+				if (jobsArray.isEmpty() && buildServer.statusJsonUrl != null) {
+					url = new URL(buildServer.statusJsonUrl);
+					connection = (HttpURLConnection) url.openConnection();
+					InputStream is = connection.getInputStream();
+					jobsArray = new JSONArray(new JSONTokener(is));
+					is.close();
+				}
+
+				if (jobsArray.isEmpty()) {
+					sendBroadcastMessage(String.format(
+							"No Jenkins jobs found on (%s) (%s)", buildServer.jenkinsUrl, buildServer.statusJsonUrl));
+				}
+
+				for (int i = 0; i < jobsArray.length(); i++) {
+					JSONObject jb = jobsArray.getJSONObject(i);
 					String name = jb.getString("name");
 					String color = jb.getString("color");
 					if (!color.equals("blue") && !color.equals("disabled") && !color.equals("notbuilt")
@@ -290,28 +332,29 @@ public class OsmAndServerMonitorTasks {
 						jobsFailed.add(name);
 					}
 				}
-				is.close();
+
 				if (buildServer.jobsFailed == null) {
 					buildServer.jobsFailed = jobsFailed;
 				} else if (!buildServer.jobsFailed.equals(jobsFailed)) {
 					Set<String> jobsFailedCopy = new TreeSet<String>(jobsFailed);
 					jobsFailedCopy.removeAll(buildServer.jobsFailed);
 					if (!jobsFailedCopy.isEmpty()) {
-						sendBroadcastMessage(
-								"There are new failures on Build Server: " + formatJobNamesAsHref(buildServer, jobsFailedCopy));
+						sendBroadcastMessage(String.format("New failures on %s: %s",
+								buildServer.serverName, formatJobNamesAsHref(buildServer, jobsFailedCopy)));
 					}
 					Set<String> jobsRecoveredCopy = new TreeSet<String>(buildServer.jobsFailed);
 					jobsRecoveredCopy.removeAll(jobsFailed);
 					if (!jobsRecoveredCopy.isEmpty()) {
-						sendBroadcastMessage(
-								"There are recovered jobs on Build Server: " + formatJobNamesAsHref(buildServer, jobsRecoveredCopy));
+						sendBroadcastMessage(String.format("Recovered jobs on %s: %s",
+								buildServer.serverName, formatJobNamesAsHref(buildServer, jobsRecoveredCopy)));
 					}
 					buildServer.jobsFailed = jobsFailed;
 				}
 				buildServer.lastCheckTimestamp = System.currentTimeMillis();
 			} catch (Exception e) {
-				sendBroadcastMessage("Exception while checking the build server status: " + buildServer.serverUrl);
-				LOG.error(buildServer.serverUrl + "\n" + e.getMessage(), e);
+				sendBroadcastMessage(String.format(
+						"Exception in checkOsmAndBuildServer (%s) (%s)", buildServer.serverName, e.getMessage()));
+				LOG.error(buildServer.jenkinsUrl + "\n" + e.getMessage(), e);
 			}
 		}
 	}
@@ -613,7 +656,6 @@ public class OsmAndServerMonitorTasks {
 						return ps.execute();
 					}
 				});
-//		redisTemplate.opsForZSet().add(key, score + ":" + now, now);
 	}
 
 	private double estimateResponse(String tileUrl) {
@@ -670,7 +712,6 @@ public class OsmAndServerMonitorTasks {
 	private DescriptiveStatistics readStats(String key, String server, int hour) {
 		
 		DescriptiveStatistics stats = new DescriptiveStatistics();
-//		Set<String> ls = redisTemplate.opsForZSet().rangeByScore(key, now - hour * HOUR, now);
 		jdbcTemplate.execute("SELECT value FROM servers.metrics WHERE name = ? and server = ? and timestamp >= now() - interval ? hour "
 						+ " ORDER BY timestamp asc", new PreparedStatementCallback<Boolean>() {
 
@@ -717,12 +758,12 @@ public class OsmAndServerMonitorTasks {
 		for (BuildServerCheckInfo buildServer : buildServers) {
 			if (buildServer.jobsFailed != null && !buildServer.jobsFailed.isEmpty()) {
 				failed++;
-				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.serverUrl,
+				msg += String.format("<a href='%s'>%s</a>: <b>FAILED</b>. Jobs: %s\n", buildServer.jenkinsUrl,
 						buildServer.serverName, formatJobNamesAsHref(buildServer, buildServer.jobsFailed));
 			}
 		}
 		if (failed == 0) {
-			msg += "<a href='https://creator.osmand.net:8080'>jenkins</a>: <b>OK</b>.\n"; // TODO builder
+			msg += "<a href='https://builder.osmand.net:8080/'>Jenkins</a>: <b>OK</b>.\n";
 		}
 		for (String host: downloadTests.keySet()) {
 			DownloadTestResult r = downloadTests.get(host);
@@ -732,10 +773,6 @@ public class OsmAndServerMonitorTasks {
 		msg += getTileServerMessage();
 		return msg;
 	}
-
-	
-
-	
 
 	private String timeAgo(long tm) {
 		float hr = (float) ((System.currentTimeMillis() - tm) / (60 * 60 * 1000.0));
@@ -747,7 +784,7 @@ public class OsmAndServerMonitorTasks {
 	private Set<String> formatJobNamesAsHref(BuildServerCheckInfo buildServer, Set<String> jobNames) {
 		Set<String> formatted = new TreeSet<>();
 		for (String jobName : jobNames) {
-			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.serverUrl, jobName, jobName));
+			formatted.add(String.format("<a href='%s/job/%s/'>%s</a>", buildServer.jenkinsUrl, jobName, jobName));
 		}
 		return formatted;
 	}
@@ -773,7 +810,7 @@ public class OsmAndServerMonitorTasks {
 		if (!Algorithms.isEmpty(urlChangesFeed)) {
 			List<FeedEntry> newFeed = new ArrayList<>();
 			long timestampNow = System.currentTimeMillis();
-			for (FeedEntry e : parseFeed(urlChangesFeed)) {
+			for (FeedEntry e : parseFeed(new URL(urlChangesFeed).openStream())) {
 				FeedEntry old = null;
 				for (FeedEntry o : feed) {
 					if (Algorithms.objectEquals(o.id, e.id)) {
@@ -789,12 +826,10 @@ public class OsmAndServerMonitorTasks {
 			if (lastFeedCheckTimestamp == 0) {
 				if (newFeed.size() > 0) {
 					FeedEntry last = newFeed.get(newFeed.size() - 1);
-					downloadLinkTitle(last);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(last));
 				}
 			} else {
 				for (FeedEntry n : newFeed) {
-					downloadLinkTitle(n);
 					telegram.sendChannelMessage(publishChannel, formatGithubMsg(n));
 				}
 			}
@@ -803,104 +838,119 @@ public class OsmAndServerMonitorTasks {
 				feed.remove(0);
 			}
 			
-
 			lastFeedCheckTimestamp = timestampNow;
 		}
 	}
+
 	
-	private void downloadLinkTitle(FeedEntry e) {
-		if (e.link != null) {
-			try {
-				URL url = new URL(e.link);
-				InputStream stream = url.openStream();
-				BufferedReader br = new BufferedReader(new InputStreamReader(stream));
-				String s;
-				while ((s = br.readLine()) != null) {
-					if (s.contains("<title>")) {
-						LOG.info("Check " + s);
-						int i1 = s.indexOf("<title>");
-						int i2 = s.indexOf("</title>");
-						if (i1 != -1 && i2 != -1) {
-							e.linkTitle = s.substring(i1 + "<title>".length(), i2).trim();
-							break;
-						}
-					}
-				}
-				br.close();
-			} catch (Exception e1) {
-				LOG.info("Failed to fetch " + e.link, e1);
-			}
-		}
-	}
 
 	static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(" EEE - dd MMM yyyy, HH:mm");
 	
+	/**
+	 * This method now creates a plain text message with a raw link
+	 * to allow for Telegram's link preview functionality.
+	 */
 	private String formatGithubMsg(FeedEntry n) {
 		String emoji = EmojiConstants.GITHUB_EMOJI;
 		String tags = "";
-		if(n.title.contains("reopen")) {
+
+		String title = n.title.toLowerCase();
+
+		
+		if (title.contains("opened a pull request")) {
+			emoji = EmojiConstants.OPEN_EMOJI;
+			tags = "#pullrequest #open";
+		} else if (title.contains("reopened")) {
 			emoji = EmojiConstants.REOPEN_EMOJI;
 			tags = "#reopen";
-		} else if(n.title.contains("open")) {
+		} else if (title.contains("opened an issue")) {
 			emoji = EmojiConstants.OPEN_EMOJI;
-			tags = "#open";
-		} else if(n.title.contains("create")) {
-			emoji = EmojiConstants.CREATE_EMOJI;
-			tags = "#create";
-		} else if(n.title.contains("close")) {
+			tags = "#issue #open";
+		} else if (title.contains("closed")) {
 			emoji = EmojiConstants.CLOSED_EMOJI;
 			tags = "#close";
-		} else if(n.title.contains("pushed")) {
+		} else if (title.contains("pushed")) {
 			emoji = EmojiConstants.PUSHED_EMOJI;
-			tags = "#push";
-		} else if(n.title.contains("comment")) {
+			tags = "#push #branch";
+		} else if (title.contains("commented on")) {
 			emoji = EmojiConstants.COMMENT_EMOJI;
 			tags = "#comment";
-		} else if(n.title.contains("merge")) {
+		} else if (title.contains("merged")) {
 			emoji = EmojiConstants.MERGE_EMOJI;
 			tags = "#merge";
-		} else if(n.title.contains("delete")) {
+		} else if (title.contains("created a branch")) {
+			emoji = EmojiConstants.CREATE_EMOJI;
+			tags = "#create #branch";
+		} else if (title.contains("deleted a branch")) {
 			emoji = EmojiConstants.DELETE_EMOJI;
-			tags = "#delete";
-		} 
-		if(n.title.contains("branch")) {
-			tags += " #branch";
-		} else if (n.title.contains("pull request")) {
-			tags += " #pullrequest";
-		} else if (n.title.contains("issue")) {
-			tags += " #issue";
+			tags = "#delete #branch";
 		}
 
-		String[] words = n.title.split(" ");
+		// Build the main message body
 		StringBuilder bld = new StringBuilder();
-		boolean author = false;
-		for (int i = 0; i < words.length; i++) {
-			bld.append(" ");
-			if (words[i].startsWith("osmandapp/")) {
-				String linkName = n.linkTitle;
-				if (Algorithms.isEmpty(linkName)) {
-					linkName = words[i].substring("osmandapp/".length());
-				}
-				bld.append(String.format("<a href='%s'>%s</a>", n.link, linkName));
-			} else if (words[i].equals(n.author)) {
-				author = true;
-				bld.append(String.format("<b>#%s</b>", words[i].replace('-', '_')));
-			} else {
-				bld.append(words[i]);
+		bld.append(emoji).append(" <b>#").append(n.author).append("</b> ").append(title.toLowerCase().replace(n.author.toLowerCase(), ""));
+		
+
+		if (n.link != null) {
+			bld.append("\n").append(loadPreviewTitleAndDescription(n.link));
+			
+		}
+
+		// Add timestamp, tags, and the raw link on separate lines
+		bld.append("\n").append(DATE_FORMAT.format(n.updated).trim());
+		bld.append("\n").append(tags.trim());
+		bld.append("\n").append(n.link);
+		
+		return bld.toString();
+	}
+	
+	public String loadPreviewTitleAndDescription(String urlString) {
+		String title = "";
+		String description = "";
+		try {
+			URL url = new URL(urlString);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestProperty("User-Agent", "Mozilla/5.0"); // Act like a browser
+			// Request only the first 4KB of the page, which should contain the <head> tag.
+			connection.setInstanceFollowRedirects(true);
+			int responseCode = connection.getResponseCode();
+			if (responseCode != HttpURLConnection.HTTP_OK) {
+				return "";
 			}
+			Pattern titleM = Pattern.compile("property=\"og:title\" content=\"([^\"]*)\"");
+			Pattern descM = Pattern.compile("property=\"og:description\" content=\"([^\"]*)\"");
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					Matcher matcher = titleM.matcher(line);
+					if (matcher.find()) {
+						title = matcher.group(1);
+					}
+					matcher = descM.matcher(line);
+					if (matcher.find()) {
+						description = matcher.group(1);
+					}
+					// Stop early if both are found
+					if (!title.isEmpty() && !description.isEmpty()) {
+						break;
+					}
+				}
+			}
+		} catch (IOException e) {
+			System.err.println("Error fetching or parsing URL: " + e.getMessage());
+			return ""; // Return empty string on error
 		}
-		String message = bld.toString();
-		if (!author) {
-			message = " " + String.format("<b>#%s</b>:", n.author.replace('-', '_'));
-		}
-		message = emoji + " " + message;
-		message += "\n<i>" + DATE_FORMAT.format(n.updated) + "</i>\n" + tags.trim();
-		return message;
+
+		//return (title + " " + description).trim();
+//		System.out.println("TITLE: " + title);
+//		System.out.println("DESC: " + description);
+		return title.trim();
 	}
 
-	public List<FeedEntry> parseFeed(String url) throws IOException, XmlPullParserException, ParseException {
+
+	public List<FeedEntry> parseFeed(InputStream stream) throws IOException, XmlPullParserException, ParseException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
-		parser.setInput(new InputStreamReader(new URL(url).openStream()));
+		parser.setInput(new InputStreamReader(stream));
 		int token;
 		StringBuilder content = new StringBuilder();
 		FeedEntry lastEntry = null;
@@ -909,7 +959,11 @@ public class OsmAndServerMonitorTasks {
 			if(token == XmlPullParser.START_TAG) {
 				switch (parser.getName()) {
 				case "entry": lastEntry = new FeedEntry(); break;
-				case "link": if (lastEntry != null) lastEntry.link = parser.getAttributeValue("", "href"); break;
+				case "link":
+					if (lastEntry != null) {
+						lastEntry.link = parser.getAttributeValue("", "href");
+					}
+					break;
 				}
 				content.setLength(0);
 			} else if(token == XmlPullParser.TEXT) {
@@ -939,7 +993,11 @@ public class OsmAndServerMonitorTasks {
 				case "title":
 					if (lastEntry != null) lastEntry.title = content.toString(); break;
 				case "content":
-					if (lastEntry != null) lastEntry.content = content.toString(); break;
+					if (lastEntry != null) {
+						lastEntry.content = content.toString();
+						// no title could be parsed
+					}
+					break;
 				}
 			}
 		};
@@ -975,14 +1033,16 @@ public class OsmAndServerMonitorTasks {
 	}
 
 	protected static class BuildServerCheckInfo {
-		String serverUrl;
 		String serverName;
+		String jenkinsUrl;
+		String statusJsonUrl;
 		Set<String> jobsFailed;
 		long lastCheckTimestamp = 0;
 		
-		public BuildServerCheckInfo(String serverUrl, String serverName) {
+		public BuildServerCheckInfo(String serverName, String jenkinsUrl, String statusJsonUrl) {
 			this.serverName = serverName;
-			this.serverUrl = serverUrl;
+			this.jenkinsUrl = jenkinsUrl;
+			this.statusJsonUrl = statusJsonUrl;
 		}
 	}
 
@@ -1039,7 +1099,6 @@ public class OsmAndServerMonitorTasks {
 		try {
 			Process p = Runtime.getRuntime().exec(cmd.split(" "), new String[0], loc);
 			BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//			BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 			String s, commit = "";
 			// read the output from the command
 			while ((s = stdInput.readLine()) != null) {
@@ -1062,8 +1121,11 @@ public class OsmAndServerMonitorTasks {
 		this.telegram = sender;
 	}
 	
-	
-	
-	
-	
+	public static void main(String[] args) throws IOException, XmlPullParserException, ParseException {
+		OsmAndServerMonitorTasks t = new OsmAndServerMonitorTasks();
+		for (FeedEntry e : t.parseFeed(OsmAndServerMonitorTasks.class.getResourceAsStream("/test-feed.xml"))) {
+			System.out.println(t.formatGithubMsg(e));
+			System.out.println("----------");
+		}
+	}
 }

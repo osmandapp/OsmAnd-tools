@@ -57,10 +57,15 @@ public class OrderManagementService {
 				.replace("\\", "\\\\")
 				.replace("_",  "\\_")
 				.replace("%",  "\\%");
+		if (q.contains("..")) { // q.startsWith("GPA") && 
+			// remove postfix
+			q = q.substring(0, q.indexOf(".."));
+		}
 		String email = q + "%";
 		String order = q + "%";
 		String sku = "%" + q + "%";
 		String purchaseToken = q;
+		
 
 		String sql =
 				"SELECT u.email, s.sku, s.orderid, s.purchasetoken, " +
