@@ -21,7 +21,7 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 @EnableJpaRepositories(
 		basePackages = "net.osmand.server",
 		excludeFilters = @ComponentScan.Filter(
-			type = FilterType.REGEX, pattern = "net.osmand.server.api.searchtest.repo\\..*"))
+				type = FilterType.REGEX, pattern = "net.osmand.server.api.searchtest.repo\\..*"))
 public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
@@ -29,15 +29,15 @@ public class DatasourceConfiguration {
 	private boolean monitorInitialzed;
 	private boolean changesetInitialzed;
 	private boolean osmgpxInitialzed;
-
-
+	
+	
     @Bean
 	@ConfigurationProperties(prefix="spring.datasource")
     public DataSourceProperties primaryDataSourceProperties() {
         return new DataSourceProperties();
     }
-
-
+    
+    
     @Bean
 	@ConfigurationProperties(prefix="spring.wikidatasource")
     public DataSourceProperties wikiDataSourceProperties() {
@@ -49,19 +49,19 @@ public class DatasourceConfiguration {
 	public DataSourceProperties osmgpxDataSourceProperties() {
 		return new DataSourceProperties();
 	}
-
+    
     @Bean
 	@ConfigurationProperties(prefix="spring.changesetdatasource")
     public DataSourceProperties changesetSourceProperties() {
         return new DataSourceProperties();
     }
-
+    
     @Bean
 	@ConfigurationProperties(prefix="spring.monitordatasource")
     public DataSourceProperties monitorDataSourceProperties() {
         return new DataSourceProperties();
     }
-
+    
 	@Bean
 	@Primary
 	public DataSource primaryDataSource() {
@@ -107,7 +107,7 @@ public class DatasourceConfiguration {
 		}
 		return emptyDataSource();
 	}
-
+	
 	@Bean
 	public DataSource monitorDataSource() {
 		try {
@@ -119,8 +119,8 @@ public class DatasourceConfiguration {
 		}
 		return emptyDataSource();
 	}
-
-
+	
+	
 	@Bean
 	public DataSource changesetDataSource() {
 		try {
@@ -136,20 +136,20 @@ public class DatasourceConfiguration {
 
 	private DataSource emptyDataSource() {
 		return new AbstractDataSource() {
-
+			
 			@Override
 			public Connection getConnection(String username, String password) throws SQLException {
 				return null;
 			}
-
+			
 			@Override
 			public Connection getConnection() throws SQLException {
 				return null;
 			}
 		};
 	}
-
-
+    
+	
 	@Bean
 	@Primary
 	public JdbcTemplate jdbcTemplate(@Qualifier("primaryDataSource") DataSource dataSource) {
@@ -158,7 +158,7 @@ public class DatasourceConfiguration {
 		}
 		return new JdbcTemplate(dataSource);
 	}
-
+	
 	@Bean
 	public JdbcTemplate wikiJdbcTemplate(@Qualifier("wikiDataSource") DataSource dataSource) {
 		if (dataSource == null) {
@@ -182,7 +182,7 @@ public class DatasourceConfiguration {
 		}
 		return new JdbcTemplate(dataSource);
 	}
-
+	
 	@Bean
 	public JdbcTemplate monitorJdbcTemplate(@Qualifier("monitorDataSource") DataSource dataSource) {
 		if (dataSource == null) {
