@@ -167,9 +167,9 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
 
         cfg_lines = [f"{indent}{code}: {locale_dict[code]}," for code in sorted_codes]
 
-        new_inner_cfg = "\n".join(cfg_lines)
+        new_inner_cfg = "\n".join(cfg_lines).strip() + "\n"
 
-        content = configs_pattern.sub(f"{g1}{new_inner_cfg.strip() + "\n"}{g3}", content, count=1)
+        content = configs_pattern.sub(f"{g1}{new_inner_cfg}{g3}", content, count=1)
         updated = True
     else:
         print("Warning: Could not find a localeConfigs object in docusaurus.config.js")
