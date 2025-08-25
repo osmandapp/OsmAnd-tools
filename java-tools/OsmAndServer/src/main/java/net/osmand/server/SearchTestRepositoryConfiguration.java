@@ -58,7 +58,7 @@ public class SearchTestRepositoryConfiguration {
 			EntityManagerFactoryBuilder builder) {
 		return builder
 				.dataSource(dataSource)
-				.packages("net.osmand.server.api.searchtest.entity")
+				.packages(Application.PACKAGE_NAME)
 				.persistenceUnit("searchTest")
 				.properties(Map.of(
 						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect"))
