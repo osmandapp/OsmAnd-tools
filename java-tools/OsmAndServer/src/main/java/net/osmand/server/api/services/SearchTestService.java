@@ -53,19 +53,6 @@ public class SearchTestService extends ReportService {
 		return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
 	}
 
-	public Page<TestCase> getTestCases(Long datasetId, String status, Pageable pageable) {
-		if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
-			try {
-				TestCase.Status st = TestCase.Status.valueOf(status.toUpperCase());
-				return testCaseRepo.findByDatasetIdAndStatusOrderByIdDesc(datasetId, st, pageable);
-			} catch (IllegalArgumentException ex) {
-				// Fallback to no-status filtering if invalid status is provided
-				return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
-			}
-		}
-		return testCaseRepo.findByDatasetIdOrderByIdDesc(datasetId, pageable);
-	}
-
 	@Async
 	public CompletableFuture<TestCase> createTestCase(Long datasetId, GenParam param) {
 		return CompletableFuture.supplyAsync(() -> {
@@ -318,15 +305,11 @@ public class SearchTestService extends ReportService {
 		return testCaseRepo.findById(id);
 	}
 
-	public Page<TestCaseItem> getAllTestCases(String name, String labels, String status, Pageable pageable) {
-		String normalizedStatus = null;
-		if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
-			normalizedStatus = status.toUpperCase();
-		} else {
-			// Use empty string to disable status filtering in native query
-			normalizedStatus = "";
-		}
-		Page<TestCase> page = testCaseRepo.findAllCasesFiltered(name, labels, normalizedStatus, pageable);
+	public Page<TestCaseItem> getAllTestCases(String name, String labels, Pageable pageable) {
+		// Decide which repository query to use:
+		// - TestCase status filter for NEW/GENERATED
+		// - Latest Run status filter for RUNNING/COMPLETED/CANCELED/FAILED (and we prefer RUN domain for FAILED)
+		Page<TestCase> page = testCaseRepo.findAllCasesFiltered(name, labels, pageable);
 		List<TestCase> content = page.getContent();
 
 		// Collect dataset IDs and fetch names in batch
@@ -353,7 +336,7 @@ public class SearchTestService extends ReportService {
 
 			TestCaseStatus tcStatus = tcOpt.get();
 			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
-					tc.lastRunId, tc.status, tc.updated,
+					tc.lastRunId, tcStatus.status().name(), tc.updated,
 					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
 		}
 

@@ -27,15 +27,12 @@ public interface TestCaseRepository extends JpaRepository<TestCase, Long> {
 	@Query(value = "SELECT * FROM test_case j " +
 			"WHERE (COALESCE(:name, '') = '' OR lower(j.name) LIKE '%' || lower(:name) || '%') " +
 			"AND (COALESCE(:labels, '') = '' OR lower(j.labels) LIKE '%' || lower(:labels) || '%') " +
-			"AND (COALESCE(:status, '') = '' OR j.status = :status) " +
 			"ORDER BY updated DESC",
 			countQuery = "SELECT count(j.id) FROM test_case j " +
 					"WHERE (COALESCE(:name, '') = '' OR lower(j.name) LIKE '%' || lower(:name) || '%') " +
-					"AND (COALESCE(:labels, '') = '' OR lower(j.labels) LIKE '%' || lower(:labels) || '%') " +
-					"AND (COALESCE(:status, '') = '' OR j.status = :status)",
+					"AND (COALESCE(:labels, '') = '' OR lower(j.labels) LIKE '%' || lower(:labels) || '%') ",
 			nativeQuery = true)
 	Page<TestCase> findAllCasesFiltered(@Param("name") String name,
 										@Param("labels") String labels,
-										@Param("status") String status,
 										Pageable pageable);
 }

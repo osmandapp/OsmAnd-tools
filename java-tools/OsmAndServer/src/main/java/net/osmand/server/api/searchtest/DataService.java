@@ -225,12 +225,11 @@ public abstract class DataService extends BaseService {
 	 *
 	 * @param name     Case-insensitive search for the dataset name.
 	 * @param labels   Case-insensitive search for comma-separated labels associated with the dataset.
-	 * @param status   Limits the results to datasets with the given status.
 	 * @param pageable Pageable request defining the page number and size.
 	 * @return Page of matching datasets.
 	 */
-	public Page<Dataset> getDatasets(String name, String labels, String status, Pageable pageable) {
-		return datasetRepo.findAllDatasets(name, labels, status, pageable);
+	public Page<Dataset> getDatasets(String name, String labels, Pageable pageable) {
+		return datasetRepo.findAllDatasets(name, labels, pageable);
 	}
 
 	public String getDatasetSample(Long datasetId) {

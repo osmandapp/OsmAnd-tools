@@ -39,9 +39,8 @@ public class SearchTestController {
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Page<TestCase>> getTestCases(@PathVariable Long datasetId,
-													   @RequestParam(required = false) String status,
 													   Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, status, pageable));
+		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, pageable));
 	}
 
 	@GetMapping(value = "/cases/{caseId}/runs", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -72,9 +71,8 @@ public class SearchTestController {
 	@ResponseBody
 	public ResponseEntity<Page<TestCaseItem>> getAllTestCases(@RequestParam(required = false) String name,
 															  @RequestParam(required = false) String labels,
-															  @RequestParam(required = false) String status,
 															  Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getAllTestCases(name, labels, status, pageable));
+		return ResponseEntity.ok(testSearchService.getAllTestCases(name, labels, pageable));
 	}
 
 	@PostMapping(value = "/datasets/{datasetId:\\d+}/gen", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -213,9 +211,8 @@ public class SearchTestController {
 	@ResponseBody
 	public ResponseEntity<Page<Dataset>> getDatasets(@RequestParam(required = false) String name,
 													 @RequestParam(required = false) String labels,
-													 @RequestParam(required = false) String status,
 													 Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getDatasets(name, labels, status, pageable));
+		return ResponseEntity.ok(testSearchService.getDatasets(name, labels, pageable));
 	}
 
 	@PutMapping(value = "/dataset/{datasetId}", consumes = MediaType.APPLICATION_JSON_VALUE)
