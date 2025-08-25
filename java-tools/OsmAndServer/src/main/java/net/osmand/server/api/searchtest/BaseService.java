@@ -34,12 +34,10 @@ public abstract class BaseService {
 	protected ObjectMapper objectMapper;
 	@Autowired
 	private WebClient.Builder webClientBuilder;
-	@Value("${testsearch.csv.dir}")
+	@Value("${searchtest.csv.dir}")
 	protected String csvDownloadingDir;
-	@Value("${osmand.web.location}")
-	protected String webLocation;
 	private WebClient webClient;
-	@Value("${testsearch.overpass.url}")
+	@Value("${overpass.url}")
 	private String overpassApiUrl;
 	private Engine polyglotEngine;
 
