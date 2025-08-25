@@ -8,4 +8,5 @@ public record TestCaseStatus(
 		long failed,
 		long filtered,
 		long empty,
-		long duration) {}
+		long duration) {
+}

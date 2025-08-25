@@ -13,4 +13,5 @@ public record RunStatus(
 		double averagePlace,
 		long found,
 		Map<String, Number> distanceHistogram,
-		TestCaseStatus generatedChart) {}
+		TestCaseStatus generatedChart) {
+}

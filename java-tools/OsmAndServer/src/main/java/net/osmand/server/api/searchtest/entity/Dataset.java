@@ -12,6 +12,7 @@ public class Dataset {
 	public enum ConfigStatus {
 		UNKNOWN, OK, ERROR
 	}
+
 	public enum Source {
 		CSV, Overpass
 	}
@@ -34,15 +35,12 @@ public class Dataset {
 	@Column(nullable = false, columnDefinition = "TEXT")
 	public String source; // Overpass query or file path
 
-	@Column(columnDefinition = "TEXT")
-	private String error;
-
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name="all_cols", columnDefinition = "TEXT")
+	@Column(name = "all_cols", columnDefinition = "TEXT")
 	public String allCols;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name="sel_cols", columnDefinition = "TEXT")
+	@Column(name = "sel_cols", columnDefinition = "TEXT")
 	public String selCols; // selected column names as JSON string array
 
 	@JdbcTypeCode(SqlTypes.JSON)
@@ -52,10 +50,6 @@ public class Dataset {
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(columnDefinition = "TEXT")
 	public String meta; // JS script with functions meta-info
-
-	@Enumerated(EnumType.STRING)
-	@Column(name = "source_status", nullable = false)
-	private ConfigStatus sourceStatus = ConfigStatus.UNKNOWN;
 
 	@Column
 	public Integer sizeLimit = 10000;
@@ -68,6 +62,13 @@ public class Dataset {
 
 	@Column(nullable = false)
 	public LocalDateTime updated = LocalDateTime.now();
+
+	@Column(columnDefinition = "TEXT")
+	private String error;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "source_status", nullable = false)
+	private ConfigStatus sourceStatus = ConfigStatus.UNKNOWN;
 
 	// Getters and Setters
 	public String getError() {

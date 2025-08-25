@@ -1,8 +1,8 @@
 package net.osmand.server.api.searchtest.entity;
 
-import jakarta.persistence.*;
-
-import java.sql.Timestamp;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "run_result")

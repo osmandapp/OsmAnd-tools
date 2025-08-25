@@ -11,17 +11,17 @@ public class RunParam {
 	@Column(name = "base_search")
 	public Boolean baseSearch;
 
-	@Column(name = "north_west")
-	private String northWest;
-
-	@Column(name = "south_east")
-	private String southEast;
-
 	@Column()
 	public Double lat;
 
 	@Column()
 	public Double lon;
+
+	@Column(name = "north_west")
+	private String northWest;
+
+	@Column(name = "south_east")
+	private String southEast;
 
 	public String getNorthWest() {
 		return northWest;
