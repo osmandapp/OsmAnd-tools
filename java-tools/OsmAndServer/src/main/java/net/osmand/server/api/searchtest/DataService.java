@@ -13,6 +13,7 @@ import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,24 +32,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public abstract class DataService extends BaseService {
-	protected final SearchTestDatasetRepository datasetRepo;
-	protected final SearchTestCaseRepository testCaseRepo;
-	protected final SearchTestRunRepository runRepo;
-	protected final JdbcTemplate jdbcTemplate;
-	protected final EntityManager em;
-
-	public DataService(EntityManager em, SearchTestDatasetRepository datasetRepo, SearchTestCaseRepository testCaseRepo,
-					   SearchTestRunRepository runRepo,
-					   @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
-					   ObjectMapper objectMapper) {
-		super(webClientBuilder, objectMapper);
-
-		this.em = em;
-		this.testCaseRepo = testCaseRepo;
-		this.datasetRepo = datasetRepo;
-		this.runRepo = runRepo;
-		this.jdbcTemplate = jdbcTemplate;
-	}
+	@Autowired
+	protected SearchTestDatasetRepository datasetRepo;
+	@Autowired
+	protected SearchTestCaseRepository testCaseRepo;
+	@Autowired
+	protected SearchTestRunRepository runRepo;
+	@Autowired @Qualifier("testJdbcTemplate")
+	protected JdbcTemplate jdbcTemplate;
+	@Autowired
+	protected EntityManager em;
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;

@@ -14,6 +14,7 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -29,8 +30,10 @@ import java.util.zip.GZIPInputStream;
 
 public abstract class BaseService {
 	protected static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-	protected final ObjectMapper objectMapper;
-	private final WebClient.Builder webClientBuilder;
+	@Autowired
+	protected ObjectMapper objectMapper;
+	@Autowired
+	private WebClient.Builder webClientBuilder;
 	@Value("${testsearch.csv.dir}")
 	protected String csvDownloadingDir;
 	@Value("${osmand.web.location}")
@@ -40,13 +43,7 @@ public abstract class BaseService {
 	private String overpassApiUrl;
 	private Engine polyglotEngine;
 
-	public BaseService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
-		this.webClientBuilder = webClientBuilder;
-		this.objectMapper = objectMapper;
-	}
-
 	// -------------------- Utility methods (common) --------------------
-
 	public static String pointToString(LatLon point) {
 		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
 	}

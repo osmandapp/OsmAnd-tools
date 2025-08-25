@@ -60,13 +60,6 @@ public abstract class ReportService extends DataService {
 			"FROM" +
 			" gen_result WHERE case_id = ? ORDER BY id)";
 
-	public ReportService(EntityManager em, SearchTestDatasetRepository datasetRepo, SearchTestCaseRepository testCaseRepo,
-						 SearchTestRunRepository runRepo,
-						 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate, WebClient.Builder webClientBuilder,
-						 ObjectMapper objectMapper) {
-		super(em, datasetRepo, testCaseRepo, runRepo, jdbcTemplate, webClientBuilder, objectMapper);
-	}
-
 	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
 								   String format) throws IOException {
 		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, runId,

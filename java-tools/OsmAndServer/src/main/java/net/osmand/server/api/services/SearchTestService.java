@@ -40,12 +40,7 @@ public class SearchTestService extends ReportService {
 	private final SearchService searchService;
 
 	@Autowired
-	public SearchTestService(EntityManager em, SearchTestDatasetRepository datasetRepository,
-							 SearchTestCaseRepository testCaseRepo, SearchTestRunRepository runRepo,
-							 @Qualifier("testJdbcTemplate") JdbcTemplate jdbcTemplate,
-							 SearchService searchService, WebClient.Builder webClientBuilder,
-							 ObjectMapper objectMapper) {
-		super(em, datasetRepository, testCaseRepo, runRepo, jdbcTemplate, webClientBuilder, objectMapper);
+	public SearchTestService(SearchService searchService) {
 		this.searchService = searchService;
 	}
 
