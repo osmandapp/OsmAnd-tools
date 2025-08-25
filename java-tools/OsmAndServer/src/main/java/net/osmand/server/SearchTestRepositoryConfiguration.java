@@ -31,9 +31,7 @@ import java.util.Map;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-		basePackageClasses = {SearchTestDatasetRepository.class, SearchTestCaseRepository.class, SearchTestRunRepository.class},
-		includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
-				{SearchTestDatasetRepository.class, SearchTestCaseRepository.class, SearchTestRunRepository.class}),
+		basePackages = "net.osmand.server.api.searchtest.repo",
 		entityManagerFactoryRef = "testEntityManagerFactory",
 		transactionManagerRef = "testTransactionManager"
 )
