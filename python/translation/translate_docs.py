@@ -29,8 +29,8 @@ if INPUT_PATTERN:
         raise ValueError(f"INPUT_PATTERN '{INPUT_PATTERN}' is not a valid file/directory pattern: {e}")
 
 print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}, FORCE_TRANSLATION: {FORCE_TRANSLATION}", flush=True)
-if not all([MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
-    raise ValueError("Missing required environment variables (MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
+if not all([API_KEY, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
+    raise ValueError("Missing required environment variables (API_KEY, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
 if INPUT_PATTERN and not (INPUT_PATTERN.endswith('.json') or '.md' in INPUT_PATTERN):
     raise ValueError("Incorrect INPUT_PATTERN variable. Should be a glob pattern for '*.json' or '*.md*' files.")
 
@@ -149,12 +149,15 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
         indent_match = re.search(r"^([ \t]+)\w", inner_cfg, re.MULTILINE)
         indent = indent_match.group(1) if indent_match else "  "
 
-        # Extract existing locale lines into dict code->label
-        existing_pairs = re.findall(r"^\s*([\w-]+)\s*:\s*\{\s*label\s*:\s*['\"]([^'\"]+)['\"]\s*}\s*,?", inner_cfg, re.MULTILINE)
-        locale_dict = {code: label for code, label in existing_pairs}
+        # Extract existing locale lines into dict code->full_config
+        # Capture everything after ':' up to the closing '}' (on the same line), including optional trailing comma
+        # Example match: ar: { label: 'العربية', direction: 'rtl', htmlLang: 'ar' },
+        existing_pairs = re.findall(r"^\s*([\w-]+)\s*:\s*({[^}]*}\s*,?)", inner_cfg, re.MULTILINE)
+        # Store the full object without a trailing comma so we can re-render consistently
+        locale_dict = {langCode: cfg.strip().rstrip(',').strip() for langCode, cfg in existing_pairs}
 
         # Add new locale
-        locale_dict.setdefault(lang_code, native_label)
+        locale_dict.setdefault(lang_code, f"{{ label: '{native_label}' }}")
 
         # Build sorted lines
         sorted_codes = sorted(locale_dict.keys())
@@ -162,11 +165,11 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
             sorted_codes.remove('en')
             sorted_codes.insert(0, 'en')
 
-        cfg_lines = [f"{indent}{code}: {{ label: '{locale_dict[code]}' }}," for code in sorted_codes]
+        cfg_lines = [f"{indent}{code}: {locale_dict[code]}," for code in sorted_codes]
 
-        new_inner_cfg = "\n".join(cfg_lines) + "\n"
+        new_inner_cfg = "\n".join(cfg_lines)
 
-        content = configs_pattern.sub(f"{g1}{new_inner_cfg}{g3}", content, count=1)
+        content = configs_pattern.sub(f"{g1}{new_inner_cfg.strip() + "\n"}{g3}", content, count=1)
         updated = True
     else:
         print("Warning: Could not find a localeConfigs object in docusaurus.config.js")
