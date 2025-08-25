@@ -1,5 +1,6 @@
 package net.osmand.server.api.searchtest.repo;
 
+import net.osmand.server.SearchTestRepository;
 import net.osmand.server.api.searchtest.entity.Dataset;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
-@Repository
+@SearchTestRepository
 public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long> {
 	@Query("SELECT d FROM Dataset d WHERE d.name = :name")
 	Optional<Dataset> findByName(@Param("name") String name);

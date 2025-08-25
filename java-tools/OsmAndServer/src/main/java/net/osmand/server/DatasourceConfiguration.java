@@ -21,7 +21,7 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 @EnableJpaRepositories(
 		basePackages = "net.osmand.server",
 		excludeFilters = @ComponentScan.Filter(
-				type = FilterType.REGEX, pattern = "net.osmand.server.api.searchtest.repo\\..*"))
+				type = FilterType.ANNOTATION, classes = SearchTestRepository.class))
 public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
