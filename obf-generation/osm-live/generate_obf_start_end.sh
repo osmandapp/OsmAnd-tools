@@ -63,16 +63,17 @@ for DATE_DIR in $(find $RESULT_DIR/_diff -maxdepth 1  -type d | sort ); do
 
         echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
         $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-relation-osm \
-            $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz $DATE_DIR/src/${BASENAME}_diff.osm.gz ${BASENAME}_after_rel_m.osm.gz
+            $DATE_DIR/src/${BASENAME}_before_rel.osm.gz $DATE_DIR/src/${BASENAME}_after_rel.osm.gz \
+            $DATE_DIR/src/${BASENAME}_diff.osm.gz $DATE_DIR/src/${BASENAME}_after.osm.gz ${BASENAME}_after_rel_m.osm.gz
 
         echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
         $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
             --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
         $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
             --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
-        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address-no-multipolygon $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
             --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
-        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address-no-multipolygon ${BASENAME}_after_rel_m.osm.gz \
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address ${BASENAME}_after_rel_m.osm.gz \
             --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
         wait            
 
