@@ -1,9 +1,12 @@
 package net.osmand.obf.diff;
 
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
@@ -126,6 +129,7 @@ public class RelationDiffGenerator {
         long t3 = System.currentTimeMillis() - time - t2;
         System.out.println("Parse _diff.osm in " + (t3 / 1000) + " sec.");
 
+        TLongHashSet nodeIdsFromOtherAfter = new TLongHashSet();
         for (Map.Entry<EntityId, Entity> e : startEntities.entrySet()) {
             Entity.EntityType entityType = e.getKey().getType();
             if (entityType != Entity.EntityType.NODE && entityType != Entity.EntityType.WAY) {
@@ -135,7 +139,18 @@ public class RelationDiffGenerator {
                 continue;
             }
             if (otherAfterEntities.containsKey(e.getKey())) {
-                endStorage.registerEntity(otherAfterEntities.get(e.getKey()), null);
+                Entity entity = otherAfterEntities.get(e.getKey());
+                endStorage.registerEntity(entity, null);
+                if (entity instanceof Way w) {
+                    List<Node> nodes = w.getNodes();
+                    for (Node n : nodes) {
+                        if (!nodeIdsFromOtherAfter.contains(n.getId())) {
+                            nodeIdsFromOtherAfter.add(n.getId());
+                            endStorage.registerEntity(n, null);
+                            statisticAddedMembers++;
+                        }
+                    }
+                }
                 statisticAddedMembers++;
             } else if (!deletedObjIds.contains(e.getKey())) {
                 endStorage.registerEntity(e.getValue(), null);
