@@ -53,7 +53,7 @@ public abstract class DataService extends BaseService {
 				fullPath = Path.of(csvDownloadingDir, dataset.source);
 			}
 			if (!Files.exists(fullPath)) {
-				dataset.setError("File is not existed.");
+				dataset.setError("File is not existed: " + fullPath);
 				return dataset;
 			}
 
