@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 import yaml
 
-from python.lib.OpenAIClient import OpenAIClient
+from python.lib.OpenAIClient import OpenAIClient, MAX_TOKENS
 
 MODEL = os.getenv('MODEL')
 API_KEY = os.getenv('API_KEY')
@@ -371,7 +371,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         content, imports = pull_imports(src_path)  # separate content and imports
 
-        response = llm.ask(prompt, content, 1024 + len(content), 0.0 if dest_dir.suffix == '.json' else -1.0)
+        response = llm.ask(prompt, content, max(MAX_TOKENS, len(content) // 3))
         if '```json' in response:
             response = re.sub(r'^```(?:json)?\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
 
