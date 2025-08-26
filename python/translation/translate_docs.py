@@ -371,6 +371,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         content, imports = pull_imports(src_path)  # separate content and imports
 
+        print(f"File {dest_path.name} ({len(content)} bytes) is translating...", flush=True)
         response = llm.ask(prompt, content, max(MAX_TOKENS, len(content) // 3))
         if '```json' in response:
             response = re.sub(r'^```(?:json)?\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
