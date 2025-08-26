@@ -13,7 +13,7 @@ base_urls = {"ollama": "http://localhost:11434/v1", "or": "https://openrouter.ai
              "dp": "https://api.deepseek.com/v1", "veles": "https://veles.osmand.net:8081/api"}
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
 top_p = float(os.getenv('MODEL_TOP_P', 0.7))  # Controls randomness; lower is more deterministic
-MAX_TOKENS = 8 * 1024  # Limit the response length
+MAX_TOKENS = 32 * 1024  # Limit the response length
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 15))
 
 
@@ -57,7 +57,7 @@ class OpenAIClient:
             # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
             {"role": "system", "content": system_prompt}, {"role": "user", "content": user_query}],
                                                        max_tokens=max_tokens,
-                                                       n=1,  # Number of completions to generate
+                                                       n=2,  # Number of completions to generate
                                                        temperature=temperature,
                                                        top_p=top_p, stream=False)
         if response.usage:
