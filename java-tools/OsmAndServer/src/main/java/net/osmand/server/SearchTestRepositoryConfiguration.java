@@ -61,7 +61,9 @@ public class SearchTestRepositoryConfiguration {
 				.packages(Application.PACKAGE_NAME)
 				.persistenceUnit("searchTest")
 				.properties(Map.of(
-						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect"))
+						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
+						"hibernate.hbm2ddl.auto", "update",
+						"hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"))
 				.build();
 	}
 
