@@ -90,7 +90,7 @@ spring:
       dialect: org.hibernate.dialect.PostgreSQLDialect
       lob.non_contextual_creation: true
       physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
-      hibernate.ddl-auto: update
+    hibernate.ddl-auto: update
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
