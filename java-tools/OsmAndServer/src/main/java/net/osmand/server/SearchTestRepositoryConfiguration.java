@@ -5,6 +5,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateProperties;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateSettings;
+import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.Bean;
@@ -27,49 +30,57 @@ import java.util.Map;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-		basePackages = Application.PACKAGE_NAME,
-		includeFilters = @ComponentScan.Filter(
-				type = FilterType.ANNOTATION, classes = SearchTestRepository.class),
-		entityManagerFactoryRef = "searchTestEntityManagerFactory",
-		transactionManagerRef = "searchTestTransactionManager"
+        basePackages = Application.PACKAGE_NAME,
+        includeFilters = @ComponentScan.Filter(
+                type = FilterType.ANNOTATION, classes = SearchTestRepository.class),
+        entityManagerFactoryRef = "searchTestEntityManagerFactory",
+        transactionManagerRef = "searchTestTransactionManager"
 )
 public class SearchTestRepositoryConfiguration {
-	protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
+    protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
-	@Bean
-	@ConfigurationProperties(prefix = "spring.searchtestdatasource")
-	public DataSourceProperties searchTestDataSourceProperties() {
-		return new DataSourceProperties();
-	}
+    @Bean
+    @ConfigurationProperties(prefix = "spring.searchtestdatasource")
+    public DataSourceProperties searchTestDataSourceProperties() {
+        return new DataSourceProperties();
+    }
 
-	@Bean(name = "searchTestDataSource")
-	public DataSource searchTestDataSource() {
-		return searchTestDataSourceProperties().initializeDataSourceBuilder().build();
-	}
+    @Bean(name = "searchTestDataSource")
+    public DataSource searchTestDataSource() {
+        return searchTestDataSourceProperties().initializeDataSourceBuilder().build();
+    }
 
-	@Bean(name = "searchTestJdbcTemplate")
-	public JdbcTemplate searchTestJdbcTemplate(@Qualifier("searchTestDataSource") DataSource ds) {
-		return new JdbcTemplate(ds);
-	}
+    @Bean(name = "searchTestJdbcTemplate")
+    public JdbcTemplate searchTestJdbcTemplate(@Qualifier("searchTestDataSource") DataSource ds) {
+        return new JdbcTemplate(ds);
+    }
 
-	@Bean(name = "searchTestEntityManagerFactory")
-	public LocalContainerEntityManagerFactoryBean testEntityManagerFactory(
-			@Qualifier("searchTestDataSource") DataSource dataSource,
-			EntityManagerFactoryBuilder builder) {
-		return builder
-				.dataSource(dataSource)
-				.packages(Application.PACKAGE_NAME)
-				.persistenceUnit("searchTest")
-				.properties(Map.of(
-						"hibernate.dialect", "net.osmand.server.StrictSQLiteDialect",
-						"hibernate.hbm2ddl.auto", "update",
-						"hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy"))
-				.build();
-	}
+    @Bean(name = "searchTestEntityManagerFactory")
+    public LocalContainerEntityManagerFactoryBean testEntityManagerFactory(
+            @Qualifier("searchTestDataSource") DataSource dataSource,
+            EntityManagerFactoryBuilder builder,
+            JpaProperties jpaProperties,
+            HibernateProperties hibernateProperties) {
+        // Derive vendor properties from Spring Boot configuration (includes ddl-auto, naming, etc.)
+        Map<String, Object> vendorProps = new java.util.HashMap<>(
+                hibernateProperties.determineHibernateProperties(
+                        jpaProperties.getProperties(), new HibernateSettings()
+                )
+        );
+        // Force SQLite dialect for this EMF
+        vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
 
-	@Bean(name = "searchTestTransactionManager")
-	public PlatformTransactionManager searchTestTransactionManager(
-			@Qualifier("searchTestEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
-		return new JpaTransactionManager(entityManagerFactory);
-	}
+        return builder
+                .dataSource(dataSource)
+                .packages(Application.PACKAGE_NAME + ".api.searchtest.entity")
+                .properties(vendorProps)
+                .persistenceUnit("searchTest")
+                .build();
+    }
+
+    @Bean(name = "searchTestTransactionManager")
+    public PlatformTransactionManager searchTestTransactionManager(
+            @Qualifier("searchTestEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+        return new JpaTransactionManager(entityManagerFactory);
+    }
 }
