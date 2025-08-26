@@ -109,8 +109,8 @@ spring:
     username: ${OSM_GPX_DB_USER:}
     password: ${OSM_GPX_DB_PWD:}
   searchtestdatasource:
-    url:
-    driverClassname:
+    url: jdbc:sqlite:${SEARCH_TEST_DB}
+    driverClassname: org.sqlite.JDBC
   monitordatasource:
     url:
     username:
@@ -145,8 +145,8 @@ monitoring:
 geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
-overpass.url: ${OVERPASS_URL} # used by search test
-searchtest.csv.dir:
+overpass.url: https://overpass-turbo.eu/ # used by search test
+searchtest.csv.dir: ${CSV_DIR}
 
 ---
 spring.jpa.hibernate.ddl-auto: validate
