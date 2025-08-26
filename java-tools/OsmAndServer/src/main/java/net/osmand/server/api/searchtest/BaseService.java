@@ -118,7 +118,9 @@ public abstract class BaseService {
 	@PostConstruct
 	protected void init() {
 		this.webClient =
-				webClientBuilder.baseUrl(overpassApiUrl).exchangeStrategies(ExchangeStrategies.builder().codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
+						.builder().codecs(configurer
+								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
 	}
 
 	protected Path queryOverpass(String query) {
