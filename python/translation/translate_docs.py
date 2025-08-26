@@ -371,7 +371,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         content, imports = pull_imports(src_path)  # separate content and imports
 
-        safe_max_tokens = min(MAX_TOKENS, max(512, len(content) // 3) + 256)
+        safe_max_tokens = min(MAX_TOKENS, max(512, len(content) // 3) + 1024)
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens) is translating...", flush=True)
 
         response = llm.ask(prompt, content, safe_max_tokens)
