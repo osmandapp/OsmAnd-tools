@@ -50,16 +50,45 @@ class OpenAIClient:
         start_time = time.time()
         self._init()
 
-        response = self.client.chat.completions.create(model=self.model, messages=[
-            # There are the following roles: system/user/assistant
-            # system - instructions (tools) for shaping behavior which is most authoritative.
-            # user - input query which is medium authoritative.
-            # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
-            {"role": "system", "content": system_prompt}, {"role": "user", "content": user_query}],
-                                                       max_tokens=max_tokens,
-                                                       n=2,  # Number of completions to generate
-                                                       temperature=temperature,
-                                                       top_p=top_p, stream=False)
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    # There are the following roles: system/user/assistant
+                    # system - instructions (tools) for shaping behavior which is most authoritative.
+                    # user - input query which is medium authoritative.
+                    # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_query},
+                ],
+                max_tokens=max_tokens,
+                n=1,  # Number of completions to generate
+                temperature=temperature,
+                top_p=top_p,
+                stream=False,
+            )
+        except Exception as e:
+            # Expose underlying HTTP response when available (often the case for non-JSON/HTML errors)
+            status = None
+            body_preview = None
+            try:
+                resp = getattr(e, "response", None)
+                if resp is not None:
+                    status = getattr(resp, "status_code", None)
+                    # httpx.Response.text might raise if stream not read; guard accordingly
+                    try:
+                        text = resp.text
+                        body_preview = text[:800]
+                    except Exception:
+                        body_preview = "<unavailable>"
+            except Exception:
+                pass
+            print(
+                f"#${current_thread().name}. LLM call error. status={status}, max_tokens={max_tokens}, temp={temperature}. Body preview: {body_preview}",
+                flush=True,
+            )
+            raise
+
         if response.usage:
             self.prompt_tokens = response.usage.prompt_tokens
             self.completion_tokens = response.usage.completion_tokens
