@@ -57,7 +57,7 @@ class OpenAIClient:
             # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
             {"role": "system", "content": system_prompt}, {"role": "user", "content": user_query}],
                                                        max_tokens=max_tokens,
-                                                       n=2,  # Number of completions to generate
+                                                       n=1,  # Number of completions to generate
                                                        temperature=temperature,
                                                        top_p=top_p, stream=False)
         if response.usage:
