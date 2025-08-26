@@ -1,9 +1,8 @@
 package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
+import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
 import net.osmand.server.api.searchtest.dto.GenParam;
 import net.osmand.server.api.searchtest.dto.TestCaseItem;
@@ -12,22 +11,16 @@ import net.osmand.server.api.searchtest.entity.Dataset;
 import net.osmand.server.api.searchtest.entity.Run;
 import net.osmand.server.api.searchtest.entity.RunParam;
 import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -38,6 +31,8 @@ import java.util.concurrent.CompletableFuture;
 public class SearchTestService extends ReportService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 	private final SearchService searchService;
+	@Autowired
+	private PolyglotEngine engine;
 
 	@Autowired
 	public SearchTestService(SearchService searchService) {
@@ -112,8 +107,8 @@ public class SearchTestService extends ReportService {
 
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<GenRow> examples = execute(dataset.script, test, delCols, rows);
-			for (GenRow example : examples) {
+			List<PolyglotEngine.GenRow> examples = engine.execute(dataset.script, test, delCols, rows);
+			for (PolyglotEngine.GenRow example : examples) {
 				saveCaseResults(test, example);
 			}
 			test.status = TestCase.Status.GENERATED;
@@ -202,7 +197,8 @@ public class SearchTestService extends ReportService {
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY id",
+		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY" +
+						" id",
 				run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);

@@ -1,6 +1,5 @@
 package net.osmand.server.api.searchtest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.entity.Dataset;
@@ -19,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -145,7 +143,7 @@ public abstract class DataService extends BaseService {
 		});
 	}
 
-	protected void saveCaseResults(TestCase test, GenRow data) throws IOException {
+	protected void saveCaseResults(TestCase test, PolyglotEngine.GenRow data) throws IOException {
 		String sql =
 				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
 						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -200,9 +198,7 @@ public abstract class DataService extends BaseService {
 		}
 
 		String sql = "INSERT INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration," +
-				" results_count, " +
-				"min_distance, closest_result, actual_place, lat, lon, timestamp) " +
+				"duration, results_count, min_distance, closest_result, actual_place, lat, lon, timestamp) " +
 				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = objectMapper.writeValueAsString(row);
