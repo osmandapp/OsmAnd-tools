@@ -13,7 +13,7 @@ base_urls = {"ollama": "http://localhost:11434/v1", "or": "https://openrouter.ai
              "dp": "https://api.deepseek.com/v1", "veles": "https://veles.osmand.net:8081/api"}
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
 top_p = float(os.getenv('MODEL_TOP_P', 0.7))  # Controls randomness; lower is more deterministic
-MAX_TOKENS = 32 * 1024  # Limit the response length
+MAX_TOKENS = int(os.getenv('MAX_TOKENS', 32 * 1024))  # Limit the response length
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 15))
 
 
