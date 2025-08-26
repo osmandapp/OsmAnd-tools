@@ -86,13 +86,12 @@ spring:
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:50MB}
       enabled: true
   jpa:
-    hibernate:
-      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         lob.non_contextual_creation: true
         physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        hbm2ddl.auto: update
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
     username: ${DB_USER:test}
