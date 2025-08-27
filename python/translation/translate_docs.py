@@ -380,7 +380,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
 
         response = llm.ask(prompt, content, safe_max_tokens, temperature)
-        if '```' in response:
+        if response.startswith('```'):
             # Strip surrounding fenced code block with any language tag (e.g., ```json, ```uk, etc.)
             response = re.sub(r'^```[A-Za-z0-9_-]*\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
 
