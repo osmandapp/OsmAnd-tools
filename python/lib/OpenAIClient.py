@@ -34,8 +34,10 @@ class OpenAIClient:
             api_key = 'ollama'
 
         base_url = api_url if api_url else base_urls[parts[0]]
-        self.client = openai.OpenAI(base_url=base_url, api_key=api_key,
-                                    timeout=httpx.Timeout(LLM_TIMEOUT, connect=3.0), max_retries=1)
+        # Use explicit per-phase timeouts and disable HTTP/2 to avoid intermittent large-response truncation on some stacks.
+        http_timeout = httpx.Timeout(connect=30.0, read=LLM_TIMEOUT, write=LLM_TIMEOUT, pool=60.0)
+        http_client = httpx.Client(http2=False, timeout=http_timeout)
+        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, http_client=http_client, max_retries=2)
         self._init()
 
     def _init(self):
