@@ -12,7 +12,7 @@ logging.getLogger("httpx").setLevel(logging.DEBUG)
 base_urls = {"ollama": "http://localhost:11434/v1", "or": "https://openrouter.ai/api/v1",
              "dp": "https://api.deepseek.com/v1", "veles": "https://veles.osmand.net:8081/api"}
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
-top_p = float(os.getenv('MODEL_TOP_P', 0.7))  # Controls randomness; lower is more deterministic
+top_p = float(os.getenv('MODEL_TOP_P', 1.0))  # Controls randomness; lower is more deterministic
 MAX_TOKENS = int(os.getenv('MAX_TOKENS', 8 * 1024))  # Limit the response length
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 120))
 
@@ -35,8 +35,8 @@ class OpenAIClient:
 
         base_url = api_url if api_url else base_urls[parts[0]]
         # Use explicit per-phase timeouts and disable HTTP/2 to avoid intermittent large-response truncation on some stacks.
-        http_client = httpx.Client(timeout=httpx.Timeout(connect=30.0, read=LLM_TIMEOUT, write=LLM_TIMEOUT, pool=60.0))
-        self.client = openai.OpenAI(base_url=base_url, api_key=api_key, http_client=http_client, max_retries=2)
+        self.client = openai.OpenAI(base_url=base_url, api_key=api_key,
+                                    timeout=httpx.Timeout(LLM_TIMEOUT, connect=3.0), max_retries=1)
         self._init()
 
     def _init(self):
