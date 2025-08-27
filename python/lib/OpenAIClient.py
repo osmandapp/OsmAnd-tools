@@ -13,8 +13,8 @@ base_urls = {"ollama": "http://localhost:11434/v1", "or": "https://openrouter.ai
              "dp": "https://api.deepseek.com/v1", "veles": "https://veles.osmand.net:8081/api"}
 MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
 top_p = float(os.getenv('MODEL_TOP_P', 0.7))  # Controls randomness; lower is more deterministic
-MAX_TOKENS = int(os.getenv('MAX_TOKENS', 4 * 1024))  # Limit the response length
-LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 15))
+MAX_TOKENS = int(os.getenv('MAX_TOKENS', 8 * 1024))  # Limit the response length
+LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 120))
 
 
 class OpenAIClient:
@@ -35,8 +35,7 @@ class OpenAIClient:
 
         base_url = api_url if api_url else base_urls[parts[0]]
         # Use explicit per-phase timeouts and disable HTTP/2 to avoid intermittent large-response truncation on some stacks.
-        http_timeout = httpx.Timeout(connect=30.0, read=LLM_TIMEOUT, write=LLM_TIMEOUT, pool=60.0)
-        http_client = httpx.Client(http2=False, timeout=http_timeout)
+        http_client = httpx.Client(timeout=httpx.Timeout(connect=30.0, read=LLM_TIMEOUT, write=LLM_TIMEOUT, pool=60.0))
         self.client = openai.OpenAI(base_url=base_url, api_key=api_key, http_client=http_client, max_retries=2)
         self._init()
 
@@ -52,25 +51,26 @@ class OpenAIClient:
         start_time = time.time()
         self._init()
 
-        response = self.client.chat.completions.create(model=self.model, messages=[
-            # There are the following roles: system/user/assistant
-            # system - instructions (tools) for shaping behavior which is most authoritative.
-            # user - input query which is medium authoritative.
-            # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
-            {"role": "system", "content": system_prompt}, {"role": "user", "content": user_query}],
-                                                       max_tokens=max_tokens,
-                                                       n=1,  # Number of completions to generate
-                                                       temperature=temperature,
-                                                       top_p=top_p, stream=False)
-        if response.usage:
-            self.prompt_tokens = response.usage.prompt_tokens
-            self.completion_tokens = response.usage.completion_tokens
-            if response.usage.prompt_tokens_details:
-                self.cached_tokens = response.usage.prompt_tokens_details.cached_tokens
-        self.duration = time.time() - start_time
-
-        print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}.", flush=True)
-        return response.choices[0].message.content
+        try:
+            response = self.client.chat.completions.create(model=self.model, messages=[
+                # There are the following roles: system/user/assistant
+                # system - instructions (tools) for shaping behavior which is most authoritative.
+                # user - input query which is medium authoritative.
+                # assistant - to send back “assistant” messages (and “user” messages) as further context to more accurate completions.
+                {"role": "system", "content": system_prompt}, {"role": "user", "content": user_query}],
+                                                           max_tokens=max_tokens,
+                                                           n=1,  # Number of completions to generate
+                                                           temperature=temperature,
+                                                           top_p=top_p, stream=False)
+            if response.usage:
+                self.prompt_tokens = response.usage.prompt_tokens
+                self.completion_tokens = response.usage.completion_tokens
+                if response.usage.prompt_tokens_details:
+                    self.cached_tokens = response.usage.prompt_tokens_details.cached_tokens
+            return response.choices[0].message.content
+        finally:
+            self.duration = time.time() - start_time
+            print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}.", flush=True)
 
     def ask_with_image(self, system_prompt: str, images: List[Tuple[str, str]], init_enum: int = 1, image_prompt: str = "Score image and provide justifying reasons.") -> Tuple[str, bool]:
         start_time = time.time()
