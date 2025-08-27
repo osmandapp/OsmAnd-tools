@@ -319,15 +319,19 @@ def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
 
 
 def save_dest(path, response, imports, digest_now):
-    if path.suffix == ".json":
-        json_response = json.loads(response)
-        json_response["sourceHash"] = {"message": digest_now}
-        response = json.dumps(json_response, indent=2, ensure_ascii=False)
-    else:
-        if not response.startswith('---'):
-            response = f"---\n\n---\n{response}"
-        line_break = '' if response.startswith('\n') else '\n'
-        response = f"---\nsource-hash: {digest_now}{line_break}{response[4:]}"
+    try:
+        if path.suffix == ".json":
+            json_response = json.loads(response)
+            json_response["sourceHash"] = {"message": digest_now}
+            response = json.dumps(json_response, indent=2, ensure_ascii=False)
+        else:
+            if not response.startswith('---'):
+                response = f"---\n\n---\n{response}"
+            line_break = '' if response.startswith('\n') else '\n'
+            response = f"---\nsource-hash: {digest_now}{line_break}{response[4:]}"
+    except json.decoder.JSONDecodeError:
+        print(f"JSON decode error: {response}")
+        raise
 
     response = reinsert_imports(response, imports)
     with open(path, 'w', encoding='utf-8') as f:
@@ -376,8 +380,9 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
 
         response = llm.ask(prompt, content, safe_max_tokens, temperature)
-        if '```json' in response:
-            response = re.sub(r'^```(?:json)?\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
+        if '```' in response:
+            # Strip surrounding fenced code block with any language tag (e.g., ```json, ```uk, etc.)
+            response = re.sub(r'^```[A-Za-z0-9_-]*\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
 
         save_dest(dest_path, response, imports, digest_now)
 
