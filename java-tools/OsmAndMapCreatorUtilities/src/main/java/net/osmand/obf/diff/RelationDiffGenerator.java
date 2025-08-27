@@ -1,9 +1,12 @@
 package net.osmand.obf.diff;
 
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Node;
+import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmStorageWriter;
 import net.osmand.util.Algorithms;
@@ -20,25 +23,33 @@ public class RelationDiffGenerator {
     public static void main(String[] args) {
 
         if(args.length == 1 && args[0].equals("test")) {
-            args = new String[4];
+            args = new String[5];
             List<String> s = new ArrayList<String>();
-            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_before_rel.osm.gz");
-            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_after_rel.osm.gz");
-            s.add("/Users/ivan/OsmAnd/tmp/24_12_11_22_00_diff.osm.gz");
-            s.add("/Users/ivan/OsmAnd/tmp/_after_rel_m.osm");
+            s.add("/Users/ivan/OsmAnd/tmp/live1111/before_rel.osm");
+            s.add("/Users/ivan/OsmAnd/tmp/live1111/after_rel.osm");
+            s.add("/Users/ivan/OsmAnd/tmp/live1111/diff.osm");
+            s.add("/Users/ivan/OsmAnd/tmp/live1111/after.osm.gz");
+            s.add("/Users/ivan/OsmAnd/tmp/live1111/_after_rel_m.osm");
             args = s.toArray(new String[0]);
         } else if (args.length < 4) {
             System.out.println("Usage: <path before_rel.osm.gz file> " +
                 "<path to after_rel.osm.gz file> " +
                 "<path to _diff.osm file> " +
+                "<path to after.osm.gz file> " +
                 "<path to write result> ");
             System.exit(1);
         }
-
         String start = args[0];
         String end = args[1];
         String diff = args[2];
-        String result = args[3];
+        String result = "";
+        String otherAfter = "";
+        if (args.length == 5) {
+            otherAfter = args[3];
+            result = args[4];
+        } else {
+            result = args[3];
+        }
 
         try {
             RelationDiffGenerator rdg = new RelationDiffGenerator();
@@ -46,13 +57,17 @@ public class RelationDiffGenerator {
             File endFile = new File(end);
             File targetFile = new File(result);
             File diffFile = new File(diff);
-            rdg.compareOsmFiles(startFile, endFile, diffFile, targetFile);
+            File otherAfterFile = null;
+            if (!Algorithms.isEmpty(otherAfter)) {
+                otherAfterFile = new File(otherAfter);
+            }
+            rdg.compareOsmFiles(startFile, endFile, diffFile, otherAfterFile, targetFile);
         } catch (IOException | XmlPullParserException | XMLStreamException e) {
             e.printStackTrace();
         }
     }
 
-    private void compareOsmFiles(File start, File end, File diffFile, File targetFile) throws IOException, XmlPullParserException, XMLStreamException {
+    private void compareOsmFiles(File start, File end, File diffFile, File otherAfterFile, File targetFile) throws IOException, XmlPullParserException, XMLStreamException {
 
         long time = System.currentTimeMillis();
 
@@ -85,11 +100,28 @@ public class RelationDiffGenerator {
         Map<EntityId, Entity> endEntities = endStorage.getRegisteredEntities();
         int statisticAddedMembers = 0;
 
+        Map<EntityId, Entity> otherAfterEntities = new HashMap<>();
+        if (otherAfterFile != null) {
+            time = System.currentTimeMillis();
+            InputStream otherAfterIs;
+            if(otherAfterFile.getName().endsWith(".gz")) {
+                otherAfterIs = new GZIPInputStream(new FileInputStream(otherAfterFile));
+            } else {
+                otherAfterIs = new FileInputStream(otherAfterFile);
+            }
+            InputStream otherAfterStream = new BufferedInputStream(otherAfterIs, 8192 * 4);
+            OsmBaseStorage otherAfterStorage = new OsmBaseStorage();
+            otherAfterStorage.parseOSM(otherAfterStream, IProgress.EMPTY_PROGRESS);
+            long t3 = System.currentTimeMillis() - time;
+            System.out.println("Parse " + otherAfterFile.getName() + ": " + (t3 / 1000) + " sec.");
+            otherAfterStream.close();
+            otherAfterEntities = otherAfterStorage.getRegisteredEntities();
+        }
+
         Set<EntityId> deletedObjIds = new HashSet<>();
-        Set<EntityId> modifiedObjIds = new HashSet<>();
         if (diffFile != null) {
             try {
-                DiffParser.fetchModifiedIds(diffFile, null, deletedObjIds, modifiedObjIds);
+                DiffParser.fetchModifiedIds(diffFile, null, deletedObjIds, null);
             } catch (IOException | XmlPullParserException e) {
                 e.printStackTrace();
             }
@@ -97,12 +129,30 @@ public class RelationDiffGenerator {
         long t3 = System.currentTimeMillis() - time - t2;
         System.out.println("Parse _diff.osm in " + (t3 / 1000) + " sec.");
 
+        TLongHashSet nodeIdsFromOtherAfter = new TLongHashSet();
         for (Map.Entry<EntityId, Entity> e : startEntities.entrySet()) {
             Entity.EntityType entityType = e.getKey().getType();
             if (entityType != Entity.EntityType.NODE && entityType != Entity.EntityType.WAY) {
                 continue;
             }
-            if (!endEntities.containsKey(e.getKey()) && !deletedObjIds.contains(e.getKey()) && !modifiedObjIds.contains(e.getKey())) {
+            if (endEntities.containsKey(e.getKey())) {
+                continue;
+            }
+            if (otherAfterEntities.containsKey(e.getKey())) {
+                Entity entity = otherAfterEntities.get(e.getKey());
+                endStorage.registerEntity(entity, null);
+                if (entity instanceof Way w) {
+                    List<Node> nodes = w.getNodes();
+                    for (Node n : nodes) {
+                        if (!nodeIdsFromOtherAfter.contains(n.getId())) {
+                            nodeIdsFromOtherAfter.add(n.getId());
+                            endStorage.registerEntity(n, null);
+                            statisticAddedMembers++;
+                        }
+                    }
+                }
+                statisticAddedMembers++;
+            } else if (!deletedObjIds.contains(e.getKey())) {
                 endStorage.registerEntity(e.getValue(), null);
                 statisticAddedMembers++;
             }
