@@ -374,7 +374,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
         safe_max_tokens = max(512, len(content)) + 1024
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens) is translating...", flush=True)
 
-        response = llm.ask(prompt, content, safe_max_tokens, 0.0 if dest_dir.suffix == '.json' else -1.0)
+        response = llm.ask(prompt, content, safe_max_tokens, 0.0 if src_path.suffix == '.json' else -1.0)
         if '```json' in response:
             response = re.sub(r'^```(?:json)?\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
 
