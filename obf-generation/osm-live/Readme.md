@@ -94,7 +94,7 @@ For example, way is removed from relation and road disappear in the issue https:
 
 ### OSM: Query 2. - Support cases of deleted relations or changed number of members
 This query is used for relation's `<action type="delete">` or if the members of the relation are added or deleted (the count of members inside the relation is changed.)<br>
-**Purpose:** get complete objects that are now or used to be **members** of changed/created/deleted relations.<br>
+**Purpose:** get complete objects that exist now or used to be **members** of changed/created/deleted relations.<br>
 **Full Overpass query:**
 ```
    // get all relation changed between START - END
@@ -113,13 +113,26 @@ This query is used for relation's `<action type="delete">` or if the members of 
     .b out meta;
     .c out meta;
 ```
-**Important Note.** - unique set of completed objects different in `before_rel.osm` and `after_rel.osm`! As we can't retrieve ways in `after_rel.osm` for deleted relations this mean that these ways are missing in `after_rel.osm`, but present in `before_rel.osm` and it later creates wrongly deleted ways. We compensate this issue by copying data from `before_rel.osm` (not modified node/ways) and `after.osm` (modified node/ways) to `after_rel.osm`, see utility `generate-relation-osm`.
+**Important Note.** - unique sets of completed objects are different in `before_rel.osm` and `after_rel.osm`! As we can't retrieve ways in `after_rel.osm` for deleted relations this mean that these ways are missing in `after_rel.osm`, but present in `before_rel.osm` and it later creates wrongly deleted ways. We compensate this issue by copying missing data from `before_rel.osm` and `after.osm` to `after_rel.osm` (after rename to `after_rel_m.osm`), see utility `generate-relation-osm` (see chapter `OSM: Create *_after_rel_m.osm`).
+
+### OSM: Query 3. - Create `diff.osm`
+`diff.osm` - file with OSM changesets format that consist of actions for modified node / way / relation: `<action type="create">`, `<action type="modify">`, `<action type="delete">`
+```
+  QUERY_DIFF="[timeout:3600][maxsize:2000000000][diff:\"$START_DATE\",\"$END_DATE\"];
+    (
+      node(changed:\"$START_DATE\",\"$END_DATE\");
+      way(changed:\"$START_DATE\",\"$END_DATE\");
+      relation(changed:\"$START_DATE\",\"$END_DATE\");
+    )->.a;
+    .a out geom meta;
+  "
+```
 
 ### OSM: Create `*_after_rel_m.osm`
-For avoid getting many "deleted" objects in diff file (`diff_rel.obf`) need to copy node/ways to `after_rel.osm`:
-- copy not modified from `before_rel.osm`
-- copy modified from `after.osm` (avoid [bug of duplicates geometry](https://github.com/osmandapp/OsmAnd/issues/21561))
-- avoid deleted using `diff.osm` (`<action type="delete">`)
+To avoid incorrect `osmand_change=delete` objects in diff file (`diff_rel.obf`) we need to copy node/ways to `after_rel.osm`:
+- not modified objects from `before_rel.osm`
+- modified objects from `after.osm` (avoid [bug of duplicates geometry](https://github.com/osmandapp/OsmAnd/issues/21561))
+- check real deleted objects using `diff.osm` (`<action type="delete">`)<br>
 After copying we save all data to new file `after_rel_m.osm`.<br>
 ```
     echo "### 1. Generate relation osm : $(date -u) . All nodes and ways copy from before_rel to after_rel " &
@@ -130,19 +143,20 @@ After copying we save all data to new file `after_rel_m.osm`.<br>
 
 ### OBF: Generate obf files:
 **Incompleted routes and multipolygons:**<br>
-After step 3 of "Full Overpass query" (**OSM Query 2. - Support cases of deleted relations**) we get many incompleted relation. For multipolygons (relation type=multipolygon) and routes (relation type=route) we use Overpass query all members, see [OverpassFetcher.java](https://github.com/osmandapp/OsmAnd-tools/blob/master/java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/obf/preparation/OverpassFetcher.java)
+For incompleted multipolygons (relation type=multipolygon) and incompeted routes (relation type=route) we use Overpass to query all members, see [OverpassFetcher.java](https://github.com/osmandapp/OsmAnd-tools/blob/master/java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/obf/preparation/OverpassFetcher.java)
 ```
-    echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
-    $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
-        --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
-    $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
-        --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
-    $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
-        --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
-    $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address ${BASENAME}_after_rel_m.osm.gz \
-        --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
-    wait 
+        echo "### 2. Generate obf files : $(date -u) . Will store into $DATE_DIR/obf/"
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_after.osm.gz  \
+            --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address $DATE_DIR/src/${BASENAME}_before.osm.gz  \
+            --ram-process --add-region-tags --extra-relations="$LOW_EMMISION_ZONE_FILE" --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address-no-multipolygon $DATE_DIR/src/${BASENAME}_before_rel.osm.gz \
+            --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
+        $OSMAND_MAP_CREATOR_PATH/utilities.sh generate-obf-no-address-no-multipolygon ${BASENAME}_after_rel_m.osm.gz \
+            --ram-process --add-region-tags --upload $DATE_DIR/obf/ &
+        wait  
 ```
+**Note:** Utility `generate-obf-no-address-no-multipolygon` is needed to avoid fetching of incomplete relations by [OverpassFetcher.java](https://github.com/osmandapp/OsmAnd-tools/blob/master/java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/obf/preparation/OverpassFetcher.java) only for `_rel` files.
 
 ### COMPARE: Generate `*_diff.obf` files:
 We need to make sure that diff file contains only properly changed and complete objects. So in both files entities are complete & correct.
@@ -154,7 +168,8 @@ We need to make sure that diff file contains only properly changed and complete 
             ${BEFORE_REL_OBF_FILE} ${AFTER_REL_M_OBF_FILE} ${BASENAME}_diff_rel.obf $DIFF_FILE &
         wait
 ```
-Where `$DIFF_FILE` is `*_diff.osm` file with OSM changesets that consist of `<action type="create">`, `<action type="modify">`, `<action type="delete">`
+Where `$DIFF_FILE` is `*_diff.osm` file with OSM changesets that consist of `<action type="create">`, `<action type="modify">`, `<action type="delete">`<br>
+The result stored into `_diff.obf` and `_diff_rel.obf`
 
 ### COMPARE: Merge `*_diff.obf` and `*_diff_rel.obf`
 On this step we copy all objects from `_diff_rel.obf` to `_diff.obf`.<br> 
@@ -167,6 +182,7 @@ $OSMAND_MAP_CREATOR_PATH/utilities.sh merge-obf-diff ${BASENAME}_diff_rel.obf ${
 ```
 $OSMAND_MAP_CREATOR_PATH/utilities.sh split-obf ${BASENAME}_diff.obf $RESULT_DIR  "$DATE_NAME" "_$TIME_NAME" --srtm="$SRTM_DIR"
 ```
+**Note:** We add SRTM data by option --srtm="$SRTM_DIR"
 
 ## Issues
 #### [Part of the road is missing after edits](https://github.com/osmandapp/OsmAnd/issues/23030#issuecomment-3205108026)
@@ -189,7 +205,7 @@ OSM editor deleted [relation](https://www.openstreetmap.org/relation/8060127) an
     ```
 **Analyze:**
 1. Why [way 536051747](https://www.openstreetmap.org/way/536051747/history/14) is not present in `diff.obf` ? - We know that editor changed tags, but no any changes wasn't stored in `diff.obf`.<br>
-After analyze changed tags we found that any change had no influence on map section (`-vmap`), so nothing stored to changes (`diff.obf`).
+After analyze changed tags we found that any change had no influence on map section (`-vmap`), tags `maxspeed:backward=90` and `maxspeed:forward=70`, so nothing stored to changes in map section of `diff.obf`.
 2. Why [way 536051747](https://www.openstreetmap.org/way/536051747) is marked as deleted (`osmand_change-delete`) in diff_rel.obf ? - We know that was deleted only [relation](https://www.openstreetmap.org/relation/8060127), but no [way](https://www.openstreetmap.org/way/536051747) itself!<br>
 
 **Try to fix:**
