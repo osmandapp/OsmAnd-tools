@@ -37,37 +37,38 @@ public interface ReportService {
 			TestCaseStatus generatedChart) {
 	}
 
-	String REPORT_SQL = "WITH result AS (" +
-			"    SELECT" +
-			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type," +
-			"        count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row," +
-			"        actual_place <= ?                                                  AS is_place," +
-			"        min_distance <= ?                                                  AS is_dist," +
-			"        CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id," +
-			"        COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name," +
-			"        COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1," +
-			"        COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2," +
-			"        CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id," +
-			"        (query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'" +
-			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'" +
-			"            AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')" +
-			"                                                                           AS is_addr_match," +
-			"        ((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =" +
-			"         CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match" +
-			"    FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance" +
-			") " +
-			"SELECT CASE" +
-			"        WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'" +
-			"        WHEN is_place AND is_dist THEN 'Found'" +
-			"        WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match)" +
-			"            THEN 'Near'" +
-			"        WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match)" +
-			"            THEN 'Too Far' ELSE 'Not Found'" +
-			"END AS \"group\", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row " +
-			"FROM result UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM " +
-			"(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'" +
-			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id " +
-			"FROM gen_result WHERE case_id = ? ORDER BY id)";
+	String REPORT_SQL = """
+WITH result AS (
+	SELECT
+		UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type,
+		count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row,
+		actual_place <= ?                                                  AS is_place,
+		min_distance <= ?                                                  AS is_dist,
+		CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id,
+		COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name,
+		COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1,
+		COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2,
+		CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id,
+		(query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'
+			AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'
+			AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')
+																		   AS is_addr_match,
+		((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =
+		 CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match
+	FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance
+)
+SELECT CASE
+	WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'
+	WHEN is_place AND is_dist THEN 'Found'
+	WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Near'
+	WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Too Far'
+    ELSE 'Not Found'
+END AS "group", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
+FROM result UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM
+(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
+  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id
+FROM gen_result WHERE case_id = ? ORDER BY id)
+			""";
 
 	JdbcTemplate getJdbcTemplate();
 

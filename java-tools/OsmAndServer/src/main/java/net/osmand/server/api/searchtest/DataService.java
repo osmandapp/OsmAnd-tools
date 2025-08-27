@@ -68,7 +68,7 @@ public interface DataService extends BaseService {
 			dataset.allCols = getObjectMapper().writeValueAsString(headers);
 			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
 				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
-				LOGGER.error("{} Header: {}", error, String.join(",", headers));
+				getLogger().error("{} Header: {}", error, String.join(",", headers));
 				dataset.setError(error);
 				return dataset;
 			}
@@ -80,7 +80,7 @@ public interface DataService extends BaseService {
 				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
 				insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
 				dataset.total = sample.size() - 1;
-				LOGGER.info("Stored {} rows into table: {}", sample.size(), tableName);
+				getLogger().info("Stored {} rows into table: {}", sample.size(), tableName);
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
@@ -88,16 +88,16 @@ public interface DataService extends BaseService {
 		} catch (Exception e) {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
 
-			LOGGER.error("Failed to process and insert data from CSV file: {}", fullPath, e);
+			getLogger().error("Failed to process and insert data from CSV file: {}", fullPath, e);
 			return dataset;
 		} finally {
 			if (dataset.type == Dataset.Source.Overpass) {
 				try {
 					if (fullPath != null && !Files.deleteIfExists(fullPath)) {
-						LOGGER.warn("Could not delete temporary file: {}", fullPath);
+						getLogger().warn("Could not delete temporary file: {}", fullPath);
 					}
 				} catch (IOException e) {
-					LOGGER.error("Error deleting temporary file: {}", fullPath, e);
+					getLogger().error("Error deleting temporary file: {}", fullPath, e);
 				}
 			}
 		}
@@ -107,7 +107,7 @@ public interface DataService extends BaseService {
 	default TestCase generate(Dataset dataset, TestCase test) {
 		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
 			test.status = TestCase.Status.FAILED;
-			LOGGER.info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
+			getLogger().info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
 			return test;
 		}
 
@@ -138,7 +138,7 @@ public interface DataService extends BaseService {
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {
-			LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
+			getLogger().error("Generation of test-case failed for on dataset {}", dataset.id, e);
 			test.setError(e.getMessage());
 			test.status = TestCase.Status.FAILED;
 		} finally {
@@ -285,7 +285,7 @@ public interface DataService extends BaseService {
 
 			return stringWriter.toString();
 		} catch (Exception e) {
-			LOGGER.error("Failed to retrieve sample for dataset {}", datasetId, e);
+			getLogger().error("Failed to retrieve sample for dataset {}", datasetId, e);
 			throw new RuntimeException("Failed to generate dataset sample: " + e.getMessage(), e);
 		}
 	}
@@ -329,7 +329,7 @@ public interface DataService extends BaseService {
 			batchArgs.add(values);
 		}
 		getJdbcTemplate().batchUpdate(insertSql, batchArgs);
-		LOGGER.info("Batch inserted {} records into {}.", sample.size(), tableName);
+		getLogger().info("Batch inserted {} records into {}.", sample.size(), tableName);
 	}
 
 	private void createDynamicTable(String tableName, String[] columns) {
@@ -339,7 +339,7 @@ public interface DataService extends BaseService {
 				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT, " + "%s)",
 						tableName, columnsDefinition);
 		getJdbcTemplate().execute(createTableSql);
-		LOGGER.info("Ensured table {} exists.", tableName);
+		getLogger().info("Ensured table {} exists.", tableName);
 	}
 
 	default List<String> getAllLabels() {
@@ -366,7 +366,7 @@ public interface DataService extends BaseService {
 			results.sort(null);
 			return results;
 		} catch (Exception e) {
-			LOGGER.error("Failed to retrieve labels", e);
+			getLogger().error("Failed to retrieve labels", e);
 			throw new RuntimeException("Failed to retrieve labels: " + e.getMessage(), e);
 		}
 	}

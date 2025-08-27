@@ -112,6 +112,10 @@ public class SearchTestService implements ReportService, DataService {
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
 	}
 
+	public Logger getLogger() {
+		return LOGGER;
+	}
+
 	public JdbcTemplate getJdbcTemplate() {
 		return jdbcTemplate;
 	}
@@ -256,8 +260,7 @@ public class SearchTestService implements ReportService, DataService {
 
 	private void run(Run run) {
 		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY" +
-						" id",
-				run.caseId);
+						" id", run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			for (Map<String, Object> row : rows) {

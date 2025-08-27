@@ -3,12 +3,10 @@ package net.osmand.server.api.searchtest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -37,8 +35,6 @@ public interface BaseService {
 			String[] columns,
 			String[] selectParamValues,
 			String[] whereParamValues) {}
-
-	Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 
 	// -------------------- Utility methods (common) --------------------
 	default String pointToString(LatLon point) {
@@ -116,6 +112,8 @@ public interface BaseService {
 
 	String getCsvDownloadingDir();
 
+	Logger getLogger();
+
 	default Path queryOverpass(String query) {
 		Path tempFile;
 		try {
@@ -124,10 +122,10 @@ public interface BaseService {
 							";out;").retrieve().bodyToMono(String.class).toFuture().join();
 			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
-			LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
+			getLogger().info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 			return tempFile;
 		} catch (Exception e) {
-			LOGGER.error("Failed to query data from Overpass for {}", query, e);
+			getLogger().error("Failed to query data from Overpass for {}", query, e);
 			throw new RuntimeException("Failed to query from Overpass", e);
 		}
 	}
@@ -195,7 +193,7 @@ public interface BaseService {
 			try (BufferedReader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
 				return Math.max(0, reader.lines().count() - 1); // exclude header
 			} catch (IOException e) {
-				LOGGER.error("Failed to count rows in CSV file: {}", fullPath, e);
+				getLogger().error("Failed to count rows in CSV file: {}", fullPath, e);
 				throw new RuntimeException("Failed to count rows in CSV file", e);
 			}
 		});
