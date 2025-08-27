@@ -72,7 +72,7 @@ public class SearchTestRepositoryConfiguration {
 
         return builder
                 .dataSource(dataSource)
-                .packages(Application.PACKAGE_NAME + ".api.searchtest.entity")
+                .packages(Application.PACKAGE_NAME + ".api.searchtest")
                 .properties(vendorProps)
                 .persistenceUnit("searchTest")
                 .build();

@@ -1,22 +1,17 @@
 package net.osmand.server.api.searchtest;
 
-import jakarta.persistence.EntityManager;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.entity.Run;
-import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 
 import java.io.IOException;
@@ -29,17 +24,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public abstract class DataService extends BaseService {
-	@Autowired
-	protected SearchTestDatasetRepository datasetRepo;
-	@Autowired
-	protected SearchTestCaseRepository testCaseRepo;
-	@Autowired
-	protected SearchTestRunRepository runRepo;
-	@Autowired @Qualifier("searchTestJdbcTemplate")
-	protected JdbcTemplate jdbcTemplate;
-	@Autowired
-	protected EntityManager em;
+public interface DataService extends BaseService {
+	static String sanitize(String input) {
+		if (input == null) {
+			return "";
+		}
+		return input.toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+	}
+
+	SearchTestDatasetRepository getDatasetRepo();
+
+	SearchTestCaseRepository getTestCaseRepo();
+
+	PolyglotEngine getEngine();
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
@@ -50,7 +47,7 @@ public abstract class DataService extends BaseService {
 			if (dataset.type == Dataset.Source.Overpass) {
 				fullPath = queryOverpass(dataset.source);
 			} else {
-				fullPath = Path.of(csvDownloadingDir, dataset.source);
+				fullPath = Path.of(getCsvDownloadingDir(), dataset.source);
 			}
 			if (!Files.exists(fullPath)) {
 				dataset.setError("File is not existed: " + fullPath);
@@ -68,7 +65,7 @@ public abstract class DataService extends BaseService {
 							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
 			String[] headers =
 					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
-			dataset.allCols = objectMapper.writeValueAsString(headers);
+			dataset.allCols = getObjectMapper().writeValueAsString(headers);
 			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
 				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
 				LOGGER.error("{} Header: {}", error, String.join(",", headers));
@@ -76,7 +73,7 @@ public abstract class DataService extends BaseService {
 				return dataset;
 			}
 
-			dataset.selCols = objectMapper.writeValueAsString(Arrays.stream(headers).filter(s ->
+			dataset.selCols = getObjectMapper().writeValueAsString(Arrays.stream(headers).filter(s ->
 					s.startsWith("road") || s.startsWith("city") ||
 							s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new));
 			if (reload) {
@@ -87,7 +84,7 @@ public abstract class DataService extends BaseService {
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
-			return datasetRepo.save(dataset);
+			return getDatasetRepo().save(dataset);
 		} catch (Exception e) {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
 
@@ -106,10 +103,54 @@ public abstract class DataService extends BaseService {
 		}
 	}
 
+
+	default TestCase generate(Dataset dataset, TestCase test) {
+		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
+			test.status = TestCase.Status.FAILED;
+			LOGGER.info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
+			return test;
+		}
+
+		try {
+			String tableName = "dataset_" + sanitize(dataset.name);
+
+			String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
+			List<String> columns = new ArrayList<>(), delCols = new ArrayList<>();
+			Collections.addAll(columns, selCols);
+			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
+				columns.add("lon");
+				delCols.add("lon");
+			}
+			if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
+				columns.add("lat");
+				delCols.add("lat");
+			}
+			if (Arrays.stream(selCols).noneMatch("id"::equals)) {
+				columns.add("id");
+				delCols.add("id");
+			}
+
+			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
+			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
+			List<PolyglotEngine.GenRow> examples = getEngine().execute(dataset.script, test, delCols, rows);
+			for (PolyglotEngine.GenRow example : examples) {
+				saveCaseResults(test, example);
+			}
+			test.status = TestCase.Status.GENERATED;
+		} catch (Exception e) {
+			LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
+			test.setError(e.getMessage());
+			test.status = TestCase.Status.FAILED;
+		} finally {
+			test.updated = LocalDateTime.now();
+		}
+		return getTestCaseRepo().save(test);
+	}
+
 	@Async
-	public CompletableFuture<Dataset> createDataset(Dataset dataset) {
+	default CompletableFuture<Dataset> createDataset(Dataset dataset) {
 		return CompletableFuture.supplyAsync(() -> {
-			Optional<Dataset> datasetOptional = datasetRepo.findByName(dataset.name);
+			Optional<Dataset> datasetOptional = getDatasetRepo().findByName(dataset.name);
 			if (datasetOptional.isPresent()) {
 				dataset.setError("Dataset is already created: " + dataset.name);
 				return dataset;
@@ -122,9 +163,9 @@ public abstract class DataService extends BaseService {
 	}
 
 	@Async
-	public CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
+	default CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
-			Dataset dataset = datasetRepo.findById(id).orElseThrow(() ->
+			Dataset dataset = getDatasetRepo().findById(id).orElseThrow(() ->
 					new RuntimeException("Dataset not found with id: " + id));
 
 			updates.forEach((key, value) -> {
@@ -143,22 +184,22 @@ public abstract class DataService extends BaseService {
 		});
 	}
 
-	protected void saveCaseResults(TestCase test, PolyglotEngine.GenRow data) throws IOException {
+	default void saveCaseResults(TestCase test, PolyglotEngine.GenRow data) throws IOException {
 		String sql =
 				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
 						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-		String rowJson = objectMapper.writeValueAsString(data.row());
+		String rowJson = getObjectMapper().writeValueAsString(data.row());
 		String[] outputArray = data.output() == null || data.count() <= 0 ? new String[]{null} :
-				objectMapper.readValue(data.output(), String[].class);
+				getObjectMapper().readValue(data.output(), String[].class);
 		for (String query : outputArray) {
-			jdbcTemplate.update(sql, data.count(), test.id, test.datasetId, rowJson, query, data.error(),
+			getJdbcTemplate().update(sql, data.count(), test.id, test.datasetId, rowJson, query, data.error(),
 					data.duration(),
 					data.point().getLatitude(), data.point().getLongitude(),
 					new java.sql.Timestamp(System.currentTimeMillis()));
 		}
 	}
 
-	protected void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
+	default void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
 								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
@@ -201,8 +242,8 @@ public abstract class DataService extends BaseService {
 				"duration, results_count, min_distance, closest_result, actual_place, lat, lon, timestamp) " +
 				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-		String rowJson = objectMapper.writeValueAsString(row);
-		jdbcTemplate.update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
+		String rowJson = getObjectMapper().writeValueAsString(row);
+		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
 				resultsCount,
 				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
 				targetPoint == null ? null : targetPoint.getLongitude(),
@@ -217,19 +258,19 @@ public abstract class DataService extends BaseService {
 	 * @param pageable Pageable request defining the page number and size.
 	 * @return Page of matching datasets.
 	 */
-	public Page<Dataset> getDatasets(String name, String labels, Pageable pageable) {
-		return datasetRepo.findAllDatasets(name, labels, pageable);
+	default Page<Dataset> getDatasets(String name, String labels, Pageable pageable) {
+		return getDatasetRepo().findAllDatasets(name, labels, pageable);
 	}
 
-	public String getDatasetSample(Long datasetId) {
-		Dataset dataset = datasetRepo.findById(datasetId).orElseThrow(() ->
+	default String getDatasetSample(Long datasetId) {
+		Dataset dataset = getDatasetRepo().findById(datasetId).orElseThrow(() ->
 				new RuntimeException("Dataset not found with id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
 		String sql = "SELECT * FROM " + tableName;
 		try {
 			StringWriter stringWriter = new StringWriter();
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
 			if (rows.isEmpty()) {
 				return "";
 			}
@@ -249,29 +290,29 @@ public abstract class DataService extends BaseService {
 		}
 	}
 
-	public boolean deleteDataset(Long datasetId) {
-		Optional<Dataset> dsOpt = datasetRepo.findById(datasetId);
+	default boolean deleteDataset(Long datasetId) {
+		Optional<Dataset> dsOpt = getDatasetRepo().findById(datasetId);
 		if (dsOpt.isEmpty()) {
 			return false;
 		}
 		String tableName = "dataset_" + sanitize(dsOpt.get().name);
-		jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
+		getJdbcTemplate().execute("DROP TABLE IF EXISTS " + tableName);
 
 		String deleteSql = "DELETE FROM run_result WHERE dataset_id = ?";
-		jdbcTemplate.update(deleteSql, datasetId);
+		getJdbcTemplate().update(deleteSql, datasetId);
 
 		deleteSql = "DELETE FROM test_case WHERE dataset_id = ?";
-		jdbcTemplate.update(deleteSql, datasetId);
+		getJdbcTemplate().update(deleteSql, datasetId);
 
 		Dataset ds = dsOpt.get();
-		datasetRepo.delete(ds);
+		getDatasetRepo().delete(ds);
 		return true;
 	}
 
-	public void insertSampleData(String tableName, String[] columns, List<String> sample, String delimiter,
+	default void insertSampleData(String tableName, String[] columns, List<String> sample, String delimiter,
 								 boolean deleteBefore) {
 		if (deleteBefore) {
-			jdbcTemplate.execute("DROP TABLE IF EXISTS " + tableName);
+			getJdbcTemplate().execute("DROP TABLE IF EXISTS " + tableName);
 		}
 		createDynamicTable(tableName, columns);
 
@@ -287,26 +328,26 @@ public abstract class DataService extends BaseService {
 			}
 			batchArgs.add(values);
 		}
-		jdbcTemplate.batchUpdate(insertSql, batchArgs);
+		getJdbcTemplate().batchUpdate(insertSql, batchArgs);
 		LOGGER.info("Batch inserted {} records into {}.", sample.size(), tableName);
 	}
 
-	protected void createDynamicTable(String tableName, String[] columns) {
+	private void createDynamicTable(String tableName, String[] columns) {
 		String columnsDefinition =
 				Stream.of(columns).map(header -> "\"" + header + "\" VARCHAR(255)").collect(Collectors.joining(", "));
 		String createTableSql =
 				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT, " + "%s)",
 						tableName, columnsDefinition);
-		jdbcTemplate.execute(createTableSql);
+		getJdbcTemplate().execute(createTableSql);
 		LOGGER.info("Ensured table {} exists.", tableName);
 	}
 
-	public List<String> getAllLabels() {
+	default List<String> getAllLabels() {
 		try {
 			String sql = "SELECT labels FROM dataset";
-			List<String> rows = jdbcTemplate.queryForList(sql, String.class);
+			List<String> rows = getJdbcTemplate().queryForList(sql, String.class);
 			sql = "SELECT labels FROM test_case";
-			rows.addAll(jdbcTemplate.queryForList(sql, String.class));
+			rows.addAll(getJdbcTemplate().queryForList(sql, String.class));
 
 			Set<String> set = new LinkedHashSet<>();
 			for (String label : rows) {

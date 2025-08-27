@@ -2,22 +2,15 @@ package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.entity.TestCase;
 import net.osmand.server.api.services.SearchTestService;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Engine;
-import org.graalvm.polyglot.PolyglotException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
@@ -28,37 +21,37 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
-public abstract class BaseService {
-	protected static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-	@Autowired
-	protected ObjectMapper objectMapper;
-	@Autowired
-	private WebClient.Builder webClientBuilder;
-	@Value("${searchtest.csv.dir}")
-	protected String csvDownloadingDir;
-	private WebClient webClient;
-	@Value("${overpass.url}")
-	private String overpassApiUrl;
+public interface BaseService {
+	record Function(String name, String description, Param[] param) {
+	}
+
+	record Param(String name, String type, String description) {
+	}
+
+	record GenParam(
+			String name,
+			String labels,
+			// New fields to explicitly support 2 functions
+			String selectFun,
+			String whereFun,
+			String[] columns,
+			String[] selectParamValues,
+			String[] whereParamValues) {}
+
+	Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
 
 	// -------------------- Utility methods (common) --------------------
-	public static String pointToString(LatLon point) {
+	default String pointToString(LatLon point) {
 		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
 	}
 
-	public static LatLon getLatLon(GeojsonClasses.Feature feature) {
+	default LatLon getLatLon(GeojsonClasses.Feature feature) {
 		float[] point = "Point".equals(feature.geometry.type) ? (float[]) feature.geometry.coordinates :
 				((float[][]) feature.geometry.coordinates)[0];
 		return new LatLon(point[1], point[0]);
 	}
 
-	public static String sanitize(String input) {
-		if (input == null) {
-			return "";
-		}
-		return input.toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
-	}
-
-	public static String unquote(String input) {
+	default String unquote(String input) {
 		if (input == null) {
 			return "";
 		}
@@ -68,14 +61,14 @@ public abstract class BaseService {
 		return input;
 	}
 
-	public static String crop(String input, int length) {
+	default String crop(String input, int length) {
 		if (input == null) {
 			return "";
 		}
 		return input.substring(0, Math.min(length, input.length()));
 	}
 
-	protected static List<String> reservoirSample(Path filePath, int n) throws IOException {
+	default List<String> reservoirSample(Path filePath, int n) throws IOException {
 		List<String> sample = new ArrayList<>();
 		try (BufferedReader reader = Files.newBufferedReader(filePath)) {
 			String header = reader.readLine();
@@ -99,7 +92,7 @@ public abstract class BaseService {
 		return sample;
 	}
 
-	protected static String getHeader(Path filePath) throws IOException {
+	default String getHeader(Path filePath) throws IOException {
 		String fileName = filePath.getFileName().toString();
 		if (fileName.endsWith(".csv")) {
 			try (BufferedReader reader = Files.newBufferedReader(filePath)) {
@@ -115,21 +108,21 @@ public abstract class BaseService {
 		return null;
 	}
 
-	@PostConstruct
-	protected void init() {
-		this.webClient =
-				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
-						.builder().codecs(configurer
-								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
-	}
+	JdbcTemplate getJdbcTemplate();
 
-	protected Path queryOverpass(String query) {
+	ObjectMapper getObjectMapper();
+
+	WebClient getWebClient();
+
+	String getCsvDownloadingDir();
+
+	default Path queryOverpass(String query) {
 		Path tempFile;
 		try {
 			String overpassResponse =
-					webClient.post().uri("").bodyValue("[out:json][timeout:25];" + query +
+					getWebClient().post().uri("").bodyValue("[out:json][timeout:25];" + query +
 							";out;").retrieve().bodyToMono(String.class).toFuture().join();
-			tempFile = Files.createTempFile(Path.of(csvDownloadingDir), "overpass_", ".csv");
+			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			LOGGER.info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 			return tempFile;
@@ -139,8 +132,8 @@ public abstract class BaseService {
 		}
 	}
 
-	protected int convertJsonToSaveInCsv(String jsonResponse, Path outputPath) throws IOException {
-		JsonNode root = objectMapper.readTree(jsonResponse);
+	default int convertJsonToSaveInCsv(String jsonResponse, Path outputPath) throws IOException {
+		JsonNode root = getObjectMapper().readTree(jsonResponse);
 		JsonNode elements = root.path("elements");
 
 		if (!elements.isArray()) {
@@ -179,9 +172,9 @@ public abstract class BaseService {
 		return rowCount;
 	}
 
-	public Map<String, Integer> browseCsvFiles() throws IOException {
+	default Map<String, Integer> browseCsvFiles() throws IOException {
 		Map<String, Integer> fileRowCounts = new HashMap<>();
-		try (Stream<Path> paths = Files.walk(Path.of(csvDownloadingDir))) {
+		try (Stream<Path> paths = Files.walk(Path.of(getCsvDownloadingDir()))) {
 			List<Path> csvFiles = paths.filter(Files::isRegularFile).filter(p -> p.toString().toLowerCase().endsWith(
 					".csv")).toList();
 
@@ -196,9 +189,9 @@ public abstract class BaseService {
 	}
 
 	@Async
-	public CompletableFuture<Long> countCsvRows(String filePath) {
+	default CompletableFuture<Long> countCsvRows(String filePath) {
 		return CompletableFuture.supplyAsync(() -> {
-			Path fullPath = Path.of(csvDownloadingDir, filePath);
+			Path fullPath = Path.of(getCsvDownloadingDir(), filePath);
 			try (BufferedReader reader = new BufferedReader(new FileReader(fullPath.toFile()))) {
 				return Math.max(0, reader.lines().count() - 1); // exclude header
 			} catch (IOException e) {
@@ -207,5 +200,4 @@ public abstract class BaseService {
 			}
 		});
 	}
-
 }

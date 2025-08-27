@@ -1,26 +1,34 @@
 package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
+import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
-import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.TestCaseItem;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
-import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.entity.Run;
-import net.osmand.server.api.searchtest.entity.RunParam;
-import net.osmand.server.api.searchtest.entity.TestCase;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -28,8 +36,65 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 @Service
-public class SearchTestService extends ReportService {
+public class SearchTestService implements ReportService, DataService {
+	/**
+	 * Lightweight DTO for listing test-cases with parent dataset name.
+	 */
+	public static class TestCaseItem {
+		public Long id;
+		public String name;
+		public String labels;
+		public Long datasetId;
+		public String datasetName;
+		public Long lastRunId;
+		public String status;
+		public LocalDateTime updated;
+		public String error;
+		public long total;
+		public long failed;
+		public long duration;
+
+		public TestCaseItem() {
+		}
+
+		public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
+							Long lastRunId, String status, LocalDateTime updated, String error,
+							long total, long failed, long duration) {
+			this.id = id;
+			this.name = name;
+			this.labels = labels;
+			this.datasetId = datasetId;
+			this.datasetName = datasetName;
+			this.lastRunId = lastRunId;
+			this.status = status;
+			this.updated = updated;
+			this.error = error;
+			this.total = total;
+			this.failed = failed;
+			this.duration = duration;
+		}
+	}
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+	@Autowired
+	private ObjectMapper objectMapper;
+	@Autowired
+	private WebClient.Builder webClientBuilder;
+	private WebClient webClient;
+
+	@Autowired
+	private SearchTestDatasetRepository datasetRepo;
+	@Autowired
+	private SearchTestCaseRepository testCaseRepo;
+	@Autowired
+	private SearchTestRunRepository runRepo;
+	@Autowired @Qualifier("searchTestJdbcTemplate")
+	private JdbcTemplate jdbcTemplate;
+
+	@Value("${searchtest.csv.dir}")
+	private String csvDownloadingDir;
+	@Value("${overpass.url}")
+	private String overpassApiUrl;
 	private final SearchService searchService;
 	@Autowired
 	private PolyglotEngine engine;
@@ -37,6 +102,42 @@ public class SearchTestService extends ReportService {
 	@Autowired
 	public SearchTestService(SearchService searchService) {
 		this.searchService = searchService;
+	}
+
+	@PostConstruct
+	protected void init() {
+		this.webClient =
+				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
+						.builder().codecs(configurer
+								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+	}
+
+	public JdbcTemplate getJdbcTemplate() {
+		return jdbcTemplate;
+	}
+
+	public ObjectMapper getObjectMapper() {
+		return objectMapper;
+	}
+
+	public WebClient getWebClient() {
+		return webClient;
+	}
+
+	public SearchTestDatasetRepository getDatasetRepo() {
+		return datasetRepo;
+	}
+
+	public SearchTestCaseRepository getTestCaseRepo() {
+		return testCaseRepo;
+	}
+
+	public PolyglotEngine getEngine() {
+		return engine;
+	}
+
+	public String getCsvDownloadingDir() {
+		return csvDownloadingDir;
 	}
 
 	public Page<TestCase> getTestCases(Long datasetId, Pageable pageable) {
@@ -77,49 +178,6 @@ public class SearchTestService extends ReportService {
 			}
 			return testCaseRepo.save(test);
 		});
-	}
-
-	private TestCase generate(Dataset dataset, TestCase test) {
-		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
-			test.status = TestCase.Status.FAILED;
-			LOGGER.info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
-			return test;
-		}
-
-		try {
-			String tableName = "dataset_" + sanitize(dataset.name);
-
-			String[] selCols = objectMapper.readValue(test.selCols, String[].class);
-			List<String> columns = new ArrayList<>(), delCols = new ArrayList<>();
-			Collections.addAll(columns, selCols);
-			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
-				columns.add("lon");
-				delCols.add("lon");
-			}
-			if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
-				columns.add("lat");
-				delCols.add("lat");
-			}
-			if (Arrays.stream(selCols).noneMatch("id"::equals)) {
-				columns.add("id");
-				delCols.add("id");
-			}
-
-			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
-			List<PolyglotEngine.GenRow> examples = engine.execute(dataset.script, test, delCols, rows);
-			for (PolyglotEngine.GenRow example : examples) {
-				saveCaseResults(test, example);
-			}
-			test.status = TestCase.Status.GENERATED;
-		} catch (Exception e) {
-			LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
-			test.setError(e.getMessage());
-			test.status = TestCase.Status.FAILED;
-		} finally {
-			test.updated = LocalDateTime.now();
-		}
-		return testCaseRepo.save(test);
 	}
 
 	@Async

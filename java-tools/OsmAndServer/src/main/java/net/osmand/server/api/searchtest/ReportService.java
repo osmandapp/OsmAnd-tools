@@ -2,28 +2,42 @@ package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityManager;
-import net.osmand.server.api.searchtest.dto.RunStatus;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
-import net.osmand.server.api.searchtest.entity.Run;
-import net.osmand.server.api.searchtest.entity.TestCase;
-import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public abstract class ReportService extends DataService {
-	final String REPORT_SQL = "WITH result AS (" +
+public interface ReportService {
+	record TestCaseStatus(
+			TestCase.Status status,
+			long processed,
+			long failed,
+			long filtered,
+			long empty,
+			long duration) {
+	}
+
+	record RunStatus(
+			SearchTestRunRepository.Run.Status status,
+			long total,
+			long processed,
+			long failed,
+			long duration,
+			double averagePlace,
+			long found,
+			Map<String, Number> distanceHistogram,
+			TestCaseStatus generatedChart) {
+	}
+
+	String REPORT_SQL = "WITH result AS (" +
 			"    SELECT" +
 			"        UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type," +
 			"        count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row," +
@@ -55,9 +69,13 @@ public abstract class ReportService extends DataService {
 			"  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id " +
 			"FROM gen_result WHERE case_id = ? ORDER BY id)";
 
-	public void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
+	JdbcTemplate getJdbcTemplate();
+
+	ObjectMapper getObjectMapper();
+
+	default void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
 								   String format) throws IOException {
-		List<Map<String, Object>> results = jdbcTemplate.queryForList(REPORT_SQL, placeLimit, distLimit, runId,
+		List<Map<String, Object>> results = getJdbcTemplate().queryForList(REPORT_SQL, placeLimit, distLimit, runId,
 				caseId);
 		if ("csv".equalsIgnoreCase(format)) {
 			writeAsCsv(writer, results);
@@ -68,7 +86,7 @@ public abstract class ReportService extends DataService {
 		}
 	}
 
-	public Optional<TestCaseStatus> getTestCaseStatus(Long cased) {
+	default Optional<TestCaseStatus> getTestCaseStatus(Long cased) {
 		String sql = """
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
@@ -82,7 +100,7 @@ public abstract class ReportService extends DataService {
 				    case_id = ?
 				""";
 		try {
-			Map<String, Object> result = jdbcTemplate.queryForMap(sql, cased);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, cased);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
@@ -109,7 +127,7 @@ public abstract class ReportService extends DataService {
 		}
 	}
 
-	public Optional<RunStatus> getRunStatus(Long runId) {
+	default Optional<RunStatus> getRunStatus(Long runId) {
 		String sql = """
 				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
@@ -124,7 +142,7 @@ public abstract class ReportService extends DataService {
 				    run_id = ?
 				""";
 		try {
-			Map<String, Object> result = jdbcTemplate.queryForMap(sql, runId);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, runId);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
@@ -155,7 +173,7 @@ public abstract class ReportService extends DataService {
 		}
 	}
 
-	public Optional<RunStatus> getRunReport(Long caseId, Long runId, int placeLimit, int distLimit) {
+	default Optional<RunStatus> getRunReport(Long caseId, Long runId, int placeLimit, int distLimit) {
 		Optional<TestCaseStatus> optCase = getTestCaseStatus(caseId);
 		if (optCase.isEmpty()) {
 			return Optional.empty();
@@ -178,7 +196,7 @@ public abstract class ReportService extends DataService {
 		distanceHistogram.put("Too Far", 0);
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
-				jdbcTemplate.queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
+				getJdbcTemplate().queryForList("SELECT \"group\", count(*) as cnt FROM (" + REPORT_SQL + ") GROUP BY " +
 						"\"group\"", placeLimit, distLimit, runId, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
@@ -196,7 +214,7 @@ public abstract class ReportService extends DataService {
 		return Optional.of(finalStatus);
 	}
 
-	protected void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
+	default void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
 		List<Map<String, Object>> expanded = results.stream().map(row -> {
 			Map<String, Object> out = new LinkedHashMap<>();
 			// copy base fields except 'row'
@@ -208,7 +226,7 @@ public abstract class ReportService extends DataService {
 			Object rowObj = row.get("row");
 			if (rowObj != null) {
 				try {
-					JsonNode rowNode = objectMapper.readTree(rowObj.toString());
+					JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
 					// For consistency with CSV, serialize values as text
 					rowNode.fieldNames().forEachRemaining(fn -> {
 						JsonNode v = rowNode.get(fn);
@@ -220,10 +238,10 @@ public abstract class ReportService extends DataService {
 			}
 			return out;
 		}).collect(Collectors.toList());
-		objectMapper.writeValue(writer, expanded);
+		getObjectMapper().writeValue(writer, expanded);
 	}
 
-	protected void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
+	default void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
 		if (results.isEmpty()) {
 			writer.write("");
 			return;
@@ -239,7 +257,7 @@ public abstract class ReportService extends DataService {
 			Object rowObj = row.get("row");
 			if (rowObj != null) {
 				try {
-					JsonNode rowNode = objectMapper.readTree(rowObj.toString());
+					JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
 					rowNode.fieldNames().forEachRemaining(rowHeaders::add);
 				} catch (IOException e) {
 					// ignore invalid JSON in 'row'
@@ -259,7 +277,7 @@ public abstract class ReportService extends DataService {
 				Object rowObj = row.get("row");
 				if (rowObj != null) {
 					try {
-						rowNode = objectMapper.readTree(rowObj.toString());
+						rowNode = getObjectMapper().readTree(rowObj.toString());
 					} catch (IOException e) {
 						// keep rowNode null
 					}

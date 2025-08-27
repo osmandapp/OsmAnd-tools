@@ -1,14 +1,14 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
-import net.osmand.server.api.searchtest.dto.GenParam;
-import net.osmand.server.api.searchtest.dto.RunStatus;
-import net.osmand.server.api.searchtest.dto.TestCaseItem;
-import net.osmand.server.api.searchtest.dto.TestCaseStatus;
-import net.osmand.server.api.searchtest.entity.Dataset;
-import net.osmand.server.api.searchtest.entity.Run;
-import net.osmand.server.api.searchtest.entity.RunParam;
-import net.osmand.server.api.searchtest.entity.TestCase;
+import net.osmand.server.api.searchtest.BaseService.GenParam;
+import net.osmand.server.api.searchtest.ReportService.RunStatus;
+import net.osmand.server.api.services.SearchTestService.TestCaseItem;
+import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.services.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;

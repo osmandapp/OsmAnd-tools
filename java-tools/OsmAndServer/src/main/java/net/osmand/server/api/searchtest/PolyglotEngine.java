@@ -2,7 +2,7 @@ package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.entity.TestCase;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
