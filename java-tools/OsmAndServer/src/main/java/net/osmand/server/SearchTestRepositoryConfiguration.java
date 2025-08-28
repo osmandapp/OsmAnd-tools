@@ -67,9 +67,6 @@ public class SearchTestRepositoryConfiguration {
                         jpaProperties.getProperties(), new HibernateSettings()
                 )
         );
-        for (Map.Entry<String, Object> e : vendorProps.entrySet()) {
-            System.out.println(e.getKey() + ": " + e.getValue());
-        }
         // Force SQLite dialect for this EMF
         vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
         vendorProps.put("hibernate.hbm2ddl.auto", "update");
