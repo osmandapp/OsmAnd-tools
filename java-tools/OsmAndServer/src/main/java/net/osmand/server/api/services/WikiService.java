@@ -178,7 +178,7 @@ public class WikiService {
 	
 	private void logError(String url, int code, String content) {
 		String shortenedContent = content != null && content.length() > 20 ? content.substring(0, 20) + "..." : content;
-		log.error("Error while reading url: " + url + " code: " + code + " content: " + shortenedContent);
+		log.error("Error (" + code + ") reading url: " + url + " content: " + shortenedContent);
 	}
 	
 	public Map<String, String> parseImageInfo(String rawData) throws SQLException, IOException {
