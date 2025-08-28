@@ -207,6 +207,7 @@ public class DatasourceConfiguration {
 	}
 
 	@Bean(name = "transactionManager")
+	@Primary
 	public PlatformTransactionManager transactionManager(
 			@Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
 		return new JpaTransactionManager(entityManagerFactory);
