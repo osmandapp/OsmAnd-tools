@@ -46,8 +46,8 @@ public class UserdataController {
 	private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PRO_USERS;
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PRO_USERS;
-	private static boolean DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED = true;
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PRO_USERS;
+	private static boolean DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED = true;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -173,22 +173,8 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		// we allow to reset order id to null
 		if (orderid != null) {
-			String errorMsg = userSubService.checkOrderIdPro(orderid);
-			if (errorMsg != null) {
-				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-			}
-			CloudUser otherUser = usersRepository.findByOrderid(orderid);
-			if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
-				if (!DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
-					String hideEmail = userdataService.hideEmail(otherUser.email);
-					logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-							"user was already signed up as " + hideEmail);
-				}
-				otherUser.orderid = null;
-				usersRepository.saveAndFlush(otherUser);
-			}
+			discardPreviousAccountOrderId(orderid, email, request);
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
@@ -222,33 +208,16 @@ public class UserdataController {
 			// don't check order id validity for login
 			// keep old order id
 		} else {
-			if (orderid != null) {
-//				String error = userSubService.checkOrderIdPremium(orderid);
-//				if (error != null) {
-//					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-//				}
-				CloudUser otherUser = usersRepository.findByOrderid(orderid);
-				if (otherUser != null) {
-					if (!DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
-						String hideEmail = userdataService.hideEmail(otherUser.email);
-						List<CloudUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
-						// check that user already registered at least 1 device (avoid typos in email)
-						if (pud != null && !pud.isEmpty()) {
-							logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-									"user was already signed up as " + hideEmail);
-						}
-					}
-					otherUser.orderid = null;
-					usersRepository.saveAndFlush(otherUser);
-				}
-			}
 			pu = new CloudUsersRepository.CloudUser();
 			pu.email = email;
 			pu.regTime = new Date();
 			pu.orderid = orderid;
 		}
-		if (pu.orderid == null && orderid != null) {
-			pu.orderid = orderid;
+		if (orderid != null) {
+			discardPreviousAccountOrderId(orderid, email, request);
+			if (pu.orderid == null) {
+				pu.orderid = orderid;
+			}
 		}
 		pu.tokendevice = deviceId;
 		pu.tokenTime = new Date();
@@ -315,6 +284,19 @@ public class UserdataController {
 	    }
 
 		return userdataService.ok();
+	}
+
+	private void discardPreviousAccountOrderId(String orderid, String email, HttpServletRequest request) {
+		CloudUser previousUser = usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, email);
+		if (previousUser != null) {
+			if (DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
+				previousUser.orderid = null;
+				usersRepository.saveAndFlush(previousUser);
+			} else {
+				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+						"user has already signed up as " + userdataService.hideEmail(previousUser.email));
+			}
+		}
 	}
 
 	@PostMapping(value = "/device-register")
