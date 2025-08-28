@@ -177,7 +177,7 @@ public class WikiService {
 	}
 	
 	private void logError(String url, int code, String content) {
-		String shortenedContent = content != null && content.length() > 20 ? content.substring(0, 20) + "..." : content;
+		String shortenedContent = content != null && content.length() > 80 ? content.substring(0, 80) + "..." : content;
 		log.error("Error (" + code + ") reading url: " + url + " content: " + shortenedContent);
 	}
 	
