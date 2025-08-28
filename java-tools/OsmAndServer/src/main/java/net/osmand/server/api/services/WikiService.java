@@ -159,7 +159,9 @@ public class WikiService {
 			}
 			return rawData;
 		} catch (IOException e) {
-			logError(urlStr, -1, e.getMessage());
+			log.error("Error while reading url: " + urlStr
+					+ " ex=" + e.getClass().getSimpleName()
+					+ " msg=" + e.getMessage(), e);
 			return null;
 		} finally {
 			if (connection != null) {
