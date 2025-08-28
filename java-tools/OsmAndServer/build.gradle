@@ -58,13 +58,17 @@ bootJar {
 dependencies {
     // make optional for release run
     implementation "org.springframework.boot:spring-boot-devtools"
-    
+
     implementation "org.springframework.boot:spring-boot-starter-web"
+    implementation "org.springframework.boot:spring-boot-starter-websocket"
+    // Use core WebFlux library for WebClient without enabling reactive MVC auto-configuration
+    implementation "org.springframework:spring-webflux"
     implementation "org.springframework.boot:spring-boot-starter-actuator"
     implementation "org.springframework.boot:spring-boot-starter-security"
     implementation "org.springframework.boot:spring-boot-starter-thymeleaf"
     implementation "org.springframework.boot:spring-boot-starter-data-jpa"
     implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
+    // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0'
     implementation "org.javassist:javassist:3.25.0-GA"
     implementation "javax.xml.bind:jaxb-api:2.3.1"
     implementation "javax.activation:activation:1.1"
@@ -74,6 +78,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     implementation group: 'com.vladmihalcea', name: 'hibernate-types-60', version: '2.21.1'
+    implementation 'org.hibernate.orm:hibernate-community-dialects'
 
     implementation 'com.sendgrid:sendgrid-java:4.2.1'
     implementation group: 'net.sf.trove4j', name: 'trove4j', version: '3.0.3'
@@ -91,15 +96,16 @@ dependencies {
  //   implementation "org.springframework.cloud:spring-cloud-security:1.2.2.RELEASE"
 
     implementation "org.apache.commons:commons-collections4:4.1"
+    implementation "org.apache.commons:commons-csv:1.10.0"
     implementation "com.j256.simplecsv:simplecsv:2.3"
     implementation 'com.google.code.gson:gson:2.8.2'
     implementation "org.apache.commons:commons-math3:3.6.1"
 
     implementation 'org.apache.commons:commons-email:1.5'
 
-	implementation 'com.vividsolutions:jts-core:1.14.0'	
+	implementation 'com.vividsolutions:jts-core:1.14.0'
 	implementation 'commons-net:commons-net:3.9.0'
-	
+
     // For reading Parquet files
     implementation 'org.apache.parquet:parquet-hadoop:1.13.1'
     implementation 'org.apache.parquet:parquet-column:1.13.1'
@@ -129,17 +135,17 @@ dependencies {
     implementation project(path:':OsmAnd-shared', configuration : 'jvmPublicConfig')
     implementation project(':OsmAnd-java')
     implementation project(':OsmAndMapCreatorUtilities')
-    
+
     // potential conflict google oauth jetty & spring boot jetty / tomcat libs
     implementation (project(':OsmAndServerUtilities'));
 //    implementation (project(':OsmAndServerUtilities')) {
 //    	exclude group: 'com.google.oauth-client', module:'google-oauth-client-jetty'
 //    }
 
-	
-	 
-    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v3-rev103-1.25.0') { 
-        transitive = true 
+
+
+    implementation(group: 'com.google.apis', name: 'google-api-services-androidpublisher', version: 'v3-rev103-1.25.0') {
+        transitive = true
     }
 
     testImplementation "junit:junit"
@@ -158,5 +164,9 @@ dependencies {
     implementation 'com.maxmind.geoip:geoip-api:1.3.1'
 
 //    implementation 'com.clickhouse:clickhouse-http-client:0.6.0'
+
+    // GraalVM JavaScript engine (Polyglot API + JS engine)
+    implementation 'org.graalvm.sdk:graal-sdk:24.1.1'
+    implementation 'org.graalvm.js:js:24.1.1'
 
 }
