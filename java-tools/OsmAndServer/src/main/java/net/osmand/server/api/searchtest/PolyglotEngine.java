@@ -115,8 +115,11 @@ public class PolyglotEngine {
 					String[] output = null;
 					if (where) {
 						try {
-							output = (String[]) execute(context, test.selectFun, selectArgs);
-							count = output.length;
+							Object result = execute(context, test.selectFun, selectArgs);
+							if (result instanceof String[]) {
+								output = (String[]) result;
+								count = output.length;
+							}
 						} catch (PolyglotException pe) {
 							// Capture JS error from select() and persist a failed record with empty query
 							errorMessage = extractJsErrorMessage(pe);
@@ -185,8 +188,7 @@ public class PolyglotEngine {
 		}
 
 		if (result.hasArrayElements()) {
-			org.graalvm.polyglot.Value stringify = context.eval("js", "JSON.stringify");
-			return stringify.execute(result).asString();
+			return result.as(String[].class);
 		}
 		return new String[]{result.asString()};
 	}
