@@ -294,6 +294,20 @@ public interface DataService extends BaseService {
 		}
 	}
 
+	default Map<String, Object> getDatasetSample(Long datasetId, int position) {
+		Dataset dataset = getDatasetRepo().findById(datasetId).orElseThrow(() ->
+				new RuntimeException("Dataset not found with id: " + datasetId));
+
+		String tableName = "dataset_" + sanitize(dataset.name);
+		String sql = "SELECT * FROM " + tableName + " LIMIT 1 OFFSET ?";
+		try {
+			return getJdbcTemplate().queryForMap(sql, position);
+		} catch (Exception e) {
+			getLogger().error("Failed to retrieve sample for dataset {}", datasetId, e);
+			throw new RuntimeException("Failed to generate dataset sample: " + e.getMessage(), e);
+		}
+	}
+
 	default boolean deleteDataset(Long datasetId) {
 		Optional<Dataset> dsOpt = getDatasetRepo().findById(datasetId);
 		if (dsOpt.isEmpty()) {

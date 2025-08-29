@@ -139,6 +139,16 @@ public class SearchTestController {
 		}
 	}
 
+	/**
+	 * Returns a single dataset row by zero-based position for UI testing in the New Test Case form.
+	 */
+	@GetMapping(value = "/datasets/{datasetId}/sample/{position}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Map<String, Object>> getDatasetSampleRow(@PathVariable Long datasetId,
+																		   @PathVariable int position) {
+		return ResponseEntity.ok(testSearchService.getDatasetSample(datasetId, position));
+	}
+
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId,
