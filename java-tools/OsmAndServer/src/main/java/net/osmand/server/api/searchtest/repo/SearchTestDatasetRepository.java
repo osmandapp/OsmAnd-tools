@@ -53,14 +53,6 @@ public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long
 		@Column(name = "sel_cols", columnDefinition = "TEXT")
 		public String selCols; // selected column names as JSON string array
 
-		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(columnDefinition = "TEXT")
-		public String script;
-
-		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(columnDefinition = "TEXT")
-		public String meta; // JS script with functions meta-info
-
 		@Column
 		public Integer sizeLimit = 10000;
 

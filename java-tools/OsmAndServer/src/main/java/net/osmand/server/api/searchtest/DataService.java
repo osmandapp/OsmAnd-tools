@@ -103,7 +103,6 @@ public interface DataService extends BaseService {
 		}
 	}
 
-
 	default TestCase generate(Dataset dataset, TestCase test) {
 		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
 			test.status = TestCase.Status.FAILED;
@@ -132,7 +131,13 @@ public interface DataService extends BaseService {
 
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
-			List<PolyglotEngine.GenRow> examples = getEngine().execute(dataset.script, test, delCols, rows);
+			// Load default JS helper script from web-server-config repository
+			Path scriptPath = Path.of(getWebServerConfigDir(), "js", "search-test", "modules", "lib", "default.js");
+			if (!Files.exists(scriptPath)) {
+				throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
+			}
+			String script = Files.readString(scriptPath);
+			List<PolyglotEngine.GenRow> examples = getEngine().execute(script, test, delCols, rows);
 			for (PolyglotEngine.GenRow example : examples) {
 				saveCaseResults(test, example);
 			}
