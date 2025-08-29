@@ -93,6 +93,8 @@ public class SearchTestService implements ReportService, DataService {
 
 	@Value("${searchtest.csv.dir}")
 	private String csvDownloadingDir;
+	@Value("${osmand.web.location}")
+	private String webServerConfigDir;
 	@Value("${overpass.url}")
 	private String overpassApiUrl;
 	private final SearchService searchService;
@@ -110,6 +112,10 @@ public class SearchTestService implements ReportService, DataService {
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+	}
+
+	public String getWebServerConfigDir() {
+		return webServerConfigDir;
 	}
 
 	public Logger getLogger() {
@@ -183,28 +189,6 @@ public class SearchTestService implements ReportService, DataService {
 				test.updated = LocalDateTime.now();
 			}
 			return testCaseRepo.save(test);
-		});
-	}
-
-	@Async
-	public CompletableFuture<TestCase> updateTestCase(Long id, Map<String, String> updates, boolean regen) {
-		return CompletableFuture.supplyAsync(() -> {
-			TestCase test = testCaseRepo.findById(id).orElseThrow(() ->
-					new RuntimeException("Test case not found with id: " + id));
-
-			updates.forEach((key, value) -> {
-				switch (key) {
-					case "name" -> test.name = value;
-					case "labels" -> test.labels = value;
-				}
-			});
-			TestCase updated = null;
-			if (regen) {
-				Dataset dataset = datasetRepo.findById(test.datasetId)
-						.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + test.datasetId));
-				updated = generate(dataset, test);
-			}
-			return updated != null ? updated : testCaseRepo.save(test);
 		});
 	}
 

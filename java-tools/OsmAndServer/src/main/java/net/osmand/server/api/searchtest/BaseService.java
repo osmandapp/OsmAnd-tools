@@ -119,6 +119,11 @@ public interface BaseService {
 
 	Logger getLogger();
 
+	/**
+	 * Absolute path to the web-server-config repository root on disk.
+	 */
+	String getWebServerConfigDir();
+
 	default Path queryOverpass(String query) {
 		Path tempFile;
 		try {

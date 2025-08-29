@@ -57,14 +57,6 @@ public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long
 		@Column(name = "test_row", columnDefinition = "TEXT")
 		public String testRow; // @Map<String, String> as JSON
 
-		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(columnDefinition = "TEXT")
-		public String script;
-
-		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(columnDefinition = "TEXT")
-		public String meta; // JS script with functions meta-info
-
 		@Column
 		public Integer sizeLimit = 10000;
 
