@@ -58,13 +58,13 @@ public class PolyglotEngine {
 	public List<GenRow> execute(String script, TestCase test, List<String> delCols,
 								List<Map<String, Object>> rows) throws Exception {
 		String columnsJson = test.selCols;
-		BaseService.ProgrammaticConfig progConfig = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
-		String[] whereParams = progConfig.whereParamValues();
-		String[] selectParams = progConfig.selectParamValues();
+		String[] selectParams = objectMapper.readValue(test.selectParams, String[].class);
+		String[] whereParams = objectMapper.readValue(test.whereParams, String[].class);
+
 		if (script == null || script.trim().isEmpty()) {
 			throw new IllegalArgumentException("Script must not be null or empty.");
 		}
-		if (progConfig.selectFun() == null) {
+		if (test.selectFun == null || test.selectFun.trim().isEmpty()) {
 			throw new IllegalArgumentException("Function name must not be null or empty.");
 		}
 		try {
@@ -97,14 +97,14 @@ public class PolyglotEngine {
 
 					String lat = (String) origRow.get("lat");
 					String lon = (String) origRow.get("lon");
-					boolean where = false;
+					boolean where = true;
 					String errorMessage = null;
-					if (progConfig.whereFun() != null) {
+					if (test.whereFun != null && !test.whereFun.trim().isEmpty()) {
 						List<Object> whereArgs = getArgs(whereParams);
 						whereArgs.add(0, jsColumns);
 						whereArgs.add(0, jsRow);
 						try {
-							where = (Boolean) execute(context, progConfig.whereFun(), whereArgs);
+							where = (Boolean) execute(context, test.whereFun, whereArgs);
 						} catch (PolyglotException pe) {
 							// Capture JS error from where() and continue processing this row
 							errorMessage = extractJsErrorMessage(pe);
@@ -115,8 +115,11 @@ public class PolyglotEngine {
 					String[] output = null;
 					if (where) {
 						try {
-							output = (String[]) execute(context, progConfig.selectFun(), selectArgs);
-							count = output.length;
+							Object result = execute(context, test.selectFun, selectArgs);
+							if (result instanceof String[]) {
+								output = (String[]) result;
+								count = output.length;
+							}
 						} catch (PolyglotException pe) {
 							// Capture JS error from select() and persist a failed record with empty query
 							errorMessage = extractJsErrorMessage(pe);
@@ -137,7 +140,7 @@ public class PolyglotEngine {
 		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to execute script function '" + progConfig.selectFun() + "': " +
+			throw new RuntimeException("Failed to execute script function '" + test.selectFun + "': " +
 					(e.getMessage() == null ? e.toString() : e.getMessage()), e);
 		}
 	}
@@ -185,8 +188,7 @@ public class PolyglotEngine {
 		}
 
 		if (result.hasArrayElements()) {
-			org.graalvm.polyglot.Value stringify = context.eval("js", "JSON.stringify");
-			return stringify.execute(result).asString();
+			return result.as(String[].class);
 		}
 		return new String[]{result.asString()};
 	}
