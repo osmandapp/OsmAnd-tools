@@ -97,7 +97,7 @@ public class PolyglotEngine {
 
 					String lat = (String) origRow.get("lat");
 					String lon = (String) origRow.get("lon");
-					boolean where = false;
+					boolean where = true;
 					String errorMessage = null;
 					if (test.whereFun != null && !test.whereFun.trim().isEmpty()) {
 						List<Object> whereArgs = getArgs(whereParams);
