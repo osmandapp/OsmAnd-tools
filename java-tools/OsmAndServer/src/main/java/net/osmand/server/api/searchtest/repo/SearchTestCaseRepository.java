@@ -89,12 +89,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@UpdateTimestamp
 		public LocalDateTime updated;
 
-		@Column(name = "select_fun")
-		public String selectFun; // Selected JS function name to calculate output
-
-		@Column(name = "where_fun")
-		public String whereFun; // Selected JS function name to calculate output
-
 		@JdbcTypeCode(SqlTypes.JSON)
 		@Column(name = "all_cols", columnDefinition = "TEXT")
 		public String allCols; // column names as JSON string array
@@ -104,12 +98,16 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		public String selCols; // selected column names as JSON string array
 
 		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(name = "select_params", columnDefinition = "TEXT")
-		public String selectParams; // function param values as JSON string array
+		@Column(name = "prog_cfg", columnDefinition = "TEXT")
+		public String progCfg; // @ProgrammaticConfig as JSON
 
 		@JdbcTypeCode(SqlTypes.JSON)
-		@Column(name = "where_params", columnDefinition = "TEXT")
-		public String whereParams; // function param values as JSON string array
+		@Column(name = "nocode_cfg", columnDefinition = "TEXT")
+		public String nocodeCfg; // @Tuple[] as JSON
+
+		@JdbcTypeCode(SqlTypes.JSON)
+		@Column(name = "test_row", columnDefinition = "TEXT")
+		public String testRow; // @Map<String, String> as JSON
 
 		@Column(columnDefinition = "TEXT")
 		private String error;

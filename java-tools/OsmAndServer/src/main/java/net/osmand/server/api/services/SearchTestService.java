@@ -153,18 +153,20 @@ public class SearchTestService implements ReportService, DataService {
 		return CompletableFuture.supplyAsync(() -> {
 			Dataset dataset = datasetRepo.findById(datasetId)
 					.orElseThrow(() -> new RuntimeException("Dataset not found for test-case id: " + datasetId));
+
 			TestCase test = new TestCase();
 			test.datasetId = datasetId;
 			test.name = param.name();
 			test.labels = param.labels();
-			test.selectFun = param.selectFun();
-			test.whereFun = param.whereFun();
 			test.status = TestCase.Status.NEW;
 			try {
-				test.selectParams = objectMapper.writeValueAsString(param.selectParamValues());
-				test.whereParams = objectMapper.writeValueAsString(param.whereParamValues());
 				test.selCols = objectMapper.writeValueAsString(param.columns());
+				test.progCfg = objectMapper.writeValueAsString(param.programConfig());
+				test.nocodeCfg = objectMapper.writeValueAsString(param.nocodeConfig());
+				test.testRow = objectMapper.writeValueAsString(param.testRow());
+
 				dataset.selCols = test.selCols;
+				dataset.testRow = test.testRow;
 				test.allCols = dataset.allCols;
 
 				test.created = LocalDateTime.now();

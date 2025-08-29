@@ -74,8 +74,7 @@ public interface DataService extends BaseService {
 			}
 
 			dataset.selCols = getObjectMapper().writeValueAsString(Arrays.stream(headers).filter(s ->
-					s.startsWith("road") || s.startsWith("city") ||
-							s.startsWith("stree") || s.startsWith("addr")).toArray(String[]::new));
+					s.startsWith("road") || s.startsWith("city") || s.startsWith("street")));
 			if (reload) {
 				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
 				insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);

@@ -54,6 +54,10 @@ public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long
 		public String selCols; // selected column names as JSON string array
 
 		@JdbcTypeCode(SqlTypes.JSON)
+		@Column(name = "test_row", columnDefinition = "TEXT")
+		public String testRow; // @Map<String, String> as JSON
+
+		@JdbcTypeCode(SqlTypes.JSON)
 		@Column(columnDefinition = "TEXT")
 		public String script;
 

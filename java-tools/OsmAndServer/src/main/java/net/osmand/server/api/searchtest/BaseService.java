@@ -20,21 +20,26 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 public interface BaseService {
-	record Function(String name, String description, Param[] param) {
-	}
+	record ProgrammaticConfig(String selectFun,
+							  String[] selectParamValues,
+							  String whereFun,
+							  String[] whereParamValues) {}
 
-	record Param(String name, String type, String description) {
+	record Tuple(String columnName, ParamType type, String values) {
 	}
 
 	record GenParam(
 			String name,
 			String labels,
-			// New fields to explicitly support 2 functions
-			String selectFun,
-			String whereFun,
 			String[] columns,
-			String[] selectParamValues,
-			String[] whereParamValues) {}
+			// Fields for Programmatic tab
+			ProgrammaticConfig programConfig,
+			// New fields for No-Code tab
+			Tuple[] nocodeConfig,
+			Map<String, String> testRow) {
+	}
+
+	enum ParamType {Before, With, After, Expand, ExpandAndRevers}
 
 	// -------------------- Utility methods (common) --------------------
 	default String pointToString(LatLon point) {

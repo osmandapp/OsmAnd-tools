@@ -58,13 +58,13 @@ public class PolyglotEngine {
 	public List<GenRow> execute(String script, TestCase test, List<String> delCols,
 								List<Map<String, Object>> rows) throws Exception {
 		String columnsJson = test.selCols;
-		String[] selectParams = objectMapper.readValue(test.selectParams, String[].class);
-		String[] whereParams = objectMapper.readValue(test.whereParams, String[].class);
-
+		BaseService.ProgrammaticConfig progConfig = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
+		String[] whereParams = progConfig.whereParamValues();
+		String[] selectParams = progConfig.selectParamValues();
 		if (script == null || script.trim().isEmpty()) {
 			throw new IllegalArgumentException("Script must not be null or empty.");
 		}
-		if (test.selectFun == null || test.selectFun.trim().isEmpty()) {
+		if (progConfig.selectFun() == null) {
 			throw new IllegalArgumentException("Function name must not be null or empty.");
 		}
 		try {
@@ -99,12 +99,12 @@ public class PolyglotEngine {
 					String lon = (String) origRow.get("lon");
 					boolean where = false;
 					String errorMessage = null;
-					if (test.whereFun != null && !test.whereFun.trim().isEmpty()) {
+					if (progConfig.whereFun() != null) {
 						List<Object> whereArgs = getArgs(whereParams);
 						whereArgs.add(0, jsColumns);
 						whereArgs.add(0, jsRow);
 						try {
-							where = (Boolean) execute(context, test.whereFun, whereArgs);
+							where = (Boolean) execute(context, progConfig.whereFun(), whereArgs);
 						} catch (PolyglotException pe) {
 							// Capture JS error from where() and continue processing this row
 							errorMessage = extractJsErrorMessage(pe);
@@ -115,7 +115,7 @@ public class PolyglotEngine {
 					String[] output = null;
 					if (where) {
 						try {
-							output = (String[]) execute(context, test.selectFun, selectArgs);
+							output = (String[]) execute(context, progConfig.selectFun(), selectArgs);
 							count = output.length;
 						} catch (PolyglotException pe) {
 							// Capture JS error from select() and persist a failed record with empty query
@@ -137,7 +137,7 @@ public class PolyglotEngine {
 		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to execute script function '" + test.selectFun + "': " +
+			throw new RuntimeException("Failed to execute script function '" + progConfig.selectFun() + "': " +
 					(e.getMessage() == null ? e.toString() : e.getMessage()), e);
 		}
 	}
