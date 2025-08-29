@@ -286,8 +286,9 @@ public class UserdataController {
 		return userdataService.ok();
 	}
 
-	private void discardPreviousAccountOrderId(String orderid, String email, HttpServletRequest request) {
-		CloudUser previousUser = usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, email);
+	private void discardPreviousAccountOrderId(String orderid, String currentEmail, HttpServletRequest request) {
+		CloudUser previousUser =
+				usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, currentEmail);
 		if (previousUser != null) {
 			if (DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
 				previousUser.orderid = null;
