@@ -25,7 +25,7 @@ public interface BaseService {
 							  String whereFun,
 							  String[] whereParamValues) {}
 
-	record Tuple(String columnName, ParamType type, String domain, String values, String whereExp) {
+	record Tuple(String columnName, ParamType type, String domain, String values) {
 	}
 
 	record GenParam(

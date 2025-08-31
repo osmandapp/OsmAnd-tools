@@ -154,12 +154,12 @@ public class SearchTestController {
 	 * List available name sets for the No-code Values field lookup.
 	 * Returns an array of { name, data, preview: [..up to 3 rows..] }.
 	 */
-	@GetMapping(value = "/name_sets", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/domains", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Map<String, Object>>> getNameSets(
+	public ResponseEntity<List<Map<String, Object>>> getDomains(
 			@RequestParam(name = "q", required = false) String q,
 			@RequestParam(name = "limit", required = false, defaultValue = "20") Integer limit) {
-		return ResponseEntity.ok(testSearchService.getNameSets(q, limit == null ? 20 : limit));
+		return ResponseEntity.ok(testSearchService.getDomains(q, limit == null ? 20 : limit));
 	}
 
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)

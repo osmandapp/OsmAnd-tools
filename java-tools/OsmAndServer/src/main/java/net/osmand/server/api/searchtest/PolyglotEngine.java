@@ -6,6 +6,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,19 +56,18 @@ public class PolyglotEngine {
 		}
 	}
 
-	public List<GenRow> execute(String script, TestCase test, List<String> delCols,
+	public List<GenRow> execute(String dir, TestCase test, List<String> delCols,
 								List<Map<String, Object>> rows) throws Exception {
-		String columnsJson = test.selCols;
-		BaseService.ProgrammaticConfig cfg = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
-		String[] selectParams = cfg.selectParamValues();
-		String[] whereParams = cfg.whereParamValues();
+		BaseService.ProgrammaticConfig program = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
 
-		if (script == null || script.trim().isEmpty()) {
-			throw new IllegalArgumentException("Script must not be null or empty.");
+		// Load default JS helper script from web-server-config repository
+		Path scriptPath = Path.of(dir, "js", "search-test", "modules", "lib", program == null ? "no-code.js" : "main.js");
+		if (!Files.exists(scriptPath)) {
+			throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
 		}
-		if (cfg.selectFun() == null) {
-			throw new IllegalArgumentException("Function name must not be null or empty.");
-		}
+		String script = Files.readString(scriptPath);
+
+		String columnsJson = test.selCols;
 		try {
 			// Execute with GraalVM JavaScript (Polyglot API)
 			List<GenRow> results = new ArrayList<>();
@@ -75,6 +75,7 @@ public class PolyglotEngine {
 					"2022").allowAllAccess(false).build()) {
 				// 1) Evaluate user script (should define the target function)
 				context.eval("js", script);
+				Value jsonParse = context.eval("js", "JSON.parse");
 
 				// 2) Prepare JS-native arguments
 				for (Map<String, Object> origRow : rows) {
@@ -88,48 +89,27 @@ public class PolyglotEngine {
 					}
 
 					String rowJson = objectMapper.writeValueAsString(row);
-					org.graalvm.polyglot.Value jsonParse = context.eval("js", "JSON.parse");
-					org.graalvm.polyglot.Value jsRow = jsonParse.execute(rowJson);
-					org.graalvm.polyglot.Value jsColumns = jsonParse.execute(columnsJson);
-
-					List<Object> selectArgs = getArgs(selectParams);
-					selectArgs.add(0, jsColumns);
-					selectArgs.add(0, jsRow);
+					Value jsRow = jsonParse.execute(rowJson);
 
 					String lat = (String) origRow.get("lat");
 					String lon = (String) origRow.get("lon");
-					boolean where = true;
+
+					Object output = null;
 					String errorMessage = null;
-					if (cfg.whereFun() != null) {
-						List<Object> whereArgs = getArgs(whereParams);
-						whereArgs.add(0, jsColumns);
-						whereArgs.add(0, jsRow);
-						try {
-							where = (Boolean) execute(context, cfg.whereFun(), whereArgs);
-						} catch (PolyglotException pe) {
-							// Capture JS error from where() and continue processing this row
-							errorMessage = extractJsErrorMessage(pe);
-						}
+					try {
+						output = program != null ?
+							 executeProgram(context, program, jsRow, jsonParse.execute(columnsJson)) :
+								executeNocode(context, jsonParse.execute(test.progCfg), jsRow);
+					} catch (PolyglotException pe) {
+						errorMessage = extractJsErrorMessage(pe);
 					}
 
-					int count = -1;
-					String[] output = null;
-					if (where) {
-						try {
-							Object result = execute(context, cfg.selectFun(), selectArgs);
-							if (result instanceof String[]) {
-								output = (String[]) result;
-								count = output.length;
-							}
-						} catch (PolyglotException pe) {
-							// Capture JS error from select() and persist a failed record with empty query
-							errorMessage = extractJsErrorMessage(pe);
-						}
-					}
+					int count = output instanceof String[] ? ((String[])output).length : -1;
 					String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
 					results.add(new GenRow(parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
 							System.currentTimeMillis() - start));
 				}
+
 				return results;
 			}
 		} catch (PolyglotException e) {
@@ -141,7 +121,7 @@ public class PolyglotEngine {
 		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to execute script function '" + cfg.selectFun() + "': " +
+			throw new RuntimeException("Failed to execute script function '" + program.selectFun() + "': " +
 					(e.getMessage() == null ? e.toString() : e.getMessage()), e);
 		}
 	}
@@ -175,6 +155,34 @@ public class PolyglotEngine {
 			}
 		}
 		return args;
+	}
+
+	private Object executeNocode(Context context, Value jsCfg, Value jsRow) throws PolyglotException, IOException {
+		List<Object> args = new ArrayList<>();
+		args.add(0, jsCfg);
+		args.add(0, jsRow);
+
+		return execute(context, "evalNocode", args);
+	}
+
+	private Object executeProgram(Context context, BaseService.ProgrammaticConfig program, Value jsRow, Value jsColumns) throws PolyglotException, IOException {
+		if (program.selectFun() == null) {
+			throw new IllegalArgumentException("Function name must not be null or empty.");
+		}
+		String[] selectParams = program.selectParamValues();
+		String[] whereParams = program.whereParamValues();
+		List<Object> selectArgs = getArgs(selectParams);
+		selectArgs.add(0, jsColumns);
+		selectArgs.add(0, jsRow);
+
+		boolean where = true;
+		if (program.whereFun() != null) {
+			List<Object> whereArgs = getArgs(whereParams);
+			whereArgs.add(0, jsColumns);
+			whereArgs.add(0, jsRow);
+			where = (Boolean) execute(context, program.whereFun(), whereArgs);
+		}
+		return where ? execute(context, program.selectFun(), selectArgs) : null;
 	}
 
 	private Object execute(Context context, String functionName, List<Object> args) throws IOException {

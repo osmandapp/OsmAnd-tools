@@ -130,13 +130,8 @@ public interface DataService extends BaseService {
 
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
-			// Load default JS helper script from web-server-config repository
-			Path scriptPath = Path.of(getWebServerConfigDir(), "js", "search-test", "modules", "lib", "main.js");
-			if (!Files.exists(scriptPath)) {
-				throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
-			}
-			String script = Files.readString(scriptPath);
-			List<PolyglotEngine.GenRow> examples = getEngine().execute(script, test, delCols, rows);
+
+			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, delCols, rows);
 			for (PolyglotEngine.GenRow example : examples) {
 				saveCaseResults(test, example);
 			}
@@ -311,7 +306,7 @@ public interface DataService extends BaseService {
 	/**
 	 * Find name sets by optional prefix/query and return a list of entries containing:
 	 */
-	default List<Map<String, Object>> getNameSets(String query, int limit) {
+	default List<Map<String, Object>> getDomains(String query, int limit) {
 		final String q = query == null ? "" : query;
 		final int lim = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
 		String sql = "SELECT name, data FROM domain " +
