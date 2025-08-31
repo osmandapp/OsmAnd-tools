@@ -17,8 +17,8 @@ import java.util.Optional;
 @SearchTestRepository
 public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long> {
 	@Entity
-	@Table(name = "name_set")
-	public class NameSet {
+	@Table(name = "domain")
+	public class Domain {
 		@Id
 		@GeneratedValue(strategy = GenerationType.IDENTITY)
 		@Column(columnDefinition = "INTEGER")

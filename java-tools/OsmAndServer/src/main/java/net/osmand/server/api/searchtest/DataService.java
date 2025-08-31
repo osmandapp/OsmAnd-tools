@@ -299,7 +299,7 @@ public interface DataService extends BaseService {
 				new RuntimeException("Dataset not found with id: " + datasetId));
 
 		String tableName = "dataset_" + sanitize(dataset.name);
-		String sql = "SELECT * FROM " + tableName + " LIMIT 1 OFFSET ?";
+		String sql = "SELECT * FROM " + tableName + " ORDER BY _id LIMIT 1 OFFSET ?";
 		try {
 			return getJdbcTemplate().queryForMap(sql, position);
 		} catch (Exception e) {
@@ -314,7 +314,7 @@ public interface DataService extends BaseService {
 	default List<Map<String, Object>> getNameSets(String query, int limit) {
 		final String q = query == null ? "" : query;
 		final int lim = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
-		String sql = "SELECT name, data FROM name_set " +
+		String sql = "SELECT name, data FROM domain " +
 				"WHERE COALESCE(?, '') = '' OR lower(name) LIKE lower(?) || '%' OR lower(name) LIKE '%' || lower(?) || '%' " +
 				"ORDER BY name LIMIT ?";
 		try {
