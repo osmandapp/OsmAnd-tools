@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
@@ -152,14 +153,37 @@ public class SearchTestController {
 
 	/**
 	 * List available name sets for the No-code Values field lookup.
-	 * Returns an array of { name, data, preview: [..up to 3 rows..] }.
+	 * Returns an list of @Domain.
 	 */
 	@GetMapping(value = "/domains", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Map<String, Object>>> getDomains(
+	public ResponseEntity<List<SearchTestDatasetRepository.Domain>> getDomains(
 			@RequestParam(name = "q", required = false) String q,
 			@RequestParam(name = "limit", required = false, defaultValue = "20") Integer limit) {
 		return ResponseEntity.ok(testSearchService.getDomains(q, limit == null ? 20 : limit));
+	}
+
+	@PostMapping(value = "/domains", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<SearchTestDatasetRepository.Domain> createDomain(@RequestBody Map<String, String> payload) {
+		String name = payload.get("name");
+		String data = payload.getOrDefault("data", "");
+		SearchTestDatasetRepository.Domain created = testSearchService.createDomain(name, data);
+		return ResponseEntity.status(HttpStatus.CREATED).body(created);
+	}
+
+	@PutMapping(value = "/domains/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<SearchTestDatasetRepository.Domain> updateDomain(@PathVariable("id") Long id,
+																	 @RequestBody Map<String, String> updates) {
+		return ResponseEntity.ok(testSearchService.updateDomain(id, updates));
+	}
+
+	@DeleteMapping(value = "/domains/{id}")
+	@ResponseBody
+	public ResponseEntity<Void> deleteDomain(@PathVariable("id") Long id) {
+		boolean deleted = testSearchService.deleteDomain(id);
+		return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
 	}
 
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)

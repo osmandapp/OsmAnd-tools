@@ -298,57 +298,9 @@ public interface DataService extends BaseService {
 		try {
 			return getJdbcTemplate().queryForMap(sql, position);
 		} catch (Exception e) {
-			getLogger().error("Failed to retrieve sample for dataset {}", datasetId, e);
-			throw new RuntimeException("Failed to generate dataset sample: " + e.getMessage(), e);
+			getLogger().error("Failed to retrieve sample row for dataset {} at position {}", datasetId, position, e);
+			throw new RuntimeException("Failed to retrieve dataset sample row: " + e.getMessage(), e);
 		}
-	}
-
-	/**
-	 * Find name sets by optional prefix/query and return a list of entries containing:
-	 */
-	default List<Map<String, Object>> getDomains(String query, int limit) {
-		final String q = query == null ? "" : query;
-		final int lim = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
-		String sql = "SELECT name, data FROM domain " +
-				"WHERE COALESCE(?, '') = '' OR lower(name) LIKE lower(?) || '%' OR lower(name) LIKE '%' || lower(?) || '%' " +
-				"ORDER BY name LIMIT ?";
-		try {
-			return getJdbcTemplate().query(sql, (rs, i) -> {
-				String name = rs.getString("name");
-				String data = rs.getString("data");
-				List<String> preview = buildPreviewRows(data, 3);
-				Map<String, Object> m = new LinkedHashMap<>();
-				m.put("name", name);
-				m.put("data", data);
-				m.put("preview", preview);
-				return m;
-			}, q, q, q, lim);
-		} catch (Exception e) {
-			getLogger().error("Failed to list name sets for query: {}", query, e);
-			throw new RuntimeException("Failed to list name sets: " + e.getMessage(), e);
-		}
-	}
-
-	/**
-	 * Build a short preview (up to maxRows) from a CSV-like string. It tries to split by newlines first,
-	 * falling back to ';' separators if it's a single-line value.
-	 */
-	private List<String> buildPreviewRows(String data, int maxRows) {
-		if (data == null || data.isEmpty()) return Collections.emptyList();
-		final int n = Math.max(1, maxRows);
-		// Prefer newline-separated rows; otherwise split by ';'
-		String[] rows = data.split("\r?\n");
-		if (rows.length <= 1) {
-			rows = Arrays.stream(data.split(";"))
-					.map(String::trim)
-					.filter(s -> !s.isEmpty())
-					.toArray(String[]::new);
-		}
-		List<String> out = new ArrayList<>(n);
-		for (int i = 0; i < rows.length && i < n; i++) {
-			out.add(rows[i]);
-		}
-		return out;
 	}
 
 	default boolean deleteDataset(Long datasetId) {
@@ -401,6 +353,81 @@ public interface DataService extends BaseService {
 						tableName, columnsDefinition);
 		getJdbcTemplate().execute(createTableSql);
 		getLogger().info("Ensured table {} exists.", tableName);
+	}
+
+	/**
+	 * Domains API (CRUD)
+	 */
+	default List<SearchTestDatasetRepository.Domain> getDomains(String query, int limit) {
+		final String q = query == null ? "" : query;
+		final int lim = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 200));
+		String sql = "SELECT id, name, data FROM domain " +
+				"WHERE COALESCE(?, '') = '' OR lower(name) LIKE lower(?) || '%' OR lower(name) LIKE '%' || lower(?) || '%' " +
+				"ORDER BY name LIMIT ?";
+		try {
+			return getJdbcTemplate().query(sql, (rs, i) -> {
+				SearchTestDatasetRepository.Domain d = new SearchTestDatasetRepository.Domain();
+				long id = rs.getLong("id");
+				d.id = rs.wasNull() ? null : id;
+				d.name = rs.getString("name");
+				d.data = rs.getString("data");
+				return d;
+			}, q, q, q, lim);
+		} catch (Exception e) {
+			getLogger().error("Failed to list domains for query: {}", query, e);
+			throw new RuntimeException("Failed to list domains: " + e.getMessage(), e);
+		}
+	}
+
+	default SearchTestDatasetRepository.Domain createDomain(String name, String data) {
+		if (name == null || name.trim().isEmpty()) {
+			throw new IllegalArgumentException("Domain name must not be empty");
+		}
+		String n = name.trim();
+		String d = data == null ? "" : data;
+		Integer exists = getJdbcTemplate().queryForObject(
+				"SELECT COUNT(1) FROM domain WHERE lower(name) = lower(?)", Integer.class, n);
+		if (exists > 0) {
+			throw new RuntimeException("Domain already exists: " + n);
+		}
+		getJdbcTemplate().update("INSERT INTO domain(name, data) VALUES(?, ?)", n, d);
+		Long id = getJdbcTemplate().queryForObject("SELECT id FROM domain WHERE name = ?", Long.class, n);
+		SearchTestDatasetRepository.Domain out = new SearchTestDatasetRepository.Domain();
+		out.id = id;
+		out.name = n;
+		out.data = d;
+		return out;
+	}
+
+	default SearchTestDatasetRepository.Domain updateDomain(Long id, Map<String, String> updates) {
+		if (id == null) throw new IllegalArgumentException("Domain id is required");
+		SearchTestDatasetRepository.Domain current = getJdbcTemplate().query(
+				"SELECT id, name, data FROM domain WHERE id = ?",
+				rs -> rs.next() ? new SearchTestDatasetRepository.Domain() {{
+					long i = rs.getLong("id");
+					this.id = rs.wasNull() ? null : i;
+					this.name = rs.getString("name");
+					this.data = rs.getString("data");
+				}} : null,
+				id);
+		if (current == null) {
+			throw new RuntimeException("Domain not found with id: " + id);
+		}
+		String newName = updates.getOrDefault("name", current.name);
+		String newData = updates.getOrDefault("data", current.data);
+		if (newName == null || newName.trim().isEmpty()) {
+			throw new IllegalArgumentException("Domain name must not be empty");
+		}
+		getJdbcTemplate().update("UPDATE domain SET name = ?, data = ? WHERE id = ?", newName.trim(), newData, id);
+		current.name = newName.trim();
+		current.data = newData;
+		return current;
+	}
+
+	default boolean deleteDomain(Long id) {
+		if (id == null) return false;
+		int n = getJdbcTemplate().update("DELETE FROM domain WHERE id = ?", id);
+		return n > 0;
 	}
 
 	default List<String> getAllLabels() {
