@@ -17,6 +17,21 @@ import java.util.Optional;
 @SearchTestRepository
 public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long> {
 	@Entity
+	@Table(name = "name_set")
+	public class NameSet {
+		@Id
+		@GeneratedValue(strategy = GenerationType.IDENTITY)
+		@Column(columnDefinition = "INTEGER")
+		public Long id;
+
+		@Column(nullable = false, unique = true)
+		public String name;
+
+		@Column()
+		public String data;
+	}
+
+	@Entity
 	@Table(name = "dataset")
 	public class Dataset {
 		public enum ConfigStatus {

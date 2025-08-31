@@ -131,7 +131,7 @@ public interface DataService extends BaseService {
 			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
 			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
 			// Load default JS helper script from web-server-config repository
-			Path scriptPath = Path.of(getWebServerConfigDir(), "js", "search-test", "modules", "lib", "default.js");
+			Path scriptPath = Path.of(getWebServerConfigDir(), "js", "search-test", "modules", "lib", "main.js");
 			if (!Files.exists(scriptPath)) {
 				throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
 			}
@@ -306,6 +306,54 @@ public interface DataService extends BaseService {
 			getLogger().error("Failed to retrieve sample for dataset {}", datasetId, e);
 			throw new RuntimeException("Failed to generate dataset sample: " + e.getMessage(), e);
 		}
+	}
+
+	/**
+	 * Find name sets by optional prefix/query and return a list of entries containing:
+	 */
+	default List<Map<String, Object>> getNameSets(String query, int limit) {
+		final String q = query == null ? "" : query;
+		final int lim = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
+		String sql = "SELECT name, data FROM name_set " +
+				"WHERE COALESCE(?, '') = '' OR lower(name) LIKE lower(?) || '%' OR lower(name) LIKE '%' || lower(?) || '%' " +
+				"ORDER BY name LIMIT ?";
+		try {
+			return getJdbcTemplate().query(sql, (rs, i) -> {
+				String name = rs.getString("name");
+				String data = rs.getString("data");
+				List<String> preview = buildPreviewRows(data, 3);
+				Map<String, Object> m = new LinkedHashMap<>();
+				m.put("name", name);
+				m.put("data", data);
+				m.put("preview", preview);
+				return m;
+			}, q, q, q, lim);
+		} catch (Exception e) {
+			getLogger().error("Failed to list name sets for query: {}", query, e);
+			throw new RuntimeException("Failed to list name sets: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Build a short preview (up to maxRows) from a CSV-like string. It tries to split by newlines first,
+	 * falling back to ';' separators if it's a single-line value.
+	 */
+	private List<String> buildPreviewRows(String data, int maxRows) {
+		if (data == null || data.isEmpty()) return Collections.emptyList();
+		final int n = Math.max(1, maxRows);
+		// Prefer newline-separated rows; otherwise split by ';'
+		String[] rows = data.split("\r?\n");
+		if (rows.length <= 1) {
+			rows = Arrays.stream(data.split(";"))
+					.map(String::trim)
+					.filter(s -> !s.isEmpty())
+					.toArray(String[]::new);
+		}
+		List<String> out = new ArrayList<>(n);
+		for (int i = 0; i < rows.length && i < n; i++) {
+			out.add(rows[i]);
+		}
+		return out;
 	}
 
 	default boolean deleteDataset(Long datasetId) {

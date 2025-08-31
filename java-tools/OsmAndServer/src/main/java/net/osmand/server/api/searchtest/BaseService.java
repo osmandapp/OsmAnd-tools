@@ -39,7 +39,7 @@ public interface BaseService {
 			Map<String, String> testRow) {
 	}
 
-	enum ParamType {Before, With, After, Expand, ExpandAndRevers}
+	enum ParamType {Before, After, Expand, Fold, ExpandOrFold, FoldOrExpand}
 
 	// -------------------- Utility methods (common) --------------------
 	default String pointToString(LatLon point) {

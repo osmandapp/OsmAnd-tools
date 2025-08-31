@@ -21,6 +21,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -147,6 +148,18 @@ public class SearchTestController {
 	public ResponseEntity<Map<String, Object>> getDatasetSampleRow(@PathVariable Long datasetId,
 																		   @PathVariable int position) {
 		return ResponseEntity.ok(testSearchService.getDatasetSample(datasetId, position));
+	}
+
+	/**
+	 * List available name sets for the No-code Values field lookup.
+	 * Returns an array of { name, data, preview: [..up to 3 rows..] }.
+	 */
+	@GetMapping(value = "/name_sets", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getNameSets(
+			@RequestParam(name = "q", required = false) String q,
+			@RequestParam(name = "limit", required = false, defaultValue = "20") Integer limit) {
+		return ResponseEntity.ok(testSearchService.getNameSets(q, limit == null ? 20 : limit));
 	}
 
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
