@@ -7,11 +7,14 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.io.IOAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,53 +68,74 @@ public class PolyglotEngine {
 		if (!Files.exists(scriptPath)) {
 			throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
 		}
-		String script = Files.readString(scriptPath);
 
 		String columnsJson = test.selCols;
-		try {
-			// Execute with GraalVM JavaScript (Polyglot API)
+		try (Context context = Context.newBuilder("js")
+				.engine(polyglotEngine)
+				.option("js.ecmascript-version", "2022")
+				.option("js.esm-eval-returns-exports", "true")
+				// Allow reading module files from disk so relative imports (e.g., "./system.js") resolve
+				.allowIO(IOAccess.ALL)
+				.allowAllAccess(false)
+				.build()) {
+			// 1) Evaluate script: for programmatic mode, load as ES module so import/export works;
+			//    for no-code mode, evaluate as classic script.
+			Value moduleNamespace = null;
+			Source moduleSrc = Source.newBuilder("js", new File(scriptPath.toUri()))
+				.mimeType("application/javascript+module")
+				.build();
+			moduleNamespace = context.eval(moduleSrc);
+			// Fallback: if eval did not return a namespace (e.g., classic script parse), load via a loader module
+			if (moduleNamespace == null || (!moduleNamespace.hasMembers() && !moduleNamespace.canExecute())) {
+				String moduleUri = scriptPath.toUri().toString();
+				String loaderCode = "import * as __mod__ from '" + moduleUri + "';\n" +
+					"globalThis.__mod__ = __mod__;";
+				Source loaderSrc = Source.newBuilder("js", loaderCode, "module-loader.mjs")
+					.mimeType("application/javascript+module")
+					.build();
+				context.eval(loaderSrc);
+				Value exported = context.getBindings("js").getMember("__mod__");
+				if (exported != null) {
+					moduleNamespace = exported;
+				}
+			}
+
+			Value jsonParse = context.eval("js", "JSON.parse");
+
 			List<GenRow> results = new ArrayList<>();
-			try (Context context = Context.newBuilder("js").engine(polyglotEngine).option("js.ecmascript-version",
-					"2022").allowAllAccess(false).build()) {
-				// 1) Evaluate user script (should define the target function)
-				context.eval("js", script);
-				Value jsonParse = context.eval("js", "JSON.parse");
-
-				// 2) Prepare JS-native arguments
-				for (Map<String, Object> origRow : rows) {
-					long start = System.currentTimeMillis();
-					Map<String, Object> row = origRow;
-					if (!delCols.isEmpty()) {
-						row = new HashMap<>(origRow);
-						for (String key : delCols) {
-							row.remove(key);
-						}
+			for (Map<String, Object> origRow : rows) {
+				long start = System.currentTimeMillis();
+				Map<String, Object> row = origRow;
+				if (!delCols.isEmpty()) {
+					row = new HashMap<>(origRow);
+					for (String key : delCols) {
+						row.remove(key);
 					}
-
-					String rowJson = objectMapper.writeValueAsString(row);
-					Value jsRow = jsonParse.execute(rowJson);
-
-					String lat = (String) origRow.get("lat");
-					String lon = (String) origRow.get("lon");
-
-					Object output = null;
-					String errorMessage = null;
-					try {
-						output = program != null ?
-							 executeProgram(context, program, jsRow, jsonParse.execute(columnsJson)) :
-								executeNocode(context, jsonParse.execute(test.progCfg), jsRow);
-					} catch (PolyglotException pe) {
-						errorMessage = extractJsErrorMessage(pe);
-					}
-
-					int count = output instanceof String[] ? ((String[])output).length : -1;
-					String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
-					results.add(new GenRow(parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
-							System.currentTimeMillis() - start));
 				}
 
-				return results;
+				String rowJson = objectMapper.writeValueAsString(row);
+				Value jsRow = jsonParse.execute(rowJson);
+
+				String lat = (String) origRow.get("lat");
+				String lon = (String) origRow.get("lon");
+
+				Object output = null;
+				String errorMessage = null;
+				try {
+					output = program != null ?
+							executeProgram(context, moduleNamespace, program, jsRow, jsonParse.execute(columnsJson == null ? "[]" : columnsJson)) :
+							executeNocode(context, moduleNamespace, jsonParse.execute(test.nocodeCfg), jsRow);
+				} catch (PolyglotException pe) {
+					errorMessage = extractJsErrorMessage(pe);
+				}
+
+				int count = output instanceof String[] ? ((String[]) output).length : -1;
+				String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
+				results.add(new GenRow(parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
+						System.currentTimeMillis() - start));
 			}
+
+			return results;
 		} catch (PolyglotException e) {
 			throw new RuntimeException("JavaScript execution error: " + (e.getMessage() == null ? e.toString() :
 					e.getMessage()), e);
@@ -157,15 +181,15 @@ public class PolyglotEngine {
 		return args;
 	}
 
-	private Object executeNocode(Context context, Value jsCfg, Value jsRow) throws PolyglotException, IOException {
+	private Object executeNocode(Context context, Value moduleNamespace, Value jsCfg, Value jsRow) throws PolyglotException, IOException {
 		List<Object> args = new ArrayList<>();
-		args.add(0, jsCfg);
-		args.add(0, jsRow);
+		args.add(jsCfg);
+		args.add(jsRow);
 
-		return execute(context, "evalNocode", args);
+		return execute(context, moduleNamespace, "evalNocode", args);
 	}
 
-	private Object executeProgram(Context context, BaseService.ProgrammaticConfig program, Value jsRow, Value jsColumns) throws PolyglotException, IOException {
+	private Object executeProgram(Context context, Value moduleNamespace, BaseService.ProgrammaticConfig program, Value jsRow, Value jsColumns) throws PolyglotException, IOException {
 		if (program.selectFun() == null) {
 			throw new IllegalArgumentException("Function name must not be null or empty.");
 		}
@@ -176,20 +200,34 @@ public class PolyglotEngine {
 		selectArgs.add(0, jsRow);
 
 		boolean where = true;
-		if (program.whereFun() != null) {
+		if (program.whereFun() != null && !program.whereFun().trim().isEmpty()) {
 			List<Object> whereArgs = getArgs(whereParams);
 			whereArgs.add(0, jsColumns);
 			whereArgs.add(0, jsRow);
-			where = (Boolean) execute(context, program.whereFun(), whereArgs);
+			where = (Boolean) execute(context, moduleNamespace, program.whereFun(), whereArgs);
 		}
-		return where ? execute(context, program.selectFun(), selectArgs) : null;
+		return where ? execute(context, moduleNamespace, program.selectFun(), selectArgs) : null;
 	}
 
-	private Object execute(Context context, String functionName, List<Object> args) throws IOException {
+	private Object execute(Context context, Value moduleNamespace, String functionName, List<Object> args) {
 		// 3) Resolve and invoke the target function
-		org.graalvm.polyglot.Value fn = context.getBindings("js").getMember(functionName);
+		org.graalvm.polyglot.Value fn = null;
+		// Prefer exported member from module namespace if available
+		if (moduleNamespace != null && moduleNamespace.hasMembers() && moduleNamespace.getMemberKeys().contains(functionName)) {
+			fn = moduleNamespace.getMember(functionName);
+		}
+		if (fn == null) {
+			fn = context.getBindings("js").getMember(functionName);
+		}
 		if (fn == null || !fn.canExecute()) {
-			throw new IllegalArgumentException("Function not found or not executable: " + functionName);
+			String available = "";
+			try {
+				if (moduleNamespace != null && moduleNamespace.hasMembers()) {
+					available = String.join(", ", moduleNamespace.getMemberKeys());
+				}
+			} catch (Throwable ignore) {}
+			throw new IllegalArgumentException("Function not found or not executable: " + functionName +
+					(available.isEmpty() ? "" : "; available exports: [" + available + "]"));
 		}
 		org.graalvm.polyglot.Value result = fn.execute(args.toArray());
 		if (result.isBoolean()) {
