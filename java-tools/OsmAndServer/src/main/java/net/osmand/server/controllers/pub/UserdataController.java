@@ -211,10 +211,10 @@ public class UserdataController {
 			pu.email = email;
 			pu.regTime = new Date();
 			pu.orderid = orderid;
+			pu.id = usersRepository.saveAndFlush(pu).id; // fetch fresh id
 		}
 		if (orderid != null) {
-			int newUserId = pu.id > 0 ? pu.id : usersRepository.saveAndFlush(pu).id;
-			discardPreviousAccountOrderId(newUserId, orderid, email, request);
+			discardPreviousAccountOrderId(pu.id, orderid, email, request);
 			if (pu.orderid == null) {
 				pu.orderid = orderid;
 			}
