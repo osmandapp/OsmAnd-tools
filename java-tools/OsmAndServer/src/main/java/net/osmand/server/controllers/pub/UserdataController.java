@@ -213,7 +213,8 @@ public class UserdataController {
 			pu.orderid = orderid;
 		}
 		if (orderid != null) {
-			discardPreviousAccountOrderId(pu.id, orderid, email, request);
+			int newUserId = pu.id > 0 ? pu.id : usersRepository.saveAndFlush(pu).id;
+			discardPreviousAccountOrderId(newUserId, orderid, email, request);
 			if (pu.orderid == null) {
 				pu.orderid = orderid;
 			}
