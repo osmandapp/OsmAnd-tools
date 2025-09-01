@@ -239,13 +239,8 @@ public class OrderManagementService {
 	}
 
 	@Transactional
-	public void registerNewOrder(String email,
-	                             String sku,
-	                             Integer period,
-	                             String interval,
-	                             String orderId,
-	                             String purchaseToken,
-	                             boolean isSubscription) {
+	public void registerNewOrder(String email, String sku, Integer period, String interval, String orderId,
+			String purchaseToken, boolean isSubscription) {
 		if (isSubscription) {
 			if (period == null || period <= 0 || interval == null) {
 				throw new IllegalArgumentException("For subscriptions, period and interval are required");

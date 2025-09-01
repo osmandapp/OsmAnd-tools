@@ -47,6 +47,7 @@ public class UserdataController {
 	private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
 	private static final int ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT = 9 + ERROR_CODE_PRO_USERS;
 	private static final int ERROR_CODE_USER_IS_ALREADY_REGISTERED = 11 + ERROR_CODE_PRO_USERS;
+	private static boolean DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED = true;
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
@@ -163,27 +164,17 @@ public class UserdataController {
 	}
 
 	@PostMapping(value = "/user-update-orderid")
-	public ResponseEntity<String> userUpdateOrderid(@RequestParam(name = "email", required = true) String email,
-			@RequestParam(name = "deviceid", required = false) String deviceId,
-			@RequestParam(name = "orderid", required = false) String orderid,
-			HttpServletRequest request) throws IOException {
+	public ResponseEntity<String> userUpdateOrderid(@RequestParam String email,
+	                                                @RequestParam(name = "deviceid", required = false) String deviceId,
+	                                                @RequestParam(required = false) String orderid,
+	                                                HttpServletRequest request) {
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		// we allow to reset order id to null
 		if (orderid != null) {
-			String errorMsg = userSubService.checkOrderIdPro(orderid);
-			if (errorMsg != null) {
-				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-			}
-			CloudUser otherUser = usersRepository.findByOrderid(orderid);
-			if (otherUser != null && !Algorithms.objectEquals(pu.orderid, orderid)) {
-				String hideEmail = userdataService.hideEmail(otherUser.email);
-				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
-						"user was already signed up as " + hideEmail);
-			}
+			discardPreviousAccountOrderId(pu.id, orderid, email, request);
 		}
 		pu.orderid = orderid;
 		usersRepository.saveAndFlush(pu);
@@ -195,15 +186,14 @@ public class UserdataController {
 
     @PostMapping(value = "/user-register")
     @Transactional // Make linking atomic with registration
-    public ResponseEntity<String> userRegister(
-            @RequestParam(name = "email") String email,
-            @RequestParam(name = "deviceid", required = false) String deviceId, // PremiumUserDevice deviceId (e.g., "web")
-            @RequestParam(name = "orderid", required = false) String orderid, // Subscription orderId
-            @RequestParam(name = "login", required = false) boolean login,
-            @RequestParam(name = "lang", required = false) String lang,
-            @RequestParam(name = "userId", required = false) String userId,
-            @RequestParam(name = "userToken", required = false) String userToken,
-            HttpServletRequest request) {
+    public ResponseEntity<String> userRegister(@RequestParam String email,
+                                               @RequestParam(name = "deviceid", required = false) String deviceId, // PremiumUserDevice deviceId (e.g., "web")
+                                               @RequestParam(required = false) String orderid, // Subscription orderId
+                                               @RequestParam(required = false) Boolean login,
+                                               @RequestParam(required = false) String lang,
+                                               @RequestParam(required = false) String userId,
+                                               @RequestParam(required = false) String userToken,
+                                               HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
@@ -211,37 +201,22 @@ public class UserdataController {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
-			if (!login) {
+			if (!Boolean.TRUE.equals(login)) {
 				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
 			// keep old order id
 		} else {
-			if (orderid != null) {
-//				String error = userSubService.checkOrderIdPremium(orderid);
-//				if (error != null) {
-//					throw new OsmAndPublicApiException(ERROR_CODE_NO_VALID_SUBSCRIPTION, error);
-//				}
-				CloudUser otherUser = usersRepository.findByOrderid(orderid);
-				if (otherUser != null) {
-					String hideEmail = userdataService.hideEmail(otherUser.email);
-					List<CloudUserDevice> pud = devicesRepository.findByUserid(otherUser.id);
-					// check that user already registered at least 1 device (avoid typos in email)
-					if (pud != null && !pud.isEmpty()) {
-						logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT, "user was already signed up as " + hideEmail);
-					} else {
-						otherUser.orderid = null;
-						usersRepository.saveAndFlush(otherUser);
-					}
-				}
-			}
 			pu = new CloudUsersRepository.CloudUser();
 			pu.email = email;
 			pu.regTime = new Date();
 			pu.orderid = orderid;
 		}
-		if (pu.orderid == null && orderid != null) {
-			pu.orderid = orderid;
+		if (orderid != null) {
+			discardPreviousAccountOrderId(pu.id, orderid, email, request);
+			if (pu.orderid == null) {
+				pu.orderid = orderid;
+			}
 		}
 		pu.tokendevice = deviceId;
 		pu.tokenTime = new Date();
@@ -308,6 +283,20 @@ public class UserdataController {
 	    }
 
 		return userdataService.ok();
+	}
+
+	protected void discardPreviousAccountOrderId(int newUserId, String orderid, String currentEmail, HttpServletRequest request) {
+		CloudUser previousUser =
+				usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, currentEmail);
+		if (previousUser != null) {
+			if (DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
+				LOG.info("Discarding orderId " + orderid + " from previous user " + previousUser.id + " because it was used to register new user " + newUserId);
+				userSubService.relinkPurchasesToNewAccount(previousUser, newUserId);
+			} else {
+				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
+						"user has already signed up as " + userdataService.hideEmail(previousUser.email));
+			}
+		}
 	}
 
 	@PostMapping(value = "/device-register")

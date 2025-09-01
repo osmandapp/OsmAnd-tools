@@ -33,6 +33,8 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
     List<CloudUser> findByEmailStartingWith(String prefix, Pageable pageable);
     
     List<CloudUser> findUsersByOrderidAndTokendevice(String orderid, String tokendevice);
+
+    CloudUser findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(String orderid, String email);
 	
 	CloudUser findById(int id);
 	
