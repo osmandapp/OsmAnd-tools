@@ -211,13 +211,9 @@ public class UserdataController {
 			pu.email = email;
 			pu.regTime = new Date();
 			pu.orderid = orderid;
-			pu.id = usersRepository.saveAndFlush(pu).id; // fetch fresh id
 		}
-		if (orderid != null) {
-			discardPreviousAccountOrderId(pu.id, orderid, email, request);
-			if (pu.orderid == null) {
-				pu.orderid = orderid;
-			}
+		if (orderid != null && pu.orderid == null) {
+			pu.orderid = orderid;
 		}
 		pu.tokendevice = deviceId;
 		pu.tokenTime = new Date();
@@ -227,7 +223,10 @@ public class UserdataController {
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
-		usersRepository.saveAndFlush(pu);
+		CloudUser saved = usersRepository.saveAndFlush(pu);
+	    if (orderid != null) {
+		    discardPreviousAccountOrderId(saved.id, orderid, email, request);
+	    }
 
         // --- Attempt to Link Supporter IAPs ---
         if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
