@@ -290,6 +290,9 @@ public class UserdataController {
 				usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, currentEmail);
 		if (previousUser != null) {
 			if (DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
+				LOG.info("Discarding orderId " + orderid + " from previous user "
+						+ userdataService.hideEmail(previousUser.email) + " because it was used to register new user "
+						+ userdataService.hideEmail(currentEmail));
 				userSubService.relinkPurchasesToNewAccount(previousUser, newUserId);
 			} else {
 				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
