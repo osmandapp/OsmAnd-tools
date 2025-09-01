@@ -106,10 +106,6 @@ public class SearchTestRepositoryConfiguration {
         if (!isInitialized()) {
             // In-memory SQLite: let Hibernate create and drop schema automatically
             vendorProps.put("hibernate.hbm2ddl.auto", "none");
-            // Allow JDBC metadata access so Hibernate can determine capabilities for DDL
-            vendorProps.put("hibernate.boot.allow_jdbc_metadata_access", "true");
-            // Some drivers misbehave with auto-commit toggles; hint Hibernate that provider may disable it
-            vendorProps.putIfAbsent("hibernate.connection.provider_disables_autocommit", "true");
             vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
         }
 
