@@ -79,6 +79,8 @@ public class ApiController {
 
     private static final String PROC_FILE = ".proc_timestamp";
 
+    private final int BROKEN_STATE_VERSION = 519;
+
     @Value("${osmand.files.location}")
     private String filesLocation;
 
@@ -440,6 +442,7 @@ public class ApiController {
 	public String getAllActiveSubscriptions(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String accessToken,
+            @RequestParam(required = false) String version,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request) {
 		MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
@@ -458,6 +461,10 @@ public class ApiController {
 			for (SupporterDeviceSubscription sub : activeSubscriptions) {
 				Map<String, String> subMap = userSubscriptionService.getSubscriptionInfo(sub);
 				if (!subMap.isEmpty()) {
+                    int ver = extractVersionNumber(version);
+                    if (ver > 0 && ver <= BROKEN_STATE_VERSION && "cancelled".equals(subMap.get("state"))) {
+                        subMap.put("state", "active");
+                    }
 					res.add(subMap);
 				}
 			}
@@ -750,4 +757,25 @@ public class ApiController {
 			@RequestParam(required = false) boolean nightly, @RequestParam(required = false) String os) throws IOException {
 		return gson.toJson(pluginsService.getPluginsInfo(os, version, nightly));
 	}
+
+    public static int extractVersionNumber(String version) {
+        if (Algorithms.isEmpty(version)) {
+            return -1;
+        }
+        List<Integer> versionNumbers = new ArrayList<>();
+        String[] parts = version.split("\\D+");
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                versionNumbers.add(Integer.parseInt(part));
+            }
+        }
+        if (versionNumbers.isEmpty()) {
+            return -1;
+        }
+        String num = "";
+        for (Integer n : versionNumbers) {
+            num += n;
+        }
+        return Integer.parseInt(num);
+    }
 }
