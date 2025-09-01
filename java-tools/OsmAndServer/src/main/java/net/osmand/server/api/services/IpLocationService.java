@@ -52,6 +52,10 @@ public class IpLocationService {
 			try {
 				LookupService lookup = new LookupService(db);
 				Location location = ipv6 ? lookup.getLocationV6(ip) : lookup.getLocation(ip);
+				if (location == null) {
+					LOG.warn(String.format("geoiplookup null location for %s", ip));
+					return fields;
+				}
 				if (!Algorithms.isEmpty(location.countryCode)) {
 					fields.put(COUNTRY_CODE, location.countryCode);
 				}
