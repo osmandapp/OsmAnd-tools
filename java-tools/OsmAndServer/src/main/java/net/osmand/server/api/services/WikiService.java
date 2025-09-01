@@ -198,6 +198,11 @@ public class WikiService {
 	}
 
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, Integer zoom) {
+		// fix filters="" case
+		if (filters.size() == 1 && filters.contains("")) {
+			filters = Set.of("0");
+		}
+
 		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
