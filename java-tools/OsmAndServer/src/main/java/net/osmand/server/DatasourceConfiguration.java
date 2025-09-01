@@ -5,18 +5,26 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
+import jakarta.persistence.EntityManagerFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
+import org.springframework.context.annotation.*;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.AbstractDataSource;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
+@EnableJpaRepositories(
+		basePackages = Application.PACKAGE_NAME,
+		excludeFilters = @ComponentScan.Filter(
+				type = FilterType.ANNOTATION, classes = SearchTestRepository.class))
 public class DatasourceConfiguration {
 	
 	protected static final Log LOG = LogFactory.getLog(DatasourceConfiguration.class);
@@ -129,7 +137,7 @@ public class DatasourceConfiguration {
 	}
 
 
-	private DataSource emptyDataSource() {
+	public static DataSource emptyDataSource() {
 		return new AbstractDataSource() {
 			
 			@Override
@@ -185,5 +193,23 @@ public class DatasourceConfiguration {
 		}
 		return new JdbcTemplate(dataSource);
 	}
-	
+
+	@Bean(name = "entityManagerFactory")
+	@Primary
+	public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+			EntityManagerFactoryBuilder builder,
+			@Qualifier("primaryDataSource") DataSource dataSource) {
+		return builder
+				.dataSource(dataSource)
+				.packages(Application.PACKAGE_NAME)
+				.persistenceUnit("default")
+				.build();
+	}
+
+	@Bean(name = "transactionManager")
+	@Primary
+	public PlatformTransactionManager transactionManager(
+			@Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
+		return new JpaTransactionManager(entityManagerFactory);
+	}
 }
