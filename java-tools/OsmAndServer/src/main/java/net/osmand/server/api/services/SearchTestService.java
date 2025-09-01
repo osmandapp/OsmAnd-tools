@@ -223,6 +223,7 @@ public class SearchTestService implements ReportService, DataService {
 		run.setNorthWest(payload.getNorthWest());
 		run.setSouthEast(payload.getSouthEast());
 		run.baseSearch = payload.baseSearch;
+		run.version = payload.version;
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
@@ -235,6 +236,7 @@ public class SearchTestService implements ReportService, DataService {
 		test.setNorthWest(run.getNorthWest());
 		test.setSouthEast(run.getSouthEast());
 		test.baseSearch = run.baseSearch;
+		test.version = run.version;
 		test.lat = run.lat;
 		test.lon = run.lon;
 		testCaseRepo.save(test);

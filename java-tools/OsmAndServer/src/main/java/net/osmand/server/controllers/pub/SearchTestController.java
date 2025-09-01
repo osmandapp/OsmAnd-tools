@@ -245,6 +245,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
 	}
 
+	@GetMapping(value = "/versions", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<String[]> getVersions() {
+		return ResponseEntity.ok(new String[] {"EXPAND_COMMON_WORDS", "EXPAND_ABBREVIATIONS", "DEFAULT"});
+	}
+
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
