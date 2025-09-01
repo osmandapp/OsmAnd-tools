@@ -76,7 +76,10 @@ public class PlacesService {
 	@Autowired
 	public PlacesService(RestTemplateBuilder builder) {
 		this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
-				.setConnectTimeout(Duration.ofMillis(TIMEOUT)).setReadTimeout(Duration.ofMillis(TIMEOUT)).build();
+				.defaultHeader(HttpHeaders.USER_AGENT, WikiService.USER_AGENT)
+				.setConnectTimeout(Duration.ofMillis(TIMEOUT))
+				.setReadTimeout(Duration.ofMillis(TIMEOUT))
+				.build();
 
 		this.executor = new ThreadPoolTaskExecutor();
 		executor.setThreadNamePrefix("ImageService");

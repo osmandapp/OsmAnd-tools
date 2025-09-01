@@ -47,7 +47,8 @@ import static net.osmand.wiki.WikiDatabasePreparation.*;
 public class WikiService {
 	
 	protected static final Log log = LogFactory.getLog(WikiService.class);
-	// String url = WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + fileName;
+
+	public static final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
 	public static final String WIKIMEDIA_COMMON_SPECIAL_FILE_PATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
@@ -139,7 +140,7 @@ public class WikiService {
 			URL url = new URL(urlStr);
 			connection = (HttpURLConnection) url.openConnection();
 			connection.setRequestMethod("GET");
-			connection.setRequestProperty("User-Agent", "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0");
+			connection.setRequestProperty("User-Agent", USER_AGENT);
 			
 			int responseCode = connection.getResponseCode();
 			String rawData;
