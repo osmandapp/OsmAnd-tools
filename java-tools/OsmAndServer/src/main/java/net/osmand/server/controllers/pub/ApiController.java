@@ -79,7 +79,7 @@ public class ApiController {
 
     private static final String PROC_FILE = ".proc_timestamp";
 
-    private final int BROKEN_STATE_VERSION = 519;
+    private final String BROKEN_STATE_VERSION = "5.1";
 
     @Value("${osmand.files.location}")
     private String filesLocation;
@@ -461,8 +461,8 @@ public class ApiController {
 			for (SupporterDeviceSubscription sub : activeSubscriptions) {
 				Map<String, String> subMap = userSubscriptionService.getSubscriptionInfo(sub);
 				if (!subMap.isEmpty()) {
-                    int ver = extractVersionNumber(version);
-                    if (ver > 0 && ver <= BROKEN_STATE_VERSION && "cancelled".equals(subMap.get("state"))) {
+                    String ver = extractVersionNumber(version);
+                    if (ver.startsWith(BROKEN_STATE_VERSION) && "cancelled".equals(subMap.get("state"))) {
                         subMap.put("state", "active");
                     }
 					res.add(subMap);
@@ -758,24 +758,18 @@ public class ApiController {
 		return gson.toJson(pluginsService.getPluginsInfo(os, version, nightly));
 	}
 
-    public static int extractVersionNumber(String version) {
+    public static String extractVersionNumber(String version) {
         if (Algorithms.isEmpty(version)) {
-            return -1;
+            return "";
         }
-        List<Integer> versionNumbers = new ArrayList<>();
-        String[] parts = version.split("\\D+");
+        version = version.replaceAll("\\D+", ".");
+        String[] parts = version.split("\\.");
+        List<String> versionNumbers = new ArrayList<>();
         for (String part : parts) {
             if (!part.isEmpty()) {
-                versionNumbers.add(Integer.parseInt(part));
+                versionNumbers.add(part);
             }
         }
-        if (versionNumbers.isEmpty()) {
-            return -1;
-        }
-        String num = "";
-        for (Integer n : versionNumbers) {
-            num += n;
-        }
-        return Integer.parseInt(num);
+        return String.join(".", versionNumbers);
     }
 }
