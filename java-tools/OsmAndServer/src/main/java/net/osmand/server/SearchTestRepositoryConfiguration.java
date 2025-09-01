@@ -69,7 +69,7 @@ public class SearchTestRepositoryConfiguration {
         );
         // Force SQLite dialect for this EMF
         vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
-        vendorProps.put("hibernate.hbm2ddl.auto", "update");
+        //vendorProps.put("hibernate.hbm2ddl.auto", "update");
 
         return builder
                 .dataSource(dataSource)
