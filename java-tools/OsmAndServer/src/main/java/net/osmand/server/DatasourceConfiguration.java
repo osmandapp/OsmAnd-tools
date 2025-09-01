@@ -137,7 +137,7 @@ public class DatasourceConfiguration {
 	}
 
 
-	private DataSource emptyDataSource() {
+	public static DataSource emptyDataSource() {
 		return new AbstractDataSource() {
 			
 			@Override

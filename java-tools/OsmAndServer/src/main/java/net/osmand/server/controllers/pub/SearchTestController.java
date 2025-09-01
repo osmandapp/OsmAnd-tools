@@ -41,10 +41,10 @@ public class SearchTestController {
 		return "admin/search-test";
 	}
 
-	@GetMapping(value = "/init", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/initialized", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Boolean> isInitialized() {
-		return ResponseEntity.ok(dbCfg.isInitialized());
+		return ResponseEntity.ok(dbCfg.isSearchTestDataSourceInitialized());
 	}
 
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)

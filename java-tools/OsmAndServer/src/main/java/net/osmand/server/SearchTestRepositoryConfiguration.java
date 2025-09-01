@@ -16,15 +16,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Map;
 
 /**
@@ -42,11 +39,7 @@ import java.util.Map;
 public class SearchTestRepositoryConfiguration {
     protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
-    private boolean initialized = false;
-
-    public boolean isInitialized() {
-        return initialized;
-    }
+    private boolean searchTestDataSourceInitialized = false;
 
     @Bean
     @ConfigurationProperties(prefix = "spring.searchtestdatasource")
@@ -58,30 +51,12 @@ public class SearchTestRepositoryConfiguration {
     public DataSource searchTestDataSource() {
         try {
             DataSource ds = searchTestDataSourceProperties().initializeDataSourceBuilder().build();
-            initialized = true;
+            searchTestDataSourceInitialized = true;
             return ds;
         } catch (Exception e) {
-            LOG.warn("WARN - Search-test database not configured to be persisted: " + e.getMessage());
+            LOG.warn("WARN - Search-test database is not configured: " + e.getMessage());
         }
-        return emptySqliteDataSource();
-    }
-
-    /**
-     * Attempts to create an empty datasource.
-     */
-    private synchronized DataSource emptySqliteDataSource() {
-        return new AbstractDataSource() {
-            @Override
-            public Connection getConnection() throws SQLException {
-                // Return a new connection to the same shared in-memory DB
-                return null;
-            }
-
-            @Override
-            public Connection getConnection(String username, String password) throws SQLException {
-                return getConnection();
-            }
-        };
+        return DatasourceConfiguration.emptyDataSource();
     }
 
     @Bean(name = "searchTestJdbcTemplate")
@@ -103,8 +78,9 @@ public class SearchTestRepositoryConfiguration {
         );
         // Force SQLite dialect for this EMF
         vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
-        if (!isInitialized()) {
-            // In-memory SQLite: let Hibernate create and drop schema automatically
+
+        if (!isSearchTestDataSourceInitialized()) {
+            // Allow to start without searchtestdatasource
             vendorProps.put("hibernate.hbm2ddl.auto", "none");
             vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
         }
@@ -121,5 +97,9 @@ public class SearchTestRepositoryConfiguration {
     public PlatformTransactionManager searchTestTransactionManager(
             @Qualifier("searchTestEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
         return new JpaTransactionManager(entityManagerFactory);
+    }
+
+    public boolean isSearchTestDataSourceInitialized() {
+        return searchTestDataSourceInitialized;
     }
 }

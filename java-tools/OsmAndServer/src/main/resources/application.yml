@@ -145,7 +145,7 @@ monitoring:
 geoip.city.dat.v4: "/usr/share/GeoIP/GeoIPCity.dat"
 geoip.city.dat.v6: "/usr/share/GeoIP/GeoIPCityv6.dat"
 
-overpass.url: ${OVERPASS_URL} # used by search test
+overpass.url: ${OVERPASS_URL:} # used by search test
 searchtest.csv.dir:
 
 ---
