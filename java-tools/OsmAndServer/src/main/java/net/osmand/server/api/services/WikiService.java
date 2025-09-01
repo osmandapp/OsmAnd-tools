@@ -198,7 +198,7 @@ public class WikiService {
 	}
 
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, Integer zoom) {
-		// fix filters="" case
+		// SpringBoot converts filters="" to 1-element Set.of(""), so treat it in a special way
 		if (filters.size() == 1 && filters.contains("")) {
 			filters = Set.of("0");
 		}
