@@ -173,11 +173,13 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
+		pu.orderid = orderid;
+
+		usersRepository.saveAndFlush(pu);
+
 		if (orderid != null) {
 			discardPreviousAccountOrderId(pu.id, orderid, email, request);
 		}
-		pu.orderid = orderid;
-		usersRepository.saveAndFlush(pu);
 
 		userSubService.verifyAndRefreshProOrderId(pu);
 
@@ -212,11 +214,8 @@ public class UserdataController {
 			pu.regTime = new Date();
 			pu.orderid = orderid;
 		}
-		if (orderid != null) {
-			discardPreviousAccountOrderId(pu.id, orderid, email, request);
-			if (pu.orderid == null) {
-				pu.orderid = orderid;
-			}
+		if (orderid != null && pu.orderid == null) {
+			pu.orderid = orderid;
 		}
 		pu.tokendevice = deviceId;
 		pu.tokenTime = new Date();
@@ -226,7 +225,10 @@ public class UserdataController {
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
-		usersRepository.saveAndFlush(pu);
+		CloudUser saved = usersRepository.saveAndFlush(pu);
+	    if (orderid != null) {
+		    discardPreviousAccountOrderId(saved.id, orderid, email, request);
+	    }
 
         // --- Attempt to Link Supporter IAPs ---
         if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
