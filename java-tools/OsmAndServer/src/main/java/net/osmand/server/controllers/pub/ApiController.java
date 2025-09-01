@@ -79,6 +79,8 @@ public class ApiController {
 
     private static final String PROC_FILE = ".proc_timestamp";
 
+    private final String BROKEN_STATE_VERSION = "5.1";
+
     @Value("${osmand.files.location}")
     private String filesLocation;
 
@@ -440,6 +442,7 @@ public class ApiController {
 	public String getAllActiveSubscriptions(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String accessToken,
+            @RequestParam(required = false) String version,
 			@RequestHeader HttpHeaders headers, HttpServletRequest request) {
 		MessageParams params = new MessageParams();
 		params.hostAddress = request.getRemoteAddr();
@@ -458,6 +461,10 @@ public class ApiController {
 			for (SupporterDeviceSubscription sub : activeSubscriptions) {
 				Map<String, String> subMap = userSubscriptionService.getSubscriptionInfo(sub);
 				if (!subMap.isEmpty()) {
+                    String ver = extractVersionNumber(version);
+                    if (ver.startsWith(BROKEN_STATE_VERSION) && "cancelled".equals(subMap.get("state"))) {
+                        subMap.put("state", "active");
+                    }
 					res.add(subMap);
 				}
 			}
@@ -750,4 +757,19 @@ public class ApiController {
 			@RequestParam(required = false) boolean nightly, @RequestParam(required = false) String os) throws IOException {
 		return gson.toJson(pluginsService.getPluginsInfo(os, version, nightly));
 	}
+
+    public static String extractVersionNumber(String version) {
+        if (Algorithms.isEmpty(version)) {
+            return "";
+        }
+        version = version.replaceAll("\\D+", ".");
+        String[] parts = version.split("\\.");
+        List<String> versionNumbers = new ArrayList<>();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                versionNumbers.add(part);
+            }
+        }
+        return String.join(".", versionNumbers);
+    }
 }
