@@ -29,8 +29,8 @@ if INPUT_PATTERN:
         raise ValueError(f"INPUT_PATTERN '{INPUT_PATTERN}' is not a valid file/directory pattern: {e}")
 
 print(f"LLM: {MODEL}, INPUT_DIR: {INPUT_DIR}, INPUT_PATTERN: {INPUT_PATTERN}, LANG: {LANG}, FORCE_TRANSLATION: {FORCE_TRANSLATION}", flush=True)
-if not all([MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
-    raise ValueError("Missing required environment variables (MODEL, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
+if not all([API_KEY, INPUT_DIR, WEB_SERVER_CONFIG_PATH]):
+    raise ValueError("Missing required environment variables (API_KEY, INPUT_DIR, WEB_SERVER_CONFIG_PATH)")
 if INPUT_PATTERN and not (INPUT_PATTERN.endswith('.json') or '.md' in INPUT_PATTERN):
     raise ValueError("Incorrect INPUT_PATTERN variable. Should be a glob pattern for '*.json' or '*.md*' files.")
 
@@ -149,12 +149,15 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
         indent_match = re.search(r"^([ \t]+)\w", inner_cfg, re.MULTILINE)
         indent = indent_match.group(1) if indent_match else "  "
 
-        # Extract existing locale lines into dict code->label
-        existing_pairs = re.findall(r"^\s*([\w-]+)\s*:\s*\{\s*label\s*:\s*['\"]([^'\"]+)['\"]\s*}\s*,?", inner_cfg, re.MULTILINE)
-        locale_dict = {code: label for code, label in existing_pairs}
+        # Extract existing locale lines into dict code->full_config
+        # Capture everything after ':' up to the closing '}' (on the same line), including optional trailing comma
+        # Example match: ar: { label: 'العربية', direction: 'rtl', htmlLang: 'ar' },
+        existing_pairs = re.findall(r"^\s*([\w-]+)\s*:\s*({[^}]*}\s*,?)", inner_cfg, re.MULTILINE)
+        # Store the full object without a trailing comma so we can re-render consistently
+        locale_dict = {langCode: cfg.strip().rstrip(',').strip() for langCode, cfg in existing_pairs}
 
         # Add new locale
-        locale_dict.setdefault(lang_code, native_label)
+        locale_dict.setdefault(lang_code, f"{{ label: '{native_label}' }}")
 
         # Build sorted lines
         sorted_codes = sorted(locale_dict.keys())
@@ -162,9 +165,9 @@ def init_i18n(lang_code: str, i18n_lang_dir: Path):
             sorted_codes.remove('en')
             sorted_codes.insert(0, 'en')
 
-        cfg_lines = [f"{indent}{code}: {{ label: '{locale_dict[code]}' }}," for code in sorted_codes]
+        cfg_lines = [f"{indent}{code}: {locale_dict[code]}," for code in sorted_codes]
 
-        new_inner_cfg = "\n".join(cfg_lines) + "\n"
+        new_inner_cfg = "\n".join(cfg_lines).strip() + "\n"
 
         content = configs_pattern.sub(f"{g1}{new_inner_cfg}{g3}", content, count=1)
         updated = True
@@ -316,15 +319,19 @@ def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
 
 
 def save_dest(path, response, imports, digest_now):
-    if path.suffix == ".json":
-        json_response = json.loads(response)
-        json_response["sourceHash"] = {"message": digest_now}
-        response = json.dumps(json_response, indent=2, ensure_ascii=False)
-    else:
-        if not response.startswith('---'):
-            response = f"---\n\n---\n{response}"
-        line_break = '' if response.startswith('\n') else '\n'
-        response = f"---\nsource-hash: {digest_now}{line_break}{response[4:]}"
+    try:
+        if path.suffix == ".json":
+            json_response = json.loads(response)
+            json_response["sourceHash"] = {"message": digest_now}
+            response = json.dumps(json_response, indent=2, ensure_ascii=False)
+        else:
+            if not response.startswith('---'):
+                response = f"---\n\n---\n{response}"
+            line_break = '' if response.startswith('\n') else '\n'
+            response = f"---\nsource-hash: {digest_now}{line_break}{response[4:]}"
+    except json.decoder.JSONDecodeError:
+        print(f"JSON decode error: {response}")
+        raise
 
     response = reinsert_imports(response, imports)
     with open(path, 'w', encoding='utf-8') as f:
@@ -368,9 +375,14 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         content, imports = pull_imports(src_path)  # separate content and imports
 
-        response = llm.ask(prompt, content, 1024 + len(content), 0.0 if dest_dir.suffix == '.json' else -1.0)
-        if '```json' in response:
-            response = re.sub(r'^```(?:json)?\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
+        safe_max_tokens = max(512, len(content)) + 1024
+        temperature = 0.0 if src_path.suffix == '.json' else 0.1
+        print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
+
+        response = llm.ask(prompt, content, safe_max_tokens, temperature)
+        if response.startswith('```'):
+            # Strip surrounding fenced code block with any language tag (e.g., ```json, ```uk, etc.)
+            response = re.sub(r'^```[A-Za-z0-9_-]*\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
 
         save_dest(dest_path, response, imports, digest_now)
 

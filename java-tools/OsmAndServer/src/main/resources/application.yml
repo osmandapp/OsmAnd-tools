@@ -87,9 +87,9 @@ spring:
       enabled: true
   jpa:
     properties.hibernate:
-		dialect: org.hibernate.dialect.PostgreSQLDialect
-		lob.non_contextual_creation: true
-		physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+      dialect: org.hibernate.dialect.PostgreSQLDialect
+      lob.non_contextual_creation: true
+      physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
     hibernate.ddl-auto: update
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/osmanddb}
@@ -109,8 +109,8 @@ spring:
     username: ${OSM_GPX_DB_USER:}
     password: ${OSM_GPX_DB_PWD:}
   searchtestdatasource:
-	url:
-	driverClassname:
+    url:
+    driverClassname:
   monitordatasource:
     url:
     username:
