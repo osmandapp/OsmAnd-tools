@@ -201,7 +201,7 @@ public class UserdataController {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
 		if (pu != null) {
-			if (Boolean.FALSE.equals(login)) {
+			if (!Boolean.TRUE.equals(login)) {
 				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
 			}
 			// don't check order id validity for login
