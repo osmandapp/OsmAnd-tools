@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -31,11 +32,19 @@ import java.util.concurrent.CompletableFuture;
 public class SearchTestController {
 
 	@Autowired
+	private SearchTestRepositoryConfiguration dbCfg;
+	@Autowired
 	private SearchTestService testSearchService;
 
 	@GetMapping
 	public String index(Model model) throws IOException {
 		return "admin/search-test";
+	}
+
+	@GetMapping(value = "/memory", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Boolean> isMemory() {
+		return ResponseEntity.ok(!dbCfg.isPersisted());
 	}
 
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)
