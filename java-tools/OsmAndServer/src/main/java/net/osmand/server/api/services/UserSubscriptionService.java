@@ -30,6 +30,7 @@ import net.osmand.purchases.HuaweiIAPHelper.HuaweiSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.util.Algorithms;
+import org.springframework.transaction.annotation.Transactional;
 
 import static net.osmand.purchases.PurchaseHelper.PLATFORM_KEY;
 import static net.osmand.server.api.services.OrderManagementService.MANUALLY_VALIDATED;
@@ -419,6 +420,30 @@ public class UserSubscriptionService {
 			return true;
 		}
 		return false;
+	}
+
+	@Transactional
+	public void relinkPurchasesToNewAccount(CloudUsersRepository.CloudUser previousUser, int newUserId) {
+		List<SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(previousUser.id);
+		for (SupporterDeviceSubscription s : subscriptionList) {
+			s.userId = newUserId;
+			subscriptionsRepo.saveAndFlush(s);
+		}
+		if (!subscriptionList.isEmpty()) {
+			LOG.info("Relinked " + subscriptionList.size() + " subscriptions from user " + previousUser.id + " to userId " + newUserId);
+		}
+		List<SupporterDeviceInAppPurchase> iapList = inAppPurchasesRepo.findByUserId(previousUser.id);
+		for (SupporterDeviceInAppPurchase iap : iapList) {
+			iap.userId = newUserId;
+			inAppPurchasesRepo.saveAndFlush(iap);
+		}
+		if (!iapList.isEmpty()) {
+			LOG.info("Relinked " + iapList.size() + " in-app purchases from user " + previousUser.id + " to userId " + newUserId);
+		}
+
+		previousUser.orderid = null;
+		usersRepository.saveAndFlush(previousUser);
+		LOG.info("Cleared orderId for previous user " + previousUser.id);
 	}
 
 	@NotNull
