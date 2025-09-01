@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
 
@@ -43,11 +42,10 @@ import java.util.Map;
 public class SearchTestRepositoryConfiguration {
     protected static final Log LOG = LogFactory.getLog(SearchTestRepositoryConfiguration.class);
 
-    private static final String SQLITE_SHARED_MEM_URL = "jdbc:sqlite:file:searchtest?mode=memory&cache=shared";
-    private Connection memoryKeeperConnection = null;
+    private boolean initialized = false;
 
-    public boolean isPersisted() {
-        return memoryKeeperConnection == null;
+    public boolean isInitialized() {
+        return initialized;
     }
 
     @Bean
@@ -59,35 +57,24 @@ public class SearchTestRepositoryConfiguration {
     @Bean(name = "searchTestDataSource")
     public DataSource searchTestDataSource() {
         try {
-            return searchTestDataSourceProperties().initializeDataSourceBuilder().build();
+            DataSource ds = searchTestDataSourceProperties().initializeDataSourceBuilder().build();
+            initialized = true;
+            return ds;
         } catch (Exception e) {
             LOG.warn("WARN - Search-test database not configured to be persisted: " + e.getMessage());
         }
-        return memorySqliteDataSource();
+        return emptySqliteDataSource();
     }
 
     /**
-     * Attempts to create a minimal in-memory SQLite DataSource via DriverManager.
-     * Returns null if the SQLite JDBC driver is not present.
+     * Attempts to create an empty datasource.
      */
-    private synchronized DataSource memorySqliteDataSource() {
-        if (memoryKeeperConnection == null) {
-            try {
-                // Ensure driver is available; if not, bail out to keep startup safe
-                Class.forName("org.sqlite.JDBC");
-                // Open and keep a persistent connection to a shared in-memory DB
-                memoryKeeperConnection = DriverManager.getConnection(SQLITE_SHARED_MEM_URL);
-            } catch (Exception ex) {
-                LOG.info("SQLite JDBC driver not found on classpath; skipping dummy in-memory SQLite fallback.");
-                return null;
-            }
-        }
-
+    private synchronized DataSource emptySqliteDataSource() {
         return new AbstractDataSource() {
             @Override
             public Connection getConnection() throws SQLException {
                 // Return a new connection to the same shared in-memory DB
-                return DriverManager.getConnection(SQLITE_SHARED_MEM_URL);
+                return null;
             }
 
             @Override
@@ -116,13 +103,14 @@ public class SearchTestRepositoryConfiguration {
         );
         // Force SQLite dialect for this EMF
         vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
-        if (!isPersisted()) {
+        if (!isInitialized()) {
             // In-memory SQLite: let Hibernate create and drop schema automatically
-            vendorProps.put("hibernate.hbm2ddl.auto", "create-drop");
+            vendorProps.put("hibernate.hbm2ddl.auto", "none");
             // Allow JDBC metadata access so Hibernate can determine capabilities for DDL
             vendorProps.put("hibernate.boot.allow_jdbc_metadata_access", "true");
             // Some drivers misbehave with auto-commit toggles; hint Hibernate that provider may disable it
             vendorProps.putIfAbsent("hibernate.connection.provider_disables_autocommit", "true");
+            vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
         }
 
         return builder

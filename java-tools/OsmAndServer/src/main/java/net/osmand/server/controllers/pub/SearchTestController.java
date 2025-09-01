@@ -41,10 +41,10 @@ public class SearchTestController {
 		return "admin/search-test";
 	}
 
-	@GetMapping(value = "/memory", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/init", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Boolean> isMemory() {
-		return ResponseEntity.ok(!dbCfg.isPersisted());
+	public ResponseEntity<Boolean> isInitialized() {
+		return ResponseEntity.ok(dbCfg.isInitialized());
 	}
 
 	@GetMapping(value = "/datasets/{datasetId}/cases", produces = MediaType.APPLICATION_JSON_VALUE)
