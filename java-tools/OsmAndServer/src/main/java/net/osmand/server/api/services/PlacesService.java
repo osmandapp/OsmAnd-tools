@@ -137,6 +137,7 @@ public class PlacesService {
 				asyncCtx.complete();
 			} catch (Exception e) {
 				LOGGER.error("Error processing places: " + e.getMessage());
+				LOGGER.warn(e);
 			}
 		});
 	}
