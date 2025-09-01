@@ -76,6 +76,7 @@ download() {
 
     sleep $SLEEP_BEFORE_CURL
 
+    set +e
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
         HTTP_CODE=$(curl -k -L -w "%{http_code}" "$URL" --output "$INTERMEDIATE" --http1.1)
@@ -83,6 +84,7 @@ download() {
         # download part file by byte offset
         HTTP_CODE=$(curl -k -L -w "%{http_code}" --range $START_BYTE_OFFSET-$END_BYTE_OFFSET "$URL" --output "$INTERMEDIATE" --http1.1)
     fi
+    set -e
 
     if [ "$HTTP_CODE" = "200" -o "$HTTP_CODE" = "206" ]; then
       mv -vf "$INTERMEDIATE" "$FILENAME"
@@ -355,7 +357,10 @@ find_latest_ecmwf_forecat_date() {
         # https://data.ecmwf.int/forecasts/20220909/00z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.index
         # https://data.ecmwf.int/forecasts/20220909/12z/ifs/0p4-beta/oper/20220909000000-0h-oper-fc.index
         local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/ifs/0p25/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
+
+        set +e
         local HEAD_RESPONSE=$(curl -s -I -L $CHECKING_FILE_URL | head -1)
+        set -e
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
             FORECAST_DATE=$SEARCHING_DATE
@@ -399,7 +404,10 @@ get_raw_ecmwf_files() {
     local FORECAST_RND_TIME=$2 # 00 or 12
 
     local BASE_URL="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/ifs/0p25/oper/"
+
+    set +e
     local FILE_ARRAY=($(curl -s $BASE_URL | grep -o '>[^<]*</a>' | sed -e 's/^>//' -e 's/<\/a>$//' | grep -v -E '^\.|/$'))
+    set -e
 
     # Download forecast files
     local MAX_FORECAST_HOURS=240
