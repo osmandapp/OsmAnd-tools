@@ -139,7 +139,7 @@ public class WikiService {
 			URL url = new URL(urlStr);
 			connection = (HttpURLConnection) url.openConnection();
 			connection.setRequestMethod("GET");
-			connection.setRequestProperty("User-Agent", "OsmAnd Java Server");
+			connection.setRequestProperty("User-Agent", "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0");
 			
 			int responseCode = connection.getResponseCode();
 			String rawData;
