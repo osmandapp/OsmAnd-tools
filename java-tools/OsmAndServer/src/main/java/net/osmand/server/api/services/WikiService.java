@@ -208,7 +208,7 @@ public class WikiService {
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
 
-		if (!showAll && !filters.isEmpty()) {
+		if (!showAll && !topics.isEmpty()) {
 			filterQuery = " AND w.topic IN (" + String.join(", ", Collections.nCopies(topics.size(), "?")) + ") ";
 			filterParams.addAll(topics);
 		}
