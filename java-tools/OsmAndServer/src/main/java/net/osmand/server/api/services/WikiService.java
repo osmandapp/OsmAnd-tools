@@ -5,6 +5,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
@@ -58,6 +59,8 @@ public class WikiService {
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
 	private static final String SIMILARITY_CF = "0.975";
+
+	private static final Pattern DIGITS = Pattern.compile("\\d+");
 
 
 	private final Map<String, String> licenseMap = new HashMap<>();
@@ -199,18 +202,15 @@ public class WikiService {
 	}
 
 	public FeatureCollection getWikidataData(String northWest, String southEast, String lang, Set<String> filters, Integer zoom) {
-		// SpringBoot converts filters="" to 1-element Set.of(""), so treat it in a special way
-		if (filters.size() == 1 && filters.contains("")) {
-			filters = Set.of("0");
-		}
+		List<Integer> topics = prepareTopics(filters);
+		boolean showAll = topics.contains(0);
 
-		boolean showAll = filters.contains("0");
 		String filterQuery = "";
 		List<Object> filterParams = new ArrayList<>();
 
 		if (!showAll && !filters.isEmpty()) {
-			filterQuery = "AND w.topic IN (" + filters.stream().map(f -> "?").collect(Collectors.joining(", ")) + ")";
-			filterParams.addAll(filters);
+			filterQuery = " AND w.topic IN (" + String.join(", ", Collections.nCopies(topics.size(), "?")) + ") ";
+			filterParams.addAll(topics);
 		}
 
 		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast);
@@ -220,6 +220,20 @@ public class WikiService {
 		String query = buildWikidataQuery(langPriority, showAll, filterQuery, z);
 
 		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", langPriority);
+	}
+
+	private List<Integer> prepareTopics(Set<String> filters) {
+		// if contains 0 or only empty string - show all
+		if (filters.contains("0") || (filters.size() == 1 && filters.contains(""))) {
+			return List.of(0);
+		}
+
+		return filters.stream()
+				.filter(Objects::nonNull)
+				.map(String::trim)
+				.filter(s -> DIGITS.matcher(s).matches())
+				.map(Integer::valueOf)
+				.toList();
 	}
 
 	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery, int zoom) {
@@ -246,7 +260,7 @@ public class WikiService {
 				"FROM " + table + " AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
-				"ORDER BY w.elo DESC, w.qrank DESC " +
+				" ORDER BY w.elo DESC, w.qrank DESC " +
 				"LIMIT " + LIMIT_OBJS_QUERY;
 	}
 
