@@ -532,13 +532,15 @@ public class UserdataService {
         }
         pu.tokenTime = null;
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
-        CloudUserDevicesRepository.CloudUserDevice sameDevice;
-	    if (Algorithms.isEmpty(deviceId)) {
+	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
 	    } else {
-		    while ((sameDevice = devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id,
-				    deviceId)) != null) {
-			    LOG.error("device-register: call delete-same-device (" + email + ")");
+		    CloudUserDevicesRepository.CloudUserDevice sameDevice;
+		    while ((sameDevice = devicesRepository
+				    .findTopByUseridAndDeviceidAndModelOrderByUdpatetimeDesc(pu.id, deviceId, model)) != null) {
+				LOG.error(String.format(
+						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
+						email, sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
 		    }
 	    }
