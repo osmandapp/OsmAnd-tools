@@ -40,9 +40,9 @@ public class SvgMapLegendGenerator {
 	}
 
 	private static String getStylePath(String styleName, String repositoriesPath) {
-		String[] allStylesNames = new String[] { "default", "desert", "LightRS", "mapnik", "nautical", "offroad",
+		String[] allStylesNames = new String[]{"default", "desert", "LightRS", "mapnik", "nautical", "offroad",
 				"osm-carto", "regions", "skimap", "snowmobile", "standalone-template", "Topo-map-assimilation", "topo",
-				"Touring-view_(more-contrast-and-details)", "UniRS", "weather.addon" };
+				"Touring-view_(more-contrast-and-details)", "UniRS", "weather.addon"};
 		if (Algorithms.isEmpty(styleName) || !Arrays.asList(allStylesNames).contains(styleName)) {
 			styleName = "default";
 		}
@@ -72,6 +72,9 @@ public class SvgMapLegendGenerator {
 			String path = getStylePath(rendererStyle, repositoriesPath);
 			RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(path);
 			for (GroupDTO group : configGroups) {
+				if (group.spriteSheet) {
+					continue;
+				}
 				for (IconDTO icon : group.icons) {
 					Map<String, String> dayStyle = getAmenityIconStyle(icon.tag,
 							icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
@@ -141,7 +144,7 @@ public class SvgMapLegendGenerator {
 	}
 
 	public static Map<String, String> getAmenityIconStyle(String tag, String value, String tag2, String value2,
-			boolean nightMode, int zoom, RenderingRulesStorage storage) throws XmlPullParserException, IOException {
+	                                                      boolean nightMode, int zoom, RenderingRulesStorage storage) throws XmlPullParserException, IOException {
 
 		RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
 
@@ -176,12 +179,14 @@ public class SvgMapLegendGenerator {
 	private static class GroupDTO {
 		String groupName = "";
 		String folderName = "";
+		boolean spriteSheet = false;
 		ArrayList<IconDTO> icons = new ArrayList<IconDTO>();
 	}
 
 	private static class IconDTO {
 		public String iconTargetFileName;
 		String name = null;
+		String id = null;
 		String tag = null;
 		String value = null;
 		String tag2 = null;
@@ -225,7 +230,14 @@ public class SvgMapLegendGenerator {
 					String name = parser.getName();
 					if (name.equals("group")) {
 						tempGroup.groupName = parser.getAttributeValue("", "name");
-						tempGroup.folderName = parser.getAttributeValue("", "foldername");
+						String foldername = parser.getAttributeValue("", "foldername");
+						if (foldername == null) {
+							foldername = parser.getAttributeValue("", "sprite");
+							if (foldername != null) {
+								tempGroup.spriteSheet = true;
+							}
+						}
+						tempGroup.folderName = foldername;
 
 						if (Algorithms.isEmpty(tempGroup.groupName) || Algorithms.isEmpty(tempGroup.folderName)) {
 							throw new Exception("ERROR: parseXmlConfig() - group fields invalid at map-legend.xml line "
@@ -233,30 +245,38 @@ public class SvgMapLegendGenerator {
 						}
 					} else if (name.equals("icon")) {
 						tempIcon.name = parser.getAttributeValue("", "name");
-						tempIcon.tag = parser.getAttributeValue("", "tag");
-						tempIcon.value = parser.getAttributeValue("", "value");
-						tempIcon.tag2 = parser.getAttributeValue("", "tag2");
-						tempIcon.value2 = parser.getAttributeValue("", "value2");
+						if (tempGroup.spriteSheet) {
+							tempIcon.id = parser.getAttributeValue("", "id");
+							if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.id)) {
+								throw new Exception("ERROR: parseXmlConfig() - icon fields invalid at map-legend.xml line "
+										+ parser.getLineNumber());
+							}
+						} else {
+							tempIcon.tag = parser.getAttributeValue("", "tag");
+							tempIcon.value = parser.getAttributeValue("", "value");
+							tempIcon.tag2 = parser.getAttributeValue("", "tag2");
+							tempIcon.value2 = parser.getAttributeValue("", "value2");
 
-						String numberString = parser.getAttributeValue("", "icon_size");
-						if (!Algorithms.isEmpty(numberString)) {
-							tempIcon.iconSize = Integer.parseInt(numberString);
-						}
+							String numberString = parser.getAttributeValue("", "icon_size");
+							if (!Algorithms.isEmpty(numberString)) {
+								tempIcon.iconSize = Integer.parseInt(numberString);
+							}
 
-						numberString = parser.getAttributeValue("", "shield_size");
-						if (!Algorithms.isEmpty(numberString)) {
-							tempIcon.shieldSize = Integer.parseInt(numberString);
-						}
+							numberString = parser.getAttributeValue("", "shield_size");
+							if (!Algorithms.isEmpty(numberString)) {
+								tempIcon.shieldSize = Integer.parseInt(numberString);
+							}
 
-						numberString = parser.getAttributeValue("", "zoom");
-						if (!Algorithms.isEmpty(numberString)) {
-							tempIcon.zoom = Integer.parseInt(numberString);
-						}
+							numberString = parser.getAttributeValue("", "zoom");
+							if (!Algorithms.isEmpty(numberString)) {
+								tempIcon.zoom = Integer.parseInt(numberString);
+							}
 
-						if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.tag)
-								|| Algorithms.isEmpty(tempIcon.value)) {
-							throw new Exception("ERROR: parseXmlConfig() - icon fields invalid at map-legend.xml line "
-									+ parser.getLineNumber());
+							if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.tag)
+									|| Algorithms.isEmpty(tempIcon.value)) {
+								throw new Exception("ERROR: parseXmlConfig() - icon fields invalid at map-legend.xml line "
+										+ parser.getLineNumber());
+							}
 						}
 					}
 				}
@@ -271,7 +291,7 @@ public class SvgMapLegendGenerator {
 	private static class SvgGenerator {
 
 		public static String generate(String iconName, int iconSize, String shieldName, int shieldSize,
-				String backgroundColor, float backgroundOpacity) throws Exception {
+		                              String backgroundColor, float backgroundOpacity) throws Exception {
 
 			String additionalIconHeaderTags = getSvgIconAdditionalHeaderTags(iconName);
 			String content = String.format(
@@ -290,11 +310,11 @@ public class SvgMapLegendGenerator {
 			content += "</svg>";
 			return content;
 		}
-		
+
 		private static String getIconPath(String iconName) throws Exception {
 			String basePath = System.getenv("repo_dir") + "/resources/rendering_styles/style-icons/map-icons-svg/";
 			String filePath = basePath + "mx_" + iconName + ".svg";
-			
+
 			File file = new File(filePath);
 			if (file.exists()) {
 				return filePath;
@@ -413,7 +433,7 @@ public class SvgMapLegendGenerator {
 				throw new Exception("ERROR: getSvgInnerContent() failed to process file " + filePath);
 			}
 		}
-		
+
 		/**
 		 * Using viewBox for scaling calculations instead of the width and height attributes
 		 * ensures that the SVG content is scaled based on its intended visual representation. This approach
@@ -428,12 +448,12 @@ public class SvgMapLegendGenerator {
 			String resultContent = String.format(Locale.US, "%n<g transform=\"translate(%f, %f) scale(%f %f) \"> %n",
 					xOffset, yOffset, rescalingRatio, rescalingRatio);
 			resultContent += svg.content + "</g>%n%n";
-			
+
 			return resultContent;
 		}
 
 		public static void createSvgFile(GroupDTO group, IconDTO icon, String content, boolean isDay,
-				String resultIconsFolderPath) throws Exception {
+		                                 String resultIconsFolderPath) throws Exception {
 			String postfix = isDay ? "_day.svg" : "_night.svg";
 			String path = resultIconsFolderPath + group.folderName + "/" + group.folderName + "_" + icon.iconTargetFileName
 					+ postfix;
@@ -458,7 +478,12 @@ public class SvgMapLegendGenerator {
 	private static class ReactComponentsGenerator {
 		public static void generate(ArrayList<GroupDTO> groups) throws Exception {
 			for (GroupDTO group : groups) {
-				StringBuilder content = createGroupContent(group);
+				StringBuilder content;
+				if (group.spriteSheet) {
+					content = createSpriteSheetGroupContent(group);
+				} else {
+					content = createGroupContent(group);
+				}
 				String CapitalisedName = group.folderName.substring(0, 1).toUpperCase() + group.folderName.substring(1);
 				String path = System.getenv("repo_dir")
 						+ "/web/main/src/components/docs/autogenerated/LegendItemAutogenerated" + CapitalisedName
@@ -472,6 +497,32 @@ public class SvgMapLegendGenerator {
 					throw new Exception("ERROR: HtmlGenerator - file saving error for " + path);
 				}
 			}
+		}
+
+		private static @NotNull StringBuilder createSpriteSheetGroupContent(GroupDTO group) {
+			int height = 70 + (group.icons.size() + 2) / 3 * 111;
+			String svgPath = group.folderName;
+			StringBuilder content = new StringBuilder("""
+					import LegendItem from "../LegendItemWithProcessing";
+					
+					
+					// This code was automatically generated\s
+					// with Java-tools SvgMapLegendGenerator
+					
+					export default function Render() {
+					  return LegendItemWithProcessing({
+					    svgPath: '/img/map-legend/osmand-%s',
+					    height: %d,
+					    svgParts: {
+					""".formatted(svgPath, height));
+			for (IconDTO icon : group.icons) {
+				content.append(String.format("      '%s' : '%s',\n", icon.id, icon.name));
+			}
+			content.append("""
+					    }});
+					}
+					""");
+			return content;
 		}
 
 		private static @NotNull StringBuilder createGroupContent(GroupDTO group) {
@@ -496,5 +547,4 @@ public class SvgMapLegendGenerator {
 			return content;
 		}
 	}
-
 }
