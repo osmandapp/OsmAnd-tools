@@ -10,6 +10,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
@@ -389,7 +390,7 @@ public class IndexRouteRelationCreator {
 
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
-				if ("yes".equals(way.getTag("area"))) {
+				if ("yes".equals(way.getTag(OSMTagKey.AREA))) {
 					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
 				waysToJoin.add(way);

@@ -10,6 +10,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -364,7 +365,7 @@ public class RouteRelationExtractor {
 		for (Map.Entry<EntityId, Entity> entry : children.entrySet()) {
 			if (entry.getKey().getType() == Entity.EntityType.WAY) {
 				Way way = (Way) entry.getValue();
-				if ("yes".equals(way.getTag("area"))) {
+				if ("yes".equals(way.getTag(OSMTagKey.AREA))) {
 					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
 				waysToJoin.add(way);
