@@ -551,7 +551,13 @@ public class WikiService {
 	}
 	
 	private String createImageUrl(String imageTitle) {
-		String[] hash = getHash(URLDecoder.decode(imageTitle, StandardCharsets.UTF_8));
+		try {
+			imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
+		} catch (IllegalArgumentException e) {
+			log.warn("imageTitle decode failed: " + imageTitle, e);
+		}
+		String[] hash = getHash(imageTitle);
+		imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
 		if (FILE_URL_TO_USE == 0) {
 			return WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + imageTitle;
 		} else if (FILE_URL_TO_USE == 1) {
