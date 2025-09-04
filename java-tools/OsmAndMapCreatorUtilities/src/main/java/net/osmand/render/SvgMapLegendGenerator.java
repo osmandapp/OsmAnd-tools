@@ -1,9 +1,6 @@
 package net.osmand.render;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -25,6 +22,8 @@ public class SvgMapLegendGenerator {
 
 	public static final String LEGEND_COMPONENT_MAP_JS = "/web/main/src/components/docs/legend/componentMap.js";
 	public static final String LEGEND_LEGEND_SECTIONS_JS = "/web/main/src/components/docs/legend/legendSections.js";
+	public static final String WEB_DESTINATION_SPRITES_DIR = "/web/main/static/img/map-legend/";
+	public static final String RES_SOURCES_SPRITES_DIR = "/resources/rendering_styles/map-legend/sprites";
 	static int defaultZoomLevel = 19; // Most of the icons on this zoom are visible
 	static int canvasWidth = 300;
 	static int canvasHeight = 40;
@@ -98,13 +97,13 @@ public class SvgMapLegendGenerator {
 
 			// 3 Generate SVG files
 			for (GroupDTO group : configGroups) {
-				String resultIconsFolderPath = System.getenv("repo_dir") + "/web/main/static/img/legend/osmand/";
 				if (group.spriteSheet) {
-					//TODO  copy sprite file
+					copySpritesToWebFolder(repositoriesPath, group);
 					continue;
 				}
 
 				// Create directory is it needed. Clean files inside.
+				String resultIconsFolderPath = repositoriesPath + "/web/main/static/img/legend/osmand/";
 				String resultFolderPath = resultIconsFolderPath + group.folderName;
 				try {
 					Files.createDirectories(Paths.get(resultFolderPath));
@@ -137,6 +136,26 @@ public class SvgMapLegendGenerator {
 			System.out.println("SUCCESS: SvgMapLegendGenerator - script finished successful!");
 		} catch (Exception e) {
 			throw new Exception("FATAL ERROR: SvgMapLegendGenerator - script failed with error:", e);
+		}
+	}
+
+	private static void copySpritesToWebFolder(String repositoriesPath, GroupDTO group) throws Exception {
+		String fileNameDay = "osmand-" + group.folderName + "-day.svg";
+		String fileNameNight = "osmand-" + group.folderName + "-night.svg";
+		String destDir = repositoriesPath + WEB_DESTINATION_SPRITES_DIR;
+		File destSprite = new File(destDir, fileNameDay);
+		String sourceDir = repositoriesPath + RES_SOURCES_SPRITES_DIR;
+		File sourceSprite = new File(sourceDir, fileNameDay);
+		try {
+			FileUtils.copyFile(sourceSprite, destSprite);
+			destSprite = new File(destDir, fileNameNight);
+			File sourceSpriteNight = new File(sourceDir, fileNameNight);
+			if (sourceSpriteNight.exists()) {
+				sourceSprite = sourceSpriteNight;
+			}
+			FileUtils.copyFile(sourceSprite, destSprite);
+		} catch (IOException e) {
+			throw new Exception("ERROR: SvgMapLegendGenerator - file not found: " + sourceSprite, e);
 		}
 	}
 
