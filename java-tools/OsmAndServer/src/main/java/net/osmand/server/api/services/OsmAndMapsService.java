@@ -545,12 +545,19 @@ public class OsmAndMapsService {
 		return routingConfig;
 	}
 
-	public synchronized boolean validateAndInitConfig() throws IOException {
+    public synchronized boolean validateAndInitConfig() throws IOException {
+        return validateAndInitConfig(true);
+    }
+
+	public synchronized boolean validateAndInitConfig(boolean initLibrary) throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
 			if (osmandRegions == null) {
 				osmandRegions = new OsmandRegions();
 				osmandRegions.prepareFile();
 			}
+            if (!initLibrary) {
+                return true;
+            }
 			if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
 				tileConfig.initErrorMessage = "Files location is not specified";
 			} else {
@@ -1237,7 +1244,11 @@ public class OsmAndMapsService {
 				files.add(ref);
 			}
 		}
-		LOGGER.info(String.format("Preparing %d files for %s", files.size(), reason));
+        StringBuilder fileNames = new StringBuilder();
+        for (BinaryMapIndexReaderReference r : files) {
+            fileNames.append(r.fileIndex.getFileName()).append(" ");
+        }
+		LOGGER.info(String.format("Preparing %d files for %s [%s]", files.size(), reason, fileNames.toString()));
 		return files;
 	}
 

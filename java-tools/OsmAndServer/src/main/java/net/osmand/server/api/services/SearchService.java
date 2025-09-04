@@ -31,14 +31,14 @@ import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Service
 public class SearchService {
-    
+
     @Autowired
     OsmAndMapsService osmAndMapsService;
-    
+
     OsmandRegions osmandRegions;
-    
+
     private ConcurrentHashMap<String, Map<String, String>> translationsCache;
-    
+
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 2000;
@@ -47,32 +47,32 @@ public class SearchService {
 
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
-    
+
     private static final int DUPLICATE_SPLIT = 5;
     public static final long RELATION_BIT = 1L << ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
     public static final long SPLIT_BIT = 1L << ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
-    
+
     private static final String DELIMITER = " ";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
     public static class PoiSearchResult {
-        
+
         public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound, FeatureCollection features) {
             this.useLimit = useLimit;
             this.mapLimitExceeded = mapLimitExceeded;
             this.alreadyFound = alreadyFound;
             this.features = features;
         }
-        
+
         public boolean useLimit;
         public boolean mapLimitExceeded;
         public boolean alreadyFound;
         public FeatureCollection features;
     }
-    
+
     public static class PoiSearchData {
-        
+
         public PoiSearchData(List<String> categories,
                              Map<String, String> categoriesLang,
                              String northWest,
@@ -94,7 +94,7 @@ public class SearchService {
                 this.prevSearchCategory = prevSearchCategory;
             }
         }
-        
+
         public List<String> categories;
         public Map<String, String> categoriesLang;
         public List<LatLon> bbox;
@@ -102,7 +102,7 @@ public class SearchService {
         public int prevCategoriesCount;
         public String prevSearchRes;
         public String prevSearchCategory;
-        
+
         private static List<LatLon> getBboxCoords(List<String> coords) {
             List<LatLon> bbox = new ArrayList<>();
             for (String coord : coords) {
@@ -112,7 +112,7 @@ public class SearchService {
             return bbox;
         }
     }
-    
+
     public List<LatLon> getBboxCoords(List<String> coords) {
         List<LatLon> bbox = new ArrayList<>();
         for (String coord : coords) {
@@ -121,15 +121,15 @@ public class SearchService {
         }
         return bbox;
     }
-    
-    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
+
+    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, String version) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig(false)) {
             return Collections.emptyList();
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         searchUICore.getSearchSettings().setRegions(osmandRegions);
-        
+
         QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
@@ -146,11 +146,12 @@ public class SearchService {
             SearchSettings settings = searchUICore.getPhrase().getSettings();
             settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
+            settings.setSearchVersion(SearchSettings.SearchVersion.valueOf(version));
             searchUICore.updateSettings(settings);
-            
+
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-            
+
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
             List<SearchResult> res;
@@ -259,19 +260,19 @@ public class SearchService {
 
         return searchUICore;
     }
-    
+
     public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon loc, boolean baseSearch) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
-        
+
         MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        
+
         SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
         SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
         searchUICore.registerAPI(searchAmenityByTypesAPI);
-        
+
         List<Feature> features = new ArrayList<>();
         int leftoverLimit = 0;
         int limit = TOTAL_LIMIT_POI / data.categories.size();
@@ -283,9 +284,9 @@ public class SearchService {
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
-            
+
             usedMapList = osmAndMapsService.getReaders(mapList, null);
-            
+
             SearchSettings settings = searchUICore.getSearchSettings().setSearchTypes(ObjectType.POI);
             settings = settings.setOriginalLocation(loc);
             settings.setRegions(osmandRegions);
@@ -347,7 +348,7 @@ public class SearchService {
             return null;
         }
     }
-    
+
     public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
         final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0055 : 0.0001; // 3-relation,0.0055-600m,0.0001-11m
         final int mapZoom = 15;
@@ -365,7 +366,7 @@ public class SearchService {
                     public boolean publish(Amenity amenity) {
                         return getOsmObjectId(amenity) == osmid;
                     }
-                    
+
                     @Override
                     public boolean isCancelled() {
                         return false;
@@ -443,13 +444,13 @@ public class SearchService {
         return res;
     }
 
-    
+
     private boolean isContainsBbox(SearchService.PoiSearchData data) {
         QuadRect searchBbox = getSearchBbox(data.bbox);
         QuadRect oldSearchBbox = getSearchBbox(data.savedBbox);
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
-    
+
     private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox, boolean baseSearch) throws IOException {
         OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
         if (baseSearch) {
@@ -474,7 +475,7 @@ public class SearchService {
             return list;
         }
     }
-    
+
     public SearchUICore.SearchResultCollection searchPoiByCategory(SearchUICore searchUICore, String text, int limit) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
@@ -482,7 +483,7 @@ public class SearchService {
         searchUICore.setTotalLimit(limit);
         return searchUICore.immediateSearch(text  + DELIMITER, null);
     }
-    
+
     public SearchUICore.SearchResultCollection searchCitiesByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
@@ -491,24 +492,24 @@ public class SearchService {
         MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
-        
+
         SearchSettings settings = searchUICore.getPhrase().getSettings();
         settings.setRegions(osmandRegions);
         settings.setOfflineIndexes(mapList);
-        
+
         Set<String> types = getAllCityTypeStrings();
         SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
-        
+
         int attempts = 0;
         while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
             searchBbox = doubleBboxSize(searchBbox);
             res = searchWithBbox(searchUICore, settings, searchBbox, types);
             attempts++;
         }
-        
+
         return res;
     }
-    
+
     private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
         SearchUICore.SearchResultCollection res = null;
@@ -523,16 +524,16 @@ public class SearchService {
         }
         return res;
     }
-    
+
     private QuadRect doubleBboxSize(QuadRect bbox) {
         double centerX = (bbox.left + bbox.right) / 2;
         double centerY = (bbox.top + bbox.bottom) / 2;
         double width = bbox.right - bbox.left;
         double height = bbox.bottom - bbox.top;
-        
+
         double newWidth = width * 2;
         double newHeight = height * 2;
-        
+
         return new QuadRect(
                 centerX - newWidth / 2,
                 centerY + newHeight / 2,
@@ -540,22 +541,22 @@ public class SearchService {
                 centerY - newHeight / 2
         );
     }
-    
+
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {
             return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
         }
         return null;
     }
-    
+
     public List<String> getTopFilters() {
         List<String> filters = new ArrayList<>();
         SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
         searchUICore.getPoiTypes().getTopVisibleFilters().forEach(f -> filters.add(f.getKeyName()));
         return filters;
     }
-    
-    
+
+
     public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) {
         Map<String, Map<String, String>> results = new HashMap<>();
         List<SearchResult> categories = searchPoiCategoriesByName(search, locale);
@@ -582,7 +583,7 @@ public class SearchService {
         results.forEach(res -> searchRes.put(res.localeName, getPoiTypeFields(res.object)));
         return searchRes;
     }
-    
+
     public Map<String, List<String>> searchPoiCategories(String locale) {
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         List<PoiCategory> categoriesList = searchUICore.getPoiTypes().getCategories(false);
@@ -593,26 +594,26 @@ public class SearchService {
             List<String> typesNames = new ArrayList<>();
             poiTypes.forEach(type -> typesNames.add(type.getOsmValue()));
             res.put(category, typesNames);
-            
+
         });
         return res;
     }
-    
+
     private Map<String, String> getTranslations(String locale) {
         if (translationsCache == null) {
             translationsCache = new ConcurrentHashMap<>();
         }
-        
+
         return translationsCache.computeIfAbsent(locale, loc -> {
             try {
                 String validLoc = validateLocale(loc);
                 String localPath = validLoc.equals("en") ? "values" : "values-" + validLoc;
-                
+
                 InputStream phrasesStream = this.getClass().getResourceAsStream(AND_RES + localPath + "/phrases.xml");
                 if (phrasesStream == null) {
                     throw new IllegalArgumentException("Locale not found: " + loc);
                 }
-                
+
                 return parseStringsXml(phrasesStream);
             } catch (XmlPullParserException | IOException e) {
                 throw new RuntimeException(e);
@@ -632,18 +633,18 @@ public class SearchService {
             return mapPoiTypes;
         });
     }
-    
+
     private Map<String, String> parseStringsXml(InputStream inputStream) throws XmlPullParserException, IOException {
         Map<String, String> resultMap = new HashMap<>();
-        
+
         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
         XmlPullParser parser = factory.newPullParser();
         parser.setInput(inputStream, "UTF-8");
-        
+
         int eventType = parser.getEventType();
         String key = null;
         String value = null;
-        
+
         while (eventType != XmlPullParser.END_DOCUMENT) {
             String tagName = parser.getName();
             switch (eventType) {
@@ -668,7 +669,7 @@ public class SearchService {
         inputStream.close();
         return resultMap;
     }
-    
+
     private String validateLocale(String locale) {
         if (locale == null || locale.isEmpty()) {
             throw new IllegalArgumentException("Locale cannot be null or empty");
@@ -676,7 +677,7 @@ public class SearchService {
         // Remove potentially dangerous characters such as '/'
         return locale.replaceAll("[/\\\\]", "");
     }
-    
+
     private String getIconName(PoiType poiType) {
         if (poiType != null) {
             if (poiType.getParentType() != null) {
@@ -772,7 +773,7 @@ public class SearchService {
             return fieldName;
         }
     }
-    
+
     private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
         for (SearchResult result : res) {
             Feature feature;
@@ -800,7 +801,7 @@ public class SearchService {
             features.add(feature);
         }
     }
-    
+
     private Feature getPoiFeature(SearchResult result) {
         Amenity amenity = (Amenity) result.object;
         PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
@@ -832,7 +833,7 @@ public class SearchService {
         }
         return feature;
     }
-    
+
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
         if (location != null) {
             List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(location.getLatitude(), location.getLongitude());
@@ -844,7 +845,7 @@ public class SearchService {
         }
         return null;
     }
-    
+
     private String getOsmUrl(SearchResult result) {
         MapObject mapObject = (MapObject) result.object;
         Entity.EntityType type = getOsmEntityType(mapObject);
@@ -854,7 +855,7 @@ public class SearchService {
         }
         return null;
     }
-    
+
     public static long getOsmObjectId(MapObject object) {
         long originalId = -1;
         Long id = object.getId();
@@ -871,7 +872,7 @@ public class SearchService {
         }
         return originalId;
     }
-    
+
     public Entity.EntityType getOsmEntityType(MapObject object) {
         if (isOsmUrlAvailable(object)) {
             Long id = object.getId();
@@ -885,29 +886,29 @@ public class SearchService {
         }
         return null;
     }
-    
+
     public static boolean isOsmUrlAvailable(MapObject object) {
         Long id = object.getId();
         return id != null && id > 0;
     }
-    
+
     public static long getOsmId(long id) {
         long clearBits = RELATION_BIT | SPLIT_BIT;
         id = isShiftedID(id) ? (id & ~clearBits) >> DUPLICATE_SPLIT : id;
         return id >> SHIFT_ID;
     }
-    
+
     public static boolean isShiftedID(long id) {
         return isIdFromRelation(id) || isIdFromSplit(id);
     }
-    
+
     public static boolean isIdFromRelation(long id) {
         return id > 0 && (id & RELATION_BIT) == RELATION_BIT;
     }
-    
+
     public static boolean isIdFromSplit(long id) {
         return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
     }
-    
+
 }
 
