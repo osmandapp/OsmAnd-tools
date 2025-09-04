@@ -597,6 +597,7 @@ public class UserSubscriptionService {
 			info.put(ACCOUNT_KEY, FREE_ACCOUNT);
 			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_FREE_ACCOUNT_SIZE)));
 		} else {
+			info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByOrderId(orderId);
 			if (!subscriptions.isEmpty()) {
 				// get main pro subscription
@@ -618,7 +619,6 @@ public class UserSubscriptionService {
 				} else {
 					info.put(PURCHASE_NAME_KEY, subBaseData.name());
 				}
-				info.put(MAX_ACCOUNT_SIZE, String.valueOf((MAXIMUM_ACCOUNT_SIZE)));
 			}
 		}
 		// get other purchases
