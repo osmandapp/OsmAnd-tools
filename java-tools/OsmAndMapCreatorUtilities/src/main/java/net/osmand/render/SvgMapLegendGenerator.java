@@ -3,22 +3,16 @@ package net.osmand.render;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
@@ -29,6 +23,8 @@ import net.osmand.util.Algorithms;
 
 public class SvgMapLegendGenerator {
 
+	public static final String LEGEND_COMPONENT_MAP_JS = "/web/main/src/components/docs/legend/componentMap.js";
+	public static final String LEGEND_LEGEND_SECTIONS_JS = "/web/main/src/components/docs/legend/legendSections.js";
 	static int defaultZoomLevel = 19; // Most of the icons on this zoom are visible
 	static int canvasWidth = 300;
 	static int canvasHeight = 40;
@@ -90,7 +86,7 @@ public class SvgMapLegendGenerator {
 							icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
 						}
 						icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
-						icon.styleIconSize = Float.valueOf(dayStyle.get("iconSize"));
+						icon.styleIconSize = Float.parseFloat(dayStyle.get("iconSize"));
 					} else {
 						throw new Exception(String.format(
 								"ERROR: SvgMapLegendGenerator - style collecting invalid result for  '%s':'%s'  '%s':'%s'",
@@ -145,7 +141,7 @@ public class SvgMapLegendGenerator {
 	}
 
 	public static Map<String, String> getAmenityIconStyle(String tag, String value, String tag2, String value2,
-	                                                      boolean nightMode, int zoom, RenderingRulesStorage storage) throws XmlPullParserException, IOException {
+	                                                      boolean nightMode, int zoom, RenderingRulesStorage storage) {
 
 		RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
 
@@ -169,7 +165,7 @@ public class SvgMapLegendGenerator {
 
 		searchRequest.search(RenderingRulesStorage.POINT_RULES);
 
-		Map<String, String> result = new HashMap<String, String>();
+		Map<String, String> result = new HashMap<>();
 		result.put("iconName", searchRequest.getStringPropertyValue(searchRequest.ALL.R_ICON));
 		result.put("shieldName", searchRequest.getStringPropertyValue(searchRequest.ALL.R_SHIELD));
 		result.put("iconSize", String.valueOf(searchRequest.getFloatPropertyValue(searchRequest.ALL.R_ICON_VISIBLE_SIZE, -1)));
@@ -181,7 +177,7 @@ public class SvgMapLegendGenerator {
 		String groupName = "";
 		String folderName = "";
 		boolean spriteSheet = false;
-		ArrayList<IconDTO> icons = new ArrayList<IconDTO>();
+		ArrayList<IconDTO> icons = new ArrayList<>();
 	}
 
 	private static class IconDTO {
@@ -213,7 +209,7 @@ public class SvgMapLegendGenerator {
 			parser.setInput(fis, "UTF-8");
 			int next;
 
-			ArrayList<GroupDTO> resultGroups = new ArrayList<GroupDTO>();
+			ArrayList<GroupDTO> resultGroups = new ArrayList<>();
 			GroupDTO tempGroup = new GroupDTO();
 			IconDTO tempIcon = new IconDTO();
 
@@ -396,15 +392,17 @@ public class SvgMapLegendGenerator {
 				svgHeaderContent = svgHeaderContent.replace("\n", " ");
 				svgHeaderContent = svgHeaderContent.replace("  ", " ");
 
-				String filteredAdditionalTags = "";
+				String filteredAdditionalTags;
 				String[] parameters = svgHeaderContent.split("\" ");
+				StringBuilder filteredAdditionalTagsBuilder = new StringBuilder();
 				for (String parameter : parameters) {
 					if (!parameter.contains("width=") && !parameter.contains("height=")
 							&& !parameter.contains("viewBox=") && !parameter.contains("fill=")
 							&& !parameter.contains("xmlns=")) {
-						filteredAdditionalTags += parameter + "\" ";
+						filteredAdditionalTagsBuilder.append(parameter).append("\" ");
 					}
 				}
+				filteredAdditionalTags = filteredAdditionalTagsBuilder.toString();
 
 				filteredAdditionalTags = filteredAdditionalTags.trim();
 				if (filteredAdditionalTags.endsWith("\"\"")) {
@@ -473,7 +471,7 @@ public class SvgMapLegendGenerator {
 
 	private static class ReactComponentsGenerator {
 		public static void generate(ArrayList<GroupDTO> groups) throws Exception {
-			ArrayList<String> componentsName = new ArrayList<>();
+			Map<String, GroupDTO> components = new LinkedHashMap<>();
 			for (GroupDTO group : groups) {
 				StringBuilder content;
 				if (group.spriteSheet) {
@@ -488,16 +486,15 @@ public class SvgMapLegendGenerator {
 					FileWriter writer = new FileWriter(path);
 					writer.write(content.toString());
 					writer.close();
-					componentsName.add(componentName);
+					components.put(componentName, group);
 				} catch (Exception e) {
 					throw new Exception("ERROR: ReactComponentsGenerator - file saving error for " + path, e);
 				}
-				createLegendAndComponentsFiles(componentsName);
+				createLegendAndComponentsFiles(components);
 			}
 		}
 
-
-		private static void createLegendAndComponentsFiles(ArrayList<String> componentsName) throws Exception {
+		private static void createLegendAndComponentsFiles(Map<String, GroupDTO> components) throws Exception {
 			StringBuilder componentMapContent = new StringBuilder("""
 					import React from 'react';
 					
@@ -507,36 +504,45 @@ public class SvgMapLegendGenerator {
 					export const componentMap = {
 					""");
 			StringBuilder legendSectionsContent = new StringBuilder("""
-					import React from 'react';
-					
 					/**
 					 * This code was automatically generated
 					 * with Java-tools SvgMapLegendGenerator
+					 *
 					 * Data for the CONTENT of legend sections.
 					 * Headings are defined directly in the MD file for Docusaurus's Table of Contents.
 					 */
 					
 					export const legendContentData = {
 					""");
-			for (String componentName : componentsName) {
-				componentMapContent.append("  ").append(componentName)
-						.append(": React.lazy(() => import('@site/src/components/docs/autogenerated/")
-						.append(componentName)
-						.append(".js')),\n");
+			for (Map.Entry<String, GroupDTO> component : components.entrySet()) {
+				String componentName = component.getKey();
+				componentMapContent
+						.append("  %s: React.lazy(() => import('@site/src/components/docs/autogenerated/%s.js')),\n"
+								.formatted(componentName, componentName));
+				int height = 70 + (component.getValue().icons.size() + 2) / 3 * 111;
+				String sectionId = component.getValue().folderName;
+				legendSectionsContent
+						.append("  '%s': { component: '%s', height: %d },\n"
+								.formatted(sectionId, componentName, height));
 			}
 			componentMapContent.append("};");
-			String path = System.getenv("repo_dir") + "/web/main/src/components/docs/legend/componentMap.js";
+			legendSectionsContent.append("};");
+			String componentMapPath = System.getenv("repo_dir") + LEGEND_COMPONENT_MAP_JS;
+			String legendSectionsPath = System.getenv("repo_dir") + LEGEND_LEGEND_SECTIONS_JS;
 			try {
-				FileWriter writer = new FileWriter(path);
+				FileWriter writer = new FileWriter(componentMapPath);
 				writer.write(componentMapContent.toString());
 				writer.close();
+				writer = new FileWriter(legendSectionsPath);
+				writer.write(legendSectionsContent.toString());
+				writer.close();
 			} catch (Exception e) {
-				throw new Exception("ERROR: ReactComponentsGenerator - file saving error for " + path, e);
+				throw new Exception("ERROR: createLegendAndComponentsFiles - file saving error ", e);
 			}
 		}
 
 		private static @NotNull StringBuilder createSpriteSheetGroupContent(GroupDTO group) {
-			int height = 70 + (group.icons.size() + 2) / 3 * 111;
+
 			String svgPath = group.folderName;
 			StringBuilder content = new StringBuilder("""
 					import LegendItemWithProcessing from "../LegendItemWithProcessing";
@@ -547,9 +553,8 @@ public class SvgMapLegendGenerator {
 					export default function Render() {
 					  return LegendItemWithProcessing({
 					    svgPath: '/img/map-legend/osmand-%s',
-					    height: %d,
 					    svgParts: {
-					""".formatted(svgPath, height));
+					""".formatted(svgPath));
 			for (IconDTO icon : group.icons) {
 				content.append(String.format("      '%s' : '%s',\n", icon.id, icon.name));
 			}
