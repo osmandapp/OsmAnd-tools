@@ -300,6 +300,10 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
 
+		if ("node_network".equals(commonTags.get("network:type")) && commonTags.containsKey("network")) {
+			mapSectionTags.putIfAbsent("node_network", commonTags.get("network"));
+		}
+
 		if (DEBUG_GENERATE_ROUTE_SEGMENT) {
 			mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
 		}
