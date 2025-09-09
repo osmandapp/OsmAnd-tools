@@ -71,6 +71,8 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX = "net.osmand.maps.subscription.pro";
 	public static final String OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX = "net.osmand.fastspring.subscription.pro";
 
+	private static final String EXPIRED_STATE = "expired";
+
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000L * 60 * 60 * 24;
 	private static final long HOUR = 1000L * 60 * 60;
@@ -311,6 +313,8 @@ public class UpdateSubscription {
 							regTime, startTime, expireTime, currentTime, pms);
 				} else if (subType == SubscriptionType.FASTSPRING) {
 					sub = processFastSpringSubscription(sku, orderId, startTime, expireTime, currentTime, pms);
+				} else if (subType == SubscriptionType.PROMO) {
+					processPromoSubscription(orderId, sku, expireTime, currentTime);
 				}
 				if (sub == null && prevpurchaseToken != null) {
 					exceptionsUpdates.add(new SubscriptionUpdateException(orderId, "This situation need to be checked, we have prev valid purchase token but current token is not valid."));
@@ -330,6 +334,23 @@ public class UpdateSubscription {
 		}
 		if (!conn.getAutoCommit()) {
 			conn.commit();
+		}
+	}
+
+	private void processPromoSubscription(String orderId, String sku, Timestamp expireTime, long currentTime) throws SQLException {
+		if (expireTime != null && currentTime > expireTime.getTime()) {
+			deleteSubscription(orderId, sku, currentTime, "promo expired", EXPIRED_STATE);
+			return;
+		}
+		int ind = 1;
+		updCheckStat.setTimestamp(ind++, new Timestamp(currentTime));
+		updCheckStat.setString(ind++, orderId);
+		updCheckStat.setString(ind, sku);
+		updCheckStat.addBatch();
+		checkChanges++;
+		if (checkChanges > BATCH_SIZE) {
+			updCheckStat.executeBatch();
+			checkChanges = 0;
 		}
 	}
 
@@ -457,7 +478,7 @@ public class UpdateSubscription {
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
-				kind = "expired";
+				kind = EXPIRED_STATE;
 			} else if (errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_ACCOUNT_ERROR ||
 					errorCode == HuaweiIAPHelper.RESPONSE_CODE_USER_CONSUME_ERROR) {
 				kind = "gone";
@@ -525,7 +546,7 @@ public class UpdateSubscription {
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
-				kind = "expired";
+				kind = EXPIRED_STATE;
 			} else if (errorCode == AmazonIAPHelper.RESPONSE_CODE_USER_ID_ERROR ||
 					errorCode == AmazonIAPHelper.RESPONSE_CODE_TRANSACTION_ERROR) {
 				kind = "gone";
@@ -592,7 +613,7 @@ public class UpdateSubscription {
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
-				kind = "expired";
+				kind = EXPIRED_STATE;
 			} else if (!purchaseToken.contains(".AO") || errorCode == 400) {
 				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage());
 				if((currentTime - regTime.getTime()) > MAX_WAITING_TIME_TO_MAKE_INVALID) {
@@ -641,7 +662,7 @@ public class UpdateSubscription {
 			if (fsSub == null) {
 				reason = "FastSpring: subscription not found";
 			} else if (!Boolean.TRUE.equals(fsSub.active)) {
-				kind = "expired";
+				kind = EXPIRED_STATE;
 				reason = "FastSpring: subscription not active";
 			} else {
 				subscription = new SubscriptionPurchase();
@@ -660,7 +681,7 @@ public class UpdateSubscription {
 			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
-				kind = "expired";
+				kind = EXPIRED_STATE;
 			} else {
 				reason = "FastSpring error: " + e.getMessage();
 			}
@@ -793,7 +814,7 @@ public class UpdateSubscription {
 			updStat.setBoolean(ind++, !expired);
 			if (expired) {
 				updated = true;
-				updStat.setString(ind++, "expired");
+				updStat.setString(ind++, EXPIRED_STATE);
 			} else {
 				updStat.setNull(ind++, Types.VARCHAR);
 			}
