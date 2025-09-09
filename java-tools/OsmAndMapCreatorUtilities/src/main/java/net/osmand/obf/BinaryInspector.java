@@ -1471,7 +1471,7 @@ public class BinaryInspector {
 		for (int i = 0; i < cs.size(); i++) {
 			println(String.format("\t\t\t%s (%d): %s", cs.get(i), subcategories.get(i).size(), subcategories.get(i)));
 		}
-		println("\t\tPOI Aditionals:");
+		println("\t\tPOI Additionals:");
 		List<PoiSubType> subtypes = p.getSubTypes();
 		Set<String> text = new TreeSet<String>();
 		Set<String> refs = new TreeSet<String>();
