@@ -194,7 +194,8 @@ public class UpdateSubscription {
 				SubscriptionType.IOS,
 				SubscriptionType.HUAWEI,
 				SubscriptionType.AMAZON,
-				SubscriptionType.FASTSPRING);
+				SubscriptionType.FASTSPRING,
+				SubscriptionType.PROMO);
 
 		boolean revalidateinvalid = false;
 		UpdateParams up = new UpdateParams();
