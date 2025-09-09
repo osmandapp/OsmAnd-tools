@@ -149,6 +149,8 @@ public class IndexRouteRelationCreator {
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
 
+			collectElevationStatsForWays(joinedWays, poiSectionTags, icc);
+
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
 					if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
@@ -176,6 +178,35 @@ public class IndexRouteRelationCreator {
 			}
 			indexPoiCreator.iterateEntity(relation, ctx, icc);
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
+		}
+	}
+
+	private void collectElevationStatsForWays(List<Way> ways, Map<String, String> tags, IndexCreationContext icc) {
+		int eleCount = 0;
+		double upHill = 0, downHill = 0, sumEle = 0;
+		double minEle = Double.POSITIVE_INFINITY, maxEle = Double.NEGATIVE_INFINITY;
+
+		if (icc.getIndexHeightData() != null) {
+			for (Way way : ways) {
+				IndexHeightData.WayGeneralStats wg = icc.getIndexHeightData()
+						.calculateWayGeneralStats(way, IndexRouteRelationCreatorV1.DIST_STEP);
+				if (wg.eleCount > 0) {
+					upHill += wg.up;
+					downHill += wg.down;
+					minEle = Math.min(minEle, wg.minEle);
+					maxEle = Math.max(maxEle, wg.maxEle);
+					eleCount += wg.eleCount;
+					sumEle += wg.sumEle;
+				}
+			}
+		}
+
+		if (eleCount > 0) {
+			tags.put("min_ele", String.valueOf((int) minEle));
+			tags.put("max_ele", String.valueOf((int) maxEle));
+			tags.put("diff_ele_up", String.valueOf((int) upHill));
+			tags.put("diff_ele_down", String.valueOf((int) downHill));
+			tags.put("avg_ele", String.valueOf((int) (sumEle / eleCount)));
 		}
 	}
 
