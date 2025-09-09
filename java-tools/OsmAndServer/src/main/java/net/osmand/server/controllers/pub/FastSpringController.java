@@ -9,11 +9,9 @@ import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.EmailSenderService;
-import net.osmand.server.api.services.PromoService;
 import net.osmand.server.api.services.UserSubscriptionService;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,9 +39,6 @@ public class FastSpringController {
 
 	@Autowired
 	EmailSenderService emailSender;
-	
-	@Autowired
-	PromoService promoService;
 
 	@Autowired
 	protected Gson gson;
@@ -118,14 +113,6 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
-					ResponseEntity<String> promoResp = promoService.addFastSpringPromo(user.id);
-					if (promoResp != null) {
-						if (promoResp.getStatusCode() == HttpStatus.OK) {
-							LOGGER.info(promoResp.getBody());
-						} else {
-							LOGGER.error(promoResp.getBody());
-						}
-					}
 					
 					userSubService.verifyAndRefreshProOrderId(user);
 
