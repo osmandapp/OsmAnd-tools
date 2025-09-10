@@ -543,8 +543,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public static class PoiCreatorCategories {
-		Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
-		Set<PoiAdditionalType> additionalAttributes = new HashSet<PoiAdditionalType>();
+		Map<String, Set<String>> categories = new LinkedHashMap<String, Set<String>>();
+		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
 
 		// build indexes to write
@@ -793,7 +793,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		} else {
 			log.info("Not using global list of poi indexes");
 		}
-		topIndexAdditional = new HashMap<>();
+		topIndexAdditional = new LinkedHashMap<>();
 		ResultSet rs;
 		boolean isBrand = false;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
