@@ -126,6 +126,9 @@ public class IndexRouteRelationCreator {
 		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
 			return;
 		}
+		if ("proposed".equals(relation.getTag("state")) || "yes".equals(relation.getTag("proposed"))) {
+			return;
+		}
 		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
@@ -572,15 +575,21 @@ public class IndexRouteRelationCreator {
 	@Nonnull
 	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags, long relationId) {
 		String requiredGroupPrefix = "route_"; // default prefix for generated OSMC-related tags
+		Map<String, String> result = new LinkedHashMap<>();
 		if (relationId != 0) {
+			boolean relationPrefixFound = false;
 			for (String tag : tags.keySet()) {
 				if (tag.endsWith(RELATION_ID) && tags.get(tag).equals(Long.toString(relationId))) {
+					// mandatory prefix of this relation to catch tags from the distinct group
 					requiredGroupPrefix = tag.replace(RELATION_ID, "");
-					break; // use relation prefix to catch tags from distinct group
+					relationPrefixFound = true;
+					break;
 				}
 			}
+			if (!relationPrefixFound) {
+				return result; // empty
+			}
 		}
-		Map<String, String> result = new LinkedHashMap<>();
 		for (String tag : tags.keySet()) {
 			for (String match : OSMC_TAGS_TO_SHIELD_PROPS.keySet()) {
 				if (tag.startsWith(requiredGroupPrefix) && tag.endsWith(match)) {

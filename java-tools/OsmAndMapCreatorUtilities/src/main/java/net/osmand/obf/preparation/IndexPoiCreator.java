@@ -238,7 +238,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					for (Multipolygon m : multipolygons) {
 						assert m.getOuterRings().size() == 1;
 						if (!m.areRingsComplete()) {
-							log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
+							log.warn("In multipolygon (POI) " + relation.getId() + " there are incompleted ways");
 						}
 						Ring out = m.getOuterRings().get(0);
 						if (out.getBorder().size() == 0) {
