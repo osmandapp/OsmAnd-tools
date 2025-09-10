@@ -237,7 +237,7 @@ public interface DataService extends BaseService {
 				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
 		}
 
-		String sql = "INSERT INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
+		String sql = "INSERT OR IGNORE INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
 				"duration, results_count, min_distance, closest_result, actual_place, lat, lon, timestamp) " +
 				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 

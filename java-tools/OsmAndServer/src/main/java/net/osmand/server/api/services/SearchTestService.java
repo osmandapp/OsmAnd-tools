@@ -112,6 +112,12 @@ public class SearchTestService implements ReportService, DataService {
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+		// Ensure DB uniqueness to prevent duplicate inserts per (run_id, gen_id)
+		try {
+			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
+		} catch (Exception e) {
+			LOGGER.warn("Could not ensure unique index on run_result(run_id, gen_id)", e);
+		}
 	}
 
 	public String getWebServerConfigDir() {
@@ -192,7 +198,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 	}
 
-	@Async
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
@@ -272,8 +277,7 @@ public class SearchTestService implements ReportService, DataService {
 
 				Integer id = (Integer) row.get("id");
 				String query = (String) row.get("query");
-				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {
-				});
+				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
 				int count = (Integer) row.get("count");
 				try {
 					List<Feature> searchResults = Collections.emptyList();
