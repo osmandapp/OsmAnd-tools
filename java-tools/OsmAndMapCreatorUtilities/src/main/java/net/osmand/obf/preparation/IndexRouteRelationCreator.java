@@ -345,12 +345,11 @@ public class IndexRouteRelationCreator {
 	}
 
 	public static void finalizeRouteShieldTags(Map<String, String> tags) {
-		if (tags.containsKey("ref") || tags.containsKey(SHIELD_TEXT)) {
-			tags.remove(SHIELD_STUB_NAME);
-		} else if (tags.containsKey(SHIELD_FG) || tags.containsKey(SHIELD_BG)) {
+		if (tags.containsKey(SHIELD_FG) || tags.containsKey(SHIELD_BG)) {
 			tags.put(SHIELD_STUB_NAME, ".");
 		}
 		if (tags.containsKey(SHIELD_TEXT)) {
+			tags.remove(SHIELD_STUB_NAME);
 			String text = tags.get(SHIELD_TEXT);
 			if (text.length() >= MIN_REF_LENGTH_TO_USE_FOR_SEARCH && !text.equals(tags.get("ref"))) {
 				tags.put("name:sym", text);
