@@ -20,6 +20,9 @@ import java.util.Optional;
 public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> {
 	@MappedSuperclass
 	public class RunParam {
+		@Column()
+		public String name;
+
 		@Column
 		public String locale;
 
