@@ -407,10 +407,10 @@ public class IndexHeightData {
 			}
 		}
 		if (wh.firstHeight != INEXISTENT_HEIGHT && wh.lastHeight != INEXISTENT_HEIGHT) {
-			e.putTag(ELE_ASC_START, ((int) wh.firstHeight) + "");
+			e.putTag(ELE_ASC_START, ((int) Math.round(wh.firstHeight)) + "");
 		}
 		if (wh.lastHeight != INEXISTENT_HEIGHT && wh.firstHeight != wh.lastHeight) {
-			e.putTag(ELE_ASC_END, ((int) wh.lastHeight) + "");
+			e.putTag(ELE_ASC_END, ((int) Math.round(wh.lastHeight)) + "");
 		}
 		// for(int k = 0; k < wh.SIZE; k++) {
 		// int deg = wh.DEGREE_START + k * wh.DEGREE_PRECISION;
@@ -597,7 +597,6 @@ public class IndexHeightData {
 			}
 		}
 		tileData.accessed++;
-		
 		return tileData.getHeight(lonDelta, latDelta, neighboors);
 	}
 
@@ -703,17 +702,20 @@ public class IndexHeightData {
 		IndexHeightData hd = new IndexHeightData();
 		hd.setSrtmData("/Users/victorshcherb/osmand/maps/srtm/", null);
 		
-//		test(-1.3, -3.1);
-//		simpleTestHeight(hd);
+		test(50.5841136, 2.8897935);
+		test(50.5841013, 2.8898731);
+		USE_BILINEAR_INTERPOLATION = false;
+		cmp(hd, 50.5841136, 2.8897935, 44);
+		cmp(hd, 50.5841013, 2.8898731, 45);
 //		USE_BILINEAR_INTERPOLATION = false;
 //		simpleTestHeight(hd);
 //		testHeight(hd);
 		
-		Polygon plg = testFileSmoothness(hd);
-		long tms = System.currentTimeMillis();
-		List<Geometry> lst = generateGridPrecision(plg, 2.7, hd);
-		System.out.println((System.currentTimeMillis() - tms)  + " ms");
-		draw(plg, lst);
+//		Polygon plg = testFileSmoothness(hd);
+//		long tms = System.currentTimeMillis();
+//		List<Geometry> lst = generateGridPrecision(plg, 2.7, hd);
+//		System.out.println((System.currentTimeMillis() - tms)  + " ms");
+//		draw(plg, lst);
 	}
 
 

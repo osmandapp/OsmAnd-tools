@@ -10,6 +10,7 @@ import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
@@ -125,6 +126,9 @@ public class IndexRouteRelationCreator {
 		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
 			return;
 		}
+		if ("proposed".equals(relation.getTag("state")) || "yes".equals(relation.getTag("proposed"))) {
+			return;
+		}
 		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
@@ -147,6 +151,8 @@ public class IndexRouteRelationCreator {
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
+
+			collectElevationStatsForWays(joinedWays, poiSectionTags, icc);
 
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
@@ -175,6 +181,35 @@ public class IndexRouteRelationCreator {
 			}
 			indexPoiCreator.iterateEntity(relation, ctx, icc);
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
+		}
+	}
+
+	private void collectElevationStatsForWays(List<Way> ways, Map<String, String> tags, IndexCreationContext icc) {
+		int eleCount = 0;
+		double upHill = 0, downHill = 0, sumEle = 0;
+		double minEle = Double.POSITIVE_INFINITY, maxEle = Double.NEGATIVE_INFINITY;
+
+		if (icc.getIndexHeightData() != null) {
+			for (Way way : ways) {
+				IndexHeightData.WayGeneralStats wg = icc.getIndexHeightData()
+						.calculateWayGeneralStats(way, IndexRouteRelationCreatorV1.DIST_STEP);
+				if (wg.eleCount > 0) {
+					upHill += wg.up;
+					downHill += wg.down;
+					minEle = Math.min(minEle, wg.minEle);
+					maxEle = Math.max(maxEle, wg.maxEle);
+					eleCount += wg.eleCount;
+					sumEle += wg.sumEle;
+				}
+			}
+		}
+
+		if (eleCount > 0) {
+			tags.put("min_ele", String.valueOf((int) minEle));
+			tags.put("max_ele", String.valueOf((int) maxEle));
+			tags.put("diff_ele_up", String.valueOf((int) upHill));
+			tags.put("diff_ele_down", String.valueOf((int) downHill));
+			tags.put("avg_ele", String.valueOf((int) (sumEle / eleCount)));
 		}
 	}
 
@@ -299,6 +334,10 @@ public class IndexRouteRelationCreator {
 		mapSectionTags.putAll(commonTags);
 		poiSectionTags.putAll(commonTags);
 
+		if ("node_network".equals(commonTags.get("network:type")) && commonTags.containsKey("network")) {
+			mapSectionTags.putIfAbsent("node_network", commonTags.get("network"));
+		}
+
 		if (DEBUG_GENERATE_ROUTE_SEGMENT) {
 			mapSectionTags.put(ROUTE, "segment"); // enable to debug as TravelGpx data
 		}
@@ -309,12 +348,11 @@ public class IndexRouteRelationCreator {
 	}
 
 	public static void finalizeRouteShieldTags(Map<String, String> tags) {
-		if (tags.containsKey("ref") || tags.containsKey(SHIELD_TEXT)) {
-			tags.remove(SHIELD_STUB_NAME);
-		} else if (tags.containsKey(SHIELD_FG) || tags.containsKey(SHIELD_BG)) {
+		if (tags.containsKey(SHIELD_FG) || tags.containsKey(SHIELD_BG)) {
 			tags.put(SHIELD_STUB_NAME, ".");
 		}
 		if (tags.containsKey(SHIELD_TEXT)) {
+			tags.remove(SHIELD_STUB_NAME);
 			String text = tags.get(SHIELD_TEXT);
 			if (text.length() >= MIN_REF_LENGTH_TO_USE_FOR_SEARCH && !text.equals(tags.get("ref"))) {
 				tags.put("name:sym", text);
@@ -389,7 +427,7 @@ public class IndexRouteRelationCreator {
 
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
-				if ("yes".equals(way.getTag("area"))) {
+				if ("yes".equals(way.getTag(OSMTagKey.AREA))) {
 					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
 				waysToJoin.add(way);
@@ -537,15 +575,21 @@ public class IndexRouteRelationCreator {
 	@Nonnull
 	public static Map<String, String> getShieldTagsFromOsmcTags(@Nonnull Map<String, String> tags, long relationId) {
 		String requiredGroupPrefix = "route_"; // default prefix for generated OSMC-related tags
+		Map<String, String> result = new LinkedHashMap<>();
 		if (relationId != 0) {
+			boolean relationPrefixFound = false;
 			for (String tag : tags.keySet()) {
 				if (tag.endsWith(RELATION_ID) && tags.get(tag).equals(Long.toString(relationId))) {
+					// mandatory prefix of this relation to catch tags from the distinct group
 					requiredGroupPrefix = tag.replace(RELATION_ID, "");
-					break; // use relation prefix to catch tags from distinct group
+					relationPrefixFound = true;
+					break;
 				}
 			}
+			if (!relationPrefixFound) {
+				return result; // empty
+			}
 		}
-		Map<String, String> result = new LinkedHashMap<>();
 		for (String tag : tags.keySet()) {
 			for (String match : OSMC_TAGS_TO_SHIELD_PROPS.keySet()) {
 				if (tag.startsWith(requiredGroupPrefix) && tag.endsWith(match)) {

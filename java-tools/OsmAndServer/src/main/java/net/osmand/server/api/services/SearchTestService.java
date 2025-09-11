@@ -112,6 +112,19 @@ public class SearchTestService implements ReportService, DataService {
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+		// Ensure DB integrity
+		try {
+			jdbcTemplate.execute("DELETE FROM test_case WHERE dataset_id NOT IN (SELECT id FROM dataset)");
+			jdbcTemplate.execute("DELETE FROM gen_result WHERE case_id NOT IN (SELECT id FROM test_case)");
+			jdbcTemplate.execute("DELETE FROM run WHERE case_id NOT IN (SELECT id FROM test_case)");
+			jdbcTemplate.execute("DELETE FROM run_result WHERE run_id NOT IN (SELECT id FROM run)");
+			// Remove duplicates (SQLite-compatible): keep the smallest id per (run_id, gen_id)
+			jdbcTemplate.execute("DELETE FROM run_result WHERE gen_id IS NOT NULL AND id NOT IN " +
+					"(SELECT MIN(id) FROM run_result WHERE gen_id IS NOT NULL GROUP BY run_id, gen_id)");
+			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
+		} catch (Exception e) {
+			LOGGER.warn("Could not ensure unique index on run_result(run_id, gen_id)", e);
+		}
 	}
 
 	public String getWebServerConfigDir() {
@@ -192,7 +205,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 	}
 
-	@Async
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
@@ -272,8 +284,7 @@ public class SearchTestService implements ReportService, DataService {
 
 				Integer id = (Integer) row.get("id");
 				String query = (String) row.get("query");
-				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {
-				});
+				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
 				int count = (Integer) row.get("count");
 				try {
 					List<Feature> searchResults = Collections.emptyList();
@@ -389,6 +400,9 @@ public class SearchTestService implements ReportService, DataService {
 
 	@Async
 	public CompletableFuture<Void> deleteRun(Long id) {
+		String sql = "DELETE FROM run_result WHERE run_id = ?";
+		jdbcTemplate.update(sql, id);
+
 		return CompletableFuture.runAsync(() -> runRepo.deleteById(id));
 	}
 

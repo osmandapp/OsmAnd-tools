@@ -921,7 +921,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		} else if (e instanceof Way /* && OSMSettings.wayForCar(e.getTag(OSMTagKey.HIGHWAY)) */
 				&& e.getTag(OSMTagKey.HIGHWAY) != null && e.getTag(OSMTagKey.NAME) != null &&
-				isStreetTag(e.getTag(OSMTagKey.HIGHWAY))) {
+				isStreetTag(e.getTag(OSMTagKey.HIGHWAY)) && !"yes".equals(e.getTag(OSMTagKey.AREA))) {
 			// suppose that streets with names are ways for car
 			// Ignore all ways that have house numbers and highway type
 

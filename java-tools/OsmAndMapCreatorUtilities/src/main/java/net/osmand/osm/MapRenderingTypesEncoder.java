@@ -1472,22 +1472,25 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		} else if ("compacted".equals(surface)) {
 			result += 8;
 			result_bicycle_routing += 8;
-		} else if ("ground".equals(surface) || "earth".equals(surface) || "pebblestone".equals(surface)) {
+		} else if ("cobblestone".equals(surface)) {
+			result += 8;
+			result_bicycle_routing += 8;
+		} else if ("pebblestone".equals(surface)) {
+			result += 9;
+			result_bicycle_routing += 9;
+		} else if ("ground".equals(surface) || "earth".equals(surface) || "dirt".equals(surface)) {
 			result += 9;
 			result_bicycle_routing += 9;
 		} else if ("grass".equals(surface)) {
 			result += 12;
 			result_bicycle_routing += 12;
-		} else if ("cobblestone".equals(surface)) {
-			result += 11;
-			result_bicycle_routing += 11;
 		} else if ("gravel".equals(surface)) {
 			result += 12;
 			result_bicycle_routing += 12;
 		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
 			result += 13;
 			result_bicycle_routing += 13;
-		} else if ("unpaved".equals(surface) || "dirt".equals(surface)) {
+		} else if ("unpaved".equals(surface)) {
 			result += 14;
 			result_bicycle_routing += 14;
 		} else if ("salt".equals(surface) || "ice".equals(surface) || "snow".equals(surface)) {

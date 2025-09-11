@@ -84,7 +84,7 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY, null,"imgLat", "imgLon", null);
+				+ " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
@@ -206,11 +206,12 @@ public class WikiService {
 		boolean showAll = topics.contains(0);
 
 		String filterQuery = "";
-		List<Object> filterParams = new ArrayList<>();
 
 		if (!showAll && !topics.isEmpty()) {
-			filterQuery = " AND w.topic IN (" + String.join(", ", Collections.nCopies(topics.size(), "?")) + ") ";
-			filterParams.addAll(topics);
+			String inList = topics.stream()
+					.map(String::valueOf)
+					.collect(Collectors.joining(", "));
+			filterQuery = " AND w.topic IN (" + inList + ") ";
 		}
 
 		int z = zoom != null ? zoom : calculateOptimalZoom(northWest, southEast);
@@ -219,7 +220,7 @@ public class WikiService {
 
 		String query = buildWikidataQuery(langPriority, showAll, filterQuery, z);
 
-		return getPoiData(northWest, southEast, query, filterParams, "lat", "lon", langPriority);
+		return getPoiData(northWest, southEast, query, "lat", "lon", langPriority);
 	}
 
 	private List<Integer> prepareTopics(Set<String> filters) {
@@ -323,7 +324,6 @@ public class WikiService {
 			String northWest,
 			String southEast,
 			String query,
-			List<Object> filterParams,
 			String lat,
 			String lon,
 			List<String> langPriority
@@ -375,9 +375,6 @@ public class WikiService {
 				ps.setDouble(2, bbox[0]); // north
 				ps.setDouble(3, bbox[1]); // west
 				ps.setDouble(4, bbox[3]); // east
-			}
-			for (int i = 0; i < filterParams.size(); i++) {
-				ps.setObject(5 + i, filterParams.get(i));
 			}
 		}, rowMapper);
 
@@ -551,7 +548,13 @@ public class WikiService {
 	}
 	
 	private String createImageUrl(String imageTitle) {
-		String[] hash = getHash(URLDecoder.decode(imageTitle, StandardCharsets.UTF_8));
+		try {
+			imageTitle = URLDecoder.decode(imageTitle, StandardCharsets.UTF_8);
+		} catch (IllegalArgumentException e) {
+			log.warn("imageTitle decode failed: " + imageTitle, e);
+		}
+		String[] hash = getHash(imageTitle);
+		imageTitle = URLEncoder.encode(imageTitle, StandardCharsets.UTF_8);
 		if (FILE_URL_TO_USE == 0) {
 			return WIKIMEDIA_COMMON_SPECIAL_FILE_PATH + imageTitle;
 		} else if (FILE_URL_TO_USE == 1) {
