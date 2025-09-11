@@ -401,6 +401,9 @@ public class SearchTestService implements ReportService, DataService {
 
 	@Async
 	public CompletableFuture<Void> deleteRun(Long id) {
+		String sql = "DELETE FROM run_result WHERE run_id = ?";
+		jdbcTemplate.update(sql, id);
+
 		return CompletableFuture.runAsync(() -> runRepo.deleteById(id));
 	}
 
