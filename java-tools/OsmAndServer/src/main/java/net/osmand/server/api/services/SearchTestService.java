@@ -112,8 +112,15 @@ public class SearchTestService implements ReportService, DataService {
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
-		// Ensure DB uniqueness to prevent duplicate inserts per (run_id, gen_id)
+		// Ensure DB integrity
 		try {
+			jdbcTemplate.execute("DELETE FROM test_case WHERE dataset_id NOT IN (SELECT id FROM dataset)");
+			jdbcTemplate.execute("DELETE FROM gen_result WHERE case_id NOT IN (SELECT id FROM test_case)");
+			jdbcTemplate.execute("DELETE FROM run WHERE case_id NOT IN (SELECT id FROM test_case)");
+			jdbcTemplate.execute("DELETE FROM run_result WHERE run_id NOT IN (SELECT id FROM run)");
+			// Remove duplicates (SQLite-compatible): keep the smallest id per (run_id, gen_id)
+			jdbcTemplate.execute("DELETE FROM run_result WHERE gen_id IS NOT NULL AND id NOT IN " +
+					"(SELECT MIN(id) FROM run_result WHERE gen_id IS NOT NULL GROUP BY run_id, gen_id)");
 			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure unique index on run_result(run_id, gen_id)", e);
@@ -217,6 +224,7 @@ public class SearchTestService implements ReportService, DataService {
 		}
 
 		Run run = new Run();
+		run.name = payload.name;
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;
