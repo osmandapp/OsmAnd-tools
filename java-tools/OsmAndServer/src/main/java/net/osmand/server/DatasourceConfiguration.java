@@ -2,6 +2,7 @@ package net.osmand.server;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
@@ -10,6 +11,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateProperties;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateSettings;
+import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.*;
@@ -198,11 +202,22 @@ public class DatasourceConfiguration {
 	@Primary
 	public LocalContainerEntityManagerFactoryBean entityManagerFactory(
 			EntityManagerFactoryBuilder builder,
-			@Qualifier("primaryDataSource") DataSource dataSource) {
+			@Qualifier("primaryDataSource") DataSource dataSource,
+            JpaProperties jpaProperties,
+            HibernateProperties hibernateProperties) {
+        Map<String, Object> vendorProps = new java.util.HashMap<>(
+                hibernateProperties.determineHibernateProperties(
+                        jpaProperties.getProperties(), new HibernateSettings()
+                )
+        );
+
 		return builder
 				.dataSource(dataSource)
-				.packages(Application.PACKAGE_NAME)
+				.packages(Application.PACKAGE_NAME + ".api.repo",
+						Application.PACKAGE_NAME + ".assist.data",
+						Application.PACKAGE_NAME + ".monitor")
 				.persistenceUnit("default")
+                .properties(vendorProps)
 				.build();
 	}
 
