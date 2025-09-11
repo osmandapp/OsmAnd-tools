@@ -224,6 +224,7 @@ public class SearchTestService implements ReportService, DataService {
 		}
 
 		Run run = new Run();
+		run.name = payload.name;
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;

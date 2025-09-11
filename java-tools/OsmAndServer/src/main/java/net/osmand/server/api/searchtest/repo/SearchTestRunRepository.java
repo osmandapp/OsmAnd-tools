@@ -38,6 +38,9 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@Column(name = "dataset_id", nullable = false)
 		public Long datasetId;
 
+		@Column()
+		public String name;
+
 		@CreationTimestamp
 		public LocalDateTime timestamp;
 
