@@ -287,27 +287,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         // The Rings are only composed by type, so if one way gets in a different Ring, the rings will be incomplete
         List<Multipolygon> multipolygons = original.splitPerOuterRing(logMapDataWarn);
 
-        if (multipolygons.size() > 1 && "boundary".equals(tags.get(OSMTagKey.TYPE.getValue()))) {
-            for (Multipolygon m : multipolygons) {
-                assert m.getOuterRings().size() == 1;
-                if (!m.areRingsComplete()) {
-                    log.warn("In multipolygon (MAP) " + e.getId() + " there are incompleted ways");
-                }
-                Ring out = m.getOuterRings().get(0);
-                if (out.getBorder().size() == 0) {
-                    log.warn("Multipolygon (MAP) has an outer ring that can't be formed: " + e.getId());
-                    // don't index this
-                    continue;
-                }
-                LatLon center = OsmMapUtils.getCenter(out.getBorderWay());
-                if (center != null) {
-                    String url = MapUtils.createShortLinkString(center.getLatitude(), center.getLongitude(), 13);
-                    tags.put("osmand_poi_lat_lon", url);
-                    break;
-                }
-            }
-        }
-
         for (Multipolygon m : multipolygons) {
             assert m.getOuterRings().size() == 1;
             // Log the fact that Rings aren't complete, but continue with the relation, try
