@@ -1692,4 +1692,23 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		public List<TagValuePattern> toTags = new ArrayList<MapRenderingTypes.TagValuePattern>();
 		public boolean lang;
 	}
+
+    public void addExternalAdditionalText(String tag, boolean lang) {
+        checkIfInitNeeded();
+        if (!types.containsKey(tag)) {
+            registerRuleType(MapRulType.createText(tag, null));
+        }
+        if (lang) {
+            for (String lng : langs) {
+                String langTag = tag + ":" + lng;
+                if (!types.containsKey(langTag)) {
+                    registerRuleType(MapRulType.createText(langTag, null));
+                }
+            }
+            String enTag = tag + ":en";
+            if (!types.containsKey(enTag)) {
+                registerRuleType(MapRulType.createText(enTag, null));
+            }
+        }
+    }
 }

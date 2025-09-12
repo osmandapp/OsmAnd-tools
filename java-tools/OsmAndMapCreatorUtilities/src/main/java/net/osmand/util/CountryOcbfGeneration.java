@@ -41,7 +41,7 @@ public class CountryOcbfGeneration {
 	private static final Log log = PlatformUtil.getLog(CountryOcbfGeneration.class);
 
 	public static void main(String[] args) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		String repo =  "/Users/victorshcherb/osmand/repos/";
+		String repo =  "/Users/ivan/OsmAnd/";
 		if(args != null && args.length > 0) {
 			repo = args[0];
 		}
@@ -76,15 +76,15 @@ public class CountryOcbfGeneration {
 		}
 		return translates;
 	}
-	
+
 	public CountryRegion parseDefaultOsmAndRegionStructure() throws XmlPullParserException, IOException {
 		URL url = new URL( "https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml");
-		return parseRegionStructure(url.openStream()); 
+		return parseRegionStructure(url.openStream());
 	}
 
-	
+
 	public CountryRegion parseRegionStructure(InputStream repo) throws XmlPullParserException, IOException {
-		
+
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(new InputStreamReader(repo, "UTF-8"));
 		int tok;
@@ -158,13 +158,13 @@ public class CountryOcbfGeneration {
 		public boolean srtm ;
 
 		public long timestampToUpdate;
-		
-		
+
+
 
 		public CountryRegion getParent() {
 			return parent;
 		}
-		
+
 		public List<CountryRegion> getChildren() {
 			return children;
 		}
@@ -393,7 +393,7 @@ public class CountryOcbfGeneration {
 		serializer.endDocument();
 		serializer.flush();
 		fous.close();
-		
+
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
 		settings.indexAddress = false;
@@ -404,10 +404,13 @@ public class CountryOcbfGeneration {
 		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile(), settings); //$NON-NLS-1$
 		creator.setMapFileName(new File(targetObf).getName());
 		MapZooms zooms = MapZooms.parseZooms("5-6");
-		creator.generateIndexes(osm,
+        MapRenderingTypesEncoder encoder = new MapRenderingTypesEncoder("regions");
+        encoder.addExternalAdditionalText("short_name", true);
+        encoder.addExternalAdditionalText("alt_name", true);
+        encoder.addExternalAdditionalText("name:abbreviation", false);
+        creator.generateIndexes(osm,
 				new ConsoleProgressImplementation(1), null, zooms,
-				new MapRenderingTypesEncoder("regions"), log);
-
+				encoder, log);
 
 	}
 
