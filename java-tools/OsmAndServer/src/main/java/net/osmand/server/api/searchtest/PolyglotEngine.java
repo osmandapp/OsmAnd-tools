@@ -107,7 +107,7 @@ public class PolyglotEngine {
 				long start = System.currentTimeMillis();
 				Map<String, Object> row = origRow;
 				if (!delCols.isEmpty()) {
-					row = new HashMap<>(origRow);
+					row = new LinkedHashMap<>(origRow);
 					for (String key : delCols) {
 						row.remove(key);
 					}
