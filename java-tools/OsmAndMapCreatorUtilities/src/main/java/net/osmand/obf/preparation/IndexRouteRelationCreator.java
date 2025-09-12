@@ -150,9 +150,8 @@ public class IndexRouteRelationCreator {
 
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
 			Map<String, String> poiSectionTags = new LinkedHashMap<>();
+			collectElevationStatsForWays(joinedWays, preparedTags, icc);
 			collectMapAndPoiSectionTags(relation, preparedTags, mapSectionTags, poiSectionTags);
-
-			collectElevationStatsForWays(joinedWays, poiSectionTags, icc);
 
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
