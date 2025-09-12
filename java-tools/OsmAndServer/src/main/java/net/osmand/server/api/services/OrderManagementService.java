@@ -200,7 +200,7 @@ public class OrderManagementService {
 		info.nickname = user.nickname;
 		info.tokenTime = user.tokenTime;
 		info.regTime = user.regTime;
-		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, null);
+		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, (String[]) null);
 		info.filesCount = res.totalFiles;
 		return info;
 	}
