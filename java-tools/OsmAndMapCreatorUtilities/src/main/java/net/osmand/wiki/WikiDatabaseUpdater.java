@@ -24,28 +24,32 @@ public class WikiDatabaseUpdater {
 
     private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
     private final String WIKIDATA_URL = "https://dumps.wikimedia.org/wikidatawiki/latest/";
-    private List<String> downloadedPages = new ArrayList<>();
+    private final List<String> downloadedPages = new ArrayList<>();
     private long maxQId = 0;
     private final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
-    public WikiDatabaseUpdater(File db) {
+    public WikiDatabaseUpdater(File wikidataDB, boolean daily) {
         try {
-            maxQId = getMaxQIdFromDb(db);
-            long maxId = getMaxId();
-            Pattern pattern = Pattern.compile("wikidatawiki-latest-pages-articles\\d+\\.xml.+bz2\"");
-            List<Page> pages = readUrl(pattern);
-            List<Page> updateList =  new ArrayList<>();
-            for (Page p : pages) {
-                if (maxId < p.max || maxId < p.min) {
-                    updateList.add(p);
+            maxQId = getMaxQIdFromDb(wikidataDB);
+            List<Page> updateList = new ArrayList<>();
+
+            if (daily) {
+                long modifiedDate = wikidataDB.lastModified();
+                //todo daily url list
+                
+            } else {
+                long maxId = getMaxId();
+                List<Page> pages = readUrl(WIKIDATA_URL, false);
+                for (Page p : pages) {
+                    if (maxId < p.max || maxId < p.min) {
+                        updateList.add(p);
+                    }
                 }
+                updateList = getWithoutRepeats(updateList);
             }
-            updateList = getWithoutRepeats(updateList);
-            String folder = db.getParent();
-            downloadPages(folder, updateList);
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        } catch (IOException e) {
+            String destFolder = wikidataDB.getParent();
+            downloadPages(destFolder, updateList);
+        } catch (SQLException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -89,10 +93,10 @@ public class WikiDatabaseUpdater {
         return updateList;
     }
 
-    private void downloadPages(String folder, List<Page> updateList) throws IOException {
+    private void downloadPages(String destFolder, List<Page> updateList) throws IOException {
         for (Page p : updateList) {
             String gzFile = p.url.replace(".bz2", ".gz");
-            gzFile = folder + "/" + gzFile;
+            gzFile = destFolder + "/" + gzFile;
             File gz = new File(gzFile);
             if (gz.exists()) {
                 System.out.println(gzFile + " already downloaded");
@@ -128,8 +132,12 @@ public class WikiDatabaseUpdater {
         }
     }
 
-    private List<Page> readUrl(Pattern pattern) throws IOException {
-        URLConnection connection = new URL(WIKIDATA_URL).openConnection();
+    private List<Page> readUrl(String wikidataUrl, boolean daily) throws IOException {
+
+        Pattern pattern = daily
+                ? Pattern.compile("wikidatawiki-\\d+-pages-meta-hist-incr.xml.bz2\"")
+                : Pattern.compile("wikidatawiki-latest-pages-articles\\d+\\.xml.+bz2\"");
+        URLConnection connection = new URL(wikidataUrl).openConnection();
         connection
                 .setRequestProperty("User-Agent", USER_AGENT);
         connection.connect();
@@ -152,8 +160,8 @@ public class WikiDatabaseUpdater {
                 result.add(page);
             }
         }
-        if (result.size() == 0) {
-            throw new RuntimeException("Could not download list from " + WIKIDATA_URL);
+        if (result.isEmpty()) {
+            throw new RuntimeException("Could not download list from " + wikidataUrl);
         }
         return result;
     }
