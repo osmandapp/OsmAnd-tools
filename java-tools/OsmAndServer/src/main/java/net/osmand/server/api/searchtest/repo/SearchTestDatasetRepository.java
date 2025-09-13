@@ -32,6 +32,22 @@ public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long
 	}
 
 	@Entity
+	@Table(name = "dataset_result")
+	public class DatasetResult {
+		@Id
+		@GeneratedValue(strategy = GenerationType.IDENTITY)
+		@Column(columnDefinition = "INTEGER")
+		public Long id;
+
+		@Column(name = "dataset_id", nullable = false)
+		public Long datasetId;
+
+		@JdbcTypeCode(SqlTypes.JSON)
+		@Column(columnDefinition = "TEXT")
+		public String value;
+	}
+
+	@Entity
 	@Table(name = "dataset")
 	public class Dataset {
 		public enum ConfigStatus {

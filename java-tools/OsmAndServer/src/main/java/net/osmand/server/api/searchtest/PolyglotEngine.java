@@ -59,8 +59,7 @@ public class PolyglotEngine {
 		}
 	}
 
-	public List<GenRow> execute(String dir, TestCase test, List<String> delCols,
-								List<Map<String, Object>> rows) throws Exception {
+	public List<GenRow> execute(String dir, TestCase test, List<String> rows) throws Exception {
 		BaseService.ProgrammaticConfig program = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
 
 		// Load default JS helper script from web-server-config repository
@@ -69,7 +68,9 @@ public class PolyglotEngine {
 			throw new RuntimeException("Script file not found: " + scriptPath.toAbsolutePath());
 		}
 
-		String columnsJson = test.selCols;
+		String[] selCols = objectMapper.readValue(test.selCols, String[].class);
+		String[] allCols = objectMapper.readValue(test.allCols, String[].class);
+
 		try (Context context = Context.newBuilder("js")
 				.engine(polyglotEngine)
 				.option("js.ecmascript-version", "2022")
@@ -103,18 +104,21 @@ public class PolyglotEngine {
 			Value jsonParse = context.eval("js", "JSON.parse");
 
 			List<GenRow> results = new ArrayList<>();
-			for (Map<String, Object> origRow : rows) {
+			for (String jsonRow : rows) {
 				long start = System.currentTimeMillis();
-				Map<String, Object> row = origRow;
-				if (!delCols.isEmpty()) {
-					row = new HashMap<>(origRow);
-					for (String key : delCols) {
-						row.remove(key);
-					}
+
+				String[] values = objectMapper.readValue(jsonRow, String[].class);
+				Map<String, Object> origRow = new LinkedHashMap<>();
+				for (int i = 0; i < allCols.length; i++) {
+					origRow.put(allCols[i], values[i]);
 				}
 
-				String rowJson = objectMapper.writeValueAsString(row);
-				Value jsRow = jsonParse.execute(rowJson);
+				Map<String, Object> selRow = new LinkedHashMap<>();
+				for (String selCol : selCols) {
+					selRow.put(selCol, origRow.get(selCol));
+				}
+
+				Value jsRow = jsonParse.execute(objectMapper.writeValueAsString(selRow));
 
 				String lat = (String) origRow.get("lat");
 				String lon = (String) origRow.get("lon");
@@ -123,7 +127,7 @@ public class PolyglotEngine {
 				String errorMessage = null;
 				try {
 					output = program != null ?
-							executeProgram(context, moduleNamespace, program, jsRow, jsonParse.execute(columnsJson == null ? "[]" : columnsJson)) :
+							executeProgram(context, moduleNamespace, program, jsRow, jsonParse.execute(test.selCols)) :
 							executeNocode(context, moduleNamespace, jsonParse.execute(test.nocodeCfg), jsRow);
 				} catch (PolyglotException pe) {
 					errorMessage = extractJsErrorMessage(pe);
