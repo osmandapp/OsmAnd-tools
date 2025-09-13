@@ -124,7 +124,7 @@ public class SearchTestService implements ReportService, DataService {
 					"(SELECT MIN(id) FROM run_result WHERE gen_id IS NOT NULL GROUP BY run_id, gen_id)");
 			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
 		} catch (Exception e) {
-			LOGGER.warn("Could not ensure unique index on run_result(run_id, gen_id)", e);
+			LOGGER.warn("Could not ensure DB integrity.", e);
 		}
 	}
 
@@ -228,6 +228,8 @@ public class SearchTestService implements ReportService, DataService {
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;
+		run.name = payload.name;
+
 		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";

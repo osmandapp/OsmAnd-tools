@@ -2,10 +2,10 @@ package net.osmand.server.api.searchtest;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
-import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -21,7 +21,6 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
@@ -54,32 +53,49 @@ public interface DataService extends BaseService {
 				return dataset;
 			}
 
-			String tableName = "dataset_" + sanitize(dataset.name);
 			String header = getHeader(fullPath);
 			if (header == null || header.trim().isEmpty()) {
 				dataset.setError("File doesn't have header.");
 				return dataset;
 			}
 
-			String del = header.chars().filter(ch -> ch == ',').count() <
-							header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
-			String[] headers =
-					Stream.of(header.toLowerCase().split(del)).map(DataService::sanitize).toArray(String[]::new);
-			dataset.allCols = getObjectMapper().writeValueAsString(headers);
-			if (!Arrays.asList(headers).contains("lat") || !Arrays.asList(headers).contains("lon")) {
+			String delimiter = header.chars().filter(ch -> ch == ',').count() <
+					header.chars().filter(ch -> ch == ';').count() ? ";" : ",";
+			String[] columns =
+					Stream.of(header.toLowerCase().split(delimiter)).map(DataService::sanitize).toArray(String[]::new);
+			dataset.allCols = getObjectMapper().writeValueAsString(columns);
+			if (!Arrays.asList(columns).contains("lat") || !Arrays.asList(columns).contains("lon")) {
 				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
-				getLogger().error("{} Header: {}", error, String.join(",", headers));
+				getLogger().error("{} Header: {}", error, String.join(",", columns));
 				dataset.setError(error);
 				return dataset;
 			}
 
-			dataset.selCols = getObjectMapper().writeValueAsString(Arrays.stream(headers).filter(s ->
-					s.startsWith("road") || s.startsWith("city") || s.startsWith("street")));
+			if (dataset.selCols == null)
+				dataset.selCols = getObjectMapper().writeValueAsString(Arrays.stream(columns).filter(s ->
+						s.startsWith("road") || s.startsWith("city") || s.startsWith("street")));
 			if (reload) {
 				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
-				insertSampleData(tableName, headers, sample.subList(1, sample.size()), del, true);
+
 				dataset.total = sample.size() - 1;
-				getLogger().info("Stored {} rows into table: {}", sample.size(), tableName);
+				dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
+				dataset = getDatasetRepo().save(dataset);
+				getJdbcTemplate().update("DELETE FROM dataset_result WHERE dataset_id = ?", dataset.id);
+
+				List<Object[]> batchArgs = new ArrayList<>();
+				for (int i = 1; i < sample.size(); i++) {
+					String[] record = sample.get(i).split(delimiter);
+					String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
+					for (int j = 0; j < values.length && j < record.length; j++) {
+						values[j] = crop(unquote(record[j]), 255);
+					}
+					batchArgs.add(new Object[] {dataset.id, getObjectMapper().writeValueAsString(values)});
+				}
+
+				String insertSql = "INSERT INTO dataset_result (dataset_id, value) VALUES (?, ?)";
+				getJdbcTemplate().batchUpdate(insertSql, batchArgs);
+
+				getLogger().info("Stored {} rows into dataset: {}", sample.size(), dataset.name);
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
@@ -110,28 +126,10 @@ public interface DataService extends BaseService {
 		}
 
 		try {
-			String tableName = "dataset_" + sanitize(dataset.name);
+			List<String> rows = getJdbcTemplate().queryForList(
+					"SELECT value FROM dataset_result WHERE dataset_id = ?", String.class, dataset.id);
 
-			String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
-			List<String> columns = new ArrayList<>(), delCols = new ArrayList<>();
-			Collections.addAll(columns, selCols);
-			if (Arrays.stream(selCols).noneMatch("lon"::equals)) {
-				columns.add("lon");
-				delCols.add("lon");
-			}
-			if (Arrays.stream(selCols).noneMatch("lat"::equals)) {
-				columns.add("lat");
-				delCols.add("lat");
-			}
-			if (Arrays.stream(selCols).noneMatch("id"::equals)) {
-				columns.add("id");
-				delCols.add("id");
-			}
-
-			String sql = String.format("SELECT %s FROM %s", String.join(",", columns), tableName);
-			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
-
-			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, delCols, rows);
+			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
 			for (PolyglotEngine.GenRow example : examples) {
 				saveCaseResults(test, example);
 			}
@@ -199,7 +197,7 @@ public interface DataService extends BaseService {
 	}
 
 	default void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
-								  List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
+	                            List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Feature minFeature = null;
 		Integer minDistance = null, actualPlace = null;
@@ -265,20 +263,19 @@ public interface DataService extends BaseService {
 		Dataset dataset = getDatasetRepo().findById(datasetId).orElseThrow(() ->
 				new RuntimeException("Dataset not found with id: " + datasetId));
 
-		String tableName = "dataset_" + sanitize(dataset.name);
-		String sql = "SELECT * FROM " + tableName;
 		try {
 			StringWriter stringWriter = new StringWriter();
-			List<Map<String, Object>> rows = getJdbcTemplate().queryForList(sql);
+			List<String> rows = getJdbcTemplate().queryForList(
+					"SELECT value FROM dataset_result WHERE dataset_id = ?", String.class, dataset.id);
 			if (rows.isEmpty()) {
 				return "";
 			}
 
-			String[] headers = rows.get(0).keySet().toArray(new String[0]);
-			CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers).setDelimiter(';').build();
+			String[] headers = getObjectMapper().readValue(dataset.allCols, String[].class);
+			CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers).build();
 			try (final CSVPrinter printer = new CSVPrinter(stringWriter, csvFormat)) {
-				for (Map<String, Object> row : rows) {
-					printer.printRecord(row.values());
+				for (String jsonValue : rows) {
+					printer.printRecord((Object[]) getObjectMapper().readValue(jsonValue, String[].class));
 				}
 			}
 
@@ -293,10 +290,17 @@ public interface DataService extends BaseService {
 		Dataset dataset = getDatasetRepo().findById(datasetId).orElseThrow(() ->
 				new RuntimeException("Dataset not found with id: " + datasetId));
 
-		String tableName = "dataset_" + sanitize(dataset.name);
-		String sql = "SELECT * FROM " + tableName + " ORDER BY _id LIMIT 1 OFFSET ?";
+		String sql = "SELECT value FROM dataset_result WHERE dataset_id = ? ORDER BY id LIMIT 1 OFFSET ?";
 		try {
-			return getJdbcTemplate().queryForMap(sql, position);
+			String[] headers = getObjectMapper().readValue(dataset.allCols, String[].class);
+			Map<String, Object> sample = new LinkedHashMap<>();
+			String jsonValues = getJdbcTemplate().queryForObject(sql, String.class, datasetId, position);
+			String[] values = getObjectMapper().readValue(jsonValues, String[].class);
+			for (int i = 0; i < headers.length; i++) {
+				sample.put(headers[i], values[i]);
+			}
+
+			return sample;
 		} catch (Exception e) {
 			getLogger().error("Failed to retrieve sample row for dataset {} at position {}", datasetId, position, e);
 			throw new RuntimeException("Failed to retrieve dataset sample row: " + e.getMessage(), e);
@@ -308,51 +312,15 @@ public interface DataService extends BaseService {
 		if (dsOpt.isEmpty()) {
 			return false;
 		}
-		String tableName = "dataset_" + sanitize(dsOpt.get().name);
-		getJdbcTemplate().execute("DROP TABLE IF EXISTS " + tableName);
-
-		String deleteSql = "DELETE FROM run_result WHERE dataset_id = ?";
-		getJdbcTemplate().update(deleteSql, datasetId);
-
-		deleteSql = "DELETE FROM test_case WHERE dataset_id = ?";
-		getJdbcTemplate().update(deleteSql, datasetId);
+		getJdbcTemplate().update("DELETE FROM dataset_result WHERE dataset_id = ?", datasetId);
+		getJdbcTemplate().update("DELETE FROM run_result WHERE dataset_id = ?", datasetId);
+		getJdbcTemplate().update("DELETE FROM gen_result WHERE dataset_id = ?", datasetId);
+		getJdbcTemplate().update("DELETE FROM run WHERE dataset_id = ?", datasetId);
+		getJdbcTemplate().update("DELETE FROM test_case WHERE dataset_id = ?", datasetId);
 
 		Dataset ds = dsOpt.get();
 		getDatasetRepo().delete(ds);
 		return true;
-	}
-
-	default void insertSampleData(String tableName, String[] columns, List<String> sample, String delimiter,
-								 boolean deleteBefore) {
-		if (deleteBefore) {
-			getJdbcTemplate().execute("DROP TABLE IF EXISTS " + tableName);
-		}
-		createDynamicTable(tableName, columns);
-
-		String insertSql =
-				"INSERT INTO " + tableName + " (" + String.join(", ", columns) + ") VALUES (" + String.join(", ",
-						Collections.nCopies(columns.length, "?")) + ")";
-		List<Object[]> batchArgs = new ArrayList<>();
-		for (String s : sample) {
-			String[] record = s.split(delimiter);
-			String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
-			for (int j = 0; j < values.length && j < record.length; j++) {
-				values[j] = crop(unquote(record[j]), 255);
-			}
-			batchArgs.add(values);
-		}
-		getJdbcTemplate().batchUpdate(insertSql, batchArgs);
-		getLogger().info("Batch inserted {} records into {}.", sample.size(), tableName);
-	}
-
-	private void createDynamicTable(String tableName, String[] columns) {
-		String columnsDefinition =
-				Stream.of(columns).map(header -> "\"" + header + "\" VARCHAR(255)").collect(Collectors.joining(", "));
-		String createTableSql =
-				String.format("CREATE TABLE IF NOT EXISTS %s (_id INTEGER PRIMARY KEY AUTOINCREMENT, " + "%s)",
-						tableName, columnsDefinition);
-		getJdbcTemplate().execute(createTableSql);
-		getLogger().info("Ensured table {} exists.", tableName);
 	}
 
 	/**
