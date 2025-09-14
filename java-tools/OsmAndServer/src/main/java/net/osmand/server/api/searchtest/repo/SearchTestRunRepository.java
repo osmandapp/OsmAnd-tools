@@ -144,9 +144,8 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		public Integer resultsCount;
 	}
 
-	@Query(value = "SELECT j.* FROM run j WHERE j.case_id = :caseId ORDER BY j.updated DESC, j.id DESC",
-			countQuery = "SELECT COUNT(j.id) FROM run j WHERE j.case_id = :caseId",
-			nativeQuery = true)
+	@Query(value = "SELECT j FROM Run j JOIN FETCH j.testCase c JOIN FETCH j.dataset d WHERE j.caseId = :caseId ORDER BY j.updated DESC, j.id DESC",
+			countQuery = "SELECT COUNT(j) FROM Run j WHERE j.caseId = :caseId")
 	Page<Run> findByCaseId(@Param("caseId") Long caseId, Pageable pageable);
 
 	@Query(value = "SELECT DISTINCT j FROM Run j " +

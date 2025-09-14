@@ -2,11 +2,13 @@ package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -37,47 +39,104 @@ public interface ReportService {
 			TestCaseStatus generatedChart) {
 	}
 
-	String REPORT_SQL = """
-WITH result AS (
-	SELECT
-		UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type,
-		count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row,
-		actual_place <= ?                                                  AS is_place,
-		min_distance <= ?                                                  AS is_dist,
-		CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id,
-		COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name,
-		COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1,
-		COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2,
-		CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id,
-		(query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'
-			AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'
-			AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')
-																		   AS is_addr_match,
-		((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =
-		 CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match
-	FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance
-)
-SELECT CASE
-	WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'
-	WHEN is_place AND is_dist THEN 'Found'
-	WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Near'
-	WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Too Far'
-    ELSE 'Not Found'
-END AS "group", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
-FROM result """;
-
+	Logger LOGGER = LoggerFactory.getLogger(ReportService.class);
+	int PLACE_LIMIT = 10;
+	int DISTANCE_LIMIT = 100;
+	String BASE_SQL = """
+			WITH result AS (
+				SELECT gen_id as gen_id,
+					UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type,
+					count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row,
+					actual_place <= ?                                                  AS is_place,
+					min_distance <= ?                                                  AS is_dist,
+					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id,
+					COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name,
+					COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1,
+					COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2,
+					CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id,
+					(query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'
+						AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'
+						AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')
+																					   AS is_addr_match,
+					((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =
+					 CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match
+				FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance
+			) """;
+	String REPORT_SQL = BASE_SQL + """
+			SELECT CASE
+				WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'
+				WHEN is_place AND is_dist THEN 'Found'
+				WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Near'
+				WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Too Far'
+			    ELSE 'Not Found'
+			END AS "group", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
+			FROM result """;
 	String FULL_REPORT_SQL = REPORT_SQL + """ 
 			 UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM
 			(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
 			  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id
 			FROM gen_result WHERE case_id = ? ORDER BY id)""";
+	String COMPARISON_REPORT_SQL = BASE_SQL + """
+			SELECT gen_id, type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
+			FROM result WHERE COALESCE(is_place AND is_dist, false) = ? ORDER BY gen_id""";
 
 	JdbcTemplate getJdbcTemplate();
 
 	ObjectMapper getObjectMapper();
 
+	default List<Map<String, Object>[]> compare(boolean found, Long caseId, Long runId1, Long runId2) {
+		// Load filtered results (Found/Not Found) for each run, ordered by _id
+		List<Map<String, Object>> results1 = extendTo(
+				getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, PLACE_LIMIT, DISTANCE_LIMIT, runId1, found)
+		);
+		List<Map<String, Object>> results2 = extendTo(
+				getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, PLACE_LIMIT, DISTANCE_LIMIT, runId2, found)
+		);
+
+		List<Map<String, Object>[]> result = new ArrayList<>(Math.max(results1.size(), results2.size()));
+
+		int i = 0, j = 0;
+		while (i < results1.size() && j < results2.size()) {
+			Map<String, Object> r1 = results1.get(i);
+			Map<String, Object> r2 = results2.get(j);
+			Integer id1 = (Integer) r1.get("gen_id");
+			Integer id2 = (Integer) r2.get("gen_id");
+
+			if (id1 == null && id2 == null) {
+				result.add(new Map[]{r1, r2});
+				i++;
+				j++;
+			} else if (id1 == null) {
+				result.add(new Map[]{r1, null});
+				i++;
+			} else if (id2 == null) {
+				result.add(new Map[]{null, r2});
+				j++;
+			} else if (id1.equals(id2)) {
+				result.add(new Map[]{r1, r2});
+				i++;
+				j++;
+			} else if (id1 < id2) {
+				result.add(new Map[]{r1, null});
+				i++;
+			} else { // id2 < id1
+				result.add(new Map[]{null, r2});
+				j++;
+			}
+		}
+
+		while (i < results1.size()) {
+			result.add(new Map[]{results1.get(i++), null});
+		}
+		while (j < results2.size()) {
+			result.add(new Map[]{null, results2.get(j++)});
+		}
+
+		return result;
+	}
+
 	default void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
-								   String format) throws IOException {
+	                                String format) throws IOException {
 		if ("csv".equalsIgnoreCase(format)) {
 			List<Map<String, Object>> results = getJdbcTemplate().queryForList(REPORT_SQL,
 					placeLimit, distLimit, runId);
@@ -85,7 +144,7 @@ FROM result """;
 		} else if ("json".equalsIgnoreCase(format)) {
 			List<Map<String, Object>> results = getJdbcTemplate().queryForList(FULL_REPORT_SQL,
 					placeLimit, distLimit, runId, caseId);
-			writeAsJson(writer, results);
+			getObjectMapper().writeValue(writer, extendTo(results));
 		} else {
 			throw new IllegalArgumentException("Unsupported format: " + format);
 		}
@@ -128,6 +187,7 @@ FROM result """;
 					duration);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
+			LOGGER.error("Failed to process TestCaseStatus for {}.", cased, ee);
 			return Optional.empty();
 		}
 	}
@@ -140,14 +200,14 @@ FROM result """;
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE actual_place <= 10 and min_distance <= 50) AS found
+				    count(*) FILTER (WHERE actual_place <= ? and min_distance <= ?) AS found
 				FROM
 				    run_result
 				WHERE
 				    run_id = ?
 				""";
 		try {
-			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, runId);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, PLACE_LIMIT, DISTANCE_LIMIT, runId);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
@@ -174,6 +234,7 @@ FROM result """;
 					duration, averagePlace, found, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
+			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
 			return Optional.empty();
 		}
 	}
@@ -219,8 +280,8 @@ FROM result """;
 		return Optional.of(finalStatus);
 	}
 
-	default void writeAsJson(Writer writer, List<Map<String, Object>> results) throws IOException {
-		List<Map<String, Object>> expanded = results.stream().map(row -> {
+	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results) {
+		return results.stream().map(row -> {
 			Map<String, Object> out = new LinkedHashMap<>();
 			// copy base fields except 'row'
 			for (Map.Entry<String, Object> e : row.entrySet()) {
@@ -243,7 +304,6 @@ FROM result """;
 			}
 			return out;
 		}).collect(Collectors.toList());
-		getObjectMapper().writeValue(writer, expanded);
 	}
 
 	default void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {

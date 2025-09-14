@@ -401,6 +401,10 @@ public class SearchTestService implements ReportService, DataService {
 		return runRepo.findFiltered(name, labels, pageable);
 	}
 
+	public Page<Run> getRuns(Long caseId, Pageable pageable) {
+		return runRepo.findByCaseId(caseId, pageable);
+	}
+
 	@Async
 	public CompletableFuture<Void> deleteRun(Long id) {
 		String sql = "DELETE FROM run_result WHERE run_id = ?";
