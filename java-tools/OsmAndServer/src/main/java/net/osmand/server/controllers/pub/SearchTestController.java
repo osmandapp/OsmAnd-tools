@@ -54,10 +54,11 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getTestCases(datasetId, pageable));
 	}
 
-	@GetMapping(value = "/cases/{caseId}/runs", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/runs", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Page<Run>> getRuns(@PathVariable Long caseId, Pageable pageable) {
-		return ResponseEntity.ok(testSearchService.getRuns(caseId, pageable));
+	public ResponseEntity<Page<Run>> getRuns(@RequestParam(required = false) String name,
+	                                         @RequestParam(required = false) String labels, Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getRuns(name, labels, pageable));
 	}
 
 	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)

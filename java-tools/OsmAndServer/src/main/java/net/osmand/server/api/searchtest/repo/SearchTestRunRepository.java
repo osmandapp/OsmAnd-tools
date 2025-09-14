@@ -2,8 +2,9 @@ package net.osmand.server.api.searchtest.repo;
 
 import jakarta.persistence.*;
 import net.osmand.server.SearchTestRepository;
-import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
+import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -13,14 +14,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
+import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Map;
 
 @SearchTestRepository
 public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
-	@Entity
+	@Entity(name = "Run")
 	@Table(name = "run")
 	public class Run extends RunParam {
 		public enum Status {
@@ -37,6 +38,15 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 
 		@Column(name = "dataset_id", nullable = false)
 		public Long datasetId;
+
+		// Relationships (read-only mappings to parent entities)
+		@ManyToOne(fetch = FetchType.LAZY)
+		@JoinColumn(name = "case_id", referencedColumnName = "id", insertable = false, updatable = false)
+		public TestCase testCase;
+
+		@ManyToOne(fetch = FetchType.LAZY)
+		@JoinColumn(name = "dataset_id", referencedColumnName = "id", insertable = false, updatable = false)
+		public Dataset dataset;
 
 		@CreationTimestamp
 		public LocalDateTime timestamp;
@@ -134,6 +144,33 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		public Integer resultsCount;
 	}
 
-	@Query("SELECT j FROM SearchTestRunRepository$Run j WHERE j.caseId = :caseId ORDER by j.updated DESC")
+	@Query(value = "SELECT j.* FROM run j WHERE j.case_id = :caseId ORDER BY j.updated DESC, j.id DESC",
+			countQuery = "SELECT COUNT(j.id) FROM run j WHERE j.case_id = :caseId",
+			nativeQuery = true)
 	Page<Run> findByCaseId(@Param("caseId") Long caseId, Pageable pageable);
+
+	@Query(value = "SELECT DISTINCT j FROM Run j " +
+			"JOIN FETCH j.testCase c " +
+			"JOIN FETCH j.dataset d " +
+			"WHERE ( (:name IS NULL OR :name = '') " +
+			"        OR LOWER(j.name) LIKE CONCAT('%', LOWER(:name), '%') " +
+			"        OR LOWER(c.name) LIKE CONCAT('%', LOWER(:name), '%') " +
+			"        OR LOWER(d.name) LIKE CONCAT('%', LOWER(:name), '%') ) " +
+			"AND  ( (:labels IS NULL OR :labels = '') " +
+			"        OR LOWER(COALESCE(c.labels, '')) LIKE CONCAT('%', LOWER(:labels), '%') " +
+			"        OR LOWER(COALESCE(d.labels, '')) LIKE CONCAT('%', LOWER(:labels), '%') ) " +
+			"ORDER BY j.updated DESC, j.id DESC",
+			countQuery = "SELECT COUNT(j) FROM Run j " +
+					"JOIN j.testCase c " +
+					"JOIN j.dataset d " +
+					"WHERE ( (:name IS NULL OR :name = '') " +
+					"        OR LOWER(j.name) LIKE CONCAT('%', LOWER(:name), '%') " +
+					"        OR LOWER(c.name) LIKE CONCAT('%', LOWER(:name), '%') " +
+					"        OR LOWER(d.name) LIKE CONCAT('%', LOWER(:name), '%') ) " +
+					"AND  ( (:labels IS NULL OR :labels = '') " +
+					"        OR LOWER(COALESCE(c.labels, '')) LIKE CONCAT('%', LOWER(:labels), '%') " +
+					"        OR LOWER(COALESCE(d.labels, '')) LIKE CONCAT('%', LOWER(:labels), '%') ) ")
+	Page<Run> findFiltered(@Param("name") String name,
+			@Param("labels") String labels,
+			Pageable pageable);
 }

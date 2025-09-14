@@ -397,8 +397,8 @@ public class SearchTestService implements ReportService, DataService {
 		return new PageImpl<>(items, pageable, page.getTotalElements());
 	}
 
-	public Page<Run> getRuns(Long caseId, Pageable pageable) {
-		return runRepo.findByCaseId(caseId, pageable);
+	public Page<Run> getRuns(String name, String labels, Pageable pageable) {
+		return runRepo.findFiltered(name, labels, pageable);
 	}
 
 	@Async
