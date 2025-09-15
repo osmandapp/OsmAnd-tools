@@ -80,6 +80,8 @@ public class SearchTestRepositoryConfiguration {
 	    vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
 
 	    if (!isSearchTestDataSourceInitialized()) {
+		    // Disable any schema generation/validation
+		    vendorProps.put("jakarta.persistence.schema-generation.database.action", "none");
 		    // Allow to start without searchtestdatasource
 		    vendorProps.put("hibernate.hbm2ddl.auto", "none");
 		    vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
