@@ -2,7 +2,6 @@ package net.osmand.obf.preparation;
 
 import java.awt.Shape;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferFloat;
 import java.awt.image.DataBufferShort;
 import java.io.*;
 import java.net.URL;
@@ -21,6 +20,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
+import net.osmand.binary.ObfConstants;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -383,7 +383,7 @@ public class IndexHeightData {
 		Node prev = null;
 		for (int i = 0; i < ns.size(); i++) {
 			Node n = ns.get(i);
-			if (n != null) {
+			if (n != null && n.getId() <= ObfConstants.PROPAGATE_NODE_BIT) {
 				double pointHeight = getPointHeight(n.getLatitude(), n.getLongitude());
 				if (prev == null) {
 					if (pointHeight != INEXISTENT_HEIGHT) {
