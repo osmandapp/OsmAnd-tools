@@ -1279,7 +1279,7 @@ public class OsmAndMapsService {
 				return ref;
 			}
 		}
-		return null;
+		throw new IOException("Base map not found! Add it in OBF dir.");
 	}
 
 	private List<File> prepareMaps(List<File> files, List<LatLon> bbox, int maxNumberMaps) throws IOException {

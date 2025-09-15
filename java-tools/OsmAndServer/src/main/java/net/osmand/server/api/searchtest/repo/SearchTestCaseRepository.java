@@ -44,6 +44,9 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column(name = "version")
 		public String version;
 
+		@Column()
+		public String name;
+
 		public String getNorthWest() {
 			return northWest;
 		}

@@ -76,14 +76,16 @@ public class SearchTestRepositoryConfiguration {
                         jpaProperties.getProperties(), new HibernateSettings()
                 )
         );
-        // Force SQLite dialect for this EMF
-        vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
+	    // Force SQLite dialect for this EMF
+	    vendorProps.put("hibernate.dialect", "net.osmand.server.StrictSQLiteDialect");
 
-        if (!isSearchTestDataSourceInitialized()) {
-            // Allow to start without searchtestdatasource
-            vendorProps.put("hibernate.hbm2ddl.auto", "none");
-            vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
-        }
+	    if (!isSearchTestDataSourceInitialized()) {
+		    // Disable any schema generation/validation
+		    vendorProps.put("jakarta.persistence.schema-generation.database.action", "none");
+		    // Allow to start without searchtestdatasource
+		    vendorProps.put("hibernate.hbm2ddl.auto", "none");
+		    vendorProps.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
+	    }
 
         return builder
                 .dataSource(dataSource)

@@ -56,8 +56,15 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/runs", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Page<Run>> getRuns(@PathVariable Long caseId, Pageable pageable) {
+	public ResponseEntity<Page<Run>> getRunsPerCase(@PathVariable Long caseId, Pageable pageable) {
 		return ResponseEntity.ok(testSearchService.getRuns(caseId, pageable));
+	}
+
+	@GetMapping(value = "/runs", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Page<Run>> getRuns(@RequestParam(required = false) String name,
+	                                         @RequestParam(required = false) String labels, Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getRuns(name, labels, pageable));
 	}
 
 	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -215,6 +222,13 @@ public class SearchTestController {
 				new RuntimeException("Run not found with id: " + runId));
 		return testSearchService.getRunReport(run.caseId, runId, placeLimit, distLimit)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<List<Map<String, Object>[]>> compare(@PathVariable Long caseId, @RequestParam Boolean found,
+	                                                           @RequestParam Long runId1,
+	                                                           @RequestParam Long runId2) throws IOException {
+		return ResponseEntity.ok(testSearchService.compare(found, caseId, runId1, runId2));
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")
