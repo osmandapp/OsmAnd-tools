@@ -35,6 +35,7 @@ import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import static net.osmand.data.City.CityType.valueFromString;
+import static net.osmand.obf.preparation.IndexWeatherData.bandIndexByCode;
 
 @Controller
 @RequestMapping("/weather-api")
@@ -74,7 +75,7 @@ public class WeatherController {
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
 		File folder = new File(weatherLocation + weatherType + "/tiff/");
-		List<Object[]> dt = new ArrayList<>();
+		List<WeatherPoint> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
@@ -89,19 +90,14 @@ public class WeatherController {
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
-					try {
-						Object[] data = new Object[8];
-						data[0] = c.getTimeInMillis();
-						data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
 						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
-						for (int i = 0; i < wt.getBands() && i < 5; i++) {
-							data[2 + i] = wt.getValue(i, lat, lon, weatherType);
-						}
-						data[7] = fl.lastModified();
-						dt.add(normalizeValues(data, weatherType, increment));
-					} catch (IOException e) {
-						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
-					}
+
+						long ts   = c.getTimeInMillis();
+						String tm = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
+						long fm   = fl.lastModified();
+
+						WeatherPoint row = buildPoint(wt, lat, lon, weatherType, ts, tm, fm, increment);
+						dt.add(row);
 				} else {
 					if (weatherType.equals(ECWMF_WEATHER_TYPE) && increment != ECWMF_INCREMENT) {
 						increment = ECWMF_INCREMENT;
@@ -119,16 +115,6 @@ public class WeatherController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
-	}
-	
-	private Object[] normalizeValues(Object[] data, String weatherType, int increment) {
-		int precipIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 4 : 6;
-		int pressureIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 3 : 4;
-		increment = weatherType.equals(ECWMF_WEATHER_TYPE) ? increment : 1;
-		data[precipIndex] = ((double) data[precipIndex]) * 3600 / increment;
-		data[pressureIndex] = ((double) data[pressureIndex]) * 0.01;
-		
-		return data;
 	}
 	
 	static class AddressInfo {
@@ -248,5 +234,53 @@ public class WeatherController {
 		double distance = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
 		
 		return Math.log10(population + 1.0) - distance;
+	}
+
+	static class WeatherPoint {
+		long ts;
+		String time;
+		double temperature;
+		double precipitation;
+		double wind;
+		double pressure;
+		double cloudiness;
+		long fileModified;
+
+		WeatherPoint(long ts, String time) {
+			this.ts = ts;
+			this.time = time;
+		}
+	}
+
+	private static WeatherPoint buildPoint(WeatherTiff wt,
+	                                       double lat, double lon,
+	                                       String weatherType,
+	                                       long ts, String time, long fileModified,
+	                                       int increment) {
+		Map<Integer, String> codes = wt.getBandData();
+		WeatherPoint wp = new WeatherPoint(ts, time);
+
+		Integer iTemp = bandIndexByCode(codes, IndexWeatherData.WeatherParam.TEMP.code);
+		Integer iPres = bandIndexByCode(codes, IndexWeatherData.WeatherParam.PRESSURE.code);
+		Integer iWind = bandIndexByCode(codes, IndexWeatherData.WeatherParam.WIND.code);
+		Integer iPrec = bandIndexByCode(codes, IndexWeatherData.WeatherParam.PRECIP.code);
+		Integer iCloud = bandIndexByCode(codes, IndexWeatherData.WeatherParam.CLOUD.code);
+
+		if (iTemp != null) wp.temperature = wt.getValue(iTemp, lat, lon, weatherType);
+		if (iPres != null) wp.pressure = wt.getValue(iPres, lat, lon, weatherType);
+		if (iWind != null) wp.wind = wt.getValue(iWind, lat, lon, weatherType);
+		if (iPrec != null) wp.precipitation = wt.getValue(iPrec, lat, lon, weatherType);
+		if (iCloud != null) wp.cloudiness = wt.getValue(iCloud, lat, lon, weatherType);
+
+		wp.fileModified = fileModified;
+		normalizeValues(wp, weatherType, increment);
+		return wp;
+	}
+
+	private static void normalizeValues(WeatherPoint p, String weatherType, int increment) {
+		final boolean isECWMF = ECWMF_WEATHER_TYPE.equals(weatherType);
+		int inc = isECWMF ? Math.max(1, increment) : 1;
+		p.precipitation = p.precipitation * 3600.0 / inc;
+		p.pressure = p.pressure * 0.01;
 	}
 }
