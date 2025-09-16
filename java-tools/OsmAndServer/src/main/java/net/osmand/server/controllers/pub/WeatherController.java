@@ -74,7 +74,7 @@ public class WeatherController {
 	                                            @RequestParam double lon,
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
-		File folder = new File("/Users/plotva/osmand/weather/gfs");
+		File folder = new File(weatherLocation + weatherType + "/tiff/");
 		List<WeatherPoint> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
