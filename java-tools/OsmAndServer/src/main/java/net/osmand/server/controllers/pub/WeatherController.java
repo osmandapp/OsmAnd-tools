@@ -239,11 +239,11 @@ public class WeatherController {
 	static class WeatherPoint {
 		long ts;
 		String time;
-		double temperature;
-		double precipitation;
-		double wind;
-		double pressure;
-		double cloudiness;
+		Double temperature;
+		Double precipitation;
+		Double wind;
+		Double pressure;
+		Double cloudiness;
 		long fileModified;
 
 		WeatherPoint(long ts, String time) {

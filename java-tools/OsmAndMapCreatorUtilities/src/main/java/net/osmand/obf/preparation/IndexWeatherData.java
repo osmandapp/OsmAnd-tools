@@ -331,16 +331,16 @@ public class IndexWeatherData {
 			wth[1][i] = iTemp  != null ? td.getValue(iTemp,  lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
 			wth[2][i] = iPrec  != null ? td.getValue(iPrec,  lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
 			wth[3][i] = iWind  != null ? td.getValue(iWind,  lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
-			wth[3][i] = iPres  != null ? td.getValue(iPres,  lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
-			wth[1][i] = iCloud != null ? td.getValue(iCloud, lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
+			wth[4][i] = iPres  != null ? td.getValue(iPres,  lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
+			wth[5][i] = iCloud != null ? td.getValue(iCloud, lat, lon, ECWMF_WEATHER_TYPE) : INEXISTENT_VALUE;
 		}
 
 		System.out.println("TIME    :      " + format("%3.0f:00", wth[0]));
 		System.out.println("Temp (C):      " + format("%6.1f", wth[1]));
 		System.out.println("Precipitation: " + format("%6.2f", wth[2], 1000 * 1000));
-		System.out.println("Wind (m/s):    " + format("%6.2f", wth[4]));
-		System.out.println("Pressure (kPa):" + format("%6.2f", wth[3], 0.001));
-		System.out.println("Cloud %%:      " + format("%6.2f", wth[1]));
+		System.out.println("Wind (m/s):    " + format("%6.2f", wth[3]));
+		System.out.println("Pressure (kPa):" + format("%6.2f", wth[4], 0.001));
+		System.out.println("Cloud %%:      " + format("%6.2f", wth[5]));
 	}
 
 	private static String format(String fmt, double[] ds) {
