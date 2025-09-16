@@ -47,7 +47,7 @@ public class WikiDatabaseUpdater {
                 LocalDate lastModifiedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
                 updateFileList = getLatestFilesURL(WIKIDATA_INCR_URL, lastModifiedDate);
             } else {
-                long maxPageId = getMaxId();
+                long maxPageId = getMaxPageId();
                 List<FileForDBUpdate> pages = readFilesUrl(WIKIDATA_LATEST_URL);
                 for (FileForDBUpdate p : pages) {
                     if (maxPageId < p.maxPageId || maxPageId < p.minPageId) {
@@ -236,11 +236,15 @@ public class WikiDatabaseUpdater {
         return maxQId;
     }
 
-    private long getMaxId() throws IOException {
-        String s = "https://www.wikidata.org/wiki/Special:EntityData/Q"+maxQId+".json";
+    private long getMaxPageId() throws IOException {
+        String s = "https://www.wikidata.org/wiki/Special:EntityData/Q" + maxQId + ".json";
         URL url = new URL(s);
+        URLConnection connection = url.openConnection();
+        connection.setRequestProperty("User-Agent", USER_AGENT);
+        connection.connect();
+        InputStream inputStream = connection.getInputStream();
         ObjectMapper mapper = new ObjectMapper();
-        JsonNode json = mapper.readTree(url);
+        JsonNode json = mapper.readTree(inputStream);
         if (json != null) {
             JsonNode jsonPageId = json.findValue("pageid");
             if (jsonPageId != null) {
