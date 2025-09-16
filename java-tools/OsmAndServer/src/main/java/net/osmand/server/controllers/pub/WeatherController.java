@@ -239,11 +239,11 @@ public class WeatherController {
 	static class WeatherPoint {
 		long ts;
 		String time;
-		Double temperature;
-		Double precipitation;
+		Double temp;
+		Double precip;
 		Double wind;
-		Double pressure;
-		Double cloudiness;
+		Double press;
+		Double cloud;
 		long fileModified;
 
 		WeatherPoint(long ts, String time) {
@@ -270,11 +270,11 @@ public class WeatherController {
 		Integer iPrec = bandIndexByCode(codes, IndexWeatherData.WeatherParam.PRECIP.code);
 		Integer iCloud = bandIndexByCode(codes, IndexWeatherData.WeatherParam.CLOUD.code);
 
-		if (iTemp != null) wp.temperature = wt.getValue(iTemp, lat, lon, weatherType);
-		if (iPres != null) wp.pressure = wt.getValue(iPres, lat, lon, weatherType);
+		if (iTemp != null) wp.temp = wt.getValue(iTemp, lat, lon, weatherType);
+		if (iPres != null) wp.press = wt.getValue(iPres, lat, lon, weatherType);
 		if (iWind != null) wp.wind = wt.getValue(iWind, lat, lon, weatherType);
-		if (iPrec != null) wp.precipitation = wt.getValue(iPrec, lat, lon, weatherType);
-		if (iCloud != null) wp.cloudiness = wt.getValue(iCloud, lat, lon, weatherType);
+		if (iPrec != null) wp.precip = wt.getValue(iPrec, lat, lon, weatherType);
+		if (iCloud != null) wp.cloud = wt.getValue(iCloud, lat, lon, weatherType);
 
 		wp.fileModified = fileModified;
 		normalizeValues(wp, weatherType, increment);
@@ -282,24 +282,24 @@ public class WeatherController {
 	}
 
 	private static void normalizeValues(WeatherPoint p, String weatherType, int increment) {
-		p.temperature = WeatherPoint.isValid(p.temperature) ? Math.round(p.temperature * 1000.0) / 1000.0 : null;
+		p.temp = WeatherPoint.isValid(p.temp) ? Math.round(p.temp * 1000.0) / 1000.0 : null;
 
-		if (WeatherPoint.isValid(p.precipitation)) {
+		if (WeatherPoint.isValid(p.precip)) {
 			final boolean isECWMF = ECWMF_WEATHER_TYPE.equals(weatherType);
 			// Divide by inc (for ECMWF the step is 3h or 6h) to normalize it to the average intensity per 1 hour, regardless of the larger forecast step.
 			int inc = isECWMF ? Math.max(1, increment) : 1;
 			// PRATE in the metadata is the precipitation rate in kg/m²/s (= mm/s). We multiply it by 3600 to convert it to mm/hour.
-			p.precipitation = p.precipitation * 3600.0 / inc;
-			p.precipitation = Math.round(p.precipitation * 1000.0) / 1000.0;
+			p.precip = p.precip * 3600.0 / inc;
+			p.precip = Math.round(p.precip * 1000.0) / 1000.0;
 		}
 
-		if (WeatherPoint.isValid(p.pressure)) {
+		if (WeatherPoint.isValid(p.press)) {
 			// Convert PRATE in the metadata from Pascals (Pa) to the standard for weather maps, hectopascals (hPa).
-			p.pressure = p.pressure * 0.01;
-			p.pressure = Math.round(p.pressure * 1000.0) / 1000.0;
+			p.press = p.press * 0.01;
+			p.press = Math.round(p.press * 1000.0) / 1000.0;
 		}
 
 		p.wind = WeatherPoint.isValid(p.wind) ? Math.round(p.wind * 1000.0) / 1000.0 : null;
-		p.cloudiness = WeatherPoint.isValid(p.cloudiness) ? Math.round(p.cloudiness * 1000.0) / 1000.0 : null;
+		p.cloud = WeatherPoint.isValid(p.cloud) ? Math.round(p.cloud * 1000.0) / 1000.0 : null;
 	}
 }
