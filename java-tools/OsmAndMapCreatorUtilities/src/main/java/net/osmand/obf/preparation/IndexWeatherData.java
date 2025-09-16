@@ -360,11 +360,11 @@ public class IndexWeatherData {
 	}
 
 	public enum WeatherParam {
-		TEMP("TMP",    "temperature"),
-		PRESSURE("PRMSL","pressure"),
+		TEMP("TMP",    "temp"),
+		PRESSURE("PRMSL","press"),
 		WIND("GUST",   "wind"),
-		PRECIP("PRATE","precipitation"),
-		CLOUD("TCDC",  "cloudiness");
+		PRECIP("PRATE","precip"),
+		CLOUD("TCDC",  "cloud");
 
 		public final String code;
 		final String field;

@@ -74,7 +74,7 @@ public class WeatherController {
 	                                            @RequestParam double lon,
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
-		File folder = new File(weatherLocation + weatherType + "/tiff/");
+		File folder = new File("/Users/plotva/osmand/weather/gfs");
 		List<WeatherPoint> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
@@ -250,6 +250,10 @@ public class WeatherController {
 			this.ts = ts;
 			this.time = time;
 		}
+
+		private static boolean isValid(Double v) {
+			return v != null && v != IndexWeatherData.INEXISTENT_VALUE;
+		}
 	}
 
 	private static WeatherPoint buildPoint(WeatherTiff wt,
@@ -278,9 +282,24 @@ public class WeatherController {
 	}
 
 	private static void normalizeValues(WeatherPoint p, String weatherType, int increment) {
-		final boolean isECWMF = ECWMF_WEATHER_TYPE.equals(weatherType);
-		int inc = isECWMF ? Math.max(1, increment) : 1;
-		p.precipitation = p.precipitation * 3600.0 / inc;
-		p.pressure = p.pressure * 0.01;
+		p.temperature = WeatherPoint.isValid(p.temperature) ? Math.round(p.temperature * 1000.0) / 1000.0 : null;
+
+		if (WeatherPoint.isValid(p.precipitation)) {
+			final boolean isECWMF = ECWMF_WEATHER_TYPE.equals(weatherType);
+			// Divide by inc (for ECMWF the step is 3h or 6h) to normalize it to the average intensity per 1 hour, regardless of the larger forecast step.
+			int inc = isECWMF ? Math.max(1, increment) : 1;
+			// PRATE in the metadata is the precipitation rate in kg/m²/s (= mm/s). We multiply it by 3600 to convert it to mm/hour.
+			p.precipitation = p.precipitation * 3600.0 / inc;
+			p.precipitation = Math.round(p.precipitation * 1000.0) / 1000.0;
+		}
+
+		if (WeatherPoint.isValid(p.pressure)) {
+			// Convert PRATE in the metadata from Pascals (Pa) to the standard for weather maps, hectopascals (hPa).
+			p.pressure = p.pressure * 0.01;
+			p.pressure = Math.round(p.pressure * 1000.0) / 1000.0;
+		}
+
+		p.wind = WeatherPoint.isValid(p.wind) ? Math.round(p.wind * 1000.0) / 1000.0 : null;
+		p.cloudiness = WeatherPoint.isValid(p.cloudiness) ? Math.round(p.cloudiness * 1000.0) / 1000.0 : null;
 	}
 }
