@@ -67,7 +67,12 @@ public class IndexWeatherData {
 		
 		public WeatherTiff(File file) {
 			this.file = file;
-			readTiffFile(file);
+			readTiffFile(file, false);
+		}
+
+		public WeatherTiff(File file, boolean readMetadata) {
+			this.file = file;
+			readTiffFile(file, readMetadata);
 		}
 		
 		public int getBands() {
@@ -77,22 +82,63 @@ public class IndexWeatherData {
 		public Map<Integer, String> getBandData() { return bandData; }
 		
 		
-		private void readTiffFile(File file) {
+		private void readTiffFile(File file, boolean readMetadata) {
 			if (file.exists()) {
-				Pair<BufferedImage, String> p = iterativeReadData(file);
-				BufferedImage img = p.getLeft();
-				String metadata = p.getRight();
-				readWeatherData(img);
-				bandData = parseBandData(metadata);
-				if (img == null) {
-					log.error("Failed to read image data from file: " + file.getAbsolutePath());
+				if (readMetadata) {
+					Pair<BufferedImage, String> p = iterativeReadDataWithMeta(file);
+					BufferedImage img = p.getLeft();
+					String metadata = p.getRight();
+					readWeatherData(img);
+					bandData = parseBandData(metadata);
+					if (img == null) {
+						log.error("Failed to read image data from file: " + file.getAbsolutePath());
+					}
+				} else {
+					BufferedImage img = iterativeReadData(file);
+					readWeatherData(img);
+					if (img == null) {
+						log.error("Failed to read image data from file: " + file.getAbsolutePath());
+					}
 				}
 			} else {
 				log.error("File does not exist: " + file.getAbsolutePath());
 			}
 		}
+
+		private BufferedImage iterativeReadData(File file) {
+			boolean readSuccess = false;
+			BufferedImage img = null;
+			Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("tiff");
+			ImageInputStream iis = null;
+			while (readers.hasNext() && !readSuccess) {
+				ImageReader reader = readers.next();
+				if (reader instanceof com.sun.media.imageioimpl.plugins.tiff.TIFFImageReader) {
+					try {
+						iis = ImageIO.createImageInputStream(file);
+						reader.setInput(iis, true);
+						img = reader.read(0);
+						readSuccess = true;
+					} catch (IOException e) {
+						log.info("Error reading TIFF file with reader " + reader.getClass().getName() + ": " + e.getMessage());
+					} finally {
+						reader.dispose();
+						if (iis != null) {
+							try {
+								iis.close();
+							} catch (IOException e) {
+								log.error("Error closing ImageInputStream: " + e.getMessage());
+							}
+						}
+					}
+				}
+			}
+			if (!readSuccess) {
+				log.error("Failed to read TIFF file with all available readers.");
+			}
+			return img;
+		}
 		
-		private Pair<BufferedImage, String> iterativeReadData(File file) {
+		private Pair<BufferedImage, String> iterativeReadDataWithMeta(File file) {
 			boolean readSuccess = false;
 			BufferedImage img = null;
 			String metaData = null;

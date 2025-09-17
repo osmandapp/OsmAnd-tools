@@ -90,7 +90,7 @@ public class WeatherController {
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
-						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
+						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl, true);
 
 						long ts   = c.getTimeInMillis();
 						String tm = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
