@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -33,6 +34,9 @@ public class OrderManagementController {
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
+
+	@Autowired
+	private PurchasesDataLoader purchasesDataLoader;
 
 
 	@Autowired
@@ -92,8 +96,9 @@ public class OrderManagementController {
 	@GetMapping("/skus")
 	@ResponseBody
 	public List<String> getSkus(@RequestParam boolean isSub,
-	                            @RequestParam boolean isInApp) {
-		return orderManagementService.getSkus(isSub, isInApp);
+	                            @RequestParam boolean isInApp,
+	                            @RequestParam(defaultValue = "all") String platform) {
+		return orderManagementService.getSkus(isSub, isInApp, platform, purchasesDataLoader);
 	}
 
 	@PostMapping("/orders/register")
