@@ -247,6 +247,8 @@ public class OrderManagementService {
 		if (raw == null) return "";
 		String p = raw.trim().toLowerCase();
 		if ("fastspring".equals(p)) return "web";
+		if ("google".equals(p)) return "android";
+		if ("apple".equals(p)) return "ios";
 		return p;
 	}
 
