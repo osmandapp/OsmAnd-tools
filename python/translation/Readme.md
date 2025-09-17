@@ -78,11 +78,13 @@ python/translation/translate_docs.sh all web-translation.json # Example to trans
 
 ### 3. Commit & push changes
 
+```bash
 git checkout -b "test-fr-translate-2025-06-12_14-32"                # Create and switch to new branch
 git add -A
 git add -f ./map/src/resources/translations/fr/web-translation.json # Add specific file because web-translation.json is in ignore list
 git commit -m "Auto translate fr"
 git push --force origin "test-fr-translate-2025-06-12_14-32"
+```
 
 ### 4. Clean up after translation (optional)
 
