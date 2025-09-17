@@ -125,6 +125,7 @@ public class IndexWeatherData {
 						if (iis != null) {
 							try {
 								iis.close();
+								iis = null;
 							} catch (IOException e) {
 								log.error("Error closing ImageInputStream: " + e.getMessage());
 							}
@@ -160,6 +161,7 @@ public class IndexWeatherData {
 						if (iis != null) {
 							try {
 								iis.close();
+								iis = null;
 							} catch (IOException e) {
 								log.error("Error closing ImageInputStream: " + e.getMessage());
 							}
@@ -180,7 +182,7 @@ public class IndexWeatherData {
 			if (root == null) {
 				try { root = md.getAsTree(IIOMetadataFormatImpl.standardMetadataFormatName); } catch (IllegalArgumentException ignore) {}
 			}
-			if (!(root instanceof org.w3c.dom.Element)) return null;
+			if (!(root instanceof Element)) return null;
 
 			NodeList fields = ((Element) root).getElementsByTagName(TIFF_FIELD);
 			String metadata = null;
