@@ -107,6 +107,18 @@ public class OsmAndMapsService {
 	private static final int MAX_CONTEXTS_PER_PROFILE_DEFAULT = 2;
 	private static final Map<String, Integer> SELECTED_PROFILES = Map.of(GeneralRouterProfile.CAR.getBaseProfile(), 3, GeneralRouterProfile.BICYCLE.getBaseProfile(), 3);
 	
+	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
+	static {
+		ALWAYS_IN_MEMORY.add("car:{weight=0, height=0, length=0, width=0, motor_type=0}");
+		ALWAYS_IN_MEMORY.add("bicycle:{driving_style_balance=true, relief_smoothness_factor_plains=true}");
+		ALWAYS_IN_MEMORY.add("pedestrian:{height_obstacles=true, relief_smoothness_factor_plains=true}");
+	}
+	
+	
+	
+	
+//	driving_style_balance=true, relief_smoothness_factor_plains=true
+	
 	private static final long MAX_SAME_PROFILE_WAIT_MS = 6000;
 
 
@@ -221,9 +233,9 @@ public class OsmAndMapsService {
 
 		@Override
 		public String toString() {
-			String p = profile.length() > 5 ? profile.substring(0, 5) : profile;
 			return (locked == 0 ? '\u25FB' : '\u25FC')
-					+ String.format("%s %s %s %d, %s min", p, hCtx == null ? "-" : hCtx.hashCode() + "",
+					+ (ALWAYS_IN_MEMORY.contains(profile + ":" + routeParamsStr) ? "*" : "")
+					+ String.format("%s %s %s %d, %s min", profile, hCtx == null ? "-" : hCtx.hashCode() + "",
 							routeParamsStr, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 
@@ -367,11 +379,13 @@ public class OsmAndMapsService {
 
 			// 1. Prepare to remove according to cache limits.
 			Iterator<RoutingCacheContext> it = routingCaches.iterator();
+			List<String> profiles = new ArrayList<>(ALWAYS_IN_MEMORY);
 			while (it.hasNext()) {
 				RoutingCacheContext check = it.next();
 				if (check.locked == 0 && (routingCaches.size() > CACHE_CLEAN_OPEN_ROUTING_CONTEXTS
 						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_SEC)) {
-					if (!"".equals(check.routeParamsStr) || !SELECTED_PROFILES.containsKey(check.profile)) {
+					boolean alwaysKeep = profiles.remove(check.profile + ":" + check.routeParamsStr);
+					if (!alwaysKeep) {
 						removed.add(check); // lower importance() means higher removal priority
 						System.out.printf("Clean up %s global routing context\n", check);
 						it.remove();
