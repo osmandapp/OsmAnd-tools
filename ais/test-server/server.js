@@ -1,7 +1,7 @@
 // server.js
 const net = require('net');
 const fs = require('fs');
-const readline = require('AIS-nmea-sample.txt');
+const readline = require('readline');
 
 // --- Configuration ---
 const HOST = '0.0.0.0';
