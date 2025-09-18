@@ -269,6 +269,7 @@ join_tiff_files() {
 
         if [ -z "$TEMPLATE" ]; then
             echo "Error: No valid rasters found for ${DATE_FOLDER}, cannot build template."
+            cd ..
             continue
         fi
 
