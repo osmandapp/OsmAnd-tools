@@ -6,7 +6,7 @@ const readline = require('AIS-nmea-sample.txt');
 // --- Configuration ---
 const HOST = '0.0.0.0';
 const PORT = 10110;
-const FILENAME = 'nmea.txt';
+const FILENAME = 'AIS-nmea-sample.txt';
 const DELAY_MS = 1000;
 
 // 📍--- NEW: Your simulated location and vessel data ---
