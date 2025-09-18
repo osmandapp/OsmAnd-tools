@@ -13,6 +13,9 @@ FULL_MODE='full_mode'
 LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
 
+BANDS_DESCRIPTIONS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+
 GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
@@ -228,15 +231,6 @@ get_raw_gfs_files() {
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     MODE=$1
-    local BANDS_SHORT_NAMES=()
-    local BANDS_DESCRIPTIONS=()
-    if [[ $MODE == "$GFS" ]]; then
-        BANDS_SHORT_NAMES=("${GFS_BANDS_SHORT_NAMES[@]}")
-        BANDS_DESCRIPTIONS=("${GFS_BANDS_FULL_NAMES[@]}")
-    elif [[ $MODE == "$ECMWF" ]]; then
-        BANDS_SHORT_NAMES=("${ECMWF_BANDS_SHORT_NAMES_SAVING[@]}")
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS_FULL_NAMES[@]}")
-    fi
 
     mkdir -p $TIFF_FOLDER/
     cd $TIFF_TEMP_FOLDER
@@ -250,22 +244,36 @@ join_tiff_files() {
 
         # Create channels list in correct order
         touch settings.txt
-        local ALL_CHANNEL_FILES_EXISTS=1
         local FILE_DATE_CP
+        TEMPLATE=""
+
+        # Find first valid file to use as TEMPLATE
         for i in ${!BANDS_SHORT_NAMES[@]}; do
-            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
-                ALL_CHANNEL_FILES_EXISTS=0
+            if [ -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
+                TEMPLATE="${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
                 break
             fi
-            FILE_DATE_CP=${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff
-            echo "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" >> settings.txt
         done
 
-        if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff  not exists. Skip joining."
-            cd ..
+        if [ -z "$TEMPLATE" ]; then
+            echo "Error: No valid rasters found for ${DATE_FOLDER}, cannot build template."
             continue
         fi
+
+        # Build the list of files (real or dummy)
+        for i in ${!BANDS_SHORT_NAMES[@]}; do
+            BAND_FILE="${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
+
+            if [ ! -f "$BAND_FILE" ]; then
+                DUMMY_FILE="__dummy_${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
+                gdal_calc.py --calc="0" -A "$TEMPLATE" --outfile="$DUMMY_FILE" \
+                            --NoDataValue=0 --type=Float32
+                echo "$DUMMY_FILE" >> settings.txt
+            else
+                FILE_DATE_CP="$BAND_FILE"
+                echo "$BAND_FILE" >> settings.txt
+            fi
+        done
 
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
