@@ -23,6 +23,7 @@ import java.util.zip.ZipInputStream;
 import javax.annotation.Nullable;
 
 import net.osmand.router.*;
+import net.osmand.router.GeneralRouter.GeneralRouterProfile;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
@@ -100,11 +101,12 @@ public class OsmAndMapsService {
 
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
-	private static final long CACHE_MAX_ROUTING_CONTEXT_AGE = 4 * 60 * 60;
-	private static final int CACHE_MAX_OPEN_ROUTING_CONTEXTS = 5;
-	private static final int MAX_SAME_PROFILE_DF = 1;
-	private static final int MAX_SAME_ROUTING_CONTEXT_OPEN = 8;
-	private static final Map<String, Integer> MAX_SAME_PROFILE = Map.of("car", 2, "bicycle", 2, "pedestrian", 2);
+	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = 4 * 60 * 60;
+	private static final int CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = 7;
+	private static final int MAX_OPEN_ROUTING_CONTEXT = 8;
+	private static final int MAX_CONTEXTS_PER_PROFILE_DEFAULT = 2;
+	private static final Map<String, Integer> SELECTED_PROFILES = Map.of(GeneralRouterProfile.CAR.getBaseProfile(), 3, GeneralRouterProfile.BICYCLE.getBaseProfile(), 3);
+	
 	private static final long MAX_SAME_PROFILE_WAIT_MS = 6000;
 
 
@@ -366,10 +368,12 @@ public class OsmAndMapsService {
 			Iterator<RoutingCacheContext> it = routingCaches.iterator();
 			while (it.hasNext()) {
 				RoutingCacheContext check = it.next();
-				if (check.locked == 0 && (routingCaches.size() > CACHE_MAX_OPEN_ROUTING_CONTEXTS
-						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_AGE)) {
-					removed.add(check); // FIFO
-					it.remove();
+				if (check.locked == 0 && (routingCaches.size() > CACHE_CLEAN_OPEN_ROUTING_CONTEXTS
+						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_SEC)) {
+					if (!"".equals(check.routeParamsStr) && SELECTED_PROFILES.containsKey(check.profile)) {
+						removed.add(check); // FIFO
+						it.remove();
+					}
 				}
 			}
 
@@ -381,6 +385,7 @@ public class OsmAndMapsService {
 					if (survivor.hCtx != null) {
 						survivor.hCtx.clearSegments();
 					}
+					survivor.rCtx.unloadAllData();
 					survivor.rCtx.unloadUnusedTiles(survivor.rCtx.config.memoryLimitation);
 				}
 			}
@@ -1020,11 +1025,11 @@ public class OsmAndMapsService {
 	}
 
 	private int maxProfileMaps(String profile) {
-		Integer i = MAX_SAME_PROFILE.get(profile);
+		Integer i = SELECTED_PROFILES.get(profile);
 		if (i != null) {
 			return i;
 		}
-		return MAX_SAME_PROFILE_DF;
+		return MAX_CONTEXTS_PER_PROFILE_DEFAULT;
 	}
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
@@ -1085,7 +1090,7 @@ public class OsmAndMapsService {
 					sameProfileSize++;
 				}
 			}
-			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_SAME_ROUTING_CONTEXT_OPEN) {
+			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_OPEN_ROUTING_CONTEXT) {
 				System.out.printf("Global routing cache %s is not available (using old files)\n", rp.routeProfile);
 				return null;
 			}
