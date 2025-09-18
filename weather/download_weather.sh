@@ -293,6 +293,7 @@ join_tiff_files() {
         # Create joined tiff from "Virtual Tiff"
         local TARGET_FILE=../../${TIFF_FOLDER}/${DATE_FOLDER}.tiff
         gdal_translate bigtiff.vrt $TARGET_FILE -ot Float32 -stats  || echo "Error of gdal_translate"
+        rm -f "${TARGET_FILE}.aux.xml" || true
 
         # # Write tiff layers names
         local BANDS_RENAMING_COMMAND='python "$THIS_LOCATION"/set_band_desc.py $TARGET_FILE '
@@ -333,6 +334,7 @@ split_tiles() {
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
         "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        rm -f "${JOINED_TIFF_NAME}.aux.xml" || true
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
