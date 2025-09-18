@@ -223,7 +223,7 @@ public class OsmAndMapsService {
 		public String toString() {
 			String p = profile.length() > 5 ? profile.substring(0, 5) : profile;
 			return (locked == 0 ? '\u25FB' : '\u25FC')
-					+ String.format("%s %s %s %d, %s min", p, hCtx.hashCode() + "",
+					+ String.format("%s %s %s %d, %s min", p, hCtx == null ? "-" : hCtx.hashCode() + "",
 							routeParamsStr, used, (System.currentTimeMillis() - created) / 60 / 1000);
 		}
 
