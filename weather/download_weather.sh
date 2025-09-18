@@ -13,6 +13,18 @@ FULL_MODE='full_mode'
 LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
 
+# bands should correspond to c++ enum class WeatherBand in OsmAndCore/Map/GeoCommonTypes.h
+# add band with no data if not present
+# enum class WeatherBand
+# {
+#     Cloud = 1,
+#     Temperature = 2,
+#     Pressure = 3,
+#     WindSpeed = 4,
+#     Precipitation = 5,
+#     WindWestToEast = 6,
+#     WindSouthToNorth = 7
+# };
 BANDS_DESCRIPTIONS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
