@@ -371,7 +371,7 @@ public class OsmAndMapsService {
 				if (check.locked == 0 && (routingCaches.size() > CACHE_CLEAN_OPEN_ROUTING_CONTEXTS
 						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_SEC)) {
 					if (!"".equals(check.routeParamsStr) || !SELECTED_PROFILES.containsKey(check.profile)) {
-						removed.add(check); // FIFO
+						removed.add(check); // lower importance() means higher removal priority
 						it.remove();
 					}
 				}
