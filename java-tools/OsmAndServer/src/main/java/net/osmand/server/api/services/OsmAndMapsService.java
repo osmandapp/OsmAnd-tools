@@ -1053,12 +1053,23 @@ public class OsmAndMapsService {
 		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
+				RoutingCacheContext similar = null;
+				List<String> sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 				for (RoutingCacheContext c : routingCaches) {
 					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
-						if (c.routeParamsStr.equals(rp.routeParams.toString()) || best == null) {
+						if (c.routeParamsStr.equals(rp.routeParams.toString())) {
 							best = c;
+						} else if (best == null) {
+							boolean keepInMemory = sameInMemoryProfiles
+									.remove(c.profile + ":" + rp.routeParams.toString());
+							if (!keepInMemory) {
+								similar = c;
+							}
 						}
 					}
+				}
+				if (best == null && similar != null) {
+					best = similar;
 				}
 				if (best != null) {
 					best.used++;
