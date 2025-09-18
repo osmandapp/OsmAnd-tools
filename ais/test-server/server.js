@@ -5,7 +5,7 @@ const readline = require('readline');
 
 // --- Configuration ---
 const HOST = '0.0.0.0';
-const PORT = 10110;
+const PORT = 4001;
 const FILENAME = 'AIS-nmea-sample.txt';
 const DELAY_MS = 1000;
 
