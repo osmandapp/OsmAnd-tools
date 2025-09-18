@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
@@ -158,6 +159,22 @@ public interface DataService extends BaseService {
 			return checkDatasetInternal(dataset, true);
 		});
 	}
+
+	default TestCase updateTestCase(Long id, Map<String, String> updates) {
+		TestCase test = getTestCaseRepo().findById(id).orElseThrow(() ->
+				new RuntimeException("Dataset not found with id: " + id));
+
+		updates.forEach((key, value) -> {
+			switch (key) {
+				case "name" -> test.name = value;
+				case "labels" -> test.labels = value;
+			}
+		});
+
+		test.updated = LocalDateTime.now();
+		return getTestCaseRepo().save(test);
+	}
+
 
 	@Async
 	default CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {

@@ -110,6 +110,13 @@ public class SearchTestController {
 		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
 	}
 
+	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<TestCase> updateTestCase(@PathVariable Long caseId,
+	                                                                @RequestBody Map<String, String> updatesPayload) {
+		return ResponseEntity.ok(testSearchService.updateTestCase(caseId, updatesPayload));
+	}
+
 	@PostMapping(value = "/runs/{runId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Run>> cancelRun(@PathVariable Long runId) {
