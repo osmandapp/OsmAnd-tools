@@ -20,6 +20,9 @@ import java.util.Optional;
 public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> {
 	@MappedSuperclass
 	public class RunParam {
+		@Column()
+		public String name;
+
 		@Column
 		public String locale;
 
@@ -40,9 +43,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 		@Column(name = "version")
 		public String version;
-
-		@Column()
-		public String name;
 
 		public String getNorthWest() {
 			return northWest;
