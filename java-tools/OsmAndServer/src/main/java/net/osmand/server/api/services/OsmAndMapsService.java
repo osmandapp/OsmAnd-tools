@@ -373,6 +373,7 @@ public class OsmAndMapsService {
 						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_SEC)) {
 					if (!"".equals(check.routeParamsStr) || !SELECTED_PROFILES.containsKey(check.profile)) {
 						removed.add(check); // lower importance() means higher removal priority
+						System.out.printf("Clean up %s global routing context\n", check);
 						it.remove();
 					}
 				}
