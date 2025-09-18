@@ -102,8 +102,8 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = 4 * 60 * 60;
-	private static final int CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = 7;
-	private static final int MAX_OPEN_ROUTING_CONTEXT = 8;
+	private static final int CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = 6;
+	private static final int MAX_OPEN_ROUTING_CONTEXT = 9;
 	private static final int MAX_CONTEXTS_PER_PROFILE_DEFAULT = 2;
 	private static final Map<String, Integer> SELECTED_PROFILES = Map.of(GeneralRouterProfile.CAR.getBaseProfile(), 3, GeneralRouterProfile.BICYCLE.getBaseProfile(), 3);
 	
