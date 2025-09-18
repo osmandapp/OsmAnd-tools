@@ -370,7 +370,7 @@ public class OsmAndMapsService {
 				RoutingCacheContext check = it.next();
 				if (check.locked == 0 && (routingCaches.size() > CACHE_CLEAN_OPEN_ROUTING_CONTEXTS
 						|| (System.currentTimeMillis() - check.created) / 1000L >= CACHE_MAX_ROUTING_CONTEXT_SEC)) {
-					if (!"".equals(check.routeParamsStr) && SELECTED_PROFILES.containsKey(check.profile)) {
+					if (!"".equals(check.routeParamsStr) || !SELECTED_PROFILES.containsKey(check.profile)) {
 						removed.add(check); // FIFO
 						it.remove();
 					}
@@ -386,7 +386,7 @@ public class OsmAndMapsService {
 						survivor.hCtx.clearSegments();
 					}
 					survivor.rCtx.unloadAllData();
-					survivor.rCtx.unloadUnusedTiles(survivor.rCtx.config.memoryLimitation);
+//					survivor.rCtx.unloadUnusedTiles(survivor.rCtx.config.memoryLimitation);
 				}
 			}
 
