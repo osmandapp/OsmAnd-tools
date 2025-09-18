@@ -12,8 +12,8 @@ const DELAY_MS = 1000;
 // 📍--- NEW: Your simulated location and vessel data ---
 const myVessel = {
     // Starting position (Kyiv, for example)
-    lat: 50.4501,
-    lon: 30.5234,
+    lat: 52.37113,
+    lon: 4.89201,
     speed: 10.5, // Speed in knots
     course: 45.0, // Course in degrees true
 };
