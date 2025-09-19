@@ -104,17 +104,23 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = 4 * 60 * 60;
-	private static final int CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = 6;
-	private static final int MAX_OPEN_ROUTING_CONTEXT = 9;
-	private static final int MAX_CONTEXTS_PER_PROFILE_DEFAULT = 2;
-	private static final Map<String, Integer> SELECTED_PROFILES = Map.of(GeneralRouterProfile.CAR.getBaseProfile(), 3, GeneralRouterProfile.BICYCLE.getBaseProfile(), 3);
+	private static int CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = 8; // ALWAYS_IN_MEMORY
+	private static int MAX_OPEN_ROUTING_CONTEXT = 8; // ALWAYS_IN_MEMORY 
+	private static final int MAX_CONTEXTS_PER_PROFILE_DEFAULT = 3;
 	
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
-		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
+		ALWAYS_IN_MEMORY.add("car:{}");
+		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}");
+		ALWAYS_IN_MEMORY.add("motorcycle:{}");
+		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
+		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{}");
+		
+		CACHE_CLEAN_OPEN_ROUTING_CONTEXTS = Math.max(CACHE_CLEAN_OPEN_ROUTING_CONTEXTS, ALWAYS_IN_MEMORY.size());
+		MAX_OPEN_ROUTING_CONTEXT = Math.max(MAX_OPEN_ROUTING_CONTEXT, ALWAYS_IN_MEMORY.size());
 	}
 	
 	
@@ -1052,13 +1058,7 @@ public class OsmAndMapsService {
 		return c;
 	}
 
-	private int maxProfileMaps(String profile) {
-		Integer i = SELECTED_PROFILES.get(profile);
-		if (i != null) {
-			return i;
-		}
-		return MAX_CONTEXTS_PER_PROFILE_DEFAULT;
-	}
+
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
 		long waitTime = System.currentTimeMillis();
@@ -1166,8 +1166,8 @@ public class OsmAndMapsService {
 					sameProfileSize++;
 				}
 			}
-			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_OPEN_ROUTING_CONTEXT) {
-				LOGGER.info(String.format("Global routing cache %s is not available (using old files)", rp.routeProfile));
+			if (sameProfileSize >= MAX_CONTEXTS_PER_PROFILE_DEFAULT || all >= MAX_OPEN_ROUTING_CONTEXT) {
+				LOGGER.info(String.format("Global routing cache %s is not available (using separate files)", rp.routeProfile));
 				di.waitTime = System.currentTimeMillis() - waitTime;
 				return null;
 			}
