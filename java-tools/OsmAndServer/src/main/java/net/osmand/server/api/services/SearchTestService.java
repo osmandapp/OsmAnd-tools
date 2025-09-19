@@ -229,6 +229,7 @@ public class SearchTestService implements ReportService, DataService {
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;
 		run.name = payload.name;
+		run.average = payload.average;
 
 		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
