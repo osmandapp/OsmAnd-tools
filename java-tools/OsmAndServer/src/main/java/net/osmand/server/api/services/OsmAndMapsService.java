@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
 
 import net.osmand.router.*;
 import net.osmand.router.GeneralRouter.GeneralRouterProfile;
+import net.osmand.router.GeneralRouter.RoutingParameter;
+import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
@@ -1060,18 +1062,25 @@ public class OsmAndMapsService {
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
 		long waitTime = System.currentTimeMillis();
 		String rProfile = rp.routeProfile;
-		GeneralRouter defaultRouter = RoutingConfiguration.getDefault().getRouter(rProfile);
+		GeneralRouter defaultRouter = RoutingConfiguration.getDefault().build(rProfile, new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT)).router;
 		String rParamsStr = rp.routeParams.toString();
 		if (defaultRouter != null) {
 			// clean up parameters string key for routing
 			Map<String, String> cleanRouteParams = new TreeMap<String, String>();
+			Map<String, RoutingParameter> defaultParams = defaultRouter.getParameters();
 			for (String key : rp.routeParams.keySet()) {
-				if (defaultRouter.containsAttribute(key)) {
-					String value = rp.routeParams.get(key);
-					// add only existing parameter and non-default params
-					if (!Algorithms.objectEquals(value, defaultRouter.getAttribute(key))) {
+				String value = rp.routeParams.get(key).trim();
+				// add only existing parameter and non-default params
+				RoutingParameter pm = defaultParams.get(key);
+				if (pm != null && pm.getType() == RoutingParameterType.BOOLEAN) {
+					if (!(pm.getDefaultBoolean() + "").equalsIgnoreCase(value)) {
 						cleanRouteParams.put(key, value);
 					}
+				} else if (pm != null && !value.equals("") && !value.equals("0") && !value.equals("0.0")) {
+					cleanRouteParams.put(key, value);
+				} else if (defaultRouter.containsAttribute(key)
+						&& !Algorithms.objectEquals(value, defaultRouter.getAttribute(key))) {
+					cleanRouteParams.put(key, value);
 				}
 			}
 			rParamsStr = cleanRouteParams.toString();
