@@ -61,7 +61,7 @@ class OpenAIClient:
                                                            max_tokens=max_tokens,
                                                            n=1,  # Number of completions to generate
                                                            temperature=temperature,
-                                                           top_p=top_p, stream=False)
+                                                           top_p=top_p, stream=False, reasoning_effort="low")
             if response.usage:
                 self.prompt_tokens = response.usage.prompt_tokens
                 self.completion_tokens = response.usage.completion_tokens

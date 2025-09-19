@@ -375,7 +375,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         content, imports = pull_imports(src_path)  # separate content and imports
 
-        safe_max_tokens = max(512, len(content)) + 1024
+        safe_max_tokens = max(512, int(len(content) * 1.5)) + 1024
         temperature = 0.0 if src_path.suffix == '.json' else 0.1
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
 
