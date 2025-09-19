@@ -1088,6 +1088,7 @@ public class OsmAndMapsService {
 		}
 		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
 			RoutingCacheContext best = null;
+			boolean profileExistToWait = false;
 			synchronized (routingCaches) {
 				if (di != null) {
 					di.routingCacheInfo = routingCaches.toString();
@@ -1095,13 +1096,19 @@ public class OsmAndMapsService {
 				RoutingCacheContext similar = null;
 				List<String> sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 				for (RoutingCacheContext c : routingCaches) {
-					if (c.locked == 0 && rProfile.equals(c.profile)) {
+					if (rProfile.equals(c.profile)) {
 						if (c.routeParamsStr.equals(rParamsStr)) {
-							best = c;
+							profileExistToWait = true;
+							if (c.locked == 0) {
+								best = c;
+							}
 						} else if (best == null) {
 							boolean keepInMemory = sameInMemoryProfiles.remove(c.profile + ":" + rParamsStr);
 							if (!keepInMemory) {
-								similar = c;
+								profileExistToWait = true;
+								if (c.locked == 0) {
+									similar = c;
+								}
 							}
 						}
 					}
@@ -1137,6 +1144,9 @@ public class OsmAndMapsService {
 				}
 				di.waitTime = System.currentTimeMillis() - waitTime;
 				return best;
+			}
+			if (!profileExistToWait) {
+				break;
 			}
 			Thread.sleep(1000);
 		}
