@@ -1158,7 +1158,7 @@ public class OsmAndMapsService {
 			}
 			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_OPEN_ROUTING_CONTEXT) {
 				LOGGER.info(String.format("Global routing cache %s is not available (using old files)", rp.routeProfile));
-				di.waitTime = System.currentTimeMillis() - waitTime);
+				di.waitTime = System.currentTimeMillis() - waitTime;
 				return null;
 			}
 			routingCaches.add(cs);
