@@ -964,6 +964,7 @@ public class OsmAndMapsService {
 		String routingCacheInfo = "";
 		String selectedCache = "SEPARATE";
 		String routeParametersStr = "";
+		public long waitTime;
 	}
 	
 
@@ -981,8 +982,8 @@ public class OsmAndMapsService {
 			RouteParameters rp = parseRouteParameters(routeMode);
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
-			LOGGER.info(String.format("REQ routing %s (%s, %s): %s -> %s - cache %s", profile, di.selectedCache, di.routeParametersStr, 
-					start, end, di.routingCacheInfo));
+			LOGGER.info(String.format("REQ routing %s (%s - %.1f sec, %s): %s -> %s - cache %s", profile, 
+					di.selectedCache, di.routeParametersStr, di.waitTime / 1e3, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
@@ -1134,6 +1135,7 @@ public class OsmAndMapsService {
 					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
 					router.setHHRoutingConfig(best.hhConfig); // after prepare
 				}
+				di.waitTime = System.currentTimeMillis() - waitTime;
 				return best;
 			}
 			Thread.sleep(1000);
@@ -1156,6 +1158,7 @@ public class OsmAndMapsService {
 			}
 			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_OPEN_ROUTING_CONTEXT) {
 				LOGGER.info(String.format("Global routing cache %s is not available (using old files)", rp.routeProfile));
+				di.waitTime = System.currentTimeMillis() - waitTime);
 				return null;
 			}
 			routingCaches.add(cs);
@@ -1173,6 +1176,7 @@ public class OsmAndMapsService {
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		LOGGER.info(String.format("Use new routing context for %s profile (%s params) - all %d", rProfile,
 				rParamsStr, sameProfileSize + 1));
+		di.waitTime = System.currentTimeMillis() - waitTime;
 		return cs;
 	}
 
