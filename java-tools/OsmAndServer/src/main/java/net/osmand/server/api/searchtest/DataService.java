@@ -1,6 +1,7 @@
 package net.osmand.server.api.searchtest;
 
 import net.osmand.data.LatLon;
+import net.osmand.search.core.ObjectType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -162,7 +163,7 @@ public interface DataService extends BaseService {
 
 	default TestCase updateTestCase(Long id, Map<String, String> updates) {
 		TestCase test = getTestCaseRepo().findById(id).orElseThrow(() ->
-				new RuntimeException("Dataset not found with id: " + id));
+				new RuntimeException("TestCase not found with id: " + id));
 
 		updates.forEach((key, value) -> {
 			switch (key) {
@@ -216,40 +217,37 @@ public interface DataService extends BaseService {
 	default void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
 	                            List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
 		int resultsCount = searchResults.size();
-		Feature minFeature = null;
-		Integer minDistance = null, actualPlace = null;
-		String closestResult = null;
-
+		Integer distance = null, actualPlace = 1;
+		String resultPoint = null;
 		if (targetPoint != null && !searchResults.isEmpty()) {
-			double minDistanceMeters = Double.MAX_VALUE;
-			LatLon closestPoint = null;
-			int place = 0;
-
-			for (Feature feature : searchResults) {
-				place++;
-				if (feature == null) {
-					continue;
+			// Pick the first non-STREET feature; fallback to the first result if all are LOCATION
+			Feature resultFeature = searchResults.get(0);
+			for (Feature f : searchResults) {
+				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
+				if (!ObjectType.LOCATION.name().equals(wt)) {
+					resultFeature = f;
+					break;
 				}
-				LatLon foundPoint = getLatLon(feature);
-				double distance = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
-						foundPoint.getLatitude(), foundPoint.getLongitude());
-				if (distance < minDistanceMeters) {
-					minDistanceMeters = distance;
-					closestPoint = foundPoint;
-					actualPlace = place;
-					minFeature = feature;
-				}
+				actualPlace++;
 			}
 
-			if (closestPoint != null) {
-				minDistance = (int) minDistanceMeters;
-				closestResult = pointToString(closestPoint);
+			if (resultFeature.properties != null) {
+				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
+					Object v = e.getValue();
+					if (v != null) {
+						String s = v.toString();
+						if (!s.isEmpty()) {
+							row.put(e.getKey(), s);
+						}
+					}
+				}
 			}
-		}
+			LatLon point = getLatLon(resultFeature);
+			resultPoint = String.format(Locale.US, "%f, %f", point.getLatitude(), point.getLongitude());
 
-		if (minFeature != null) {
-			for (Map.Entry<String, Object> e : minFeature.properties.entrySet())
-				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
+			double minDistanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
+					point.getLatitude(), point.getLongitude());
+			distance = ((int) minDistanceMeters / 10) * 10;
 		}
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
@@ -259,7 +257,8 @@ public interface DataService extends BaseService {
 		String rowJson = getObjectMapper().writeValueAsString(row);
 		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
 				resultsCount,
-				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
+				distance, resultPoint, actualPlace,
+				targetPoint == null ? null : targetPoint.getLatitude(),
 				targetPoint == null ? null : targetPoint.getLongitude(),
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}

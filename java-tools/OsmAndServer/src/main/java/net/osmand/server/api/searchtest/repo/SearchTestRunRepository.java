@@ -172,4 +172,7 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 	Page<Run> findFiltered(@Param("name") String name,
 			@Param("labels") String labels,
 			Pageable pageable);
+
+	@Query("SELECT MAX(j.id) FROM Run j WHERE j.caseId = :caseId")
+	Long findLastRunId(@Param("caseId") Long caseId);
 }

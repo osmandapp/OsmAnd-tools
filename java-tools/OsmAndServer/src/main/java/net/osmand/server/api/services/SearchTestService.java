@@ -246,7 +246,6 @@ public class SearchTestService implements ReportService, DataService {
 		run.updated = run.created;
 		run = runRepo.save(run);
 
-		test.lastRunId = run.id;
 		test.locale = run.locale;
 		test.setNorthWest(run.getNorthWest());
 		test.setSouthEast(run.getSouthEast());
@@ -261,11 +260,29 @@ public class SearchTestService implements ReportService, DataService {
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
+	private static LatLon getAveragePoint(List<Map<String, Object>> rows) {
+		double sumLat = 0.0, sumLon = 0.0;
+		for (Map<String, Object> r : rows) {
+			Object latObj = r.get("lat");
+			Object lonObj = r.get("lon");
+			if (latObj instanceof Double lat && lonObj instanceof Double lon) {
+				sumLat += lat; sumLon += lon;
+			}
+		}
+		return new LatLon(sumLat / rows.size(), sumLon / rows.size());
+	}
+
 	private void run(Run run) {
 		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY" +
 						" id", run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			if (rows.isEmpty())
+				return;
+
+			LatLon point = run.lat != null && run.lon != null ?
+					new LatLon(run.lat, run.lon) :
+					(run.average != null && run.average ? getAveragePoint(rows) : null);
 			for (Map<String, Object> row : rows) {
 				String status;
 				try {
@@ -280,11 +297,8 @@ public class SearchTestService implements ReportService, DataService {
 					break; // Exit the loop if the test-case has been cancelled
 				}
 
+				point = point != null ? point : new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
 				long startTime = System.currentTimeMillis();
-				LatLon point = (run.lat == null || run.lon == null) ?
-						new LatLon((Double) row.get("lat"), (Double) row.get("lon")) :
-						new LatLon(run.lat, run.lon);
-
 				Integer id = (Integer) row.get("id");
 				String query = (String) row.get("query");
 				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
@@ -356,7 +370,9 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	public Optional<TestCase> getTestCase(Long id) {
-		return testCaseRepo.findById(id);
+		Optional<TestCase> opt = testCaseRepo.findById(id);
+		opt.ifPresent(tc -> tc.lastRunId = runRepo.findLastRunId(tc.id));
+		return opt;
 	}
 
 	public Page<TestCaseItem> getAllTestCases(String name, String labels, Pageable pageable) {
@@ -385,13 +401,14 @@ public class SearchTestService implements ReportService, DataService {
 		for (TestCase tc : content) {
 			String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
 			Optional<TestCaseStatus> tcOpt = getTestCaseStatus(tc.id);
+			Long lastRunId = runRepo.findLastRunId(tc.id);
 			if (tcOpt.isEmpty())
 				continue;
 
 			TestCaseStatus tcStatus = tcOpt.get();
-			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
-					tc.lastRunId, tcStatus.status().name(), tc.updated,
-					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
+			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, lastRunId,
+					tcStatus.status().name(), tc.updated, tc.getError(),
+					tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
 		}
 
 		return new PageImpl<>(items, pageable, page.getTotalElements());
