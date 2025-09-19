@@ -979,7 +979,6 @@ public class OsmAndMapsService {
 			RouteParameters rp = parseRouteParameters(routeMode);
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
-			routeMode=pedestrian,height_obstacles,relief_smoothness_factor_plains,routing=hh_java,approximation=geo_java,minPointApproximation=50&hasRouting=true&maxDist=100
 			LOGGER.info(String.format("Route req %s (%s): %s -> %s (%s) - cache %s", profile, di.selectedCache, start,
 					end, di.routeParametersStr, di.routingCacheInfo));
 			if (ctx == null) {
