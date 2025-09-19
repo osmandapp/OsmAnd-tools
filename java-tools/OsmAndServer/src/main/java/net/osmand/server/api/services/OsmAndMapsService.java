@@ -109,10 +109,10 @@ public class OsmAndMapsService {
 	
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
-		ALWAYS_IN_MEMORY.add("car:{weight=0, height=0, length=0, width=0, motor_type=0}");
-		ALWAYS_IN_MEMORY.add("bicycle:{driving_style_balance=true, relief_smoothness_factor_plains=true, height_obstacles=true}");
-		ALWAYS_IN_MEMORY.add("bicycle:{driving_style_balance=true, relief_smoothness_factor_plains=true}");
-		ALWAYS_IN_MEMORY.add("pedestrian:{height_obstacles=true, relief_smoothness_factor_plains=true}");
+		ALWAYS_IN_MEMORY.add("car:{}");
+		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
+		ALWAYS_IN_MEMORY.add("bicycle:{}");
+		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 	}
 	
 	
