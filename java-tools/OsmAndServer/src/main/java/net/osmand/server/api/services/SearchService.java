@@ -44,8 +44,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
-    private static final double METERS_PER_DEGREE_LAT = 111_320.0;
-    private static final double METERS_SEARCH_POI_RADIUS = 50.0;
+    private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
@@ -178,28 +177,19 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        // 50 m bbox around loc
-        double latRad = Math.toRadians(loc.getLatitude());
-        double dLat = METERS_SEARCH_POI_RADIUS / METERS_PER_DEGREE_LAT;
-        double dLon = METERS_SEARCH_POI_RADIUS / (METERS_PER_DEGREE_LAT * Math.cos(latRad));
-
-        LatLon p1 = new LatLon(loc.getLatitude() + dLat, loc.getLongitude() - dLon);
-        LatLon p2 = new LatLon(loc.getLatitude() - dLat, loc.getLongitude() + dLon);
-        List<LatLon> bbox = Arrays.asList(p1, p2);
-
-        QuadRect searchBbox = getSearchBbox(bbox);
-
+        QuadRect searchBbox = osmAndMapsService.points(null, new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE));
         List<BinaryMapIndexReader> readers = new ArrayList<>();
         Feature feature = null;
 
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapRefs = getMapsForSearch(bbox, searchBbox, false);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapRefs = getMapsForSearch(searchBbox, false);
             if (mapRefs.isEmpty()) {
                 return null;
             }
             readers = osmAndMapsService.getReaders(mapRefs, null);
             if (readers.isEmpty()) {
-                    return null;
+                return null;
             }
             SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(
                     readers, searchBbox, SEARCH_LOCALE, loc.getLatitude(), loc.getLongitude());
@@ -228,7 +218,7 @@ public class SearchService {
         } finally {
             osmAndMapsService.unlockReaders(readers);
         }
-	    return feature;
+        return feature;
     }
 
     private boolean matchesName(Amenity a, String name) {
