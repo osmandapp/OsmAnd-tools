@@ -962,7 +962,7 @@ public class OsmAndMapsService {
 	
 	private static class DebugInfo {
 		String routingCacheInfo = "";
-		String selectedCache = "";
+		String selectedCache = "SEPARATE";
 		String routeParametersStr = "";
 	}
 	
@@ -981,8 +981,8 @@ public class OsmAndMapsService {
 			RouteParameters rp = parseRouteParameters(routeMode);
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
-			LOGGER.info(String.format("Route req %s (%s): %s -> %s (%s) - cache %s", profile, di.selectedCache, start,
-					end, di.routeParametersStr, di.routingCacheInfo));
+			LOGGER.info(String.format("REQ routing %s (%s, %s): %s -> %s - cache %s", profile, di.selectedCache, di.routeParametersStr, 
+					start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
@@ -1045,7 +1045,7 @@ public class OsmAndMapsService {
 		c.unloadAllData();
 		c.calculationProgress = new RouteCalculationProgress();
 		if (di != null) {
-			di.selectedCache = cache.hCtx != null ? cache.hCtx.hashCode() + "" : "";
+			di.selectedCache = cache.hCtx != null ? cache.hCtx.hashCode() + "" : "NEW";
 			di.routeParametersStr = cache.routeParamsStr;
 		}
 		return c;
@@ -1155,7 +1155,7 @@ public class OsmAndMapsService {
 				}
 			}
 			if (sameProfileSize >= maxProfileMaps(rp.routeProfile) || all >= MAX_OPEN_ROUTING_CONTEXT) {
-				System.out.printf("Global routing cache %s is not available (using old files)\n", rp.routeProfile);
+				LOGGER.info(String.format("Global routing cache %s is not available (using old files)", rp.routeProfile));
 				return null;
 			}
 			routingCaches.add(cs);
@@ -1171,8 +1171,8 @@ public class OsmAndMapsService {
 		cache.writeToFile(targetIndex);
 		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader), false);
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
-		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", rProfile,
-				rParamsStr, sameProfileSize + 1);
+		LOGGER.info(String.format("Use new routing context for %s profile (%s params) - all %d", rProfile,
+				rParamsStr, sameProfileSize + 1));
 		return cs;
 	}
 
