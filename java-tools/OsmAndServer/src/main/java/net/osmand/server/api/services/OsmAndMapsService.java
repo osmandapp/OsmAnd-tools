@@ -983,7 +983,7 @@ public class OsmAndMapsService {
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
 			LOGGER.info(String.format("REQ routing %s (%s - %.1f sec, %s): %s -> %s - cache %s", profile, 
-					di.selectedCache, di.routeParametersStr, di.waitTime / 1e3, start, end, di.routingCacheInfo));
+					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
