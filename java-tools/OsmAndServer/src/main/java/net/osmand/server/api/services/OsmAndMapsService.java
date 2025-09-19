@@ -844,7 +844,6 @@ public class OsmAndMapsService {
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
-
 		if (rp.minPointApproximation >= 0) {
 			config.minPointApproximation = rp.minPointApproximation;
 		}
@@ -962,6 +961,7 @@ public class OsmAndMapsService {
 	private static class DebugInfo {
 		String routingCacheInfo = "";
 		String selectedCache = "";
+		String routeParametersStr = "";
 	}
 	
 
@@ -979,8 +979,9 @@ public class OsmAndMapsService {
 			RouteParameters rp = parseRouteParameters(routeMode);
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
-			
-			LOGGER.info(String.format("Route req %s (%s): %s -> %s (%s) - cache %s", profile,  di.selectedCache,start, end, routeMode, di.routingCacheInfo));
+			routeMode=pedestrian,height_obstacles,relief_smoothness_factor_plains,routing=hh_java,approximation=geo_java,minPointApproximation=50&hasRouting=true&maxDist=100
+			LOGGER.info(String.format("Route req %s (%s): %s -> %s (%s) - cache %s", profile, di.selectedCache, start,
+					end, di.routeParametersStr, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
@@ -1042,8 +1043,9 @@ public class OsmAndMapsService {
 		RoutingContext c = cache.rCtx;
 		c.unloadAllData();
 		c.calculationProgress = new RouteCalculationProgress();
-		if (di != null && cache.hCtx != null) {
-			di.selectedCache = cache.hCtx.hashCode() + "";
+		if (di != null) {
+			di.selectedCache = cache.hCtx != null ? cache.hCtx.hashCode() + "" : "";
+			di.routeParametersStr = cache.routeParamsStr;
 		}
 		return c;
 	}
@@ -1058,8 +1060,24 @@ public class OsmAndMapsService {
 
 	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
 		long waitTime = System.currentTimeMillis();
+		String rProfile = rp.routeProfile;
+		GeneralRouter defaultRouter = RoutingConfiguration.getDefault().getRouter(rProfile);
+		String rParamsStr = rp.routeParams.toString();
+		if (defaultRouter != null) {
+			// clean up parameters string key for routing
+			Map<String, String> cleanRouteParams = new TreeMap<String, String>();
+			for (String key : rp.routeParams.keySet()) {
+				if (defaultRouter.containsAttribute(key)) {
+					String value = rp.routeParams.get(key);
+					// add only existing parameter and non-default params
+					if (!Algorithms.objectEquals(value, defaultRouter.getAttribute(key))) {
+						cleanRouteParams.put(key, value);
+					}
+				}
+			}
+			rParamsStr = cleanRouteParams.toString();
+		}
 		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
-			String paramsStr = rp.routeParams.toString();
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
 				if (di != null) {
@@ -1068,11 +1086,11 @@ public class OsmAndMapsService {
 				RoutingCacheContext similar = null;
 				List<String> sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 				for (RoutingCacheContext c : routingCaches) {
-					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
-						if (c.routeParamsStr.equals(paramsStr)) {
+					if (c.locked == 0 && rProfile.equals(c.profile)) {
+						if (c.routeParamsStr.equals(rParamsStr)) {
 							best = c;
 						} else if (best == null) {
-							boolean keepInMemory = sameInMemoryProfiles.remove(c.profile + ":" + paramsStr);
+							boolean keepInMemory = sameInMemoryProfiles.remove(c.profile + ":" + rParamsStr);
 							if (!keepInMemory) {
 								similar = c;
 							}
@@ -1090,8 +1108,8 @@ public class OsmAndMapsService {
 			}
 			if (best != null) {
 				best.rCtx.unloadAllData();
-				if (!best.routeParamsStr.equals(paramsStr)) {
-					best.routeParamsStr = paramsStr;
+				if (!best.routeParamsStr.equals(rParamsStr)) {
+					best.routeParamsStr = rParamsStr;
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					oldRouter.clearCaches();
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
@@ -1117,14 +1135,14 @@ public class OsmAndMapsService {
 		cs.locked = System.currentTimeMillis();
 		cs.created = System.currentTimeMillis();
 		cs.hhConfig = RoutePlannerFrontEnd.defaultHHConfig().cacheContext(cs.hCtx);
-		cs.routeParamsStr = rp.routeParams.toString();
-		cs.profile = rp.routeProfile;
+		cs.routeParamsStr = rParamsStr;
+		cs.profile = rProfile;
 		int sameProfileSize = 0, all = 0;
 		synchronized (routingCaches) {
 			all = sameProfileSize = 0;
 			for (RoutingCacheContext c : routingCaches) {
 				all++;
-				if (rp.routeProfile.equals(c.profile)) {
+				if (rProfile.equals(c.profile)) {
 					sameProfileSize++;
 				}
 			}
@@ -1145,8 +1163,8 @@ public class OsmAndMapsService {
 		cache.writeToFile(targetIndex);
 		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader), false);
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
-		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", cs.profile,
-				cs.routeParamsStr, sameProfileSize + 1);
+		System.out.printf("Use new routing context for %s profile (%s params) - all %d\n", rProfile,
+				rParamsStr, sameProfileSize + 1);
 		return cs;
 	}
 
