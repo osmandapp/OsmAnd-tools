@@ -110,6 +110,7 @@ public class OsmAndMapsService {
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{weight=0, height=0, length=0, width=0, motor_type=0}");
+		ALWAYS_IN_MEMORY.add("bicycle:{driving_style_balance=true, relief_smoothness_factor_plains=true, height_obstacles=true}");
 		ALWAYS_IN_MEMORY.add("bicycle:{driving_style_balance=true, relief_smoothness_factor_plains=true}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{height_obstacles=true, relief_smoothness_factor_plains=true}");
 	}
@@ -375,7 +376,7 @@ public class OsmAndMapsService {
 				}
 			});
 
-			System.out.println("Prepare to clean up global routing contexts " + routingCaches);
+			System.out.println("Prepare to clean global routing contexts " + routingCaches);
 
 			// 1. Prepare to remove according to cache limits.
 			Iterator<RoutingCacheContext> it = routingCaches.iterator();
@@ -387,7 +388,7 @@ public class OsmAndMapsService {
 					boolean alwaysKeep = profiles.remove(check.profile + ":" + check.routeParamsStr);
 					if (!alwaysKeep) {
 						removed.add(check); // lower importance() means higher removal priority
-						System.out.printf("Clean up %s global routing context\n", check);
+						System.out.printf("Delete %s global routing context from cache\n", check);
 						it.remove();
 					}
 				}
@@ -957,6 +958,12 @@ public class OsmAndMapsService {
 		LOGGER.error("Empty GPX from Rescuetrack: " + url);
 		return new ArrayList<>();
 	}
+	
+	private static class DebugInfo {
+		String routingCacheInfo = "";
+		String selectedCache = "";
+	}
+	
 
 	@Nullable
 	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
@@ -970,12 +977,10 @@ public class OsmAndMapsService {
 		RoutingContext ctx = null;
 		try {
 			RouteParameters rp = parseRouteParameters(routeMode);
-			String routingCacheStr = "";
-			synchronized (routingCaches) {
-				routingCacheStr = routingCaches.toString();
-			}
-			ctx = lockCacheRoutingContext(router, rp);
-			LOGGER.info(String.format("Route %s: %s -> %s (%s) - cache %s", profile, start, end, routeMode, routingCacheStr));
+			DebugInfo di = new DebugInfo();
+			ctx = lockCacheRoutingContext(router, rp, di);
+			
+			LOGGER.info(String.format("Route req %s (%s): %s -> %s (%s) - cache %s", profile,  di.selectedCache,start, end, routeMode, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
 				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
@@ -1019,24 +1024,27 @@ public class OsmAndMapsService {
 	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
 		String tz = TimezoneMapper.latLngToTimezoneString(lat, lon);
 		ZonedDateTime zonedDateTime = ZonedDateTime.now(ZoneId.of(tz));
-		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
+//		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
 		return zonedDateTime.toInstant().toEpochMilli();
 	}
 
-	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
+	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
 		if (routeObfLocation == null || routeObfLocation.length() == 0) {
 			return null;
 		}
 		if (rp.useNativeRouting || rp.useNativeApproximation || rp.noGlobalFile || rp.calcMode != null) {
 			return null;
 		}
-		RoutingCacheContext cache = lockRoutingCache(router, rp);
+		RoutingCacheContext cache = lockRoutingCache(router, rp, di);
 		if (cache == null) {
 			return null;
 		}
 		RoutingContext c = cache.rCtx;
 		c.unloadAllData();
 		c.calculationProgress = new RouteCalculationProgress();
+		if (di != null && cache.hCtx != null) {
+			di.selectedCache = cache.hCtx.hashCode() + "";
+		}
 		return c;
 	}
 
@@ -1048,20 +1056,23 @@ public class OsmAndMapsService {
 		return MAX_CONTEXTS_PER_PROFILE_DEFAULT;
 	}
 
-	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp) throws IOException, InterruptedException {
+	private RoutingCacheContext lockRoutingCache(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
 		long waitTime = System.currentTimeMillis();
 		while ((System.currentTimeMillis() - waitTime) < MAX_SAME_PROFILE_WAIT_MS) {
+			String paramsStr = rp.routeParams.toString();
 			RoutingCacheContext best = null;
 			synchronized (routingCaches) {
+				if (di != null) {
+					di.routingCacheInfo = routingCaches.toString();
+				}
 				RoutingCacheContext similar = null;
 				List<String> sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 				for (RoutingCacheContext c : routingCaches) {
 					if (c.locked == 0 && rp.routeProfile.equals(c.profile)) {
-						if (c.routeParamsStr.equals(rp.routeParams.toString())) {
+						if (c.routeParamsStr.equals(paramsStr)) {
 							best = c;
 						} else if (best == null) {
-							boolean keepInMemory = sameInMemoryProfiles
-									.remove(c.profile + ":" + rp.routeParams.toString());
+							boolean keepInMemory = sameInMemoryProfiles.remove(c.profile + ":" + paramsStr);
 							if (!keepInMemory) {
 								similar = c;
 							}
@@ -1079,8 +1090,8 @@ public class OsmAndMapsService {
 			}
 			if (best != null) {
 				best.rCtx.unloadAllData();
-				if (!best.routeParamsStr.equals(rp.routeParams.toString())) {
-					best.routeParamsStr = rp.routeParams.toString();
+				if (!best.routeParamsStr.equals(paramsStr)) {
+					best.routeParamsStr = paramsStr;
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					oldRouter.clearCaches();
 					GeneralRouter newRouter = new GeneralRouter(oldRouter, rp.routeParams);
