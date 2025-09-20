@@ -1,6 +1,5 @@
 package net.osmand.reviews.mangrove;
 
-import com.google.common.collect.ImmutableList;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -8,9 +7,8 @@ import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.reviews.ReviewedPlace;
-import net.osmand.reviews.Review;
 import net.osmand.reviews.ReviewJsonCodec;
+import net.osmand.reviews.ReviewedPlace;
 import net.osmand.reviews.Tags;
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
@@ -19,11 +17,7 @@ import org.xmlpull.v1.XmlSerializer;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.sql.SQLException;
-import java.time.LocalDate;
-import java.time.Month;
 import java.util.Arrays;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
@@ -35,44 +29,37 @@ public final class MangroveReviews {
     private static final Log log = PlatformUtil.getLog(MangroveReviews.class);
 
     public static void main(String[] args) throws Exception {
+        File inputFile = null;
         File outputDir = null;
         for (String arg : args) {
             String val = arg.substring(arg.indexOf("=") + 1);
-            if (arg.startsWith("--dir=")) {
+            if (arg.startsWith("--input=")) {
+                inputFile = new File(val);
+            } else if (arg.startsWith("--dir=")) {
                 outputDir = new File(val);
             } else {
                 throw new IllegalArgumentException(String.format("unexpected argument: '%s'. args: %s", arg, Arrays.toString(args)));
             }
         }
+        if (inputFile == null) {
+            throw new IllegalArgumentException("--input=<input-file> argument must be specified");
+        }
         if (outputDir == null) {
             throw new IllegalArgumentException("--dir=<output-dir> argument must be specified");
         }
-        generateTestFile(outputDir);
+        generateWorldFile(inputFile, outputDir);
     }
 
-    private static void generateTestFile(File outputDir) throws IOException, URISyntaxException, SQLException, XmlPullParserException, InterruptedException {
-        List<ReviewedPlace> testReviews = ImmutableList.of(
-                new ReviewedPlace(52.2219219, 21.0142540,9028264713L,
-                        ImmutableList.of(
-                                new Review(
-                                        "yhjkE6T9Xkq-ZXIGsBPJtexR9ISOSljxqXRcGcBBPw0bUmmTl-OFSDI1ZP4btkNk8knMWajZpAHwzdPQHFyScw",
-                                        "Vintage cocktails made with ingredients that are no longer available and have been recreated from scratch. Amazing barrel-aged cocktails.",
-                                        100,
-                                        "enigal",
-                                        LocalDate.of(2025, Month.JULY, 8),
-                                        new URI("https://mangrove.reviews/list?signature=yhjkE6T9Xkq-ZXIGsBPJtexR9ISOSljxqXRcGcBBPw0bUmmTl-OFSDI1ZP4btkNk8knMWajZpAHwzdPQHFyScw")),
-                                new Review(
-                                        "test1",
-                                        "I could not find the place at all",
-                                        40,
-                                        "some rando",
-                                        LocalDate.of(2025, Month.JULY, 22),
-                                        new URI("https://blog.mmakowski.com"))
-                        )));
+    private static void generateWorldFile(File inputFile, File outputDir) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+        List<ReviewedPlace> testReviews = parseInputFile(inputFile);
         File osmGz = new File(outputDir, WorldRegion.WORLD + ".reviews.osm.gz");
         File obf = new File(outputDir, WorldRegion.WORLD + ".reviews.obf");
         generateOsmFile(testReviews, osmGz);
         generateObf(osmGz, obf);
+    }
+
+    private static List<ReviewedPlace> parseInputFile(File inputFile) {
+        throw new UnsupportedOperationException("TODO: implement");
     }
 
     private static void generateOsmFile(List<ReviewedPlace> places, File outputFile) throws IOException {
