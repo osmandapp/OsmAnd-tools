@@ -99,8 +99,8 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@Column
 		public Integer duration;
 
-		@Column(nullable = false)
-		public Integer count;
+		@Column(name = "gen_count", nullable = false)
+		public Integer genCount;
 
 		@JdbcTypeCode(SqlTypes.JSON)
 		@Column(columnDefinition = "TEXT")
@@ -131,17 +131,20 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@Column(name = "gen_id", nullable = false)
 		public Long genId;
 
-		@Column(name = "min_distance")
-		public Integer minDistance;
+		@Column(name = "res_distance")
+		public Integer resDistance;
 
-		@Column(name = "closest_result", length = 512)
-		public String closestResult;
+		@Column(name = "res_lat_lon", length = 64)
+		public String resLatLon;
 
-		@Column(name = "actual_place")
-		public Integer actualPlace;
+		@Column(length = 64)
+		public String bbox;
 
-		@Column(name = "results_count")
-		public Integer resultsCount;
+		@Column(name = "res_place")
+		public Integer resPlace;
+
+		@Column(name = "res_count")
+		public Integer resCount;
 	}
 
 	@Query(value = "SELECT j FROM Run j JOIN FETCH j.testCase c JOIN FETCH j.dataset d WHERE j.caseId = :caseId ORDER BY j.updated DESC, j.id DESC",

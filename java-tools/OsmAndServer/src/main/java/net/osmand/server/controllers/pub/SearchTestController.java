@@ -257,8 +257,7 @@ public class SearchTestController {
 		response.setContentType(contentType);
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-		testSearchService.downloadRawResults(response.getWriter(), caseId, tc.lastRunId,
-				format);
+		testSearchService.downloadRawResults(response.getWriter(), caseId, tc.lastRunId, format);
 	}
 
 	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -267,11 +266,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
 	}
 
-	@GetMapping(value = "/versions", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String[]> getVersions() {
-		return ResponseEntity.ok(new String[] {"EXPAND_COMMON_WORDS", "EXPAND_ABBREVIATIONS", "DEFAULT"});
+	public ResponseEntity<String[]> getBranches() {
+		return ResponseEntity.ok(testSearchService.getBranches().toArray(new String[0]));
 	}
+
 
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)

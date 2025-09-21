@@ -42,33 +42,32 @@ public interface ReportService {
 
 	Logger LOGGER = LoggerFactory.getLogger(ReportService.class);
 	int DISTANCE_LIMIT = 50;
-	String[] RESULT_PROPS = new String[] {"id", "web_type", "web_poi_id", "lat", "lon"};
 
 	String BASE_SQL = """
 			WITH result AS (
 				SELECT gen_id,
-					UPPER(COALESCE(json_extract(row, '$.web_type'), ''))                 AS type,
-					count, lat || ', ' || lon as lat_lon, query, closest_result as result, 
-					CAST((min_distance/10) AS INTEGER)*10 as distance, actual_place, results_count, row,
-					CASE WHEN UPPER(COALESCE(json_extract(row, '$.web_type'), '')) = 'POI' 
-					    THEN CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)
-					    ELSE CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) END AS id
-				FROM run_result AS r WHERE run_id = ? ORDER BY gen_id
+					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
+					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
+					r.res_count, g.row AS in_row, r.row AS out_row, 
+					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id
+				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY gen_id
 			)""";
 	String REPORT_SQL = BASE_SQL + """
 			 SELECT CASE
-				WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'
-				WHEN distance <= ? THEN 'Found'
+				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
+				WHEN res_distance <= ? THEN 'Found'
 				ELSE 'Not Found'
-			END AS "group", type, lat_lon, query, result, distance, results_count, id, row FROM result""";
-	String FULL_REPORT_SQL = REPORT_SQL + """ 
-			 UNION SELECT c1, c2, lat_lon, query, 0, 0, 0, 0, '' as row FROM
-			(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
-			  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, 
-			     lat || ', ' || lon as lat_lon, query, 0, 0, 0, id, '' as row
-			FROM gen_result WHERE case_id = ? ORDER BY id)""";
+			END AS "group", type, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
+			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
+	String FULL_REPORT_SQL = REPORT_SQL + """
+			 UNION SELECT 'Generated', CASE 
+			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
+				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END, 
+			id as gen_id, lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
+			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String COMPARISON_REPORT_SQL = BASE_SQL + """
-			 SELECT gen_id, type, lat_lon, query, result, distance, results_count, id
+			 SELECT gen_id, type, lat_lon, query, result, distance, res_count, id
 			FROM result WHERE COALESCE(is_place AND is_dist, false) = ? ORDER BY gen_id""";
 
 	JdbcTemplate getJdbcTemplate();
@@ -78,49 +77,7 @@ public interface ReportService {
 	SearchTestCaseRepository getTestCaseRepo();
 
 	default List<Map<String, Object>[]> compare(boolean found, Long caseId, Long runId1, Long runId2) {
-		// Load filtered results (Found/Not Found) for each run, ordered by gen_id
-		List<Map<String, Object>> results1 = getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, DISTANCE_LIMIT, runId1, found);
-		List<Map<String, Object>> results2 = getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, DISTANCE_LIMIT, runId2, found);
-
-		List<Map<String, Object>[]> result = new ArrayList<>(Math.max(results1.size(), results2.size()));
-
-		int i = 0, j = 0;
-		while (i < results1.size() && j < results2.size()) {
-			Map<String, Object> r1 = results1.get(i);
-			Map<String, Object> r2 = results2.get(j);
-			Integer id1 = (Integer) r1.get("gen_id");
-			Integer id2 = (Integer) r2.get("gen_id");
-
-			if (id1 == null && id2 == null) {
-				result.add(new Map[]{r1, r2});
-				i++;
-				j++;
-			} else if (id1 == null) {
-				result.add(new Map[]{r1, null});
-				i++;
-			} else if (id2 == null) {
-				result.add(new Map[]{null, r2});
-				j++;
-			} else if (id1.equals(id2)) {
-				result.add(new Map[]{r1, r2});
-				i++;
-				j++;
-			} else if (id1 < id2) {
-				result.add(new Map[]{r1, null});
-				i++;
-			} else { // id2 < id1
-				result.add(new Map[]{null, r2});
-				j++;
-			}
-		}
-
-		while (i < results1.size()) {
-			result.add(new Map[]{results1.get(i++), null});
-		}
-		while (j < results2.size()) {
-			result.add(new Map[]{null, results2.get(j++)});
-		}
-
+		List<Map<String, Object>[]> result = new ArrayList<>();
 		return result;
 	}
 
@@ -129,7 +86,7 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + caseId));
 
 		if ("csv".equalsIgnoreCase(format)) {
-			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL, runId,
+			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER by get_id", runId,
 					DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class),
 					getObjectMapper().readValue(test.selCols, String[].class));
 			writeAsCsv(writer, results);
@@ -143,13 +100,74 @@ public interface ReportService {
 		}
 	}
 
+
+	String[] IN_PROPS = new String[] {"group", "type", "gen_id", "id", "lat_lon", "query"};
+	String[] OUT_PROPS = new String[] {"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon"};
+
+	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
+		// Exclude fields already exposed as top-level columns to avoid duplication
+		final java.util.Set<String> include = new java.util.HashSet<>(java.util.Arrays.asList(selCols));
+		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		exclude.addAll(java.util.Arrays.asList(allCols));
+
+		return results.stream().map(srcRow -> {
+			String inRowJson = (String)srcRow.get("in_row");
+			String outRowJson = (String)srcRow.get("out_row");
+			srcRow.remove("in_row");
+			srcRow.remove("out_row");
+
+			Map<String, Object> row = new LinkedHashMap<>();
+			if (inRowJson == null) return row;
+			for (String p : IN_PROPS)
+				if (srcRow.containsKey(p))
+					row.put(p, srcRow.get(p));
+
+			try {
+				JsonNode inRow = getObjectMapper().readTree(inRowJson);
+				inRow.fieldNames().forEachRemaining(fn -> {
+					JsonNode v = inRow.get(fn);
+					if (include.contains(fn)) {
+						row.put(fn, v.asText());
+					}
+				});
+
+				Map<String, Object> out = new LinkedHashMap<>();
+				StringBuilder resultName = new StringBuilder();
+				if (outRowJson != null) {
+					for (String p : OUT_PROPS)
+						row.put(p, srcRow.get(p));
+
+					JsonNode outRow = getObjectMapper().readTree(outRowJson);
+					// For consistency with CSV, serialize values as text, skipping excluded keys
+					outRow.fieldNames().forEachRemaining(fn -> {
+						if (exclude.contains(fn))
+							return; // remove from the inner 'row' map
+						JsonNode v = outRow.get(fn);
+						if (fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
+							row.put(fn, v.asText());
+						else if (fn.startsWith("web_"))
+							resultName.append(v.asText()).append(" ");
+						else
+							out.put(fn, v.asText());
+					});
+
+					row.put("res_name", resultName.toString().trim());
+					row.put("res_tags", getObjectMapper().writeValueAsString(out));
+				}
+			} catch (IOException e) {
+				// ignore invalid JSON in 'row'
+			}
+			return row;
+		}).collect(Collectors.toList());
+	}
+
 	default Optional<TestCaseStatus> getTestCaseStatus(Long cased) {
 		String sql = """
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE (count = -1 or query IS NULL) and error IS NULL) AS filtered,
-				    count(*) FILTER (WHERE count = 0 or trim(query) = '') AS empty,
+				    count(*) FILTER (WHERE (gen_count = -1 or query IS NULL) and error IS NULL) AS filtered,
+				    count(*) FILTER (WHERE gen_count = 0 or trim(query) = '') AS empty,
 				    sum(duration) AS duration
 				FROM
 				    gen_result
@@ -189,11 +207,11 @@ public interface ReportService {
 		String sql = """
 				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
-				    count(*) FILTER (WHERE count > 0 and trim(query) <> '') AS processed,
+				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
+				    avg(res_place) FILTER (WHERE res_place IS NOT NULL) AS average_place,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE min_distance <= ?) AS found
+				    count(*) FILTER (WHERE res_distance <= ?) AS found
 				FROM
 				    run_result
 				WHERE
@@ -271,46 +289,6 @@ public interface ReportService {
 		return Optional.of(finalStatus);
 	}
 
-	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
-	    // Exclude fields already exposed as top-level columns to avoid duplication
-	    final java.util.Set<String> include = new java.util.HashSet<>(java.util.Arrays.asList(selCols));
-		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(RESULT_PROPS));
-		exclude.addAll(java.util.Arrays.asList(allCols));
-	    return results.stream().peek(row -> {
-	        Object rowObj = row.get("row");
-			row.remove("row");
-	        if (rowObj == null) return;
-	        try {
-		        Map<String, Object> in = new LinkedHashMap<>();
-	            Map<String, Object> out = new LinkedHashMap<>();
-	            JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
-	            // For consistency with CSV, serialize values as text, skipping excluded keys
-		        StringBuilder resultName = new StringBuilder();
-	            rowNode.fieldNames().forEachRemaining(fn -> {
-	                JsonNode v = rowNode.get(fn);
-		            if (include.contains(fn)) {
-						if (v != null && !v.isNull() && !v.asText().isEmpty())
-			                in.put(fn, v.asText());
-						return;
-		            }
-		            if (exclude.contains(fn))
-			            return; // remove from the inner 'row' map
-
-		            if (v != null && !v.isNull() && !v.asText().isEmpty())
-						if (fn.startsWith("web_"))
-							resultName.append(v.asText()).append(" ");
-						else
-		                    out.put(fn, v.asText());
-	            });
-		        row.put("result_name", resultName.toString().trim());
-		        row.put("in_tags", getObjectMapper().writeValueAsString(in));
-	            row.put("out_tags", getObjectMapper().writeValueAsString(out));
-	        } catch (IOException e) {
-	            // ignore invalid JSON in 'row'
-	        }
-	    }).collect(Collectors.toList());
-	}
-
 	default void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
 		if (results.isEmpty()) {
 			writer.write("");
@@ -318,37 +296,14 @@ public interface ReportService {
 		}
 
 		Set<String> headers = new LinkedHashSet<>();
-		results.get(0).keySet().stream()
-				.filter(k -> !k.equals("out_tags") && !k.equals("in_tags"))
-				.forEach(headers::add);
-
-		Set<String> rowHeaders = new LinkedHashSet<>();
-		for (String tagName : new String[] {"in_tags", "out_tags"}) {
-			for (Map<String, Object> row : results) {
-				Object rowObj = row.get(tagName);
-				if (rowObj != null) {
-					try {
-						JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
-						rowNode.fieldNames().forEachRemaining(rowHeaders::add);
-					} catch (IOException e) {
-						// ignore invalid JSON in 'row'
-					}
-				}
-			}
-			headers.addAll(rowHeaders);
+		for (Map<String, Object> row : results) {
+			headers.addAll(row.keySet());
 		}
 
 		CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers.toArray(new String[0])).build();
 		try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
 			for (Map<String, Object> row : results) {
 				List<String> record = new ArrayList<>();
-				try {
-					getObjectMapper().readValue(row.get("in_tags").toString(), Map.class).forEach((k, v) -> row.put((String) k, v));
-					getObjectMapper().readValue(row.get("out_tags").toString(), Map.class).forEach((k, v) -> row.put((String) k, v));
-				} catch (IOException e) {
-					// keep rowNode null
-				}
-
 				for (String header : headers) {
 					if (row.containsKey(header)) {
 						Object value = row.get(header);

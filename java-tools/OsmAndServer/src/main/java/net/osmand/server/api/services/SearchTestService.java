@@ -30,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -230,6 +232,7 @@ public class SearchTestService implements ReportService, DataService {
 		run.datasetId = test.datasetId;
 		run.name = payload.name;
 		run.average = payload.average;
+		test.average = payload.average;
 
 		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
@@ -239,7 +242,6 @@ public class SearchTestService implements ReportService, DataService {
 		run.setNorthWest(payload.getNorthWest());
 		run.setSouthEast(payload.getSouthEast());
 		run.baseSearch = payload.baseSearch;
-		run.version = payload.version;
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
@@ -251,7 +253,6 @@ public class SearchTestService implements ReportService, DataService {
 		test.setNorthWest(run.getNorthWest());
 		test.setSouthEast(run.getSouthEast());
 		test.baseSearch = run.baseSearch;
-		test.version = run.version;
 		test.lat = run.lat;
 		test.lon = run.lon;
 		testCaseRepo.save(test);
@@ -270,20 +271,33 @@ public class SearchTestService implements ReportService, DataService {
 				sumLat += lat; sumLon += lon;
 			}
 		}
-		return new LatLon(sumLat / rows.size(), sumLon / rows.size());
+		double roundedLat = BigDecimal.valueOf(sumLat /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		double roundedLon = BigDecimal.valueOf(sumLon /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		return new LatLon(roundedLat, roundedLon);
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY" +
+		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY" +
 						" id", run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			if (rows.isEmpty())
 				return;
 
-			LatLon point = run.lat != null && run.lon != null ?
-					new LatLon(run.lat, run.lon) :
-					(run.average != null && run.average ? getAveragePoint(rows) : null);
+			LatLon srcPoint = null;	String[] srcBbox = null;
+			if (run.lat != null && run.lon != null)
+				srcPoint = new LatLon(run.lat, run.lon);
+			else if (run.average != null && run.average)
+				srcPoint = getAveragePoint(rows);
+			if (srcPoint != null) {
+				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
+						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[] {
+					String.format(Locale.US, "%f, %f",srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
+					String.format(Locale.US, "%f, %f",srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
+			}
+
 			for (Map<String, Object> row : rows) {
 				String status;
 				try {
@@ -298,24 +312,26 @@ public class SearchTestService implements ReportService, DataService {
 					break; // Exit the loop if the test-case has been cancelled
 				}
 
-				point = point != null ? point : new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
 				long startTime = System.currentTimeMillis();
-				Integer id = (Integer) row.get("id");
+				Integer gen_id = (Integer) row.get("id");
 				String query = (String) row.get("query");
-				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {});
-				int count = (Integer) row.get("count");
+				int count = (Integer) row.get("gen_count");
+				LatLon point = srcPoint != null ? srcPoint : new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
+				String[] bbox = srcBbox != null ? srcBbox : new String[] {
+					String.format(Locale.US, "%f, %f",point.getLatitude() + 1.5, point.getLongitude() - 1.5),
+					String.format(Locale.US, "%f, %f",point.getLatitude() - 1.5, point.getLongitude() + 1.5)};
 				try {
 					List<Feature> searchResults = Collections.emptyList();
 					if (query != null && !query.trim().isEmpty())
 						searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-								query, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
-					saveRunResults(id, count, run, query, mapRow, searchResults, point,
-							System.currentTimeMillis() - startTime, null);
+								query, run.locale, run.baseSearch, bbox[0], bbox[1]);
+					saveRunResults(gen_id, count, run, query, searchResults, point,
+							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(id, count, run, query, mapRow, Collections.emptyList(), point,
-							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
-									e.getMessage());
+					saveRunResults(gen_id, count, run, query, Collections.emptyList(), point,
+							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
+							e.getMessage() == null ? e.toString() :	e.getMessage());
 				}
 			}
 			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {

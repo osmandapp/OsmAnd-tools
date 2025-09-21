@@ -26,6 +26,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
+
 	static String sanitize(String input) {
 		if (input == null) {
 			return "";
@@ -214,12 +215,14 @@ public interface DataService extends BaseService {
 		}
 	}
 
-	default void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
-	                            List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
+	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults,
+	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		int resultsCount = searchResults.size();
-		Integer distance = null, actualPlace = 1;
+		Integer distance = null, resPlace = null;
 		String resultPoint = null;
-		if (targetPoint != null && !searchResults.isEmpty()) {
+		Map<String, Object> row = new LinkedHashMap<>();
+		if (searchPoint != null && !searchResults.isEmpty()) {
+			resPlace = 1;
 			// Pick the first non-STREET feature; fallback to the first result if all are LOCATION
 			Feature resultFeature = searchResults.get(0);
 			for (Feature f : searchResults) {
@@ -228,7 +231,7 @@ public interface DataService extends BaseService {
 					resultFeature = f;
 					break;
 				}
-				actualPlace++;
+				resPlace++;
 			}
 
 			if (resultFeature.properties != null) {
@@ -245,21 +248,22 @@ public interface DataService extends BaseService {
 			LatLon point = getLatLon(resultFeature);
 			resultPoint = String.format(Locale.US, "%f, %f", point.getLatitude(), point.getLongitude());
 
-			double minDistanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
+			double minDistanceMeters = MapUtils.getDistance(searchPoint.getLatitude(), searchPoint.getLongitude(),
 					point.getLatitude(), point.getLongitude());
 			distance = ((int) minDistanceMeters / 10) * 10;
 		}
 
-		String sql = "INSERT OR IGNORE INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration, results_count, min_distance, closest_result, actual_place, lat, lon, timestamp) " +
-				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = getObjectMapper().writeValueAsString(row);
-		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
+		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
 				resultsCount,
-				distance, resultPoint, actualPlace,
-				targetPoint == null ? null : targetPoint.getLatitude(),
-				targetPoint == null ? null : targetPoint.getLongitude(),
+				distance, resultPoint, resPlace,
+				searchPoint == null ? null : searchPoint.getLatitude(),
+				searchPoint == null ? null : searchPoint.getLongitude(),
+				bbox,
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
 
@@ -412,6 +416,17 @@ public interface DataService extends BaseService {
 		if (id == null) return false;
 		int n = getJdbcTemplate().update("DELETE FROM domain WHERE id = ?", id);
 		return n > 0;
+	}
+
+	default List<String> getBranches() {
+		try {
+			String sql = "SELECT distinct name FROM run";
+
+			return getJdbcTemplate().queryForList(sql, String.class);
+		} catch (Exception e) {
+			getLogger().error("Failed to retrieve branches", e);
+			throw new RuntimeException("Failed to retrieve branches: " + e.getMessage(), e);
+		}
 	}
 
 	default List<String> getAllLabels() {
