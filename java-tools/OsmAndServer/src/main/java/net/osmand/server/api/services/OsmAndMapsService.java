@@ -1025,10 +1025,6 @@ public class OsmAndMapsService {
 		RoutingContext c = cache.rCtx;
 		c.unloadAllData();
 		c.calculationProgress = new RouteCalculationProgress();
-		if (di != null) {
-			di.selectedCache = cache.hCtx != null ? cache.hCtx.hashCode() + "" : "NEW";
-			di.routeParametersStr = cache.routeParamsStr;
-		}
 		return c;
 	}
 
@@ -1039,6 +1035,7 @@ public class OsmAndMapsService {
 		String rProfile = rp.routeProfile;
 		String rParamsStr = getCleanRouteParams(rp, rProfile);
 		String rProfileKey = rProfile + ":" + rParamsStr;
+		di.routeParametersStr = rParamsStr;
 		List<String> sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 		if (!sameInMemoryProfiles.contains(rProfileKey)) {
 			di.waitTime = System.currentTimeMillis() - waitTime;
@@ -1050,9 +1047,7 @@ public class OsmAndMapsService {
 			RoutingCacheContext best = null;
 			sameInMemoryProfiles = new ArrayList<>(ALWAYS_IN_MEMORY); // don't reuse
 			synchronized (routingCaches) {
-				if (di != null) {
-					di.routingCacheInfo = routingCaches.toString();
-				}
+				di.routingCacheInfo = routingCaches.toString();
 				for (RoutingCacheContext c : routingCaches) {
 					if (rProfile.equals(c.profile) && c.routeParamsStr.equals(rParamsStr)) {
 						sameInMemoryProfiles.remove(rProfileKey);
@@ -1088,6 +1083,7 @@ public class OsmAndMapsService {
 					router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
 					router.setHHRoutingConfig(best.hhConfig); // after prepare
 				}
+				di.selectedCache = best.hCtx != null ? best.hCtx.hashCode() + "" : "RENEW";
 				di.waitTime = System.currentTimeMillis() - waitTime;
 				return best;
 			}
@@ -1125,6 +1121,7 @@ public class OsmAndMapsService {
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		LOGGER.info(String.format("Use new routing context for %s profile (%s params)", rProfile, rParamsStr));
 		di.waitTime = System.currentTimeMillis() - waitTime;
+		di.selectedCache = "NEW";
 		return cs;
 	}
 
