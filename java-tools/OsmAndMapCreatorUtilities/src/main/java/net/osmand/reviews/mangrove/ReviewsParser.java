@@ -26,18 +26,47 @@ public final class ReviewsParser {
         Final
     }
 
-    public static final class ParseException extends Exception {
+    public static final class ParseException extends RuntimeException {
         ParseException(State state, String message) {
             super(String.format("%s: %s", state, message));
         }
     }
 
-    @SuppressWarnings("SwitchStatementWithTooFewBranches")
-    public Stream<Review> parse(File input) throws IOException, ParseException {
+    private Review nextReview = null;
+    private JsonParser parser = null;
+    private State state = null;
+
+    public Stream<Review> parse(File input) throws IOException {
         JsonFactory jsonFactory = JsonFactory.builder().build();
-        JsonParser parser = jsonFactory.createParser(input);
-        State state = State.Initial;
-        // builders for currently processed objects:
+        parser = jsonFactory.createParser(input);
+        state = State.Initial;
+        readNext();
+        if (hasNext()) {
+            return Stream.iterate(nextReview, this::streamHasNext, this::streamNext);
+        }
+        return Stream.empty();
+    }
+
+    private boolean streamHasNext(Review ignored) {
+        return hasNext();
+    }
+
+    private boolean hasNext() {
+        return nextReview != null;
+    }
+
+    private Review streamNext(Review ignored) {
+        Review currentReview = nextReview;
+        try {
+            readNext();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return currentReview;
+    }
+
+    @SuppressWarnings("SwitchStatementWithTooFewBranches")
+    private void readNext() throws IOException {
         Review.Builder review = null;
         Review.Payload.Builder payload = null;
         ImmutableList.Builder<Review.Payload.Image> images = null;
@@ -106,10 +135,9 @@ public final class ReviewsParser {
                             }
                         }
                         case END_OBJECT -> {
-                            // TODO: emit!
-                            System.err.println(review.build());
-                            review = null;
+                            nextReview = review.build();
                             state = State.ReviewList;
+                            return;
                         }
                         default -> unexpectedToken(state, token);
                     }
@@ -247,8 +275,8 @@ public final class ReviewsParser {
                 default -> throw new RuntimeException(String.format("TODO: %s", state));
             }
         }
-        // TODO:
-        return null;
+        // end of review list
+        nextReview = null;
     }
 
     private static boolean isNull(JsonParser parser, State state, JsonToken expectedToken) throws IOException, ParseException {
@@ -298,7 +326,7 @@ public final class ReviewsParser {
     }
 
     private static boolean nextBooleanValue(JsonParser parser) throws IOException {
-        return Boolean.valueOf(parser.nextTextValue());
+        return Boolean.parseBoolean(parser.nextTextValue());
     }
 
     private static void skip(JsonParser parser) throws IOException {
