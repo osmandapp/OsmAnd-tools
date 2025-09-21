@@ -402,6 +402,9 @@ public class OsmAndMapsService {
 					removed.add(check); // lower importance() means higher removal priority
 					System.out.printf("Delete %s global routing context from cache\n", check);
 					it.remove();
+					if (criticalMemory) {
+						criticalMemory = false;
+					}
 				}
 			}
 		}
