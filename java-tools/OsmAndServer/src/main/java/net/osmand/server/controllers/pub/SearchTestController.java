@@ -269,8 +269,8 @@ public class SearchTestController {
 
 	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String[]> getBranches() {
-		return ResponseEntity.ok(testSearchService.getBranches().toArray(new String[0]));
+	public ResponseEntity<List<String>> getBranches() {
+		return ResponseEntity.ok(testSearchService.getBranches());
 	}
 
 
