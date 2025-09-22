@@ -143,17 +143,34 @@ public interface ReportService {
 					cell = r1.createCell(c + 1);
 					cell.setCellValue(groups[j]);
 
+					cell = r1.createCell(c + 2);
+					int fr = j * 3 + 2 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
 					Row r2 = statSheet.createRow(j * 3 + 2 + i);
 					cell = r2.createCell(c);
 					cell.setCellValue(groups[1]);
 					cell = r2.createCell(c + 1);
 					cell.setCellValue(groups[j]);
 
+					cell = r2.createCell(c + 2);
+					fr = j * 3 + 3 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
 					Row r3 = statSheet.createRow(j * 3 + 3 + i);
 					cell = r3.createCell(c);
 					cell.setCellValue(groups[2]);
 					cell = r3.createCell(c + 1);
 					cell.setCellValue(groups[j]);
+
+					cell = r3.createCell(c + 2);
+					fr = j * 3 + 4 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
+					Row r4 = statSheet.createRow(j * 3 + 4 + i);
+					cell = r4.createCell(c + 2);
+					cell.setCellFormula(String.format("SUM(C%d:C%d)", j * 3 + 2 + i, j * 3 + 2 + i + 2));
+					cell.setCellStyle(header);
 
 					i++;
 				}
