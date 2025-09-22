@@ -420,8 +420,7 @@ public interface DataService extends BaseService {
 
 	default List<String> getBranches() {
 		try {
-			String sql = "SELECT distinct name FROM run";
-
+			String sql = "SELECT DISTINCT name FROM run WHERE name IS NOT NULL AND TRIM(name) <> '' ORDER BY name";
 			return getJdbcTemplate().queryForList(sql, String.class);
 		} catch (Exception e) {
 			getLogger().error("Failed to retrieve branches", e);

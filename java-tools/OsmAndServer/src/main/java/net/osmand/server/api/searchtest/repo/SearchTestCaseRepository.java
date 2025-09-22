@@ -23,9 +23,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column
 		public String locale;
 
-		@Column(name = "base_search")
-		public Boolean baseSearch;
-
 		@Column()
 		public Boolean average;
 
