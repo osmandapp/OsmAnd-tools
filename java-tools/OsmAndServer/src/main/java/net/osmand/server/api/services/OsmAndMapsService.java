@@ -14,24 +14,24 @@ import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
 
-import net.osmand.router.*;
-import net.osmand.router.GeneralRouter.GeneralRouterProfile;
-import net.osmand.router.GeneralRouter.RoutingParameter;
-import net.osmand.router.GeneralRouter.RoutingParameterType;
-import net.osmand.server.WebSecurityConfiguration;
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.tileManager.TileMemoryCache;
-import net.osmand.server.tileManager.VectorMetatile;
-import net.osmand.server.utils.TimezoneMapper;
-import net.osmand.shared.gpx.GpxFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -77,18 +77,34 @@ import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.obf.OsmGpxWriteContext;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.GeneralRouter.RoutingParameter;
+import net.osmand.router.GeneralRouter.RoutingParameterType;
+import net.osmand.router.GpxRouteApproximation;
 import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.RouteCalculationProgress;
+import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.router.RoutingContext;
+import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.tileManager.TileMemoryCache;
+import net.osmand.server.tileManager.TileServerConfig;
+import net.osmand.server.tileManager.VectorMetatile;
+import net.osmand.server.utils.TimezoneMapper;
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.server.tileManager.TileServerConfig;
 
 @Service
 public class OsmAndMapsService {
@@ -97,6 +113,7 @@ public class OsmAndMapsService {
 	protected static final int MAX_FILES_PER_FOLDER = 1 << 12; // 4096
 
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
+	private static final int MEM_MAX_HITS_PER_RUN = 5;
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
@@ -829,6 +846,7 @@ public class OsmAndMapsService {
 		Builder cfgBuilder = RoutingConfiguration.getDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = cfgBuilder.build(rp.routeProfile, /* RoutingConfiguration.DEFAULT_MEMORY_LIMIT */ memoryLimit, rp.routeParams);
+		config.memoryMaxHits = MEM_MAX_HITS_PER_RUN;
 		if (rp.minPointApproximation >= 0) {
 			config.minPointApproximation = rp.minPointApproximation;
 		}
