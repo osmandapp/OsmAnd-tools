@@ -120,6 +120,9 @@ dependencies {
         exclude group: 'org.slf4j'
     }
 
+    // Excel report
+    implementation "org.apache.poi:poi-ooxml:5.3.0"
+
     // frontend
     implementation 'org.webjars:jquery:3.5.0'
     implementation 'org.webjars:bootstrap:5.0.0'

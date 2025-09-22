@@ -228,10 +228,11 @@ public class SearchTestController {
 	}
 
 	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<List<Map<String, Object>[]>> compare(@PathVariable Long caseId, @RequestParam Boolean found,
-	                                                           @RequestParam Long runId1,
-	                                                           @RequestParam Long runId2) throws IOException {
-		return ResponseEntity.ok(testSearchService.compare(found, caseId, runId1, runId2));
+	public void compareReport(@PathVariable Long caseId, @RequestParam Long[] runIds,
+	                                                                 HttpServletResponse response) throws IOException {
+		response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"");
+		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")
