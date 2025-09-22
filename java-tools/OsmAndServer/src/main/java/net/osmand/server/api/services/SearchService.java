@@ -44,6 +44,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
+    private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
@@ -170,6 +171,72 @@ public class SearchService {
         } else {
             return Collections.emptyList();
         }
+    }
+
+    public Feature getPoi(String name, String type, LatLon loc) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        QuadRect searchBbox = osmAndMapsService.points(null, new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE));
+        List<BinaryMapIndexReader> readers = new ArrayList<>();
+        Feature feature = null;
+
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapRefs = getMapsForSearch(searchBbox, false);
+            if (mapRefs.isEmpty()) {
+                return null;
+            }
+            readers = osmAndMapsService.getReaders(mapRefs, null);
+            if (readers.isEmpty()) {
+                return null;
+            }
+            SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(
+                    readers, searchBbox, SEARCH_LOCALE, loc.getLatitude(), loc.getLongitude());
+
+            // Find POIs by type
+            SearchUICore.SearchResultCollection rc =
+                    searchPoiByCategory(searchUICore, type, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB);
+            if (rc == null) {
+                return null;
+            }
+
+            // Filter by name
+            for (SearchResult r : rc.getCurrentSearchResults()) {
+                if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                    continue;
+                }
+                if (!matchesName(a, name)) {
+                    continue;
+                }
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    feature = f;
+                    break;
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readers);
+        }
+        return feature;
+    }
+
+    private boolean matchesName(Amenity a, String name) {
+        if (name == null || name.isBlank()) return true;
+        String target = name.trim();
+
+        if (equalsIgnoreCaseSafe(a.getName(), target)) return true;
+        if (equalsIgnoreCaseSafe(a.getEnName(false), target)) return true;
+
+        Map<String, String> names = a.getNamesMap(true);
+        for (String v : names.values()) {
+            if (equalsIgnoreCaseSafe(v, target)) return true;
+        }
+        return false;
+    }
+
+    private boolean equalsIgnoreCaseSafe(String s, String t) {
+        return s != null && s.equalsIgnoreCase(t);
     }
 
     private SearchUICore.SearchResultCollection addPoiCategoriesToSearchResult(SearchUICore.SearchResultCollection resultCollection, String text, String locale, SearchUICore searchUICore) {

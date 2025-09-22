@@ -39,7 +39,7 @@
 				<level>ERROR</level>
 			</filter>
 			<encoder>
-			    <pattern>%d %-5level [%thread]: %message%n%ex{full}</pattern>
+			    <pattern>%d %-5level [%thread]: %message%n%ex{30}</pattern>
 				<!--   <pattern>${FILE_LOG_PATTERN}</pattern> -->
 			</encoder>
     	</appender>
