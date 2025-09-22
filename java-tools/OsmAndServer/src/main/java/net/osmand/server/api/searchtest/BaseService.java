@@ -42,10 +42,6 @@ public interface BaseService {
 	enum ParamType {Before, After, Expand, Fold, ExpandOrFold, FoldOrExpand}
 
 	// -------------------- Utility methods (common) --------------------
-	default String pointToString(LatLon point) {
-		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
-	}
-
 	default LatLon getLatLon(GeojsonClasses.Feature feature) {
 		float[] point = "Point".equals(feature.geometry.type) ? (float[]) feature.geometry.coordinates :
 				((float[][]) feature.geometry.coordinates)[0];

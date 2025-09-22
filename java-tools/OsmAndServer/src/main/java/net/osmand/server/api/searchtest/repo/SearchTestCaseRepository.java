@@ -23,8 +23,8 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column
 		public String locale;
 
-		@Column(name = "base_search")
-		public Boolean baseSearch;
+		@Column()
+		public Boolean average;
 
 		@Column()
 		public Double lat;
@@ -37,9 +37,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 		@Column(name = "south_east")
 		private String southEast;
-
-		@Column(name = "version")
-		public String version;
 
 		@Column()
 		public String name;
@@ -61,7 +58,7 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		}
 	}
 
-	@Entity
+	@Entity(name = "TestCase")
 	@Table(name = "test_case")
 	public class TestCase extends RunParam {
 		public enum Status {
@@ -73,6 +70,11 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column(columnDefinition = "INTEGER")
 		public Long id;
 
+
+		// Latest Run id for this test-case (computed in service layer)
+		@Transient
+		public Long lastRunId;
+
 		@Column()
 		public String name;
 
@@ -81,9 +83,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 		@Column(name = "dataset_id", nullable = false)
 		public Long datasetId;
-
-		@Column(name = "last_run_id")
-		public Long lastRunId;
 
 		@Enumerated(EnumType.STRING)
 		@Column(nullable = false)
@@ -132,25 +131,18 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 	Optional<TestCase> findByName(@Param("name") String name);
 
-	@Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId ORDER BY updated DESC", nativeQuery = true)
-	Page<TestCase> findByDatasetIdOrderByIdDesc(Long datasetId, Pageable pageable);
+	@Query(value = "SELECT j FROM TestCase j WHERE j.datasetId = :datasetId ORDER BY j.updated DESC")
+	Page<TestCase> findByDatasetIdOrderByIdDesc(@Param("datasetId") Long datasetId, Pageable pageable);
 
-	@Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId AND status = :status ORDER BY id DESC",
-            nativeQuery = true)
-	Page<TestCase> findByDatasetIdAndStatusOrderByIdDesc(Long datasetId, TestCase.Status status, Pageable pageable);
+	@Query(value = "SELECT j FROM TestCase j WHERE j.datasetId = :datasetId AND j.status = :status ORDER BY j.id DESC")
+	Page<TestCase> findByDatasetIdAndStatusOrderByIdDesc(@Param("datasetId") Long datasetId, @Param("status") TestCase.Status status, Pageable pageable);
 
-	@Query(value = "SELECT * FROM test_case WHERE dataset_id = :datasetId ORDER BY id DESC LIMIT 1", nativeQuery =
-            true)
 	Optional<TestCase> findTopByDatasetIdOrderByIdDesc(@Param("datasetId") Long datasetId);
 
-	@Query(value = "SELECT * FROM test_case j " +
-			"WHERE (COALESCE(:name, '') = '' OR lower(j.name) LIKE '%' || lower(:name) || '%') " +
-			"AND (COALESCE(:labels, '') = '' OR lower(j.labels) LIKE '%' || lower(:labels) || '%') " +
-			"ORDER BY updated DESC",
-			countQuery = "SELECT count(j.id) FROM test_case j " +
-					"WHERE (COALESCE(:name, '') = '' OR lower(j.name) LIKE '%' || lower(:name) || '%') " +
-					"AND (COALESCE(:labels, '') = '' OR lower(j.labels) LIKE '%' || lower(:labels) || '%') ",
-			nativeQuery = true)
+	@Query("SELECT j FROM TestCase j " +
+			"WHERE (:name IS NULL OR :name = '' OR LOWER(j.name) LIKE LOWER(CONCAT('%', :name, '%'))) " +
+			"AND (:labels IS NULL OR :labels = '' OR LOWER(COALESCE(j.labels, '')) LIKE LOWER(CONCAT('%', :labels, '%'))) " +
+			"ORDER BY j.updated DESC")
 	Page<TestCase> findAllCasesFiltered(@Param("name") String name,
 										@Param("labels") String labels,
 										Pageable pageable);

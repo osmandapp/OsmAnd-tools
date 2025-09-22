@@ -1,6 +1,7 @@
 package net.osmand.server.api.searchtest;
 
 import net.osmand.data.LatLon;
+import net.osmand.search.core.ObjectType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -21,9 +22,11 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
+
 	static String sanitize(String input) {
 		if (input == null) {
 			return "";
@@ -159,6 +162,22 @@ public interface DataService extends BaseService {
 		});
 	}
 
+	default TestCase updateTestCase(Long id, Map<String, String> updates) {
+		TestCase test = getTestCaseRepo().findById(id).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + id));
+
+		updates.forEach((key, value) -> {
+			switch (key) {
+				case "name" -> test.name = value;
+				case "labels" -> test.labels = value;
+			}
+		});
+
+		test.updated = LocalDateTime.now();
+		return getTestCaseRepo().save(test);
+	}
+
+
 	@Async
 	default CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
@@ -196,54 +215,55 @@ public interface DataService extends BaseService {
 		}
 	}
 
-	default void saveRunResults(long genId, int count, Run run, String output, Map<String, Object> row,
-	                            List<Feature> searchResults, LatLon targetPoint, long duration, String error) throws IOException {
+	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults,
+	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		int resultsCount = searchResults.size();
-		Feature minFeature = null;
-		Integer minDistance = null, actualPlace = null;
-		String closestResult = null;
-
-		if (targetPoint != null && !searchResults.isEmpty()) {
-			double minDistanceMeters = Double.MAX_VALUE;
-			LatLon closestPoint = null;
-			int place = 0;
-
-			for (Feature feature : searchResults) {
-				place++;
-				if (feature == null) {
-					continue;
+		Integer distance = null, resPlace = null;
+		String resultPoint = null;
+		Map<String, Object> row = new LinkedHashMap<>();
+		if (searchPoint != null && !searchResults.isEmpty()) {
+			resPlace = 1;
+			// Pick the first non-STREET feature; fallback to the first result if all are LOCATION
+			Feature resultFeature = searchResults.get(0);
+			for (Feature f : searchResults) {
+				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
+				if (!ObjectType.LOCATION.name().equals(wt)) {
+					resultFeature = f;
+					break;
 				}
-				LatLon foundPoint = getLatLon(feature);
-				double distance = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
-						foundPoint.getLatitude(), foundPoint.getLongitude());
-				if (distance < minDistanceMeters) {
-					minDistanceMeters = distance;
-					closestPoint = foundPoint;
-					actualPlace = place;
-					minFeature = feature;
-				}
+				resPlace++;
 			}
 
-			if (closestPoint != null) {
-				minDistance = (int) minDistanceMeters;
-				closestResult = pointToString(closestPoint);
+			if (resultFeature.properties != null) {
+				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
+					Object v = e.getValue();
+					if (v != null) {
+						String s = v.toString();
+						if (!s.isEmpty()) {
+							row.put(e.getKey(), s);
+						}
+					}
+				}
 			}
+			LatLon point = getLatLon(resultFeature);
+			resultPoint = String.format(Locale.US, "%f, %f", point.getLatitude(), point.getLongitude());
+
+			double minDistanceMeters = MapUtils.getDistance(searchPoint.getLatitude(), searchPoint.getLongitude(),
+					point.getLatitude(), point.getLongitude());
+			distance = ((int) minDistanceMeters / 10) * 10;
 		}
 
-		if (minFeature != null) {
-			for (Map.Entry<String, Object> e : minFeature.properties.entrySet())
-				row.put(e.getKey(), e.getValue() == null ? "" : e.getValue().toString());
-		}
-
-		String sql = "INSERT OR IGNORE INTO run_result (gen_id, count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration, results_count, min_distance, closest_result, actual_place, lat, lon, timestamp) " +
-				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = getObjectMapper().writeValueAsString(row);
-		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, output, rowJson, error, duration,
+		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
 				resultsCount,
-				minDistance, closestResult, actualPlace, targetPoint == null ? null : targetPoint.getLatitude(),
-				targetPoint == null ? null : targetPoint.getLongitude(),
+				distance, resultPoint, resPlace,
+				searchPoint == null ? null : searchPoint.getLatitude(),
+				searchPoint == null ? null : searchPoint.getLongitude(),
+				bbox,
 				new java.sql.Timestamp(System.currentTimeMillis()));
 	}
 
@@ -396,6 +416,16 @@ public interface DataService extends BaseService {
 		if (id == null) return false;
 		int n = getJdbcTemplate().update("DELETE FROM domain WHERE id = ?", id);
 		return n > 0;
+	}
+
+	default List<String> getBranches() {
+		try {
+			String sql = "SELECT DISTINCT name FROM run WHERE name IS NOT NULL AND TRIM(name) <> '' ORDER BY name";
+			return getJdbcTemplate().queryForList(sql, String.class);
+		} catch (Exception e) {
+			getLogger().error("Failed to retrieve branches", e);
+			throw new RuntimeException("Failed to retrieve branches: " + e.getMessage(), e);
+		}
 	}
 
 	default List<String> getAllLabels() {

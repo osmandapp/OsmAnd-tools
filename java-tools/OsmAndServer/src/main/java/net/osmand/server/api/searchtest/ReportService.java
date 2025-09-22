@@ -2,11 +2,15 @@ package net.osmand.server.api.searchtest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.ServletOutputStream;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -16,6 +20,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public interface ReportService {
 	record TestCaseStatus(
@@ -40,114 +45,300 @@ public interface ReportService {
 	}
 
 	Logger LOGGER = LoggerFactory.getLogger(ReportService.class);
-	int PLACE_LIMIT = 10;
-	int DISTANCE_LIMIT = 100;
+	int DISTANCE_LIMIT = 50;
+
 	String BASE_SQL = """
 			WITH result AS (
-				SELECT gen_id as gen_id,
-					UPPER(COALESCE(json_extract(row, '$.web_type'), ''))               AS type,
-					count, lat, lon, query, closest_result, min_distance, actual_place, results_count, row,
-					actual_place <= ?                                                  AS is_place,
-					min_distance <= ?                                                  AS is_dist,
-					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER)            AS id,
-					COALESCE(json_extract(row, '$.web_name'), '')                      AS web_name,
-					COALESCE(json_extract(row, '$.web_address1'), '')                  AS web_address1,
-					COALESCE(json_extract(row, '$.web_address2'), '')                  AS web_address2,
-					CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)    AS web_poi_id,
-					(query LIKE '%' || COALESCE(json_extract(row, '$.web_name'), '') || '%'
-						AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address1'), '') || '%'
-						AND query LIKE '%' || COALESCE(json_extract(row, '$.web_address2'), '') || '%')
-																					   AS is_addr_match,
-					((CAST(COALESCE(json_extract(row, '$.web_poi_id'), 0) AS INTEGER)  / 2) =
-					 CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER))          AS is_poi_match
-				FROM run_result AS r WHERE run_id = ? ORDER BY actual_place, min_distance
-			) """;
+				SELECT gen_id,
+					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
+					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
+					r.res_count, g.row AS in_row, r.row AS out_row, 
+					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id
+				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY gen_id
+			)""";
 	String REPORT_SQL = BASE_SQL + """
-			SELECT CASE
-				WHEN count <= 0 OR trim(query) = '' THEN 'Not Processed'
-				WHEN is_place AND is_dist THEN 'Found'
-				WHEN NOT is_place AND is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Near'
-				WHEN is_place AND NOT is_dist AND (type = 'POI' AND is_poi_match OR type <> 'POI' AND is_addr_match) THEN 'Too Far'
-			    ELSE 'Not Found'
-			END AS "group", type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
-			FROM result """;
-	String FULL_REPORT_SQL = REPORT_SQL + """ 
-			 UNION SELECT c1, c2, lat, lon, query, 0, '', 0, 0, row FROM
-			(SELECT 'Generated' as c1, CASE WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
-			  WHEN count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END as c2, lat, lon, query, row, id
-			FROM gen_result WHERE case_id = ? ORDER BY id)""";
-	String COMPARISON_REPORT_SQL = BASE_SQL + """
-			SELECT gen_id, type, lat, lon, query, actual_place, closest_result, min_distance, results_count, row
-			FROM result WHERE COALESCE(is_place AND is_dist, false) = ? ORDER BY gen_id""";
+			 SELECT CASE
+				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
+				WHEN res_distance <= ? THEN 'Found'
+				ELSE 'Not Found'
+			END AS "group", type, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
+			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
+	String FULL_REPORT_SQL = REPORT_SQL + """
+			 UNION SELECT 'Generated', CASE 
+			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
+				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END, 
+			id as gen_id, lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
+			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
+	String[] IN_PROPS = new String[]{"group", "type", "gen_id", "id", "lat_lon", "query"};
+	String[] OUT_PROPS = new String[]{"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon"};
 
 	JdbcTemplate getJdbcTemplate();
 
 	ObjectMapper getObjectMapper();
 
-	default List<Map<String, Object>[]> compare(boolean found, Long caseId, Long runId1, Long runId2) {
-		// Load filtered results (Found/Not Found) for each run, ordered by _id
-		List<Map<String, Object>> results1 = extendTo(
-				getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, PLACE_LIMIT, DISTANCE_LIMIT, runId1, found)
-		);
-		List<Map<String, Object>> results2 = extendTo(
-				getJdbcTemplate().queryForList(COMPARISON_REPORT_SQL, PLACE_LIMIT, DISTANCE_LIMIT, runId2, found)
-		);
+	SearchTestCaseRepository getTestCaseRepo();
 
-		List<Map<String, Object>[]> result = new ArrayList<>(Math.max(results1.size(), results2.size()));
+	Logger getLogger();
 
-		int i = 0, j = 0;
-		while (i < results1.size() && j < results2.size()) {
-			Map<String, Object> r1 = results1.get(i);
-			Map<String, Object> r2 = results2.get(j);
-			Integer id1 = (Integer) r1.get("gen_id");
-			Integer id2 = (Integer) r2.get("gen_id");
+	default void compareReport(ServletOutputStream out, Long caseId, Long[] runIds) throws IOException {
+		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
 
-			if (id1 == null && id2 == null) {
-				result.add(new Map[]{r1, r2});
-				i++;
-				j++;
-			} else if (id1 == null) {
-				result.add(new Map[]{r1, null});
-				i++;
-			} else if (id2 == null) {
-				result.add(new Map[]{null, r2});
-				j++;
-			} else if (id1.equals(id2)) {
-				result.add(new Map[]{r1, r2});
-				i++;
-				j++;
-			} else if (id1 < id2) {
-				result.add(new Map[]{r1, null});
-				i++;
-			} else { // id2 < id1
-				result.add(new Map[]{null, r2});
-				j++;
+		String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
+		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
+		final String[] gen_cols = Stream.concat(Arrays.stream(new String[]{"gen_id", "id", "lat_lon", "query"}),
+				Arrays.stream(selCols)).toArray(String[]::new);
+		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name"};
+		try (Workbook wb = new XSSFWorkbook()) {
+			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
+			Map<Long, String> runNames = new HashMap<>();
+			for (long runId : runIds) {
+				runs.add(extendTo(getJdbcTemplate().queryForList(
+						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, selCols));
+				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?", String.class, runId));
 			}
-		}
 
-		while (i < results1.size()) {
-			result.add(new Map[]{results1.get(i++), null});
-		}
-		while (j < results2.size()) {
-			result.add(new Map[]{null, results2.get(j++)});
-		}
+			Set<String> runHeaderSet = new LinkedHashSet<>();
+			for (List<Map<String, Object>> runSet : runs)
+				for (Map<String, Object> row : runSet)
+					runHeaderSet.addAll(row.keySet());
+			String[] runHeaders = runHeaderSet.toArray(new String[0]);
 
-		return result;
+			// Styles
+			CellStyle header = wb.createCellStyle();
+			Font headerFont = wb.createFont();
+			headerFont.setBold(true);
+			header.setFont(headerFont);
+			header.setWrapText(true);
+
+			// Statistics
+			Sheet statSheet = wb.createSheet("Stats");
+			String[] groups = new String[]{"Found", "Not Found", "Not Processed"};
+			int c = 0;
+			for (Long[] p : getPairs(runIds)) {
+				Row sh = statSheet.createRow(0);
+
+				Cell cell = sh.createCell(c);
+				cell.setCellValue(runNames.get(p[0]));
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 1);
+				cell.setCellValue(runNames.get(p[1]));
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 2);
+				cell.setCellValue("Sum");
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 3);
+				cell.setCellValue("%");
+				cell.setCellStyle(header);
+
+				int i = 0;
+				for (int j = 0; j < groups.length; j++) {
+					Row r1 = statSheet.createRow(j * 3 + 1 + i);
+					cell = r1.createCell(c);
+					cell.setCellValue(groups[0]);
+					cell = r1.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					Row r2 = statSheet.createRow(j * 3 + 2 + i);
+					cell = r2.createCell(c);
+					cell.setCellValue(groups[1]);
+					cell = r2.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					Row r3 = statSheet.createRow(j * 3 + 3 + i);
+					cell = r3.createCell(c);
+					cell.setCellValue(groups[2]);
+					cell = r3.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					i++;
+				}
+
+				statSheet.autoSizeColumn(c);
+				statSheet.autoSizeColumn(c + 1);
+
+				c += 4;
+			}
+
+			// Sheet 1
+			Sheet sheet = wb.createSheet("Comparison");
+			Row h = sheet.createRow(0);
+			sheet.createFreezePane(runIds.length + gen_cols.length - selCols.length, 1);
+
+			// Group header: one column per run (to hold group name per run)
+			for (c = 0; c < runIds.length; c++) {
+				Cell cell = h.createCell(c);
+				cell.setCellValue(runNames.get(runIds[c]));
+				cell.setCellStyle(header);
+			}
+			// General columns header
+			for (c = 0; c < gen_cols.length; c++) {
+				Cell cell = h.createCell(runIds.length + c);
+				cell.setCellValue(gen_cols[c]);
+				cell.setCellStyle(header);
+			}
+
+			// Per-run block headers
+			int r;
+			// Helper to stringify values safely
+			java.util.function.Function<Object, String> toStr = v -> v == null ? "" : String.valueOf(v);
+
+			for (int ri = 0; ri < runIds.length; ri++) {
+				int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
+				for (c = 0; c < run_cols.length; c++) {
+					Cell cell = h.createCell(baseCol + c);
+					cell.setCellValue(run_cols[c] + "_" + (ri + 1));
+					cell.setCellStyle(header);
+				}
+
+				Sheet runSheet = wb.createSheet(runNames.get(runIds[ri]) + " (#" + runIds[ri] + ")");
+				r = 1;
+				for (Map<String, Object> values : runs.get(ri)) {
+					Row rh = runSheet.createRow(0);
+					for (c = 0; c < runHeaders.length; c++) {
+						Cell cell = rh.createCell(c);
+						cell.setCellValue(runHeaders[c]);
+						cell.setCellStyle(header);
+					}
+
+					Row row = runSheet.createRow(r++);
+					for (int j = 0; j < runHeaders.length; j++) {
+						Cell cell = row.createCell(j);
+						cell.setCellValue(toStr.apply(values.get(runHeaders[j])));
+					}
+				}
+				for (c = 0; c < runHeaders.length; c++) {
+					runSheet.autoSizeColumn(c);
+				}
+			}
+
+			// Body: create one row per generated item (gens is ordered by gen_id)
+			r = 1;
+			for (Map<String, Object> values : runs.get(0)) {
+				Row row = sheet.createRow(r++);
+				for (int j = 0; j < gen_cols.length; j++) {
+					int colIdx = runIds.length + j;
+					Cell cell = row.createCell(colIdx);
+					cell.setCellValue(toStr.apply(values.get(gen_cols[j])));
+				}
+			}
+
+			// For each run (index ri), fill group column and run block columns, aligned by row index
+			for (int ri = 0; ri < runs.size(); ri++) {
+				List<Map<String, Object>> runSet = runs.get(ri);
+				int rowsCount = runSet.size();
+				for (int idx = 0; idx < rowsCount; idx++) {
+					Row row = sheet.getRow(idx + 1);
+					if (row == null) row = sheet.createRow(idx + 1);
+					Map<String, Object> values = idx < runSet.size() ? runSet.get(idx) : Collections.emptyMap();
+
+					// Group column for this run
+					{
+						Cell cell = row.getCell(ri);
+						if (cell == null) cell = row.createCell(ri);
+						cell.setCellValue(toStr.apply(values.get("group")));
+					}
+					// Run block columns for this run
+					int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
+					for (c = 0; c < run_cols.length; c++) {
+						Cell cell = row.getCell(baseCol + c);
+						if (cell == null) cell = row.createCell(baseCol + c);
+						cell.setCellValue(toStr.apply(values.get(run_cols[c])));
+					}
+				}
+			}
+
+			// Auto-size columns
+			int totalCols = runIds.length + gen_cols.length + runIds.length * run_cols.length;
+			for (c = 0; c < totalCols; c++) {
+				sheet.autoSizeColumn(c);
+			}
+
+			wb.write(out);
+		} catch (Exception e) {
+			getLogger().error("Cannot create comparison report", e);
+		}
 	}
 
-	default void downloadRawResults(Writer writer, int placeLimit, int distLimit, Long caseId, Long runId,
-	                                String format) throws IOException {
+
+	default void downloadRawResults(Writer writer, Long caseId, Long runId, String format) throws IOException {
+		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+
 		if ("csv".equalsIgnoreCase(format)) {
-			List<Map<String, Object>> results = getJdbcTemplate().queryForList(REPORT_SQL,
-					placeLimit, distLimit, runId);
+			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER by get_id", runId,
+							DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class),
+					getObjectMapper().readValue(test.selCols, String[].class));
 			writeAsCsv(writer, results);
 		} else if ("json".equalsIgnoreCase(format)) {
-			List<Map<String, Object>> results = getJdbcTemplate().queryForList(FULL_REPORT_SQL,
-					placeLimit, distLimit, runId, caseId);
-			getObjectMapper().writeValue(writer, extendTo(results));
+			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId,
+							DISTANCE_LIMIT, caseId), getObjectMapper().readValue(test.allCols, String[].class),
+					getObjectMapper().readValue(test.selCols, String[].class));
+			getObjectMapper().writeValue(writer, results);
 		} else {
 			throw new IllegalArgumentException("Unsupported format: " + format);
 		}
+	}
+
+	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
+		// Exclude fields already exposed as top-level columns to avoid duplication
+		final java.util.Set<String> include = new java.util.HashSet<>(java.util.Arrays.asList(selCols));
+		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		exclude.addAll(java.util.Arrays.asList(allCols));
+
+		return results.stream().map(srcRow -> {
+			String inRowJson = (String) srcRow.get("in_row");
+			String outRowJson = (String) srcRow.get("out_row");
+			srcRow.remove("in_row");
+			srcRow.remove("out_row");
+
+			Map<String, Object> row = new LinkedHashMap<>();
+			if (inRowJson == null) return row;
+			for (String p : IN_PROPS)
+				if (srcRow.containsKey(p))
+					row.put(p, srcRow.get(p));
+
+			try {
+				JsonNode inRow = getObjectMapper().readTree(inRowJson);
+				inRow.fieldNames().forEachRemaining(fn -> {
+					JsonNode v = inRow.get(fn);
+					if (include.contains(fn)) {
+						row.put(fn, v.asText());
+					}
+				});
+
+				Map<String, Object> out = new LinkedHashMap<>();
+				StringBuilder resultName = new StringBuilder();
+				if (outRowJson != null) {
+					for (String p : OUT_PROPS)
+						row.put(p, srcRow.get(p));
+
+					JsonNode outRow = getObjectMapper().readTree(outRowJson);
+					// For consistency with CSV, serialize values as text, skipping excluded keys
+					outRow.fieldNames().forEachRemaining(fn -> {
+						if (exclude.contains(fn))
+							return; // remove from the inner 'row' map
+						JsonNode v = outRow.get(fn);
+						if (fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
+							row.put(fn, v.asText());
+						else if (fn.startsWith("web_"))
+							resultName.append(v.asText()).append(" ");
+						else
+							out.put(fn, v.asText());
+					});
+
+					row.put("res_name", resultName.toString().trim());
+					row.put("res_tags", getObjectMapper().writeValueAsString(out));
+				}
+			} catch (IOException e) {
+				// ignore invalid JSON in 'row'
+			}
+			return row;
+		}).collect(Collectors.toList());
 	}
 
 	default Optional<TestCaseStatus> getTestCaseStatus(Long cased) {
@@ -155,8 +346,8 @@ public interface ReportService {
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE (count = -1 or query IS NULL) and error IS NULL) AS filtered,
-				    count(*) FILTER (WHERE count = 0 or trim(query) = '') AS empty,
+				    count(*) FILTER (WHERE (gen_count = -1 or query IS NULL) and error IS NULL) AS filtered,
+				    count(*) FILTER (WHERE gen_count = 0 or trim(query) = '') AS empty,
 				    sum(duration) AS duration
 				FROM
 				    gen_result
@@ -196,18 +387,18 @@ public interface ReportService {
 		String sql = """
 				SELECT (select status from run where id = run_id) AS status,
 				    count(*) AS total,
-				    count(*) FILTER (WHERE count > 0 and trim(query) <> '') AS processed,
+				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    avg(actual_place) FILTER (WHERE actual_place IS NOT NULL) AS average_place,
+				    avg(res_place) FILTER (WHERE res_place IS NOT NULL) AS average_place,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE actual_place <= ? and min_distance <= ?) AS found
+				    count(*) FILTER (WHERE res_distance <= ?) AS found
 				FROM
 				    run_result
 				WHERE
 				    run_id = ?
 				""";
 		try {
-			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, PLACE_LIMIT, DISTANCE_LIMIT, runId);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, DISTANCE_LIMIT, runId);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
@@ -239,7 +430,7 @@ public interface ReportService {
 		}
 	}
 
-	default Optional<RunStatus> getRunReport(Long caseId, Long runId, int placeLimit, int distLimit) {
+	default Optional<RunStatus> getRunReport(Long caseId, Long runId) {
 		Optional<TestCaseStatus> optCase = getTestCaseStatus(caseId);
 		if (optCase.isEmpty()) {
 			return Optional.empty();
@@ -258,12 +449,10 @@ public interface ReportService {
 		distanceHistogram.put("Generated", 0);
 		distanceHistogram.put("Not Processed", 0);
 		distanceHistogram.put("Found", 0);
-		distanceHistogram.put("Near", 0);
-		distanceHistogram.put("Too Far", 0);
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				getJdbcTemplate().queryForList("SELECT \"group\", count(*) as cnt FROM (" + FULL_REPORT_SQL + ") GROUP BY " +
-						"\"group\"", placeLimit, distLimit, runId, caseId);
+						"\"group\"", runId, DISTANCE_LIMIT, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
@@ -280,32 +469,6 @@ public interface ReportService {
 		return Optional.of(finalStatus);
 	}
 
-	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results) {
-		return results.stream().map(row -> {
-			Map<String, Object> out = new LinkedHashMap<>();
-			// copy base fields except 'row'
-			for (Map.Entry<String, Object> e : row.entrySet()) {
-				if (!"row".equals(e.getKey())) {
-					out.put(e.getKey(), e.getValue());
-				}
-			}
-			Object rowObj = row.get("row");
-			if (rowObj != null) {
-				try {
-					JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
-					// For consistency with CSV, serialize values as text
-					rowNode.fieldNames().forEachRemaining(fn -> {
-						JsonNode v = rowNode.get(fn);
-						out.put(fn, v == null || v.isNull() ? null : v.asText());
-					});
-				} catch (IOException e) {
-					// ignore invalid JSON in 'row'
-				}
-			}
-			return out;
-		}).collect(Collectors.toList());
-	}
-
 	default void writeAsCsv(Writer writer, List<Map<String, Object>> results) throws IOException {
 		if (results.isEmpty()) {
 			writer.write("");
@@ -313,47 +476,18 @@ public interface ReportService {
 		}
 
 		Set<String> headers = new LinkedHashSet<>();
-		results.get(0).keySet().stream()
-				.filter(k -> !k.equals("row"))
-				.forEach(headers::add);
-
-		Set<String> rowHeaders = new LinkedHashSet<>();
 		for (Map<String, Object> row : results) {
-			Object rowObj = row.get("row");
-			if (rowObj != null) {
-				try {
-					JsonNode rowNode = getObjectMapper().readTree(rowObj.toString());
-					rowNode.fieldNames().forEachRemaining(rowHeaders::add);
-				} catch (IOException e) {
-					// ignore invalid JSON in 'row'
-				}
-			}
+			headers.addAll(row.keySet());
 		}
-		headers.addAll(rowHeaders);
 
-		CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
-				.setHeader(headers.toArray(new String[0])).setDelimiter(";")
-				.build();
-
+		CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader(headers.toArray(new String[0])).build();
 		try (final CSVPrinter printer = new CSVPrinter(writer, csvFormat)) {
 			for (Map<String, Object> row : results) {
 				List<String> record = new ArrayList<>();
-				JsonNode rowNode = null;
-				Object rowObj = row.get("row");
-				if (rowObj != null) {
-					try {
-						rowNode = getObjectMapper().readTree(rowObj.toString());
-					} catch (IOException e) {
-						// keep rowNode null
-					}
-				}
-
 				for (String header : headers) {
 					if (row.containsKey(header)) {
 						Object value = row.get(header);
 						record.add(value != null ? value.toString().trim() : null);
-					} else if (rowNode != null && rowNode.has(header)) {
-						record.add(rowNode.get(header).asText());
 					} else {
 						record.add(null);
 					}
@@ -361,5 +495,39 @@ public interface ReportService {
 				printer.printRecord(record);
 			}
 		}
+	}
+
+	/**
+	 * Builds all pairs between the first element of the input IDs and each of the remaining elements,
+	 * after sorting the IDs in reverse (descending) order. For example, for input {1, 2, 3} it sorts to
+	 * {3, 2, 1} and returns [[3, 2], [3, 1]].
+	 * <p>
+	 * Edge cases:
+	 * - If the array is null or contains fewer than two non-null elements, returns an empty list.
+	 * - Null elements are skipped.
+	 *
+	 * @param ids input array of run/test ids
+	 * @return list of pairs where each pair is a Long[2] = {firstDescending, other}
+	 */
+	default List<Long[]> getPairs(Long[] ids) {
+		if (ids == null || ids.length == 0) {
+			return Collections.emptyList();
+		}
+
+		List<Long> sorted = Arrays.stream(ids)
+				.filter(Objects::nonNull)
+				.sorted(Comparator.reverseOrder())
+				.collect(Collectors.toList());
+
+		if (sorted.size() < 2) {
+			return Collections.emptyList();
+		}
+
+		Long first = sorted.get(0);
+		List<Long[]> pairs = new ArrayList<>(sorted.size() - 1);
+		for (int i = 1; i < sorted.size(); i++) {
+			pairs.add(new Long[]{first, sorted.get(i)});
+		}
+		return pairs;
 	}
 }

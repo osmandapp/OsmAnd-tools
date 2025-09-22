@@ -110,6 +110,13 @@ public class SearchTestController {
 		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
 	}
 
+	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<TestCase> updateTestCase(@PathVariable Long caseId,
+	                                                                @RequestBody Map<String, String> updatesPayload) {
+		return ResponseEntity.ok(testSearchService.updateTestCase(caseId, updatesPayload));
+	}
+
 	@PostMapping(value = "/runs/{runId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Run>> cancelRun(@PathVariable Long runId) {
@@ -204,37 +211,32 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId,
-													   @RequestParam(defaultValue = "10") Integer placeLimit,
-													   @RequestParam(defaultValue = "50") Integer distLimit) {
+	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId) {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		return testSearchService.getRunReport(caseId, tc.lastRunId, placeLimit, distLimit)
+		return testSearchService.getRunReport(caseId, tc.lastRunId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/runs/{runId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId,
-												  @RequestParam(defaultValue = "10") Integer placeLimit,
-												  @RequestParam(defaultValue = "50") Integer distLimit) {
+	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId) {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		return testSearchService.getRunReport(run.caseId, runId, placeLimit, distLimit)
+		return testSearchService.getRunReport(run.caseId, runId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<List<Map<String, Object>[]>> compare(@PathVariable Long caseId, @RequestParam Boolean found,
-	                                                           @RequestParam Long runId1,
-	                                                           @RequestParam Long runId2) throws IOException {
-		return ResponseEntity.ok(testSearchService.compare(found, caseId, runId1, runId2));
+	public void compareReport(@PathVariable Long caseId, @RequestParam Long[] runIds,
+	                                                                 HttpServletResponse response) throws IOException {
+		response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"");
+		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")
 	public void downloadRunReport(@PathVariable Long runId,
-								  @RequestParam(defaultValue = "10") Integer placeLimit,
-								  @RequestParam(defaultValue = "50") Integer distLimit,
 								  @RequestParam(defaultValue = "csv") String format,
 								  HttpServletResponse response) throws IOException {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
@@ -243,13 +245,11 @@ public class SearchTestController {
 		response.setContentType(contentType);
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, run.caseId, runId, format);
+		testSearchService.downloadRawResults(response.getWriter(), run.caseId, runId, format);
 	}
 
 	@GetMapping(value = "/cases/{caseId}/download")
 	public void downloadTestCaseReport(@PathVariable Long caseId,
-									   @RequestParam(defaultValue = "10") Integer placeLimit,
-									   @RequestParam(defaultValue = "50") Integer distLimit,
 									   @RequestParam(defaultValue = "csv") String format,
 									   HttpServletResponse response) throws IOException {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
@@ -258,8 +258,7 @@ public class SearchTestController {
 		response.setContentType(contentType);
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
 
-		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, caseId, tc.lastRunId,
-				format);
+		testSearchService.downloadRawResults(response.getWriter(), caseId, tc.lastRunId, format);
 	}
 
 	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -268,11 +267,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
 	}
 
-	@GetMapping(value = "/versions", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String[]> getVersions() {
-		return ResponseEntity.ok(new String[] {"EXPAND_COMMON_WORDS", "EXPAND_ABBREVIATIONS", "DEFAULT"});
+	public ResponseEntity<List<String>> getBranches() {
+		return ResponseEntity.ok(testSearchService.getBranches());
 	}
+
 
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
