@@ -6,6 +6,7 @@ import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
+import net.osmand.util.Algorithms;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
@@ -23,6 +24,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -266,11 +268,21 @@ public class SearchTestController {
 	public ResponseEntity<String[]> getLabels() {
 		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
 	}
+	
+	public String getSystemBranch() {
+		String branch = System.getenv("SYSTEM_BRANCH");
+		if (Algorithms.isEmpty(branch)) {
+			branch = "master";
+		}
+		return branch;
+	}
 
 	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<String>> getBranches() {
-		return ResponseEntity.ok(testSearchService.getBranches());
+//		return ResponseEntity.ok(testSearchService.getBranches());
+		return ResponseEntity.ok(Arrays.asList(getSystemBranch()));
+		
 	}
 
 

@@ -38,6 +38,7 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column(name = "south_east")
 		private String southEast;
 
+		// branch
 		@Column()
 		public String name;
 
