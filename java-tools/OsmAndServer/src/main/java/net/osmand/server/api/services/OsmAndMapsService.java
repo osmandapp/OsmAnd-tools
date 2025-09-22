@@ -388,7 +388,7 @@ public class OsmAndMapsService {
 				}
 			}
 			System.gc();
-			long brpReservedBytes = routingCaches.size() * routingCaches.get(0).rCtx.config.memoryLimitation;
+			long brpReservedBytes = routingCaches.size() == 0 ? 0 : routingCaches.size() * routingCaches.get(0).rCtx.config.memoryLimitation;
 			long futureFreeMemory = rt.maxMemory() - rt.totalMemory() + rt.freeMemory();
 			boolean criticalMemory = futureFreeMemory < brpReservedBytes;
 			if (criticalMemory) {
