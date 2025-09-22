@@ -14,13 +14,19 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
+import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
+
+import static net.osmand.reviews.mangrove.ReviewsProcessor.applyEdits;
 
 /**
  * Tools for working with reviews from <a href="https://mangrove.reviews">mangrove.reviews</a>.
@@ -58,7 +64,14 @@ public final class MangroveReviews {
         generateObf(osmGz, obf);
     }
 
-    private static List<ReviewedPlace> parseInputFile(File inputFile) {
+    private static List<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
+        ReviewsParser parser = new ReviewsParser();
+        Map<@NotNull String, Review> bySignature = parser.parse(inputFile).collect(Collectors.toMap(Review::signature, Function.identity()));
+        Map<@NotNull String, Review> bySignatureEdited = applyEdits(bySignature);
+        // TODO:
+        // - reduce edit chains
+        // - map to Review
+        // - group by ReviewedPlace
         throw new UnsupportedOperationException("TODO: implement");
     }
 

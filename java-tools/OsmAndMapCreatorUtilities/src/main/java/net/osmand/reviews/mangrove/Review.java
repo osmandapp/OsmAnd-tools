@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * A Mangrove API representation of a review. See <a href="https://docs.mangrove.reviews/#operation/get_reviews_route">Mangrove API docs</a>.
  */
-public record Review(
+record Review(
         @NotNull String signature,
         @NotNull String kid,
         @NotNull Payload payload,
@@ -117,6 +117,10 @@ public record Review(
             public static Builder builder() {
                 return new Builder();
             }
+
+            public Metadata withClientId(String clientId) {
+                return new Metadata(clientId, familyName, givenName, isAffiliated, isGenerated, isPersonalExperience, nickname, preferredUsername);
+            }
         }
 
         public static final class Builder {
@@ -170,6 +174,14 @@ public record Review(
 
         public static Builder builder() {
             return new Builder();
+        }
+
+        public Payload withSub(@NotNull String sub) {
+            return new Payload(iat, sub, rating, opinion, action, images, metadata);
+        }
+
+        public Payload withMetadata(Metadata metadata) {
+            return new Payload(iat, sub, rating, opinion, action, images, metadata);
         }
     }
 
@@ -275,5 +287,17 @@ public record Review(
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    public Review withPayload(Payload payload) {
+        return new Review(signature, kid, payload, scheme, geo);
+    }
+
+    public Review withScheme(String scheme) {
+        return new Review(signature, kid, payload, scheme, geo);
+    }
+
+    public Review withGeo(Geo geo) {
+        return new Review(signature, kid, payload, scheme, geo);
     }
 }

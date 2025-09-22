@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 
 import static com.fasterxml.jackson.core.JsonToken.*;
 
-public final class ReviewsParser {
+final class ReviewsParser {
     private enum State {
         Initial,
         TopLevel,

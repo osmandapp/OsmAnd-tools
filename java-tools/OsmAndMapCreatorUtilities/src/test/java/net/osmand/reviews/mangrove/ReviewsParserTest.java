@@ -12,6 +12,7 @@ import static org.junit.Assert.assertEquals;
 public class ReviewsParserTest {
     @Test
     public void parsesRealApiOutput() throws IOException, ReviewsParser.ParseException {
+        // mangrove200.json file contains 200 actual reviews from Mangrove API, some of the oldest and newest ones available in September 2025.
         File input = new File("src/test/resources/mangrove200.json");
         ReviewsParser parser = new ReviewsParser();
         Stream<Review> reviewStream = parser.parse(input);
