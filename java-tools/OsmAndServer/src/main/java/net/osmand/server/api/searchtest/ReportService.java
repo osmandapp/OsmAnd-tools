@@ -304,7 +304,6 @@ public interface ReportService {
 
 	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
-		final java.util.Set<String> include = new java.util.HashSet<>(java.util.Arrays.asList(selCols));
 		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
 		exclude.addAll(java.util.Arrays.asList(allCols));
 
@@ -322,14 +321,6 @@ public interface ReportService {
 
 			row.remove("gen_id");
 			try {
-				JsonNode inRow = getObjectMapper().readTree(inRowJson);
-				inRow.fieldNames().forEachRemaining(fn -> {
-					JsonNode v = inRow.get(fn);
-					if (include.contains(fn)) {
-						row.put(fn, v.asText());
-					}
-				});
-
 				Map<String, Object> out = new LinkedHashMap<>();
 				StringBuilder resultName = new StringBuilder();
 				if (outRowJson != null) {
