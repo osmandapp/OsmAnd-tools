@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.w3c.dom.Document;
@@ -72,75 +73,53 @@ public class SvgMapLegendGenerator {
 			}
 
 			// 2 Get styles for each icon.
-			AndroidStringsLoader loader = new AndroidStringsLoader("/home/user/StudioProjects/osmandapp/resources/poi/phrases/en/phrases.xml");
+			AndroidStrings androidStrings = new AndroidStrings(repositoriesPath + "/resources/poi/phrases/en/phrases.xml");
 			String path = getStylePath(rendererStyle, repositoriesPath);
 			RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(path);
 			String csvFile = "output.csv";
-			List<String> includePrefix = Arrays.asList("leisure_fishing", "barrier_coupure", "barrier_planter",
-					"barrier_planter", "waterway_fuel");
-			List<String> excludePrefix = Arrays.asList("amenity", "highway", "barrier_colored", "osmand");
-			List<String> excludeTagPrefix = Arrays.asList("tourism", "natural", "historic", "sport",
-					"shop", "barrier", "emergency", "leisure", "man_made", "waterway");
+			MapPoiTypes mpt = MapPoiTypes.getDefault();
 			try (PrintWriter pw = new PrintWriter(csvFile)) {
-				pw.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "name", "getString_poi_name)", "poi_name", "iconName", "iconTargetFileName", "tag", "value", " tag2", " value2");
+				pw.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "name", "getString_poi_name)", "poi_name", "iconName",
+						"iconTargetFileName", "tag", "value", " tag2", " value2");
 				for (GroupDTO group : configGroups) {
 					if (group.spriteSheet) {
 						continue;
 					}
 					for (IconDTO icon : group.icons) {
-						Map<String, String> dayStyle = getAmenityIconStyle(icon.tag,
-								icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
-						Map<String, String> nightStyle = getAmenityIconStyle(icon.tag,
-								icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
+						String tag = icon.editTag == null ? icon.tag : icon.editTag;
+						String value = icon.editValue == null ? icon.value : icon.editValue;
+						Map<String, String> dayStyle = getAmenityIconStyle(tag, value,
+								icon.tag2, icon.value2, false, icon.zoom, storage);
+						Map<String, String> nightStyle = getAmenityIconStyle(tag, value,
+								icon.tag2, icon.value2, false, icon.zoom, storage);
 						if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle)
 								&& !Algorithms.isEmpty(dayStyle.get("iconName"))) {
 							icon.iconName = dayStyle.get("iconName");
 							icon.shieldNameDay = dayStyle.get("shieldName");
 							icon.shieldNameNight = nightStyle.get("shieldName");
-							icon.iconTargetFileName = icon.tag + "_" + icon.value;
+							icon.iconTargetFileName = tag + "_" + value;
 							String name = icon.iconName;
 
-							String prefixToUse = null;
-							for (String prefix : includePrefix) {
-								if (name.startsWith(prefix)) {
-									prefixToUse = prefix;
-									break;
-								}
-							}
-							if (prefixToUse == null) {
-								for (String prefix : excludePrefix) {
-									if (name.startsWith(prefix)) {
-										prefixToUse = prefix + (name.length() > prefix.length() ? "_" : "");
-										break;
+							String nameStr = androidStrings.getString("poi_!!!");
+							PoiType poiType = mpt.getPoiTypeByTagValue(icon.tag, icon.value);
+							if (poiType != null) {
+								if (icon.tag2 != null && icon.value2 != null) {
+									PoiType poiTypeByTagValue2 = mpt.getPoiTypeByTagValue(icon.tag2, icon.value2);
+									if (poiTypeByTagValue2 != null) {
+										nameStr = androidStrings.getString("poi_" + poiType.getFormattedKeyName()) + " ("
+												+ androidStrings.getString("poi_" + poiTypeByTagValue2.getKeyName()).toLowerCase() + ")";
 									}
-								}
-								if (prefixToUse != null) {
-									name = name.substring(prefixToUse.length());
 								} else {
-									String finalName = name;
-									if (excludeTagPrefix.contains(icon.tag)) {
-										if (includePrefix.stream().anyMatch(prefix -> !finalName.startsWith(prefix))) {
-											name = name.replaceFirst(icon.tag + "_", "");
-										}
-									}
+									nameStr = androidStrings.getString("poi_" + poiType.getFormattedKeyName());
 								}
 							}
-							if (name.endsWith("_map")) {
-								name = name.substring(0, name.length() - "_map".length());
-							}
-							if (name.endsWith("_big")) {
-								name = name.substring(0, name.length() - "_big".length());
-							}
-							if (name.endsWith("_small")) {
-								name = name.substring(0, name.length() - "_small".length());
-							}
-							name = "poi_" + name;
 							if (!Algorithms.isEmpty(icon.tag2)) {
 								icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
 							}
 							icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
-							pw.printf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n"
-									, icon.name, loader.getString(name), name, icon.iconName, icon.iconTargetFileName, icon.tag, icon.value, icon.tag2, icon.value2);
+							pw.printf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n", icon.name,
+									nameStr, name, icon.iconName, icon.iconTargetFileName, icon.tag, icon.value,
+									icon.tag2, icon.value2);
 							icon.styleIconSize = Float.parseFloat(dayStyle.get("iconSize"));
 						} else {
 							throw new Exception(String.format(
@@ -266,6 +245,8 @@ public class SvgMapLegendGenerator {
 		String value = null;
 		String tag2 = null;
 		String value2 = null;
+		String editTag = null;
+		String editValue = null;
 		int iconSize = defaultIconSize; // optional value
 		int shieldSize = defaultShieldSize; // optional value
 		int zoom = defaultZoomLevel; // optional value
@@ -331,6 +312,8 @@ public class SvgMapLegendGenerator {
 							tempIcon.value = parser.getAttributeValue("", "value");
 							tempIcon.tag2 = parser.getAttributeValue("", "tag2");
 							tempIcon.value2 = parser.getAttributeValue("", "value2");
+							tempIcon.editTag = parser.getAttributeValue("", "edit_tag");
+							tempIcon.editValue = parser.getAttributeValue("", "edit_value");
 
 							String numberString = parser.getAttributeValue("", "icon_size");
 							if (!Algorithms.isEmpty(numberString)) {
@@ -570,7 +553,7 @@ public class SvgMapLegendGenerator {
 				} catch (Exception e) {
 					throw new Exception("ERROR: ReactComponentsGenerator - file saving error for " + path, e);
 				}
-				createLegendAndComponentsFiles(components);
+//				createLegendAndComponentsFiles(components);
 			}
 		}
 
@@ -674,11 +657,11 @@ public class SvgMapLegendGenerator {
 		}
 	}
 
-	public static class AndroidStringsLoader {
+	public static class AndroidStrings {
 
 		private final Map<String, String> strings = new HashMap<>();
 
-		public AndroidStringsLoader(String filePath) throws Exception {
+		public AndroidStrings(String filePath) throws Exception {
 			loadStrings(filePath);
 		}
 
@@ -698,7 +681,7 @@ public class SvgMapLegendGenerator {
 		}
 
 		public String getString(String key) {
-			return strings.getOrDefault(key, "???" + key + "???");
+			return strings.getOrDefault(key, "???" + key + "???").split(";")[0];
 		}
 	}
 
