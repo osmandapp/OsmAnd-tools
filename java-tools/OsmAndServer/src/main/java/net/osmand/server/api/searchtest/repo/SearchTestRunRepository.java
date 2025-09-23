@@ -119,6 +119,8 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 	@Entity
 	@Table(name = "gen_result")
 	public class GenResult extends Result {
+		@Column(name = "ds_result_id")
+		public Integer dsResultId;
 	}
 
 	@Entity

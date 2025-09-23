@@ -313,20 +313,22 @@ public class SearchTestService implements ReportService, DataService {
 				Integer gen_id = (Integer) row.get("id");
 				String query = (String) row.get("query");
 				int count = (Integer) row.get("gen_count");
-				LatLon point = srcPoint != null ? srcPoint : new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
+
+				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
+				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[] {
-					String.format(Locale.US, "%f, %f",point.getLatitude() + 1.5, point.getLongitude() - 1.5),
-					String.format(Locale.US, "%f, %f",point.getLatitude() - 1.5, point.getLongitude() + 1.5)};
+					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
+					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
 					List<Feature> searchResults = Collections.emptyList();
 					if (query != null && !query.trim().isEmpty())
-						searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
+						searchResults = searchService.search(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
-					saveRunResults(gen_id, count, run, query, searchResults, point,
+					saveRunResults(gen_id, count, run, query, searchResults, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(gen_id, count, run, query, Collections.emptyList(), point,
+					saveRunResults(gen_id, count, run, query, Collections.emptyList(), targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() :	e.getMessage());
 				}

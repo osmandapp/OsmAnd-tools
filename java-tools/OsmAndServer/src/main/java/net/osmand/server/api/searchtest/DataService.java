@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -129,8 +130,16 @@ public interface DataService extends BaseService {
 		}
 
 		try {
-			List<String> rows = getJdbcTemplate().queryForList(
-					"SELECT value FROM dataset_result WHERE dataset_id = ?", String.class, dataset.id);
+			Map<Integer, String> rows = getJdbcTemplate().query(
+					"SELECT id, value FROM dataset_result WHERE dataset_id = ? ORDER BY id", new Object[]{dataset.id},
+					(ResultSet rs) -> {
+						Map<Integer, String> result = new LinkedHashMap<>();
+						while (rs.next()) {
+							result.put(rs.getInt("id"), rs.getString("value"));
+						}
+						return result;
+					}
+			);
 
 			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
 			for (PolyglotEngine.GenRow example : examples) {
@@ -200,22 +209,22 @@ public interface DataService extends BaseService {
 		});
 	}
 
-	default void saveCaseResults(TestCase test, PolyglotEngine.GenRow data) throws IOException {
+	default void saveCaseResults(TestCase test, PolyglotEngine.GenRow row) throws IOException {
 		String sql =
-				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
-						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-		String rowJson = getObjectMapper().writeValueAsString(data.row());
-		String[] outputArray = data.output() == null || data.count() <= 0 ? new String[]{null} :
-				getObjectMapper().readValue(data.output(), String[].class);
+				"INSERT INTO gen_result (ds_result_id, gen_count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
+						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		String rowJson = getObjectMapper().writeValueAsString(row.row());
+		String[] outputArray = row.output() == null || row.count() <= 0 ? new String[]{null} :
+				getObjectMapper().readValue(row.output(), String[].class);
 		for (String query : outputArray) {
-			getJdbcTemplate().update(sql, data.count(), test.id, test.datasetId, rowJson, query, data.error(),
-					data.duration(),
-					data.point().getLatitude(), data.point().getLongitude(),
+			getJdbcTemplate().update(sql, row.dsResultId(), row.count(), test.id, test.datasetId, rowJson, query, row.error(),
+					row.duration(),
+					row.point().getLatitude(), row.point().getLongitude(),
 					new java.sql.Timestamp(System.currentTimeMillis()));
 		}
 	}
 
-	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults,
+	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
@@ -227,7 +236,7 @@ public interface DataService extends BaseService {
 			Feature resultFeature = searchResults.get(0);
 			for (Feature f : searchResults) {
 				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
-				if (!ObjectType.LOCATION.name().equals(wt)) {
+				if (wt != null && !"LOCATION".equals(wt.toString())) {
 					resultFeature = f;
 					break;
 				}
@@ -245,11 +254,11 @@ public interface DataService extends BaseService {
 					}
 				}
 			}
-			LatLon point = getLatLon(resultFeature);
-			resultPoint = String.format(Locale.US, "%f, %f", point.getLatitude(), point.getLongitude());
+			LatLon resPoint = getLatLon(resultFeature);
+			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
 
-			double minDistanceMeters = MapUtils.getDistance(searchPoint.getLatitude(), searchPoint.getLongitude(),
-					point.getLatitude(), point.getLongitude());
+			double minDistanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
+					resPoint.getLatitude(), resPoint.getLongitude());
 			distance = ((int) minDistanceMeters / 10) * 10;
 		}
 
