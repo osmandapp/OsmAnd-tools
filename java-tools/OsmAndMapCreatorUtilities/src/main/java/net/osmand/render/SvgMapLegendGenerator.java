@@ -7,12 +7,19 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
+import net.osmand.osm.MapPoiTypes;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 import org.xmlpull.v1.XmlPullParser;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 // Script launches from MainUtilities with CLI Arguments: generate-maplegend-svg
 // Also you need to add to environment variables a path to all OsmAnd repositories. Like this:
@@ -65,34 +72,85 @@ public class SvgMapLegendGenerator {
 			}
 
 			// 2 Get styles for each icon.
+			AndroidStringsLoader loader = new AndroidStringsLoader("/home/user/StudioProjects/osmandapp/resources/poi/phrases/en/phrases.xml");
 			String path = getStylePath(rendererStyle, repositoriesPath);
 			RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(path);
-			for (GroupDTO group : configGroups) {
-				if (group.spriteSheet) {
-					continue;
-				}
-				for (IconDTO icon : group.icons) {
-					Map<String, String> dayStyle = getAmenityIconStyle(icon.tag,
-							icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
-					Map<String, String> nightStyle = getAmenityIconStyle(icon.tag,
-							icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
-					if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle)
-							&& !Algorithms.isEmpty(dayStyle.get("iconName"))) {
-						icon.iconName = dayStyle.get("iconName");
-						icon.shieldNameDay = dayStyle.get("shieldName");
-						icon.shieldNameNight = nightStyle.get("shieldName");
-						icon.iconTargetFileName = icon.tag + "_" + icon.value;
-						if (!Algorithms.isEmpty(icon.tag2)) {
-							icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
+			String csvFile = "output.csv";
+			List<String> includePrefix = Arrays.asList("leisure_fishing", "barrier_coupure", "barrier_planter",
+					"barrier_planter", "waterway_fuel");
+			List<String> excludePrefix = Arrays.asList("amenity", "highway", "barrier_colored", "osmand");
+			List<String> excludeTagPrefix = Arrays.asList("tourism", "natural", "historic", "sport",
+					"shop", "barrier", "emergency", "leisure", "man_made", "waterway");
+			try (PrintWriter pw = new PrintWriter(csvFile)) {
+				pw.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "name", "getString_poi_name)", "poi_name", "iconName", "iconTargetFileName", "tag", "value", " tag2", " value2");
+				for (GroupDTO group : configGroups) {
+					if (group.spriteSheet) {
+						continue;
+					}
+					for (IconDTO icon : group.icons) {
+						Map<String, String> dayStyle = getAmenityIconStyle(icon.tag,
+								icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
+						Map<String, String> nightStyle = getAmenityIconStyle(icon.tag,
+								icon.value, icon.tag2, icon.value2, false, icon.zoom, storage);
+						if (!Algorithms.isEmpty(dayStyle) && !Algorithms.isEmpty(dayStyle)
+								&& !Algorithms.isEmpty(dayStyle.get("iconName"))) {
+							icon.iconName = dayStyle.get("iconName");
+							icon.shieldNameDay = dayStyle.get("shieldName");
+							icon.shieldNameNight = nightStyle.get("shieldName");
+							icon.iconTargetFileName = icon.tag + "_" + icon.value;
+							String name = icon.iconName;
+
+							String prefixToUse = null;
+							for (String prefix : includePrefix) {
+								if (name.startsWith(prefix)) {
+									prefixToUse = prefix;
+									break;
+								}
+							}
+							if (prefixToUse == null) {
+								for (String prefix : excludePrefix) {
+									if (name.startsWith(prefix)) {
+										prefixToUse = prefix + (name.length() > prefix.length() ? "_" : "");
+										break;
+									}
+								}
+								if (prefixToUse != null) {
+									name = name.substring(prefixToUse.length());
+								} else {
+									String finalName = name;
+									if (excludeTagPrefix.contains(icon.tag)) {
+										if (includePrefix.stream().anyMatch(prefix -> !finalName.startsWith(prefix))) {
+											name = name.replaceFirst(icon.tag + "_", "");
+										}
+									}
+								}
+							}
+							if (name.endsWith("_map")) {
+								name = name.substring(0, name.length() - "_map".length());
+							}
+							if (name.endsWith("_big")) {
+								name = name.substring(0, name.length() - "_big".length());
+							}
+							if (name.endsWith("_small")) {
+								name = name.substring(0, name.length() - "_small".length());
+							}
+							name = "poi_" + name;
+							if (!Algorithms.isEmpty(icon.tag2)) {
+								icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
+							}
+							icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
+							pw.printf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n"
+									, icon.name, loader.getString(name), name, icon.iconName, icon.iconTargetFileName, icon.tag, icon.value, icon.tag2, icon.value2);
+							icon.styleIconSize = Float.parseFloat(dayStyle.get("iconSize"));
+						} else {
+							throw new Exception(String.format(
+									"ERROR: SvgMapLegendGenerator - style collecting invalid result for  '%s':'%s'  '%s':'%s'",
+									icon.tag, icon.value, icon.tag2, icon.value2));
 						}
-						icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
-						icon.styleIconSize = Float.parseFloat(dayStyle.get("iconSize"));
-					} else {
-						throw new Exception(String.format(
-								"ERROR: SvgMapLegendGenerator - style collecting invalid result for  '%s':'%s'  '%s':'%s'",
-								icon.tag, icon.value, icon.tag2, icon.value2));
 					}
 				}
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 			System.out.println("OK: SvgMapLegendGenerator - styles collecting DONE");
 
@@ -495,7 +553,8 @@ public class SvgMapLegendGenerator {
 			for (GroupDTO group : groups) {
 				StringBuilder content;
 				if (group.spriteSheet) {
-					content = createSpriteSheetGroupContent(group);
+					continue;
+//					content = createSpriteSheetGroupContent(group);
 				} else {
 					content = createGroupContent(group);
 				}
@@ -614,4 +673,33 @@ public class SvgMapLegendGenerator {
 			return content;
 		}
 	}
+
+	public static class AndroidStringsLoader {
+
+		private final Map<String, String> strings = new HashMap<>();
+
+		public AndroidStringsLoader(String filePath) throws Exception {
+			loadStrings(filePath);
+		}
+
+		private void loadStrings(String filePath) throws Exception {
+			File xmlFile = new File(filePath);
+
+			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+			Document doc = dBuilder.parse(xmlFile);
+			doc.getDocumentElement().normalize();
+
+			NodeList list = doc.getElementsByTagName("string");
+			for (int i = 0; i < list.getLength(); i++) {
+				Element e = (Element) list.item(i);
+				strings.put(e.getAttribute("name"), e.getTextContent());
+			}
+		}
+
+		public String getString(String key) {
+			return strings.getOrDefault(key, "???" + key + "???");
+		}
+	}
+
 }
