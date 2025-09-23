@@ -236,7 +236,7 @@ public interface DataService extends BaseService {
 			Feature resultFeature = searchResults.get(0);
 			for (Feature f : searchResults) {
 				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
-				if (!"LOCATION".equals(wt)) {
+				if (wt != null && !"LOCATION".equals(wt.toString())) {
 					resultFeature = f;
 					break;
 				}
