@@ -7,7 +7,7 @@ import com.google.common.collect.Sets;
 import javax.validation.constraints.NotNull;
 import java.util.*;
 
-final class ReviewsProcessor {
+final class ReviewEdits {
     private final static String MARESI_PREFIX = "urn:maresi:";
 
     /**
@@ -22,7 +22,7 @@ final class ReviewsProcessor {
      *     <li><code>geo</code></li>
      * </ul>
      * <p>
-     * from the edited review to the edit, then removes the edited review from the set. In case of multiple parallel edits of the same review, only the latest one (by <code>payload.iat</code> is left.
+     * from the edited review to the edit, then removes the edited review from the set. In case of multiple parallel edits of the same review, only the latest one (by <code>payload.iat</code>) is left.
      * </p>
      *
      * @param reviewsBySignature a map of review signature to review
@@ -63,7 +63,7 @@ final class ReviewsProcessor {
     private static @NotNull Map<String, Review> latestEditsForRoots(Map<String, Set<Review>> rootEdits) {
         ImmutableMap.Builder<String, Review> rootLatestEdits = ImmutableMap.builder();
         for (Map.Entry<String, Set<Review>> entry : rootEdits.entrySet()) {
-            Review latestEdit = entry.getValue().stream().max(Comparator.comparingLong(r -> r.payload().iat())).get();
+            @SuppressWarnings("OptionalGetWithoutIsPresent") Review latestEdit = entry.getValue().stream().max(Comparator.comparingLong(r -> r.payload().iat())).get();
             rootLatestEdits.put(entry.getKey(), latestEdit);
         }
         return rootLatestEdits.build();
@@ -131,5 +131,8 @@ final class ReviewsProcessor {
     private static String signatureFromSub(@NotNull String sub) {
         Preconditions.checkArgument(sub.startsWith(MARESI_PREFIX), "can't extract signature from sub '%s'", sub);
         return sub.substring(MARESI_PREFIX.length());
+    }
+
+    private ReviewEdits() {
     }
 }

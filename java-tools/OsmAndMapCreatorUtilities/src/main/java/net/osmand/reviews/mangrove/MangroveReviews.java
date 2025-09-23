@@ -26,7 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static net.osmand.reviews.mangrove.ReviewsProcessor.applyEdits;
+import static net.osmand.reviews.mangrove.ReviewEdits.applyEdits;
 
 /**
  * Tools for working with reviews from <a href="https://mangrove.reviews">mangrove.reviews</a>.
@@ -69,7 +69,6 @@ public final class MangroveReviews {
         Map<@NotNull String, Review> bySignature = parser.parse(inputFile).collect(Collectors.toMap(Review::signature, Function.identity()));
         Map<@NotNull String, Review> bySignatureEdited = applyEdits(bySignature);
         // TODO:
-        // - reduce edit chains
         // - map to Review
         // - group by ReviewedPlace
         throw new UnsupportedOperationException("TODO: implement");
