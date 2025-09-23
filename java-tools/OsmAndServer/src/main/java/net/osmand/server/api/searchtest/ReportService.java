@@ -49,28 +49,29 @@ public interface ReportService {
 
 	String BASE_SQL = """
 			WITH result AS (
-				SELECT gen_id,
-					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+				SELECT DENSE_RANK() OVER (ORDER BY g.ds_result_id) AS grp, ROW_NUMBER() OVER (PARTITION BY g.ds_result_id ORDER BY g.id) AS rn,
+					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, g.id as gen_id,
 					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
 					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
 					r.res_count, g.row AS in_row, r.row AS out_row, 
 					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id
-				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY gen_id
+				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY g.id
 			)""";
 	String REPORT_SQL = BASE_SQL + """
 			 SELECT CASE
 				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
 				WHEN res_distance <= ? THEN 'Found'
 				ELSE 'Not Found'
-			END AS "group", type, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
+			END AS "group", type, grp || '.' || rn AS row_id, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
 			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated', CASE 
 			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
 				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END, 
-			id as gen_id, lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
+			DENSE_RANK() OVER (ORDER BY ds_result_id) || '.' || ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS row_id, id as gen_id, 
+			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
-	String[] IN_PROPS = new String[]{"group", "type", "gen_id", "id", "lat_lon", "query"};
+	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon"};
 
 	JdbcTemplate getJdbcTemplate();
@@ -87,7 +88,7 @@ public interface ReportService {
 
 		String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
 		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
-		final String[] gen_cols = Stream.concat(Arrays.stream(new String[]{"gen_id", "id", "lat_lon", "query"}),
+		final String[] gen_cols = Stream.concat(Arrays.stream(new String[]{"row_id", "id", "lat_lon", "query"}),
 				Arrays.stream(selCols)).toArray(String[]::new);
 		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name"};
 		try (Workbook wb = new XSSFWorkbook()) {
@@ -319,6 +320,7 @@ public interface ReportService {
 				if (srcRow.containsKey(p))
 					row.put(p, srcRow.get(p));
 
+			row.remove("gen_id");
 			try {
 				JsonNode inRow = getObjectMapper().readTree(inRowJson);
 				inRow.fieldNames().forEachRemaining(fn -> {
