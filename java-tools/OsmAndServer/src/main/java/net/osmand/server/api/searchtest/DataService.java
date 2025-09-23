@@ -202,7 +202,7 @@ public interface DataService extends BaseService {
 
 	default void saveCaseResults(TestCase test, PolyglotEngine.GenRow data) throws IOException {
 		String sql =
-				"INSERT INTO gen_result (count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
+				"INSERT INTO gen_result (gen_count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
 						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = getObjectMapper().writeValueAsString(data.row());
 		String[] outputArray = data.output() == null || data.count() <= 0 ? new String[]{null} :
