@@ -344,7 +344,7 @@ public interface ReportService {
 						JsonNode v = outRow.get(fn);
 						if (fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
 							row.put(fn, v.asText());
-						else if (fn.startsWith("web_"))
+						else if (fn.startsWith("web_") && !fn.contains("web_type") && !fn.contains("osmUrl"))
 							resultName.append(v.asText()).append(" ");
 						else
 							out.put(fn, v.asText());
