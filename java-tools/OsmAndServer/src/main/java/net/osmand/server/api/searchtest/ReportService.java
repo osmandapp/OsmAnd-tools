@@ -86,17 +86,15 @@ public interface ReportService {
 		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
 
-		String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
 		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
-		final String[] gen_cols = Stream.concat(Arrays.stream(new String[]{"row_id", "id", "lat_lon", "query"}),
-				Arrays.stream(selCols)).toArray(String[]::new);
+		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "query"};
 		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name"};
 		try (Workbook wb = new XSSFWorkbook()) {
 			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, selCols));
+						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, null));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?", String.class, runId));
 			}
 
@@ -185,7 +183,7 @@ public interface ReportService {
 			// Sheet 1
 			Sheet sheet = wb.createSheet("Comparison");
 			Row h = sheet.createRow(0);
-			sheet.createFreezePane(runIds.length + gen_cols.length - selCols.length, 1);
+			sheet.createFreezePane(runIds.length + gen_cols.length, 1);
 
 			// Group header: one column per run (to hold group name per run)
 			for (c = 0; c < runIds.length; c++) {
