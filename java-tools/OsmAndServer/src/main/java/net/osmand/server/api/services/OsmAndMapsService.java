@@ -129,7 +129,7 @@ public class OsmAndMapsService {
 //		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}");
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
-//		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}");
+		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
