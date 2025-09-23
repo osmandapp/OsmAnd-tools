@@ -49,28 +49,29 @@ public interface ReportService {
 
 	String BASE_SQL = """
 			WITH result AS (
-				SELECT gen_id,
-					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+				SELECT DENSE_RANK() OVER (ORDER BY g.ds_result_id) AS grp, ROW_NUMBER() OVER (PARTITION BY g.ds_result_id ORDER BY g.id) AS rn,
+					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, g.id as gen_id,
 					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
 					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
 					r.res_count, g.row AS in_row, r.row AS out_row, 
 					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id
-				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY gen_id
+				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY g.id
 			)""";
 	String REPORT_SQL = BASE_SQL + """
 			 SELECT CASE
 				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
 				WHEN res_distance <= ? THEN 'Found'
 				ELSE 'Not Found'
-			END AS "group", type, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
+			END AS "group", type, grp || '.' || rn AS row_id, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
 			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated', CASE 
 			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
 				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END, 
-			id as gen_id, lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
+			DENSE_RANK() OVER (ORDER BY ds_result_id) || '.' || ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS row_id, id as gen_id, 
+			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
-	String[] IN_PROPS = new String[]{"group", "type", "gen_id", "id", "lat_lon", "query"};
+	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon"};
 
 	JdbcTemplate getJdbcTemplate();
@@ -85,17 +86,15 @@ public interface ReportService {
 		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
 
-		String[] selCols = getObjectMapper().readValue(test.selCols, String[].class);
 		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
-		final String[] gen_cols = Stream.concat(Arrays.stream(new String[]{"gen_id", "id", "lat_lon", "query"}),
-				Arrays.stream(selCols)).toArray(String[]::new);
+		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "query"};
 		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name"};
 		try (Workbook wb = new XSSFWorkbook()) {
 			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, selCols));
+						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, null));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?", String.class, runId));
 			}
 
@@ -143,17 +142,34 @@ public interface ReportService {
 					cell = r1.createCell(c + 1);
 					cell.setCellValue(groups[j]);
 
+					cell = r1.createCell(c + 2);
+					int fr = j * 3 + 2 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
 					Row r2 = statSheet.createRow(j * 3 + 2 + i);
 					cell = r2.createCell(c);
 					cell.setCellValue(groups[1]);
 					cell = r2.createCell(c + 1);
 					cell.setCellValue(groups[j]);
 
+					cell = r2.createCell(c + 2);
+					fr = j * 3 + 3 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
 					Row r3 = statSheet.createRow(j * 3 + 3 + i);
 					cell = r3.createCell(c);
 					cell.setCellValue(groups[2]);
 					cell = r3.createCell(c + 1);
 					cell.setCellValue(groups[j]);
+
+					cell = r3.createCell(c + 2);
+					fr = j * 3 + 4 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
+					Row r4 = statSheet.createRow(j * 3 + 4 + i);
+					cell = r4.createCell(c + 2);
+					cell.setCellFormula(String.format("SUM(C%d:C%d)", j * 3 + 2 + i, j * 3 + 2 + i + 2));
+					cell.setCellStyle(header);
 
 					i++;
 				}
@@ -167,7 +183,7 @@ public interface ReportService {
 			// Sheet 1
 			Sheet sheet = wb.createSheet("Comparison");
 			Row h = sheet.createRow(0);
-			sheet.createFreezePane(runIds.length + gen_cols.length - selCols.length, 1);
+			sheet.createFreezePane(runIds.length + gen_cols.length, 1);
 
 			// Group header: one column per run (to hold group name per run)
 			for (c = 0; c < runIds.length; c++) {
@@ -286,8 +302,8 @@ public interface ReportService {
 
 	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
-		final java.util.Set<String> include = new java.util.HashSet<>(java.util.Arrays.asList(selCols));
 		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		exclude.add("web_type");
 		exclude.addAll(java.util.Arrays.asList(allCols));
 
 		return results.stream().map(srcRow -> {
@@ -302,18 +318,12 @@ public interface ReportService {
 				if (srcRow.containsKey(p))
 					row.put(p, srcRow.get(p));
 
+			row.remove("gen_id");
 			try {
-				JsonNode inRow = getObjectMapper().readTree(inRowJson);
-				inRow.fieldNames().forEachRemaining(fn -> {
-					JsonNode v = inRow.get(fn);
-					if (include.contains(fn)) {
-						row.put(fn, v.asText());
-					}
-				});
-
 				Map<String, Object> out = new LinkedHashMap<>();
 				StringBuilder resultName = new StringBuilder();
 				if (outRowJson != null) {
+					row.put("res_name", resultName.toString().trim());
 					for (String p : OUT_PROPS)
 						row.put(p, srcRow.get(p));
 
@@ -325,7 +335,7 @@ public interface ReportService {
 						JsonNode v = outRow.get(fn);
 						if (fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
 							row.put(fn, v.asText());
-						else if (fn.startsWith("web_"))
+						else if (fn.startsWith("web_name") || fn.startsWith("web_address") || fn.startsWith("web_poi_name"))
 							resultName.append(v.asText()).append(" ");
 						else
 							out.put(fn, v.asText());

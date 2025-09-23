@@ -59,7 +59,7 @@ public class PolyglotEngine {
 		}
 	}
 
-	public List<GenRow> execute(String dir, TestCase test, List<String> rows) throws Exception {
+	public List<GenRow> execute(String dir, TestCase test, Map<Integer, String> rows) throws Exception {
 		BaseService.ProgrammaticConfig program = objectMapper.readValue(test.progCfg, BaseService.ProgrammaticConfig.class);
 
 		// Load default JS helper script from web-server-config repository
@@ -104,7 +104,8 @@ public class PolyglotEngine {
 			Value jsonParse = context.eval("js", "JSON.parse");
 
 			List<GenRow> results = new ArrayList<>();
-			for (String jsonRow : rows) {
+			for (Map.Entry<Integer, String> entry : rows.entrySet()) {
+				String jsonRow = entry.getValue();
 				long start = System.currentTimeMillis();
 
 				String[] values = objectMapper.readValue(jsonRow, String[].class);
@@ -135,7 +136,7 @@ public class PolyglotEngine {
 
 				int count = output instanceof String[] ? ((String[]) output).length : -1;
 				String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
-				results.add(new GenRow(parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
+				results.add(new GenRow(entry.getKey(), parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
 						System.currentTimeMillis() - start));
 			}
 
@@ -271,7 +272,7 @@ public class PolyglotEngine {
 		}
 	}
 
-	public record GenRow(LatLon point, Map<String, Object> row, String output, int count, String error,
+	public record GenRow(Integer dsResultId, LatLon point, Map<String, Object> row, String output, int count, String error,
 						 long duration) {
 	}
 }
