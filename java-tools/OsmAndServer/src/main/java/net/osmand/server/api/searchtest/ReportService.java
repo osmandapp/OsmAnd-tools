@@ -303,6 +303,7 @@ public interface ReportService {
 	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
 		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		exclude.add("web_type");
 		exclude.addAll(java.util.Arrays.asList(allCols));
 
 		return results.stream().map(srcRow -> {
