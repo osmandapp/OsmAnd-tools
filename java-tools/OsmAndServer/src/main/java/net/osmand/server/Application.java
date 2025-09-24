@@ -68,7 +68,7 @@ public class Application  {
 				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 0;
 				HHRoutingConfig.STATS_VERBOSE_LEVEL = 0;
 			} else {
-				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 2;
+				HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 3;
 				RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
 				HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
 			}
