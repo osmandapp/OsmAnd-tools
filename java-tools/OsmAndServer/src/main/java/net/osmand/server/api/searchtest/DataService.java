@@ -68,8 +68,13 @@ public interface DataService extends BaseService {
 			String[] columns =
 					Stream.of(header.toLowerCase().split(delimiter)).map(DataService::sanitize).toArray(String[]::new);
 			dataset.allCols = getObjectMapper().writeValueAsString(columns);
-			if (!Arrays.asList(columns).contains("lat") || !Arrays.asList(columns).contains("lon")) {
-				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
+			List<String> colsList = Arrays.asList(columns);
+			int latIndex = colsList.indexOf("lat");
+			int lonIndex = colsList.indexOf("lon");
+			int idIndex = colsList.indexOf("id");
+			if (latIndex == -1 || lonIndex == -1 || idIndex == -1) {
+				String error = String.format("Header doesn't include mandatory fields: 'lat', 'lon' or 'id' (%d, %d, %d)",
+						latIndex, lonIndex, idIndex);
 				getLogger().error("{} Header: {}", error, String.join(",", columns));
 				dataset.setError(error);
 				return dataset;
@@ -93,13 +98,18 @@ public interface DataService extends BaseService {
 					for (int j = 0; j < values.length && j < record.length; j++) {
 						values[j] = crop(unquote(record[j]), 255);
 					}
-					batchArgs.add(new Object[] {dataset.id, getObjectMapper().writeValueAsString(values)});
+					if (values[latIndex] != null && values[lonIndex] != null && values[idIndex] != null)
+						batchArgs.add(new Object[] {dataset.id, getObjectMapper().writeValueAsString(values)});
+					else
+						getLogger().warn("Dataset row: {} doesn't have lat={}, lon={} or id={}",
+								getObjectMapper().writeValueAsString(values),
+								values[latIndex] != null, values[lonIndex] != null, values[idIndex] != null);
 				}
 
 				String insertSql = "INSERT INTO dataset_result (dataset_id, value) VALUES (?, ?)";
 				getJdbcTemplate().batchUpdate(insertSql, batchArgs);
 
-				getLogger().info("Stored {} rows into dataset: {}", sample.size(), dataset.name);
+				getLogger().info("Stored {} rows into dataset: {}", sample.size() - 1, dataset.name);
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
@@ -140,10 +150,14 @@ public interface DataService extends BaseService {
 						return result;
 					}
 			);
+			assert rows != null;
 
 			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
 			for (PolyglotEngine.GenRow example : examples) {
-				saveCaseResults(test, example);
+				if (example.point() != null)
+					saveCaseResults(test, example);
+				else
+					getLogger().warn("Dataset row: {} has no point.", rows.get(example.dsResultId()));
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {

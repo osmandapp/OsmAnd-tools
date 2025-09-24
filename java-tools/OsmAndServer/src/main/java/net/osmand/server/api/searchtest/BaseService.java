@@ -120,12 +120,50 @@ public interface BaseService {
 	 */
 	String getWebServerConfigDir();
 
+	/**
+	 * Sanitize a value for CSV output so that each record remains a single physical line.
+	 * Replaces newline-like characters (\r, \n, Unicode line/paragraph separators, NEL) and
+	 * other ISO control characters (except TAB) with a space, then collapses repeated spaces.
+	 *
+	 * @param value original string value (may be null)
+	 * @return sanitized value (null if input was null)
+	 */
+	default String sanitizeCsvValue(String value) {
+		if (value == null) {
+			return null;
+		}
+		StringBuilder sb = new StringBuilder(value.length());
+		for (int i = 0; i < value.length(); i++) {
+			char ch = value.charAt(i);
+			switch (ch) {
+				case '\r':
+				case '\n':
+				case '\f': // form feed
+				case '\u000B': // vertical tab
+				case '\u0085': // NEL
+				case '\u2028': // line separator
+				case '\u2029': // paragraph separator
+					sb.append(' ');
+					break;
+				default:
+					if (Character.isISOControl(ch) && ch != '\t') {
+						sb.append(' ');
+					} else {
+						sb.append(ch);
+					}
+			}
+		}
+		// Collapse multiple spaces and trim
+		String s = sb.toString();
+		return s.replaceAll(" {2,}", " ").trim();
+	}
+
 	default Path queryOverpass(String query) {
 		Path tempFile;
 		try {
 			String overpassResponse =
-					getWebClient().post().uri("").bodyValue("[out:json][timeout:25];" + query +
-							";out;").retrieve().bodyToMono(String.class).toFuture().join();
+					getWebClient().post().uri("").bodyValue("[out:json][timeout:25];" + query +	";out;")
+							.retrieve().bodyToMono(String.class).toFuture().join();
 			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			getLogger().info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
@@ -167,10 +205,16 @@ public interface BaseService {
 						case "lon" -> element.path("lon").asText();
 						default -> element.path("tags").path(header).asText(null);
 					};
-					record.add(value);
+					if (value == null && (header.equals("id") || header.equals("lat") || header.equals("lon"))) {
+						record = null;
+						break;
+					}
+					record.add(sanitizeCsvValue(value));
 				}
-				csvPrinter.printRecord(record);
-				rowCount++;
+				if (record != null) {
+					csvPrinter.printRecord(record);
+					rowCount++;
+				}
 			}
 		}
 		return rowCount;
