@@ -11,16 +11,10 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.NotNull;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import org.xmlpull.v1.XmlPullParser;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 // Script launches from MainUtilities with CLI Arguments: generate-maplegend-svg
 // Also you need to add to environment variables a path to all OsmAnd repositories. Like this:
@@ -73,14 +67,10 @@ public class SvgMapLegendGenerator {
 			}
 
 			// 2 Get styles for each icon.
-			AndroidStrings androidStrings = new AndroidStrings(repositoriesPath + "/resources/poi/phrases/en/phrases.xml");
 			String path = getStylePath(rendererStyle, repositoriesPath);
 			RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(path);
-			String csvFile = "output.csv";
 			MapPoiTypes mpt = MapPoiTypes.getDefault();
-			try (PrintWriter pw = new PrintWriter(csvFile)) {
-				pw.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "name", "getString_poi_name)", "poi_name", "iconName",
-						"iconTargetFileName", "tag", "value", " tag2", " value2");
+			try {
 				for (GroupDTO group : configGroups) {
 					if (group.spriteSheet) {
 						continue;
@@ -98,28 +88,22 @@ public class SvgMapLegendGenerator {
 							icon.shieldNameDay = dayStyle.get("shieldName");
 							icon.shieldNameNight = nightStyle.get("shieldName");
 							icon.iconTargetFileName = tag + "_" + value;
-							String name = icon.iconName;
 
-							String nameStr = androidStrings.getString("poi_!!!");
 							PoiType poiType = mpt.getPoiTypeByTagValue(icon.tag, icon.value);
 							if (poiType != null) {
 								if (icon.tag2 != null && icon.value2 != null) {
 									PoiType poiTypeByTagValue2 = mpt.getPoiTypeByTagValue(icon.tag2, icon.value2);
 									if (poiTypeByTagValue2 != null) {
-										nameStr = androidStrings.getString("poi_" + poiType.getFormattedKeyName()) + " ("
-												+ androidStrings.getString("poi_" + poiTypeByTagValue2.getKeyName()).toLowerCase() + ")";
+										icon.poiName2 = poiTypeByTagValue2.getFormattedKeyName();
 									}
 								} else {
-									nameStr = androidStrings.getString("poi_" + poiType.getFormattedKeyName());
+									icon.poiName = poiType.getFormattedKeyName();
 								}
 							}
 							if (!Algorithms.isEmpty(icon.tag2)) {
 								icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
 							}
 							icon.iconTargetFileName = icon.iconTargetFileName.replace(':', '_');
-							pw.printf("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n", icon.name,
-									nameStr, name, icon.iconName, icon.iconTargetFileName, icon.tag, icon.value,
-									icon.tag2, icon.value2);
 							icon.styleIconSize = Float.parseFloat(dayStyle.get("iconSize"));
 						} else {
 							throw new Exception(String.format(
@@ -252,6 +236,8 @@ public class SvgMapLegendGenerator {
 		int zoom = defaultZoomLevel; // optional value
 
 		String iconName = null;
+		String poiName = null;
+		String poiName2 = null;
 		String shieldNameNight = null;
 		String shieldNameDay = null;
 		float styleIconSize = -1;
@@ -656,33 +642,4 @@ public class SvgMapLegendGenerator {
 			return content;
 		}
 	}
-
-	public static class AndroidStrings {
-
-		private final Map<String, String> strings = new HashMap<>();
-
-		public AndroidStrings(String filePath) throws Exception {
-			loadStrings(filePath);
-		}
-
-		private void loadStrings(String filePath) throws Exception {
-			File xmlFile = new File(filePath);
-
-			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-			Document doc = dBuilder.parse(xmlFile);
-			doc.getDocumentElement().normalize();
-
-			NodeList list = doc.getElementsByTagName("string");
-			for (int i = 0; i < list.getLength(); i++) {
-				Element e = (Element) list.item(i);
-				strings.put(e.getAttribute("name"), e.getTextContent());
-			}
-		}
-
-		public String getString(String key) {
-			return strings.getOrDefault(key, "???" + key + "???").split(";")[0];
-		}
-	}
-
 }
