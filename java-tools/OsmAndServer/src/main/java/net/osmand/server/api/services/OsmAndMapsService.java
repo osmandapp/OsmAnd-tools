@@ -125,19 +125,19 @@ public class OsmAndMapsService {
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
-//		ALWAYS_IN_MEMORY.add("car:{}");
-		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}");
+		ALWAYS_IN_MEMORY.add("car:{}");
+//		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}");
 		ALWAYS_IN_MEMORY.add("car:{prefer_unpaved=true}");
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
-//		ALWAYS_IN_MEMORY.add("motorcycle:{}");
-		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}");
-		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}");
+		ALWAYS_IN_MEMORY.add("motorcycle:{}");
+//		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}");
+//		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}");
 		
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
-//		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
-//		ALWAYS_IN_MEMORY.add("pedestrian:{}");
-//		ALWAYS_IN_MEMORY.add("pedestrian:{}");
+		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
+		ALWAYS_IN_MEMORY.add("pedestrian:{}");
+		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 	}
 	
 	
