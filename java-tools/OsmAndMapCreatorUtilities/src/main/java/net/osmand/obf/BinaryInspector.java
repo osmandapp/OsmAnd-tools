@@ -54,7 +54,7 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 //					"-vpoi",
-					"-vmap", "-vmapobjects",
+//					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
@@ -66,10 +66,8 @@ public class BinaryInspector {
 //					"-latlon=50.441932,30.510840,0.0005",
 					//"-xyz=12071,26142,16",
 //					"-c",
-					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "lightsector/World_lightsectors_src_0.obf"
-//					"-osm="+System.getProperty("maps.dir")+"lightsectors-0.osm",
-//					System.getProperty("maps.dir") + "lightsector/original/lightsectors-0.obf"
+//					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					System.getProperty("maps.dir") + "Ukraine_kyiv_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1421,6 +1419,7 @@ public class BinaryInspector {
 
 
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
+		int[] count = new int[1];
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
 				MapUtils.get31TileNumberX(verbose.lonleft),
 				MapUtils.get31TileNumberX(verbose.lonright),
@@ -1431,6 +1430,7 @@ public class BinaryInspector {
 				new ResultMatcher<>() {
 					@Override
 					public boolean publish(Amenity amenity) {
+						count[0]++;
 						String s = String.valueOf(amenity.printNamesAndAdditional());
 						long id = (amenity.getId());
 						if(id > 0) {
@@ -1511,7 +1511,8 @@ public class BinaryInspector {
 		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(p, req);
-
+		
+		println(String.format("Found %d pois", count[0]));
 	}
 
 	public static void printUsage(String warning) {
