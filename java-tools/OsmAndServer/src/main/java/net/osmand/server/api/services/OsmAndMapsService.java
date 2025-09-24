@@ -126,13 +126,13 @@ public class OsmAndMapsService {
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
 		ALWAYS_IN_MEMORY.add("car:{}");
-		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}"); // test
-		ALWAYS_IN_MEMORY.add("car:{prefer_unpaved=true}"); // test
+//		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}"); // test
+//		ALWAYS_IN_MEMORY.add("car:{prefer_unpaved=true}"); // test
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
-		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}"); // test
-		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_4wd_only=true, avoid_motorway=true, prefer_unpaved=true}"); // test
-		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}"); // test
+//		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}"); // test
+//		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_4wd_only=true, avoid_motorway=true, prefer_unpaved=true}"); // test
+//		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}"); // test
 		
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
