@@ -96,9 +96,8 @@ public class SvgMapLegendGenerator {
 									if (poiTypeByTagValue2 != null) {
 										icon.poiName2 = poiTypeByTagValue2.getFormattedKeyName();
 									}
-								} else {
-									icon.poiName = poiType.getFormattedKeyName();
 								}
+								icon.poiName = poiType.getFormattedKeyName();
 							}
 							if (!Algorithms.isEmpty(icon.tag2)) {
 								icon.iconTargetFileName += "_" + icon.tag2 + "_" + icon.value2;
@@ -633,7 +632,8 @@ public class SvgMapLegendGenerator {
 					""");
 			for (IconDTO icon : group.icons) {
 				String iconName = group.folderName + "_" + icon.iconTargetFileName;
-				content.append(String.format("        '%s' : '%s/%s',\n", icon.name, group.folderName, iconName));
+				String poiName2 = icon.poiName2 == null ? null : "'" + icon.poiName2 + "'";
+				content.append(String.format("        '%s' : {poiName:'%s', poiName2:%s, folderName:'%s/%s'},\n", icon.name, icon.poiName, poiName2, group.folderName, iconName));
 			}
 			content.append("""
 					    }});
