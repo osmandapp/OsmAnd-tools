@@ -1472,7 +1472,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		wc.wayMapIds.clear();
 		wc.wayMapIdsCache.clear();
 		wc.pointMapIds.clear();
-        List<Long> restrictionVia = new ArrayList<>();
+        Set<Long> restrictionVia = new HashSet<>();
         List<Long> ids = new ArrayList<>();
         for (int i = 0; i < parent.getTotalElements(); i++) {
             if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
@@ -1491,8 +1491,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
         }
         if (!restrictionVia.isEmpty() && !ids.isEmpty()) {
             // set restrictionVia to the end of idTable (val.viaWay != 0)
-            if (restrictionVia.contains(ids.get(0))) {
-                Collections.swap(ids, 0, ids.size() - 1);
+            for (int i = 1; i < ids.size(); i++) {
+                if (!restrictionVia.contains(ids.get(i))) {
+                    Collections.swap(ids, 0, i);
+                    break;
+                }
             }
         }
         for (long id : ids) {
