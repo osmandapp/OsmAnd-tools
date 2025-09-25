@@ -83,7 +83,7 @@ public class IndexCreatorSettings {
 	
 	public boolean poiGeocodingEnable = true; // enable detecting address for poi if possible 
 	
-	public boolean poiGeocodingPrecise = true; // to house number
+	public boolean poiGeocodingPrecise = false; // to house number
 
 	public String getString(String key) {
 		// IndexCreator.INDEX_LO_LEVEL_WAYS
