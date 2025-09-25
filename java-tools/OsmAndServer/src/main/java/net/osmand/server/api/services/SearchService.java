@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
@@ -863,6 +864,8 @@ public class SearchService {
                 for (Map.Entry<String, String> entry : tags.entrySet()) {
                     feature.prop(entry.getKey(), entry.getValue());
                 }
+				long id = result.getId();
+				feature.prop("res_id", id > 0 ? id / 128 : id);
             }
             features.add(feature);
         }
