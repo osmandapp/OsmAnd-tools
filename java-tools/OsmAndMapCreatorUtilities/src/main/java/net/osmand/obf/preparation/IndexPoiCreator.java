@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
@@ -30,6 +31,8 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
@@ -57,6 +60,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
@@ -76,6 +80,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
+	private static final double GEOCODING_DISTANCE = 150;
+	
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	private static int DUPLICATE_SPLIT = 5;
@@ -387,6 +393,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
+	
+
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
 
 		Map<String, String> tempNames = new LinkedHashMap<String, String>();
@@ -644,7 +652,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryPoiIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws SQLException, IOException {
+	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName, 
+			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
 		}
@@ -661,7 +670,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTopIndexMap();
 		collectTagGroups();
 		// 0. process all entities
-		processPOIIntoTree(namesIndex, zoomToStart, bbox, rootZoomsTree);
+		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
@@ -817,7 +826,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
 			}
 
-			Map<String, Map<String, Integer>> normalizedGroups = new HashMap<>();
             rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\", *" +
                     " from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
                     " order by cnt desc");
@@ -882,10 +890,27 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		return null;
 	}
 
-	private void processPOIIntoTree(Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
-			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
+	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
+			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
+		long geocodingTime = 0, geocodingCnt = 0, geocodingSuccess = 0, geoCitySuccess = 0, geoCityCnt = 0, geoCityTime = 0;
+		RoutingContext geocodingCtx = null;
+		GeocodingUtilities geocodingUtilities = new GeocodingUtilities();
+		BinaryMapIndexReader geoReader = null;
+		if (poiGeocoding != null && settings.poiGeocodingEnable) {
+			geoReader = new BinaryMapIndexReader(new RandomAccessFile(poiGeocoding, "r"),
+					poiGeocoding, false);
+			geoReader.init(false);
+			if (geoReader.containsAddressData() && geoReader.containsRouteData()) {
+				geocodingCtx = GeocodingUtilities.buildDefaultContextForPOI(geoReader);
+			}
+		}
+		if (geocodingCtx == null) {
+			log.info("Geocoding for POI is disabled");
+		} else {
+			log.info("Geocoding for POI is enabled");
+		}
 
 		int count = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
@@ -893,9 +918,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
 		PoiAdditionalType nameRuleType = retrieveAdditionalType("name");
 		PoiAdditionalType nameEnRuleType = retrieveAdditionalType("name:en");
+		PoiAdditionalType streetRuleType = retrieveAdditionalType(Amenity.ADDR_STREET);
+		PoiAdditionalType hnoRuleType = retrieveAdditionalType(Amenity.ADDR_HOUSENUMBER);
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
+			LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
 			bbox.minX = Math.min(x, bbox.minX);
 			bbox.maxX = Math.max(x, bbox.maxX);
 			bbox.minY = Math.min(y, bbox.minY);
@@ -908,25 +936,54 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String type = rs.getString(3);
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
+			if (geocodingCtx != null && 
+					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
+					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {
+				long tm = System.currentTimeMillis();
+				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
+						latLon.getLatitude(), latLon.getLongitude(), false);
+				if (settings.poiGeocodingPrecise) {
+					res = geocodingUtilities.sortGeocodingResults(Collections.singletonList(geoReader), res);
+				}
+				geocodingCnt++;
+				if (res.size() > 0 && res.get(0).getDistance() < GEOCODING_DISTANCE) {
+					GeocodingResult geoRes = res.get(0);
+					if (geoRes.streetName != null) {
+						additionalTags.put(streetRuleType, geoRes.streetName);
+						if (geoRes.getBuildingString() != null) {
+							additionalTags.put(hnoRuleType, geoRes.getBuildingString());
+						}
+						geocodingSuccess++;
+					}
+				}
+				geocodingTime += (System.currentTimeMillis() - tm);
+			}
 
 			List<Integer> tagGroupIds = parseTaggroups(rs.getString(7));
 			List<PoiCreatorTagGroup> tagGroups = new ArrayList<>();
 			if (cityQuadTree != null) {
+				geoCityCnt++;
+				long tm = System.currentTimeMillis();
 				List<Multipolygon> result = new ArrayList<>();
 				cityQuadTree.queryInBox(new QuadRect(x, y, x, y), result);
+				boolean ok = false;
 				if (result.size() > 0) {
-					LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
 					for (Multipolygon multipolygon : result) {
 						if (multipolygon.containsPoint(latLon)) {
 							if (!cityTagsGroup.containsKey(multipolygon)) {
 								log.error("Multipolygon for POI is not found!!! " + type + " " + subtype + " " + latLon.toString());
 							} else {
+								ok = true;
 								List<PoiCreatorTagGroup> list = cityTagsGroup.get(multipolygon);
 								tagGroups.addAll(list);
 							}
 						}
 					}
 				}
+				if (ok) {
+					geoCitySuccess++;
+				}
+				geoCityTime += (System.currentTimeMillis() - tm);
 			} else if (tagGroupsFromDB != null && tagGroupIds.size() > 0) {
 				for (int id : tagGroupIds) {
 					if (tagGroupsFromDB.containsKey(id)) {
@@ -1019,6 +1076,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
+		
+		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
+				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
 	}
 

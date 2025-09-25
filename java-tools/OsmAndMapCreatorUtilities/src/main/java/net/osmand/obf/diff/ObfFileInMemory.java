@@ -190,7 +190,7 @@ public class ObfFileInMemory {
 					indexPoiCreator.insertAmenityIntoPoi(a);
 				}
 			}
-			indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
+			indexPoiCreator.writeBinaryPoiIndex(null, writer, name, null);
 			indexPoiCreator.commitAndClosePoiFile(System.currentTimeMillis());
 			indexPoiCreator.removePoiFile();
 		}

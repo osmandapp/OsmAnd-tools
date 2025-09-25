@@ -22,11 +22,17 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingContext;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -43,6 +49,9 @@ public class BinaryInspector {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static final int SHIFT_ID = 6;
+	
+	protected static final boolean DETECT_POI_ADDRESS = false;
+	
 	private VerboseInfo vInfo;
 	public static void main(String[] args) throws IOException {
 		BinaryInspector in = new BinaryInspector();
@@ -53,7 +62,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -61,13 +70,15 @@ public class BinaryInspector {
 //					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
-					"-zoom=10",
+//					"-zoom=15",
 					// road
 //					"-latlon=50.441932,30.510840,0.0005",
+//					"-latlon=39.911388,-76.186317,0.0005",
+					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Ukraine_kyiv_europe_2.obf"
+					System.getProperty("maps.dir") + "Andorra_europe.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1419,7 +1430,9 @@ public class BinaryInspector {
 
 
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
-		int[] count = new int[1];
+		int[] count = new int[3];
+		RoutingContext ctx = GeocodingUtilities.buildDefaultContextForPOI(index);
+		GeocodingUtilities geocodingUtilities = new GeocodingUtilities();
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
 				MapUtils.get31TileNumberX(verbose.lonleft),
 				MapUtils.get31TileNumberX(verbose.lonright),
@@ -1449,6 +1462,11 @@ public class BinaryInspector {
 						}
 						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
 								" " + amenity.getLocation() + " osmid=" + id + " " + s);
+						if(!Algorithms.isEmpty(amenity.getStreetName())) {
+							count[1] ++; 
+						} else if (!Algorithms.isEmpty(amenity.getName())) {
+							count[2]++;
+						}
 						return false;
 					}
 
@@ -1512,7 +1530,8 @@ public class BinaryInspector {
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(p, req);
 		
-		println(String.format("Found %d pois", count[0]));
+		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
+				count[1], count[2]));
 	}
 
 	public static void printUsage(String warning) {

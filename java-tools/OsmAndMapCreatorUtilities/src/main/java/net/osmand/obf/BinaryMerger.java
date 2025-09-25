@@ -595,7 +595,7 @@ public class BinaryMerger {
 					}));
 			set.addAll(file);
 		}
-		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
+		indexPoiCreator.writeBinaryPoiIndex(null, writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
 //		REMOVE_POI_DB = false;
 		if (REMOVE_POI_DB) {

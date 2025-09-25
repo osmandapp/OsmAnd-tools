@@ -4,14 +4,12 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.preparation.OsmDbAccessor.OsmDbTagsPreparation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -28,11 +26,7 @@ import rtree.RTreeException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import java.io.*;
-import java.net.URL;
-import java.net.URLConnection;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.zip.GZIPInputStream;
@@ -476,7 +470,7 @@ public class IndexCreator {
 			progress.startTask("Writing map index to binary file...", -1);
 			processor.writeBasemapFile(writer, regionName);
 			if (settings.indexPOI) {
-				poiCreator.writeBinaryPoiIndex(writer, regionName, progress);
+				poiCreator.writeBinaryPoiIndex(null, writer, regionName, progress);
 			}
 			progress.finishTask();
 			writer.close();
@@ -658,10 +652,11 @@ public class IndexCreator {
 					indexAddressCreator.writeBinaryAddressIndex(writer, regionName, progress);
 				}
 
+				// Order matters! Write POI after address / routing to allow use geocoding for POI
 				if (settings.indexPOI) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing poi index to binary file...", -1);
-					indexPoiCreator.writeBinaryPoiIndex(writer, regionName, progress);
+					indexPoiCreator.writeBinaryPoiIndex(mapFile, writer, regionName, progress);
 				}
 
 				if (settings.indexTransport) {
@@ -856,13 +851,14 @@ public class IndexCreator {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
 		settings.indexMap = true;
-//		settings.indexAddress = true;
+		settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
-//		settings.indexRouting = true;
+		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
+		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;
 
@@ -874,8 +870,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/Map.osm";
-//		String file = rootFolder + "../temp/divoka_sarka.osm";
+//		String file = rootFolder + "../temp/Map.osm";
+		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
