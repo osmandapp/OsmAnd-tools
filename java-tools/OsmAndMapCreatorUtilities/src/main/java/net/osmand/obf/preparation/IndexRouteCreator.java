@@ -589,6 +589,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private void indexHighwayRestrictions(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		if (e instanceof Relation && "restriction".equals(e.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
 			String val = e.getTag("restriction"); //$NON-NLS-1$
+            if (e.getId() == 19565585L) {
+                System.out.println("---");
+            }
 			if (val != null) {
 				Relation r = (Relation) e;
 				if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
@@ -1472,9 +1475,31 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		wc.wayMapIds.clear();
 		wc.wayMapIdsCache.clear();
 		wc.pointMapIds.clear();
-		for (int i = 0; i < parent.getTotalElements(); i++) {
-			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = e[i].getPtr();
+        List<Long> restrictionVia = new ArrayList<>();
+        List<Long> ids = new LinkedList<>();
+        for (int i = 0; i < parent.getTotalElements(); i++) {
+            if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
+                long id = e[i].getPtr();
+                List<RestrictionInfo> restrictions = wc.highwayRestrictions.get(id);
+                if (restrictions != null) {
+                    for (int li = 0; li < restrictions.size(); li++) {
+                        RestrictionInfo rd = restrictions.get(li);
+                        if(rd.viaWay != 0) {
+                            restrictionVia.add(rd.viaWay);
+                        }
+                    }
+                }
+                ids.add(id);
+            }
+        }
+        // set restrictionVia to the end of idTable (val.viaWay != 0)
+        for (long id : restrictionVia) {
+            if (ids.get(0) == id) {
+                ids.remove(0);
+                ids.add(id);
+            }
+        }
+        for (long id : ids) {
 				// IndexRouteCreator.SELECT_STAT;
 				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
 				boolean retrieveObject = wc.retrieveObject(id);
@@ -1517,7 +1542,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						System.err.println("Something goes wrong with id = " + id);
 					}
 				}
-			}
+//			}
 		}
 		if (dataBlock != null) {
 			IdTable.Builder idTable = IdTable.newBuilder();
