@@ -1489,7 +1489,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
                 ids.add(id);
             }
         }
-        if (!restrictionVia.isEmpty() && !ids.isEmpty()) {
+        if (!ids.isEmpty() && restrictionVia.contains(ids.get(0))) {
             // set restrictionVia to the end of idTable (val.viaWay != 0)
             for (int i = 1; i < ids.size(); i++) {
                 if (!restrictionVia.contains(ids.get(i))) {
