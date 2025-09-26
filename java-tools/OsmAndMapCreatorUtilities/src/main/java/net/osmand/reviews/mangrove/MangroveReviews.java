@@ -1,5 +1,6 @@
 package net.osmand.reviews.mangrove;
 
+import com.google.common.collect.ImmutableSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -18,10 +19,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
@@ -56,14 +54,14 @@ public final class MangroveReviews {
     }
 
     private static void generateWorldFile(File inputFile, File outputDir) throws IOException, SQLException, XmlPullParserException, InterruptedException {
-        List<ReviewedPlace> testReviews = parseInputFile(inputFile);
+        Set<ReviewedPlace> testReviews = parseInputFile(inputFile);
         File osmGz = new File(outputDir, WorldRegion.WORLD + ".reviews.osm.gz");
         File obf = new File(outputDir, WorldRegion.WORLD + ".reviews.obf");
         generateOsmFile(testReviews, osmGz);
         generateObf(osmGz, obf);
     }
 
-    private static List<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
+    private static Set<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
         ReviewsParser parser = new ReviewsParser();
         Set<Review> parsedReviews = parser.parse(inputFile).collect(Collectors.toSet());
         log.info(String.format("%d reviews parsed from %s", parsedReviews.size(), inputFile));
@@ -71,13 +69,32 @@ public final class MangroveReviews {
         log.info(String.format("%d reviews remaining after edits were applied", edited.size()));
         Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(edited);
         log.info(String.format("%d reviews successfully mapped to OSM POIs", pois.size()));
-        // TODO:
-        // - group by ReviewedPlace
-        // - map to Review
-        throw new UnsupportedOperationException("TODO: implement");
+        // TODO: allow null ratings/opinions?
+        Set<ReviewedPlace> places = toReviewedPlaces(pois);
+        log.info(String.format("%d reviewed places constructed", places.size()));
+        return places;
     }
 
-    private static void generateOsmFile(List<ReviewedPlace> places, File outputFile) throws IOException {
+    private static Set<ReviewedPlace> toReviewedPlaces(Map<Review, OsmCoding.OsmPoi> pois) {
+        Map<OsmCoding.OsmPoi, ReviewedPlace> result = new HashMap<>();
+        for (Map.Entry<Review, OsmCoding.OsmPoi> entry : pois.entrySet()) {
+            Review mangroveReview = entry.getKey();
+            OsmCoding.OsmPoi poi = entry.getValue();
+
+            if (!result.containsKey(poi)) {
+                result.put(poi, emptyReviewedPlace(poi));
+            }
+            ReviewedPlace place = result.get(poi);
+            place.reviews().add(mangroveReview.asOsmAndReview());
+        }
+        return ImmutableSet.copyOf(result.values());
+    }
+
+    private static ReviewedPlace emptyReviewedPlace(OsmCoding.OsmPoi poi) {
+        return new ReviewedPlace(poi.lat(), poi.lon(), poi.elementType(), poi.osmId(), new ArrayList<>());
+    }
+
+    private static void generateOsmFile(Set<ReviewedPlace> places, File outputFile) throws IOException {
         // TODO: factor out the common bits from Wikipedia and Reviews
         FileOutputStream out = new FileOutputStream(outputFile);
         GZIPOutputStream gzStream = new GZIPOutputStream(out);

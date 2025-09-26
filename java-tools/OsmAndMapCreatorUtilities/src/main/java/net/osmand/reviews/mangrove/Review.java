@@ -1,6 +1,10 @@
 package net.osmand.reviews.mangrove;
 
 import javax.validation.constraints.NotNull;
+import java.net.URI;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -300,4 +304,16 @@ record Review(
     public Review withGeo(Geo geo) {
         return new Review(signature, kid, payload, scheme, geo);
     }
+
+    public net.osmand.reviews.Review asOsmAndReview() {
+        return new net.osmand.reviews.Review(
+                signature(),
+                payload().opinion(),
+                payload().rating(),
+                payload().metadata().nickname(),
+                LocalDate.ofInstant(Instant.ofEpochSecond(payload.iat()), ZoneId.of("UTC")),
+                URI.create("https://mangrove.reviews/list?signature=" + signature())
+        );
+    }
+
 }
