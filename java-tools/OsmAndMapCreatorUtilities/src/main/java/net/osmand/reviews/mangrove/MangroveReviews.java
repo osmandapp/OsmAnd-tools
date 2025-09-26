@@ -22,6 +22,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
@@ -66,11 +67,12 @@ public final class MangroveReviews {
 
     private static List<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
         ReviewsParser parser = new ReviewsParser();
-        Map<@NotNull String, Review> bySignature = parser.parse(inputFile).collect(Collectors.toMap(Review::signature, Function.identity()));
-        Map<@NotNull String, Review> bySignatureEdited = applyEdits(bySignature);
+        Set<Review> parsedReviews = parser.parse(inputFile).collect(Collectors.toSet());
+        Set<Review> edited = applyEdits(parsedReviews);
+        //Map<Review, ReviewedPlace> places = OsmCoding.resolveOsmPois()
         // TODO:
-        // - map to Review
         // - group by ReviewedPlace
+        // - map to Review
         throw new UnsupportedOperationException("TODO: implement");
     }
 

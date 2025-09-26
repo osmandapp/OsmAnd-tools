@@ -2,10 +2,13 @@ package net.osmand.reviews.mangrove;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
 import javax.validation.constraints.NotNull;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 final class ReviewEdits {
     private final static String MARESI_PREFIX = "urn:maresi:";
@@ -25,37 +28,38 @@ final class ReviewEdits {
      * from the edited review to the edit, then removes the edited review from the set. In case of multiple parallel edits of the same review, only the latest one (by <code>payload.iat</code>) is left.
      * </p>
      *
-     * @param reviewsBySignature a map of review signature to review
-     * @return a map of review signature to review. The map will not contain reviews that have been edited.
+     * @param reviews a set of reviews, including all edits
+     * @return a set of reviews, with only latest edits remaining, and with fields updated to match the originals as described above
      */
-    public static @NotNull Map<String, Review> applyEdits(Map<String, Review> reviewsBySignature) {
-        Map<String, String> rootSignatures = rootSignaturesForEdits(reviewsBySignature);
-        Map<String, Set<Review>> rootEdits = editsForRoots(reviewsBySignature, rootSignatures);
+    public static @NotNull Set<@NotNull Review> applyEdits(Set<Review> reviews) {
+        Map<String, Review> bySignature = reviews.stream().collect(Collectors.toMap(Review::signature, Function.identity()));
+        Map<String, String> rootSignatures = rootSignaturesForEdits(bySignature);
+        Map<String, Set<Review>> rootEdits = editsForRoots(bySignature, rootSignatures);
         Map<String, Review> rootLatestEdits = latestEditsForRoots(rootEdits);
-        Map<String, Review> updatedEdits = updateEditsFromRoots(reviewsBySignature, rootLatestEdits);
+        Set<Review> updatedEdits = updateEditsFromRoots(bySignature, rootLatestEdits);
 
         // output consists of:
         // - all reviews that have never been edited (are not roots) and that are themselves not edits
         // - latest edits, updated with info from their roots
         Set<String> signaturesToExclude = Sets.union(rootEdits.keySet(), rootSignatures.keySet());
 
-        ImmutableMap.Builder<String, Review> result = ImmutableMap.builder();
-        for (Map.Entry<String, Review> entry : reviewsBySignature.entrySet()) {
+        ImmutableSet.Builder<Review> result = ImmutableSet.builder();
+        for (Map.Entry<String, Review> entry : bySignature.entrySet()) {
             if (!signaturesToExclude.contains(entry.getKey())) {
-                result.put(entry);
+                result.add(entry.getValue());
             }
         }
-        result.putAll(updatedEdits);
+        result.addAll(updatedEdits);
         return result.build();
     }
 
-    private static @NotNull Map<String, Review> updateEditsFromRoots(Map<String, Review> reviewsBySignature, Map<String, Review> rootLatestEdits) {
-        ImmutableMap.Builder<String, Review> updatedEdits = ImmutableMap.builder();
+    private static @NotNull Set<Review> updateEditsFromRoots(Map<String, Review> reviewsBySignature, Map<String, Review> rootLatestEdits) {
+        ImmutableSet.Builder<Review> updatedEdits = ImmutableSet.builder();
         for (Map.Entry<String, Review> entry : rootLatestEdits.entrySet()) {
             Review root = reviewsBySignature.get(entry.getKey());
             Review edit = entry.getValue();
             Review updatedEdit = updateEditFromRoot(edit, root);
-            updatedEdits.put(updatedEdit.signature(), updatedEdit);
+            updatedEdits.add(updatedEdit);
         }
         return updatedEdits.build();
     }
