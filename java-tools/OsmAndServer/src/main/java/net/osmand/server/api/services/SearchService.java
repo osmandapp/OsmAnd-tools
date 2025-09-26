@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
@@ -749,7 +748,7 @@ public class SearchService {
         return locale.replaceAll("[/\\\\]", "");
     }
     
-    private static String getIconName(PoiType poiType) {
+    private String getIconName(PoiType poiType) {
         if (poiType != null) {
             if (poiType.getParentType() != null) {
                 return poiType.getParentType().getIconKeyName();
@@ -762,7 +761,7 @@ public class SearchService {
         return null;
     }
 
-    private static Map<String, String> getPoiTypeFields(Object obj) {
+    private Map<String, String> getPoiTypeFields(Object obj) {
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
@@ -985,4 +984,3 @@ public class SearchService {
         return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
     }
 }
-
