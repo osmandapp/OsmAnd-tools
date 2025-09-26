@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
@@ -127,6 +128,10 @@ public class SearchTestService implements ReportService, DataService {
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
 		}
+	}
+
+	public SearchService getSearchService() {
+		return searchService;
 	}
 
 	public String getWebServerConfigDir() {
@@ -313,6 +318,8 @@ public class SearchTestService implements ReportService, DataService {
 				Integer gen_id = (Integer) row.get("id");
 				String query = (String) row.get("query");
 				int count = (Integer) row.get("gen_count");
+				String rowJson = (String) row.get("row");
+				Map<String, Object> genRow = getObjectMapper().readValue(rowJson, Map.class);
 
 				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
@@ -320,15 +327,15 @@ public class SearchTestService implements ReportService, DataService {
 					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
 					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
-					List<Feature> searchResults = Collections.emptyList();
+					List<SearchResult> searchResults = Collections.emptyList();
 					if (query != null && !query.trim().isEmpty())
-						searchResults = searchService.search(searchPoint.getLatitude(), searchPoint.getLongitude(),
+						searchResults = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
-					saveRunResults(gen_id, count, run, query, searchResults, targetPoint, searchPoint,
+					saveRunResults(genRow, gen_id, count, run, query, searchResults, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(gen_id, count, run, query, Collections.emptyList(), targetPoint, searchPoint,
+					saveRunResults(genRow, gen_id, count, run, query, Collections.emptyList(), targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() :	e.getMessage());
 				}

@@ -1,12 +1,15 @@
 package net.osmand.server.api.searchtest;
 
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.Building;
 import net.osmand.data.LatLon;
-import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.services.SearchService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -14,6 +17,7 @@ import org.apache.commons.csv.CSVPrinter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
+import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -23,7 +27,6 @@ import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
@@ -40,6 +43,8 @@ public interface DataService extends BaseService {
 	SearchTestCaseRepository getTestCaseRepo();
 
 	PolyglotEngine getEngine();
+
+	SearchService getSearchService();
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
@@ -68,8 +73,13 @@ public interface DataService extends BaseService {
 			String[] columns =
 					Stream.of(header.toLowerCase().split(delimiter)).map(DataService::sanitize).toArray(String[]::new);
 			dataset.allCols = getObjectMapper().writeValueAsString(columns);
-			if (!Arrays.asList(columns).contains("lat") || !Arrays.asList(columns).contains("lon")) {
-				String error = "Header doesn't include mandatory 'lat' or 'lon' fields.";
+			List<String> colsList = Arrays.asList(columns);
+			int latIndex = colsList.indexOf("lat");
+			int lonIndex = colsList.indexOf("lon");
+			int idIndex = colsList.indexOf("id");
+			if (latIndex == -1 || lonIndex == -1 || idIndex == -1) {
+				String error = String.format("Header doesn't include mandatory fields: 'lat', 'lon' or 'id' (%d, %d, %d)",
+						latIndex, lonIndex, idIndex);
 				getLogger().error("{} Header: {}", error, String.join(",", columns));
 				dataset.setError(error);
 				return dataset;
@@ -93,13 +103,18 @@ public interface DataService extends BaseService {
 					for (int j = 0; j < values.length && j < record.length; j++) {
 						values[j] = crop(unquote(record[j]), 255);
 					}
-					batchArgs.add(new Object[] {dataset.id, getObjectMapper().writeValueAsString(values)});
+					if (values[latIndex] != null && values[lonIndex] != null && values[idIndex] != null)
+						batchArgs.add(new Object[] {dataset.id, getObjectMapper().writeValueAsString(values)});
+					else
+						getLogger().warn("Dataset row: {} doesn't have lat={}, lon={} or id={}",
+								getObjectMapper().writeValueAsString(values),
+								values[latIndex] != null, values[lonIndex] != null, values[idIndex] != null);
 				}
 
 				String insertSql = "INSERT INTO dataset_result (dataset_id, value) VALUES (?, ?)";
 				getJdbcTemplate().batchUpdate(insertSql, batchArgs);
 
-				getLogger().info("Stored {} rows into dataset: {}", sample.size(), dataset.name);
+				getLogger().info("Stored {} rows into dataset: {}", sample.size() - 1, dataset.name);
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
@@ -140,10 +155,14 @@ public interface DataService extends BaseService {
 						return result;
 					}
 			);
+			assert rows != null;
 
 			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
 			for (PolyglotEngine.GenRow example : examples) {
-				saveCaseResults(test, example);
+				if (example.point() != null)
+					saveCaseResults(test, example);
+				else
+					getLogger().warn("Dataset row: {} has no point.", rows.get(example.dsResultId()));
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {
@@ -224,25 +243,38 @@ public interface DataService extends BaseService {
 		}
 	}
 
-	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults, LatLon targetPoint,
+	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, List<SearchResult> searchResults, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
+		final MapDataObjectFinder finder = new MapDataObjectFinder();
+
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
 		String resultPoint = null;
+		long datasetId;
+		try {
+			datasetId = Long.parseLong((String) genRow.get("id"));
+		} catch (NumberFormatException e) {
+			datasetId = -1;
+		}
+
 		Map<String, Object> row = new LinkedHashMap<>();
 		if (searchPoint != null && !searchResults.isEmpty()) {
-			resPlace = 1;
-			// Pick the first non-STREET feature; fallback to the first result if all are LOCATION
-			Feature resultFeature = searchResults.get(0);
-			for (Feature f : searchResults) {
-				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
-				if (wt != null && !"LOCATION".equals(wt.toString())) {
-					resultFeature = f;
-					break;
-				}
-				resPlace++;
+			// Pick the first non-LOCATION object; fallback to the first result if all are LOCATION
+			Result[] found = finder.find(searchResults, datasetId);
+			Result firstResult = found[0];
+			SearchResult result = firstResult.searchResult();
+			resPlace = firstResult.place();
+			Result bestResult = found[1] == null ? firstResult : found[1];
+
+			row.put("res_id", firstResult.toIdString());
+			row.put("res_place", firstResult.toPlaceString());
+			row.put("actual_place", bestResult.toPlaceString());
+			if (result.object instanceof Building b) {
+				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
+					row.put("interpolation", b.toString());
 			}
 
+			Feature resultFeature = getSearchService().getFeature(result);
 			if (resultFeature.properties != null) {
 				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
 					Object v = e.getValue();

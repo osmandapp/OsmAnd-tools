@@ -72,7 +72,7 @@ public interface ReportService {
 			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "query"};
-	String[] OUT_PROPS = new String[]{"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon"};
+	String[] OUT_PROPS = new String[]{"res_count", "res_distance", "res_place", "actual_place", "res_id", "res_lat_lon", "search_lat_lon", "search_bbox" };
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -81,205 +81,6 @@ public interface ReportService {
 	SearchTestCaseRepository getTestCaseRepo();
 
 	Logger getLogger();
-
-	default void compareReport(ServletOutputStream out, Long caseId, Long[] runIds) throws IOException {
-		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
-				new RuntimeException("TestCase not found with id: " + caseId));
-
-		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
-		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "query"};
-		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name"};
-		try (Workbook wb = new XSSFWorkbook()) {
-			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
-			Map<Long, String> runNames = new HashMap<>();
-			for (long runId : runIds) {
-				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, null));
-				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?", String.class, runId));
-			}
-
-			Set<String> runHeaderSet = new LinkedHashSet<>();
-			for (List<Map<String, Object>> runSet : runs)
-				for (Map<String, Object> row : runSet)
-					runHeaderSet.addAll(row.keySet());
-			String[] runHeaders = runHeaderSet.toArray(new String[0]);
-
-			// Styles
-			CellStyle header = wb.createCellStyle();
-			Font headerFont = wb.createFont();
-			headerFont.setBold(true);
-			header.setFont(headerFont);
-			header.setWrapText(true);
-
-			// Statistics
-			Sheet statSheet = wb.createSheet("Stats");
-			String[] groups = new String[]{"Found", "Not Found", "Not Processed"};
-			int c = 0;
-			for (Long[] p : getPairs(runIds)) {
-				Row sh = statSheet.createRow(0);
-
-				Cell cell = sh.createCell(c);
-				cell.setCellValue(runNames.get(p[0]));
-				cell.setCellStyle(header);
-
-				cell = sh.createCell(c + 1);
-				cell.setCellValue(runNames.get(p[1]));
-				cell.setCellStyle(header);
-
-				cell = sh.createCell(c + 2);
-				cell.setCellValue("Sum");
-				cell.setCellStyle(header);
-
-				cell = sh.createCell(c + 3);
-				cell.setCellValue("%");
-				cell.setCellStyle(header);
-
-				int i = 0;
-				for (int j = 0; j < groups.length; j++) {
-					Row r1 = statSheet.createRow(j * 3 + 1 + i);
-					cell = r1.createCell(c);
-					cell.setCellValue(groups[0]);
-					cell = r1.createCell(c + 1);
-					cell.setCellValue(groups[j]);
-
-					cell = r1.createCell(c + 2);
-					int fr = j * 3 + 2 + i;
-					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
-
-					Row r2 = statSheet.createRow(j * 3 + 2 + i);
-					cell = r2.createCell(c);
-					cell.setCellValue(groups[1]);
-					cell = r2.createCell(c + 1);
-					cell.setCellValue(groups[j]);
-
-					cell = r2.createCell(c + 2);
-					fr = j * 3 + 3 + i;
-					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
-
-					Row r3 = statSheet.createRow(j * 3 + 3 + i);
-					cell = r3.createCell(c);
-					cell.setCellValue(groups[2]);
-					cell = r3.createCell(c + 1);
-					cell.setCellValue(groups[j]);
-
-					cell = r3.createCell(c + 2);
-					fr = j * 3 + 4 + i;
-					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
-
-					Row r4 = statSheet.createRow(j * 3 + 4 + i);
-					cell = r4.createCell(c + 2);
-					cell.setCellFormula(String.format("SUM(C%d:C%d)", j * 3 + 2 + i, j * 3 + 2 + i + 2));
-					cell.setCellStyle(header);
-
-					i++;
-				}
-
-				statSheet.autoSizeColumn(c);
-				statSheet.autoSizeColumn(c + 1);
-
-				c += 4;
-			}
-
-			// Sheet 1
-			Sheet sheet = wb.createSheet("Comparison");
-			Row h = sheet.createRow(0);
-			sheet.createFreezePane(runIds.length + gen_cols.length, 1);
-
-			// Group header: one column per run (to hold group name per run)
-			for (c = 0; c < runIds.length; c++) {
-				Cell cell = h.createCell(c);
-				cell.setCellValue(runNames.get(runIds[c]));
-				cell.setCellStyle(header);
-			}
-			// General columns header
-			for (c = 0; c < gen_cols.length; c++) {
-				Cell cell = h.createCell(runIds.length + c);
-				cell.setCellValue(gen_cols[c]);
-				cell.setCellStyle(header);
-			}
-
-			// Per-run block headers
-			int r;
-			// Helper to stringify values safely
-			java.util.function.Function<Object, String> toStr = v -> v == null ? "" : String.valueOf(v);
-
-			for (int ri = 0; ri < runIds.length; ri++) {
-				int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
-				for (c = 0; c < run_cols.length; c++) {
-					Cell cell = h.createCell(baseCol + c);
-					cell.setCellValue(run_cols[c] + "_" + (ri + 1));
-					cell.setCellStyle(header);
-				}
-
-				Sheet runSheet = wb.createSheet(runNames.get(runIds[ri]) + " (#" + runIds[ri] + ")");
-				r = 1;
-				for (Map<String, Object> values : runs.get(ri)) {
-					Row rh = runSheet.createRow(0);
-					for (c = 0; c < runHeaders.length; c++) {
-						Cell cell = rh.createCell(c);
-						cell.setCellValue(runHeaders[c]);
-						cell.setCellStyle(header);
-					}
-
-					Row row = runSheet.createRow(r++);
-					for (int j = 0; j < runHeaders.length; j++) {
-						Cell cell = row.createCell(j);
-						cell.setCellValue(toStr.apply(values.get(runHeaders[j])));
-					}
-				}
-				for (c = 0; c < runHeaders.length; c++) {
-					runSheet.autoSizeColumn(c);
-				}
-			}
-
-			// Body: create one row per generated item (gens is ordered by gen_id)
-			r = 1;
-			for (Map<String, Object> values : runs.get(0)) {
-				Row row = sheet.createRow(r++);
-				for (int j = 0; j < gen_cols.length; j++) {
-					int colIdx = runIds.length + j;
-					Cell cell = row.createCell(colIdx);
-					cell.setCellValue(toStr.apply(values.get(gen_cols[j])));
-				}
-			}
-
-			// For each run (index ri), fill group column and run block columns, aligned by row index
-			for (int ri = 0; ri < runs.size(); ri++) {
-				List<Map<String, Object>> runSet = runs.get(ri);
-				int rowsCount = runSet.size();
-				for (int idx = 0; idx < rowsCount; idx++) {
-					Row row = sheet.getRow(idx + 1);
-					if (row == null) row = sheet.createRow(idx + 1);
-					Map<String, Object> values = idx < runSet.size() ? runSet.get(idx) : Collections.emptyMap();
-
-					// Group column for this run
-					{
-						Cell cell = row.getCell(ri);
-						if (cell == null) cell = row.createCell(ri);
-						cell.setCellValue(toStr.apply(values.get("group")));
-					}
-					// Run block columns for this run
-					int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
-					for (c = 0; c < run_cols.length; c++) {
-						Cell cell = row.getCell(baseCol + c);
-						if (cell == null) cell = row.createCell(baseCol + c);
-						cell.setCellValue(toStr.apply(values.get(run_cols[c])));
-					}
-				}
-			}
-
-			// Auto-size columns
-			int totalCols = runIds.length + gen_cols.length + runIds.length * run_cols.length;
-			for (c = 0; c < totalCols; c++) {
-				sheet.autoSizeColumn(c);
-			}
-
-			wb.write(out);
-		} catch (Exception e) {
-			getLogger().error("Cannot create comparison report", e);
-		}
-	}
-
 
 	default void downloadRawResults(Writer writer, Long caseId, Long runId, String format) throws IOException {
 		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
@@ -333,9 +134,9 @@ public interface ReportService {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
+						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place") || fn.startsWith("web_poi_id") || fn.startsWith("amenity_")) {
 							row.put(fn, v.asText());
-						else if (fn.startsWith("web_name") || fn.startsWith("web_address") || fn.startsWith("web_poi_name"))
+						} else if (fn.startsWith("web_name") || fn.startsWith("web_address") || fn.startsWith("web_poi_name"))
 							resultName.append(v.asText()).append(" ");
 						else
 							out.put(fn, v.asText());
@@ -539,5 +340,203 @@ public interface ReportService {
 			pairs.add(new Long[]{first, sorted.get(i)});
 		}
 		return pairs;
+	}
+
+	default void compareReport(ServletOutputStream out, Long caseId, Long[] runIds) throws IOException {
+		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+
+		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
+		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "query"};
+		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "res_lat_lon", "res_name", "res_id", "search_bbox"};
+		try (Workbook wb = new XSSFWorkbook()) {
+			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
+			Map<Long, String> runNames = new HashMap<>();
+			for (long runId : runIds) {
+				runs.add(extendTo(getJdbcTemplate().queryForList(
+						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, null));
+				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?", String.class, runId));
+			}
+
+			Set<String> runHeaderSet = new LinkedHashSet<>();
+			for (List<Map<String, Object>> runSet : runs)
+				for (Map<String, Object> row : runSet)
+					runHeaderSet.addAll(row.keySet());
+			String[] runHeaders = runHeaderSet.toArray(new String[0]);
+
+			// Styles
+			CellStyle header = wb.createCellStyle();
+			Font headerFont = wb.createFont();
+			headerFont.setBold(true);
+			header.setFont(headerFont);
+			header.setWrapText(true);
+
+			// Statistics
+			Sheet statSheet = wb.createSheet("Stats");
+			String[] groups = new String[]{"Found", "Not Found", "Not Processed"};
+			int c = 0;
+			for (Long[] p : getPairs(runIds)) {
+				Row sh = statSheet.createRow(0);
+
+				Cell cell = sh.createCell(c);
+				cell.setCellValue(runNames.get(p[0]));
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 1);
+				cell.setCellValue(runNames.get(p[1]));
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 2);
+				cell.setCellValue("Sum");
+				cell.setCellStyle(header);
+
+				cell = sh.createCell(c + 3);
+				cell.setCellValue("%");
+				cell.setCellStyle(header);
+
+				int i = 0;
+				for (int j = 0; j < groups.length; j++) {
+					Row r1 = statSheet.createRow(j * 3 + 1 + i);
+					cell = r1.createCell(c);
+					cell.setCellValue(groups[0]);
+					cell = r1.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					cell = r1.createCell(c + 2);
+					int fr = j * 3 + 2 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
+					Row r2 = statSheet.createRow(j * 3 + 2 + i);
+					cell = r2.createCell(c);
+					cell.setCellValue(groups[1]);
+					cell = r2.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					cell = r2.createCell(c + 2);
+					fr = j * 3 + 3 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
+					Row r3 = statSheet.createRow(j * 3 + 3 + i);
+					cell = r3.createCell(c);
+					cell.setCellValue(groups[2]);
+					cell = r3.createCell(c + 1);
+					cell.setCellValue(groups[j]);
+
+					cell = r3.createCell(c + 2);
+					fr = j * 3 + 4 + i;
+					cell.setCellFormula(String.format("COUNTIFS(Comparison!A:A,A%d,Comparison!B:B,B%d)", fr, fr));
+
+					Row r4 = statSheet.createRow(j * 3 + 4 + i);
+					cell = r4.createCell(c + 2);
+					cell.setCellFormula(String.format("SUM(C%d:C%d)", j * 3 + 2 + i, j * 3 + 2 + i + 2));
+					cell.setCellStyle(header);
+
+					i++;
+				}
+
+				statSheet.autoSizeColumn(c);
+				statSheet.autoSizeColumn(c + 1);
+
+				c += 4;
+			}
+
+			// Sheet 1
+			Sheet sheet = wb.createSheet("Comparison");
+			Row h = sheet.createRow(0);
+			sheet.createFreezePane(runIds.length + gen_cols.length, 1);
+
+			// Group header: one column per run (to hold group name per run)
+			for (c = 0; c < runIds.length; c++) {
+				Cell cell = h.createCell(c);
+				cell.setCellValue(runNames.get(runIds[c]));
+				cell.setCellStyle(header);
+			}
+			// General columns header
+			for (c = 0; c < gen_cols.length; c++) {
+				Cell cell = h.createCell(runIds.length + c);
+				cell.setCellValue(gen_cols[c]);
+				cell.setCellStyle(header);
+			}
+
+			// Per-run block headers
+			int r;
+			// Helper to stringify values safely
+			java.util.function.Function<Object, String> toStr = v -> v == null ? "" : String.valueOf(v);
+
+			for (int ri = 0; ri < runIds.length; ri++) {
+				int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
+				for (c = 0; c < run_cols.length; c++) {
+					Cell cell = h.createCell(baseCol + c);
+					cell.setCellValue(run_cols[c] + "_" + (ri + 1));
+					cell.setCellStyle(header);
+				}
+
+				Sheet runSheet = wb.createSheet(runNames.get(runIds[ri]) + " (#" + runIds[ri] + ")");
+				r = 1;
+				for (Map<String, Object> values : runs.get(ri)) {
+					Row rh = runSheet.createRow(0);
+					for (c = 0; c < runHeaders.length; c++) {
+						Cell cell = rh.createCell(c);
+						cell.setCellValue(runHeaders[c]);
+						cell.setCellStyle(header);
+					}
+
+					Row row = runSheet.createRow(r++);
+					for (int j = 0; j < runHeaders.length; j++) {
+						Cell cell = row.createCell(j);
+						cell.setCellValue(toStr.apply(values.get(runHeaders[j])));
+					}
+				}
+				for (c = 0; c < runHeaders.length; c++) {
+					runSheet.autoSizeColumn(c);
+				}
+			}
+
+			// Body: create one row per generated item (gens is ordered by gen_id)
+			r = 1;
+			for (Map<String, Object> values : runs.get(0)) {
+				Row row = sheet.createRow(r++);
+				for (int j = 0; j < gen_cols.length; j++) {
+					int colIdx = runIds.length + j;
+					Cell cell = row.createCell(colIdx);
+					cell.setCellValue(toStr.apply(values.get(gen_cols[j])));
+				}
+			}
+
+			// For each run (index ri), fill group column and run block columns, aligned by row index
+			for (int ri = 0; ri < runs.size(); ri++) {
+				List<Map<String, Object>> runSet = runs.get(ri);
+				int rowsCount = runSet.size();
+				for (int idx = 0; idx < rowsCount; idx++) {
+					Row row = sheet.getRow(idx + 1);
+					if (row == null) row = sheet.createRow(idx + 1);
+					Map<String, Object> values = idx < runSet.size() ? runSet.get(idx) : Collections.emptyMap();
+
+					// Group column for this run
+					{
+						Cell cell = row.getCell(ri);
+						if (cell == null) cell = row.createCell(ri);
+						cell.setCellValue(toStr.apply(values.get("group")));
+					}
+					// Run block columns for this run
+					int baseCol = runIds.length + gen_cols.length + ri * run_cols.length;
+					for (c = 0; c < run_cols.length; c++) {
+						Cell cell = row.getCell(baseCol + c);
+						if (cell == null) cell = row.createCell(baseCol + c);
+						cell.setCellValue(toStr.apply(values.get(run_cols[c])));
+					}
+				}
+			}
+
+			// Auto-size columns
+			int totalCols = runIds.length + gen_cols.length + runIds.length * run_cols.length;
+			for (c = 0; c < totalCols; c++) {
+				sheet.autoSizeColumn(c);
+			}
+
+			wb.write(out);
+		} catch (Exception e) {
+			getLogger().error("Cannot create comparison report", e);
+		}
 	}
 }
