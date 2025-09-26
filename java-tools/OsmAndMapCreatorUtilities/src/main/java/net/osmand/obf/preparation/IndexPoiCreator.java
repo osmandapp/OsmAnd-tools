@@ -881,14 +881,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
-	private PoiAdditionalType retrieveAdditionalType(String key) {
-		for (PoiAdditionalType t : additionalTypesId) {
-			if (Algorithms.objectEquals(t.getTag(), key)) {
-				return t;
-			}
-		}
-		return null;
-	}
 
 	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
@@ -916,10 +908,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
-		PoiAdditionalType nameRuleType = retrieveAdditionalType("name");
-		PoiAdditionalType nameEnRuleType = retrieveAdditionalType("name:en");
-		PoiAdditionalType streetRuleType = retrieveAdditionalType(Amenity.ADDR_STREET);
-		PoiAdditionalType hnoRuleType = retrieveAdditionalType(Amenity.ADDR_HOUSENUMBER);
+		PoiAdditionalType nameRuleType = getOrCreate(Amenity.NAME, null, true);
+		PoiAdditionalType nameEnRuleType = getOrCreate("name:en", null, true);
+		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
+		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
