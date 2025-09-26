@@ -158,7 +158,6 @@ public class ReviewEditsTest {
                 ),
                 "scheme" + seqNum,
                 new Review.Geo(null, null)
-
         );
     }
 }

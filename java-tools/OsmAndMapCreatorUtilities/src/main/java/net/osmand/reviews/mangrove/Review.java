@@ -187,7 +187,7 @@ record Review(
 
     public record Geo(
             Coordinates coordinates,
-            Long uncertainty
+            Integer uncertainty
     ) {
         public record Coordinates(
                 double x,
@@ -226,14 +226,14 @@ record Review(
 
         public static final class Builder {
             private Coordinates coordinates = null;
-            private Long uncertainty = null;
+            private Integer uncertainty = null;
 
             public Builder withCoordinates(Coordinates.Builder coordinates) {
                 this.coordinates = coordinates.build();
                 return this;
             }
 
-            public Builder withUncertainty(Long uncertainty) {
+            public Builder withUncertainty(Integer uncertainty) {
                 this.uncertainty = uncertainty;
                 return this;
             }

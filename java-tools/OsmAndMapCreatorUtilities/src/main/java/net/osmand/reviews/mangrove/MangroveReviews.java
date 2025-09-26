@@ -14,7 +14,6 @@ import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
-import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -23,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
@@ -68,8 +66,11 @@ public final class MangroveReviews {
     private static List<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
         ReviewsParser parser = new ReviewsParser();
         Set<Review> parsedReviews = parser.parse(inputFile).collect(Collectors.toSet());
+        log.info(String.format("%d reviews parsed from %s", parsedReviews.size(), inputFile));
         Set<Review> edited = applyEdits(parsedReviews);
-        //Map<Review, ReviewedPlace> places = OsmCoding.resolveOsmPois()
+        log.info(String.format("%d reviews remaining after edits were applied", edited.size()));
+        Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(edited);
+        log.info(String.format("%d reviews successfully mapped to OSM POIs", pois.size()));
         // TODO:
         // - group by ReviewedPlace
         // - map to Review

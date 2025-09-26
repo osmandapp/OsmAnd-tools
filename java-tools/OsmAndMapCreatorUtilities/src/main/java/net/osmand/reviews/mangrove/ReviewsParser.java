@@ -242,7 +242,7 @@ final class ReviewsParser {
                                         state = State.Coordinates;
                                     }
                                 }
-                                case "uncertainty" -> geo.withUncertainty(nextLongValueOrNull(parser, state));
+                                case "uncertainty" -> geo.withUncertainty(nextIntValueOrNull(parser, state));
                                 default -> unexpectedField(state, parser.currentName());
                             }
                         }
@@ -308,6 +308,15 @@ final class ReviewsParser {
             throw new ParseException(state, "expected INT, got NULL");
         }
         return value;
+    }
+
+    private static Integer nextIntValueOrNull(JsonParser parser, State state) throws IOException, ParseException {
+        JsonToken token = parser.nextToken();
+        switch (token) {
+            case VALUE_NULL -> { return null; }
+            case VALUE_NUMBER_INT -> { return parser.getIntValue(); }
+            default -> throw new ParseException(state, String.format("expected INT, got %s", token));
+        }
     }
 
     private static Long nextLongValueOrNull(JsonParser parser, State state) throws IOException, ParseException {
