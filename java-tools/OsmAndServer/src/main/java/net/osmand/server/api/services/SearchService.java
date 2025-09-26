@@ -123,8 +123,26 @@ public class SearchService {
         }
         return bbox;
     }
-    
-    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+
+	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast);
+
+		List<Feature> features = new ArrayList<>();
+		if (res != null) {
+			if (!res.isEmpty()) {
+				res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
+				res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
+				saveSearchResult(res, features);
+			}
+		}
+
+		if (!features.isEmpty()) {
+			return features;
+		} else {
+			return Collections.emptyList();
+		}
+	}
+    public List<SearchResult> searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
@@ -135,7 +153,6 @@ public class SearchService {
         QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
-        List<Feature> features = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
             if (list.isEmpty()) {
@@ -155,22 +172,9 @@ public class SearchService {
             
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
-            List<SearchResult> res;
-            if (resultCollection != null) {
-                res = resultCollection.getCurrentSearchResults();
-                if (!res.isEmpty()) {
-                    res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
-                    res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
-                    saveSearchResult(res, features);
-                }
-            }
+			return resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
-        }
-        if (!features.isEmpty()) {
-            return features;
-        } else {
-            return Collections.emptyList();
         }
     }
 
@@ -745,7 +749,7 @@ public class SearchService {
         return locale.replaceAll("[/\\\\]", "");
     }
     
-    private String getIconName(PoiType poiType) {
+    private static String getIconName(PoiType poiType) {
         if (poiType != null) {
             if (poiType.getParentType() != null) {
                 return poiType.getParentType().getIconKeyName();
@@ -758,7 +762,7 @@ public class SearchService {
         return null;
     }
 
-    private Map<String, String> getPoiTypeFields(Object obj) {
+    private static Map<String, String> getPoiTypeFields(Object obj) {
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
@@ -843,33 +847,35 @@ public class SearchService {
     
     private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
         for (SearchResult result : res) {
-            Feature feature;
-            if (result.objectType == ObjectType.POI) {
-                feature = getPoiFeature(result);
-            } else {
-                Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
-                feature = new Feature(geometry)
-                        .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
-                        .prop(PoiTypeField.NAME.getFieldName(), result.localeName);
-                if (result.objectType == ObjectType.STREET || result.objectType == ObjectType.HOUSE) {
-                    if (result.localeRelatedObjectName != null) {
-                        feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
-                    }
-                    SearchResult parentResult = result.parentSearchResult;
-                    if (parentResult != null && parentResult.localeRelatedObjectName != null) {
-                        feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
-                    }
-                }
-                Map<String, String> tags = getPoiTypeFields(result.object);
-                for (Map.Entry<String, String> entry : tags.entrySet()) {
-                    feature.prop(entry.getKey(), entry.getValue());
-                }
-				long id = result.getId();
-				feature.prop("res_id", id > 0 ? id / 128 : id);
-            }
-            features.add(feature);
+            features.add(getFeature(result));
         }
     }
+
+	public Feature getFeature(SearchResult result) {
+		Feature feature;
+		if (result.objectType == ObjectType.POI) {
+			feature = getPoiFeature(result);
+		} else {
+			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
+			feature = new Feature(geometry)
+					.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+					.prop(PoiTypeField.NAME.getFieldName(), result.localeName);
+			if (result.objectType == ObjectType.STREET || result.objectType == ObjectType.HOUSE) {
+				if (result.localeRelatedObjectName != null) {
+					feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
+				}
+				SearchResult parentResult = result.parentSearchResult;
+				if (parentResult != null && parentResult.localeRelatedObjectName != null) {
+					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
+				}
+			}
+			Map<String, String> tags = getPoiTypeFields(result.object);
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				feature.prop(entry.getKey(), entry.getValue());
+			}
+		}
+		return feature;
+	}
     
     private Feature getPoiFeature(SearchResult result) {
         Amenity amenity = (Amenity) result.object;
@@ -978,6 +984,5 @@ public class SearchService {
     public static boolean isIdFromSplit(long id) {
         return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
     }
-    
 }
 

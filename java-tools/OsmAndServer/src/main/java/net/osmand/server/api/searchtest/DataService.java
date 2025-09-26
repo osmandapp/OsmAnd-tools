@@ -1,12 +1,15 @@
 package net.osmand.server.api.searchtest;
 
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.data.Building;
 import net.osmand.data.LatLon;
-import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.services.SearchService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -14,6 +17,7 @@ import org.apache.commons.csv.CSVPrinter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
+import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -23,7 +27,6 @@ import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
@@ -40,6 +43,8 @@ public interface DataService extends BaseService {
 	SearchTestCaseRepository getTestCaseRepo();
 
 	PolyglotEngine getEngine();
+
+	SearchService getSearchService();
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
@@ -238,25 +243,38 @@ public interface DataService extends BaseService {
 		}
 	}
 
-	default void saveRunResults(long genId, int count, Run run, String query, List<Feature> searchResults, LatLon targetPoint,
+	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, List<SearchResult> searchResults, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
+		final MapDataObjectFinder finder = new MapDataObjectFinder();
+
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
 		String resultPoint = null;
+		long datasetId;
+		try {
+			datasetId = Long.parseLong((String) genRow.get("id"));
+		} catch (NumberFormatException e) {
+			datasetId = -1;
+		}
+
 		Map<String, Object> row = new LinkedHashMap<>();
 		if (searchPoint != null && !searchResults.isEmpty()) {
-			resPlace = 1;
-			// Pick the first non-STREET feature; fallback to the first result if all are LOCATION
-			Feature resultFeature = searchResults.get(0);
-			for (Feature f : searchResults) {
-				Object wt = f != null && f.properties != null ? f.properties.get("web_type") : null;
-				if (wt != null && !"LOCATION".equals(wt.toString())) {
-					resultFeature = f;
-					break;
-				}
-				resPlace++;
+			// Pick the first non-LOCATION object; fallback to the first result if all are LOCATION
+			Result[] found = finder.find(searchResults, datasetId);
+			Result firstResult = found[0];
+			SearchResult result = firstResult.searchResult();
+			resPlace = firstResult.place();
+			Result bestResult = found[1] == null ? firstResult : found[1];
+
+			row.put("res_id", firstResult.toIdString());
+			row.put("res_place", firstResult.toPlaceString());
+			row.put("actual_place", bestResult.toPlaceString());
+			if (result.object instanceof Building b) {
+				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
+					row.put("interpolation", b.toString());
 			}
 
+			Feature resultFeature = getSearchService().getFeature(result);
 			if (resultFeature.properties != null) {
 				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
 					Object v = e.getValue();

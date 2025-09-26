@@ -72,7 +72,7 @@ public interface ReportService {
 			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "query"};
-	String[] OUT_PROPS = new String[]{"res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_id" };
+	String[] OUT_PROPS = new String[]{"res_count", "res_distance", "res_place", "actual_place", "res_id", "res_lat_lon", "search_lat_lon", "search_bbox" };
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -134,9 +134,9 @@ public interface ReportService {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("res_id") || fn.startsWith("web_poi_id") || fn.startsWith("amenity_"))
+						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place") || fn.startsWith("web_poi_id") || fn.startsWith("amenity_")) {
 							row.put(fn, v.asText());
-						else if (fn.startsWith("web_name") || fn.startsWith("web_address") || fn.startsWith("web_poi_name"))
+						} else if (fn.startsWith("web_name") || fn.startsWith("web_address") || fn.startsWith("web_poi_name"))
 							resultName.append(v.asText()).append(" ");
 						else
 							out.put(fn, v.asText());
@@ -348,7 +348,7 @@ public interface ReportService {
 
 		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
 		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "query"};
-		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "search_bbox", "res_lat_lon", "res_name", "res_id"};
+		final String[] run_cols = new String[]{"type", "res_count", "res_place", "res_distance", "search_lat_lon", "res_lat_lon", "res_name", "res_id", "search_bbox"};
 		try (Workbook wb = new XSSFWorkbook()) {
 			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
 			Map<Long, String> runNames = new HashMap<>();
