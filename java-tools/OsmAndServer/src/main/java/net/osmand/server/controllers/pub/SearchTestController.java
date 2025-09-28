@@ -24,7 +24,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -125,6 +128,12 @@ public class SearchTestController {
 		return testSearchService.cancelRun(runId).thenApply(ResponseEntity::ok);
 	}
 
+	@PostMapping(value = "/runs/{runId}/rerun", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<Run>> rerun(@PathVariable Long runId) {
+		return testSearchService.rerun(runId).thenApply(ResponseEntity::ok);
+	}
+
 	@DeleteMapping(value = "/cases/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Void>> deleteTestCase(@PathVariable Long id) {
@@ -158,9 +167,13 @@ public class SearchTestController {
 	public void getDatasetSample(@PathVariable Long datasetId, HttpServletResponse response) throws IOException {
 		try {
 			String csvData = testSearchService.getDatasetSample(datasetId);
-			response.setContentType("text/csv");
+			response.setContentType("text/csv; charset=UTF-8");
+			response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 			response.setHeader("Content-Disposition", "attachment; filename=\"sample.csv\"");
-			response.getWriter().write(csvData);
+			try (OutputStreamWriter w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+				w.write(csvData);
+				w.flush();
+			}
 		} catch (RuntimeException e) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
 		}
@@ -229,25 +242,19 @@ public class SearchTestController {
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
-	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
-	public void compareReport(@PathVariable Long caseId, @RequestParam Long[] runIds,
-	                                                                 HttpServletResponse response) throws IOException {
-		response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-		response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"");
-		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
-	}
-
 	@GetMapping(value = "/runs/{runId}/download")
 	public void downloadRunReport(@PathVariable Long runId,
 								  @RequestParam(defaultValue = "csv") String format,
 								  HttpServletResponse response) throws IOException {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
+		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv; charset=UTF-8" : "application/json; charset=UTF-8";
 		response.setContentType(contentType);
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), run.caseId, runId, format);
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadRawResults(writer, run.caseId, runId, format);
+		}
 	}
 
 	@GetMapping(value = "/cases/{caseId}/download")
@@ -256,33 +263,27 @@ public class SearchTestController {
 									   HttpServletResponse response) throws IOException {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
+		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv; charset=UTF-8" : "application/json; charset=UTF-8";
 		response.setContentType(contentType);
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), caseId, tc.lastRunId, format);
-	}
-
-	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<String[]> getLabels() {
-		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
-	}
-	
-	public String getSystemBranch() {
-		String branch = System.getenv("SYSTEM_BRANCH");
-		if (Algorithms.isEmpty(branch)) {
-			branch = "master";
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadRawResults(writer, caseId, tc.lastRunId, format);
 		}
-		return branch;
+	}
+
+	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
+	public void compareReport(@PathVariable Long caseId, @RequestParam Long[] runIds,
+	                                                                 HttpServletResponse response) throws IOException {
+		response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"");
+		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
 	}
 
 	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<String>> getBranches() {
-//		return ResponseEntity.ok(testSearchService.getBranches());
-		return ResponseEntity.ok(Arrays.asList(getSystemBranch()));
-		
+		return ResponseEntity.ok(Collections.singletonList(testSearchService.getSystemBranch()));
 	}
 
 

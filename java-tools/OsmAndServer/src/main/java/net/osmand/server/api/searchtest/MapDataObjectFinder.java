@@ -4,6 +4,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.Building;
 import net.osmand.data.QuadRect;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -55,13 +56,13 @@ public class MapDataObjectFinder {
 		return tags;
 	}
 
-	public Result[] find(List<SearchResult> searchResults, long datasetId) {
+	public Result[] find(List<SearchResult> searchResults, long datasetId, Map<String, Object> row) {
 		int resPlace = 1;
 		Result firstResult = null, firstByTag = null, firstByDist = null;
 		for (SearchResult res : searchResults) {
 			Object wt = res.objectType;
 			if (wt != null && !"LOCATION".equals(wt.toString())) {
-				Result currResult = getMapDataObject(res, datasetId, resPlace);
+				Result currResult = getMapDataObject(res, datasetId, resPlace, row);
 
 				if (firstResult == null)
 					firstResult = currResult;
@@ -74,6 +75,10 @@ public class MapDataObjectFinder {
 			}
 			resPlace++;
 		}
+		if (firstResult != null && firstResult.searchResult() != null && firstResult.searchResult().object instanceof Building b) {
+			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
+				row.put("interpolation", b.toString());
+		}
 		if (firstByTag != null) {
 			return new Result[] {firstResult, firstByTag};
 		}
@@ -83,7 +88,7 @@ public class MapDataObjectFinder {
 		return new Result[] {firstResult, null};
 	}
 
-	public Result getMapDataObject(SearchResult result, long expectedOsmId, int place) {
+	public Result getMapDataObject(SearchResult result, long expectedOsmId, int place, Map<String, Object> row) {
 		if (result.location == null || result.localeName == null || result.file == null)
 			return new Result(ResultType.Error, null, place, result);
 
@@ -112,7 +117,10 @@ public class MapDataObjectFinder {
 							return false;
 
 						String value = tags.get(tag);
-						return value != null && value.startsWith(result.localeName);
+						boolean matches = value != null && value.startsWith(result.localeName);
+						if (matches)
+							row.put("by_tag", tag + "=" + value);
+						return matches;
 					}
 
 					@Override

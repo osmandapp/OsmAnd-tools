@@ -260,7 +260,7 @@ public interface DataService extends BaseService {
 		Map<String, Object> row = new LinkedHashMap<>();
 		if (searchPoint != null && !searchResults.isEmpty()) {
 			// Pick the first non-LOCATION object; fallback to the first result if all are LOCATION
-			Result[] found = finder.find(searchResults, datasetId);
+			Result[] found = finder.find(searchResults, datasetId, row);
 			Result firstResult = found[0];
 			SearchResult result = firstResult.searchResult();
 			resPlace = firstResult.place();
@@ -269,10 +269,6 @@ public interface DataService extends BaseService {
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			row.put("actual_place", bestResult.toPlaceString());
-			if (result.object instanceof Building b) {
-				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
-					row.put("interpolation", b.toString());
-			}
 
 			Feature resultFeature = getSearchService().getFeature(result);
 			if (resultFeature.properties != null) {

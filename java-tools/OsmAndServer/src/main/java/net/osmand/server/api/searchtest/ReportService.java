@@ -87,7 +87,7 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + caseId));
 
 		if ("csv".equalsIgnoreCase(format)) {
-			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER by get_id", runId,
+			List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", runId,
 							DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class),
 					getObjectMapper().readValue(test.selCols, String[].class));
 			writeAsCsv(writer, results);
