@@ -289,16 +289,17 @@ def pull_imports(file_path: Path) -> Tuple[str, List[Tuple[int, str]]]:
     if not fnmatch.fnmatch(file_path.name, '*.md*'):
         return file_path.read_text(encoding="utf-8"), []
 
-    imports: List[Tuple[int, str]] = []
+    import_lines: List[Tuple[int, str]] = []
     body_lines: List[str] = []
 
     for i, line in enumerate(file_path.read_text(encoding="utf-8").splitlines()):
         if IMPORT_RE.match(line):
-            imports.append((i, line.rstrip("\n")))
+            import_lines.append((i, line.rstrip("\n")))
         else:
-            body_lines.append(line)
+            if not line.startswith('source-hash:'):
+                body_lines.append(line)
 
-    return "\n".join(body_lines), imports
+    return "\n".join(body_lines), import_lines
 
 
 def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
