@@ -183,7 +183,7 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void collectElevationStatsForWays(List<Way> ways, Map<String, String> tags, IndexCreationContext icc) {
+	protected void collectElevationStatsForWays(List<Way> ways, Map<String, String> tags, IndexCreationContext icc) {
 		int eleCount = 0;
 		double upHill = 0, downHill = 0, sumEle = 0;
 		double minEle = Double.POSITIVE_INFINITY, maxEle = Double.NEGATIVE_INFINITY;
