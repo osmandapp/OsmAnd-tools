@@ -332,7 +332,7 @@ split_tiles() {
         mkdir -p ${JOINED_TIFF_NAME}
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 22 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
@@ -431,7 +431,7 @@ get_raw_ecmwf_files() {
     set -e
 
     # Download forecast files
-    local MAX_FORECAST_HOURS=240
+    local MAX_FORECAST_HOURS=9
     local FORECAST_INCREMENT_HOURS=3
     local PREV_FILETIME=""
     for (( FORECAST_HOUR=0; FORECAST_HOUR<=${MAX_FORECAST_HOURS}; FORECAST_HOUR+=${FORECAST_INCREMENT_HOURS} ))
