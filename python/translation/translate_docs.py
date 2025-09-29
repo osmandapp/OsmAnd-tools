@@ -377,7 +377,7 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
 
         safe_max_tokens = max(512, len(content)) + 1024
         temperature = 0.0 if src_path.suffix == '.json' else 0.1
-        print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
+        print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} limit, {temperature} temperature) is translating...", flush=True)
 
         response = llm.ask(prompt, content, safe_max_tokens, temperature)
         if response.startswith('```'):
