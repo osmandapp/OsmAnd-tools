@@ -92,6 +92,7 @@ public class MapDataObjectFinder {
 		if (result.location == null || result.localeName == null || result.file == null)
 			return new Result(ResultType.Error, null, place, result);
 
+		final String[] byTag = {null};
 		final BinaryMapDataObject[] byDist = {null}, byId = {null};
 		QuadRect quad = MapUtils.calculateLatLonBbox(result.location.getLatitude(), result.location.getLongitude(), 100);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
@@ -119,7 +120,7 @@ public class MapDataObjectFinder {
 						String value = tags.get(tag);
 						boolean matches = value != null && value.startsWith(result.localeName);
 						if (matches)
-							row.put("by_tag", tag + "=" + value);
+							byTag[0] = tag + "=" + value;
 						return matches;
 					}
 
@@ -135,10 +136,13 @@ public class MapDataObjectFinder {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+
+		if (byId[0] != null)
+			return new Result(ResultType.ById, byId[0], place, result);
+
 		if (!found.isEmpty()) {
-			return byId[0] != null ?
-					new Result(ResultType.ById, byId[0], place, result) :
-					new Result(ResultType.ByTag, found.get(0), place, result);
+			row.put("by_tag", byTag[0]);
+			return new Result(ResultType.ByTag, found.get(0), place, result);
 		}
 		return new Result(ResultType.ByDist, byDist[0], place, result);
 	}
