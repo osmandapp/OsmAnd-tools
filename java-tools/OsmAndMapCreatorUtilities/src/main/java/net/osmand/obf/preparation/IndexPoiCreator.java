@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -217,6 +218,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList.clear();
 		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
 		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		if (e instanceof Way way && ClickableWayTags.isClickableWayTags(null, tags)) {
+			tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
+			icc.getIndexRouteRelationCreator().collectElevationStatsForWays(List.of(way), tags, icc);
+		}
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (isOutOfRegionBbox(e, icc)) {
