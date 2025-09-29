@@ -210,7 +210,7 @@ def make_sync(original_dir: Path, target_dir: Path, patterns: List[str]) -> None
                 make_symlink(original_item, target_item)
                 continue
 
-            if not target_item.exists() or digest(original_item) != stored_digest(target_item):
+            if not target_item.exists():
                 shutil.copy2(original_item, target_item)
                 print(f">> File {original_item.name} is copied.")
 
@@ -281,15 +281,18 @@ def stored_digest(path: Path):
 IMPORT_RE = re.compile(r'^\s*import\s+.+?\s+from\s+[\'"].+?[\'"]\s*;?\s*$')
 
 
-def pull_imports(md_path: Path) -> Tuple[str, List[Tuple[int, str]]]:
+def pull_imports(file_path: Path) -> Tuple[str, List[Tuple[int, str]]]:
+    if not file_path.exists():
+        return "", []
+
     """ Return (markdown_without_imports, list_of_(original_line_index, line_text)).  """
-    if not fnmatch.fnmatch(md_path.name, '*.md*'):
-        return md_path.read_text(encoding="utf-8"), []
+    if not fnmatch.fnmatch(file_path.name, '*.md*'):
+        return file_path.read_text(encoding="utf-8"), []
 
     imports: List[Tuple[int, str]] = []
     body_lines: List[str] = []
 
-    for i, line in enumerate(md_path.read_text(encoding="utf-8").splitlines()):
+    for i, line in enumerate(file_path.read_text(encoding="utf-8").splitlines()):
         if IMPORT_RE.match(line):
             imports.append((i, line.rstrip("\n")))
         else:
@@ -338,14 +341,15 @@ def save_dest(path, response, imports, digest_now):
         f.write(response)
 
 
-def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: str) -> None:
+def make_translation(lang_code: str, prompt_name: str, src_dir: Path, dest_dir: Path, file_pattern: str) -> None:
     """
     Translate files in src_dir to dest_dir with a given prompt.
 
     The translation is done by calling the `llm.ask` function with the prompt and the content of the file.
     The translated content is written to the destination file with the same name as the source file.
 
-    :param prompt: The prompt to use for translation.
+    :param lang_code: The language code to use for translation.
+    :param prompt_name: The prompt name to use for translation.
     :param src_dir: The source directory.
     :param dest_dir: The destination directory.
     :param file_pattern: The file pattern to translate.
@@ -374,10 +378,16 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
             continue
 
         content, imports = pull_imports(src_path)  # separate content and imports
+        prev_content, _ = pull_imports(dest_path)
+        prev_content = prev_content if content != prev_content else ""
 
-        safe_max_tokens = max(512, len(content)) + 1024
+        safe_max_tokens = max(512, len(content) + len(prev_content)) + 1024
         temperature = 0.0 if src_path.suffix == '.json' else 0.1
         print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} limit, {temperature} temperature) is translating...", flush=True)
+
+        prompt = prompts.get(f"{prompt_name}_{lang_code.upper()}", None)
+        prompt = prompt if prompt else prompts[prompt_name]
+        prompt = prompt.format(lang=langs[lang_code]["name"], prev_content=prev_content)
 
         response = llm.ask(prompt, content, safe_max_tokens, temperature)
         if response.startswith('```'):
@@ -476,8 +486,6 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         return
 
     print(f"Translation to '{lang_code}' is starting...", flush=True)
-    prompt = prompts.get(f"MD_PROMPT_{lang_code.upper()}", None)
-    prompt = prompt if prompt else prompts['MD_PROMPT'].format(lang=lang_name)
     if not INPUT_PATTERN:
         if not i18n_lang_dir.exists():
             create_i18n(i18n_lang_dir, lang_code, lang_name)
@@ -487,15 +495,15 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         make_sync(blog_dir, blog_lang_dir, extensions)
         make_sync(docs_dir, docs_lang_dir, extensions)
 
-        make_translation(prompts['CURRENT_JSON_PROMPT'].format(lang=lang_name), root_lang_dir, root_lang_dir, 'current.json')
-        make_translation(prompts['CATEGORY_JSON_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '_*_.json')
-        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code,
+        make_translation(lang_code, 'CURRENT_JSON_PROMPT', root_lang_dir, root_lang_dir, 'current.json')
+        make_translation(lang_code, 'CATEGORY_JSON_PROMPT', docs_dir, docs_lang_dir, '_*_.json')
+        make_translation(lang_code, 'KEY_VALUE_JSON_PROMPT', map_translations_dir / "en", map_translations_dir / lang_code,
                          "web-translation.json")
-        make_translation(prompt, docs_dir, docs_lang_dir, '*.md*')
+        make_translation(lang_code, 'MD_PROMPT', docs_dir, docs_lang_dir, '*.md*')
     else:
-        make_translation(prompt, blog_dir, blog_lang_dir, INPUT_PATTERN)
-        make_translation(prompt, docs_dir, docs_lang_dir, INPUT_PATTERN)
-        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
+        make_translation(lang_code, 'MD_PROMPT', blog_dir, blog_lang_dir, INPUT_PATTERN)
+        make_translation(lang_code, 'MD_PROMPT', docs_dir, docs_lang_dir, INPUT_PATTERN)
+        make_translation(lang_code, 'KEY_VALUE_JSON_PROMPT', map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
 
 
 if __name__ == "__main__":
