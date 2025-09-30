@@ -6,7 +6,6 @@ import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
-import net.osmand.util.Algorithms;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
@@ -26,7 +25,6 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -229,7 +227,7 @@ public class SearchTestController {
 	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId) {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		return testSearchService.getRunReport(caseId, tc.lastRunId)
+		return testSearchService.getRunStatus(caseId, tc.lastRunId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
@@ -238,37 +236,41 @@ public class SearchTestController {
 	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId) {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		return testSearchService.getRunReport(run.caseId, runId)
+		return testSearchService.getRunStatus(run.caseId, runId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId) throws IOException {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		return ResponseEntity.ok(testSearchService.getRunResults(run.caseId, runId));
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")
 	public void downloadRunReport(@PathVariable Long runId,
-								  @RequestParam(defaultValue = "csv") String format,
 								  HttpServletResponse response) throws IOException {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv; charset=UTF-8" : "application/json; charset=UTF-8";
-		response.setContentType(contentType);
+		response.setContentType("text/csv; charset=UTF-8");
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
 		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
-			testSearchService.downloadRawResults(writer, run.caseId, runId, format);
+			testSearchService.downloadCsvResults(writer, run.caseId, runId);
 		}
 	}
 
 	@GetMapping(value = "/cases/{caseId}/download")
 	public void downloadTestCaseReport(@PathVariable Long caseId,
-									   @RequestParam(defaultValue = "csv") String format,
 									   HttpServletResponse response) throws IOException {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv; charset=UTF-8" : "application/json; charset=UTF-8";
-		response.setContentType(contentType);
+		response.setContentType("text/csv; charset=UTF-8");
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
 		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
-			testSearchService.downloadRawResults(writer, caseId, tc.lastRunId, format);
+			testSearchService.downloadCsvResults(writer, caseId, tc.lastRunId);
 		}
 	}
 
