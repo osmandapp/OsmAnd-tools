@@ -18,14 +18,18 @@ import net.osmand.util.Algorithms;
 public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 	private static final Log log = LogFactory.getLog(MissingWikiTagsProcessor.class);
 	private final String wikidataMappingUrl;
+	private final String wikirankingUrl;
 	Boolean init = null;
 	private PreparedStatement selectById;
 	private PreparedStatement selectId;
+	private PreparedStatement selectRankById;
 
-	public MissingWikiTagsProcessor(String wikidataMappingUrl) {
+	public MissingWikiTagsProcessor(String wikidataMappingUrl, String wikirankingUrl) {
 		this.wikidataMappingUrl = wikidataMappingUrl;
+		this.wikirankingUrl = wikirankingUrl;
 	}
 
+	
 	@Override
 	public void processTags(Entity e) {
 		String wikidata = e.getTag(OSMTagKey.WIKIDATA);
@@ -40,6 +44,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 
 	private synchronized void syncReadTags(Entity e, String wikidata, String wikipedia) {
 		try {
+			long wikidataId = 0;
 			if (wikipedia != null && wikidata == null) {
 				if (!init()) {
 					return;
@@ -55,7 +60,8 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 				selectId.setString(2, title);
 				ResultSet rs = selectId.executeQuery();
 				if (rs.next()) {
-					e.putTag("wikidata", "Q" + rs.getLong(1));
+					wikidataId = rs.getLong(1);
+					e.putTag("wikidata", "Q" + wikidataId);
 				}
 				rs.close();
 			} else if (wikidata != null && wikipedia == null) {
@@ -63,11 +69,11 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					return;
 				}
 				String ind = wikidata.substring(wikidata.lastIndexOf('Q') + 1);
-				long wid = Algorithms.parseLongSilently(ind, 0);
-				if (wid == 0) {
+				wikidataId = Algorithms.parseLongSilently(ind, 0);
+				if (wikidataId == 0) {
 					return;
 				}
-				selectById.setLong(1, wid);
+				selectById.setLong(1, wikidataId);
 				ResultSet rs = selectById.executeQuery();
 				try {
 					String lang = null, title = null;
@@ -77,7 +83,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 						title = rs.getString(2);
 						cntLangs++;
 						if (lang == null) {
-							System.out.println("Null language for " + title + " Q" + wid);
+							System.out.println("Null language for " + title + " Q" + wikidataId);
 						}
 						if (lang.length() == 2) { // for main languages length = 2 (wikivoyage > 2)
 							if (lang.equals("en")) {
@@ -94,6 +100,32 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					}
 				} finally {
 					rs.close();
+				}
+			}
+			if (wikidataId != 0 && selectRankById != null) {
+				selectRankById.setLong(1, wikidataId);
+				ResultSet rankIdRes = selectRankById.executeQuery();
+				if (rankIdRes.next()) {
+					int travelElo = rankIdRes.getInt("elo");
+					int qrank = rankIdRes.getInt("qrank");
+					int travelTopic = rankIdRes.getInt("topic");
+					String photoTitle = rankIdRes.getString("photoTitle");
+					String catTitle = rankIdRes.getString("catTitle");
+					if (travelElo > 0) {
+						e.putTag("travel_elo", "" + travelElo);
+					}
+					if (qrank > 0) {
+						e.putTag("qrank", "" + qrank);
+					}
+					if (travelTopic > 0) {
+						e.putTag("travel_topic", "" + travelTopic);
+					}
+					if (!Algorithms.isEmpty(photoTitle)) {
+						e.putTag("wiki_photo", "" + photoTitle);
+					}
+					if (!Algorithms.isEmpty(catTitle)) {
+						e.putTag("wiki_category", "" + catTitle);
+					}
 				}
 			}
 		} catch (Exception es) {
@@ -121,9 +153,30 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 			} else {
 				log.info("Using local wikidata database: " + wikidataMappingUrl);
 			}
+			
+			
 			Connection wikiMapping = DBDialect.SQLITE.getDatabaseConnection(fileName, log);
 			selectById = wikiMapping.prepareStatement("SELECT lang, title from wiki_mapping where id = ?");
 			selectId = wikiMapping.prepareStatement("SELECT id from wiki_mapping where lang = ? and title = ? ");
+			
+			if (!Algorithms.isEmpty(wikirankingUrl)) {
+				String wikiRanking = wikirankingUrl;
+				if (wikirankingUrl.startsWith("http")) {
+					log.info("Downloading wikiranking database by url " + wikirankingUrl);
+					URL url = new URL(wikirankingUrl);
+					URLConnection cn = url.openConnection();
+					wikiRanking = "wiki_ranking.sqlitedb";
+					FileOutputStream fous = new FileOutputStream(wikiRanking);
+					Algorithms.streamCopy(cn.getInputStream(), fous);
+					fous.close();
+					log.info("Finished downloading wikiranking database");
+				} else {
+					log.info("Using local wikiranking database: " + wikirankingUrl);
+				}
+				Connection wikiRankingConn = DBDialect.SQLITE.getDatabaseConnection(wikiRanking, log);
+				selectRankById = wikiRankingConn.prepareStatement("SELECT photoId, photoTitle, catId, catTitle, poikey, "
+						+ "wikiTitle, osmid, osmtype, elo, qrank, topic, categories FROM wiki_rating WHERE id = ?");
+			}
 			init = true;
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);

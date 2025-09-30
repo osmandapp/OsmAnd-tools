@@ -1745,7 +1745,6 @@ public class WikiDatabasePreparation {
 		Connection mappingConn = DBDialect.SQLITE.getDatabaseConnection(mappingFile.getAbsolutePath(), log);
 
 		Statement mapSt = mappingConn.createStatement();
-
 		mapSt.execute("DROP TABLE IF EXISTS wiki_mapping");
 		mapSt.execute("CREATE TABLE wiki_mapping(id LONG, lang TEXT, title TEXT)");
 		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_id ON wiki_mapping(id)");

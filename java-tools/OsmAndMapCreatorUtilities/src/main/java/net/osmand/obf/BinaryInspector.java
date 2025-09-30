@@ -73,12 +73,12 @@ public class BinaryInspector {
 //					"-zoom=15",
 					// road
 //					"-latlon=50.441932,30.510840,0.0005",
-//					"-latlon=39.911388,-76.186317,0.0005",
+					"-latlon=50.452866,30.513785,0.0005",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Andorra_europe.obf"
+					System.getProperty("maps.dir") + "Ukraine_kyiv_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

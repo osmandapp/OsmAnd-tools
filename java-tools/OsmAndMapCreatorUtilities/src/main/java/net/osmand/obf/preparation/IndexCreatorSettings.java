@@ -37,6 +37,8 @@ public class IndexCreatorSettings {
 	// mapping wikidata id <-> wikipedia articles
 	public String wikidataMappingUrl;
 	
+	public String wikirankingMappingUrl;
+	
 	// lst file <tag>,<value> to index and store as poi category like default - (toilets, cafe)
 	public String poiTopIndexUrl;
 	

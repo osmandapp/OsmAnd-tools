@@ -313,6 +313,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--wikimapping=")) {
 				settings.wikidataMappingUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
+			} else if (s.startsWith("--wikiranking=")) {
+				settings.wikirankingMappingUrl = s.substring(s.indexOf('=') + 1);
+				it.remove();
 			} else if (s.startsWith("--poi-top-index-list=")) {
 				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();

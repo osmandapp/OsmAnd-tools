@@ -327,9 +327,9 @@ public class IndexCreator {
 			boolean generateUniqueIdsForEachFile) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (settings.wikidataMappingUrl != null) {
-			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl));
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl, settings.wikirankingMappingUrl));
 		} else if (!Algorithms.isEmpty(System.getenv("WIKIDATA_MAPPING_URL"))) {
-			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL")));
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL"), System.getenv("WIKIRANKING_MAPPING_URL")));
 		} else {
 			log.info("Not using wikidata database to map missing wikidata tags");
 		}
