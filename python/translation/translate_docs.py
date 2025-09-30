@@ -388,9 +388,15 @@ def make_translation(lang_code: str, prompt_name: str, src_dir: Path, dest_dir: 
 
         prompt = prompts.get(f"{prompt_name}_{lang_code.upper()}", None)
         prompt = prompt if prompt else prompts[prompt_name]
-        prompt = prompt.format(lang=langs[lang_code]["name"], prev_content=prev_content)
+        prompt = prompt.format(lang=langs[lang_code]["name"])
 
-        response = llm.ask(prompt, content, safe_max_tokens, temperature)
+        response = llm.ask(prompt,
+f"""Previous translated ({lang_code}) version:
+{prev_content}
+
+Source text (en) to translate:
+{content}""",
+                           safe_max_tokens, temperature)
         if response.startswith('```'):
             # Strip surrounding fenced code block with any language tag (e.g., ```json, ```uk, etc.)
             response = re.sub(r'^```[A-Za-z0-9_-]*\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
