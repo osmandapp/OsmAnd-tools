@@ -53,6 +53,7 @@
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx16096M"/>
                 <parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
+				<parameter k="env_4" v="WIKIRANKING_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wiki_ranking.sqlitedb"/>
 				
 				<filter exclude="world_seamarks" />
 			</job>
@@ -64,7 +65,8 @@
 				<parameter k="env_1" v="JAVA_OPTS=-Xms2048M -Xmx32000M "/>
                 <parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
-                
+                <parameter k="env_4" v="WIKIRANKING_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wiki_ranking.sqlitedb"/>
+				
 				<filter exclude="world_seamarks" />
 			</job>
 		</external>
