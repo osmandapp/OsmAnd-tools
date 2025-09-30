@@ -29,6 +29,8 @@ import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
+import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+
 @Service
 public class SearchService {
     
@@ -764,6 +766,9 @@ public class SearchService {
     private Map<String, String> getPoiTypeFields(Object obj) {
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
+            if (type.isHidden()) {
+                return tags;
+            }
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
             tags.put(PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
             tags.put(PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
@@ -892,6 +897,10 @@ public class SearchService {
                     .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
             for (Map.Entry<String, String> entry : tags.entrySet()) {
+                String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
+                if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+                        continue;
+                }
                 String value = unzipContent(entry.getValue());
                 feature.prop(entry.getKey(), value);
             }
