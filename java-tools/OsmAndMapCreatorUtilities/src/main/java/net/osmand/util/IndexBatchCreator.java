@@ -145,6 +145,7 @@ public class IndexBatchCreator {
 		public List<Bind> binds = new ArrayList<>();
 		public List<String> envs = new ArrayList<String>();
 		public CreateContainerResponse container;
+		public long startTime;
 	}
 	
 	private static class LocalPendingGeneration {
@@ -612,8 +613,8 @@ public class IndexBatchCreator {
 		}
 		if (lastStarted != null && lastStarted.jd.freeRamToStopPerc > 0
 				&& freeRamPerc < lastStarted.jd.freeRamToStopPerc) {
-			log.warn(String.format("Low RAM detected (%d%% free). Stopping last started container %s to reschedule.",
-					freeRamPerc, lastStarted.name));
+			log.warn(String.format("Low RAM detected (%d%% free). Stopping last started container %s (%d seconds) to reschedule.",
+					freeRamPerc, lastStarted.name, (System.currentTimeMillis() - lastStarted.startTime)/ 1000));
 			try {
 				dockerClient.stopContainerCmd(lastStarted.container.getId()).exec();
 				dockerClient.removeContainerCmd(lastStarted.container.getId()).exec();
@@ -666,6 +667,7 @@ public class IndexBatchCreator {
 					// In future: we can find & remove container if it exists with same name
 					p.jd.pendingGenerations.remove(p);
 					dockerRescheduledGenerations.remove(p);
+					p.startTime = System.currentTimeMillis();
 					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
 							.withEnv(p.envs).withName(p.name).exec();
 					dockerClient.startContainerCmd(p.container.getId()).exec();
