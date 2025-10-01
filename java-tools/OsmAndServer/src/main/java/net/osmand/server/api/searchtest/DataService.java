@@ -266,6 +266,31 @@ public interface DataService extends BaseService {
 			resPlace = firstResult.place();
 			Result bestResult = found[1] == null ? firstResult : found[1];
 
+			if (firstResult != bestResult && bestResult.type() == MapDataObjectFinder.ResultType.ById) {
+				String resName = searchResults.get(bestResult.place() - 1).toString();
+				int dupCount = 0, minPlace = 0;
+				double minDistance = Double.MAX_VALUE;
+				for (int i = firstResult.place(); i < searchResults.size(); i++) {
+					SearchResult candidate = searchResults.get(i);
+					if (resName.equals(candidate.toString())) {
+						double distanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
+								candidate.location.getLatitude(), candidate.location.getLongitude());
+						if (minDistance > distanceMeters) {
+							minDistance = distanceMeters;
+							result = candidate;
+							minPlace = i + 1;
+						}
+						dupCount++;
+					} else
+						break;
+				}
+
+				if (dupCount > 0) {
+					row.put("dup_count", dupCount);
+					row.put("dup_place", minPlace);
+				}
+			}
+
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			row.put("actual_place", bestResult.toPlaceString());
@@ -282,7 +307,7 @@ public interface DataService extends BaseService {
 					}
 				}
 			}
-			LatLon resPoint = getLatLon(resultFeature);
+			LatLon resPoint = result.location;
 			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
 
 			double minDistanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),

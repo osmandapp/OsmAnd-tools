@@ -79,6 +79,7 @@ public class MapDataObjectFinder {
 			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
 				row.put("interpolation", b.toString());
 		}
+
 		if (firstByTag != null) {
 			return new Result[] {firstResult, firstByTag};
 		}
