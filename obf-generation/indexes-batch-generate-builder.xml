@@ -10,7 +10,7 @@
 		directory_for_srtm_files="/home/relief-data/srtm/">
 		
 		
-		<external dockerSlots="56">
+		<external dockerSlots="52">
 			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker"
 					freeRamToStartPerc="15" freeRamToStopPerc="5" order="2">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />

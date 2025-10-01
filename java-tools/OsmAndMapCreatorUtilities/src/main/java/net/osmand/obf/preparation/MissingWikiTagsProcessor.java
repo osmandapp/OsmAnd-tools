@@ -36,8 +36,6 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 		String wikipedia = e.getTag(OSMTagKey.WIKIPEDIA);
 		if (wikipedia == null && wikidata == null) {
 			return;
-		} else if (wikidata != null && wikipedia != null) {
-			return;
 		}	
 		syncReadTags(e, wikidata, wikipedia);
 	}
@@ -45,10 +43,10 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 	private synchronized void syncReadTags(Entity e, String wikidata, String wikipedia) {
 		try {
 			long wikidataId = 0;
+			if (!init()) {
+				return;
+			}
 			if (wikipedia != null && wikidata == null) {
-				if (!init()) {
-					return;
-				}
 				int langInd = wikipedia.indexOf(':');
 				String lang = "en";
 				String title = wikipedia;
@@ -65,9 +63,6 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 				}
 				rs.close();
 			} else if (wikidata != null && wikipedia == null) {
-				if (!init()) {
-					return;
-				}
 				String ind = wikidata.substring(wikidata.lastIndexOf('Q') + 1);
 				wikidataId = Algorithms.parseLongSilently(ind, 0);
 				if (wikidataId == 0) {
@@ -111,6 +106,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					int travelTopic = rankIdRes.getInt("topic");
 					String photoTitle = rankIdRes.getString("photoTitle");
 					String catTitle = rankIdRes.getString("catTitle");
+					e.putTag("osmwiki", "wiki_place");
 					if (travelElo > 0) {
 						e.putTag("travel_elo", "" + travelElo);
 					}
