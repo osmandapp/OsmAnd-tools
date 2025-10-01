@@ -97,19 +97,20 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					rs.close();
 				}
 			}
+			// assign wiki place
 			if (wikidataId != 0 && selectRankById != null) {
 				selectRankById.setLong(1, wikidataId);
 				ResultSet rankIdRes = selectRankById.executeQuery();
 				if (rankIdRes.next()) {
-					int travelElo = rankIdRes.getInt("elo");
+					double travelElo = rankIdRes.getDouble("elo");
 					int qrank = rankIdRes.getInt("qrank");
 					int travelTopic = rankIdRes.getInt("topic");
 					String photoTitle = rankIdRes.getString("photoTitle");
 					String catTitle = rankIdRes.getString("catTitle");
 					String poiKey = rankIdRes.getString("poikey");
-					e.putTag("osmwiki", "wiki_place");
 					if (travelElo > 0) {
-						e.putTag("travel_elo", "" + travelElo);
+						e.putTag("osmwiki", "wiki_place");
+						e.putTag("travel_elo", "" + (int) travelElo);
 					}
 					if (qrank > 0) {
 						e.putTag("qrank", "" + qrank);
@@ -127,6 +128,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 						e.putTag("osmand_poi_key", "" + poiKey);
 					}
 				}
+				rankIdRes.close();
 			}
 		} catch (Exception es) {
 			log.error(es.getMessage(), es);
