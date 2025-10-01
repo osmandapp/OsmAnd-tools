@@ -106,6 +106,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					int travelTopic = rankIdRes.getInt("topic");
 					String photoTitle = rankIdRes.getString("photoTitle");
 					String catTitle = rankIdRes.getString("catTitle");
+					String poiKey = rankIdRes.getString("poikey");
 					e.putTag("osmwiki", "wiki_place");
 					if (travelElo > 0) {
 						e.putTag("travel_elo", "" + travelElo);
@@ -121,6 +122,9 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 					}
 					if (!Algorithms.isEmpty(catTitle)) {
 						e.putTag("wiki_category", "" + catTitle);
+					}
+					if (!Algorithms.isEmpty(poiKey)) {
+						e.putTag("osmand_poi_key", "" + poiKey);
 					}
 				}
 			}
