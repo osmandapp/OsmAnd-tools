@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbTagsPreparation;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -24,6 +25,7 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 	private PreparedStatement selectById;
 	private PreparedStatement selectId;
 	private PreparedStatement selectRankById;
+	private TLongHashSet assignedWids = new TLongHashSet();
 
 	public MissingWikiTagsProcessor(String wikidataMappingUrl, String wikirankingUrl) {
 		this.wikidataMappingUrl = wikidataMappingUrl;
@@ -60,8 +62,12 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 				wikidataId = findAndAssignWikidataId(e, wikipedia);
 			}
 			// assign wiki place
-			if (wikidataId != 0 && selectRankById != null) {
-				assignRankingTags(e, wikidataId);
+			// wikidata != null  filter duplicates
+			if (wikidata != null && wikidataId != 0 && selectRankById != null) {
+				boolean added = assignedWids.add(wikidataId);
+				if (added) {
+					assignRankingTags(e, wikidataId);
+				}
 			}
 		} catch (Exception es) {
 			log.error(es.getMessage(), es);
