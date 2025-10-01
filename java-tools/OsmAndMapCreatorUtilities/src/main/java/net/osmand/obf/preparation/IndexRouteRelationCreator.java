@@ -185,6 +185,7 @@ public class IndexRouteRelationCreator {
 
 	protected void collectElevationStatsForWays(List<Way> ways, Map<String, String> tags, IndexCreationContext icc) {
 		int eleCount = 0;
+		double distance = 0;
 		double upHill = 0, downHill = 0, sumEle = 0;
 		double minEle = Double.POSITIVE_INFINITY, maxEle = Double.NEGATIVE_INFINITY;
 
@@ -199,6 +200,7 @@ public class IndexRouteRelationCreator {
 					maxEle = Math.max(maxEle, wg.maxEle);
 					eleCount += wg.eleCount;
 					sumEle += wg.sumEle;
+					distance += wg.dist;
 				}
 			}
 		}
@@ -209,6 +211,7 @@ public class IndexRouteRelationCreator {
 			tags.put("diff_ele_up", String.valueOf((int) upHill));
 			tags.put("diff_ele_down", String.valueOf((int) downHill));
 			tags.put("avg_ele", String.valueOf((int) (sumEle / eleCount)));
+			tags.putIfAbsent("distance", distanceKmFormat.format(distance / 1000.0));
 		}
 	}
 
@@ -280,7 +283,7 @@ public class IndexRouteRelationCreator {
 		}
 
 		if (distance > 0) {
-			tagsToFill.put("distance", distanceKmFormat.format(distance / 1000));
+			tagsToFill.put("distance", distanceKmFormat.format(distance / 1000.0));
 		}
 
 		if (!bbox.hasInitialState()) {
