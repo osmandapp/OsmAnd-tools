@@ -6,6 +6,7 @@ import java.net.URLConnection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -42,96 +43,116 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 
 	private synchronized void syncReadTags(Entity e, String wikidata, String wikipedia) {
 		try {
-			long wikidataId = 0;
 			if (!init()) {
 				return;
 			}
-			if (wikipedia != null && wikidata == null) {
-				int langInd = wikipedia.indexOf(':');
-				String lang = "en";
-				String title = wikipedia;
-				if (langInd >= 0) {
-					lang = wikipedia.substring(0, langInd);
-					title = wikipedia.substring(langInd + 1);
-				}
-				selectId.setString(1, lang);
-				selectId.setString(2, title);
-				ResultSet rs = selectId.executeQuery();
-				if (rs.next()) {
-					wikidataId = rs.getLong(1);
-					e.putTag("wikidata", "Q" + wikidataId);
-				}
-				rs.close();
-			} else if (wikidata != null && wikipedia == null) {
+			if (wikipedia == null && wikidata == null) {
+				return;
+			}
+			long wikidataId;
+			if (wikidata != null) {
 				String ind = wikidata.substring(wikidata.lastIndexOf('Q') + 1);
 				wikidataId = Algorithms.parseLongSilently(ind, 0);
-				if (wikidataId == 0) {
-					return;
+				if (wikidataId != 0 && wikipedia == null) {
+					assignWikipediaTags(e, wikidataId);
 				}
-				selectById.setLong(1, wikidataId);
-				ResultSet rs = selectById.executeQuery();
-				try {
-					String lang = null, title = null;
-					int cntLangs = 0;
-					while (rs.next()) {
-						lang = rs.getString(1);
-						title = rs.getString(2);
-						cntLangs++;
-						if (lang == null) {
-							System.out.println("Null language for " + title + " Q" + wikidataId);
-						}
-						if (lang.length() == 2) { // for main languages length = 2 (wikivoyage > 2)
-							if (lang.equals("en")) {
-								e.putTag("wikipedia", "en:" + title);
-							} else {
-								// ignore 2nd languages as it's too much data and not by OSM standard
-//							e.putTag("wikipedia:" + lang, title);
-							}
-						}
-					}
-					if (cntLangs == 1 && !lang.equals("en")) {
-						e.removeTag("wikipedia:" + lang);
-						e.putTag("wikipedia", lang + ":" + title);
-					}
-				} finally {
-					rs.close();
-				}
+			} else {
+				wikidataId = findAndAssignWikidataId(e, wikipedia);
 			}
 			// assign wiki place
 			if (wikidataId != 0 && selectRankById != null) {
-				selectRankById.setLong(1, wikidataId);
-				ResultSet rankIdRes = selectRankById.executeQuery();
-				if (rankIdRes.next()) {
-					double travelElo = rankIdRes.getDouble("elo");
-					int qrank = rankIdRes.getInt("qrank");
-					int travelTopic = rankIdRes.getInt("topic");
-					String photoTitle = rankIdRes.getString("photoTitle");
-					String catTitle = rankIdRes.getString("catTitle");
-					String poiKey = rankIdRes.getString("poikey");
-					if (travelElo > 0) {
-						e.putTag("osmwiki", "wiki_place");
-						e.putTag("travel_elo", "" + (int) travelElo);
-					}
-					if (qrank > 0) {
-						e.putTag("qrank", "" + qrank);
-					}
-					if (travelTopic > 0) {
-						e.putTag("travel_topic", "" + travelTopic);
-					}
-					if (!Algorithms.isEmpty(photoTitle)) {
-						e.putTag("wiki_photo", "" + photoTitle);
-					}
-					if (!Algorithms.isEmpty(catTitle)) {
-						e.putTag("wiki_category", "" + catTitle);
-					}
-					if (!Algorithms.isEmpty(poiKey)) {
-						e.putTag("osmand_poi_key", "" + poiKey);
-					}
-				}
-				rankIdRes.close();
+				assignRankingTags(e, wikidataId);
 			}
 		} catch (Exception es) {
 			log.error(es.getMessage(), es);
+		}
+	}
+
+
+	private void assignRankingTags(Entity e, long wikidataId) throws SQLException {
+		selectRankById.setLong(1, wikidataId);
+		ResultSet rankIdRes = selectRankById.executeQuery();
+		if (rankIdRes.next()) {
+			double travelElo = rankIdRes.getDouble("elo");
+			int qrank = rankIdRes.getInt("qrank");
+			int travelTopic = rankIdRes.getInt("topic");
+			String photoTitle = rankIdRes.getString("photoTitle");
+			String catTitle = rankIdRes.getString("catTitle");
+			String poiKey = rankIdRes.getString("poikey");
+			if (travelElo > 0) {
+				e.putTag("osmwiki", "wiki_place");
+				e.putTag("travel_elo", "" + (int) travelElo);
+			}
+			if (qrank > 0) {
+				e.putTag("qrank", "" + qrank);
+			}
+			if (travelTopic > 0) {
+				e.putTag("travel_topic", "" + travelTopic);
+			}
+			if (!Algorithms.isEmpty(photoTitle)) {
+				e.putTag("wiki_photo", "" + photoTitle);
+			}
+			if (!Algorithms.isEmpty(catTitle)) {
+				e.putTag("wiki_category", "" + catTitle);
+			}
+			if (!Algorithms.isEmpty(poiKey)) {
+				e.putTag("osmand_poi_key", "" + poiKey);
+			}
+		}
+		rankIdRes.close();
+	}
+
+
+	private long findAndAssignWikidataId(Entity e, String wikipedia) throws SQLException {
+		// wikipedia != null && wikidata == null!
+		int langInd = wikipedia.indexOf(':');
+		String lang = "en";
+		String title = wikipedia;
+		if (langInd >= 0) {
+			lang = wikipedia.substring(0, langInd);
+			title = wikipedia.substring(langInd + 1);
+		}
+		selectId.setString(1, lang);
+		selectId.setString(2, title);
+		ResultSet rs = selectId.executeQuery();
+		long wikidataId = 0;
+		if (rs.next()) {
+			wikidataId = rs.getLong(1);
+			e.putTag("wikidata", "Q" + wikidataId);
+		}
+		rs.close();
+		return wikidataId;
+	}
+
+
+	private void assignWikipediaTags(Entity e, long wikidataId) throws SQLException {
+		selectById.setLong(1, wikidataId);
+		ResultSet rs = selectById.executeQuery();
+		try {
+			String lang = null, title = null;
+			int cntLangs = 0;
+			while (rs.next()) {
+				lang = rs.getString(1);
+				title = rs.getString(2);
+				cntLangs++;
+				if (lang == null) {
+					System.out.println("Null language for " + title + " Q" + wikidataId);
+				}
+				if (lang.length() == 2) { // for main languages length = 2 (wikivoyage > 2)
+					if (lang.equals("en")) {
+						e.putTag("wikipedia", "en:" + title);
+					} else {
+						// ignore 2nd languages as it's too much data and not by OSM standard
+//							e.putTag("wikipedia:" + lang, title);
+					}
+				}
+			}
+			if (cntLangs == 1 && !lang.equals("en")) {
+				e.removeTag("wikipedia:" + lang);
+				e.putTag("wikipedia", lang + ":" + title);
+			}
+		} finally {
+			rs.close();
 		}
 	}
 
