@@ -242,10 +242,9 @@ public class SearchTestController {
 
 	@GetMapping(value = "/runs/{runId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId) throws IOException {
-		Run run = testSearchService.getRun(runId).orElseThrow(() ->
-				new RuntimeException("Run not found with id: " + runId));
-		return ResponseEntity.ok(testSearchService.getRunResults(run.caseId, runId));
+	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId,
+	                                                               @RequestParam(defaultValue = "true") boolean isFull) throws IOException {
+		return ResponseEntity.ok(testSearchService.getRunResults(runId, isFull));
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")

@@ -154,6 +154,10 @@ public class SearchTestService implements ReportService, DataService {
 		return testCaseRepo;
 	}
 
+	public SearchTestRunRepository getTestRunRepo() {
+		return runRepo;
+	}
+
 	public PolyglotEngine getEngine() {
 		return engine;
 	}

@@ -80,14 +80,21 @@ public interface ReportService {
 
 	SearchTestCaseRepository getTestCaseRepo();
 
+	SearchTestRunRepository getTestRunRepo();
+
 	Logger getLogger();
 
-	default List<Map<String, Object>> getRunResults(Long caseId, Long runId) throws IOException {
-		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
-				new RuntimeException("TestCase not found with id: " + caseId));
-		return extendTo(getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId,
-						DISTANCE_LIMIT, caseId), getObjectMapper().readValue(test.allCols, String[].class),
-				getObjectMapper().readValue(test.selCols, String[].class));
+	default List<Map<String, Object>> getRunResults(Long runId, boolean isFull) throws IOException {
+		Run run = getTestRunRepo().findById(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		TestCase test = getTestCaseRepo().findById(run.caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + run.caseId));
+
+		List<Map<String, Object>> list  = isFull ?
+			getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId, DISTANCE_LIMIT, run.caseId) :
+			getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT);
+
+		return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
 	}
 
 	default void downloadCsvResults(Writer writer, Long caseId, Long runId) throws IOException {
@@ -95,12 +102,11 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + caseId));
 
 		List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id",
-						runId, DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class),
-				getObjectMapper().readValue(test.selCols, String[].class));
+						runId, DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class));
 		writeAsCsv(writer, results);
 	}
 
-	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols, String[] selCols) {
+	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
 		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
 		exclude.add("web_type");
@@ -339,7 +345,7 @@ public interface ReportService {
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols, null));
+						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?",
 						String.class, runId));
 			}
