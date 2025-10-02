@@ -261,6 +261,7 @@ public interface DataService extends BaseService {
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
 		String resultPoint = null;
+		boolean found = false;
 		if (firstResult != null) {
 			int dupCount = 0;
 			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
@@ -282,6 +283,8 @@ public interface DataService extends BaseService {
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			row.put("actual_place", actualResult == null ? "-" : actualResult.toPlaceString());
+			
+			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
 			
 			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
 			if (resultFeature.properties != null) {
