@@ -16,7 +16,7 @@ if [ -z "$WEB_SERVER_CONFIG_PATH" ]; then
   export WEB_SERVER_CONFIG_PATH="$(realpath "$CURRENT_DIR/../../../web-server-config")"
 fi
 if [ -z "$MODEL" ]; then
-  export MODEL=or@google/gemini-2.5-flash
+  export MODEL=or@x-ai/grok-4-fast
 fi
 
 export LLM_TIMEOUT=360
