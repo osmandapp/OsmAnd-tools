@@ -270,7 +270,7 @@ public interface DataService extends BaseService {
 				String resName = searchResults.get(bestResult.place() - 1).toString();
 				int dupCount = 0, minPlace = 0;
 				double minDistance = Double.MAX_VALUE;
-				for (int i = firstResult.place(); i < searchResults.size(); i++) {
+				for (int i = firstResult.place() - 1; i < searchResults.size(); i++) {
 					SearchResult candidate = searchResults.get(i);
 					if (resName.equals(candidate.toString())) {
 						double distanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
@@ -278,7 +278,7 @@ public interface DataService extends BaseService {
 						if (minDistance > distanceMeters) {
 							minDistance = distanceMeters;
 							result = candidate;
-							minPlace = i + 1;
+							minPlace = i;
 						}
 						dupCount++;
 					} else
@@ -287,7 +287,7 @@ public interface DataService extends BaseService {
 
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
-					row.put("dup_place", minPlace);
+					row.put("dup_place", minPlace + 1);
 				}
 			}
 
