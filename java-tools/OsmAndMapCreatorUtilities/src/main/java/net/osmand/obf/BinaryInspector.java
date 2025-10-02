@@ -62,18 +62,18 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities", "-vstreetgroups",
-//					"-vstreets", "-vbuildings", "-vintersections",
+					"-vaddress", "-vcities", "-vstreetgroups",
+					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
 //					"-latlon=50.441932,30.510840,0.0005",
-					"-latlon=-19.25783,146.82456,0.05",
+//					"-latlon=-19.25783,146.82456,0.05",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
