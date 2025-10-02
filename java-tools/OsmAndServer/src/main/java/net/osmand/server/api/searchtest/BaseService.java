@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.data.LatLon;
 import net.osmand.server.controllers.pub.GeojsonClasses;
+import net.osmand.util.Algorithms;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -122,11 +123,7 @@ public interface BaseService {
 
 	/**
 	 * Sanitize a value for CSV output so that each record remains a single physical line.
-	 * Replaces newline-like characters (\r, \n, Unicode line/paragraph separators, NEL) and
-	 * other ISO control characters (except TAB) with a space, then collapses repeated spaces.
-	 *
-	 * @param value original string value (may be null)
-	 * @return sanitized value (null if input was null)
+	 * Replaces newline-like and other ISO control characters (except TAB) with a space, then collapses repeated spaces.
 	 */
 	default String sanitizeCsvValue(String value) {
 		if (value == null) {
@@ -153,23 +150,23 @@ public interface BaseService {
 					}
 			}
 		}
-		// Collapse multiple spaces and trim
 		String s = sb.toString();
 		return s.replaceAll(" {2,}", " ").trim();
 	}
 
 	default Path queryOverpass(String query) {
 		Path tempFile;
+		String request = buildOverpassRequest(query);
 		try {
 			String overpassResponse =
-					getWebClient().post().uri("").bodyValue("[out:json][timeout:25];" + query +	";out;")
+					getWebClient().post().uri("").bodyValue(request)
 							.retrieve().bodyToMono(String.class).toFuture().join();
 			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			getLogger().info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 			return tempFile;
 		} catch (Exception e) {
-			getLogger().error("Failed to query data from Overpass for {}", query, e);
+			getLogger().error("Failed to query data from Overpass for {}", request, e);
 			throw new RuntimeException("Failed to query from Overpass", e);
 		}
 	}
@@ -220,6 +217,20 @@ public interface BaseService {
 		return rowCount;
 	}
 
+	/**
+	 * Build a valid Overpass request by normalizing control statements.
+	 * Ensures the request starts with [out:json][timeout:25]; and ends with ;out; without duplicates.
+	 */
+	default String buildOverpassRequest(String rawQuery) {
+		String q = rawQuery == null ? "" : rawQuery.trim();
+		// Strip an existing global [out:...]; prefix to avoid duplication
+		q = q.replaceFirst("^\\[out:[^;]+];\\s*", "");
+		// Strip a trailing ;out; to avoid duplication
+		q = q.replaceFirst(";\\s*out\\s*;?\\s*$", "");
+		// Expand Overpass Turbo macros if present
+		return "[out:json][timeout:25];" + q + ";out;";
+	}
+
 	default Map<String, Integer> browseCsvFiles() throws IOException {
 		Map<String, Integer> fileRowCounts = new HashMap<>();
 		try (Stream<Path> paths = Files.walk(Path.of(getCsvDownloadingDir()))) {
@@ -247,5 +258,13 @@ public interface BaseService {
 				throw new RuntimeException("Failed to count rows in CSV file", e);
 			}
 		});
+	}
+
+	default String getSystemBranch() {
+		String branch = System.getenv("SYSTEM_BRANCH");
+		if (Algorithms.isEmpty(branch)) {
+			branch = "master";
+		}
+		return branch;
 	}
 }

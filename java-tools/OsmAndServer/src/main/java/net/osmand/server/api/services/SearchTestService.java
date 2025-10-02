@@ -8,13 +8,12 @@ import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
-import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,25 +42,11 @@ public class SearchTestService implements ReportService, DataService {
 	 * Lightweight DTO for listing test-cases with parent dataset name.
 	 */
 	public static class TestCaseItem {
-		public Long id;
-		public String name;
-		public String labels;
-		public Long datasetId;
-		public String datasetName;
-		public Long lastRunId;
-		public String status;
-		public LocalDateTime updated;
-		public String error;
-		public long total;
-		public long failed;
-		public long duration;
-
 		public TestCaseItem() {
 		}
-
 		public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-							Long lastRunId, String status, LocalDateTime updated, String error,
-							long total, long failed, long duration) {
+		                    Long lastRunId, String status, LocalDateTime updated, String error,
+		                    long total, long failed, long duration) {
 			this.id = id;
 			this.name = name;
 			this.labels = labels;
@@ -75,6 +60,18 @@ public class SearchTestService implements ReportService, DataService {
 			this.failed = failed;
 			this.duration = duration;
 		}
+		public Long id;
+		public String name;
+		public String labels;
+		public Long datasetId;
+		public String datasetName;
+		public Long lastRunId;
+		public String status;
+		public LocalDateTime updated;
+		public String error;
+		public long total;
+		public long failed;
+		public long duration;
 	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
@@ -90,7 +87,8 @@ public class SearchTestService implements ReportService, DataService {
 	private SearchTestCaseRepository testCaseRepo;
 	@Autowired
 	private SearchTestRunRepository runRepo;
-	@Autowired @Qualifier("searchTestJdbcTemplate")
+	@Autowired
+	@Qualifier("searchTestJdbcTemplate")
 	private JdbcTemplate jdbcTemplate;
 
 	@Value("${searchtest.csv.dir}")
@@ -99,14 +97,8 @@ public class SearchTestService implements ReportService, DataService {
 	private String webServerConfigDir;
 	@Value("${overpass.url}")
 	private String overpassApiUrl;
-	private final SearchService searchService;
 	@Autowired
 	private PolyglotEngine engine;
-
-	@Autowired
-	public SearchTestService(SearchService searchService) {
-		this.searchService = searchService;
-	}
 
 	@PostConstruct
 	protected void init() {
@@ -162,6 +154,10 @@ public class SearchTestService implements ReportService, DataService {
 		return testCaseRepo;
 	}
 
+	public SearchTestRunRepository getTestRunRepo() {
+		return runRepo;
+	}
+
 	public PolyglotEngine getEngine() {
 		return engine;
 	}
@@ -210,6 +206,22 @@ public class SearchTestService implements ReportService, DataService {
 			}
 			return testCaseRepo.save(test);
 		});
+	}
+
+	public CompletableFuture<Run> rerun(Long runId) {
+		Run run = runRepo.findById(runId)
+				.orElseThrow(() -> new RuntimeException("Run not found with id: " + runId));
+
+		RunParam param = new RunParam();
+		param.name = getSystemBranch();
+		param.average = run.average;
+		param.locale = run.locale;
+		param.setNorthWest(run.getNorthWest());
+		param.setSouthEast(run.getSouthEast());
+		param.lat = run.lat;
+		param.lon = run.lon;
+
+		return runTestCase(run.caseId, param);
 	}
 
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
@@ -264,40 +276,25 @@ public class SearchTestService implements ReportService, DataService {
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private static LatLon getAveragePoint(List<Map<String, Object>> rows) {
-		double sumLat = 0.0, sumLon = 0.0;
-		for (Map<String, Object> r : rows) {
-			Object latObj = r.get("lat");
-			Object lonObj = r.get("lon");
-			if (latObj instanceof Double lat && lonObj instanceof Double lon) {
-				sumLat += lat; sumLon += lon;
-			}
-		}
-		double roundedLat = BigDecimal.valueOf(sumLat /
-				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
-		double roundedLon = BigDecimal.valueOf(sumLon /
-				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
-		return new LatLon(roundedLat, roundedLon);
-	}
-
 	private void run(Run run) {
 		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY" +
-						" id", run.caseId);
+				" id", run.caseId);
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			if (rows.isEmpty())
 				return;
 
-			LatLon srcPoint = null;	String[] srcBbox = null;
+			LatLon srcPoint = null;
+			String[] srcBbox = null;
 			if (run.lat != null && run.lon != null)
 				srcPoint = new LatLon(run.lat, run.lon);
 			else if (run.average != null && run.average)
 				srcPoint = getAveragePoint(rows);
 			if (srcPoint != null) {
 				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
-						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[] {
-					String.format(Locale.US, "%f, %f",srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
-					String.format(Locale.US, "%f, %f",srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
+						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
 			}
 
 			for (Map<String, Object> row : rows) {
@@ -323,9 +320,9 @@ public class SearchTestService implements ReportService, DataService {
 
 				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
-				String[] bbox = srcBbox != null ? srcBbox : new String[] {
-					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
-					String.format(Locale.US, "%f, %f",searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
+				String[] bbox = srcBbox != null ? srcBbox : new String[]{
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
 					List<SearchResult> searchResults = Collections.emptyList();
 					if (query != null && !query.trim().isEmpty())
@@ -337,7 +334,7 @@ public class SearchTestService implements ReportService, DataService {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
 					saveRunResults(genRow, gen_id, count, run, query, Collections.emptyList(), targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
-							e.getMessage() == null ? e.toString() :	e.getMessage());
+							e.getMessage() == null ? e.toString() : e.getMessage());
 				}
 			}
 			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
@@ -455,5 +452,28 @@ public class SearchTestService implements ReportService, DataService {
 
 	public Optional<Run> getRun(Long id) {
 		return runRepo.findById(id);
+	}
+	private final SearchService searchService;
+
+	@Autowired
+	public SearchTestService(SearchService searchService) {
+		this.searchService = searchService;
+	}
+
+	private static LatLon getAveragePoint(List<Map<String, Object>> rows) {
+		double sumLat = 0.0, sumLon = 0.0;
+		for (Map<String, Object> r : rows) {
+			Object latObj = r.get("lat");
+			Object lonObj = r.get("lon");
+			if (latObj instanceof Double lat && lonObj instanceof Double lon) {
+				sumLat += lat;
+				sumLon += lon;
+			}
+		}
+		double roundedLat = BigDecimal.valueOf(sumLat /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		double roundedLon = BigDecimal.valueOf(sumLon /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		return new LatLon(roundedLat, roundedLon);
 	}
 }

@@ -4,6 +4,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.Building;
 import net.osmand.data.QuadRect;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -55,13 +56,13 @@ public class MapDataObjectFinder {
 		return tags;
 	}
 
-	public Result[] find(List<SearchResult> searchResults, long datasetId) {
+	public Result[] find(List<SearchResult> searchResults, long datasetId, Map<String, Object> row) {
 		int resPlace = 1;
 		Result firstResult = null, firstByTag = null, firstByDist = null;
 		for (SearchResult res : searchResults) {
 			Object wt = res.objectType;
 			if (wt != null && !"LOCATION".equals(wt.toString())) {
-				Result currResult = getMapDataObject(res, datasetId, resPlace);
+				Result currResult = getMapDataObject(res, datasetId, resPlace, row);
 
 				if (firstResult == null)
 					firstResult = currResult;
@@ -74,6 +75,11 @@ public class MapDataObjectFinder {
 			}
 			resPlace++;
 		}
+		if (firstResult != null && firstResult.searchResult() != null && firstResult.searchResult().object instanceof Building b) {
+			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
+				row.put("interpolation", b.toString());
+		}
+
 		if (firstByTag != null) {
 			return new Result[] {firstResult, firstByTag};
 		}
@@ -83,10 +89,11 @@ public class MapDataObjectFinder {
 		return new Result[] {firstResult, null};
 	}
 
-	public Result getMapDataObject(SearchResult result, long expectedOsmId, int place) {
+	public Result getMapDataObject(SearchResult result, long expectedOsmId, int place, Map<String, Object> row) {
 		if (result.location == null || result.localeName == null || result.file == null)
 			return new Result(ResultType.Error, null, place, result);
 
+		final String[] byTag = {null};
 		final BinaryMapDataObject[] byDist = {null}, byId = {null};
 		QuadRect quad = MapUtils.calculateLatLonBbox(result.location.getLatitude(), result.location.getLongitude(), 100);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
@@ -112,7 +119,10 @@ public class MapDataObjectFinder {
 							return false;
 
 						String value = tags.get(tag);
-						return value != null && value.startsWith(result.localeName);
+						boolean matches = value != null && value.startsWith(result.localeName);
+						if (matches)
+							byTag[0] = tag + "=" + value;
+						return matches;
 					}
 
 					@Override
@@ -127,10 +137,13 @@ public class MapDataObjectFinder {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+
+		if (byId[0] != null)
+			return new Result(ResultType.ById, byId[0], place, result);
+
 		if (!found.isEmpty()) {
-			return byId[0] != null ?
-					new Result(ResultType.ById, byId[0], place, result) :
-					new Result(ResultType.ByTag, found.get(0), place, result);
+			row.put("by_tag", byTag[0]);
+			return new Result(ResultType.ByTag, found.get(0), place, result);
 		}
 		return new Result(ResultType.ByDist, byDist[0], place, result);
 	}

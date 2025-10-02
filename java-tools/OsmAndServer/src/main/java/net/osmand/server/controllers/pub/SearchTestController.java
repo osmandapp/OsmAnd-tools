@@ -6,7 +6,6 @@ import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
-import net.osmand.util.Algorithms;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
@@ -24,7 +23,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -125,6 +126,12 @@ public class SearchTestController {
 		return testSearchService.cancelRun(runId).thenApply(ResponseEntity::ok);
 	}
 
+	@PostMapping(value = "/runs/{runId}/rerun", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public CompletableFuture<ResponseEntity<Run>> rerun(@PathVariable Long runId) {
+		return testSearchService.rerun(runId).thenApply(ResponseEntity::ok);
+	}
+
 	@DeleteMapping(value = "/cases/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Void>> deleteTestCase(@PathVariable Long id) {
@@ -158,9 +165,13 @@ public class SearchTestController {
 	public void getDatasetSample(@PathVariable Long datasetId, HttpServletResponse response) throws IOException {
 		try {
 			String csvData = testSearchService.getDatasetSample(datasetId);
-			response.setContentType("text/csv");
+			response.setContentType("text/csv; charset=UTF-8");
+			response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 			response.setHeader("Content-Disposition", "attachment; filename=\"sample.csv\"");
-			response.getWriter().write(csvData);
+			try (OutputStreamWriter w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+				w.write(csvData);
+				w.flush();
+			}
 		} catch (RuntimeException e) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
 		}
@@ -216,8 +227,16 @@ public class SearchTestController {
 	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId) {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		return testSearchService.getRunReport(caseId, tc.lastRunId)
+		return testSearchService.getRunStatus(caseId, tc.lastRunId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Run> getRun(@PathVariable Long runId) {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		return ResponseEntity.ok(run);
 	}
 
 	@GetMapping(value = "/runs/{runId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -225,8 +244,41 @@ public class SearchTestController {
 	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId) {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		return testSearchService.getRunReport(run.caseId, runId)
+		return testSearchService.getRunStatus(run.caseId, runId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId,
+	                                                               @RequestParam(defaultValue = "true") boolean isFull) throws IOException {
+		return ResponseEntity.ok(testSearchService.getRunResults(runId, isFull));
+	}
+
+	@GetMapping(value = "/runs/{runId}/download")
+	public void downloadRunReport(@PathVariable Long runId,
+								  HttpServletResponse response) throws IOException {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		response.setContentType("text/csv; charset=UTF-8");
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadCsvResults(writer, run.caseId, runId);
+		}
+	}
+
+	@GetMapping(value = "/cases/{caseId}/download")
+	public void downloadTestCaseReport(@PathVariable Long caseId,
+									   HttpServletResponse response) throws IOException {
+		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+		response.setContentType("text/csv; charset=UTF-8");
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadCsvResults(writer, caseId, tc.lastRunId);
+		}
 	}
 
 	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -237,52 +289,10 @@ public class SearchTestController {
 		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
 	}
 
-	@GetMapping(value = "/runs/{runId}/download")
-	public void downloadRunReport(@PathVariable Long runId,
-								  @RequestParam(defaultValue = "csv") String format,
-								  HttpServletResponse response) throws IOException {
-		Run run = testSearchService.getRun(runId).orElseThrow(() ->
-				new RuntimeException("Run not found with id: " + runId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
-		response.setContentType(contentType);
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), run.caseId, runId, format);
-	}
-
-	@GetMapping(value = "/cases/{caseId}/download")
-	public void downloadTestCaseReport(@PathVariable Long caseId,
-									   @RequestParam(defaultValue = "csv") String format,
-									   HttpServletResponse response) throws IOException {
-		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
-				new RuntimeException("TestCase not found with id: " + caseId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
-		response.setContentType(contentType);
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), caseId, tc.lastRunId, format);
-	}
-
-	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<String[]> getLabels() {
-		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
-	}
-	
-	public String getSystemBranch() {
-		String branch = System.getenv("SYSTEM_BRANCH");
-		if (Algorithms.isEmpty(branch)) {
-			branch = "master";
-		}
-		return branch;
-	}
-
 	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<String>> getBranches() {
-//		return ResponseEntity.ok(testSearchService.getBranches());
-		return ResponseEntity.ok(Arrays.asList(getSystemBranch()));
-		
+		return ResponseEntity.ok(Collections.singletonList(testSearchService.getSystemBranch()));
 	}
 
 

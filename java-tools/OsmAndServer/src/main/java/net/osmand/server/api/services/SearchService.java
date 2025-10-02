@@ -129,20 +129,13 @@ public class SearchService {
 		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast);
 
 		List<Feature> features = new ArrayList<>();
-		if (res != null) {
-			if (!res.isEmpty()) {
-				res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
-				res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
-				saveSearchResult(res, features);
-			}
+		if (res != null && !res.isEmpty()) {
+			saveSearchResult(res, features);
 		}
 
-		if (!features.isEmpty()) {
-			return features;
-		} else {
-			return Collections.emptyList();
-		}
+		return !features.isEmpty() ? features : Collections.emptyList();
 	}
+
     public List<SearchResult> searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
@@ -173,7 +166,11 @@ public class SearchService {
             
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
-			return resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
+
+	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
+	        res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
+	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
+			return res;
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
