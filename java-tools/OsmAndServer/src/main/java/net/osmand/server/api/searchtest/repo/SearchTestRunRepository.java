@@ -40,11 +40,11 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		public Long datasetId;
 
 		// Relationships (read-only mappings to parent entities)
-		@ManyToOne(fetch = FetchType.LAZY)
+		@ManyToOne(fetch = FetchType.EAGER)
 		@JoinColumn(name = "case_id", referencedColumnName = "id", insertable = false, updatable = false)
 		public TestCase testCase;
 
-		@ManyToOne(fetch = FetchType.LAZY)
+		@ManyToOne(fetch = FetchType.EAGER)
 		@JoinColumn(name = "dataset_id", referencedColumnName = "id", insertable = false, updatable = false)
 		public Dataset dataset;
 
