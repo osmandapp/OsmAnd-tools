@@ -1,150 +1,131 @@
 package net.osmand.server.api.searchtest;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.Building;
-import net.osmand.data.QuadRect;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
-import net.osmand.util.MapUtils;
-import org.jetbrains.annotations.NotNull;
-
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.jetbrains.annotations.NotNull;
+
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.ObfConstants;
+import net.osmand.data.Building;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+
 public class MapDataObjectFinder {
 	public enum ResultType {
+		Best,
 		ById,
 		ByTag,
 		ByDist,
 		Error
 	}
 
-	public record Result(ResultType type, BinaryMapDataObject object, int place, SearchResult searchResult) {
+	public record Result(ResultType type, BinaryMapDataObject exact, int place, SearchResult searchResult) {
+		
 		@NotNull
 		public String toIdString() {
-			long id = object == null ? -1 : object.getId();
-			if (id > 0)
-				return String.valueOf(id / 128);
+			if (exact != null) {
+				return ObfConstants.getOsmObjectId(exact) + "";
+			}
+			if (searchResult.object instanceof MapObject) {
+				MapObject mo = (MapObject) searchResult.object;
+				return ObfConstants.getOsmObjectId(mo) + "";
+			}
 			return "";
 		}
+		
 		public String toPlaceString() {
 			return place + " - " + type();
 		}
 	}
 
-	private Map<String, String> getTags(BinaryMapDataObject obj) {
-		Map<String, String> tags = new HashMap<>();
-
-		TIntObjectHashMap<String> names = obj.getObjectNames();
-		int[] keys = names.keys();
-		for (int key : keys) {
-			BinaryMapIndexReader.TagValuePair pair = obj.getMapIndex().decodeType(key);
-			if (pair == null)
-				continue;
-
-			String v = names.get(key);
-			if (v != null) {
-				tags.put(pair.tag, v);
-			}
-
-		}
-		return tags;
-	}
-
-	public Result[] find(List<SearchResult> searchResults, long datasetId, Map<String, Object> row) {
+	
+	public Result[] find(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
+		int DIST_THRESHOLD_M = 20;
+		double closestDist = DIST_THRESHOLD_M;
+		Result firstResult = null, actualResult = null, firstByDist = null, firstByTag = null;
 		int resPlace = 1;
-		Result firstResult = null, firstByTag = null, firstByDist = null;
-		for (SearchResult res : searchResults) {
-			Object wt = res.objectType;
-			if (wt != null && !"LOCATION".equals(wt.toString())) {
-				Result currResult = getMapDataObject(res, datasetId, resPlace, row);
-
-				if (firstResult == null)
-					firstResult = currResult;
-				if (currResult.type() == MapDataObjectFinder.ResultType.ById)
-					return new Result[] {firstResult, currResult};
-				if (currResult.type() == MapDataObjectFinder.ResultType.ByTag && firstByTag == null)
-					firstByTag = currResult;
-				if (currResult.type() == MapDataObjectFinder.ResultType.ByDist && firstByDist == null)
-					firstByDist = currResult;
+		for (SearchResult sr : searchResults) {
+			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType && firstResult == null) {
+				firstResult = new Result(ResultType.Best, null, resPlace, sr);
+				break;
 			}
 			resPlace++;
 		}
-		if (firstResult != null && firstResult.searchResult() != null && firstResult.searchResult().object instanceof Building b) {
-			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null)
+		if (firstResult == null) {
+			return new Result[] { firstResult, actualResult };
+		}
+
+		if (firstResult.searchResult().object instanceof Building b) {
+			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null) {
 				row.put("interpolation", b.toString());
+			}
 		}
-
-		if (firstByTag != null) {
-			return new Result[] {firstResult, firstByTag};
-		}
-		if (firstByDist != null) {
-			return new Result[] {firstResult, firstByDist};
-		}
-		return new Result[] {firstResult, null};
-	}
-
-	public Result getMapDataObject(SearchResult result, long expectedOsmId, int place, Map<String, Object> row) {
-		if (result.location == null || result.localeName == null || result.file == null)
-			return new Result(ResultType.Error, null, place, result);
-
-		final String[] byTag = {null};
-		final BinaryMapDataObject[] byDist = {null}, byId = {null};
-		QuadRect quad = MapUtils.calculateLatLonBbox(result.location.getLatitude(), result.location.getLongitude(), 100);
+		// Retrieve target map binary object - unnecessary step if store all tags earlier
+		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
-				MapUtils.get31TileNumberX(quad.left),
-				MapUtils.get31TileNumberX(quad.right),
-				MapUtils.get31TileNumberY(quad.top),
-				MapUtils.get31TileNumberY(quad.bottom), 16, null, new ResultMatcher<>() {
+				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
+				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+				new ResultMatcher<>() {
 
 					@Override
 					public boolean publish(BinaryMapDataObject obj) {
-						if (obj.getId() != -1 && byDist[0] == null)
-							byDist[0] = obj;
-
-						if (obj.getId() / 128 == expectedOsmId) {
-							byId[0] = obj;
-							return true;
-						}
-
-						// Use address tags to match SearchResult types against BinaryMapDataObject names
-						String tag = ObjectType.HOUSE.equals(result.objectType) ? "addr:housenumber" : "name";
-						Map<String, String> tags = getTags(obj);
-						if (tags.isEmpty())
+						if(ObfConstants.getOsmObjectId(obj) != datasetId) {
 							return false;
-
-						String value = tags.get(tag);
-						boolean matches = value != null && value.startsWith(result.localeName);
-						if (matches)
-							byTag[0] = tag + "=" + value;
-						return matches;
+						}
+						return true;
 					}
 
 					@Override
 					public boolean isCancelled() {
-						return byId[0] != null;
+						return false;
 					}
 				});
-
-		List<BinaryMapDataObject> found;
-		try {
-			found = result.file.searchMapIndex(request);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
+		BinaryMapDataObject srcObj = null;
+		List<BinaryMapDataObject> res = firstResult.searchResult.file.searchMapIndex(request);
+		if (res.size() > 0) {
+			srcObj = res.get(0);
 		}
-
-		if (byId[0] != null)
-			return new Result(ResultType.ById, byId[0], place, result);
-
-		if (!found.isEmpty()) {
-			row.put("by_tag", byTag[0]);
-			return new Result(ResultType.ByTag, found.get(0), place, result);
+		
+		// Find closest by distance by id & by tags 
+		resPlace = 1;
+		for (SearchResult sr : searchResults) {
+			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == datasetId) {
+				actualResult = new Result(ResultType.ById, null, resPlace, sr);
+				break;
+			} else if (sr.object instanceof BinaryMapDataObject bo && actualResult == null && ObfConstants.getOsmObjectId(bo) == datasetId) {
+				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
+				break;
+			} else if (srcObj != null && firstByTag == null && sr.object instanceof Building b) {
+				// only do matching by tags for object that we know don't store id like Building
+				String hno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
+				if (Algorithms.objectEquals(hno, b.getName())) {
+					firstByTag = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+				}
+			}
+			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist) {
+				firstByDist = new Result(ResultType.ByDist, null, resPlace, sr);
+				closestDist = MapUtils.getDistance(sr.location, targetPoint);
+			}
+			resPlace++;
 		}
-		return new Result(ResultType.ByDist, byDist[0], place, result);
+		
+		if (actualResult == null) {
+			actualResult = firstByTag;
+		}
+		if (actualResult == null) {
+			actualResult = firstByDist;
+		}
+		return new Result[] {firstResult, actualResult};
 	}
+
 }

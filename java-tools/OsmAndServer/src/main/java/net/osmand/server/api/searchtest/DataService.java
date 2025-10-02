@@ -1,7 +1,5 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.data.Building;
 import net.osmand.data.LatLon;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -260,7 +258,7 @@ public interface DataService extends BaseService {
 		Map<String, Object> row = new LinkedHashMap<>();
 		if (searchPoint != null && !searchResults.isEmpty()) {
 			// Pick the first non-LOCATION object; fallback to the first result if all are LOCATION
-			Result[] found = finder.find(searchResults, datasetId, row);
+			Result[] found = finder.find(searchResults, targetPoint, datasetId, row);
 			Result firstResult = found[0];
 			SearchResult result = firstResult.searchResult();
 			resPlace = firstResult.place();
