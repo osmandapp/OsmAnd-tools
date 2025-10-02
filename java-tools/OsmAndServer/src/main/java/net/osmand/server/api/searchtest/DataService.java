@@ -269,8 +269,9 @@ public interface DataService extends BaseService {
 			if (firstResult != bestResult && bestResult.type() == MapDataObjectFinder.ResultType.ById) {
 				String resName = searchResults.get(bestResult.place() - 1).toString();
 				int dupCount = 0, minPlace = 0;
-				double minDistance = Double.MAX_VALUE;
-				for (int i = firstResult.place() - 1; i < searchResults.size(); i++) {
+				double minDistance = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
+						result.location.getLatitude(), result.location.getLongitude());
+				for (int i = firstResult.place(); i < searchResults.size(); i++) {
 					SearchResult candidate = searchResults.get(i);
 					if (resName.equals(candidate.toString())) {
 						double distanceMeters = MapUtils.getDistance(targetPoint.getLatitude(), targetPoint.getLongitude(),
