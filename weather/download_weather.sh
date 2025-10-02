@@ -107,7 +107,7 @@ download() {
       echo
       echo "Download failed with code $HTTP_CODE ($URL) [$START_BYTE_OFFSET]-[$END_BYTE_OFFSET]"
       echo
-      cat "$INTERMEDIATE"
+      cat "$INTERMEDIATE" || true
       echo
       rm -vf "$INTERMEDIATE"
     fi
