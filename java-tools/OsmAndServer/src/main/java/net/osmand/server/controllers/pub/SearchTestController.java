@@ -231,6 +231,14 @@ public class SearchTestController {
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
+	@GetMapping(value = "/runs/{runId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Run> getRun(@PathVariable Long runId) {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		return ResponseEntity.ok(run);
+	}
+
 	@GetMapping(value = "/runs/{runId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId) {
