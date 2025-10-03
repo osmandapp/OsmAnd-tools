@@ -52,7 +52,7 @@ public class MapDataObjectFinder {
 	public Result[] find(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
 		int DIST_THRESHOLD_M = 20;
 		double closestDist = DIST_THRESHOLD_M;
-		Result firstResult = null, actualResult = null, firstByDist = null, firstByTag = null;
+		Result firstResult = null, actualResult = null, actualByDist = null, actualByTag = null;
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {
 			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType && firstResult == null) {
@@ -105,25 +105,25 @@ public class MapDataObjectFinder {
 			} else if (sr.object instanceof BinaryMapDataObject bo && actualResult == null && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
-			} else if (srcObj != null && firstByTag == null && sr.object instanceof Building b) {
+			} else if (srcObj != null && actualByTag == null && sr.object instanceof Building b) {
 				// only do matching by tags for object that we know don't store id like Building
 				String hno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 				if (Algorithms.objectEquals(hno, b.getName())) {
-					firstByTag = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+					actualByTag = new Result(ResultType.ByTag, srcObj, resPlace, sr);
 				}
 			}
 			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist) {
-				firstByDist = new Result(ResultType.ByDist, null, resPlace, sr);
+				actualByDist = new Result(ResultType.ByDist, null, resPlace, sr);
 				closestDist = MapUtils.getDistance(sr.location, targetPoint);
 			}
 			resPlace++;
 		}
 		
 		if (actualResult == null) {
-			actualResult = firstByTag;
+			actualResult = actualByTag;
 		}
 		if (actualResult == null) {
-			actualResult = firstByDist;
+			actualResult = actualByDist;
 		}
 		return new Result[] {firstResult, actualResult};
 	}
