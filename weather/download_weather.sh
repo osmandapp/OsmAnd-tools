@@ -32,7 +32,7 @@ GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mea
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
 ECMWF_BANDS_FULL_NAMES=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tp" "10u" "10v")
+ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tprate" "10u" "10v")
 ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-3600} # 60 hours (temporary due ECMWF old data available, default 1800 - 30 hours)
@@ -332,7 +332,12 @@ split_tiles() {
         mkdir -p ${JOINED_TIFF_NAME}
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 12 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        # Only disable statistics warning for ECMWF processing (which has dummy bands)
+        if [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
+            "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 12 --disableStatWarning ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        else
+            "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 12 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        fi
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
@@ -468,7 +473,8 @@ get_raw_ecmwf_files() {
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
             for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
                 # Parse from index file start and end byte offset for needed band
-                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
+                # Match exact JSON param value, e.g. "param":"2t" (avoid matching mx2t3)
+                local CHANNEL_LINE=$( grep -E '"param"\s*:\s*"'"${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}"'"' "$DOWNLOAD_FOLDER/$FILETIME.index" )
                 if [[ -z "$CHANNEL_LINE" ]]; then
                     echo
                     cat $DOWNLOAD_FOLDER/$FILETIME.index
