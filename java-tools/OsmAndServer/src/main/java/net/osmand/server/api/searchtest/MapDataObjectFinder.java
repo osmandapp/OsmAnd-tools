@@ -99,7 +99,7 @@ public class MapDataObjectFinder {
 
 	private static final int DIST_THRESHOLD_M = 20;
 
-	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
+	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
 		Result actualResult = null, actualByDist = null, actualByTag = null;
 		double closestDist = DIST_THRESHOLD_M;
 		int resPlace;

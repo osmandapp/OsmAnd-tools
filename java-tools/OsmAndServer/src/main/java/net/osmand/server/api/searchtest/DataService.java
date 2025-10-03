@@ -253,7 +253,7 @@ public interface DataService extends BaseService {
 		}
 		Map<String, Object> row = new LinkedHashMap<>();
 		Result firstResult = finder.findFirstResult(searchResults, targetPoint, genRow);
-		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, genRow);
+		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId);
 		
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
