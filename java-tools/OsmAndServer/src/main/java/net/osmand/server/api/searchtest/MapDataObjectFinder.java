@@ -101,7 +101,7 @@ public class MapDataObjectFinder {
 
 	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
 		Result actualResult = null, actualByDist = null, actualByTag = null;
-		double closestDist = DIST_THRESHOLD_M;
+		double closestDist = 100; // needed by deduplicate for interpolation 
 		int resPlace;
 		// Retrieve target map binary object - unnecessary step if store all tags earlier
 		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
