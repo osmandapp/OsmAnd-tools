@@ -47,8 +47,10 @@ class WeatherGeoTiffSlicer(object):
             help="Base zoom.")
         p.add_option("--extraPoints", dest="extraPoints", type="int",
             help="Extra points.")
+        p.add_option("--disableStatWarning", action="store_true", dest="disableStatWarning",
+            help="Disable statistics warnings for bands with no valid pixels.")
 
-        p.set_defaults(verbose=False, zoom=4, tileSize=256, extraPoints=2)
+        p.set_defaults(verbose=False, zoom=4, tileSize=256, extraPoints=2, disableStatWarning=False)
 
         self.parser = p
 
@@ -146,7 +148,18 @@ class WeatherGeoTiffSlicer(object):
                     projWin=[minLon, minLat, maxLon, maxLat],
                     stats=True,
                 )
+                
+                if self.options.disableStatWarning:
+                    def suppress_stats_warning_handler(err_class, err_num, err_msg):
+                        if "Failed to compute statistics, no valid pixels found in sampling" not in err_msg:
+                            print(f"GDAL Error: {err_msg}")
+                    
+                    gdal.PushErrorHandler(suppress_stats_warning_handler)
+                
                 geoTileDS = gdal.Translate(geoTileOutputFile, inputDataset, options=translateOptions)
+                
+                if self.options.disableStatWarning:
+                    gdal.PopErrorHandler()
                 geoTileDS = None
 
         inputDataset = None
