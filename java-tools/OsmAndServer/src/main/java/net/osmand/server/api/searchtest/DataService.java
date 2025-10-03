@@ -299,6 +299,7 @@ public interface DataService extends BaseService {
 				}
 			}
 		}
+		row.put("found", found);
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
 				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp) " +
