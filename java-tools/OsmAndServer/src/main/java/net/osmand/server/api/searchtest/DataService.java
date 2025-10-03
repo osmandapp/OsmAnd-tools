@@ -252,8 +252,8 @@ public interface DataService extends BaseService {
 			datasetId = -1;
 		}
 		Map<String, Object> row = new LinkedHashMap<>();
-		Result firstResult = finder.findFirstResult(searchResults, targetPoint, datasetId, genRow);
-		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, genRow);
+		Result firstResult = finder.findFirstResult(searchResults, targetPoint, genRow);
+		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId);
 		
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
@@ -275,11 +275,15 @@ public interface DataService extends BaseService {
 			LatLon resPoint = firstResult.searchResult().location;
 			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
 			distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
-			
-			row.put("dup_count", dupCount);
+
+			if (dupCount > 0)
+				row.put("dup_count", dupCount);
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
-			row.put("actual_place", actualResult == null ? "-" : actualResult.toPlaceString());
+			if (actualResult != null) {
+				row.put("actual_place", actualResult.toPlaceString());
+				row.put("actual_id", actualResult.toIdString());
+			}
 			
 			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
 			
@@ -296,11 +300,10 @@ public interface DataService extends BaseService {
 				}
 			}
 		}
-		row.put("found", found);
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp) " +
-				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = getObjectMapper().writeValueAsString(row);
 		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
@@ -309,7 +312,7 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
-				new java.sql.Timestamp(System.currentTimeMillis()));
+				new java.sql.Timestamp(System.currentTimeMillis()), found);
 	}
 
 	/**

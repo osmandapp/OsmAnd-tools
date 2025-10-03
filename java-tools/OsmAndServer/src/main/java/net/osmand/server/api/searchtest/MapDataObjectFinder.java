@@ -33,14 +33,13 @@ public class MapDataObjectFinder {
 		
 		@NotNull
 		public String toIdString() {
+			long id = -1;
 			if (exact != null) {
-				return ObfConstants.getOsmObjectId(exact) + "";
+				id = ObfConstants.getOsmObjectId(exact);
+			} else if (searchResult.object instanceof MapObject mo) {
+				id =  ObfConstants.getOsmObjectId(mo);
 			}
-			if (searchResult.object instanceof MapObject) {
-				MapObject mo = (MapObject) searchResult.object;
-				return ObfConstants.getOsmObjectId(mo) + "";
-			}
-			return "";
+			return id > 0 ? id + "" : "";
 		}
 		
 		public String toPlaceString() {
@@ -49,11 +48,11 @@ public class MapDataObjectFinder {
 	}
 
 	
-	public Result findFirstResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
+	public Result findFirstResult(List<SearchResult> searchResults, LatLon targetPoint, Map<String, Object> row) throws IOException {
 		Result firstResult = null;
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {
-			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType && firstResult == null) {
+			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType) {
 				firstResult = new Result(ResultType.Best, null, resPlace, sr);
 				break;
 			}
@@ -65,7 +64,7 @@ public class MapDataObjectFinder {
 					row.put("interpolation", b.toString());
 				}
 				// try to calculate precise id for first result 
-				QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), 20);
+				QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
 				BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
 						MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
 						MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
@@ -98,8 +97,9 @@ public class MapDataObjectFinder {
 	}
 
 
-	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
-		int DIST_THRESHOLD_M = 20;
+	private static final int DIST_THRESHOLD_M = 20;
+
+	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
 		Result actualResult = null, actualByDist = null, actualByTag = null;
 		double closestDist = DIST_THRESHOLD_M;
 		int resPlace;
@@ -112,10 +112,7 @@ public class MapDataObjectFinder {
 
 					@Override
 					public boolean publish(BinaryMapDataObject obj) {
-						if(ObfConstants.getOsmObjectId(obj) != datasetId) {
-							return false;
-						}
-						return true;
+						return ObfConstants.getOsmObjectId(obj) == datasetId;
 					}
 
 					@Override
@@ -127,7 +124,7 @@ public class MapDataObjectFinder {
 		for (SearchResult sr : searchResults) {
 			if (sr.file != null) {
 				List<BinaryMapDataObject> res = sr.file.searchMapIndex(request);
-				if (res.size() > 0) {
+				if (!res.isEmpty()) {
 					srcObj = res.get(0);
 				}
 				break;
@@ -141,14 +138,15 @@ public class MapDataObjectFinder {
 			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == datasetId) {
 				actualResult = new Result(ResultType.ById, null, resPlace, sr);
 				break;
-			} else if (sr.object instanceof BinaryMapDataObject bo && actualResult == null && ObfConstants.getOsmObjectId(bo) == datasetId) {
+			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
-			} else if (srcObj != null && actualByTag == null && sr.object instanceof Building b) {
+			} else if (srcObj != null && sr.object instanceof Building b) {
 				// only do matching by tags for object that we know don't store id like Building
 				String hno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 				if (Algorithms.objectEquals(hno, b.getName())) {
 					actualByTag = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+					break;
 				}
 			}
 			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist) {
@@ -166,5 +164,4 @@ public class MapDataObjectFinder {
 		}
 		return actualResult;
 	}
-
 }

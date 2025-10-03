@@ -248,6 +248,12 @@ public class SearchTestController {
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
+	@GetMapping(value = "/cases/{caseId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getTestCaseResults(@PathVariable Long caseId) throws IOException {
+		return ResponseEntity.ok(testSearchService.getTestCaseResults(caseId));
+	}
+
 	@GetMapping(value = "/runs/{runId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId,

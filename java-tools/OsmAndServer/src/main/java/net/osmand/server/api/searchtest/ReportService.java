@@ -44,7 +44,6 @@ public interface ReportService {
 	}
 
 	Logger LOGGER = LoggerFactory.getLogger(ReportService.class);
-	int DISTANCE_LIMIT = 50;
 
 	String BASE_SQL = """
 			WITH result AS (
@@ -53,13 +52,13 @@ public interface ReportService {
 					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
 					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
 					r.res_count, g.row AS in_row, r.row AS out_row, 
-					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id
+					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id, r.found
 				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY g.id
 			)""";
 	String REPORT_SQL = BASE_SQL + """
 			 SELECT CASE
 				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
-				WHEN res_distance <= ? THEN 'Found'
+				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 				ELSE 'Not Found'
 			END AS "group", type, grp || '.' || rn AS row_id, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
 			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
@@ -71,7 +70,7 @@ public interface ReportService {
 			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
-	String[] OUT_PROPS = new String[]{"res_name", "res_lat_lon", "res_place", "actual_place", "res_id", "res_count",
+	String[] OUT_PROPS = new String[]{"res_name", "res_lat_lon", "res_place", "res_id", "actual_place", "actual_id", "res_count",
 			"res_distance", "search_bbox"};
 
 	JdbcTemplate getJdbcTemplate();
@@ -84,6 +83,19 @@ public interface ReportService {
 
 	Logger getLogger();
 
+	default List<Map<String, Object>> getTestCaseResults(Long caseId) throws IOException {
+		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+
+		// Do not rely on transient TestCase.lastRunId; load the latest run id explicitly
+		Long lastRunId = getTestRunRepo().findLastRunId(caseId);
+		if (lastRunId == null) {
+			List<Map<String, Object>> list = getJdbcTemplate().queryForList(FULL_REPORT_SQL, -1, caseId);
+			return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
+		}
+		return getRunResults(lastRunId, true);
+	}
+
 	default List<Map<String, Object>> getRunResults(Long runId, boolean isFull) throws IOException {
 		Run run = getTestRunRepo().findById(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
@@ -91,8 +103,8 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + run.caseId));
 
 		List<Map<String, Object>> list  = isFull ?
-			getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId, DISTANCE_LIMIT, run.caseId) :
-			getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT);
+			getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId, run.caseId) :
+			getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", runId);
 
 		return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
 	}
@@ -102,7 +114,7 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + caseId));
 
 		List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id",
-						runId, DISTANCE_LIMIT), getObjectMapper().readValue(test.allCols, String[].class));
+						runId), getObjectMapper().readValue(test.allCols, String[].class));
 		writeAsCsv(writer, results);
 	}
 
@@ -138,7 +150,8 @@ public interface ReportService {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place") ||
+						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
+								|| fn.startsWith("actual_id") ||
 								fn.startsWith("web_poi_id") || fn.startsWith("amenity_")) {
 							row.put(fn, v.asText());
 						} else if (fn.startsWith("web_name") || fn.startsWith("web_address") ||
@@ -206,24 +219,20 @@ public interface ReportService {
 				    count(*) AS total,
 				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    avg(res_place) FILTER (WHERE res_place IS NOT NULL) AS average_place,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE res_distance <= ?) AS found
+				    count(*) FILTER (WHERE COALESCE(found, res_distance <= 50)) AS found_count
 				FROM
 				    run_result
 				WHERE
 				    run_id = ?
 				""";
 		try {
-			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, DISTANCE_LIMIT, runId);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, runId);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
 
-			Number number = ((Number) result.get("average_place"));
-			double averagePlace = number == null ? 0.0 : number.doubleValue();
-
-			number = ((Number) result.get("total"));
+			Number number = ((Number) result.get("total"));
 			long total = number == null ? 0 : number.longValue();
 
 			number = ((Number) result.get("processed"));
@@ -235,11 +244,11 @@ public interface ReportService {
 			number = ((Number) result.get("duration"));
 			long duration = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("found"));
+			number = ((Number) result.get("found_count"));
 			long found = number == null ? 0 : number.longValue();
 
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					duration, averagePlace, found, null, null);
+					duration, 0, found, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -269,7 +278,7 @@ public interface ReportService {
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				getJdbcTemplate().queryForList("SELECT \"group\", count(*) as cnt FROM (" + FULL_REPORT_SQL + ") GROUP BY " +
-						"\"group\"", runId, DISTANCE_LIMIT, caseId);
+						"\"group\"", runId, caseId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
@@ -337,15 +346,15 @@ public interface ReportService {
 
 		String[] allCols = getObjectMapper().readValue(test.allCols, String[].class);
 		final String[] gen_cols = new String[]{"row_id", "id", "lat_lon", "search_lat_lon", "query"};
-		final String[] run_cols = new String[]{"type", "res_name", "res_lat_lon", "res_place", "actual_place", "res_id",
-				"res_count", "res_distance"};
+		final String[] run_cols = new String[]{"type", "res_name", "res_lat_lon", "res_place", "res_id",
+				"actual_place", "actual_id", "res_count", "res_distance"};
 
 		try (Workbook wb = new XSSFWorkbook()) {
 			List<List<Map<String, Object>>> runs = new ArrayList<>(runIds.length);
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId, DISTANCE_LIMIT), allCols));
+						REPORT_SQL + " ORDER BY gen_id", runId), allCols));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?",
 						String.class, runId));
 			}
