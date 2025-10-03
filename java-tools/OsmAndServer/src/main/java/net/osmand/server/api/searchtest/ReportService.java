@@ -83,6 +83,19 @@ public interface ReportService {
 
 	Logger getLogger();
 
+	default List<Map<String, Object>> getTestCaseResults(Long caseId) throws IOException {
+		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
+				new RuntimeException("TestCase not found with id: " + caseId));
+
+		// Do not rely on transient TestCase.lastRunId; load the latest run id explicitly
+		Long lastRunId = getTestRunRepo().findLastRunId(caseId);
+		if (lastRunId == null) {
+			List<Map<String, Object>> list = getJdbcTemplate().queryForList(FULL_REPORT_SQL, -1, caseId);
+			return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
+		}
+		return getRunResults(lastRunId, true);
+	}
+
 	default List<Map<String, Object>> getRunResults(Long runId, boolean isFull) throws IOException {
 		Run run = getTestRunRepo().findById(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
