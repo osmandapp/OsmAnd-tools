@@ -64,6 +64,9 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@Column(columnDefinition = "TEXT")
 		private String error;
 
+		@Column()
+		private Boolean found;
+
 		public String getError() {
 			return error;
 		}
