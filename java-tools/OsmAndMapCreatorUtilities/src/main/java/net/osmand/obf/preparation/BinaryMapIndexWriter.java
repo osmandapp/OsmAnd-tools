@@ -73,7 +73,7 @@ public class BinaryMapIndexWriter {
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
-	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE;
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -117,8 +117,8 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
-	
-	
+
+
 	private final static int HH_INDEX_INIT = 17;
 	private final static int HH_BLOCK_SEGMENTS =18;
 
@@ -161,7 +161,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeFixed32NoTag(0);
 		return ref;
 	}
-	
+
 	private BinaryFileReference preserveInt64Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = BinaryFileReference.createLongSizeReference(filePointer);
@@ -211,9 +211,9 @@ public class BinaryMapIndexWriter {
 		long len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
-	
-	
-	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable, 
+
+
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,
 			boolean longIndex, String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -358,7 +358,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-	
+
 	public void writeRouteEncodingRules(List<MapRouteType> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
@@ -489,7 +489,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteTreeElement(int leftX, int rightX, int topY, int bottomY) throws IOException {
 		checkPeekState(ROUTE_TREE, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -511,7 +511,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeSInt32(HHRoutePointsBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
-	
+
 	public void writeHHRoutePoints(List<NetworkDBPointWrite> l) throws IOException {
 		checkPeekState(ROUTE_TREE);
 		Bounds bounds = stackBounds.peek();
@@ -548,7 +548,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteBlockSegments(int idRangeStart, int idRangeLength, int profileId) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -562,7 +562,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeInt32(HHRouteBlockSegments.IDRANGELENGTH_FIELD_NUMBER, idRangeLength);
 		codedOutStream.writeInt32(HHRouteBlockSegments.PROFILEID_FIELD_NUMBER, profileId);
 	}
-	
+
 	public void writePointSegments(byte[] segmentsIn, byte[] segmentsOut) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS);
 		HHRoutePointSegments.Builder bld = HHRoutePointSegments.newBuilder();
@@ -571,7 +571,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessage(HHRouteBlockSegments.POINTSEGMENTS_FIELD_NUMBER, bld.build());
 	}
 
-	
+
 	public void endHHRouteBlockSegments() throws IOException {
 		popState(HH_BLOCK_SEGMENTS);
 		writeInt32Size();
@@ -822,9 +822,9 @@ public class BinaryMapIndexWriter {
 						delta = skipSomeNodes(innerPolygonTypes, len, i, x, y, true);
 					}
 				}
-			}		
+			}
 		}
-		
+
 		if (labelCoordinates != null && labelCoordinates.length > 0 && sumLabelCount > 0) {
 			mapDataBuf.clear();
 			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
@@ -841,7 +841,7 @@ public class BinaryMapIndexWriter {
 						+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 			}
 		}
-		
+
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);
@@ -1146,6 +1146,7 @@ public class BinaryMapIndexWriter {
 			int by = MapUtils.get31TileNumberY(b.getLocation().getLatitude());
 			bbuilder.setX((bx >> 7) - (sx >> 7));
 			bbuilder.setY((by >> 7) - (sy >> 7));
+            bbuilder.setId(b.getId());
 
 			String number2 = b.getName2();
 			if (!Algorithms.isEmpty(number2)) {
@@ -1354,7 +1355,7 @@ public class BinaryMapIndexWriter {
 			ptr = getFilePointer();
 			transportRoutesRegistry.put(idRoute, ptr);
 		}
-		
+
 		codedOutStream.writeMessageNoTag(tRoute.build());
 		return ptr;
 	}
@@ -1383,7 +1384,7 @@ public class BinaryMapIndexWriter {
 				pcalcx = pcalcx + tx;
 				pcalcy = pcalcy + ty;
 			}
-			
+
 		}
 	}
 
@@ -1507,7 +1508,7 @@ public class BinaryMapIndexWriter {
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
-	
+
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable, long transportIndexOffset) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
@@ -1523,7 +1524,7 @@ public class BinaryMapIndexWriter {
 		}
 		codedOutStream.writeMessage(OsmAndTransportIndex.INCOMPLETEROUTES_FIELD_NUMBER, irs.build());
 	}
-	
+
 	public void writeTransportStringTable(Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		// expect linked hash map
