@@ -49,10 +49,8 @@ public class MapDataObjectFinder {
 	}
 
 	
-	public Result[] find(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
-		int DIST_THRESHOLD_M = 20;
-		double closestDist = DIST_THRESHOLD_M;
-		Result firstResult = null, actualResult = null, actualByDist = null, actualByTag = null;
+	public Result findFirstResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
+		Result firstResult = null;
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {
 			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType && firstResult == null) {
@@ -61,15 +59,50 @@ public class MapDataObjectFinder {
 			}
 			resPlace++;
 		}
-		if (firstResult == null) {
-			return new Result[] { firstResult, actualResult };
-		}
+		if (firstResult != null) {
+			if (firstResult.searchResult().object instanceof Building b) {
+				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null) {
+					row.put("interpolation", b.toString());
+				}
+				// try to calculate precise id for first result 
+				QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), 20);
+				BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
+						MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
+						MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+						new ResultMatcher<>() {
 
-		if (firstResult.searchResult().object instanceof Building b) {
-			if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null) {
-				row.put("interpolation", b.toString());
+							@Override
+							public boolean publish(BinaryMapDataObject obj) {
+								return true;
+							}
+
+							@Override
+							public boolean isCancelled() {
+								return false;
+							}
+						});
+
+				if (firstResult.searchResult().file != null) {
+					List<BinaryMapDataObject> objects = firstResult.searchResult().file.searchMapIndex(request);
+					for (BinaryMapDataObject o : objects) {
+						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
+						if (Algorithms.objectEquals(hno, b.getName())) {
+							firstResult = new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
+							break;
+						}
+					}
+				}
 			}
 		}
+		return firstResult;
+	}
+
+
+	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> row) throws IOException {
+		int DIST_THRESHOLD_M = 20;
+		Result actualResult = null, actualByDist = null, actualByTag = null;
+		double closestDist = DIST_THRESHOLD_M;
+		int resPlace;
 		// Retrieve target map binary object - unnecessary step if store all tags earlier
 		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
@@ -91,10 +124,16 @@ public class MapDataObjectFinder {
 					}
 				});
 		BinaryMapDataObject srcObj = null;
-		List<BinaryMapDataObject> res = firstResult.searchResult.file.searchMapIndex(request);
-		if (res.size() > 0) {
-			srcObj = res.get(0);
+		for (SearchResult sr : searchResults) {
+			if (sr.file != null) {
+				List<BinaryMapDataObject> res = sr.file.searchMapIndex(request);
+				if (res.size() > 0) {
+					srcObj = res.get(0);
+				}
+				break;
+			}
 		}
+		
 		
 		// Find closest by distance by id & by tags 
 		resPlace = 1;
@@ -125,7 +164,7 @@ public class MapDataObjectFinder {
 		if (actualResult == null) {
 			actualResult = actualByDist;
 		}
-		return new Result[] {firstResult, actualResult};
+		return actualResult;
 	}
 
 }

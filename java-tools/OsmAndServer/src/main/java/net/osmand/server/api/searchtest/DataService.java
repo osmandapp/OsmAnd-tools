@@ -244,7 +244,7 @@ public interface DataService extends BaseService {
 	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, List<SearchResult> searchResults, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		final MapDataObjectFinder finder = new MapDataObjectFinder();
-		Result firstResult = null, actualResult = null; 
+		 
 		long datasetId;
 		try {
 			datasetId = Long.parseLong((String) genRow.get("id"));
@@ -252,11 +252,8 @@ public interface DataService extends BaseService {
 			datasetId = -1;
 		}
 		Map<String, Object> row = new LinkedHashMap<>();
-		if (searchPoint != null && !searchResults.isEmpty()) {
-			Result[] found = finder.find(searchResults, targetPoint, datasetId, row);
-			firstResult = found[0];
-			actualResult = found[1];
-		}
+		Result firstResult = finder.findFirstResult(searchResults, targetPoint, datasetId, genRow);
+		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, genRow);
 		
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
