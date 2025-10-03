@@ -67,9 +67,10 @@ public final class MangroveReviews {
         log.info(String.format("%d reviews parsed from %s", parsedReviews.size(), inputFile));
         Set<Review> edited = applyEdits(parsedReviews);
         log.info(String.format("%d reviews remaining after edits were applied", edited.size()));
-        Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(edited);
+        Set<Review> withRatings = edited.stream().filter(r -> r.payload().rating() != null).collect(Collectors.toSet());
+        log.info(String.format("%d reviews remaining after filtering out null ratings", withRatings.size()));
+        Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(withRatings);
         log.info(String.format("%d reviews successfully mapped to OSM POIs", pois.size()));
-        // TODO: allow null ratings/opinions?
         Set<ReviewedPlace> places = toReviewedPlaces(pois);
         log.info(String.format("%d reviewed places constructed", places.size()));
         return places;
@@ -87,6 +88,11 @@ public final class MangroveReviews {
             ReviewedPlace place = result.get(poi);
             place.reviews().add(mangroveReview.asOsmAndReview());
         }
+        // sort newest first
+        for (ReviewedPlace place : result.values()) {
+            place.reviews().sort(Comparator.comparing(net.osmand.reviews.Review::date).reversed());
+        }
+        // TODO: calculate aggregate stats (average rating, number of reviews)
         return ImmutableSet.copyOf(result.values());
     }
 
