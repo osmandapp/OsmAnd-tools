@@ -436,7 +436,7 @@ get_raw_ecmwf_files() {
     set -e
 
     # Download forecast files
-    local MAX_FORECAST_HOURS=9
+    local MAX_FORECAST_HOURS=240
     local FORECAST_INCREMENT_HOURS=3
     local PREV_FILETIME=""
     for (( FORECAST_HOUR=0; FORECAST_HOUR<=${MAX_FORECAST_HOURS}; FORECAST_HOUR+=${FORECAST_INCREMENT_HOURS} ))
