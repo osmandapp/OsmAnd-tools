@@ -262,7 +262,7 @@ public interface DataService extends BaseService {
 		if (firstResult != null) {
 			int dupCount = 0;
 			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
-			for (int i = firstResult.place() + 1; i < searchResults.size(); i++) {
+			for (int i = firstResult.place(); i < searchResults.size(); i++) {
 				SearchResult sr = searchResults.get(i);
 				double dist = MapUtils.getDistance(firstResult.searchResult().location, sr.location);
 				if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {

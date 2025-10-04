@@ -1,6 +1,8 @@
 package net.osmand.server.api.searchtest;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -144,7 +146,15 @@ public class MapDataObjectFinder {
 						return false;
 					}
 				});
-		return file.searchPoi(request);
+		List<Amenity> res = file.searchPoi(request);
+		Collections.sort(res, new Comparator<Amenity>() {
+
+			@Override
+			public int compare(Amenity o1, Amenity o2) {
+				return Double.compare(MapUtils.getDistance(targetPoint, o1.getLocation()), MapUtils.getDistance(targetPoint, o2.getLocation()));
+			}
+		});
+		return res;
 	}
 
 	private List<BinaryMapDataObject> getMapObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
@@ -164,7 +174,20 @@ public class MapDataObjectFinder {
 						return false;
 					}
 				});
-		return file.searchMapIndex(request);
+		List<BinaryMapDataObject> res = file.searchMapIndex(request);
+		Collections.sort(res, new Comparator<BinaryMapDataObject>() {
+
+			@Override
+			public int compare(BinaryMapDataObject o1, BinaryMapDataObject o2) {
+				double lat1 = MapUtils.get31LatitudeY(o1.getLabelY());
+				double lon1 = MapUtils.get31LongitudeX(o1.getLabelX());
+				double lat2 = MapUtils.get31LatitudeY(o2.getLabelY());
+				double lon2 = MapUtils.get31LongitudeX(o2.getLabelX());
+				return Double.compare(MapUtils.getDistance(targetPoint, lat1, lon1),
+						MapUtils.getDistance(targetPoint, lat2, lon2));
+			}
+		});
+		return res;
 	}
 
 
@@ -219,7 +242,8 @@ public class MapDataObjectFinder {
 					break;
 				}
 			}
-			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist) {
+			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist && sr.objectType != ObjectType.STREET) {
+				// ignore streets cause we they don't have precise single point
 				actualByDist = new Result(ResultType.ByDist, null, resPlace, sr);
 				closestDist = MapUtils.getDistance(sr.location, targetPoint);
 			}
