@@ -175,6 +175,11 @@ public class MapDataObjectFinder {
 					}
 				});
 		List<BinaryMapDataObject> res = file.searchMapIndex(request);
+		sortPoints(targetPoint, res);
+		return res;
+	}
+
+	private void sortPoints(LatLon targetPoint, List<BinaryMapDataObject> res) {
 		Collections.sort(res, new Comparator<BinaryMapDataObject>() {
 
 			@Override
@@ -187,7 +192,6 @@ public class MapDataObjectFinder {
 						MapUtils.getDistance(targetPoint, lat2, lon2));
 			}
 		});
-		return res;
 	}
 
 
@@ -197,35 +201,40 @@ public class MapDataObjectFinder {
 		Result actualResult = null, actualByDist = null;
 		double closestDist = 100; // needed by deduplicate for interpolation 
 		int resPlace;
-		// Retrieve target map binary object - unnecessary step if store all tags earlier
-		BinaryMapDataObject srcObj = null;
-		Amenity srcAmenity = null;
+		BinaryMapIndexReader file = null;
 		for (SearchResult sr : searchResults) {
 			if (sr.file != null) {
-				List<BinaryMapDataObject> objects = getMapObjects(sr.file, targetPoint);
-				for (BinaryMapDataObject o : objects) {
-					if (ObfConstants.getOsmObjectId(o) == datasetId) {
-						srcObj = o;
-						break;
-					}
-				}
-				List<Amenity> poi = getPoiObjects(sr.file, targetPoint);
-				for (Amenity o : poi) {
-					if (ObfConstants.getOsmObjectId(o) == datasetId) {
-						srcAmenity = o;
-						break;
-					}
-				}
+				file = sr.file;
 				break;
 			}
 		}
+		if (file == null) {
+			return null;
+		}
+		// Retrieve target map binary object - unnecessary step if store all tags earlier
 		
+		List<BinaryMapDataObject> objects = getMapObjects(file, targetPoint);
+		List<Amenity> poi = getPoiObjects(file, targetPoint);
+		BinaryMapDataObject srcObj = null;
+		Amenity srcAmenity = null;
+		for (BinaryMapDataObject o : objects) {
+			if (ObfConstants.getOsmObjectId(o) == datasetId) {
+				srcObj = o;
+				break;
+			}
+		}
+		for (Amenity o : poi) {
+			if (ObfConstants.getOsmObjectId(o) == datasetId) {
+				srcAmenity = o;
+				break;
+			}
+		}
 		
 		// Find closest by distance by id & by tags 
 		resPlace = 1;
 		for (SearchResult sr : searchResults) {
 			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == datasetId) {
-				actualResult = new Result(ResultType.ById, null, resPlace, sr);
+				actualResult = new Result(ResultType.ById, mo, resPlace, sr);
 				break;
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
@@ -244,7 +253,8 @@ public class MapDataObjectFinder {
 			}
 			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist && sr.objectType != ObjectType.STREET) {
 				// ignore streets cause we they don't have precise single point
-				actualByDist = new Result(ResultType.ByDist, null, resPlace, sr);
+				sortPoints(sr.location, objects);
+				actualByDist = new Result(ResultType.ByDist, objects.size() > 0 ? objects.get(0) : null, resPlace, sr);
 				closestDist = MapUtils.getDistance(sr.location, targetPoint);
 			}
 			resPlace++;
