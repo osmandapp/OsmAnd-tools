@@ -244,7 +244,7 @@ public interface DataService extends BaseService {
 	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, List<SearchResult> searchResults, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		final MapDataObjectFinder finder = new MapDataObjectFinder();
-		 
+		int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 		long datasetId;
 		try {
 			datasetId = Long.parseLong((String) genRow.get("id"));
@@ -265,7 +265,7 @@ public interface DataService extends BaseService {
 			for (int i = firstResult.place() + 1; i < searchResults.size(); i++) {
 				SearchResult sr = searchResults.get(i);
 				double dist = MapUtils.getDistance(firstResult.searchResult().location, sr.location);
-				if (resName.equals(sr.toString()) && dist < 5000) {
+				if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
 					dupCount++;
 				} else {
 					break;
@@ -276,8 +276,9 @@ public interface DataService extends BaseService {
 			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
 			distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
 
-			if (dupCount > 0)
+			if (dupCount > 0) {
 				row.put("dup_count", dupCount);
+			}
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			if (actualResult != null) {
@@ -287,18 +288,19 @@ public interface DataService extends BaseService {
 			
 			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
 			
-			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
-			if (resultFeature.properties != null) {
-				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
-					Object v = e.getValue();
-					if (v != null) {
-						String s = v.toString();
-						if (!s.isEmpty()) {
-							row.put(e.getKey(), s);
-						}
-					}
-				}
-			}
+			// generates too wide table unusable - if specific tag is needed it could be extracted to row
+//			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
+//			if (resultFeature.properties != null) {
+//				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
+//					Object v = e.getValue();
+//					if (v != null) {
+//						String s = v.toString();
+//						if (!s.isEmpty()) {
+//							row.put(e.getKey(), s);
+//						}
+//					}
+//				}
+//			}
 		}
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +

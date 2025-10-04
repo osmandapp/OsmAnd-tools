@@ -14,6 +14,8 @@ import net.osmand.data.Building;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
+import net.osmand.data.Street;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -33,13 +35,31 @@ public class MapDataObjectFinder {
 		
 		@NotNull
 		public String toIdString() {
-			long id = -1;
+			String idStr = "";
 			if (exact != null) {
-				id = ObfConstants.getOsmObjectId(exact);
+				long osmandId = exact.getId();
+				if (ObfConstants.isIdFromRelation(osmandId)) {
+					idStr = "R";
+				} else if (osmandId % 2 == 0) {
+					idStr = "N";
+				} else {
+					idStr = "W";
+				}
+				idStr += ObfConstants.getOsmId(osmandId);
+			} else if (searchResult.object instanceof Street s) {
+				idStr = "S" + ObfConstants.getOsmObjectId(s);
 			} else if (searchResult.object instanceof MapObject mo) {
-				id =  ObfConstants.getOsmObjectId(mo);
+				EntityType et = ObfConstants.getOsmEntityType(mo);
+				if (et == EntityType.NODE) {
+					idStr = "N";
+				} else if (et == EntityType.WAY) {
+					idStr = "W";
+				} else {
+					idStr = "R";
+				}
+				idStr += ObfConstants.getOsmObjectId(mo);
 			}
-			return id > 0 ? id + "" : "";
+			return idStr;
 		}
 		
 		public String toPlaceString() {
@@ -100,7 +120,7 @@ public class MapDataObjectFinder {
 	private static final int DIST_THRESHOLD_M = 20;
 
 	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
-		Result actualResult = null, actualByDist = null, actualByTag = null;
+		Result actualResult = null, actualByDist = null;
 		double closestDist = 100; // needed by deduplicate for interpolation 
 		int resPlace;
 		// Retrieve target map binary object - unnecessary step if store all tags earlier
@@ -145,7 +165,7 @@ public class MapDataObjectFinder {
 				// only do matching by tags for object that we know don't store id like Building
 				String hno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 				if (Algorithms.objectEquals(hno, b.getName())) {
-					actualByTag = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
 					break;
 				}
 			}
@@ -156,9 +176,6 @@ public class MapDataObjectFinder {
 			resPlace++;
 		}
 		
-		if (actualResult == null) {
-			actualResult = actualByTag;
-		}
 		if (actualResult == null) {
 			actualResult = actualByDist;
 		}
