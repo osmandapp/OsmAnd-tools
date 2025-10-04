@@ -261,14 +261,14 @@ public class MapDataObjectFinder {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
 			// only do matching by tags for object that we know don't store id like Building
-			} else if (srcObj != null && sr.object instanceof Building b) {
-				if (Algorithms.objectEquals(srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue()), b.getName())) {
-					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
-					break;
-				}
 			} else if (srcAmenity != null && sr.object instanceof Building b) {
 				if (Algorithms.objectEquals(srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER), b.getName())) {
 					actualResult = new Result(ResultType.ByTag, srcAmenity, resPlace, sr);
+					break;
+				}
+			} else if (srcObj != null && sr.object instanceof Building b) {
+				if (Algorithms.objectEquals(srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue()), b.getName())) {
+					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
 					break;
 				}
 			}
