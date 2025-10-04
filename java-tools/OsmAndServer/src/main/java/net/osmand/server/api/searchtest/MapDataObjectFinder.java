@@ -58,8 +58,7 @@ public class MapDataObjectFinder {
 					idStr = "R";
 				}
 				idStr += ObfConstants.getOsmObjectId(mo);
-			}
-			if(searchResult.object != null) {
+			} else if (searchResult.object != null) {
 				idStr += searchResult.object.getClass().getSimpleName();
 			}
 			return idStr;
