@@ -281,15 +281,17 @@ public interface DataService extends BaseService {
 			}
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
+			row.put("res_name", firstResult.searchResult().localeName);	
 			if (actualResult != null) {
 				row.put("actual_place", actualResult.toPlaceString());
 				row.put("actual_id", actualResult.toIdString());
+				row.put("actual_name", actualResult.searchResult().localeName);
 			}
 			
 			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
 			
 			// generates too wide table unusable - if specific tag is needed it could be extracted to row
-//			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
+			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
 //			if (resultFeature.properties != null) {
 //				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
 //					Object v = e.getValue();
