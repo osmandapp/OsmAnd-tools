@@ -35,7 +35,7 @@ public class MapDataObjectFinder {
 		
 		@NotNull
 		public String toIdString() {
-			String idStr = "";
+			String idStr = "U";
 			if (exact != null) {
 				long osmandId = exact.getId();
 				if (ObfConstants.isIdFromRelation(osmandId)) {
@@ -45,13 +45,10 @@ public class MapDataObjectFinder {
 				} else {
 					idStr = "W";
 				}
-				idStr += ObfConstants.getOsmId(osmandId);
+				idStr += ObfConstants.getOsmId(osmandId / 2);
 			} else if (searchResult.object instanceof Street s) {
 				idStr = "S" + ObfConstants.getOsmObjectId(s);
-			} else if (searchResult.object instanceof MapObject mo) {
-				if (mo.getId() == null) {
-					return "";
-				}
+			} else if (searchResult.object instanceof MapObject mo && mo.getId() != null) {
 				EntityType et = ObfConstants.getOsmEntityType(mo);
 				if (et == EntityType.NODE) {
 					idStr = "N";
@@ -61,6 +58,9 @@ public class MapDataObjectFinder {
 					idStr = "R";
 				}
 				idStr += ObfConstants.getOsmObjectId(mo);
+			}
+			if(searchResult.object != null) {
+				idStr += searchResult.object.getClass().getSimpleName();
 			}
 			return idStr;
 		}
