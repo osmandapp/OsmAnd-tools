@@ -109,20 +109,41 @@ public class MapDataObjectFinder {
 				}
 				// try to calculate precise id for first result 
 				if (firstResult.searchResult().file != null) {
-					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, targetPoint);
-					for (BinaryMapDataObject o : objects) {
-						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-						if (Algorithms.objectEquals(hno, b.getName())) {
-							return new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
-						}
-					}
-					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, targetPoint);
+					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult.location);
+					Amenity am = null;
+					BinaryMapDataObject obj = null;
 					for (Amenity o : poi) {
 						String hno = o.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
 						if (Algorithms.objectEquals(hno, b.getName())) {
-							return new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
+							am = o;
+							break;
 						}
 					}
+					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult.location);
+					for (BinaryMapDataObject o : objects) {
+						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
+						if (Algorithms.objectEquals(hno, b.getName())) {
+							obj = o;
+							break;
+						}
+					}
+					
+					if (obj != null && am != null) {
+						double dObj = MapUtils.getDistance(firstResult.searchResult.location,
+								MapUtils.get31LatitudeY(obj.getLabelY()), MapUtils.get31LongitudeX(obj.getLabelX()));
+						double dAm = MapUtils.getDistance(firstResult.searchResult.location, am.getLocation());
+						if (dObj < dAm) {
+							am = null;
+						} else {
+							obj = null;
+						}
+					}
+					if (obj != null) {
+						return new Result(ResultType.Best, obj, firstResult.place, firstResult.searchResult);
+					} else if (am != null) {
+						return new Result(ResultType.Best, am, firstResult.place, firstResult.searchResult);
+					}
+					
 				}
 			}
 		}
