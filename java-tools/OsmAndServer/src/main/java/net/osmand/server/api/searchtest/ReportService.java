@@ -139,7 +139,6 @@ public interface ReportService {
 			row.remove("gen_id");
 			try {
 				Map<String, Object> out = new LinkedHashMap<>();
-				StringBuilder resultName = new StringBuilder();
 				if (outRowJson != null) {
 					for (String p : OUT_PROPS)
 						row.put(p, srcRow.get(p));
@@ -151,17 +150,13 @@ public interface ReportService {
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
 						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
-								|| fn.startsWith("actual_id") ||
-								fn.startsWith("web_poi_id") || fn.startsWith("amenity_")) {
+								|| fn.startsWith("res_name")|| fn.startsWith("actual_id")) {
 							row.put(fn, v.asText());
-						} else if (fn.startsWith("web_name") || fn.startsWith("web_address") ||
-								fn.startsWith("web_poi_name"))
-							resultName.append(v.asText()).append(" ");
-						else
+						} else {
 							out.put(fn, v.asText());
+						}
 					});
 
-					row.put("res_name", resultName.toString().trim());
 					row.put("res_tags", getObjectMapper().writeValueAsString(out));
 				}
 			} catch (IOException e) {
