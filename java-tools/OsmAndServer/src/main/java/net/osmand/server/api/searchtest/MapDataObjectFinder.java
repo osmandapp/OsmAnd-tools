@@ -10,6 +10,7 @@ import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.ObfConstants;
+import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
@@ -31,13 +32,14 @@ public class MapDataObjectFinder {
 		Error
 	}
 
-	public record Result(ResultType type, BinaryMapDataObject exact, int place, SearchResult searchResult) {
+	public record Result(ResultType type, Object exact, int place, SearchResult searchResult) {
 		
 		@NotNull
 		public String toIdString() {
 			String idStr = "U";
-			if (exact != null) {
-				long osmandId = exact.getId();
+			Object obj = exact == null ? searchResult.object : exact; 
+			if (obj instanceof BinaryMapDataObject) {
+				long osmandId = ((BinaryMapDataObject) exact).getId();
 				if (ObfConstants.isIdFromRelation(osmandId)) {
 					idStr = "R";
 				} else if (osmandId % 2 == 0) {
@@ -46,9 +48,9 @@ public class MapDataObjectFinder {
 					idStr = "W";
 				}
 				idStr += ObfConstants.getOsmId(osmandId / 2);
-			} else if (searchResult.object instanceof Street s) {
+			} else if (obj instanceof Street s) {
 				idStr = "S" + ObfConstants.getOsmObjectId(s);
-			} else if (searchResult.object instanceof MapObject mo && mo.getId() != null) {
+			} else if (obj instanceof MapObject mo && mo.getId() != null) {
 				EntityType et = ObfConstants.getOsmEntityType(mo);
 				if (et == EntityType.NODE) {
 					idStr = "N";
@@ -69,17 +71,19 @@ public class MapDataObjectFinder {
 		}
 		
 		public String placeName() {
+			
 			String name = "";
-			if(searchResult != null) {
-				name = searchResult.localeName;
-				if (!Algorithms.isEmpty(searchResult.localeRelatedObjectName)) {
-					name += " " + searchResult.localeRelatedObjectName;
-				}
-				if(searchResult.objectType == ObjectType.HOUSE) {
-					if (searchResult.relatedObject instanceof Street) {
-						 name += " " + ((Street) searchResult.relatedObject).getCity().getName();
-					}
-				}
+			if (searchResult != null) {
+				return searchResult.toString();
+//				name = searchResult.localeName;
+//				if (!Algorithms.isEmpty(searchResult.localeRelatedObjectName)) {
+//					name += " " + searchResult.localeRelatedObjectName;
+//				}
+//				if (searchResult.objectType == ObjectType.HOUSE) {
+//					if (searchResult.relatedObject instanceof Street) {
+//						name += " " + ((Street) searchResult.relatedObject).getCity().getName();
+//					}
+//				}
 			}
 			return name;
 		}
@@ -102,36 +106,65 @@ public class MapDataObjectFinder {
 					row.put("interpolation", b.toString());
 				}
 				// try to calculate precise id for first result 
-				QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
-				BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
-						MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
-						MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
-						new ResultMatcher<>() {
-
-							@Override
-							public boolean publish(BinaryMapDataObject obj) {
-								return true;
-							}
-
-							@Override
-							public boolean isCancelled() {
-								return false;
-							}
-						});
-
 				if (firstResult.searchResult().file != null) {
-					List<BinaryMapDataObject> objects = firstResult.searchResult().file.searchMapIndex(request);
+					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, targetPoint);
 					for (BinaryMapDataObject o : objects) {
 						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 						if (Algorithms.objectEquals(hno, b.getName())) {
-							firstResult = new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
-							break;
+							return new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
+						}
+					}
+					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, targetPoint);
+					for (Amenity o : poi) {
+						String hno = o.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
+						if (Algorithms.objectEquals(hno, b.getName())) {
+							return new Result(ResultType.Best, o, firstResult.place, firstResult.searchResult);
 						}
 					}
 				}
 			}
 		}
 		return firstResult;
+	}
+	
+	private List<Amenity> getPoiObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
+		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
+		BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
+				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
+				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+				new ResultMatcher<>() {
+
+					@Override
+					public boolean publish(Amenity obj) {
+						return true;
+					}
+
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		return file.searchPoi(request);
+	}
+
+	private List<BinaryMapDataObject> getMapObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
+		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
+		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
+				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
+				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+				new ResultMatcher<>() {
+
+					@Override
+					public boolean publish(BinaryMapDataObject obj) {
+						return true;
+					}
+
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		return file.searchMapIndex(request);
 	}
 
 
@@ -142,28 +175,23 @@ public class MapDataObjectFinder {
 		double closestDist = 100; // needed by deduplicate for interpolation 
 		int resPlace;
 		// Retrieve target map binary object - unnecessary step if store all tags earlier
-		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
-		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
-				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
-				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
-				new ResultMatcher<>() {
-
-					@Override
-					public boolean publish(BinaryMapDataObject obj) {
-						return ObfConstants.getOsmObjectId(obj) == datasetId;
-					}
-
-					@Override
-					public boolean isCancelled() {
-						return false;
-					}
-				});
 		BinaryMapDataObject srcObj = null;
+		Amenity srcAmenity = null;
 		for (SearchResult sr : searchResults) {
 			if (sr.file != null) {
-				List<BinaryMapDataObject> res = sr.file.searchMapIndex(request);
-				if (!res.isEmpty()) {
-					srcObj = res.get(0);
+				List<BinaryMapDataObject> objects = getMapObjects(sr.file, targetPoint);
+				for (BinaryMapDataObject o : objects) {
+					if (ObfConstants.getOsmObjectId(o) == datasetId) {
+						srcObj = o;
+						break;
+					}
+				}
+				List<Amenity> poi = getPoiObjects(sr.file, targetPoint);
+				for (Amenity o : poi) {
+					if (ObfConstants.getOsmObjectId(o) == datasetId) {
+						srcAmenity = o;
+						break;
+					}
 				}
 				break;
 			}
@@ -179,11 +207,15 @@ public class MapDataObjectFinder {
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
+			// only do matching by tags for object that we know don't store id like Building
 			} else if (srcObj != null && sr.object instanceof Building b) {
-				// only do matching by tags for object that we know don't store id like Building
-				String hno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-				if (Algorithms.objectEquals(hno, b.getName())) {
+				if (Algorithms.objectEquals(srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue()), b.getName())) {
 					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+					break;
+				}
+			} else if (srcAmenity != null && sr.object instanceof Building b) {
+				if (Algorithms.objectEquals(srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER), b.getName())) {
+					actualResult = new Result(ResultType.ByTag, srcAmenity, resPlace, sr);
 					break;
 				}
 			}
