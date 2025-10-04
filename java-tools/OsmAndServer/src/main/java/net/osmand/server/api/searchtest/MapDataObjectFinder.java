@@ -49,6 +49,9 @@ public class MapDataObjectFinder {
 			} else if (searchResult.object instanceof Street s) {
 				idStr = "S" + ObfConstants.getOsmObjectId(s);
 			} else if (searchResult.object instanceof MapObject mo) {
+				if (mo.getId() == null) {
+					return "";
+				}
 				EntityType et = ObfConstants.getOsmEntityType(mo);
 				if (et == EntityType.NODE) {
 					idStr = "N";
@@ -64,6 +67,22 @@ public class MapDataObjectFinder {
 		
 		public String toPlaceString() {
 			return place + " - " + type();
+		}
+		
+		public String placeName() {
+			String name = "";
+			if(searchResult != null) {
+				name = searchResult.localeName;
+				if (!Algorithms.isEmpty(searchResult.localeRelatedObjectName)) {
+					name += " " + searchResult.localeRelatedObjectName;
+				}
+				if(searchResult.objectType == ObjectType.HOUSE) {
+					if (searchResult.relatedObject instanceof Street) {
+						 name += " " + ((Street) searchResult.relatedObject).getCity().getName();
+					}
+				}
+			}
+			return name;
 		}
 	}
 

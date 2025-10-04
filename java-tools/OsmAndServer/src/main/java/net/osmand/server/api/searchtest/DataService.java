@@ -281,11 +281,11 @@ public interface DataService extends BaseService {
 			}
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
-			row.put("res_name", firstResult.searchResult().localeName);	
+			row.put("res_name", firstResult.placeName());	
 			if (actualResult != null) {
 				row.put("actual_place", actualResult.toPlaceString());
 				row.put("actual_id", actualResult.toIdString());
-				row.put("actual_name", actualResult.searchResult().localeName);
+				row.put("actual_name", actualResult.placeName());
 			}
 			
 			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
