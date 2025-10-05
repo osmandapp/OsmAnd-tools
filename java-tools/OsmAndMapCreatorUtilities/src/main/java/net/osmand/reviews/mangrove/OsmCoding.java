@@ -34,7 +34,7 @@ final class OsmCoding {
         return result.build();
     }
 
-    private static final Pattern MAPCOMPLETE_CLIENT_ID_ELEMENT_PATTERN = Pattern.compile("#(?<type>node|way)/(?<id>\\d+)$");
+    private static final Pattern MAPCOMPLETE_CLIENT_ID_ELEMENT_PATTERN = Pattern.compile("#(?<type>node|relation|way)/(?<id>\\d+)$");
     private static final Pattern GEO_SUB_NAME_PATTERN = Pattern.compile("[?&]q=(?<qValue>[^&]*)");
 
     private static OsmPoi resolvePoi(Review review) {
@@ -52,13 +52,14 @@ final class OsmCoding {
         String elementTypeStr = osmIdMatcher.group("type");
         String osmIdStr = osmIdMatcher.group("id");
 
-        if (elementTypeStr.equals("node")) {
-            elementType = OsmElementType.NODE;
-        } else if (elementTypeStr.equals("way")) {
-            elementType = OsmElementType.WAY;
-        } else {
-            log.error(String.format("unexpected element type: '%s'", osmIdMatcher.group(1)));
-            return null;
+        switch (elementTypeStr) {
+            case "node" -> elementType = OsmElementType.NODE;
+            case "relation" -> elementType = OsmElementType.RELATION;
+            case "way" -> elementType = OsmElementType.WAY;
+            default -> {
+                log.error(String.format("unexpected element type: '%s'", osmIdMatcher.group(1)));
+                return null;
+            }
         }
 
         osmId = Long.parseLong(osmIdStr);
