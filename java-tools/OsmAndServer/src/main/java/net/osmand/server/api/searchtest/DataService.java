@@ -264,7 +264,7 @@ public interface DataService extends BaseService {
 		if (firstResult != null) {
 			int dupCount = 0;
 			double closestDuplicate = MapUtils.getDistance(targetPoint, firstResult.searchResult().location);
-			int dupInd = firstResult.place();
+			int dupInd = firstResult.place() - 1;
 			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
 			for (int i = firstResult.place(); i < searchResults.size(); i++) {
 				SearchResult sr = searchResults.get(i);
