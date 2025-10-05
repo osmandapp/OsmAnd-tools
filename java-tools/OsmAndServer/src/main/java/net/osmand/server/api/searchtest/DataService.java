@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
+import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -245,6 +246,7 @@ public interface DataService extends BaseService {
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		final MapDataObjectFinder finder = new MapDataObjectFinder();
 		int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
+		int FOUND_DEDUPLICATE_RADIUS = 100;
 		long datasetId;
 		try {
 			datasetId = Long.parseLong((String) genRow.get("id"));
@@ -261,6 +263,8 @@ public interface DataService extends BaseService {
 		boolean found = false;
 		if (firstResult != null) {
 			int dupCount = 0;
+			double closestDuplicate = MapUtils.getDistance(targetPoint, firstResult.searchResult().location);
+			int dupInd = firstResult.place();
 			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
 			for (int i = firstResult.place(); i < searchResults.size(); i++) {
 				SearchResult sr = searchResults.get(i);
@@ -269,6 +273,10 @@ public interface DataService extends BaseService {
 					dupCount++;
 				} else {
 					break;
+				}
+				if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
+					closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
+					dupInd = i;
 				}
 			}
 			resPlace = firstResult.place();
@@ -281,16 +289,20 @@ public interface DataService extends BaseService {
 			}
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
-			row.put("res_name", firstResult.placeName());	
+			row.put("res_name", firstResult.placeName());
+			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
+				SearchResult sr = searchResults.get(dupInd);
+				actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
+			}
 			if (actualResult != null) {
 				row.put("actual_place", actualResult.toPlaceString());
 				row.put("actual_id", actualResult.toIdString());
 				row.put("actual_name", actualResult.placeName());
 				LatLon pnt = actualResult.searchResult().location;
 				row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
-			}
+				found = actualResult.place() <= dupCount + firstResult.place();
+			} 
 			
-			found = actualResult != null && actualResult.place() <= dupCount + firstResult.place();
 			
 			// generates too wide table unusable - if specific tag is needed it could be extracted to row
 //			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());

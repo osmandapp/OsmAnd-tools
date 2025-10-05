@@ -213,8 +213,7 @@ public class MapDataObjectFinder {
 	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
 	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
-		Result actualResult = null, actualByDist = null;
-		double closestDist = 100; // needed by deduplicate for interpolation 
+		Result actualResult = null;
 		int resPlace;
 		BinaryMapIndexReader file = null;
 		for (SearchResult sr : searchResults) {
@@ -272,17 +271,7 @@ public class MapDataObjectFinder {
 					break;
 				}
 			}
-			if (getDistance(sr.location, targetPoint) < closestDist && sr.objectType != ObjectType.STREET) {
-				// ignore streets cause we they don't have precise single point
-				sortPoints(sr.location, objects);
-				actualByDist = new Result(ResultType.ByDist, objects.size() > 0 ? objects.get(0) : null, resPlace, sr);
-				closestDist = getDistance(sr.location, targetPoint);
-			}
 			resPlace++;
-		}
-		
-		if (actualResult == null) {
-			actualResult = actualByDist;
 		}
 		return actualResult;
 	}
