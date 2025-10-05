@@ -301,7 +301,9 @@ public interface DataService extends BaseService {
 				LatLon pnt = actualResult.searchResult().location;
 				row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
 				found = actualResult.place() <= dupCount + firstResult.place();
-			} 
+			}
+			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
+			
 			
 			
 			// generates too wide table unusable - if specific tag is needed it could be extracted to row
