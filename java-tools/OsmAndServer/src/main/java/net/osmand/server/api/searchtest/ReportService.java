@@ -70,8 +70,8 @@ public interface ReportService {
 			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
-	String[] OUT_PROPS = new String[]{"res_name", "res_lat_lon", "res_place", "res_id", "actual_place", "actual_id", "res_count",
-			"res_distance", "search_bbox"};
+	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
+			"oid", "res_count", "search_bbox"};
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -149,7 +149,9 @@ public interface ReportService {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
+						if (fn.startsWith("oid") && srcRow.containsKey("id")) {
+							row.put(fn, srcRow.get("id"));
+						} else if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
 								|| fn.startsWith("res_name")|| fn.startsWith("actual_id")) {
 							row.put(fn, v.asText());
 						} else {
