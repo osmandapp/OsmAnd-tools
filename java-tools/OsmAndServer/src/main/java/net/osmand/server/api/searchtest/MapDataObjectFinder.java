@@ -22,9 +22,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
-
+import static net.osmand.util.MapUtils.*;
 public class MapDataObjectFinder {
 	public enum ResultType {
 		Best,
@@ -108,13 +106,14 @@ public class MapDataObjectFinder {
 					row.put("interpolation", b.toString());
 				}
 				// try to calculate precise id for first result 
+				// building name doesn't have unit probably it's a bug to fix, so we check with startsWith
 				if (firstResult.searchResult().file != null) {
 					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult.location);
 					Amenity am = null;
 					BinaryMapDataObject obj = null;
 					for (Amenity o : poi) {
 						String hno = o.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
-						if (Algorithms.objectEquals(hno, b.getName())) {
+						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
 							am = o;
 							break;
 						}
@@ -122,16 +121,15 @@ public class MapDataObjectFinder {
 					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult.location);
 					for (BinaryMapDataObject o : objects) {
 						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-						if (Algorithms.objectEquals(hno, b.getName())) {
+						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
 							obj = o;
 							break;
 						}
 					}
 					
 					if (obj != null && am != null) {
-						double dObj = MapUtils.getDistance(firstResult.searchResult.location,
-								MapUtils.get31LatitudeY(obj.getLabelY()), MapUtils.get31LongitudeX(obj.getLabelX()));
-						double dAm = MapUtils.getDistance(firstResult.searchResult.location, am.getLocation());
+						double dObj = getDistance(firstResult.searchResult.location, obj.getLabelLatLon());
+						double dAm = getDistance(firstResult.searchResult.location, am.getLocation());
 						if (dObj < dAm) {
 							am = null;
 						} else {
@@ -151,10 +149,10 @@ public class MapDataObjectFinder {
 	}
 	
 	private List<Amenity> getPoiObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
-		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
+		QuadRect quad = calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_PRECISE_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
-				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
-				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+				get31TileNumberX(quad.left), get31TileNumberX(quad.right),
+				get31TileNumberY(quad.top), get31TileNumberY(quad.bottom), 16, null,
 				new ResultMatcher<>() {
 
 					@Override
@@ -172,17 +170,17 @@ public class MapDataObjectFinder {
 
 			@Override
 			public int compare(Amenity o1, Amenity o2) {
-				return Double.compare(MapUtils.getDistance(targetPoint, o1.getLocation()), MapUtils.getDistance(targetPoint, o2.getLocation()));
+				return Double.compare(getDistance(targetPoint, o1.getLocation()), getDistance(targetPoint, o2.getLocation()));
 			}
 		});
 		return res;
 	}
 
 	private List<BinaryMapDataObject> getMapObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
-		QuadRect quad = MapUtils.calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_THRESHOLD_M);
+		QuadRect quad = calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_PRECISE_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
-				MapUtils.get31TileNumberX(quad.left), MapUtils.get31TileNumberX(quad.right),
-				MapUtils.get31TileNumberY(quad.top), MapUtils.get31TileNumberY(quad.bottom), 16, null,
+				get31TileNumberX(quad.left), get31TileNumberX(quad.right),
+				get31TileNumberY(quad.top), get31TileNumberY(quad.bottom), 16, null,
 				new ResultMatcher<>() {
 
 					@Override
@@ -205,18 +203,14 @@ public class MapDataObjectFinder {
 
 			@Override
 			public int compare(BinaryMapDataObject o1, BinaryMapDataObject o2) {
-				double lat1 = MapUtils.get31LatitudeY(o1.getLabelY());
-				double lon1 = MapUtils.get31LongitudeX(o1.getLabelX());
-				double lat2 = MapUtils.get31LatitudeY(o2.getLabelY());
-				double lon2 = MapUtils.get31LongitudeX(o2.getLabelX());
-				return Double.compare(MapUtils.getDistance(targetPoint, lat1, lon1),
-						MapUtils.getDistance(targetPoint, lat2, lon2));
+				return Double.compare(getDistance(targetPoint, o1.getLabelLatLon()),
+						getDistance(targetPoint, o2.getLabelLatLon()));
 			}
 		});
 	}
 
 
-	private static final int DIST_THRESHOLD_M = 20;
+	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
 	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
 		Result actualResult = null, actualByDist = null;
@@ -236,17 +230,22 @@ public class MapDataObjectFinder {
 		
 		List<BinaryMapDataObject> objects = getMapObjects(file, targetPoint);
 		List<Amenity> poi = getPoiObjects(file, targetPoint);
+		
+		
 		BinaryMapDataObject srcObj = null;
 		Amenity srcAmenity = null;
+		String srcAmenityHno = null, srcObjHno = null;
 		for (BinaryMapDataObject o : objects) {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcObj = o;
+				srcObjHno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 				break;
 			}
 		}
 		for (Amenity o : poi) {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcAmenity = o;
+				srcAmenityHno = srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
 				break;
 			}
 		}
@@ -260,23 +259,24 @@ public class MapDataObjectFinder {
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
-			// only do matching by tags for object that we know don't store id like Building
-			} else if (srcAmenity != null && sr.object instanceof Building b) {
-				if (Algorithms.objectEquals(srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER), b.getName())) {
+			} else if(sr.object instanceof Building b && getDistance(sr.location, targetPoint) < DIST_PRECISE_THRESHOLD_M) {
+				// only do matching by tags for object that we know don't store id like Building
+				// 1. here we can compare addr:street as well for amenity
+				// 2. building name doesn't have unit probably it's a bug to fix, so we check with startsWith
+				String bName = b.getName();  
+				if (srcAmenityHno != null && (srcAmenityHno.equals(bName) || srcAmenityHno.startsWith(bName + " "))) {
 					actualResult = new Result(ResultType.ByTag, srcAmenity, resPlace, sr);
 					break;
-				}
-			} else if (srcObj != null && sr.object instanceof Building b) {
-				if (Algorithms.objectEquals(srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue()), b.getName())) {
+				} else if (srcObjHno != null && (srcObjHno.equals(bName) || srcObjHno.startsWith(bName + " "))) {
 					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
 					break;
 				}
 			}
-			if (MapUtils.getDistance(sr.location, targetPoint) < closestDist && sr.objectType != ObjectType.STREET) {
+			if (getDistance(sr.location, targetPoint) < closestDist && sr.objectType != ObjectType.STREET) {
 				// ignore streets cause we they don't have precise single point
 				sortPoints(sr.location, objects);
 				actualByDist = new Result(ResultType.ByDist, objects.size() > 0 ? objects.get(0) : null, resPlace, sr);
-				closestDist = MapUtils.getDistance(sr.location, targetPoint);
+				closestDist = getDistance(sr.location, targetPoint);
 			}
 			resPlace++;
 		}
