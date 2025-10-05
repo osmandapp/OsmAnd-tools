@@ -140,18 +140,19 @@ public interface ReportService {
 			try {
 				Map<String, Object> out = new LinkedHashMap<>();
 				if (outRowJson != null) {
-					for (String p : OUT_PROPS)
+					for (String p : OUT_PROPS) {
 						row.put(p, srcRow.get(p));
-
+					}
+					if (srcRow.containsKey("id")) {
+						row.put("oid", srcRow.get("id"));
+					}
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("oid") && srcRow.containsKey("id")) {
-							row.put(fn, srcRow.get("id"));
-						} else if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
+						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
 								|| fn.startsWith("res_name")|| fn.startsWith("actual_id")) {
 							row.put(fn, v.asText());
 						} else {
