@@ -266,11 +266,19 @@ public class SearchTestService implements ReportService, DataService {
 
 	private void run(Run run) {
 		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
-		if (run.rerunId != null && Boolean.TRUE.equals(run.skipFound)) {
-			sql = String.format(
-				"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-				"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
-				run.rerunId);
+		if (run.rerunId != null) {
+			// Re-run uses items from a previous run's results by joining gen_result with run_result
+			if (run.skipFound == null || !run.skipFound) {
+				sql = String.format(
+					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d ORDER BY g.id",
+					run.rerunId);
+			} else {
+				sql = String.format(
+					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
+					run.rerunId);
+			}
 		}
 
 		try {
