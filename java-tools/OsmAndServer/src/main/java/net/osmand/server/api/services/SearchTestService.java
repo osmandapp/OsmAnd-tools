@@ -208,22 +208,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 	}
 
-	public CompletableFuture<Run> rerun(Long runId) {
-		Run run = runRepo.findById(runId)
-				.orElseThrow(() -> new RuntimeException("Run not found with id: " + runId));
-
-		RunParam param = new RunParam();
-		param.name = getSystemBranch();
-		param.average = run.average;
-		param.locale = run.locale;
-		param.setNorthWest(run.getNorthWest());
-		param.setSouthEast(run.getSouthEast());
-		param.lat = run.lat;
-		param.lon = run.lon;
-
-		return runTestCase(run.caseId, param);
-	}
-
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
@@ -249,6 +233,10 @@ public class SearchTestService implements ReportService, DataService {
 		run.name = payload.name;
 		run.average = payload.average;
 		test.average = payload.average;
+		run.skipFound = payload.skipFound;
+		test.skipFound = payload.skipFound;
+		// Rerun support: persist reference run id if provided
+		run.rerunId = payload.rerunId;
 
 		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
@@ -277,8 +265,14 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY" +
-				" id", run.caseId);
+		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
+		if (run.rerunId != null && Boolean.TRUE.equals(run.skipFound)) {
+			sql = String.format(
+				"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+				"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
+				run.rerunId);
+		}
+
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
 			if (rows.isEmpty())

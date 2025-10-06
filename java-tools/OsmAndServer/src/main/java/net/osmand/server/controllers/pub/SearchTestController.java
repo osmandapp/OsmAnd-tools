@@ -126,12 +126,6 @@ public class SearchTestController {
 		return testSearchService.cancelRun(runId).thenApply(ResponseEntity::ok);
 	}
 
-	@PostMapping(value = "/runs/{runId}/rerun", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public CompletableFuture<ResponseEntity<Run>> rerun(@PathVariable Long runId) {
-		return testSearchService.rerun(runId).thenApply(ResponseEntity::ok);
-	}
-
 	@DeleteMapping(value = "/cases/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Void>> deleteTestCase(@PathVariable Long id) {
