@@ -50,7 +50,7 @@ docs_dir = Path(input_dir, "main/docs")
 blog_dir = Path(input_dir, "main/blog")
 map_translations_dir = input_dir / "map/src/resources/translations"
 
-_marker = re.compile(r"^\s*source-hash: ([0-9A-Fa-f]+)\s*$", re.I)
+_marker = re.compile(r"^\s*(?:\[//\s*)?source-hash:\s*([0-9A-Fa-f]+)\s*(?:\s*]\s*:\s*#)?\s*$", re.I)
 HASH_ALGO = "blake2s"
 
 
@@ -252,6 +252,8 @@ def digest(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+def is_partial_mdx(path: Path):
+    return path.name.startswith("_") and path.suffix == ".mdx"
 
 def stored_digest(path: Path):
     if FORCE_TRANSLATION:
@@ -263,11 +265,12 @@ def stored_digest(path: Path):
                 json_code = json.load(fh)
                 return None if "sourceHash" not in json_code else json_code.get("sourceHash").get("message")
 
+            skip_n_line = 0 if is_partial_mdx(path) else 2
             i = 0
             for line in fh:
-                if i == 2:
-                    break
                 next_line = line
+                if i == skip_n_line:
+                    break
                 i += 1
 
         m = _marker.match(next_line)
@@ -309,15 +312,44 @@ def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
     if len(imports) == 0:
         return content
     lines = content.splitlines()
+    if len(lines) <= 1:
+        return content
 
-    idx = len(lines) - lines[::-1].index('---')
-    if idx == len(lines) + 1:
-        idx = 0
+    # Determine insertion index:
+    # 1) If content starts with YAML front matter (--- ... ---), insert after the closing '---'.
+    # 2) Else, if content starts with MDX comment lines like "[// ...]", insert after the last such line.
+    # 3) Otherwise, insert at the top of the document.
+    # Find the first non-empty line as the logical start
+    start = 0
+    while start < len(lines) and not (lines[start].startswith('[//') or lines[start].strip() == '---'):
+        start += 1
+
+    idx = start
+    if start < len(lines) and lines[start].strip() == '---':
+        # Find the closing '---' after the opening one
+        closing_idx = None
+        for j in range(start + 1, len(lines)):
+            if lines[j].strip() == '---':
+                closing_idx = j
+                break
+        idx = (closing_idx + 1) if closing_idx is not None else start
+    elif start < len(lines) and lines[start].lstrip().startswith('[//'):
+        # Advance past consecutive leading MDX comment lines
+        j = start
+        while j < len(lines) and lines[j].lstrip().startswith('[//'):
+            j += 1
+        idx = j
+
+    if idx + 1 < len(lines):
+        idx += 1
+
+    # Insert the imports preserving order
     for _, text in imports:
         lines.insert(idx, text)
         idx += 1
 
-    if lines[idx].strip() != "":
+    # Ensure a blank line after the imports block if the next line is not already blank
+    if idx < len(lines) and lines[idx].strip() != "":
         lines.insert(idx, "")
     return "\n".join(lines)
 
@@ -328,6 +360,9 @@ def save_dest(path, response, imports, digest_now):
             json_response = json.loads(response)
             json_response["sourceHash"] = {"message": digest_now}
             response = json.dumps(json_response, indent=2, ensure_ascii=False)
+        if is_partial_mdx(path):
+            line_break = '' if response.startswith('\n') else '\n'
+            response = f"[// source-hash: {digest_now}]:#{line_break}{response}"
         else:
             if not response.startswith('---'):
                 response = f"---\n\n---\n{response}"
