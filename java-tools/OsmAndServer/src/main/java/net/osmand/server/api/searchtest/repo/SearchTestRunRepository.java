@@ -64,9 +64,6 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@Column(columnDefinition = "TEXT")
 		private String error;
 
-		@Column()
-		private Boolean found;
-
 		public String getError() {
 			return error;
 		}
@@ -150,6 +147,9 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 
 		@Column(name = "res_count")
 		public Integer resCount;
+
+		@Column()
+		private Boolean found;
 	}
 
 	@Query(value = "SELECT j FROM Run j JOIN FETCH j.testCase c JOIN FETCH j.dataset d WHERE j.caseId = :caseId ORDER BY j.updated DESC, j.id DESC",
