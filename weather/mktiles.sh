@@ -6,10 +6,9 @@ ROOT_FOLDER=$(pwd)
 GFS="gfs"
 ECMWF="ecmwf"
 TIFF_FOLDER="tiff"
-GFS_BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-GFS_BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
-ECMWF_BANDS=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-ECMWF_BANDS_NAMES=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
+# bands should correspond to download_weather.sh
+BANDS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+BANDS_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
 TILES_FOLDER=tiles
 
@@ -21,15 +20,8 @@ OS=$(uname -a)
 
 generate_tiles() {
     MODE=$1
-    local BANDS_NAMES=()
-    local BANDS_DESCRIPTIONS=()
-    if [[ $MODE =~ "$GFS" ]]; then
-        BANDS_NAMES=("${GFS_BANDS_NAMES[@]}")
-        BANDS_DESCRIPTIONS=("${GFS_BANDS[@]}")
-    elif [[ $MODE =~ "$ECMWF" ]]; then
-        BANDS_NAMES=("${ECMWF_BANDS_NAMES[@]}")
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS[@]}")
-    fi
+    local BANDS_NAMES_LOCAL=("${BANDS_NAMES[@]}")
+    local BANDS_DESCRIPTIONS_LOCAL=("${BANDS[@]}")
 
     rm *.O.tiff || true
     for WFILE in ${TIFF_FOLDER}/*.tiff
@@ -45,7 +37,7 @@ generate_tiles() {
 
             TIMESTAMP_NOW=$(TZ=GMT date "+%s")
             TIMESTAMP_FILE_FORECAST_DATE=$(TZ=GMT date -jf "%Y%m%d_%H00" "${FILE_NAME}" "+%s")
-            
+
         else
             FILE_NAME="${FILE_NAME//"tiff/"}"
             FILE_NAME="${FILE_NAME//".tiff"}"
@@ -62,7 +54,7 @@ generate_tiles() {
             echo "Skip"
             echo "Skip: file is outdated  $WFILE"
             continue
-        fi 
+        fi
 
         BS=$(basename $WFILE)
         ## generate gdal2tiles fo a given band with given rasterization
@@ -73,8 +65,8 @@ generate_tiles() {
             ${FILE_NAME}_orig.O.tiff ${FILE_NAME}_cut.O.tiff
         gdalwarp -of GTiff -t_srs epsg:3857 -r cubic -multi \
             ${FILE_NAME}_cut.O.tiff ${FILE_NAME}_webmerc.O.tiff
-        for TILES_BAND in ${!BANDS_NAMES[@]}; do
-            local TILES_BAND_NAME=${BANDS_NAMES[$TILES_BAND]}
+        for TILES_BAND in ${!BANDS_NAMES_LOCAL[@]}; do
+            local TILES_BAND_NAME=${BANDS_NAMES_LOCAL[$TILES_BAND]}
             local BAND_IND=$(( $TILES_BAND + 1 ))
             local FILE_BAND_NAME=${FILE_NAME}_${TILES_BAND_NAME}
             gdal_translate -b ${BAND_IND} -outsize $IMG_SIZE $IMG_SIZE -r lanczos \
