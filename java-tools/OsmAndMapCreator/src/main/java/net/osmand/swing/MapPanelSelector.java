@@ -1,21 +1,13 @@
 package net.osmand.swing;
 
 import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import javax.swing.AbstractAction;
-import javax.swing.JLabel;
-import javax.swing.JPopupMenu;
 
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.primitives.Track;
@@ -29,22 +21,14 @@ import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.PlatformUtil;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
-import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.network.NetworkRouteContext.NetworkRouteContextStats;
-import net.osmand.router.network.NetworkRouteSelector;
-import net.osmand.router.network.NetworkRouteSelector.NetworkRouteSelectorFilter;
-import net.osmand.router.network.NetworkRouteSelector.RouteKey;
 import net.osmand.swing.MapPanel.NativeRendererRunnable;
 import net.osmand.util.MapUtils;
 
 public class MapPanelSelector {
 	protected static final Log log = PlatformUtil.getLog(MapPanelSelector.class);
-	private static final boolean LOAD_ROUTE_BBOX = true;
-	private static final boolean LOAD_ROUTE_POI_RADIUS_BBOX = false;
 	private final MapPanel panel;
 	private MapSelectionArea mapSelectionArea;
 	private ThreadPoolExecutor threadPool;
@@ -77,14 +61,6 @@ public class MapPanelSelector {
 					continue;
 				}
 				if (o.getX().size() > 1) {
-					List<RouteKey> keys = NetworkRouteSelector.getRouteKeys(o.getTags());
-					if (keys.size() > 0) {
-						try {
-							createMenu(o, e.getX(), e.getY()).show(panel, e.getX(), e.getY());
-						} catch (IOException e1) {
-							log.error(e1.getMessage(), e1);
-						}
-					}
 					Way way = new Way(-1);
 					TIntArrayList x1 = o.getX();
 					TIntArrayList y1 = o.getY();
@@ -110,61 +86,6 @@ public class MapPanelSelector {
 		}
 		panel.setPoints(points);
 		panel.repaint();
-	}
-
-	private JPopupMenu createMenu(RenderedObject renderedObject, int x, int y) throws IOException {
-		JPopupMenu menu = new JPopupMenu();
-		menu.add(new JLabel("Select route"));
-		Map<RouteKey, GpxFile> routeMap;
-		NetworkRouteSelectorFilter f = new NetworkRouteSelectorFilter();
-		NetworkRouteSelector routeSelector = new NetworkRouteSelector(
-				DataExtractionSettings.getSettings().getObfReaders(), f, null);
-		Collection<RouteKey> routeKeys;
-		QuadRect latLonBBox = LOAD_ROUTE_POI_RADIUS_BBOX ? panel.getLatLonPoiBBox(x, y) : panel.getLatLonBBox();
-		if (LOAD_ROUTE_BBOX) {
-			routeMap = routeSelector.getRoutes(latLonBBox, false, null);
-			routeKeys = routeMap.keySet();
-		} else {
-			routeMap = null;
-			routeKeys = NetworkRouteSelector.getRouteKeys(renderedObject.getTags());
-		}
-		for (RouteKey routeKey : routeKeys) {
-			menu.add(new AbstractAction(routeKey.tags.toString()) {
-				private static final long serialVersionUID = 8970133073749840163L;
-
-				@Override
-				public void actionPerformed(ActionEvent actionEvent) {
-					threadPool.submit(() -> {
-						try {
-							Map<RouteKey, GpxFile> routes;
-							long tms = System.currentTimeMillis();
-							if (routeMap == null || routeMap.get(routeKey) == null) {
-								System.out.println("Start loading " + routeKey.tags);
-								if (LOAD_ROUTE_BBOX) {
-									Map<RouteKey, GpxFile> res = routeSelector.getRoutes(latLonBBox, true, routeKey);
-									routes = Collections.singletonMap(routeKey, res.get(routeKey));
-								} else {
-									f.keyFilter = Collections.singleton(routeKey);
-									routes = routeSelector.getRoutes(renderedObject); 	
-								}
-							} else {
-//								routes = routeMap;
-								routes = Collections.singletonMap(routeKey, routeMap.get(routeKey));
-							}
-							NetworkRouteContextStats stats = routeSelector.getNetworkRouteContext().getStats();
-							String msg = String.format("Load route after %.1f s: loaded %d tiles, %d routes, time %.1f s",
-									(System.currentTimeMillis() - tms) / 1.0e3, stats.loadedTiles,
-									stats.loadedRoutes, stats.loadTimeNs / 1.0e9);
-							System.out.println(msg);
-							drawGpxFiles(routes.values());
-						} catch (Exception e) {
-							log.error(e.getMessage(), e);
-						}
-					});
-				}
-			});
-		}
-		return menu;
 	}
 
 	private void drawGpxFiles(Collection<GpxFile> files) {
