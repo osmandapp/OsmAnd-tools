@@ -4,6 +4,7 @@ import static net.osmand.router.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
@@ -214,11 +215,10 @@ public class MapAddressLayer implements MapPanelLayer {
 	private void searchAddressDetailedInfo(BinaryMapIndexReader index, double lat, double lon, List<Entity> results) throws IOException {
 		Map<String, List<Street>> streets = new LinkedHashMap<String, List<Street>>();
 		log.info("Searching region ");
-		int[] cityType = new int[]{BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE,
-				BinaryMapAddressReaderAdapter.POSTCODES_TYPE,
-				BinaryMapAddressReaderAdapter.VILLAGES_TYPE};
+		CityBlocks[] cityType = new CityBlocks[] { CityBlocks.CITY_TOWN_TYPE, CityBlocks.POSTCODES_TYPE,
+				CityBlocks.VILLAGES_TYPE };
 		for (int j = 0; j < cityType.length; j++) {
-			int type = cityType[j];
+			CityBlocks type = cityType[j];
 			for (City c : index.getCities(null, type)) {
 				if (MapUtils.getDistance(c.getLocation(), lat, lon) < distance) {
 					log.info("Searching city " + c.getName());

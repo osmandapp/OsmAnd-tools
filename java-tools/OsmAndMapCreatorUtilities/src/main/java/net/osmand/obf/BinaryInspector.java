@@ -15,6 +15,7 @@ import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CitiesBlock;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader.*;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiSubType;
@@ -22,16 +23,11 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
-import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
-import net.osmand.router.RoutePlannerFrontEnd;
-import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
@@ -62,17 +58,17 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+//					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities", "-vstreetgroups",
+					"-vaddress", //"-vcities", "-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-					"-latlon=40.634196,-76.594491,0.0005",
+//					"-latlon=40.634196,-76.594491,0.0005",
 //					"-latlon=-19.25783,146.82456,0.05",
 					
 					//"-xyz=12071,26142,16",
@@ -587,8 +583,11 @@ public class BinaryInspector {
 					printPOIDetailInfo(vInfo, index, (PoiRegion) p);
 				} else if (p instanceof AddressRegion) {
 					List<CitiesBlock> cities = ((AddressRegion) p).getCities();
+					int ind = 0;
 					for (CitiesBlock c : cities) {
-						println("\t" + i + "." + c.getType() + " Address part size=" + c.getLength() + " bytes");
+						ind++;
+						CityBlocks block = CityBlocks.getByType(c.getType()); 
+						println(String.format("\t %d.%d Address %s part size=%,d bytes",i , ind, block.toString(), c.getLength()));
 					}
 					if (vInfo != null && vInfo.isVaddress()) {
 						printAddressDetailedInfo(vInfo, index, (AddressRegion) p);
@@ -790,17 +789,14 @@ public class BinaryInspector {
 	}
 
 	private void printAddressDetailedInfo(VerboseInfo verbose, BinaryMapIndexReader index, AddressRegion region) throws IOException {
-		String[] cityType_String = new String[]{
-				"Cities/Towns section",
-				"Postcodes section",
-				"Villages section",
-		};
-		for (int j = 0; j < BinaryMapAddressReaderAdapter.CITY_TYPES.length; j++) {
-			int type = BinaryMapAddressReaderAdapter.CITY_TYPES[j];
+		for (CityBlocks type : CityBlocks.values()) {
+			if (!type.cityGroupType) {
+				continue;
+			}
 			final List<City> cities = index.getCities(region, null, type);
 
-			print(MessageFormat.format("\t{0}, {1,number,#} group(s)", cityType_String[j], cities.size()));
-			if (BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE == type) {
+			print(MessageFormat.format("\t{0}, {1,number,#} entities", type.toString(), cities.size()));
+			if (CityBlocks.CITY_TOWN_TYPE == type) {
 				if (!verbose.vstreetgroups && !verbose.vcities) {
 					println("");
 					continue;
@@ -819,7 +815,7 @@ public class BinaryInspector {
 					boolean includeEnName = verbose.lang == null || !verbose.lang.equals("en");
 					name += " " + c.getNamesMap(includeEnName).toString();
 				}
-				String cityDescription = (type == BinaryMapAddressReaderAdapter.POSTCODES_TYPE ?
+				String cityDescription = (type == CityBlocks.POSTCODES_TYPE ?
 						MessageFormat.format("\t\t''{0}'' {1,number,#} street(s) size {2,number,#} bytes", name, streets.size(), size) :
 						MessageFormat.format("\t\t''{0}'' [{1,number,#}], {2,number,#} street(s) size {3,number,#} bytes", name, c.getId(), streets.size(), size));
 				print(cityDescription);

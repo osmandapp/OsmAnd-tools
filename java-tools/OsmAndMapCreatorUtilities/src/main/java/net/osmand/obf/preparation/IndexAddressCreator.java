@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.CommonWords;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
@@ -1079,9 +1080,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private static final int CITIES_TYPE = 1;
-	private static final int POSTCODES_TYPE = 2;
-	private static final int VILLAGES_TYPE = 3;
+//	private static final int CITIES_TYPE = 1;
+//	private static final int POSTCODES_TYPE = 2;
+//	private static final int VILLAGES_TYPE = 3;
 
 	public void writeBinaryAddressIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws IOException, SQLException {
 		processPostcodes();
@@ -1140,12 +1141,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
-		writeCityBlockIndex(writer, CITIES_TYPE, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
-		writeCityBlockIndex(writer, VILLAGES_TYPE, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
 
 		// write postcodes
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
-		writer.startCityBlockIndex(POSTCODES_TYPE);
+		writer.startCityBlockIndex(CityBlocks.POSTCODES_TYPE.index);
 		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
 		for (City s : posts) {
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
@@ -1344,7 +1345,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			City city = cities.get(i);
 			BinaryFileReference ref = refs.get(i);
 			putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
-			if (type == CITIES_TYPE) {
+			if (type == CityBlocks.CITY_TOWN_TYPE.index) {
 				progress.progress(1);
 			} else {
 				if ((cities.size() - i) % 100 == 0) {

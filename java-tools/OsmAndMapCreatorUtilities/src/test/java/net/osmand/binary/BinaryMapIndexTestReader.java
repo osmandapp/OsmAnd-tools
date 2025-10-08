@@ -1,5 +1,6 @@
 package net.osmand.binary;
 
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -127,12 +128,12 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	}
 
 	@Override
-	public List<City> getCities(BinaryMapAddressReaderAdapter.AddressRegion region, SearchRequest<City> resultMatcher, int cityType) throws IOException {
+	public List<City> getCities(BinaryMapAddressReaderAdapter.AddressRegion region, SearchRequest<City> resultMatcher, CityBlocks cityType) throws IOException {
 		return getCities(resultMatcher, cityType);
 	}
 
 	@Override
-	public List<City> getCities(SearchRequest<City> resultMatcher, int cityType) throws IOException {
+	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks cityType) throws IOException {
 		for (City city : cities) {
 			if (resultMatcher != null) {
 				resultMatcher.publish(city);

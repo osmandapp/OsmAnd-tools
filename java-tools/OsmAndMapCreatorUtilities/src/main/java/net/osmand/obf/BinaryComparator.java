@@ -19,7 +19,7 @@ import java.util.TreeSet;
 import net.osmand.Collator;
 import net.osmand.OsmAndCollator;
 import net.osmand.PlatformUtil;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -254,7 +254,10 @@ public class BinaryComparator {
 	}
 
 	private void compareAddress(BinaryMapIndexReader i0, BinaryMapIndexReader i1) throws IOException {
-		for (int cityType : BinaryMapAddressReaderAdapter.CITY_TYPES) {
+		for (CityBlocks cityType : CityBlocks.values()) {
+			if (!cityType.cityGroupType) {
+				continue;
+			}
 			List<City> ct0 = i0.getCities(null, cityType);
 			List<City> ct1 = i1.getCities(null, cityType);
 			Comparator<City> c = comparator();
