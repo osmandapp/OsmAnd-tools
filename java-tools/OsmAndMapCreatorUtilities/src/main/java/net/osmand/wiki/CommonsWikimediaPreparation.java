@@ -90,6 +90,7 @@ public class CommonsWikimediaPreparation {
 		private PreparedStatement prepContent;
 		private int[] contentBatch = new int[]{0};
 		private boolean page = false;
+        private boolean pageIdParsed = false;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
@@ -162,8 +163,11 @@ public class CommonsWikimediaPreparation {
 						ctext = ns;
 					}
 					case "id" -> {
-						id.setLength(0);
-						ctext = id;
+                        if(!pageIdParsed) {
+                            id.setLength(0);
+                            ctext = id;
+                            pageIdParsed = true;
+                        }
 					}
 					case "text" -> {
 						textContent.setLength(0);
@@ -191,6 +195,7 @@ public class CommonsWikimediaPreparation {
 				switch (name) {
 					case "page" -> {
 						page = false;
+                        pageIdParsed = false;
 						progress.update();
 					}
 					case "title", "ns", "id" -> ctext = null;
