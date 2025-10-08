@@ -314,6 +314,8 @@ public class QtCorePanel implements GLEventListener {
 		MapRendererSetupOptions rendererSetupOptions = new MapRendererSetupOptions();
 		rendererSetupOptions.setGpuWorkerThreadEnabled(false);
 		rendererSetupOptions.setFrameUpdateRequestCallback(callback.getBinding());
+        rendererSetupOptions.setPathToOpenGLShadersCache(DataExtractionSettings.getSettings().getBinaryFilesDir());
+        rendererSetupOptions.setMaxNumberOfRasterMapLayersInBatch(8);
 		mapRenderer.setup(rendererSetupOptions);
 
 		AtlasMapRendererConfiguration atlasRendererConfiguration = AtlasMapRendererConfiguration.Casts

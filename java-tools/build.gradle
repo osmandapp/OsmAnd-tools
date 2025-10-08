@@ -18,7 +18,7 @@ subprojects {
 	apply plugin: 'idea'
 
 	configurations {
-		jvmPublicConfig { 
+		jvmPublicConfig {
 			extendsFrom(runtimeClasspath)
 		}
 	}
@@ -27,7 +27,7 @@ subprojects {
 	version 'master-snapshot'
 	sourceCompatibility = 17
 	targetCompatibility = "17"
-	
+
 	eclipse {
 			classpath {
 				file {
@@ -45,6 +45,9 @@ subprojects {
 		maven {
 			url "https://maven.geo-solutions.it/"
 		}
+        maven {
+            url "https://repo.osgeo.org/repository/release/"
+        }
 		mavenCentral()
 		jcenter()
 		google()
@@ -58,7 +61,7 @@ subprojects {
 			   enabled
 			}
 			html {
-			  ! enabled 
+			  ! enabled
 			}
 		}
 		systemProperty 'eyepiece', System.getProperty('eyepiece')
@@ -76,7 +79,7 @@ subprojects {
 		archiveFileName = "${project.name}.jar"
 		from {
 			configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-		} 
+		}
 		{
 			exclude "META-INF/*.SF"
 			exclude "META-INF/*.DSA"
@@ -91,7 +94,7 @@ subprojects {
 			println(configurations.runtimeClasspath.collect { 'lib/'+it.getName() }.join('\n'))
 		  }
 	}
-	
+
 	task listConfigurations {
 		doLast {
 			configurations.each { config ->
