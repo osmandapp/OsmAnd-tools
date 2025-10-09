@@ -21,6 +21,7 @@ import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.CommonWords;
+import net.osmand.binary.ObfConstants;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
@@ -35,6 +36,7 @@ import net.osmand.data.Street;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -110,7 +112,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private void regCity(City city, Entity e) {
 		LatLon l = city.getLocation();
-		if (city.getType() != null && !Algorithms.isEmpty(city.getName()) && l != null) {
+		if (!Algorithms.isEmpty(city.getName()) && l != null) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
 		}
@@ -174,6 +176,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(getBoundaryCenter(cityFound.getId(), e));
 			}
+			System.out.println("Boundary " + boundaryName);
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 			} else {
@@ -358,8 +361,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
+		boolean census = "census".equals(e.getTag(OSMTagKey.BOUNDARY));
 		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
-		if (administrative || postalCode || ct != null) {
+		if (administrative || census || postalCode || ct != null) {
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
 				return null;
 			}
@@ -1141,14 +1145,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
-		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
-		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns,
+				postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes,
+				namesIndex, tagRules, progress);
 
 		// write postcodes
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 		writer.startCityBlockIndex(CityBlocks.POSTCODES_TYPE.index);
 		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
 		for (City s : posts) {
+			// TODO Enable in 5.3 (5.2 version will support postcode ordinal)
+//			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
 		}
 		for (int i = 0; i < posts.size(); i++) {
@@ -1166,6 +1174,33 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 			});
 			writer.writeCityIndex(postCode, streets, null, ref, tagRules);
+		}
+		writer.endCityBlockIndex();
+		
+		// write unassigned boundaries
+		writer.startCityBlockIndex(CityBlocks.BOUNDARY_TYPE.index);
+		refs = new ArrayList<BinaryFileReference>();
+		List<Boundary> notAssignedBoundaries = this.cityDataStorage.getNotAssignedBoundaries();
+		List<City> boundariesAsCities = new ArrayList<>();
+		for (Boundary b : notAssignedBoundaries) {
+			// TODO add bbox
+			City c = new City(CityType.BOUNDARY);
+			c.setId(ObfConstants.createMapObjectIdFromOsmId(b.getBoundaryId(), EntityType.RELATION));
+			c.setLocation(b.getCenterPoint());
+			c.setName(b.getName());
+			if (!Algorithms.isEmpty(b.getAltName())) {
+				c.setEnName(b.getAltName());
+			}
+			boundariesAsCities.add(c);
+		}
+		for (City c : boundariesAsCities) {
+			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
+		}
+		for (int i = 0; i < notAssignedBoundaries.size(); i++) {
+			City b = boundariesAsCities.get(i);
+			BinaryFileReference ref = refs.get(i);
+			putNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
+			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
 

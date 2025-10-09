@@ -850,11 +850,11 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-		settings.indexMap = true;
+//		settings.indexMap = true;
 		settings.indexAddress = true;
-		settings.indexPOI = true;
+//		settings.indexPOI = true;
 		// settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
@@ -870,8 +870,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "../temp/Map.osm";
-		String file = rootFolder + "../temp/andorra_europe.pbf";
+		String file = rootFolder + "../temp/Map.osm";
+//		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";

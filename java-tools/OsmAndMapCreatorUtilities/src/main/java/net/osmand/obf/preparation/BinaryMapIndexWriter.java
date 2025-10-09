@@ -12,6 +12,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntObjectMap;
 import net.osmand.IndexConstants;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
@@ -975,20 +976,20 @@ public class BinaryMapIndexWriter {
 //				if(checkEnNameToWrite(o)){
 //					atom.setNameEn(o.getEnName());
 //				}
-				int type = 1;
+				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
 				if (o instanceof City) {
-					if (((City) o).isPostcode()) {
-						type = 2;
-					} else {
-						CityType ct = ((City) o).getType();
-						if (ct != CityType.CITY && ct != CityType.TOWN) {
-							type = 3;
-						}
+					CityType ct = ((City) o).getType();
+					if (ct == CityType.POSTCODE) {
+						type = CityBlocks.BOUNDARY_TYPE;
+					} else if (ct == CityType.BOUNDARY) {
+						type = CityBlocks.BOUNDARY_TYPE;
+					} else if (ct != CityType.CITY && ct != CityType.TOWN) {
+						type = CityBlocks.VILLAGES_TYPE;
 					}
 				} else if (o instanceof Street) {
-					type = 4;
+					type = CityBlocks.STREET_TYPE;
 				}
-				atom.setType(type);
+				atom.setType(type.index);
 				LatLon ll = o.getLocation();
 				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
 				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());

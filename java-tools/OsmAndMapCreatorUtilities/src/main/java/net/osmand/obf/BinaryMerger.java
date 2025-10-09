@@ -501,9 +501,7 @@ public class BinaryMerger {
 						city = mergeCities(city, namesake, namesakesStreetNodes);
 					}
 				}
-
-				int cityTypeInd = city.isPostcode() ? -1 : city.getType().ordinal();
-				BinaryFileReference ref = writer.writeCityHeader(city, cityTypeInd, tagRules);
+				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);

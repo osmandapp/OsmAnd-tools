@@ -17,7 +17,6 @@ public class CityDataStorage {
     private DataTileManager<City> cityManager = new DataTileManager<City>(10);
     private Map<Entity.EntityId, City> cities = new LinkedHashMap<Entity.EntityId, City>();
     private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
-    private static final int SHIFT_BOUNDARY_CENTER = 2;
 
     public List<City> getClosestObjects(double latitude, double longitude) {
         List<City> result = new ArrayList<>();
