@@ -283,7 +283,7 @@ public class IndexCreator {
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
 				if (indexAddressCreator != null) {
-					indexAddressCreator.registerCityIfNeeded(entity);
+					indexAddressCreator.registerCityNodes(entity);
 				}
 				// accept to allow db creator parse it
 				return true;
@@ -759,9 +759,8 @@ public class IndexCreator {
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					calculateRegionTagAndTransliterate(e, icc);
 					if (settings.indexAddress) {
-						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
-						// !!!
-						indexAddressCreator.indexBoundariesRelation(e, ctx);
+						// indexAddressCreator.indexStreetRelation((Relation) e, ctx); streets needs loaded boundaries first !!!
+						indexAddressCreator.indexBoundaries(e, ctx);
 					}
 					if (settings.indexMap) {
 						if (!settings.keepOnlyRouteRelationObjects) {
@@ -797,7 +796,7 @@ public class IndexCreator {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						if (settings.indexAddress) {
-							indexAddressCreator.indexBoundariesRelation(e, ctx);
+							indexAddressCreator.indexBoundaries(e, ctx);
 						}
 						if (settings.indexRouting) {
 							indexRouteCreator.indexLowEmissionZones(e, ctx);
@@ -817,7 +816,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx, icc);
+						indexAddressCreator.indexStreetRelation((Relation) e, ctx, icc);
 					}
 				});
 
