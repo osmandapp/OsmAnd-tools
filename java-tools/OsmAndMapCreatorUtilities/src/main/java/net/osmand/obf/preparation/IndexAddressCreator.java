@@ -101,21 +101,41 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
-			City city = EntityParser.parseCity((Node) e);
-			if (city != null) {
-				city.setNames(getOtherNames(e));
-				regCity(city, e);
-			}
+			regCity(e, null);
 		}
 	}
 
+	private City createMissingCity(Entity e, CityType t) throws SQLException {
+		City c = regCity(e, t);
+		if (debugCityIds.contains(c.getId())) {
+			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
+					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
+					+c.getId() +
+					", " + c.getLocation().getLatitude() +
+					"," + c.getLocation().getLongitude() +
+					", " + c.getName() +
+					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
+					", " + CityType.valueToString(c.getType()) + ")");
+		}
+		
+		writeCity(c);
+		commitWriteCity();
+		return c;
+	}
 
-	private void regCity(City city, Entity e) {
+	private City regCity(Entity e, CityType t) {
+		City city = EntityParser.parseCity(e, t);
+		// postcodes & boundaries will be null CityType.valueFromString(el.getTag(OSMTagKey.PLACE.getValue()));
+		if (city == null || city.getLocation() == null) {
+			return null;
+		}
 		LatLon l = city.getLocation();
-		if (!Algorithms.isEmpty(city.getName()) && l != null) {
+		city.setNames(getOtherNames(e));
+		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
 		}
+		return city;
 	}
 
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -163,10 +183,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			// Monaco doesn't have place=town point, but has boundary with tags & admin_level
-			// It could be wrong if the boundary doesn't match center point
-			if (cityFound == null /*&& !boundary.hasAdminLevel() */ &&
+			// However it could be wrong create point if the boundary doesn't match center point
+			if (cityFound == null && 
+					// && !boundary.hasAdminLevel() 
+					// boundary.getCityType() == CityType.CITY || // assume all cities should have proper city 
 					(boundary.getCityType() == CityType.TOWN ||
-							// boundary.getCityType() == CityType.CITY ||
 							boundary.getCityType() == CityType.HAMLET ||
 							boundary.getCityType() == CityType.SUBURB ||
 							boundary.getCityType() == CityType.VILLAGE)) {
@@ -176,7 +197,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(getBoundaryCenter(cityFound.getId(), e));
 			}
-			System.out.println("Boundary " + boundaryName);
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 			} else {
@@ -349,8 +369,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		long centerId = 0;
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
 		// if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
-		boolean isNeighbourhood = e.getTag(OSMTagKey.ADDR_PLACE) != null && "neighbourhood".equals(e.getTag(OSMTagKey.PLACE));
-		if ((ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) || isNeighbourhood) {
+		boolean isNeighbourhood = ct == CityType.NEIGHBOURHOOD;
+		boolean isTownland = ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY));
+		if (isTownland || isNeighbourhood) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
@@ -425,27 +446,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     }
 
 
-	private City createMissingCity(Entity e, CityType t) throws SQLException {
-		City c = EntityParser.parseCity(e, t);
-		c.setNames(getOtherNames(e));
-		if (c.getLocation() == null) {
-			return null;
-		}
-		if (debugCityIds.contains(c.getId())) {
-			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
-					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
-					+c.getId() +
-					", " + c.getLocation().getLatitude() +
-					"," + c.getLocation().getLongitude() +
-					", " + c.getName() +
-					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
-					", " + CityType.valueToString(c.getType()) + ")");
-		}
-		regCity(c, e);
-		writeCity(c);
-		commitWriteCity();
-		return c;
-	}
 
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$

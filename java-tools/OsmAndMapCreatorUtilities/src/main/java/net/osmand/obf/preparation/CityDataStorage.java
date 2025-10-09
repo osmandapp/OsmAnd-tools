@@ -7,6 +7,10 @@ import net.osmand.osm.edit.Entity;
 
 import java.util.*;
 
+/**
+ * CityDataStorage stores all type of CityType except CityType.POSTCODE.
+ * CityType.BOUNDARY - are stored as notAssignedBoundaries
+ */
 public class CityDataStorage {
 
     public Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
