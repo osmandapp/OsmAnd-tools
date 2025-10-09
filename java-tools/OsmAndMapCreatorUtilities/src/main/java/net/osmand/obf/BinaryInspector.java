@@ -63,19 +63,19 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups",
+//					"-vaddress", "-vcities", //"-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-//					"-latlon=40.634196,-76.594491,0.0005",
+//					"-latlon=41.4,-75.7,0.05",
 //					"-latlon=42.060294,-77.498224,0.05",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					System.getProperty("maps.dir") + "Map.obf"
-//					System.getProperty("maps.dir") + "Us_new-york_syracuse_northamerica.obf"
+//					System.getProperty("maps.dir") + "Germany_nordrhein-westfalen_cologne-government-region_europe_3.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -821,10 +821,10 @@ public class BinaryInspector {
 				String bboxStr = "";
 				if(c.getBbox31() != null) {
 					bboxStr = String.format("%.5f, %.5f - %.5f, %.5f",
-							MapUtils.get31LongitudeX(c.getBbox31()[0]),
 							MapUtils.get31LatitudeY(c.getBbox31()[1]),
-							MapUtils.get31LongitudeX(c.getBbox31()[2]),
-							MapUtils.get31LatitudeY(c.getBbox31()[3]));
+							MapUtils.get31LongitudeX(c.getBbox31()[0]),
+							MapUtils.get31LatitudeY(c.getBbox31()[3]),
+							MapUtils.get31LongitudeX(c.getBbox31()[2]));
 				}
 				String cityDescription = (type == CityBlocks.POSTCODES_TYPE ?
 						String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr) :
