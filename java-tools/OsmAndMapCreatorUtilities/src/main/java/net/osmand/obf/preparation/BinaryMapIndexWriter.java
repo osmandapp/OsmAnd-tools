@@ -1048,10 +1048,12 @@ public class BinaryMapIndexWriter {
 		cityInd.setX(cx);
 		cityInd.setY(cy);
 		cityInd.setShiftToCityBlockIndex(0);
-		if(city.getBbox31() != null) {
+		if (city.getBbox31() != null) {
+			mapDataBuf.clear();
 			for (Integer i : city.getBbox31()) {
-				cityInd.addBoundary(i);
+				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(i));
 			}
+			cityInd.setBoundary(ByteString.copyFrom(mapDataBuf.toArray()));
 		}
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();

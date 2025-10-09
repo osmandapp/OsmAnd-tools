@@ -63,7 +63,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups",
+					"-vaddress", "-vcities",// "-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
