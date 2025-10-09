@@ -1,11 +1,37 @@
 package net.osmand.obf.preparation;
 
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Stack;
+import java.util.TreeSet;
+import java.util.zip.GZIPOutputStream;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import com.google.protobuf.WireFormat;
 import com.google.protobuf.WireFormat.FieldType;
+
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
@@ -18,25 +44,51 @@ import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.OsmandOdb.*;
+import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
+import net.osmand.binary.OsmandOdb.CityBlockIndex;
+import net.osmand.binary.OsmandOdb.CityIndex;
+import net.osmand.binary.OsmandOdb.MapData;
+import net.osmand.binary.OsmandOdb.MapDataBlock;
+import net.osmand.binary.OsmandOdb.OsmAndAddressIndex;
 import net.osmand.binary.OsmandOdb.OsmAndAddressIndex.CitiesIndex;
+import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData;
 import net.osmand.binary.OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData;
 import net.osmand.binary.OsmandOdb.OsmAndCategoryTable.Builder;
+import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex;
 import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRouteBlockSegments;
 import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRouteNetworkPoint;
 import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointSegments;
 import net.osmand.binary.OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox;
+import net.osmand.binary.OsmandOdb.OsmAndMapIndex;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapDataBox;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapEncodingRule;
 import net.osmand.binary.OsmandOdb.OsmAndMapIndex.MapRootLevel;
+import net.osmand.binary.OsmandOdb.OsmAndPoiBoxDataAtom;
+import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
+import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndexDataAtom;
+import net.osmand.binary.OsmandOdb.OsmAndPoiSubtype;
+import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBox;
-import net.osmand.binary.OsmandOdb.TransportRoute;
 import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteEncodingRule;
-import net.osmand.data.*;
+import net.osmand.binary.OsmandOdb.OsmAndSubtypesTable;
+import net.osmand.binary.OsmandOdb.OsmAndTransportIndex;
+import net.osmand.binary.OsmandOdb.RouteData;
+import net.osmand.binary.OsmandOdb.StreetIndex;
+import net.osmand.binary.OsmandOdb.StreetIntersection;
+import net.osmand.binary.OsmandOdb.StringTable;
+import net.osmand.binary.OsmandOdb.TransportRoute;
+import net.osmand.binary.OsmandOdb.TransportRouteSchedule;
+import net.osmand.binary.OsmandOdb.TransportRouteStop;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.City.CityType;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.Street;
+import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.data.TransportStopExit;
-import net.osmand.data.City.CityType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorTagGroups;
@@ -53,17 +105,6 @@ import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.zip.GZIPOutputStream;
 
 public class BinaryMapIndexWriter {
 
@@ -1048,16 +1089,21 @@ public class BinaryMapIndexWriter {
 		cityInd.setX(cx);
 		cityInd.setY(cy);
 		cityInd.setShiftToCityBlockIndex(0);
+		int boundarySize = 0;
 		if (city.getBbox31() != null) {
 			mapDataBuf.clear();
 			for (Integer i : city.getBbox31()) {
-				writeRawVarint32(mapDataBuf, CodedOutputStream.encodeZigZag32(i));
+				writeRawVarint32(mapDataBuf, i);
 			}
 			cityInd.setBoundary(ByteString.copyFrom(mapDataBuf.toArray()));
+			boundarySize = CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
+					+ CodedOutputStream.computeTagSize(CityIndex.BOUNDARY_FIELD_NUMBER) + mapDataBuf.size();
 		}
+		
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();
-		return BinaryFileReference.createShiftReference(getFilePointer() - 4, startMessage);
+		return BinaryFileReference.createShiftReference(getFilePointer() - 
+				boundarySize - 4, startMessage);
 
 	}
 

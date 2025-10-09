@@ -63,7 +63,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities",// "-vstreetgroups",
+					"-vaddress", "-vcities", "-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -795,8 +795,8 @@ public class BinaryInspector {
 				continue;
 			}
 			final List<City> cities = index.getCities(region, null, type);
-
-			print(MessageFormat.format("\t{0}, {1,number,#} entities", type.toString(), cities.size()));
+			
+			print(String.format("\t %s %d entities", type.toString(), cities.size()));
 			if (CityBlocks.CITY_TOWN_TYPE == type) {
 				if (!verbose.vstreetgroups && !verbose.vcities) {
 					println("");
@@ -807,18 +807,28 @@ public class BinaryInspector {
 				continue;
 			}
 			println(":");
-
 			for (City c : cities) {
-				int size = index.preloadStreets(c, null);
+				int size = 0;
+				if (type != CityBlocks.BOUNDARY_TYPE) {
+					size = index.preloadStreets(c, null);
+				}
 				List<Street> streets = new ArrayList<Street>(c.getStreets());
 				String name = c.getName(verbose.lang);
 				if (verbose.vcitynames) {
 					boolean includeEnName = verbose.lang == null || !verbose.lang.equals("en");
 					name += " " + c.getNamesMap(includeEnName).toString();
 				}
+				String bboxStr = "";
+				if(c.getBbox31() != null) {
+					bboxStr = String.format("%.5f, %.5f - %.5f, %.5f",
+							MapUtils.get31LongitudeX(c.getBbox31()[0]),
+							MapUtils.get31LatitudeY(c.getBbox31()[1]),
+							MapUtils.get31LongitudeX(c.getBbox31()[2]),
+							MapUtils.get31LatitudeY(c.getBbox31()[3]));
+				}
 				String cityDescription = (type == CityBlocks.POSTCODES_TYPE ?
-						MessageFormat.format("\t\t''{0}'' {1,number,#} street(s) size {2,number,#} bytes", name, streets.size(), size) :
-						MessageFormat.format("\t\t''{0}'' [{1,number,#}], {2,number,#} street(s) size {3,number,#} bytes", name, c.getId(), streets.size(), size));
+						String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr) :
+						String.format("\t\t'%s' [%d], %d street(s) size %,d bytes %s", name, c.getId(), streets.size(), size, bboxStr));
 				print(cityDescription);
 				if (!verbose.vstreets) {
 					println("");
