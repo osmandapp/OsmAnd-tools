@@ -3,7 +3,10 @@ package net.osmand.server.api.services;
 import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
+import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.data.*;
+import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
@@ -24,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static net.osmand.data.City.CityType.getAllCityTypeStrings;
 import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
@@ -553,63 +555,75 @@ public class SearchService {
         return searchUICore.immediateSearch(text  + DELIMITER, null);
     }
     
-    public SearchUICore.SearchResultCollection searchCitiesByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
-            return null;
-        }
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
-        
-        SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(osmandRegions);
-        settings.setOfflineIndexes(mapList);
-        
-        Set<String> types = getAllCityTypeStrings();
-        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
-        
-        int attempts = 0;
-        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
-            searchBbox = doubleBboxSize(searchBbox);
-            res = searchWithBbox(searchUICore, settings, searchBbox, types);
-            attempts++;
-        }
-        
-        return res;
-    }
-    
-    private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
-        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-        SearchUICore.SearchResultCollection res = null;
-        for (String type : types) {
-            type = type.replace("_", " ");
-            if (res == null) {
-                res = searchUICore.immediateSearch(type, null);
-            } else {
-                SearchUICore.SearchResultCollection searchResults = searchUICore.immediateSearch(type, null);
-                res.addSearchResults(searchResults.getCurrentSearchResults(), false, true);
-            }
-        }
-        return res;
-    }
-    
-    private QuadRect doubleBboxSize(QuadRect bbox) {
-        double centerX = (bbox.left + bbox.right) / 2;
-        double centerY = (bbox.top + bbox.bottom) / 2;
-        double width = bbox.right - bbox.left;
-        double height = bbox.bottom - bbox.top;
-        
-        double newWidth = width * 2;
-        double newHeight = height * 2;
-        
-        return new QuadRect(
-                centerX - newWidth / 2,
-                centerY + newHeight / 2,
-                centerX + newWidth / 2,
-                centerY - newHeight / 2
-        );
-    }
+	private double getRating(Amenity sr, double lat, double lon) {
+		String populationS = sr.getAdditionalInfo("population");
+		City.CityType type = CityType.valueFromString(sr.getSubType());
+		long population = type.getPopulation();
+		if (populationS != null) {
+			populationS = populationS.replaceAll("\\D", "");
+			if (populationS.matches("\\d+")) {
+				population = Long.parseLong(populationS);
+			}
+		}
+		double distance = MapUtils.getDistance(sr.getLocation(), lat, lon) / 1000.0;
+		return Math.log10(population + 1.0) - distance;
+	}
+	
+	public Amenity searchCitiesByBbox(QuadRect searchBbox, double lat, double lon, List<BinaryMapIndexReader> mapList)
+			throws IOException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return null;
+		}
+		List<Amenity> modifiableFoundedPlaces = new ArrayList<>();
+
+		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+				MapUtils.get31TileNumberX(searchBbox.left), MapUtils.get31TileNumberX(searchBbox.right),
+				MapUtils.get31TileNumberY(searchBbox.top), MapUtils.get31TileNumberY(searchBbox.bottom), 15,
+				new SearchPoiTypeFilter() {
+
+					@Override
+					public boolean isEmpty() {
+						return false;
+					}
+
+					@Override
+					public boolean accept(PoiCategory type, String subcategory) {
+						if (type.getKeyName().equals("administrative")
+								&& CityType.valueFromString(subcategory) != null) {
+							return true;
+						}
+						return false;
+					}
+				}, new ResultMatcher<Amenity>() {
+
+					@Override
+					public boolean publish(Amenity object) {
+						modifiableFoundedPlaces.add(object);
+						return false;
+					}
+
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		for (BinaryMapIndexReader r : mapList) {
+			r.searchPoi(req);
+		}
+		modifiableFoundedPlaces.sort((o1, o2) -> {
+			if (o1 instanceof Amenity && o2 instanceof Amenity) {
+				double rating1 = getRating(o1, lat, lon);
+				double rating2 = getRating(o2, lat, lon);
+				return Double.compare(rating2, rating1);
+			}
+			return 0;
+		});
+		if (modifiableFoundedPlaces.size() > 0) {
+			return modifiableFoundedPlaces.get(0);
+		}
+
+		return null;
+	}
     
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {

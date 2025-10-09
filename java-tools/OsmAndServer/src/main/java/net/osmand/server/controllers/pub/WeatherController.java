@@ -165,8 +165,7 @@ public class WeatherController {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
-			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
-			nearestPlace = getNearestPlace(resultCollection, lat, lon);
+			nearestPlace = searchService.searchCitiesByBbox(searchBbox, lat, lon, usedMapList);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
@@ -186,17 +185,7 @@ public class WeatherController {
 		return searchBbox;
 	}
 	
-	private long getPopulation(Amenity a) {
-		String population = a.getAdditionalInfo("population");
-		if (population != null) {
-			population = population.replaceAll("\\D", "");
-			if (population.matches("\\d+")) {
-				return Long.parseLong(population);
-			}
-		}
-		City.CityType type = valueFromString(a.getSubType());
-		return type.getPopulation();
-	}
+	
 	
 	private List<LatLon> getBbox(String nw, String se) {
 		List<LatLon> bbox = new ArrayList<>();
@@ -209,32 +198,7 @@ public class WeatherController {
 		return bbox;
 	}
 	
-	private Amenity getNearestPlace(SearchUICore.SearchResultCollection resultCollection, double centerLat, double centerLon) {
-		List<SearchResult> foundedPlaces = resultCollection.getCurrentSearchResults();
-		List<SearchResult> modifiableFoundedPlaces = new ArrayList<>(foundedPlaces);
-		
-		modifiableFoundedPlaces.sort((o1, o2) -> {
-			if (o1.object instanceof Amenity && o2.object instanceof Amenity) {
-				double rating1 = getRating(o1, centerLat, centerLon);
-				double rating2 = getRating(o2, centerLat, centerLon);
-				return Double.compare(rating2, rating1);
-			}
-			return 0;
-		});
-		if (!modifiableFoundedPlaces.isEmpty()) {
-			return (Amenity) modifiableFoundedPlaces.get(0).object;
-		}
-		return null;
-	}
 	
-	private double getRating(SearchResult sr, double centerLat, double centerLon) {
-		long population = getPopulation((Amenity) sr.object);
-		double lat1 = sr.location.getLatitude();
-		double lon1 = sr.location.getLongitude();
-		double distance = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
-		
-		return Math.log10(population + 1.0) - distance;
-	}
 
 	static class WeatherPoint {
 		long ts;
