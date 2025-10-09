@@ -1188,13 +1188,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<City> boundariesAsCities = new ArrayList<>();
 		for (Boundary b : notAssignedBoundaries) {
 			City c = new City(CityType.BOUNDARY);
-			QuadRect bbox = b.getMultipolygon().getLatLonBbox();
-			c.setBbox31(new int[] {
-				MapUtils.get31TileNumberX(bbox.left),
-				MapUtils.get31TileNumberY(bbox.top),
-				MapUtils.get31TileNumberX(bbox.right),
-				MapUtils.get31TileNumberY(bbox.bottom)
-			});
+			cityDataStorage.assignBbox(c, b);
 			c.setId(ObfConstants.createMapObjectIdFromOsmId(b.getBoundaryId(), EntityType.RELATION));
 			c.setLocation(b.getCenterPoint());
 			c.setName(b.getName());
@@ -1208,6 +1202,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// add boroughs as well to city data storage
 				City city = new City(CityType.BOUNDARY);
 				city.setBbox31(c.getBbox31());
+				cityDataStorage.assignBbox(city);
 				city.setId(c.getId());
 				city.setLocation(c.getLocation());
 				city.copyNames(c);
@@ -1397,6 +1392,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// 1. write cities
 		writer.startCityBlockIndex(type);
 		for (City c : cities) {
+			cityDataStorage.assignBbox(c);
 			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
 		}
 		for (int i = 0; i < cities.size(); i++) {
