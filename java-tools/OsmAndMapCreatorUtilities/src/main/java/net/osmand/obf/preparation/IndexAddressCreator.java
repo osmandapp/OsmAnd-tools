@@ -326,19 +326,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return adminLevelImportance;
 	}
 
-	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
+	private void putCityBoundary(Boundary boundary, City cityFound) {
 		final Boundary oldBoundary = cityDataStorage.getBoundaryByCity(cityFound);
 		if (oldBoundary == null) {
 			cityDataStorage.setCityBoundary(cityFound, boundary);
 			logBoundaryChanged(boundary, cityFound,
 					getCityBoundaryImportance(boundary, cityFound), 100);
-			return oldBoundary;
 		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
 				&& oldBoundary != boundary
 				&& boundary.getName().equalsIgnoreCase(
 						oldBoundary.getName())) {
 			oldBoundary.mergeWith(boundary);
-			return oldBoundary;
 		} else {
 			int old = getCityBoundaryImportance(oldBoundary, cityFound);
 			int n = getCityBoundaryImportance(boundary, cityFound);
@@ -346,8 +344,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityDataStorage.setCityBoundary(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound, n, old);
 			}
-			return oldBoundary;
 		}
+		QuadRect bbox = boundary.getMultipolygon().getLatLonBbox();
+		cityFound.setBbox31(new int[] {
+			MapUtils.get31TileNumberX(bbox.left),
+			MapUtils.get31TileNumberY(bbox.top),
+			MapUtils.get31TileNumberX(bbox.right),
+			MapUtils.get31TileNumberY(bbox.bottom)
+		});
 	}
 
 
@@ -1183,8 +1187,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<Boundary> notAssignedBoundaries = this.cityDataStorage.getNotAssignedBoundaries();
 		List<City> boundariesAsCities = new ArrayList<>();
 		for (Boundary b : notAssignedBoundaries) {
-			// TODO add bbox
 			City c = new City(CityType.BOUNDARY);
+			QuadRect bbox = b.getMultipolygon().getLatLonBbox();
+			c.setBbox31(new int[] {
+				MapUtils.get31TileNumberX(bbox.left),
+				MapUtils.get31TileNumberY(bbox.top),
+				MapUtils.get31TileNumberX(bbox.right),
+				MapUtils.get31TileNumberY(bbox.bottom)
+			});
 			c.setId(ObfConstants.createMapObjectIdFromOsmId(b.getBoundaryId(), EntityType.RELATION));
 			c.setLocation(b.getCenterPoint());
 			c.setName(b.getName());
@@ -1193,9 +1203,22 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			boundariesAsCities.add(c);
 		}
+		for (City c : this.cityDataStorage.getAllCities()) {
+			if (!c.getType().storedAsSeparateAdminEntity()) {
+				// add boroughs as well to city data storage
+				City city = new City(CityType.BOUNDARY);
+				city.setBbox31(c.getBbox31());
+				city.setId(c.getId());
+				city.setLocation(c.getLocation());
+				city.copyNames(c);
+				city.setName(c.getName());
+				boundariesAsCities.add(c);
+			}
+		}
 		for (City c : boundariesAsCities) {
 			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
 		}
+		
 		for (int i = 0; i < notAssignedBoundaries.size(); i++) {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);

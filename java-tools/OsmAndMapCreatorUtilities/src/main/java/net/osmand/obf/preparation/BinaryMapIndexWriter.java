@@ -1014,7 +1014,7 @@ public class BinaryMapIndexWriter {
 		return true;
 	}
 
-	public BinaryFileReference writeCityHeader(MapObject city, int cityType, Map<String, Integer> tagRules) throws IOException {
+	public BinaryFileReference writeCityHeader(City city, int cityType, Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.CITIES_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		long startMessage = getFilePointer();
@@ -1048,6 +1048,11 @@ public class BinaryMapIndexWriter {
 		cityInd.setX(cx);
 		cityInd.setY(cy);
 		cityInd.setShiftToCityBlockIndex(0);
+		if(city.getBbox31() != null) {
+			for (Integer i : city.getBbox31()) {
+				cityInd.addBoundary(i);
+			}
+		}
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();
 		return BinaryFileReference.createShiftReference(getFilePointer() - 4, startMessage);

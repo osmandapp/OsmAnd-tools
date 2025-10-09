@@ -9,7 +9,10 @@ import java.util.*;
 
 /**
  * CityDataStorage stores all type of CityType except CityType.POSTCODE.
- * CityType.BOUNDARY - are stored as notAssignedBoundaries
+ * CityType.BOUNDARY - are stored as notAssignedBoundariesю
+ * 
+ * Take into account that not all objects will have streets,
+ * for example DISTRICT, BOROUGH are not storedAsSeparateAdminEntity so here they are used to have proper boundaries  
  */
 public class CityDataStorage {
 
