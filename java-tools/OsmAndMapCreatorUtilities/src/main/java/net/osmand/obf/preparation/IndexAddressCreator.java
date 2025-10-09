@@ -21,6 +21,7 @@ import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.CommonWords;
+import net.osmand.binary.ObfConstants;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
 import net.osmand.data.Building.BuildingInterpolation;
@@ -35,6 +36,7 @@ import net.osmand.data.Street;
 import net.osmand.obf.preparation.DBStreetDAO.SimpleStreet;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
@@ -99,21 +101,41 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
-			City city = EntityParser.parseCity((Node) e);
-			if (city != null) {
-				city.setNames(getOtherNames(e));
-				regCity(city, e);
-			}
+			regCity(e, null);
 		}
 	}
 
+	private City createMissingCity(Entity e, CityType t) throws SQLException {
+		City c = regCity(e, t);
+		if (debugCityIds.contains(c.getId())) {
+			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
+					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
+					+c.getId() +
+					", " + c.getLocation().getLatitude() +
+					"," + c.getLocation().getLongitude() +
+					", " + c.getName() +
+					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
+					", " + CityType.valueToString(c.getType()) + ")");
+		}
+		
+		writeCity(c);
+		commitWriteCity();
+		return c;
+	}
 
-	private void regCity(City city, Entity e) {
+	private City regCity(Entity e, CityType t) {
+		City city = EntityParser.parseCity(e, t);
+		// postcodes & boundaries will be null CityType.valueFromString(el.getTag(OSMTagKey.PLACE.getValue()));
+		if (city == null || city.getLocation() == null) {
+			return null;
+		}
 		LatLon l = city.getLocation();
-		if (city.getType() != null && !Algorithms.isEmpty(city.getName()) && l != null) {
+		city.setNames(getOtherNames(e));
+		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
 		}
+		return city;
 	}
 
 	public void indexBoundariesRelation(Entity e, OsmDbAccessorContext ctx) throws SQLException {
@@ -161,10 +183,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			// Monaco doesn't have place=town point, but has boundary with tags & admin_level
-			// It could be wrong if the boundary doesn't match center point
-			if (cityFound == null /*&& !boundary.hasAdminLevel() */ &&
+			// However it could be wrong create point if the boundary doesn't match center point
+			if (cityFound == null && 
+					// && !boundary.hasAdminLevel() 
+					// boundary.getCityType() == CityType.CITY || // assume all cities should have proper city 
 					(boundary.getCityType() == CityType.TOWN ||
-							// boundary.getCityType() == CityType.CITY ||
 							boundary.getCityType() == CityType.HAMLET ||
 							boundary.getCityType() == CityType.SUBURB ||
 							boundary.getCityType() == CityType.VILLAGE)) {
@@ -303,19 +326,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return adminLevelImportance;
 	}
 
-	private Boundary putCityBoundary(Boundary boundary, City cityFound) {
+	private void putCityBoundary(Boundary boundary, City cityFound) {
 		final Boundary oldBoundary = cityDataStorage.getBoundaryByCity(cityFound);
 		if (oldBoundary == null) {
 			cityDataStorage.setCityBoundary(cityFound, boundary);
 			logBoundaryChanged(boundary, cityFound,
 					getCityBoundaryImportance(boundary, cityFound), 100);
-			return oldBoundary;
 		} else if (oldBoundary.getAdminLevel() == boundary.getAdminLevel()
 				&& oldBoundary != boundary
 				&& boundary.getName().equalsIgnoreCase(
 						oldBoundary.getName())) {
 			oldBoundary.mergeWith(boundary);
-			return oldBoundary;
 		} else {
 			int old = getCityBoundaryImportance(oldBoundary, cityFound);
 			int n = getCityBoundaryImportance(boundary, cityFound);
@@ -323,8 +344,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityDataStorage.setCityBoundary(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound, n, old);
 			}
-			return oldBoundary;
 		}
+		QuadRect bbox = boundary.getMultipolygon().getLatLonBbox();
+		cityFound.setBbox31(new int[] {
+			MapUtils.get31TileNumberX(bbox.left),
+			MapUtils.get31TileNumberY(bbox.top),
+			MapUtils.get31TileNumberX(bbox.right),
+			MapUtils.get31TileNumberY(bbox.bottom)
+		});
 	}
 
 
@@ -346,8 +373,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		long centerId = 0;
 		CityType ct = CityType.valueFromString(e.getTag(OSMTagKey.PLACE));
 		// if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
-		boolean isNeighbourhood = e.getTag(OSMTagKey.ADDR_PLACE) != null && "neighbourhood".equals(e.getTag(OSMTagKey.PLACE));
-		if ((ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY))) || isNeighbourhood) {
+		boolean isNeighbourhood = ct == CityType.NEIGHBOURHOOD;
+		boolean isTownland = ct == null && "townland".equals(e.getTag(OSMTagKey.LOCALITY));
+		if (isTownland || isNeighbourhood) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
@@ -358,8 +386,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
+		boolean census = "census".equals(e.getTag(OSMTagKey.BOUNDARY));
 		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
-		if (administrative || postalCode || ct != null) {
+		if (administrative || census || postalCode || ct != null) {
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
 				return null;
 			}
@@ -421,27 +450,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     }
 
 
-	private City createMissingCity(Entity e, CityType t) throws SQLException {
-		City c = EntityParser.parseCity(e, t);
-		c.setNames(getOtherNames(e));
-		if (c.getLocation() == null) {
-			return null;
-		}
-		if (debugCityIds.contains(c.getId())) {
-			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
-					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
-					+c.getId() +
-					", " + c.getLocation().getLatitude() +
-					"," + c.getLocation().getLongitude() +
-					", " + c.getName() +
-					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
-					", " + CityType.valueToString(c.getType()) + ")");
-		}
-		regCity(c, e);
-		writeCity(c);
-		commitWriteCity();
-		return c;
-	}
 
 	public void indexAddressRelation(Relation i, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if ("street".equals(i.getTag(OSMTagKey.TYPE)) || "associatedStreet".equals(i.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
@@ -1141,14 +1149,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
-		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns, postcodes, namesIndex, tagRules, progress);
-		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns,
+				postcodes, namesIndex, tagRules, progress);
+		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes,
+				namesIndex, tagRules, progress);
 
 		// write postcodes
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 		writer.startCityBlockIndex(CityBlocks.POSTCODES_TYPE.index);
 		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
 		for (City s : posts) {
+			// TODO Enable in 5.3 (5.2 version will support postcode ordinal)
+//			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
 		}
 		for (int i = 0; i < posts.size(); i++) {
@@ -1166,6 +1178,52 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 			});
 			writer.writeCityIndex(postCode, streets, null, ref, tagRules);
+		}
+		writer.endCityBlockIndex();
+		
+		// write unassigned boundaries
+		writer.startCityBlockIndex(CityBlocks.BOUNDARY_TYPE.index);
+		refs = new ArrayList<BinaryFileReference>();
+		List<Boundary> notAssignedBoundaries = this.cityDataStorage.getNotAssignedBoundaries();
+		List<City> boundariesAsCities = new ArrayList<>();
+		for (Boundary b : notAssignedBoundaries) {
+			City c = new City(CityType.BOUNDARY);
+			QuadRect bbox = b.getMultipolygon().getLatLonBbox();
+			c.setBbox31(new int[] {
+				MapUtils.get31TileNumberX(bbox.left),
+				MapUtils.get31TileNumberY(bbox.top),
+				MapUtils.get31TileNumberX(bbox.right),
+				MapUtils.get31TileNumberY(bbox.bottom)
+			});
+			c.setId(ObfConstants.createMapObjectIdFromOsmId(b.getBoundaryId(), EntityType.RELATION));
+			c.setLocation(b.getCenterPoint());
+			c.setName(b.getName());
+			if (!Algorithms.isEmpty(b.getAltName())) {
+				c.setEnName(b.getAltName());
+			}
+			boundariesAsCities.add(c);
+		}
+		for (City c : this.cityDataStorage.getAllCities()) {
+			if (!c.getType().storedAsSeparateAdminEntity()) {
+				// add boroughs as well to city data storage
+				City city = new City(CityType.BOUNDARY);
+				city.setBbox31(c.getBbox31());
+				city.setId(c.getId());
+				city.setLocation(c.getLocation());
+				city.copyNames(c);
+				city.setName(c.getName());
+				boundariesAsCities.add(c);
+			}
+		}
+		for (City c : boundariesAsCities) {
+			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
+		}
+		
+		for (int i = 0; i < notAssignedBoundaries.size(); i++) {
+			City b = boundariesAsCities.get(i);
+			BinaryFileReference ref = refs.get(i);
+			putNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
+			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
 

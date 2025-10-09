@@ -7,6 +7,13 @@ import net.osmand.osm.edit.Entity;
 
 import java.util.*;
 
+/**
+ * CityDataStorage stores all type of CityType except CityType.POSTCODE.
+ * CityType.BOUNDARY - are stored as notAssignedBoundariesю
+ * 
+ * Take into account that not all objects will have streets,
+ * for example DISTRICT, BOROUGH are not storedAsSeparateAdminEntity so here they are used to have proper boundaries  
+ */
 public class CityDataStorage {
 
     public Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
@@ -17,7 +24,6 @@ public class CityDataStorage {
     private DataTileManager<City> cityManager = new DataTileManager<City>(10);
     private Map<Entity.EntityId, City> cities = new LinkedHashMap<Entity.EntityId, City>();
     private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
-    private static final int SHIFT_BOUNDARY_CENTER = 2;
 
     public List<City> getClosestObjects(double latitude, double longitude) {
         List<City> result = new ArrayList<>();
