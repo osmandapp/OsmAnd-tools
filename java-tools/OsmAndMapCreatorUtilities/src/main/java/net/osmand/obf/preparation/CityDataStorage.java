@@ -43,6 +43,10 @@ public class CityDataStorage {
 		}
 		cities.put(Entity.EntityId.valueOf(e), city);
 	}
+	
+	public City getRegisteredCity(Entity e) {
+		return cities.get(Entity.EntityId.valueOf(e));
+	}
 
 	public Boundary getBoundaryByCity(City c) {
 		return cityBoundaries.get(c);

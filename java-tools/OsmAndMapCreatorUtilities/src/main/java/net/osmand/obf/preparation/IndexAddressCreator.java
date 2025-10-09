@@ -101,30 +101,30 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public void registerCityIfNeeded(Entity e) {
 		if (e instanceof Node && e.getTag(OSMTagKey.PLACE) != null) {
-			regCity(e, null);
+			City c = EntityParser.parseCity(e, null);
+			regCity(c, e);
 		}
 	}
 
 	private City createMissingCity(Entity e, CityType t) throws SQLException {
-		City c = regCity(e, t);
+		City c = EntityParser.parseCity(e, t);
 		if (debugCityIds.contains(c.getId())) {
-			log.error("SQL ERROR!!! City ID already exists in \"city\" table \n" +
+			throw new IllegalStateException("Skip creating duplicate city already exists in \"city\" table \n" +
 					"insert into city (id, latitude, longitude, name, name_en, city_type) values (" +
-					+c.getId() +
+					+ c.getId()+
 					", " + c.getLocation().getLatitude() +
 					"," + c.getLocation().getLongitude() +
 					", " + c.getName() +
 					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
 					", " + CityType.valueToString(c.getType()) + ")");
 		}
-		
+		regCity(c, e);		
 		writeCity(c);
 		commitWriteCity();
 		return c;
 	}
 
-	private City regCity(Entity e, CityType t) {
-		City city = EntityParser.parseCity(e, t);
+	private City regCity(City city, Entity e) {
 		// postcodes & boundaries will be null CityType.valueFromString(el.getTag(OSMTagKey.PLACE.getValue()));
 		if (city == null || city.getLocation() == null) {
 			return null;
@@ -143,11 +143,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// Bucharest has admin level 4
 		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4) &&
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
-		if (boundaryValid) {
+		City cityFound = cityDataStorage.getRegisteredCity(e);
+		if (cityFound != null) {
+			if (boundaryValid) {
+				putCityBoundary(boundary, cityFound);
+			}
+		} else if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
-
-			City cityFound = null;
+			cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
