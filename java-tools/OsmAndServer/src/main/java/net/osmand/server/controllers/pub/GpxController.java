@@ -7,6 +7,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -252,22 +254,39 @@ public class GpxController {
 		}
 	}
 
-	@PostMapping(path = {"/save-track-data"}, produces = "application/json")
-	public ResponseEntity<InputStreamResource> saveTrackData(@RequestBody String data,
-	                                                         HttpSession httpSession) throws IOException {
+	@PostMapping(path = "/save-track-data", produces = MediaType.APPLICATION_XML_VALUE)
+	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String data,
+	                                                           HttpSession httpSession) throws IOException {
+
 		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
-		
+
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
-		InputStreamResource resource = new InputStreamResource(new FileInputStream(tmpGpx));
+
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {
-			return ResponseEntity.badRequest().body(resource);
+			try {Files.deleteIfExists(tmpGpx.toPath()); } catch (IOException ignore) {}
+			return ResponseEntity.badRequest().build();
 		}
-		
+
+		final Path path = tmpGpx.toPath();
+		final long len = Files.size(path);
+
+		StreamingResponseBody body = outputStream -> {
+			try (InputStream in = Files.newInputStream(path)) {
+				in.transferTo(outputStream);
+				outputStream.flush();
+			} catch (IOException ignore) {
+				// client aborted
+			} finally {
+				try { Files.deleteIfExists(path); } catch (IOException ignore) {}
+			}
+		};
+
 		return ResponseEntity.ok()
 				.contentType(MediaType.APPLICATION_XML)
-				.body(resource);
+				.contentLength(len)
+				.body(body);
 	}
 
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
