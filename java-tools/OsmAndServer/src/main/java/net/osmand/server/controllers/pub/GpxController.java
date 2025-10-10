@@ -265,12 +265,20 @@ public class GpxController {
 
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {
-			try {Files.deleteIfExists(tmpGpx.toPath()); } catch (IOException ignore) {}
+			try {
+				Files.deleteIfExists(tmpGpx.toPath());
+			} catch (IOException ignore) {
+			}
 			return ResponseEntity.badRequest().build();
 		}
 
 		final Path path = tmpGpx.toPath();
 		final long len = Files.size(path);
+
+		if (len == 0) {
+			Files.deleteIfExists(path);
+			return ResponseEntity.badRequest().build();
+		}
 
 		StreamingResponseBody body = outputStream -> {
 			try (InputStream in = Files.newInputStream(path)) {
@@ -279,7 +287,10 @@ public class GpxController {
 			} catch (IOException ignore) {
 				// client aborted
 			} finally {
-				try { Files.deleteIfExists(path); } catch (IOException ignore) {}
+				try {
+					Files.deleteIfExists(path);
+				} catch (IOException ignore) {
+				}
 			}
 		};
 
