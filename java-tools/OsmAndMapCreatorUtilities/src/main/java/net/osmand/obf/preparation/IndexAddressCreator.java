@@ -826,7 +826,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (Algorithms.isEmpty(street2)) {
 			street2 = e.getTag(OSMTagKey.ADDR2_STREET);
 		}
-		boolean emptyPlace = !Algorithms.isEmpty(street) || !Algorithms.isEmpty(e.getTag(OSMTagKey.ADDR_CITY));
+		boolean emptyPlace = Algorithms.isEmpty(street) && Algorithms.isEmpty(e.getTag(OSMTagKey.ADDR_CITY));
 		if ((houseName != null || houseNumber != null) && !emptyPlace) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
