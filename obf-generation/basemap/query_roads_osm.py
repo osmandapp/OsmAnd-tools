@@ -6,7 +6,7 @@ import re
 import os
 import threading
 
-regSpaces = re.compile('\s+')
+regSpaces = re.compile(r'\s+')
 def Point(geoStr):
 	coords = regSpaces.split(geoStr.strip())
 	return [coords[0],coords[1]]

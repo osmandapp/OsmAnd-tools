@@ -5,7 +5,7 @@ import pprint
 import re
 import os
 
-regSpaces = re.compile('\s+')
+regSpaces = re.compile(r'\s+')
 def Point(geoStr):
 	coords = regSpaces.split(geoStr.strip())
 	return [coords[0],coords[1]]
@@ -107,9 +107,9 @@ def process_polygons(tags, filename):
 	cursor.execute(sql)
  
 	# retrieve the records from the database
-	parenComma = re.compile('\)\s*,\s*\(')
-	doubleParenComma = re.compile('\)\)\s*,\s*\(\(')
-	trimParens = re.compile('^\s*\(?(.*?)\)?\s*$')
+	parenComma = re.compile(r'\)\s*,\s*\(')
+	doubleParenComma = re.compile(r'\)\)\s*,\s*\(\(')
+	trimParens = re.compile(r'^\s*\(?(.*?)\)?\s*$')
 	rel_id = -1
 	way_id = -100000000
 	node_id =-10000000000000
