@@ -85,7 +85,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
@@ -107,7 +106,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
-	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
@@ -191,19 +189,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiTypes = poiTypes;
 	}
 
-	private long assignIdForMultipolygon(Relation orig) {
-		long ll = orig.getId();
-		return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
-	}
-
-	private long genId(int baseShift, long id) {
-		long gen = (id << DUPLICATE_SPLIT) +  (1l << (baseShift - 1));
-		while (generatedIds.contains(gen)) {
-			gen += 2;
-		}
-		generatedIds.add(gen);
-		return gen;
-	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
@@ -227,75 +212,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (isOutOfRegionBbox(e, icc)) {
                 return;
             }
-			List<LatLon> centers = Collections.singletonList(null);
-			String memberIds = "";
-			if (e instanceof Relation relation) {
-				ctx.loadEntityRelation(relation);
-				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
-				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
-				if (adminCenters.size() == 1) {
-					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
-				} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
-					MultipolygonBuilder original = new MultipolygonBuilder();
-					original.setId(relation.getId());
-					if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
-						Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
-						original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
-					} else {
-						original.createInnerAndOuterWays(relation);
-					}
-					List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
-					centers = new ArrayList<>();
-					for (Multipolygon m : multipolygons) {
-						assert m.getOuterRings().size() == 1;
-						if (!m.areRingsComplete()) {
-							log.warn("In multipolygon (POI) " + relation.getId() + " there are incompleted ways");
-						}
-						Ring out = m.getOuterRings().get(0);
-						if (out.getBorder().size() == 0) {
-							log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
-							// don't index this
-							continue;
-						}
-                        List<List<Node>> innerWays = new ArrayList<>();
-                        for (Ring r : m.getInnerRings()) {
-                            innerWays.add(r.getBorder());
-                        }
-                        LatLon l = OsmMapUtils.getComplexPolyCenter(out.getBorder(), innerWays);
-                        centers.add(l);
-					}
-				} else if (OsmMapUtils.isSuperRoute(tags)) {
-					for (RelationMember members : relation.getMembers()) {
-						if (members.getEntityId().getType() == EntityType.RELATION) {
-							if (memberIds.length() > 0) {
-								memberIds += " ";
-							}
-							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
-							if (centers.get(0) == null) {
-								Relation memberRel = (Relation) members.getEntity();
-								ctx.loadEntityRelation(memberRel);
-								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel, true));
-							}
-						}
-					}
-				}
-			}
+			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
+			StringBuilder memberIds = new StringBuilder();
+			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds);
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
-			} else if(e instanceof Relation) {
+			} else {
 //				id = GENERATE_OBJ_ID--;
-				id = assignIdForMultipolygon((Relation) e);
-			} else if(id > 0) {
-				boolean isPropagated = e.getId() > PROPAGATED_NODE_BIT;
-				if (isPropagated) {
-					id = e.getId();
-				} else {
-					// keep backward compatibility for ids (osm editing)
-					id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
-					if (id % 2 != (e.getId() % 2)) {
-						id ^= 1;
+				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
+				if (e instanceof Relation) {
+					// other ids couldn't be duplicated 
+					while (generatedIds.contains(id)) {
+						id += 2;
 					}
+					generatedIds.add(id);
 				}
 			}
 
@@ -306,8 +237,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-				for (int i = 0; i < centers.size(); i++) {
-                    LatLon cen = centers.get(i);
+				for (int i = 0; i < relationCenters.size(); i++) {
+                    LatLon cen = relationCenters.get(i);
 					if (cen != null) {
 						a.setLocation(cen);
 					}
@@ -315,7 +246,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                         continue;
                     }
     				EntityParser.parseMapObject(a, e, tags);
-    				if (centers.size() > 1) {
+    				if (relationCenters.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
                         long cenId = id + ((long) i * 2);
 						a.setId(cenId);
@@ -325,7 +256,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                         generatedIds.add(id);
                     }
 					if (!memberIds.isEmpty()) {
-						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds.toString());
 					}
 
    					try {
@@ -338,6 +269,62 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			}
 		}
+	}
+
+	private List<LatLon> collectRelationCenters(Entity e, OsmDbAccessorContext ctx, Map<String, String> tags,
+			List<LatLon> centers, StringBuilder memberIds) throws SQLException {
+		if (e instanceof Relation relation) {
+			ctx.loadEntityRelation(relation);
+			boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+			List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
+			if (adminCenters.size() == 1) {
+				centers = Collections.singletonList(adminCenters.get(0).getLatLon());
+			} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
+				MultipolygonBuilder original = new MultipolygonBuilder();
+				original.setId(relation.getId());
+				if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
+					Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
+					original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
+				} else {
+					original.createInnerAndOuterWays(relation);
+				}
+				List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
+				centers = new ArrayList<>();
+				for (Multipolygon m : multipolygons) {
+					assert m.getOuterRings().size() == 1;
+					if (!m.areRingsComplete()) {
+						log.warn("In multipolygon (POI) " + relation.getId() + " there are incompleted ways");
+					}
+					Ring out = m.getOuterRings().get(0);
+					if (out.getBorder().size() == 0) {
+						log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
+						// don't index this
+						continue;
+					}
+		            List<List<Node>> innerWays = new ArrayList<>();
+		            for (Ring r : m.getInnerRings()) {
+		                innerWays.add(r.getBorder());
+		            }
+		            LatLon l = OsmMapUtils.getComplexPolyCenter(out.getBorder(), innerWays);
+		            centers.add(l);
+				}
+			} else if (OsmMapUtils.isSuperRoute(tags)) {
+				for (RelationMember members : relation.getMembers()) {
+					if (members.getEntityId().getType() == EntityType.RELATION) {
+						if (memberIds.length() > 0) {
+							memberIds.append(" ");
+						}
+						memberIds.append("O" + members.getEntityId().getId()); // OSM route_id start from symbol "O"
+						if (centers.get(0) == null) {
+							Relation memberRel = (Relation) members.getEntity();
+							ctx.loadEntityRelation(memberRel);
+							centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel, true));
+						}
+					}
+				}
+			}
+		}
+		return centers;
 	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
@@ -738,7 +725,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
-					if (poi.id > PROPAGATED_NODE_BIT) {
+					if (poi.id > ObfConstants.PROPAGATE_NODE_BIT) {
 						continue;
 					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
@@ -765,7 +752,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (Algorithms.isEmpty(tagGroupIds)) {
 						tagGroupIds = parseTaggroups(rset.getString(6));
 					}
-					if (id > PROPAGATED_NODE_BIT) {
+					if (id > ObfConstants.PROPAGATE_NODE_BIT) {
 						continue;
 					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,

@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import net.osmand.NativeLibrary;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
@@ -27,9 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
-import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 
@@ -52,10 +49,6 @@ public class SearchService {
 
     private static final String SEARCH_LOCALE = "en";
     private static final String AND_RES = "/androidResources/";
-    
-    private static final int DUPLICATE_SPLIT = 5;
-    public static final long RELATION_BIT = 1L << ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
-    public static final long SPLIT_BIT = 1L << ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
     private static final String DELIMITER = " ";
 
@@ -435,7 +428,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return getOsmObjectId(amenity) == osmid;
+                        return ObfConstants.getOsmObjectId(amenity) == osmid;
                     }
                     
                     @Override
@@ -942,41 +935,10 @@ public class SearchService {
     
     private String getOsmUrl(SearchResult result) {
         MapObject mapObject = (MapObject) result.object;
-        Entity.EntityType type = getOsmEntityType(mapObject);
+        Entity.EntityType type = ObfConstants.getOsmEntityType(mapObject);
         if (type != null) {
-            long osmId = getOsmObjectId(mapObject);
+            long osmId = ObfConstants.getOsmObjectId(mapObject);
             return "https://www.openstreetmap.org/" + type.name().toLowerCase(Locale.US) + "/" + osmId;
-        }
-        return null;
-    }
-    
-    public static long getOsmObjectId(MapObject object) {
-        long originalId = -1;
-        Long id = object.getId();
-        if (id != null) {
-            if (object instanceof NativeLibrary.RenderedObject) {
-                id >>= 1;
-            }
-            if (isShiftedID(id)) {
-                originalId = getOsmId(id);
-            } else {
-                int shift = object instanceof Amenity ? AMENITY_ID_RIGHT_SHIFT : SHIFT_ID;
-                originalId = id >> shift;
-            }
-        }
-        return originalId;
-    }
-    
-    public Entity.EntityType getOsmEntityType(MapObject object) {
-        if (isOsmUrlAvailable(object)) {
-            Long id = object.getId();
-            long originalId = id >> 1;
-            long relationShift = 1L << 41;
-            if (originalId > relationShift) {
-                return Entity.EntityType.RELATION;
-            } else {
-                return id % 2 == MapObject.WAY_MODULO_REMAINDER ? Entity.EntityType.WAY : Entity.EntityType.NODE;
-            }
         }
         return null;
     }
@@ -986,21 +948,4 @@ public class SearchService {
         return id != null && id > 0;
     }
     
-    public static long getOsmId(long id) {
-        long clearBits = RELATION_BIT | SPLIT_BIT;
-        id = isShiftedID(id) ? (id & ~clearBits) >> DUPLICATE_SPLIT : id;
-        return id >> SHIFT_ID;
-    }
-    
-    public static boolean isShiftedID(long id) {
-        return isIdFromRelation(id) || isIdFromSplit(id);
-    }
-    
-    public static boolean isIdFromRelation(long id) {
-        return id > 0 && (id & RELATION_BIT) == RELATION_BIT;
-    }
-    
-    public static boolean isIdFromSplit(long id) {
-        return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
-    }
 }

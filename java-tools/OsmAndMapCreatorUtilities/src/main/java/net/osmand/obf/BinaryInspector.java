@@ -63,7 +63,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities", //"-vstreetgroups",
+					"-vaddress", "-vcities", //"-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -826,9 +826,12 @@ public class BinaryInspector {
 							MapUtils.get31LatitudeY(c.getBbox31()[3]),
 							MapUtils.get31LongitudeX(c.getBbox31()[2]));
 				}
-				String cityDescription = (type == CityBlocks.POSTCODES_TYPE ?
-						String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr) :
-						String.format("\t\t'%s' [%d], %d street(s) size %,d bytes %s", name, c.getId(), streets.size(), size, bboxStr));
+				String cityDescription = (type == CityBlocks.POSTCODES_TYPE
+						? String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr)
+						: String.format("\t\t'%s' [%s], %d street(s) size %,d bytes %s", name,
+								ObfConstants.getOsmEntityType(c).name().charAt(0) + " "
+										+ ObfConstants.getOsmObjectId(c),
+								streets.size(), size, bboxStr));
 				print(cityDescription);
 				if (!verbose.vstreets) {
 					println("");

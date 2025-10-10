@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
+import net.osmand.binary.ObfConstants;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
@@ -282,8 +283,12 @@ public class IndexCreator {
 
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
-				if (indexAddressCreator != null) {
-					indexAddressCreator.registerCityNodes(entity);
+				if (indexAddressCreator != null && entityId.getType() == EntityType.NODE) {
+					Node n = (Node) entity;
+					if(!generateNewIds) {
+						n = new Node(n, n.getId() << ObfConstants.SHIFT_ID);
+					}
+					indexAddressCreator.registerCityNodes(n);
 				}
 				// accept to allow db creator parse it
 				return true;

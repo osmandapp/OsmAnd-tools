@@ -39,15 +39,15 @@ public class MapDataObjectFinder {
 			String idStr = "U";
 			Object obj = exact == null ? searchResult.object : exact; 
 			if (obj instanceof BinaryMapDataObject) {
-				long osmandId = ((BinaryMapDataObject) exact).getId();
-				if (ObfConstants.isIdFromRelation(osmandId)) {
+				EntityType et = ObfConstants.getOsmEntityType((BinaryMapDataObject) obj);
+				if (et == EntityType.RELATION) {
 					idStr = "R";
-				} else if (osmandId % 2 == 0) {
+				} else if (et == EntityType.NODE) {
 					idStr = "N";
 				} else {
 					idStr = "W";
 				}
-				idStr += ObfConstants.getOsmId(osmandId / 2);
+				idStr += ObfConstants.getOsmObjectId((BinaryMapDataObject) obj);
 			} else if (obj instanceof Street s) {
 				idStr = "S" + ObfConstants.getOsmObjectId(s);
 			} else if (obj instanceof MapObject mo && mo.getId() != null) {

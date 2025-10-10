@@ -28,10 +28,14 @@ public class CityDataStorage {
 	private Map<Entity.EntityId, City> cities = new LinkedHashMap<Entity.EntityId, City>();
 	private List<Boundary> notAssignedBoundaries = new ArrayList<Boundary>();
 
-	public List<City> getClosestObjects(double latitude, double longitude) {
+	public List<City> getClosestObjects(double latitude, double longitude, boolean includeOnlyStored) {
 		List<City> result = new ArrayList<>();
 		result = cityManager.getClosestObjects(latitude, longitude, CITY_DIST);
-		result.addAll(cityVillageManager.getClosestObjects(latitude, longitude, CITY_VILLAGE_DIST));
+		for (City c : cityVillageManager.getClosestObjects(latitude, longitude, CITY_VILLAGE_DIST)) {
+			if (!includeOnlyStored || c.getType().storedAsSeparateAdminEntity()) {
+				result.add(c);
+			}
+		}
 		return result;
 	}
 
