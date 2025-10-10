@@ -877,7 +877,7 @@ public class IndexCreator {
 		String file = rootFolder + "../temp/Map.osm";
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
-//		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 

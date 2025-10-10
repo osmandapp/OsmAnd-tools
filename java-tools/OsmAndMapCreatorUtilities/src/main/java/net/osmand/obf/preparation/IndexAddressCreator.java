@@ -74,7 +74,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
+	private static final String PLACE_ATTR = "place";
 	private TreeSet<String> langAttributes = new TreeSet<String>();
+	{
+		langAttributes.add(PLACE_ATTR);
+		langAttributes.add("admin_level");
+	}
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
 	private static final int NO_BOUNDARY = 100;
 
@@ -146,7 +151,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
-			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude(), false);
+			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
@@ -410,7 +415,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setAltName(e.getTag("short_name")); // Goteborg
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			boundary.setBoundaryId(ObfConstants.createMapObjectIdFromOsmAndEntity(e));
-			boundary.setCityType(ct);
+			if (ct == null && census) {
+				boundary.setCityType(CityType.CENSUS);
+			} else {
+				boundary.setCityType(ct);
+			}
 			if (centerId != 0) {
 				boundary.setAdminCenterId(centerId);
 			}
@@ -451,7 +460,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 			if (streetName != null) {
-				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, null, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, false, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Collection<Entity> houses = i.getMemberEntities("house"); // both house and address roles can have address
 					houses.addAll(i.getMemberEntities("address"));
@@ -576,7 +585,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return newName.trim();
 	}
 
-	public Set<Long> getStreetInCity(Set<String> isInNames, String name, Map<String, String> names, final LatLon location, IndexCreationContext icc) throws SQLException {
+	public Set<Long> getStreetInCity(Set<String> isInNames, String name, boolean place, Map<String, String> names, final LatLon location, IndexCreationContext icc) throws SQLException {
 		if (location == null) {
 			return Collections.emptySet();
 
@@ -584,9 +593,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		name = normalizeStreetName(name, location, icc);
 		Set<City> result = new LinkedHashSet<City>();
 		// ignore districts, boroughs, neighbourhood, ...
-		List<City> nearestObjects = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude(), true);
+		List<City> nearestObjects = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude());
 		//either we found a city boundary the street is in
 		for (City c : nearestObjects) {
+			if (place && c.getName().equals(name)) {
+				if (names == null) {
+					names = new HashMap<String, String>();
+				}
+				names.put("name:" + PLACE_ATTR, CityType.valueToString(c.getType()));
+			}
+			if (!c.getType().storedAsSeparateAdminEntity()) {
+				continue;
+			}
 			Boundary boundary = cityDataStorage.getBoundaryByCity(c);
 			if (isInNames.contains(c.getName()) || (boundary != null && boundary.containsPoint(location))) {
 				// revert due to massive problems with suburb, village and other inside city objects
@@ -606,6 +624,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			    }
 		    });
     		for (City c : nearestObjects) {
+    			if (!c.getType().storedAsSeparateAdminEntity()) {
+    				continue;
+    			}
     			if (relativeDistance(location, c) > 0.2) {
 	    			if (result.isEmpty()) {
 	    				result.add(c);
@@ -689,7 +710,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<City> subcities = cityDataStorage.getCityListByBoundary(cityBoundary);
 		if (subcities == null || subcities.isEmpty()) {
 			// find nearest
-			subcities = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude(), false);
+			subcities = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude());
 		} else {
 			subcities = new ArrayList<City>(subcities);
 		}
@@ -795,10 +816,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						LatLon l = e.getLatLon();
 						String strt = first.getTag(OSMTagKey.ADDR_STREET);
+						boolean place = false;
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
+							place = true;
 						}
-						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, null, l, icc);
+						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, place, null, l, icc);
 						if (!idsOfStreet.isEmpty()) {
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
@@ -816,10 +839,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 
 		String street = null;
+		boolean place = false;
 		if (houseNumber != null || houseName != null) {
 			street = e.getTag(OSMTagKey.ADDR_STREET);
 			if (street == null) {
 				street = e.getTag(OSMTagKey.ADDR_PLACE);
+				place = true;
 			}
 		}
 		String street2 = e.getTag(OSMTagKey.ADDR_STREET2);
@@ -839,7 +864,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, null, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, place, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = null;
@@ -889,7 +914,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l, icc);
+							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
@@ -913,7 +938,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), getOtherNames(e), l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), false, getOtherNames(e), l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					streetDAO.writeStreetWayNodes(idsOfStreet, (Way) e);
 				}
@@ -1163,15 +1188,21 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (Algorithms.isEmpty(b.getName())) {
 				continue;
 			}
-			City c = new City(CityType.BOUNDARY);
-			cityDataStorage.assignBbox(c, b);
-			c.setId(b.getBoundaryId());
-			c.setLocation(b.getCenterPoint());
-			c.setName(b.getName());
-			if (!Algorithms.isEmpty(b.getAltName())) {
-				c.setEnName(b.getAltName());
+			City city = new City(CityType.BOUNDARY);
+			cityDataStorage.assignBbox(city, b);
+			city.setId(b.getBoundaryId());
+			city.setLocation(b.getCenterPoint());
+			city.setName(b.getName());
+			if (b.hasAdminLevel()) {
+				city.setName("admin_level", b.getAdminLevel() + ""); // to retrieve later
 			}
-			boundariesAsCities.add(c);
+			if (b.getCityType() != null) {
+				city.setName(PLACE_ATTR, CityType.valueToString(b.getCityType())); // to retrieve later
+			}
+			if (!Algorithms.isEmpty(b.getAltName())) {
+				city.setEnName(b.getAltName());
+			}
+			boundariesAsCities.add(city);
 		}
 		for (City c : this.cityDataStorage.getAllCities()) {
 			if (!c.getType().storedAsSeparateAdminEntity() && c.getType() != CityType.POSTCODE) {
@@ -1183,8 +1214,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				city.setLocation(c.getLocation());
 				city.copyNames(c);
 				city.setName(c.getName());
-//				city.setName("name:place", c.getType()); // to retrieve later
-				boundariesAsCities.add(c);
+				city.setName(PLACE_ATTR, CityType.valueToString(c.getType())); // to retrieve later
+				boundariesAsCities.add(city);
 			}
 		}
 		for (City c : boundariesAsCities) {

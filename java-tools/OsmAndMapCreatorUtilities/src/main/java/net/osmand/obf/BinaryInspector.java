@@ -63,19 +63,19 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities", //"-vstreetgroups",
+					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-//					"-latlon=41.4,-75.7,0.05",
-//					"-latlon=42.060294,-77.498224,0.05",
+					"-latlon=41.4,-75.7,0.05",
+//					"-latlon=45.445189,12.323986,0.05",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf"
-					System.getProperty("maps.dir") + "Germany_nordrhein-westfalen_cologne-government-region_europe_2.obf"
+					System.getProperty("maps.dir") + "Map.obf"
+//					System.getProperty("maps.dir") + "Italy_veneto_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
