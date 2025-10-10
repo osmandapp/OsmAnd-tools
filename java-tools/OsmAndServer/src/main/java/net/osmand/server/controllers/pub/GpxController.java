@@ -284,10 +284,7 @@ public class GpxController {
 			} catch (IOException ignore) {
 				// client aborted
 			} finally {
-				try {
-					Files.deleteIfExists(path);
-				} catch (IOException ignore) {
-				}
+				Files.deleteIfExists(path);
 			}
 		};
 
