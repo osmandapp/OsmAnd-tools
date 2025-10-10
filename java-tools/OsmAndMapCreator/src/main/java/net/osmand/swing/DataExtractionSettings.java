@@ -59,21 +59,24 @@ public class DataExtractionSettings {
 				cache.readFromFile(cacheFile);
 			}
 		}
-		for (File obf : Algorithms.getSortedFilesVersions(mapsFolder)) {
-			if (obf.getName().endsWith(".obf")) {
-				BinaryMapIndexReaderReference ref = obfFiles.get(obf.getAbsolutePath());
-				if (ref == null || ref.reader == null) {
-					ref = new BinaryMapIndexReaderReference();
-					ref.file = obf;
-					if (cache == null) {
-						RandomAccessFile raf = new RandomAccessFile(obf, "r"); //$NON-NLS-1$ //$NON-NLS-2$
-						ref.reader = new BinaryMapIndexReader(raf, obf);
-					} else {
-						ref.reader = cache.getReader(obf, true);
+		File[] sortedFiles = Algorithms.getSortedFilesVersions(mapsFolder);
+		if (sortedFiles != null) {
+			for (File obf : sortedFiles) {
+				if (obf.getName().endsWith(".obf")) {
+					BinaryMapIndexReaderReference ref = obfFiles.get(obf.getAbsolutePath());
+					if (ref == null || ref.reader == null) {
+						ref = new BinaryMapIndexReaderReference();
+						ref.file = obf;
+						if (cache == null) {
+							RandomAccessFile raf = new RandomAccessFile(obf, "r"); //$NON-NLS-1$ //$NON-NLS-2$
+							ref.reader = new BinaryMapIndexReader(raf, obf);
+						} else {
+							ref.reader = cache.getReader(obf, true);
+						}
+						obfFiles.put(obf.getAbsolutePath(), ref);
 					}
-					obfFiles.put(obf.getAbsolutePath(), ref);
+					files.add(ref.reader);
 				}
-				files.add(ref.reader);
 			}
 		}
 		if (cache != null && !files.isEmpty()) {
