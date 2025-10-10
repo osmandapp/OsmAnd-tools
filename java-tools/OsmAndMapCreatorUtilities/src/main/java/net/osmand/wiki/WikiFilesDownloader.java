@@ -18,37 +18,37 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-public class WikiDatabaseUpdater {
+public class WikiFilesDownloader {
 
     private static final Log log = PlatformUtil.getLog(WikiDatabasePreparation.class);
     public static final String DUMPS_WIKIMEDIA_URL = "https://dumps.wikimedia.org/";
     public static final String INCR_WIKIDATA_URL = "other/incr/wikidatawiki/";
     public static final String LATEST_WIKIDATA_URL = "wikidatawiki/latest/";
-    private final String WIKIDATA_LATEST_URL = DUMPS_WIKIMEDIA_URL + LATEST_WIKIDATA_URL;
-    private final String WIKIDATA_INCR_URL = DUMPS_WIKIMEDIA_URL + INCR_WIKIDATA_URL;
+    public static final String PAGES_INCR_XML_BZ_2_SUFFIX = "-pages-meta-hist-incr.xml.bz2";
     private final List<String> downloadedPages = new ArrayList<>();
     private long maxQId = 0;
     private final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
-    public WikiDatabaseUpdater(File wikidataDB, boolean daily) {
+    public WikiFilesDownloader(File wikiDB, boolean daily) {
         try {
-            maxQId = daily ? 0 : getMaxQIdFromDb(wikidataDB);
+            maxQId = daily ? 0 : getMaxQIdFromDb(wikiDB);
             List<FileForDBUpdate> updateFileList = new ArrayList<>();
 
             if (daily) {
-                long lastModifiedMillis = wikidataDB.lastModified();
+                long lastModifiedMillis = wikiDB.lastModified();
                 Instant instant = Instant.ofEpochMilli(lastModifiedMillis);
                 LocalDate lastModifiedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-                updateFileList = getLatestFilesURL(WIKIDATA_INCR_URL, lastModifiedDate);
+                updateFileList = getLatestFilesURL(getWikiIncrDirURL(), lastModifiedDate);
             } else {
                 long maxPageId = getMaxPageId();
-                List<FileForDBUpdate> pages = readFilesUrl(WIKIDATA_LATEST_URL);
+                List<FileForDBUpdate> pages = readFilesUrl(getWikiLatestDirURL());
                 for (FileForDBUpdate p : pages) {
                     if (maxPageId < p.maxPageId || maxPageId < p.minPageId) {
                         updateFileList.add(p);
@@ -56,15 +56,30 @@ public class WikiDatabaseUpdater {
                 }
                 updateFileList = getWithoutRepeats(updateFileList);
             }
-            String destFolder = wikidataDB.getParent();
+            String destFolder = wikiDB.getParent();
             downloadPages(destFolder, updateFileList);
         } catch (SQLException | IOException e) {
             e.printStackTrace();
         }
     }
 
+    public String getWikiLatestDirURL() {
+        return DUMPS_WIKIMEDIA_URL + LATEST_WIKIDATA_URL;
+    }
 
-    public long getMaxQId() {
+    public String getFilePrefix() {
+        return "wikidatawiki";
+    }
+
+    private String getLatestFilesPattern() {
+        return getFilePrefix() + "-latest-pages-articles\\d+\\.xml.+bz2\"";
+    }
+
+    public String getWikiIncrDirURL() {
+        return DUMPS_WIKIMEDIA_URL + INCR_WIKIDATA_URL;
+    }
+
+    public long getMaxId() {
         return maxQId;
     }
 
@@ -142,10 +157,10 @@ public class WikiDatabaseUpdater {
         }
     }
 
-    private List<FileForDBUpdate> readFilesUrl(String wikidataUrl) throws IOException {
+    private List<FileForDBUpdate> readFilesUrl(String wikiUrl) throws IOException {
 
-        Pattern pattern = Pattern.compile("wikidatawiki-latest-pages-articles\\d+\\.xml.+bz2\"");
-        URLConnection connection = new URL(wikidataUrl).openConnection();
+        Pattern pattern = Pattern.compile(getLatestFilesPattern());
+        URLConnection connection = new URL(wikiUrl).openConnection();
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.connect();
 
@@ -157,20 +172,20 @@ public class WikiDatabaseUpdater {
         while ((line = r.readLine()) != null) {
             Matcher matcher = pattern.matcher(line);
             if (matcher.find()) {
-                FileForDBUpdate fileForUpdate = getLatestFile(wikidataUrl, line);
+                FileForDBUpdate fileForUpdate = getLatestFile(wikiUrl, line);
                 result.add(fileForUpdate);
             }
         }
         if (result.isEmpty()) {
-            throw new RuntimeException("Could not download list from " + wikidataUrl);
+            throw new RuntimeException("Could not download list from " + wikiUrl);
         }
         return result;
     }
 
 
-    private List<FileForDBUpdate> getLatestFilesURL(String wikidataUrl, LocalDate lastUpdateDate) throws IOException {
+    private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate) throws IOException {
         Pattern pattern = Pattern.compile("<a href=\"\\d{8}/\">\\d{8}/</a>");
-        URLConnection connection = new URL(wikidataUrl).openConnection();
+        URLConnection connection = new URL(wikiUrl).openConnection();
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.connect();
         InputStream inputStream = connection.getInputStream();
@@ -180,30 +195,30 @@ public class WikiDatabaseUpdater {
         while ((line = r.readLine()) != null) {
             Matcher matcher = pattern.matcher(line);
             if (matcher.find()) {
-                FileForDBUpdate fileForUpdate = getIncrFile(wikidataUrl, line, lastUpdateDate);
+                FileForDBUpdate fileForUpdate = getIncrFile(wikiUrl, line, lastUpdateDate);
                 if (fileForUpdate != null) {
                     result.add(fileForUpdate);
                 }
             }
         }
         if (result.isEmpty()) {
-            throw new RuntimeException("Could not download list from " + wikidataUrl);
+            throw new RuntimeException("Could not download list from " + wikiUrl);
         }
         return result;
     }
 
-    private static FileForDBUpdate getLatestFile(String wikidataUrl, String line) {
+    private static FileForDBUpdate getLatestFile(String wikiUrl, String line) {
         String data = line.replace("<a href=\"", "").replaceAll("\">.+$", "");
         String p = data.replaceAll(".+xml-", "").replaceAll("\\.bz2", "");
         String[] pagesId = p.split("p");
         FileForDBUpdate fileForUpdate = new FileForDBUpdate();
         fileForUpdate.minPageId = Integer.parseInt(pagesId[1]);
         fileForUpdate.maxPageId = Integer.parseInt(pagesId[2]);
-        fileForUpdate.url = wikidataUrl + data;
+        fileForUpdate.url = wikiUrl + data;
         return fileForUpdate;
     }
 
-    private static FileForDBUpdate getIncrFile(String wikidataUrl, String line, LocalDate lastUpdateDate) {
+    private static FileForDBUpdate getIncrFile(String wikiUrl, String line, LocalDate lastUpdateDate) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
         String fileDate = line.replace("<a href=\"", "").replaceAll("/\">.+$", "");
         LocalDate date = LocalDate.parse(fileDate, formatter);
@@ -212,14 +227,14 @@ public class WikiDatabaseUpdater {
             fileForUpdate = new FileForDBUpdate();
             fileForUpdate.minPageId = 0;
             fileForUpdate.maxPageId = Integer.MAX_VALUE;
-            fileForUpdate.url = wikidataUrl + fileDate + "/wikidatawiki-" + fileDate + "-pages-meta-hist-incr.xml.bz2";
+            fileForUpdate.url = wikiUrl + fileDate + "/" + "wikidatawiki" + "-" + fileDate + PAGES_INCR_XML_BZ_2_SUFFIX;
         }
         return fileForUpdate;
     }
 
-    private long getMaxQIdFromDb(File wikidataSqlite) throws SQLException {
+    private long getMaxQIdFromDb(File wikiSqlite) throws SQLException {
         DBDialect dialect = DBDialect.SQLITE;
-        Connection conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
+        Connection conn = dialect.getDatabaseConnection(wikiSqlite.getAbsolutePath(), log);
         ResultSet rs = conn.createStatement().executeQuery("SELECT max(id) FROM wiki_coords");
         long maxQId = 0;
         if (rs.next()) {
@@ -231,7 +246,7 @@ public class WikiDatabaseUpdater {
         }
         conn.close();
         if (maxQId == 0) {
-            throw new RuntimeException("Could not get max QiD from " + wikidataSqlite.getAbsolutePath());
+            throw new RuntimeException("Could not get max QiD from " + wikiSqlite.getAbsolutePath());
         }
         return maxQId;
     }

@@ -1,8 +1,9 @@
-package net.osmand.wiki;
+package net.osmand.wiki.commonswiki;
 
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.wiki.WikiDatabasePreparation;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -26,6 +27,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 
 	public static final String DATA_SOURCE = "commonswiki-latest-pages-articles.xml.gz";
+	public static final String DATA_SOURCE_INCR = "commonswiki-20250922-pages-meta-hist-incr.xml.gz";
 	public static final String RESULT_SQLITE = "wikidata_commons_osm.sqlitedb";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
@@ -55,12 +57,18 @@ public class CommonsWikimediaPreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		final String commonWikiArticles = folder + DATA_SOURCE;
+
 		final String sqliteFileName = database.isEmpty() ? folder + RESULT_SQLITE : database;
 		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
+		String commonWikiArticles;
 		try {
 			switch (mode) {
-				case "parse-commonswiki-img-meta":
+				case "parse-img-meta":
+					commonWikiArticles = folder + DATA_SOURCE;
+					p.parseCommonArticles(commonWikiArticles, sqliteFileName, recreateDb);
+					break;
+				case "update-img-meta":
+					commonWikiArticles = folder + DATA_SOURCE_INCR;
 					p.parseCommonArticles(commonWikiArticles, sqliteFileName, recreateDb);
 					break;
 				default:
@@ -90,7 +98,8 @@ public class CommonsWikimediaPreparation {
 		private PreparedStatement prepContent;
 		private int[] contentBatch = new int[]{0};
 		private boolean page = false;
-        private boolean pageIdParsed = false;
+		private boolean pageIdParsed = false;
+		private boolean pageTextParsed = false;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
@@ -113,17 +122,22 @@ public class CommonsWikimediaPreparation {
 					st.execute("DROP TABLE IF EXISTS common_meta");
 				}
 				st.execute("CREATE TABLE IF NOT EXISTS common_meta(" +
-						"id long, " +
+						"id long PRIMARY KEY, " +
 						"name text, " +
 						"author text, " +
 						"date text, " +
 						"license text, " +
 						"description text)");
-				st.execute("DELETE FROM common_meta");
 			}
 
 			prepContent = conn.prepareStatement(
-					"INSERT INTO common_meta(id, name, author,  date, license, description) VALUES (?, ?, ?, ?, ?, ?)"
+					"INSERT INTO common_meta(id, name, author,  date, license, description) VALUES (?, ?, ?, ?, ?, ?) " +
+							"ON CONFLICT(id) DO UPDATE SET " +
+							"name = excluded.name, " +
+							"author = excluded.author, " +
+							"date = excluded.date, " +
+							"license = excluded.license, " +
+							"description = excluded.description;"
 			);
 		}
 
@@ -132,7 +146,6 @@ public class CommonsWikimediaPreparation {
 			log.info("Create indexes");
 
 			try (Statement st = conn.createStatement()) {
-				st.execute("CREATE INDEX IF NOT EXISTS id_common_meta_index ON common_meta(id)");
 				st.execute("CREATE INDEX IF NOT EXISTS name_common_meta_index ON common_meta(name)");
 			}
 
@@ -163,15 +176,17 @@ public class CommonsWikimediaPreparation {
 						ctext = ns;
 					}
 					case "id" -> {
-                        if(!pageIdParsed) {
-                            id.setLength(0);
-                            ctext = id;
-                            pageIdParsed = true;
-                        }
+						if(!pageIdParsed) {
+							id.setLength(0);
+							ctext = id;
+							pageIdParsed = true;
+						}
 					}
 					case "text" -> {
-						textContent.setLength(0);
-						ctext = textContent;
+						if(!pageTextParsed) {
+							textContent.setLength(0);
+							ctext = textContent;
+						}
 					}
 					default -> {
 						// do nothing
@@ -195,16 +210,17 @@ public class CommonsWikimediaPreparation {
 				switch (name) {
 					case "page" -> {
 						page = false;
-                        pageIdParsed = false;
+						pageIdParsed = false;
+						pageTextParsed = false;
 						progress.update();
 					}
 					case "title", "ns", "id" -> ctext = null;
 					case "text" -> {
-						String nameSpace = ns.toString();
-						if (!FILE_NAMESPACE.equals(nameSpace)) {
+						if (pageTextParsed) {
 							break;
 						}
-						parseMeta(nameSpace);
+						parseMeta();
+						pageTextParsed = true;
 					}
 					default -> {
 						// do nothing
@@ -223,9 +239,9 @@ public class CommonsWikimediaPreparation {
 			}
 		}
 
-		private void parseMeta(String nameSpace) {
+		private void parseMeta() {
 			try {
-				if (FILE_NAMESPACE.equals(nameSpace)) {
+				if (FILE_NAMESPACE.contentEquals(ns)) {
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
 					if (imageTitle == null) {
 						return;

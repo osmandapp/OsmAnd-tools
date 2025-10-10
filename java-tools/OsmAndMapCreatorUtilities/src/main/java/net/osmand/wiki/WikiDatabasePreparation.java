@@ -1598,13 +1598,13 @@ public class WikiDatabasePreparation {
 	private static void updateWikidata(OsmCoordinatesByTag osmCoordinates, File wikidataDB, boolean dailyUpdate) throws SQLException, ParserConfigurationException, SAXException, IOException {
 		log.info("Process OSM coordinates...");
 		osmCoordinates.parse(wikidataDB.getParentFile());
-		WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB, dailyUpdate);
+		WikiFilesDownloader wdu = new WikiFilesDownloader(wikidataDB, dailyUpdate);
 		List<String> downloadedPages = wdu.getDownloadedPages();
-		long maxQId = wdu.getMaxQId();
+		long maxId = wdu.getMaxId();
 		log.info("Updating wikidata...");
 		for (String f : downloadedPages) {
 			log.info("Updating " + f);
-			processWikidata(wikidataDB, f, osmCoordinates, maxQId);
+			processWikidata(wikidataDB, f, osmCoordinates, maxId);
 		}
 		wdu.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);

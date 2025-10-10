@@ -24,7 +24,7 @@ import net.osmand.travel.WikivoyageDataGenerator;
 import net.osmand.travel.WikivoyageGenOSM;
 import net.osmand.travel.WikivoyageLangPreparation;
 import net.osmand.util.*;
-import net.osmand.wiki.CommonsWikimediaPreparation;
+import net.osmand.wiki.commonswiki.CommonsWikimediaPreparation;
 import net.osmand.wiki.WikiDatabasePreparation;
 import net.osmand.wiki.WikipediaByCountryDivider;
 import org.apache.commons.logging.Log;
@@ -244,9 +244,9 @@ public class MainUtilities {
 				BinaryMerger.signObfFile(subArgsArray);
 			} else if (utl.equals("route-relation-extractor")) {
 				RouteRelationExtractor.main(subArgsArray);
-            } else if (utl.equals("parse-commonswiki")) {
-                CommonsWikimediaPreparation.main(subArgsArray);
-            } else {
+			} else if (utl.equals("process-commonswiki")) {
+				CommonsWikimediaPreparation.main(subArgsArray);
+			} else {
 				printSynopsys();
 			}
 		}
