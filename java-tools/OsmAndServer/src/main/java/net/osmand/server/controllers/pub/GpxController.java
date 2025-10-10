@@ -265,10 +265,7 @@ public class GpxController {
 
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {
-			try {
-				Files.deleteIfExists(tmpGpx.toPath());
-			} catch (IOException ignore) {
-			}
+			Files.deleteIfExists(tmpGpx.toPath());
 			return ResponseEntity.badRequest().build();
 		}
 
