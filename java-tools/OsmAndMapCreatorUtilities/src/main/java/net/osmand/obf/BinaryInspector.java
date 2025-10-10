@@ -63,7 +63,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", //"-vstreetgroups",
+//					"-vaddress", "-vcities", //"-vstreetgroups",
 //					"-vstreets", //"-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -74,8 +74,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Map.obf"
-//					System.getProperty("maps.dir") + "Germany_nordrhein-westfalen_cologne-government-region_europe_3.obf"
+//					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "Germany_nordrhein-westfalen_cologne-government-region_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

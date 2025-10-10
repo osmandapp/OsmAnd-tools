@@ -1160,6 +1160,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<Boundary> notAssignedBoundaries = this.cityDataStorage.getNotAssignedBoundaries();
 		List<City> boundariesAsCities = new ArrayList<>();
 		for (Boundary b : notAssignedBoundaries) {
+			if (Algorithms.isEmpty(b.getName())) {
+				continue;
+			}
 			City c = new City(CityType.BOUNDARY);
 			cityDataStorage.assignBbox(c, b);
 			c.setId(b.getBoundaryId());
