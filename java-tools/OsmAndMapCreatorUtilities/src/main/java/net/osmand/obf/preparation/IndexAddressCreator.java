@@ -189,19 +189,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			// Monaco doesn't have place=town point, but has boundary with tags & admin_level
 			// However it could be wrong create point if the boundary doesn't match center point
-			if (cityFound == null && 
-					// && !boundary.hasAdminLevel() 
-					// boundary.getCityType() == CityType.CITY || // assume all cities should have proper NODE (don't create node for it) 
-					(boundary.getCityType() == CityType.TOWN ||
-							boundary.getCityType() == CityType.HAMLET ||
-							boundary.getCityType() == CityType.SUBURB ||
-							boundary.getCityType() == CityType.VILLAGE)) {
+			 // assume all cities should have proper NODE (don't create node for it) 
+			if (cityFound == null && boundary.getCityType() != CityType.CITY &&
+					boundary.getCityType() != null) {
 				if (e instanceof Relation) {
 					ctx.loadEntityRelation((Relation) e);
 				}
 				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(cityFound.getId());
-			}
+			} 
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 				// don't attach cities to large boundaries
@@ -594,7 +590,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		Set<City> result = new LinkedHashSet<City>();
 		// ignore districts, boroughs, neighbourhood, ...
 		List<City> nearestObjects = cityDataStorage.getClosestObjects(location.getLatitude(), location.getLongitude());
-		//either we found a city boundary the street is in
+		// either we found a city boundary the street is in
 		for (City c : nearestObjects) {
 			if (place && c.getName().equals(name)) {
 				if (names == null) {
@@ -659,6 +655,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					Entry<String, String> e = it.next();
 					names.put(e.getKey(), "<" + e.getValue() + ">");
 				}
+				names.put("name:" + PLACE_ATTR, CityType.valueToString(city.getType()));
 			}
 			long streetId = getOrRegisterStreetIdForCity(nameInCity, names, location, city);
 			values.add(streetId);
@@ -667,11 +664,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city) throws SQLException {
+	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city)
+			throws SQLException {
 		String cityPart;
-        if (settings.indexByProximity) {
-            cityPart = findCityPart(location, city);
-        } else {
+		boolean place = names != null && names.containsKey("name:" + PLACE_ATTR);
+		// don't assign suburbs for existing places
+		if (settings.indexByProximity && !place) {
+			cityPart = findCityPart(location, city);
+	    } else {
             cityPart = city.getName();
         }
 		SimpleStreet foundStreet = streetDAO.findStreet(name, city, cityPart);
@@ -743,8 +743,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Boundary subBoundary = cityDataStorage.getBoundaryByCity(subpart);
 			if (subBoundary != null) {
 				boolean containsPoint = subBoundary.containsPoint(location);
-				if (containsPoint && (cityBoundary == null
-						|| cityBoundary != null && subBoundary.getAdminLevel() > cityBoundary.getAdminLevel())) {
+				boolean boundaryPriority = cityBoundary == null || !subBoundary.hasAdminLevel()
+						|| subBoundary.getAdminLevel() > cityBoundary.getAdminLevel();
+				if (containsPoint && boundaryPriority) {
 					cityPart = subpart.getName();
 					found = true;
 					break;
@@ -1129,7 +1130,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (CityType t : cities.keySet()) {
 			if (t == CityType.CITY || t == CityType.TOWN) {
 				cityTowns.addAll(cities.get(t));
-			} else {
+			} else if (t.storedAsSeparateAdminEntity()) {
 				villages.addAll(cities.get(t));
 			}
 			if (t == CityType.SUBURB) {

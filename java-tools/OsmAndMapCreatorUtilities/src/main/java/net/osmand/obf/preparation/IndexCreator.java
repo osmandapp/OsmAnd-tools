@@ -285,7 +285,7 @@ public class IndexCreator {
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
 				if (indexAddressCreator != null && entityId.getType() == EntityType.NODE) {
 					Node n = (Node) entity;
-					if(!generateNewIds) {
+					if (!generateNewIds) {
 						n = new Node(n, n.getId() << ObfConstants.SHIFT_ID);
 					}
 					indexAddressCreator.registerCityNodes(n);
@@ -874,7 +874,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/Map.osm";
+//		String file = rootFolder + "../temp/Map.osm";
+		String file = rootFolder + "../temp/venezia.osm";
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
