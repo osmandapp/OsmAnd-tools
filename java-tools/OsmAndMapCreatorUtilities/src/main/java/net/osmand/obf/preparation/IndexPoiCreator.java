@@ -218,7 +218,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
-			} else {
+			} else if (id > 0) {
 //				id = GENERATE_OBJ_ID--;
 				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
 				if (e instanceof Relation) {
