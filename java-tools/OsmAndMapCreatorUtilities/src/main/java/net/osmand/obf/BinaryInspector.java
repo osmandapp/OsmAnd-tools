@@ -28,7 +28,6 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
-import net.osmand.router.RoutingContext;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -69,13 +68,16 @@ public class BinaryInspector {
 //					"-zoom=15",
 					// road
 //					"-latlon=41.4,-75.7,0.05",
-					"-latlon=45.445189,12.323986,0.05",
+//					"-latlon=45.445189,12.323986,0.05",
+//					"-latlon=-37.766968,144.856847,0.05",
+					
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					
 //					System.getProperty("maps.dir") + "Map.obf"
-					System.getProperty("maps.dir") + "Venezia.obf"
+					System.getProperty("maps.dir") + "Eibsee.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -819,12 +821,13 @@ public class BinaryInspector {
 					name += " " + c.getNamesMap(includeEnName).toString();
 				}
 				String bboxStr = "";
-				if(c.getBbox31() != null) {
-					bboxStr = String.format("%.5f, %.5f - %.5f, %.5f",
-							MapUtils.get31LatitudeY(c.getBbox31()[1]),
-							MapUtils.get31LongitudeX(c.getBbox31()[0]),
-							MapUtils.get31LatitudeY(c.getBbox31()[3]),
-							MapUtils.get31LongitudeX(c.getBbox31()[2]));
+				double bleft = 0, btop = 0, bbottom = 0,  bright = 0;
+				if (c.getBbox31() != null) {
+					bleft = MapUtils.get31LongitudeX(c.getBbox31()[0]);
+					btop = MapUtils.get31LatitudeY(c.getBbox31()[1]);
+					bright= MapUtils.get31LongitudeX(c.getBbox31()[2]);
+					bbottom= MapUtils.get31LatitudeY(c.getBbox31()[3]);
+					bboxStr = String.format("%.5f, %.5f - %.5f, %.5f", btop, bleft, bbottom, bright);
 				}
 				String cityDescription = (type == CityBlocks.POSTCODES_TYPE
 						? String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr)
@@ -838,13 +841,21 @@ public class BinaryInspector {
 		            continue;
 		        }
 				println(":");
-				if (!verbose.contains(c))
+				if (c.getBbox31() != null) {
+					if (btop < verbose.latbottom || bbottom > verbose.lattop || bleft > verbose.lonright
+							|| bright < verbose.lonleft) {
+						continue;
+					}
+				} else if (!verbose.contains(c)) {
 					continue;
+				}
 
 				for (Street t : streets) {
 					if (!verbose.contains(t))
 						continue;
 					index.preloadBuildings(t, null);
+					
+					
 					final List<Building> buildings = t.getBuildings();
 					final List<Street> intersections = t.getIntersectedStreets();
 
@@ -855,7 +866,8 @@ public class BinaryInspector {
 						println("\t\t\t\tBuildings:");
 						for (Building b : buildings) {
 							println("\t\t\t\t" + b.getName(verbose.lang)
-									+ (b.getPostcode() == null ? "" : " postcode:" + b.getPostcode()));
+									+ (b.getPostcode() == null ? "" : " postcode:" + b.getPostcode())// + " " + b.getLocation()
+									);
 						}
 					}
 
@@ -1442,8 +1454,6 @@ public class BinaryInspector {
 
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
 		int[] count = new int[3];
-		RoutingContext ctx = GeocodingUtilities.buildDefaultContextForPOI(index);
-		GeocodingUtilities geocodingUtilities = new GeocodingUtilities();
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
 				MapUtils.get31TileNumberX(verbose.lonleft),
 				MapUtils.get31TileNumberX(verbose.lonright),

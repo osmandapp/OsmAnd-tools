@@ -856,12 +856,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 
-		String street = null;
+		String streetOrPlace = null;
 		boolean place = false;
 		if (houseNumber != null || houseName != null) {
-			street = e.getTag(OSMTagKey.ADDR_STREET);
-			if (street == null) {
-				street = e.getTag(OSMTagKey.ADDR_PLACE);
+			streetOrPlace = e.getTag(OSMTagKey.ADDR_STREET);
+			if (streetOrPlace == null) {
+				streetOrPlace = e.getTag(OSMTagKey.ADDR_PLACE);
 				place = true;
 			}
 		}
@@ -869,8 +869,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (Algorithms.isEmpty(street2)) {
 			street2 = e.getTag(OSMTagKey.ADDR2_STREET);
 		}
-		boolean emptyPlace = Algorithms.isEmpty(street) && Algorithms.isEmpty(e.getTag(OSMTagKey.ADDR_CITY));
-		if ((houseName != null || houseNumber != null) && !emptyPlace) {
+		String city = e.getTag(OSMTagKey.ADDR_CITY);
+		String suburb = e.getTag(OSMTagKey.ADDR_SUBURB);
+		boolean emptyCityPlace = Algorithms.isEmpty(streetOrPlace) && Algorithms.isEmpty(city) && Algorithms.isEmpty(suburb);
+		// ignore is_in tag as mostly duplicated 
+		if ((houseName != null || houseNumber != null) && !emptyCityPlace) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
 				Collection<Entity> outs = ((Relation) e).getMemberEntities("outer");
@@ -882,7 +885,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), street, place, null, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), streetOrPlace, place, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = null;
