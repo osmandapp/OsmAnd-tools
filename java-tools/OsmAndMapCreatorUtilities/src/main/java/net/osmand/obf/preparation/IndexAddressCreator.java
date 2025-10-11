@@ -1423,13 +1423,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 			// Collect all NEIGHBOURHOOD, SUBURBS, .. that are part of City to add all streets 
-			// That's not needed when multipolygon boundaries are created though needed Node is_in Node 
+			// That's not needed when multipolygon boundaries are created though needed Node is_in Node
+			Boundary b = cityDataStorage.getBoundaryByCity(city);
 			List<City> listSuburbs = null;
-			if (isInGroups != null && isInGroups.containsKey(city.getName().toLowerCase())) {
+			if (isInGroups != null &&  (b == null || b.getMultipolygon().hasOpenedPolygons())
+					&& isInGroups.containsKey(city.getName().toLowerCase())) {
 				List<City> suburbs = isInGroups.get(city.getName().toLowerCase());
 				listSuburbs = new ArrayList<City>();
 				for (City suburb : suburbs) {
-					if (suburb.getType() != CityType.TOWN && suburb.getType() != CityType.CITY && suburb != city) {
+//					if (suburb.getType() != CityType.TOWN && suburb.getType() != CityType.CITY && suburb != city) {
+					// limit only to suburbs
+					if(suburb.getType() == CityType.SUBURB && city.getType() != CityType.SUBURB) {
 						listSuburbs.add(suburb);
 					}
 				}
