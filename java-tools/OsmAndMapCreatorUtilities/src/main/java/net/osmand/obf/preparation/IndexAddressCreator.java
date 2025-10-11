@@ -152,6 +152,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
+			// assumption order of citiesToSearch not important as we do step by step 
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
@@ -611,30 +612,43 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
         if (settings.indexByProximity) {
     		// or we need to find closest city
-	    	Collections.sort(nearestObjects, new Comparator<City>() {
-		    	@Override
-		    	public int compare(City c1, City c2) {
-			    	double r1 = relativeDistance(location, c1);
-				    double r2 = relativeDistance(location, c2);
-			    	return Double.compare(r1, r2);
-			    }
-		    });
-    		for (City c : nearestObjects) {
-    			if (!c.getType().storedAsSeparateAdminEntity()) {
-    				continue;
-    			}
-    			if (relativeDistance(location, c) > 0.2) {
-	    			if (result.isEmpty()) {
-	    				result.add(c);
-		    		}
-			    	break;
-    			} else if (!result.contains(c)) {
+	    	City topAnyCity = null;
+	    	double relAnyDistance = 0;
+	    	List<City> allClosestCities = new ArrayList<City>();
+	    	double threshold = 0.2;
+			for (City c : nearestObjects) {
+				if (!c.getType().storedAsSeparateAdminEntity()) {
+					continue;
+				}
+				double relDist = relativeDistance(location, c);
+				if (relDist < threshold) {
+					allClosestCities.add(c);
+				}
+				if (topAnyCity == null || relDist < relAnyDistance) {
+					relAnyDistance = relDist;
+					topAnyCity = c;
+				}
+			}
+			if (result.isEmpty() && topAnyCity != null && relAnyDistance > threshold) {
+				// add only 1 city if no matched by boundary and centers are too far 
+				result.add(topAnyCity);
+			} else {
+				// add all closest cities without boundaries or at least 1 closest
+				Collections.sort(allClosestCities, new Comparator<City>() {
+			    	@Override
+			    	public int compare(City c1, City c2) {
+				    	double r1 = relativeDistance(location, c1);
+					    double r2 = relativeDistance(location, c2);
+				    	return Double.compare(r1, r2);
+				    }
+			    });
+				for (City c : allClosestCities) {
 	    			// city doesn't have boundary or there is a mistake in boundaries and we found nothing before
-	    			if (!cityDataStorage.isCityHasBoundary(c) || result.isEmpty()) {
-	    				result.add(c);
-	    			}
-		    	}
-	    	}
+					if (!result.contains(c) && (result.isEmpty() || !cityDataStorage.isCityHasBoundary(c))) {
+						result.add(c);
+					}
+				}
+			}
         }
 		return registerStreetInCities(name, names, location, result);
 	}
@@ -747,6 +761,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				boolean boundaryPriority = cityBoundary == null || !subBoundary.hasAdminLevel()
 						|| subBoundary.getAdminLevel() > cityBoundary.getAdminLevel();
 				if (containsPoint && boundaryPriority) {
+					// take any first SUBURB point that matches by boundary
 					cityPart = subpart.getName();
 					found = true;
 					break;
@@ -760,6 +775,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// 3. check by proximity 
 		double dist = Double.MAX_VALUE;
 		if (!found) {
+			// take closest suburb if nothing matched by boundary
 			for (City subpart : subcities) {
 				double actualDistance = MapUtils.getDistance(location, subpart.getLocation());
 				if (actualDistance < 1.5 * subpart.getType().getRadius() && actualDistance < dist) {
