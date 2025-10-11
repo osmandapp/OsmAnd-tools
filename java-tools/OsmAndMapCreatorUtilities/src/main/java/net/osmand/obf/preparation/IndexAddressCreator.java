@@ -1248,7 +1248,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
 		}
 		
-		for (int i = 0; i < notAssignedBoundaries.size(); i++) {
+		for (int i = 0; i < boundariesAsCities.size(); i++) {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);
 			putNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
