@@ -301,6 +301,12 @@ public class MainUtilities {
 			} else if (s.equals("--no-transport")) {
 				settings.indexTransport = false;
 				it.remove();
+			} else if (s.equals("--no-index-by-proximity")) {
+				settings.indexByProximity = false;
+				it.remove();
+			} else if (s.equals("--no-multipolygon")) {
+				settings.indexMultipolygon = false;
+				it.remove();
 			} else if (s.equals("--ram-process")) {
 				settings.processInRam = true;
 				it.remove();

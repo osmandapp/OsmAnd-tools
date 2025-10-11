@@ -128,7 +128,6 @@ public class IndexBatchCreator {
 		public boolean indexAddress = true;
 		public boolean indexMap = true;
 		public boolean indexRouting = true;
-        public boolean indexByProximity = true;
 	}
 	
 	private static class AwsPendingGeneration {
@@ -190,7 +189,6 @@ public class IndexBatchCreator {
 	boolean indexAddress = false;
 	boolean indexMap = false;
 	boolean indexRouting = false;
-	boolean indexByProximity = true;
 	private String wget;
 
 	private DBDialect osmDbDialect;
@@ -247,7 +245,6 @@ public class IndexBatchCreator {
 				|| process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
-		indexByProximity = Boolean.parseBoolean(process.getAttribute("indexByProximity"));
 		parseProcessAttributes(process);
 
 		list = doc.getElementsByTagName("process_attributes");
@@ -1138,7 +1135,6 @@ public class IndexBatchCreator {
 			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
 			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
 			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
-            final boolean indByProximity = indexByProximity && (rdata == null || rdata.indexByProximity);
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
 				log.warn("! Skip country " + file.getName() + " because nothing to index !");
 				return;
@@ -1149,8 +1145,7 @@ public class IndexBatchCreator {
 			settings.indexPOI = indPoi;
 			settings.indexTransport = indTransport;
 			settings.indexRouting = indRouting;
-            settings.indexByProximity = indByProximity;
-			if(zoomWaySmoothness != null){
+			if (zoomWaySmoothness != null) {
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
 			boolean worldMaps = regionName.toLowerCase().contains("world") ;
