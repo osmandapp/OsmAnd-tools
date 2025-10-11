@@ -1424,9 +1424,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 			// Collect all NEIGHBOURHOOD, SUBURBS, .. that are part of City to add all streets 
 			// That's not needed when multipolygon boundaries are created though needed Node is_in Node
-			Boundary b = cityDataStorage.getBoundaryByCity(city);
+			Boundary boundary = cityDataStorage.getBoundaryByCity(city);
 			List<City> listSuburbs = null;
-			if (isInGroups != null &&  (b == null || b.getMultipolygon().hasOpenedPolygons())
+			if (isInGroups != null &&  (boundary == null || boundary.getMultipolygon().hasOpenedPolygons())
 					&& isInGroups.containsKey(city.getName().toLowerCase())) {
 				List<City> suburbs = isInGroups.get(city.getName().toLowerCase());
 				listSuburbs = new ArrayList<City>();
