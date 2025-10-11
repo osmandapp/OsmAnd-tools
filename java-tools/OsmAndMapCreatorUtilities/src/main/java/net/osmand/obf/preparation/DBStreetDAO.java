@@ -209,7 +209,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 	}
 
 	public DBStreetDAO.SimpleStreet findStreet(String name, City city, String cityPart) throws SQLException {
-		if(cityPart == null) {
+		if (cityPart == null) {
 			return findStreet(name, city);
 		}
 		addressSearchStreetStat.setLong(1, city.getId());

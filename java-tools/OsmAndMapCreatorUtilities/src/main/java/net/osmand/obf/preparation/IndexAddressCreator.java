@@ -668,6 +668,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		String cityPart;
 		boolean place = names != null && names.containsKey("name:" + PLACE_ATTR);
+		
 		// don't assign suburbs for existing places
 		if (settings.indexByProximity && !place) {
 			cityPart = findCityPart(location, city);
@@ -1114,6 +1115,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		writer.startWriteAddressIndex(regionName, additionalTags);
 		Map<CityType, List<City>> cities = readCities(mapConnection);
+		Map<String, List<City>> isInGroups = new LinkedHashMap<String, List<City>>();
 		PreparedStatement streetstat = mapConnection.prepareStatement(//
 				"SELECT A.id, A.name, A.name_en, A.latitude, A.longitude, "+ //$NON-NLS-1$
 				"B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, A.cityPart, "+ //$NON-NLS-1$
@@ -1123,8 +1125,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		PreparedStatement waynodesStat =
 			 mapConnection.prepareStatement("SELECT A.id, A.latitude, A.longitude FROM street_node A WHERE A.street = ? "); //$NON-NLS-1$
 
-		// collect suburbs with is in value
-		List<City> suburbs = new ArrayList<City>();
 		List<City> cityTowns = new ArrayList<City>();
 		List<City> villages = new ArrayList<City>();
 		for (CityType t : cities.keySet()) {
@@ -1133,10 +1133,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			} else if (t.storedAsSeparateAdminEntity()) {
 				villages.addAll(cities.get(t));
 			}
-			if (t == CityType.SUBURB) {
-				for (City c : cities.get(t)) {
-					if (c.getIsInValue() != null) {
-						suburbs.add(c);
+			for (City c : cities.get(t)) {
+				Set<String> isIns = c.getIsin();
+				if (isIns != null) {
+					for (String isIn : isIns) {
+						List<City> lst = isInGroups.get(isIn);
+						if (lst == null) {
+							lst = new ArrayList<City>();
+							isInGroups.put(isIn, lst);
+						}
+						lst.add(c);
 					}
 				}
 			}
@@ -1148,9 +1154,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
-		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, suburbs, cityTowns,
+		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, isInGroups, cityTowns,
 				postcodes, namesIndex, tagRules, progress);
-		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, null, villages, postcodes,
+		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, isInGroups, villages, postcodes,
 				namesIndex, tagRules, progress);
 
 		// write postcodes
@@ -1394,7 +1400,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
-			List<City> suburbs, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
+			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
 			Map<String, Integer> tagRules, IProgress progress)
 			throws IOException, SQLException {
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
@@ -1416,13 +1422,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
+			// Collect all NEIGHBOURHOOD, SUBURBS, .. that are part of City to add all streets 
+			// That's not needed when multipolygon boundaries are created though needed Node is_in Node 
 			List<City> listSuburbs = null;
-			if (suburbs != null) {
+			if (isInGroups != null && isInGroups.containsKey(city.getName().toLowerCase())) {
+				List<City> suburbs = isInGroups.get(city.getName().toLowerCase());
+				listSuburbs = new ArrayList<City>();
 				for (City suburb : suburbs) {
-					if (suburb.getIsInValue().toLowerCase().contains(city.getName().toLowerCase())) {
-						if (listSuburbs == null) {
-							listSuburbs = new ArrayList<City>();
-						}
+					if (suburb.getType() != CityType.TOWN && suburb.getType() != CityType.CITY && suburb != city) {
 						listSuburbs.add(suburb);
 					}
 				}
@@ -1499,16 +1506,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,
-			Map<Street, List<Node>> streetNodes, List<City> citySuburbs) throws SQLException {
+			Map<Street, List<Node>> streetNodes, List<City> attachedSuburbs) throws SQLException {
 		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<>();
 		Map<String, List<Street>> uniqueNames = new TreeMap<>(OsmAndCollator.primaryCollator());
 
 		// read streets for city
-		readStreetsAndBuildingsForCity(streetBuildingsStat, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
+		readStreetsAndBuildingsForCity(streetBuildingsStat, city, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
 		// read streets for suburbs of the city
-		if (citySuburbs != null) {
-			for (City suburb : citySuburbs) {
-				readStreetsAndBuildingsForCity(streetBuildingsStat, suburb, waynodesStat, streetNodes, visitedStreets, uniqueNames);
+		if (attachedSuburbs != null) {
+			for (City suburb : attachedSuburbs) {
+				readStreetsAndBuildingsForCity(streetBuildingsStat, city, suburb, waynodesStat, streetNodes, visitedStreets, uniqueNames);
 			}
 		}
 		mergeStreetsWithSameNames(streetNodes, uniqueNames);
@@ -1573,8 +1580,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void readStreetsAndBuildingsForCity(PreparedStatement streetBuildingsStat, City city,
-			PreparedStatement waynodesStat, Map<Street, List<Node>> streetNodes, TLongObjectHashMap<Street> visitedStreets,
+	private void readStreetsAndBuildingsForCity(PreparedStatement streetBuildingsStat, City mainCity,
+			City city, PreparedStatement waynodesStat, Map<Street, List<Node>> streetNodes, TLongObjectHashMap<Street> visitedStreets,
 			Map<String, List<Street>> uniqueNames) throws SQLException {
 		streetBuildingsStat.setLong(1, city.getId());
 		ResultSet set = streetBuildingsStat.executeQuery();
@@ -1594,6 +1601,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// Add district name to all other names. If sorting is right, the first street was the one in the city
 				String district = set.getString(12);
 				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
+				if (mainCity != city && cityPart.length() == 0) {
+					cityPart = " (" + city.getName() + ")";;
+				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
 					street.setName(lang, names.get(lang) + cityPart);
