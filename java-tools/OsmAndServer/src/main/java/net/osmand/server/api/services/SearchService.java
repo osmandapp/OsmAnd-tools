@@ -171,7 +171,7 @@ public class SearchService {
         }
     }
 
-    public Feature getPoi(String name, String type, LatLon loc) throws IOException {
+    public Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
@@ -199,24 +199,50 @@ public class SearchService {
                 return null;
             }
 
-            // Filter by name
-            for (SearchResult r : rc.getCurrentSearchResults()) {
-                if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
-                    continue;
-                }
-                if (!matchesName(a, name)) {
-                    continue;
-                }
-                Feature f = getPoiFeature(r);
-                if (f != null) {
-                    feature = f;
-                    break;
-                }
+            if (name != null) {
+                feature = getPoiFeatureByName(rc, name);
+            } else if (osmId != null) {
+                feature = getPoiFeatureByOsmId(rc, osmId);
             }
+
         } finally {
             osmAndMapsService.unlockReaders(readers);
         }
         return feature;
+    }
+
+    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (matchesName(a, name)) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (ObfConstants.getOsmObjectId(a) == osmId) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc) {
+        return null;
     }
 
     private boolean matchesName(Amenity a, String name) {
