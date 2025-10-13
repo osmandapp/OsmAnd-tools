@@ -614,6 +614,7 @@ public class WikiDatabasePreparation {
 		if (line.toLowerCase().matches(".*author\\s*=\\s*.*")) {
 			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
 		}
+		line = line.replaceFirst("^\\*", "").trim();
 		
 		List<String> templatesToHandle = Arrays.asList("User", "Creator");
 		List<String> parts = splitByPipeOutsideBraces(line, true);
@@ -1595,18 +1596,19 @@ public class WikiDatabasePreparation {
 		}
 	}
 
-	private static void updateWikidata(OsmCoordinatesByTag osmCoordinates, File wikidataDB, boolean dailyUpdate) throws SQLException, ParserConfigurationException, SAXException, IOException {
+	private static void updateWikidata(OsmCoordinatesByTag osmCoordinates, File wikidataDB, boolean dailyUpdate) 
+			throws SQLException, ParserConfigurationException, SAXException, IOException {
 		log.info("Process OSM coordinates...");
 		osmCoordinates.parse(wikidataDB.getParentFile());
-		WikiFilesDownloader wdu = new WikiFilesDownloader(wikidataDB, dailyUpdate);
-		List<String> downloadedPages = wdu.getDownloadedPages();
-		long maxId = wdu.getMaxId();
+		WikidataFilesDownloader wfd = new WikidataFilesDownloader(wikidataDB, dailyUpdate);
+		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
+		long maxId = wfd.getMaxId();
 		log.info("Updating wikidata...");
-		for (String f : downloadedPages) {
-			log.info("Updating " + f);
-			processWikidata(wikidataDB, f, osmCoordinates, maxId);
+		for (String fileName : downloadedPageFiles) {
+			log.info("Updating from " + fileName);
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxId);
 		}
-		wdu.removeDownloadedPages();
+		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
 	}
 

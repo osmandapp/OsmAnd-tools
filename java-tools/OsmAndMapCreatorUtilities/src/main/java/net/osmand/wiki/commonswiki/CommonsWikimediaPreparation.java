@@ -3,6 +3,7 @@ package net.osmand.wiki.commonswiki;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.wiki.AbstractWikiFilesDownloader;
 import net.osmand.wiki.WikiDatabasePreparation;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -20,6 +21,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -27,7 +29,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 
 	public static final String DATA_SOURCE = "commonswiki-latest-pages-articles.xml.gz";
-	public static final String DATA_SOURCE_INCR = "commonswiki-20250922-pages-meta-hist-incr.xml.gz";
+	public static final String DATA_SOURCE_INCR = "commonswiki-20251007-pages-meta-hist-incr.xml.gz";
 	public static final String RESULT_SQLITE = "wikidata_commons_osm.sqlitedb";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
@@ -60,16 +62,15 @@ public class CommonsWikimediaPreparation {
 
 		final String sqliteFileName = database.isEmpty() ? folder + RESULT_SQLITE : database;
 		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
-		String commonWikiArticles;
+		File commonsWikiDB = new File(sqliteFileName);
 		try {
 			switch (mode) {
 				case "parse-img-meta":
-					commonWikiArticles = folder + DATA_SOURCE;
-					p.parseCommonArticles(commonWikiArticles, sqliteFileName, recreateDb);
+					String commonWikiArticles = folder + DATA_SOURCE;
+					p.parseCommonArticles(commonWikiArticles, commonsWikiDB, recreateDb);
 					break;
 				case "update-img-meta":
-					commonWikiArticles = folder + DATA_SOURCE_INCR;
-					p.parseCommonArticles(commonWikiArticles, sqliteFileName, recreateDb);
+					p.updateCommonsWiki(commonsWikiDB, recreateDb);
 					break;
 				default:
 					throw new RuntimeException("Unknown mode: " + mode);
@@ -79,13 +80,27 @@ public class CommonsWikimediaPreparation {
 		}
 	}
 
-	private void parseCommonArticles(String articles, String sqliteFileName, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
+	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
+		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, true);
+		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
+		String commonWikiArticles = commonsWikiDB.getParent() + "/" + DATA_SOURCE_INCR;
+		parseCommonArticles(commonWikiArticles, commonsWikiDB, recreateDb);
+		long maxId = wfd.getMaxId();
+		log.info("Updating wikidata...");
+		for (String fileName : downloadedPageFiles) {
+			log.info("Updating from " + fileName);
+			parseCommonArticles(fileName, commonsWikiDB, recreateDb);
+		}
+		wfd.removeDownloadedPages();
+	}
+
+	private void parseCommonArticles(String articles, File commonsWikiDB, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read commonswiki articles file", new File(articles));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
 
-		final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, new File(sqliteFileName), recreateDb);
+		final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, commonsWikiDB, recreateDb);
 		sx.parse(is, handler);
 		handler.finish();
 	}
@@ -176,14 +191,14 @@ public class CommonsWikimediaPreparation {
 						ctext = ns;
 					}
 					case "id" -> {
-						if(!pageIdParsed) {
+						if (!pageIdParsed) {
 							id.setLength(0);
 							ctext = id;
 							pageIdParsed = true;
 						}
 					}
 					case "text" -> {
-						if(!pageTextParsed) {
+						if (!pageTextParsed) {
 							textContent.setLength(0);
 							ctext = textContent;
 						}
@@ -262,7 +277,7 @@ public class CommonsWikimediaPreparation {
 					addBatch(prepContent, contentBatch);
 				}
 			} catch (SQLException | IOException exception) {
-				log.error(exception.getMessage(), exception);
+				log.error(exception.getMessage() + " in : " + title, exception);
 			}
 		}
 	}
