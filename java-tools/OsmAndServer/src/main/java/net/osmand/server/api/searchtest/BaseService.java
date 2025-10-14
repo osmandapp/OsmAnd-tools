@@ -175,7 +175,8 @@ public interface BaseService {
 		JsonNode root = getObjectMapper().readTree(jsonResponse);
 		JsonNode elements = root.path("elements");
 
-		if (!elements.isArray()) {
+		if (!elements.isArray() || elements.isEmpty()) {
+			getLogger().error(jsonResponse);
 			return 0;
 		}
 
@@ -218,17 +219,30 @@ public interface BaseService {
 	}
 
 	/**
-	 * Build a valid Overpass request by normalizing control statements.
-	 * Ensures the request starts with [out:json][timeout:25]; and ends with ;out; without duplicates.
+	 * Build a valid Overpass QL request from a raw query snippet.
+	 * Ensures the standard prefix and an output clause are present.
+	 * - If rawQuery lacks a header like "[out:...][timeout:...];" it prepends "[out:json][timeout:360];".
+	 * - If there is no output clause ("out;"), it appends ";out;".
 	 */
 	default String buildOverpassRequest(String rawQuery) {
-		String q = rawQuery == null ? "" : rawQuery.trim();
-		// Strip an existing global [out:...]; prefix to avoid duplication
-		q = q.replaceFirst("^\\[out:[^;]+];\\s*", "");
-		// Strip a trailing ;out; to avoid duplication
-		q = q.replaceFirst(";\\s*out\\s*;?\\s*$", "");
-		// Expand Overpass Turbo macros if present
-		return "[out:json][timeout:25];" + q + ";out;";
+		String q = Algorithms.trimIfNotNull(rawQuery);
+		if (Algorithms.isEmpty(q)) {
+			q = "";
+		}
+		String qLower = q.toLowerCase();
+		boolean hasHeader = qLower.matches("^\\s*\\[out:[^]]+]\\s*\\[timeout:[^]]+]\\s*;.*");
+		if (!hasHeader) {
+			q = "[out:json][timeout:360];" + q;
+			qLower = q.toLowerCase();
+		}
+		boolean hasOut = qLower.contains("out;");
+		if (!hasOut) {
+			if (!q.endsWith(";")) {
+				q += ";";
+			}
+			q += "out;";
+		}
+		return q;
 	}
 
 	default Map<String, Integer> browseCsvFiles() throws IOException {
