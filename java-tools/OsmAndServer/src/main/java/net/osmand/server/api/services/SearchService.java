@@ -247,13 +247,17 @@ public class SearchService {
     }
 
     public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
-        Feature poiFeature = getPoi(type, name, loc, null);
         Feature wikiFeature = null;
-        if (!type.equals(WIKI_POI_TYPE)) {
-            wikiFeature = getPoi(WIKI_POI_TYPE, name, loc, null);
+        Feature poiFeature = null;
+
+        if (type.equals(WIKI_POI_TYPE)) {
+            wikiFeature = getPoi(type, name, loc, null);
+        } else {
+            poiFeature = getPoi(type, name, loc, null);
         }
+
         if (wikiFeature == null && wikidataId != null) {
-            wikiFeature = getWikiPoi(wikidataId, lang);
+            wikiFeature = getWikiPoiById(wikidataId, lang);
         }
 
         return mergeFeatures(wikiFeature, poiFeature);
@@ -269,7 +273,7 @@ public class SearchService {
         return merged;
     }
 
-    private Feature getWikiPoi(Long wikidataId, String lang) {
+    private Feature getWikiPoiById(Long wikidataId, String lang) {
         String primaryLang = lang != null ? lang : DEFAULT_SEARCH_LANG;
         List<String> langs = primaryLang.equals(DEFAULT_SEARCH_LANG)
                 ? List.of(DEFAULT_SEARCH_LANG)
