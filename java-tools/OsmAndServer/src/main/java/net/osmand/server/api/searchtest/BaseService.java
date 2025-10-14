@@ -235,7 +235,7 @@ public interface BaseService {
 			q = "[out:json][timeout:360];" + q;
 			qLower = q.toLowerCase();
 		}
-		boolean hasOut = qLower.contains("out;");
+		boolean hasOut = qLower.contains("out ") || qLower.contains("out;");
 		if (!hasOut) {
 			if (!q.endsWith(";")) {
 				q += ";";
