@@ -255,7 +255,8 @@ public class SearchService {
         if (wikiFeature == null && wikidataId != null) {
             wikiFeature = getWikiPoi(wikidataId, lang);
         }
-        return mergeFeatures(poiFeature, wikiFeature);
+
+        return mergeFeatures(wikiFeature, poiFeature);
     }
 
     public static Feature mergeFeatures(Feature f1, Feature f2) {
@@ -263,19 +264,18 @@ public class SearchService {
         if (f2 == null) return f1;
 
         Feature merged = new Feature(f1.geometry != null ? f1.geometry : f2.geometry);
-        merged.properties.putAll(f2.properties);
-        f1.properties.forEach(merged.properties::putIfAbsent);
+        merged.properties.putAll(f1.properties);
+        merged.prop("poiTags", f2.properties);
         return merged;
     }
 
     private Feature getWikiPoi(Long wikidataId, String lang) {
         String primaryLang = lang != null ? lang : DEFAULT_SEARCH_LANG;
-        String langListQuery = primaryLang.equals(DEFAULT_SEARCH_LANG)
-                ? "['" + DEFAULT_SEARCH_LANG + "']"
-                : "['" + primaryLang + "', '" + DEFAULT_SEARCH_LANG + "']";
         List<String> langs = primaryLang.equals(DEFAULT_SEARCH_LANG)
                 ? List.of(DEFAULT_SEARCH_LANG)
                 : List.of(primaryLang, DEFAULT_SEARCH_LANG);
+
+        String langListQuery = wikiService.getLangListQuery(langs);
 
         String query =
                 "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
