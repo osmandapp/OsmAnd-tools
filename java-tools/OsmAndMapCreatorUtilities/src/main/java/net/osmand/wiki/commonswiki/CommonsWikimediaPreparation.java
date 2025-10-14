@@ -27,14 +27,12 @@ import java.util.zip.GZIPInputStream;
 
 
 public class CommonsWikimediaPreparation {
+	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 
 	public static final String DATA_SOURCE = "commonswiki-latest-pages-articles.xml.gz";
-	public static final String DATA_SOURCE_INCR = "commonswiki-20251007-pages-meta-hist-incr.xml.gz";
 	public static final String RESULT_SQLITE = "wikidata_commons_osm.sqlitedb";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
-
-	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 
 	public static void main(String[] args) {
 		String folder = "";
@@ -59,7 +57,6 @@ public class CommonsWikimediaPreparation {
 			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-
 		final String sqliteFileName = database.isEmpty() ? folder + RESULT_SQLITE : database;
 		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
 		File commonsWikiDB = new File(sqliteFileName);
@@ -83,9 +80,7 @@ public class CommonsWikimediaPreparation {
 	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
 		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, true);
 		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
-		String commonWikiArticles = commonsWikiDB.getParent() + "/" + DATA_SOURCE_INCR;
-		parseCommonArticles(commonWikiArticles, commonsWikiDB, recreateDb);
-		long maxId = wfd.getMaxId();
+//		long maxId = wfd.getMaxId();
 		log.info("Updating wikidata...");
 		for (String fileName : downloadedPageFiles) {
 			log.info("Updating from " + fileName);
@@ -99,12 +94,10 @@ public class CommonsWikimediaPreparation {
 		FileProgressImplementation progress = new FileProgressImplementation("Read commonswiki articles file", new File(articles));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-
 		final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, commonsWikiDB, recreateDb);
 		sx.parse(is, handler);
 		handler.finish();
 	}
-
 
 	private static class CommonsWikiHandler extends DefaultHandler {
 		private final SAXParser saxParser;
@@ -115,6 +108,7 @@ public class CommonsWikimediaPreparation {
 		private boolean page = false;
 		private boolean pageIdParsed = false;
 		private boolean pageTextParsed = false;
+		private int count = 0;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
@@ -215,7 +209,6 @@ public class CommonsWikimediaPreparation {
 			if (page && ctext != null) {
 				ctext.append(ch, start, length);
 			}
-
 		}
 
 		@Override
@@ -275,9 +268,13 @@ public class CommonsWikimediaPreparation {
 					prepContent.setString(5, license);
 					prepContent.setString(6, description);
 					addBatch(prepContent, contentBatch);
+					count++;
+					if (count % 100000 == 0) {
+						System.out.println(count + " Articles processed");
+					}
 				}
-			} catch (SQLException | IOException exception) {
-				log.error(exception.getMessage() + " in : " + title, exception);
+			} catch (Exception exception) {
+				log.error(exception.getMessage() + " on page id : " + id + " title : " + title, exception);
 			}
 		}
 	}

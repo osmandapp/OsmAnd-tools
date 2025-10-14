@@ -614,7 +614,6 @@ public class WikiDatabasePreparation {
 		if (line.toLowerCase().matches(".*author\\s*=\\s*.*")) {
 			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
 		}
-		line = line.replaceFirst("^\\*", "").trim();
 		
 		List<String> templatesToHandle = Arrays.asList("User", "Creator");
 		List<String> parts = splitByPipeOutsideBraces(line, true);
