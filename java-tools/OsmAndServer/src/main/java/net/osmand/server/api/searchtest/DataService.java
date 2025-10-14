@@ -287,6 +287,7 @@ public interface DataService extends BaseService {
 			if (dupCount > 0) {
 				row.put("dup_count", dupCount);
 			}
+			row.put("web_type", firstResult.searchResult().objectType);
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			row.put("res_name", firstResult.placeName());
@@ -303,22 +304,6 @@ public interface DataService extends BaseService {
 				found = actualResult.place() <= dupCount + firstResult.place();
 			}
 			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
-			
-			
-			
-			// generates too wide table unusable - if specific tag is needed it could be extracted to row
-//			Feature resultFeature = getSearchService().getFeature(firstResult.searchResult());
-//			if (resultFeature.properties != null) {
-//				for (Map.Entry<String, Object> e : resultFeature.properties.entrySet()) {
-//					Object v = e.getValue();
-//					if (v != null) {
-//						String s = v.toString();
-//						if (!s.isEmpty()) {
-//							row.put(e.getKey(), s);
-//						}
-//					}
-//				}
-//			}
 		}
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
