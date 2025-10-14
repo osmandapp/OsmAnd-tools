@@ -274,10 +274,12 @@ public class SearchService {
     }
 
     private Feature getWikiPoiById(Long wikidataId, String lang) {
-        String primaryLang = lang != null ? lang : DEFAULT_SEARCH_LANG;
-        List<String> langs = primaryLang.equals(DEFAULT_SEARCH_LANG)
-                ? List.of(DEFAULT_SEARCH_LANG)
-                : List.of(primaryLang, DEFAULT_SEARCH_LANG);
+        if (wikidataId == null) {
+            return null;
+        }
+        List<String> langs = lang != null && !lang.equals(DEFAULT_SEARCH_LANG)
+                ? List.of(lang, DEFAULT_SEARCH_LANG)
+                : List.of(DEFAULT_SEARCH_LANG);
 
         String langListQuery = wikiService.getLangListQuery(langs);
 
