@@ -239,11 +239,7 @@ public class WikiService {
 
 	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery, int zoom) {
 
-		String langList = langPriority.stream()
-				.map(String::trim)
-				.filter(l -> l.matches("^[a-z]{1,3}$"))
-				.map(l -> "'" + l + "'")
-				.collect(Collectors.joining(", ", "[", "]"));
+		String langList = getLangListQuery(langPriority);
 
 		String table;
 		if (zoom <= 5)      table = "wiki.top1000_by_quad_z5";
@@ -263,6 +259,14 @@ public class WikiService {
 				(showAll ? "" : filterQuery) +
 				" ORDER BY w.elo DESC, w.qrank DESC " +
 				"LIMIT " + LIMIT_OBJS_QUERY;
+	}
+
+	public String getLangListQuery(List<String> langPriority) {
+		return langPriority.stream()
+				.map(String::trim)
+				.filter(l -> l.matches("^[a-z]{1,3}$"))
+				.map(l -> "'" + l + "'")
+				.collect(Collectors.joining(", ", "[", "]"));
 	}
 
 	public String getWikipediaContent(String title, String lang) {
