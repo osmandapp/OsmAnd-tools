@@ -34,7 +34,7 @@ public interface DataService extends BaseService {
 		if (input == null) {
 			return "";
 		}
-		return input.toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
 	}
 
 	SearchTestDatasetRepository getDatasetRepo();

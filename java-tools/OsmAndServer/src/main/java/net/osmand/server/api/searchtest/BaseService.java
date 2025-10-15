@@ -92,18 +92,15 @@ public interface BaseService {
 
 	default String getHeader(Path filePath) throws IOException {
 		String fileName = filePath.getFileName().toString();
-		if (fileName.endsWith(".csv")) {
-			try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-				return reader.readLine();
-			}
-		}
 		if (fileName.endsWith(".gz")) {
 			try (BufferedReader reader =
-						 new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(filePath))))) {
+					     new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(filePath))))) {
 				return reader.readLine();
 			}
 		}
-		return null;
+		try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+			return reader.readLine();
+		}
 	}
 
 	JdbcTemplate getJdbcTemplate();
