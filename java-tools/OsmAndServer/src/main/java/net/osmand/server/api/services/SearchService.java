@@ -507,7 +507,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return ObfConstants.getOsmObjectId(amenity) == osmid;
+                        return ObfConstants.getOsmObjectId(amenity) == osmid && !amenity.getType().getKeyName().equals(WIKI_POI_TYPE);
                     }
                     
                     @Override
@@ -979,6 +979,7 @@ public class SearchService {
                     .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
                     .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
+            filterWikiTags(tags);
             for (Map.Entry<String, String> entry : tags.entrySet()) {
                 String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
                 if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
@@ -998,6 +999,14 @@ public class SearchService {
             feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
         }
         return feature;
+    }
+
+    private void filterWikiTags(Map<String, String> tags) {
+        tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")
+                || entry.getKey().startsWith("osm_tag_travel_topic")
+                || entry.getKey().startsWith("osm_tag_qrank")
+                || entry.getKey().startsWith("osm_tag_wiki_place")
+                || entry.getKey().startsWith("osm_tag_wiki_photo"));
     }
     
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
