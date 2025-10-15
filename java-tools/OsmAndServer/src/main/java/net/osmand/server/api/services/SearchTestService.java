@@ -105,8 +105,6 @@ public class SearchTestService implements ReportService, DataService {
 	@Autowired
 	private PolyglotEngine engine;
 
-	private OsmandRegions regions = null;
-
 	@PostConstruct
 	protected void init() {
 		this.webClient =
@@ -127,16 +125,6 @@ public class SearchTestService implements ReportService, DataService {
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
 		}
-
-		try {
-			regions = PlatformUtil.getOsmandRegions();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	public OsmandRegions getOsmandRegions() {
-		return regions;
 	}
 
 	public SearchService getSearchService() {
@@ -344,11 +332,10 @@ public class SearchTestService implements ReportService, DataService {
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
 					List<SearchResult> searchResults = Collections.emptyList();
-					if (query != null && !query.trim().isEmpty()) {
+					if (query != null && !query.trim().isEmpty())
 						searchResults = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1]);
-						searchResults = searchResults.stream().filter(x -> isSeparated(x.file)).toList();
-					}
+								query, run.locale, false, bbox[0], bbox[1], true);
+
 					saveRunResults(genRow, gen_id, count, run, query, searchResults, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
@@ -368,19 +355,6 @@ public class SearchTestService implements ReportService, DataService {
 			run.timestamp = LocalDateTime.now();
 			runRepo.save(run);
 		}
-	}
-
-	boolean isSeparated(BinaryMapIndexReader file) {
-		if (file == null)
-			return true;
-
-		BinaryMapIndexReader.MapIndex mapIndex = file.getMapIndexes().get(0);
-		if (mapIndex == null)
-			return true;
-
-		WorldRegion region = getOsmandRegions().getRegionDataByDownloadName(mapIndex.getName());
-		return region != null && (region.isRegionMapDownload() && !region.isRegionJoinMapDownload() ||
-				region.isRegionRoadsDownload() && !region.isRegionJoinRoadsDownload());
 	}
 
 	@Async
