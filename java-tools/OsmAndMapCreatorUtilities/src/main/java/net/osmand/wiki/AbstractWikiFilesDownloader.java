@@ -170,9 +170,6 @@ public abstract class AbstractWikiFilesDownloader {
 				result.add(fileForUpdate);
 			}
 		}
-		if (result.isEmpty()) {
-			throw new RuntimeException("Could not download list from " + wikiUrl);
-		}
 		return result;
 	}
 
@@ -193,9 +190,6 @@ public abstract class AbstractWikiFilesDownloader {
 					result.add(fileForUpdate);
 				}
 			}
-		}
-		if (result.isEmpty()) {
-			throw new RuntimeException("Could not download list from " + wikiUrl);
 		}
 		return result;
 	}
