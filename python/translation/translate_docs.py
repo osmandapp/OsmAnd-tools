@@ -265,13 +265,11 @@ def stored_digest(path: Path):
                 json_code = json.load(fh)
                 return None if "sourceHash" not in json_code else json_code.get("sourceHash").get("message")
 
-            skip_n_line = 0 if is_partial_mdx(path) else 2
-            i = 0
+            partial = is_partial_mdx(path)
             for line in fh:
                 next_line = line
-                if i == skip_n_line:
+                if partial or next_line.startswith('source-hash'):
                     break
-                i += 1
 
         m = _marker.match(next_line)
         value = m.groups()[0] if m else None
@@ -549,7 +547,7 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
 
 
 if __name__ == "__main__":
-    yarn_install()
+    #yarn_install()
     if LANG and LANG != "all":
         process_lang(LANG, langs[LANG]["name"])
     else:
