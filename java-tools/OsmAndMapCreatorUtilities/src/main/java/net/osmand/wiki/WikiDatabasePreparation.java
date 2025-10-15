@@ -1574,11 +1574,11 @@ public class WikiDatabasePreparation {
 			break;
 		case "update-wikidata":
 			wikidataDB = new File(wikidataSqliteName);
-			updateWikidata(osmCoordinates, wikidataDB, true);
+			updateWikidata(osmCoordinates, wikidataDB, false);
 			break; 
 		case "update-wikidata-daily":
 			wikidataDB = new File(wikidataSqliteName);
-			updateWikidata(osmCoordinates, wikidataDB, false);
+			updateWikidata(osmCoordinates, wikidataDB, true);
 			break;
 		case "process-wikipedia":
 			log.info("Processing wikipedia...");

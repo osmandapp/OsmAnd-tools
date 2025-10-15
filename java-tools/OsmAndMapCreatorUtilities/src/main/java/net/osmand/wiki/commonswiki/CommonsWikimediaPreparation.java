@@ -67,7 +67,10 @@ public class CommonsWikimediaPreparation {
 					p.parseCommonArticles(commonWikiArticles, commonsWikiDB, recreateDb);
 					break;
 				case "update-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, recreateDb);
+					p.updateCommonsWiki(commonsWikiDB, recreateDb, false);
+					break;
+				case "update-img-meta-daily":
+					p.updateCommonsWiki(commonsWikiDB, recreateDb, true);
 					break;
 				default:
 					throw new RuntimeException("Unknown mode: " + mode);
@@ -77,8 +80,9 @@ public class CommonsWikimediaPreparation {
 		}
 	}
 
-	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb) throws ParserConfigurationException, SAXException, IOException, SQLException {
-		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, true);
+	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate)
+			throws ParserConfigurationException, SAXException, IOException, SQLException {
+		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate);
 		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
 //		long maxId = wfd.getMaxId();
 		log.info("Updating wikidata...");
