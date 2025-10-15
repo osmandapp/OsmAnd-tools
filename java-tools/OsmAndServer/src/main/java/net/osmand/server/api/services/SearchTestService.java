@@ -2,11 +2,7 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import net.osmand.PlatformUtil;
-import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
-import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
@@ -33,7 +29,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
