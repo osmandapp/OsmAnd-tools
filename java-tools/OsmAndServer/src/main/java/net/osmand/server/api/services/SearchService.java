@@ -1006,7 +1006,6 @@ public class SearchService {
                 || entry.getKey().startsWith("osm_tag_travel_topic")
                 || entry.getKey().startsWith("osm_tag_qrank")
                 || entry.getKey().startsWith("osm_tag_wiki_place")
-                || entry.getKey().startsWith("osm_tag_osmand_poi_key")
                 || entry.getKey().startsWith("osm_tag_wiki_photo"));
     }
     
