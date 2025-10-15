@@ -547,7 +547,7 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
 
 
 if __name__ == "__main__":
-    #yarn_install()
+    yarn_install()
     if LANG and LANG != "all":
         process_lang(LANG, langs[LANG]["name"])
     else:
