@@ -4,6 +4,7 @@ import net.osmand.MapCreatorVersion;
 import net.osmand.NativeJavaRendering;
 import net.osmand.SQLiteBigPlanetIndex;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReaderStats.SearchStat;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
@@ -263,6 +264,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 					@Override
 					public void run() {
 						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), true);
+						System.out.println(searchUICore.getSearchSettings().getStat());
 					}
 				});
 			}
@@ -317,10 +319,12 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    			}
 	    		}
 	    		SearchSettings settings = searchUICore.getPhrase().getSettings();
+	    		SearchStat stat = new SearchStat();
+	    		searchUICore.getPhrase().getSettings().setStat(stat);
 	    		if(settings.getRadiusLevel() != 1){
 	    			searchUICore.updateSettings(settings.setRadiusLevel(1));
 	    		}
-	    		SearchResultCollection c = null;
+//	    		SearchResultCollection c = null;
 	    		if (!text.contains("#map")) {
 					searchUICore.search(text, true, null);
 	    		}
@@ -366,6 +370,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 					@Override
 					public void actionPerformed(ActionEvent e) {
 						SearchSettings settings = searchUICore.getPhrase().getSettings();
+						SearchStat searchStat = new SearchStat();
+						settings.setStat(searchStat);
 						searchUICore.updateSettings(settings.setRadiusLevel(settings.getRadiusLevel() + 1));
 						searchUICore.search(statusField.getText(), true, null);
 						updateSearchResult(statusField, searchUICore.getCurrentSearchResult(), false);
@@ -381,7 +387,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 				JMenuItem mi = new JMenuItem();
 				LatLon location = res.getPhrase().getLastTokenLocation();
 				String locationString ="";
-				if(sr.location != null) {
+				if (sr.location != null) {
 					locationString = ((int) MapUtils.getDistance(location, sr.location)) / 1000.f + " km";
 				}
 				if (!Algorithms.isEmpty(sr.localeRelatedObjectName)) {
@@ -390,17 +396,16 @@ public class OsmExtractionUI implements IMapLocationListener {
 						locationString += " " + (int) (sr.distRelatedObjectName / 1000.f) + " km";
 					}
 				}
-				if(sr.objectType == ObjectType.HOUSE) {
+				if (sr.objectType == ObjectType.HOUSE) {
 					if (sr.relatedObject instanceof Street) {
-
 						locationString += " " + ((Street) sr.relatedObject).getCity().getName();
 					}
 				}
-				if(sr.objectType == ObjectType.LOCATION) {
-					locationString += " " +osmandRegions.getCountryName(sr.location);
+				if (sr.objectType == ObjectType.LOCATION) {
+					locationString += " " + osmandRegions.getCountryName(sr.location);
 				}
-				if(sr.object instanceof Amenity) {
-					locationString += " " + ((Amenity)sr.object).getSubType();
+				if (sr.object instanceof Amenity) {
+					locationString += " " + ((Amenity) sr.object).getSubType();
 					if (((Amenity) sr.object).isClosed()) {
 						locationString += " (CLOSED)";
 					}
@@ -417,6 +422,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 							mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
 							mapPanel.setZoom(sr.preferredZoom);
 						}
+						SearchStat searchStat = new SearchStat();
+						searchUICore.getPhrase().getSettings().setStat(searchStat);
 						searchUICore.selectSearchResult(sr);
 						String txt = searchUICore.getPhrase().getText(true);
 						statusField.setText(txt);
