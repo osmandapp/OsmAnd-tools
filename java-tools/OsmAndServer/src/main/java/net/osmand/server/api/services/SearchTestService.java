@@ -329,7 +329,8 @@ public class SearchTestService implements ReportService, DataService {
 					List<SearchResult> searchResults = Collections.emptyList();
 					if (query != null && !query.trim().isEmpty())
 						searchResults = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1]);
+								query, run.locale, false, bbox[0], bbox[1], true);
+
 					saveRunResults(genRow, gen_id, count, run, query, searchResults, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {

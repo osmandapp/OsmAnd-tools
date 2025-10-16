@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
@@ -7,6 +8,7 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.data.*;
 import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
@@ -58,6 +60,8 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+
+	private OsmandRegions regions = null;
 
     public static class PoiSearchResult {
         
@@ -115,6 +119,14 @@ public class SearchService {
             return bbox;
         }
     }
+
+	public SearchService() {
+		try {
+			regions = PlatformUtil.getOsmandRegions();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
     
     public List<LatLon> getBboxCoords(List<String> coords) {
         List<LatLon> bbox = new ArrayList<>();
@@ -126,7 +138,7 @@ public class SearchService {
     }
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
-		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast);
+		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false);
 
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
@@ -136,7 +148,20 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-    public List<SearchResult> searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+	private boolean isSeparated(BinaryMapIndexReader file) {
+		if (file == null)
+			return true;
+
+		BinaryMapIndexReader.MapIndex mapIndex = file.getMapIndexes().get(0);
+		if (mapIndex == null)
+			return true;
+
+		WorldRegion region = regions.getRegionDataByDownloadName(mapIndex.getName());
+		return region != null && (region.isRegionMapDownload() && !region.isRegionJoinMapDownload() ||
+				region.isRegionRoadsDownload() && !region.isRegionJoinRoadsDownload());
+	}
+
+    public List<SearchResult> searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return Collections.emptyList();
         }
@@ -153,6 +178,9 @@ public class SearchService {
                 return Collections.emptyList();
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
+	        if (filterCombinedMap) {
+		        usedMapList = usedMapList.stream().filter(this::isSeparated).toList();
+	        }
             if (usedMapList.isEmpty()) {
                 return Collections.emptyList();
             }
