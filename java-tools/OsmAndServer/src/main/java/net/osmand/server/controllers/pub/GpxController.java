@@ -253,10 +253,10 @@ public class GpxController {
 	}
 
 	@PostMapping(path = "/save-track-data", produces = MediaType.APPLICATION_XML_VALUE)
-	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String gz,
+	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String data,
 	                                                           HttpSession httpSession) throws IOException {
-		String json = decompressGzipBase64(gz);
-		WebGpxParser.TrackData trackData = new Gson().fromJson(json, WebGpxParser.TrackData.class);
+
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
