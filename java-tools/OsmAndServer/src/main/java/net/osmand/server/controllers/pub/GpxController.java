@@ -2,11 +2,13 @@ package net.osmand.server.controllers.pub;
 
 
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -301,27 +303,11 @@ public class GpxController {
 	}
 	
 	@RequestMapping(path = {"/get-analysis"}, produces = "application/json")
-	public ResponseEntity<String> getAnalysis(@RequestBody String gz) throws IOException {
-		String json = decompressGzipBase64(gz);
-
-		WebGpxParser.TrackData trackData = gson.fromJson(json, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getAnalysis(@RequestBody String data) throws IOException {
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
-	}
-
-	private static String decompressGzipBase64(String gz) throws IOException {
-		byte[] compressed = Base64.getDecoder().decode(gz);
-		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
-		     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-
-			byte[] buffer = new byte[4096];
-			int len;
-			while ((len = gis.read(buffer)) != -1) {
-				baos.write(buffer, 0, len);
-			}
-			return baos.toString(StandardCharsets.UTF_8);
-		}
 	}
 
     private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
