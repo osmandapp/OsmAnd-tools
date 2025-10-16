@@ -2,21 +2,20 @@ package net.osmand.server.api.searchtest;
 
 import net.osmand.data.LatLon;
 import net.osmand.search.core.SearchResult;
+import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
+import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.services.SearchService;
-import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -29,13 +28,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public interface DataService extends BaseService {
-
-	static String sanitize(String input) {
-		if (input == null) {
-			return "";
-		}
-		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
-	}
 
 	SearchTestDatasetRepository getDatasetRepo();
 
@@ -204,7 +196,6 @@ public interface DataService extends BaseService {
 		return getTestCaseRepo().save(test);
 	}
 
-
 	@Async
 	default CompletableFuture<Dataset> updateDataset(Long id, Boolean reload, Map<String, String> updates) {
 		return CompletableFuture.supplyAsync(() -> {
@@ -242,21 +233,24 @@ public interface DataService extends BaseService {
 		}
 	}
 
-	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, List<SearchResult> searchResults, LatLon targetPoint,
+	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
+	int FOUND_DEDUPLICATE_RADIUS = 100;
+
+	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		final MapDataObjectFinder finder = new MapDataObjectFinder();
-		int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
-		int FOUND_DEDUPLICATE_RADIUS = 100;
 		long datasetId;
 		try {
 			datasetId = Long.parseLong((String) genRow.get("id"));
 		} catch (NumberFormatException e) {
 			datasetId = -1;
 		}
+
+		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 		Map<String, Object> row = new LinkedHashMap<>();
 		Result firstResult = finder.findFirstResult(searchResults, targetPoint, genRow);
 		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId);
-		
+
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
 		String resultPoint = null;
@@ -287,6 +281,11 @@ public interface DataService extends BaseService {
 			if (dupCount > 0) {
 				row.put("dup_count", dupCount);
 			}
+			if (searchResult != null && searchResult.stat() != null) {
+				row.put("stat_bytes", searchResult.stat().totalBytes);
+				row.put("stat_time", searchResult.stat().totalTime);
+			}
+			row.put("time", duration);
 			row.put("web_type", firstResult.searchResult().objectType);
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
@@ -508,5 +507,12 @@ public interface DataService extends BaseService {
 			getLogger().error("Failed to retrieve labels", e);
 			throw new RuntimeException("Failed to retrieve labels: " + e.getMessage(), e);
 		}
+	}
+
+	static String sanitize(String input) {
+		if (input == null) {
+			return "";
+		}
+		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
 	}
 }

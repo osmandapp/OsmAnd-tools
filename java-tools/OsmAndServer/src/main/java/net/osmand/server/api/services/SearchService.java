@@ -138,7 +138,7 @@ public class SearchService {
     }
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
-		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false);
+		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false).results();
 
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
@@ -161,31 +161,36 @@ public class SearchService {
 				region.isRegionRoadsDownload() && !region.isRegionJoinRoadsDownload());
 	}
 
-    public List<SearchResult> searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
+	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
+
+    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return Collections.emptyList();
+            return new SearchResultWrapper(Collections.emptyList(), null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
-        searchUICore.getSearchSettings().setRegions(osmandRegions);
-        
-        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
+	    searchUICore.getSearchSettings().setRegions(osmandRegions);
+
+	    QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
             if (list.isEmpty()) {
-                return Collections.emptyList();
+                return new SearchResultWrapper(Collections.emptyList(), null);
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
 	        if (filterCombinedMap) {
 		        usedMapList = usedMapList.stream().filter(this::isSeparated).toList();
 	        }
             if (usedMapList.isEmpty()) {
-                return Collections.emptyList();
+                return new SearchResultWrapper(Collections.emptyList(), null);
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-            settings.setOfflineIndexes(usedMapList);
+	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
+	        settings.setStat(stat);
+
+	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
             searchUICore.updateSettings(settings);
             
@@ -198,7 +203,7 @@ public class SearchService {
 	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
 	        res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
 	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
-			return res;
+			return new SearchResultWrapper(res, stat);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
