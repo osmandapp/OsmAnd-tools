@@ -293,10 +293,8 @@ public class GpxController {
 	}
 
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
-	public ResponseEntity<String> getSrtmData(@RequestBody String gz) throws IOException {
-		String json = decompressGzipBase64(gz);
-
-		WebGpxParser.TrackData trackData = gson.fromJson(json, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getSrtmData(@RequestBody String data) throws IOException {
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
