@@ -39,9 +39,9 @@ subprojects {
 	}
 
 	repositories {
-		maven {
-			url "https://maven.geotoolkit.org"
-		}
+//		maven {
+//			url "https://maven.geotoolkit.org"
+//		}
 		maven {
 			url "https://maven.geo-solutions.it/"
 		}

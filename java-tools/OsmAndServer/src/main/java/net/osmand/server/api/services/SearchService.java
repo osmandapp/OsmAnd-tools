@@ -35,6 +35,9 @@ public class SearchService {
     
     @Autowired
     OsmAndMapsService osmAndMapsService;
+
+    @Autowired
+    WikiService wikiService;
     
     OsmandRegions osmandRegions;
     
@@ -47,10 +50,12 @@ public class SearchService {
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
-    private static final String SEARCH_LOCALE = "en";
+    private static final String DEFAULT_SEARCH_LANG = "en";
     private static final String AND_RES = "/androidResources/";
     
     private static final String DELIMITER = " ";
+
+    private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
@@ -171,7 +176,7 @@ public class SearchService {
         }
     }
 
-    public Feature getPoi(String name, String type, LatLon loc) throws IOException {
+    public Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
@@ -190,7 +195,7 @@ public class SearchService {
                 return null;
             }
             SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(
-                    readers, searchBbox, SEARCH_LOCALE, loc.getLatitude(), loc.getLongitude());
+                    readers, searchBbox, DEFAULT_SEARCH_LANG, loc.getLatitude(), loc.getLongitude());
 
             // Find POIs by type
             SearchUICore.SearchResultCollection rc =
@@ -199,24 +204,98 @@ public class SearchService {
                 return null;
             }
 
-            // Filter by name
-            for (SearchResult r : rc.getCurrentSearchResults()) {
-                if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
-                    continue;
-                }
-                if (!matchesName(a, name)) {
-                    continue;
-                }
-                Feature f = getPoiFeature(r);
-                if (f != null) {
-                    feature = f;
-                    break;
-                }
+            if (name != null) {
+                feature = getPoiFeatureByName(rc, name);
+            } else if (osmId != null) {
+                feature = getPoiFeatureByOsmId(rc, osmId);
             }
+
         } finally {
             osmAndMapsService.unlockReaders(readers);
         }
         return feature;
+    }
+
+    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (matchesName(a, name)) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (ObfConstants.getOsmObjectId(a) == osmId) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
+        Feature wikiFeature = null;
+        Feature poiFeature = null;
+
+        if (type.equals(WIKI_POI_TYPE)) {
+            wikiFeature = getPoi(type, name, loc, null);
+        } else {
+            poiFeature = getPoi(type, name, loc, null);
+        }
+
+        if (wikiFeature == null && wikidataId != null) {
+            wikiFeature = getWikiPoiById(wikidataId, lang);
+        }
+
+        return mergeFeatures(wikiFeature, poiFeature);
+    }
+
+    public static Feature mergeFeatures(Feature f1, Feature f2) {
+        if (f1 == null) return f2;
+        if (f2 == null) return f1;
+
+        Feature merged = new Feature(f1.geometry != null ? f1.geometry : f2.geometry);
+        merged.properties.putAll(f1.properties);
+        merged.prop("poiTags", f2.properties);
+        return merged;
+    }
+
+    private Feature getWikiPoiById(Long wikidataId, String lang) {
+        if (wikidataId == null) {
+            return null;
+        }
+        List<String> langs = lang != null && !lang.equals(DEFAULT_SEARCH_LANG)
+                ? List.of(lang, DEFAULT_SEARCH_LANG)
+                : List.of(DEFAULT_SEARCH_LANG);
+
+        String langListQuery = wikiService.getLangListQuery(langs);
+
+        String query =
+                "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
+                        "w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
+                        "w.search_lat AS lat, w.search_lon AS lon, " +
+                        "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, " +
+                        "indexOf(w.wikiArticleLangs, lang) AS ind, " +
+                        "w.wikiArticleContents[ind] AS content, " +
+                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
+                        "FROM wiki.wikidata w " +
+                        "WHERE w.id = " + wikidataId + " " +
+                        "ORDER BY w.elo DESC, w.qrank DESC";
+        FeatureCollection res = wikiService.getPoiData(null, null, query, "lat", "lon", langs);
+        return res.features.get(0);
     }
 
     private boolean matchesName(Amenity a, String name) {
@@ -428,7 +507,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return ObfConstants.getOsmObjectId(amenity) == osmid;
+                        return ObfConstants.getOsmObjectId(amenity) == osmid && !amenity.getType().getKeyName().equals(WIKI_POI_TYPE);
                     }
                     
                     @Override
@@ -627,7 +706,7 @@ public class SearchService {
     
     public List<String> getTopFilters() {
         List<String> filters = new ArrayList<>();
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
+        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, true);
         searchUICore.getPoiTypes().getTopVisibleFilters().forEach(f -> filters.add(f.getKeyName()));
         return filters;
     }
@@ -698,13 +777,13 @@ public class SearchService {
     }
 
     private MapPoiTypes getMapPoiTypes(String locale) {
-        locale = locale == null ? SEARCH_LOCALE : locale;
+        locale = locale == null ? DEFAULT_SEARCH_LANG : locale;
 
         return poiTypesByLocale.computeIfAbsent(locale, loc -> {
             MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
             mapPoiTypes.init();
             Map<String, String> translations = getTranslations(loc);
-            Map<String, String> enTranslations = getTranslations(SEARCH_LOCALE);
+            Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
             mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
             return mapPoiTypes;
         });
@@ -876,7 +955,9 @@ public class SearchService {
 				if (parentResult != null && parentResult.localeRelatedObjectName != null) {
 					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
 				}
-			}
+			} else if (result.objectType == ObjectType.STREET_INTERSECTION) {
+                feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
+            }
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
@@ -900,6 +981,7 @@ public class SearchService {
                     .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
                     .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
+            filterWikiTags(tags);
             for (Map.Entry<String, String> entry : tags.entrySet()) {
                 String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
                 if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
@@ -919,6 +1001,14 @@ public class SearchService {
             feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
         }
         return feature;
+    }
+
+    private void filterWikiTags(Map<String, String> tags) {
+        tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")
+                || entry.getKey().startsWith("osm_tag_travel_topic")
+                || entry.getKey().startsWith("osm_tag_qrank")
+                || entry.getKey().startsWith("osm_tag_wiki_place")
+                || entry.getKey().startsWith("osm_tag_wiki_photo"));
     }
     
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {

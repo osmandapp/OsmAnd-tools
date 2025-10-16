@@ -84,11 +84,19 @@ public class SearchController {
 
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoi(@RequestParam String name,
-                                            @RequestParam String type,
-                                            @RequestParam double lat,
-                                            @RequestParam double lng) throws IOException {
-        Feature poiSearchResult = searchService.getPoi(name, type, new LatLon(lat, lng));
+    public ResponseEntity<String> getPoi(@RequestParam String type,
+                                         @RequestParam double lat,
+                                         @RequestParam double lng,
+                                         @RequestParam (required = false) String name,
+                                         @RequestParam (required = false) Long osmId,
+                                         @RequestParam (required = false) Long wikidataId,
+                                         @RequestParam (required = false) String lang) throws IOException {
+        Feature poiSearchResult;
+        if (wikidataId != null) {
+            poiSearchResult = searchService.getWikiPoi(type, name, wikidataId, new LatLon(lat, lng), lang);
+        } else {
+            poiSearchResult = searchService.getPoi(type, name, new LatLon(lat, lng), osmId);
+        }
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
     
