@@ -3,7 +3,6 @@ package net.osmand.swing;
 import static net.osmand.router.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
 import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.GeocodingUtilities;
@@ -222,20 +221,12 @@ public class MapAddressLayer implements MapPanelLayer {
 			for (City c : index.getCities(null, type)) {
 				if (MapUtils.getDistance(c.getLocation(), lat, lon) < distance) {
 					log.info("Searching city " + c.getName());
-					index.preloadStreets(c, null);
+					index.preloadStreets(c, null, null);
 					for (Street t : c.getStreets()) {
-						Long id = t.getId();
 						if (!streets.containsKey(t.getName())) {
 							streets.put(t.getName(), new ArrayList<Street>());
 						}
 						streets.get(t.getName()).add(t);
-//							index.preloadBuildings(t, null);
-//							List<Street> streets = t.getIntersectedStreets();
-//							if (streets != null && !streets.isEmpty()) {
-//								for (Street s : streets) {
-//									// TODO
-//								}
-//							}
 					}
 				}
 			}

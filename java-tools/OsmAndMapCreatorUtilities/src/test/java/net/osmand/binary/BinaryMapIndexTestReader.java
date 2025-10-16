@@ -1,6 +1,7 @@
 package net.osmand.binary;
 
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
+import net.osmand.binary.BinaryMapIndexReaderStats.SearchStat;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -23,7 +24,6 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
 	private List<Amenity> amenities = Collections.emptyList();
 	private List<City> cities = Collections.emptyList();
-	private List<City> initCities = Collections.emptyList();
 	private List<City> matchedCities = Collections.emptyList();
 	private List<City> streetCities = Collections.emptyList();
 
@@ -94,7 +94,6 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 //				attributeTagsTable.add("name:en");
 			}
 			reader.cities = cities;
-			reader.initCities = initCities;
 			reader.matchedCities = matchedCities;
 			reader.streetCities = streetCities;
 
@@ -127,10 +126,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		return req.getSearchResults();
 	}
 
-	@Override
-	public List<City> getCities(BinaryMapAddressReaderAdapter.AddressRegion region, SearchRequest<City> resultMatcher, CityBlocks cityType) throws IOException {
-		return getCities(resultMatcher, cityType);
-	}
+
 
 	@Override
 	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks cityType) throws IOException {
@@ -142,13 +138,15 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		return cities;
 	}
 
+	
 	@Override
-	public int preloadStreets(City c, SearchRequest<Street> resultMatcher) throws IOException {
+	public int preloadStreets(City c, SearchRequest<Street> resultMatcher, SearchStat searchStat) throws IOException {
 		return 0;
 	}
 
 	@Override
-	public void preloadBuildings(Street s, SearchRequest<Building> resultMatcher) throws IOException {
+	public void preloadBuildings(Street s, SearchRequest<Building> resultMatcher, SearchStat searchStat)
+			throws IOException {
 		// cities must be filled with streets and buildings
 	}
 

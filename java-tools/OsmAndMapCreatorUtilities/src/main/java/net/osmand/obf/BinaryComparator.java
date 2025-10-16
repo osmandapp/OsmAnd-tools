@@ -306,8 +306,8 @@ public class BinaryComparator {
 //					}
 					i++;
 					j++;
-					i0.preloadStreets(c0, null);
-					i1.preloadStreets(c1, null);
+					i0.preloadStreets(c0, null, null);
+					i1.preloadStreets(c1, null, null);
 					if (COMPARE_SET.contains(CITY_NAME_COMPARE) && !c0.getNamesMap(true).equals(c1.getNamesMap(true))) {
 						printComment("(1). City all names are not same : " + c1 + " "
 								+ (new JSONObject(c0.getNamesMap(true)) + " != "
@@ -355,8 +355,8 @@ public class BinaryComparator {
 										"(2)- Street all names are not same : " + c1 + " " + s0.getNamesMap(true) + " <> " + s1.getNamesMap(true));
 							}
 							if (s0.getName().equals(s1.getName())) {
-								i0.preloadBuildings(s0, null);
-								i1.preloadBuildings(s1, null);
+								i0.preloadBuildings(s0, null, null);
+								i1.preloadBuildings(s1, null, null);
 								if (COMPARE_SET.contains(BUILDINGS_COMPARE)) {
 									if (s0.getBuildings().size() != s1.getBuildings().size()) {
 										printMapObject(BUILDINGS_COMPARE, s0,

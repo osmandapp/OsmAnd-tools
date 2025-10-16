@@ -1,8 +1,32 @@
 package net.osmand.obf;
 
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.text.DecimalFormat;
+import java.text.MessageFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
+
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.array.TIntArrayList;
@@ -12,18 +36,37 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.IndexConstants;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
-import net.osmand.binary.*;
+import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CitiesBlock;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
-import net.osmand.binary.BinaryMapIndexReader.*;
+import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
+import net.osmand.binary.BinaryMapIndexReaderStats.MapObjectStat;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiSubType;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.data.*;
+import net.osmand.binary.ObfConstants;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
+import net.osmand.data.Street;
+import net.osmand.data.TransportRoute;
+import net.osmand.data.TransportSchedule;
+import net.osmand.data.TransportStop;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
@@ -31,13 +74,6 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-
-import java.io.*;
-import java.text.DecimalFormat;
-import java.text.MessageFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
 
 public class BinaryInspector {
 
@@ -63,7 +99,7 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress", "-vcities", "-vstreetgroups",// "-vcitynames",
-					"-vstreets", //"-vbuildings", "-vintersections",
+					"-vstreets", "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
@@ -77,7 +113,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					
 //					System.getProperty("maps.dir") + "Map.obf"
-					System.getProperty("maps.dir") + "Eibsee.obf"
+					System.getProperty("maps.dir") + "Gb_england_greater-london_europe_3.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -796,7 +832,7 @@ public class BinaryInspector {
 			if (type == CityBlocks.UNKNOWN_TYPE) {
 				continue;
 			}
-			final List<City> cities = index.getCities(region, null, type);
+			final List<City> cities = index.getCities(null, type, region, null);
 			
 			print(String.format("\t %s %d entities", type.toString(), cities.size()));
 			if (CityBlocks.CITY_TOWN_TYPE == type) {
@@ -812,7 +848,7 @@ public class BinaryInspector {
 			for (City c : cities) {
 				int size = 0;
 				if (type != CityBlocks.BOUNDARY_TYPE) {
-					size = index.preloadStreets(c, null);
+					size = index.preloadStreets(c, null, null);
 				}
 				List<Street> streets = new ArrayList<Street>(c.getStreets());
 				String name = c.getName(verbose.lang);
@@ -853,7 +889,7 @@ public class BinaryInspector {
 				for (Street t : streets) {
 					if (!verbose.contains(t))
 						continue;
-					index.preloadBuildings(t, null);
+					index.preloadBuildings(t, null, null);
 					
 					
 					final List<Building> buildings = t.getBuildings();
@@ -1549,7 +1585,7 @@ public class BinaryInspector {
 		println(String.format("\t\t\tText based (%d): %s",  text.size(), text));
 		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
-		index.searchPoi(p, req);
+		index.searchPoi(req, p);
 		
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));

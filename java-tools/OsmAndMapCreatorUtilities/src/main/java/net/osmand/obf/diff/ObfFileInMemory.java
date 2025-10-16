@@ -612,7 +612,7 @@ public class ObfFileInMemory {
 				}
 			});
 		indexReader.initCategories(pr);
-		indexReader.searchPoi(pr, req);
+		indexReader.searchPoi(req, pr);
 		return local;
 	}
 

@@ -571,7 +571,7 @@ public class SearchService {
                     for (BinaryIndexPart indexPart : map.getIndexes()) {
                         if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion p) {
                             map.initCategories(p);
-                            List<Amenity> poiRes = map.searchPoi(p, req);
+                            List<Amenity> poiRes = map.searchPoi(req, p);
                             if (!poiRes.isEmpty()) {
                                 res = new SearchResult();
                                 res.object = poiRes.get(0);

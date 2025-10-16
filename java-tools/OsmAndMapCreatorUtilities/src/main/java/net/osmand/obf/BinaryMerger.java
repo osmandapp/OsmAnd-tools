@@ -387,11 +387,11 @@ public class BinaryMerger {
 
 	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
-		rindex.preloadStreets(city, null);
+		rindex.preloadStreets(city, null, null);
 		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 		Map<String, List<Node>> streetNodesN = new LinkedHashMap<String, List<Node>>();
 		for (Street street : city.getStreets()) {
-			rindex.preloadBuildings(street, null);
+			rindex.preloadBuildings(street, null, null);
 			ArrayList<Node> nns = new ArrayList<Node>();
 			for (Street is : street.getIntersectedStreets()) {
 				List<Node> list = streetNodesN.get(is.getName());
@@ -463,14 +463,14 @@ public class BinaryMerger {
 					continue;
 				}
 				final BinaryMapIndexReader index = indexes[i];
-				for (City city : index.getCities(region, null, cityBlockType)) {
+				for (City city : index.getCities(null, cityBlockType, region, null)) {
 					normalizePostcode(city, extractCountryName(index));
 					// weird code cause city ids can overlap
 					// probably code to merge cities below is not needed (it called mostly for postcodes)
 					if(cityIds.containsKey(city.getId())) {
-						index.preloadStreets(city, null);
+						index.preloadStreets(city, null, null);
 						City city2 = cityIds.get(city.getId());
-						cityMap.get(city2).preloadStreets(city2, null);
+						cityMap.get(city2).preloadStreets(city2, null, null);
 						if(city.getStreets().size() > city2.getStreets().size()) {
 							cityMap.remove(city2);
 							cityIds.put(city.getId(), city);
