@@ -955,7 +955,9 @@ public class SearchService {
 				if (parentResult != null && parentResult.localeRelatedObjectName != null) {
 					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
 				}
-			}
+			} else if (result.objectType == ObjectType.STREET_INTERSECTION) {
+                feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
+            }
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
