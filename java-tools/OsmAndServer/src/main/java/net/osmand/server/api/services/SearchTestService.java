@@ -326,16 +326,16 @@ public class SearchTestService implements ReportService, DataService {
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
-					List<SearchResult> searchResults = Collections.emptyList();
+					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty())
-						searchResults = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
+						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1], true);
 
-					saveRunResults(genRow, gen_id, count, run, query, searchResults, targetPoint, searchPoint,
+					saveRunResults(genRow, gen_id, count, run, query, searchResult, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(genRow, gen_id, count, run, query, Collections.emptyList(), targetPoint, searchPoint,
+					saveRunResults(genRow, gen_id, count, run, query, null, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
 				}
