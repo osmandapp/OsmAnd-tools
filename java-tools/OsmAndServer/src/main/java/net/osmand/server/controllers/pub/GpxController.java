@@ -313,22 +313,16 @@ public class GpxController {
 	}
 
 	private static String decompressGzipBase64(String gz) throws IOException {
-		try {
-			byte[] compressed = Base64.getDecoder().decode(gz);
-			if (compressed.length > 2 && compressed[0] == (byte) 0x1f && compressed[1] == (byte) 0x8b) {
-				try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
-				     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-					byte[] buffer = new byte[4096];
-					int len;
-					while ((len = gis.read(buffer)) != -1) {
-						baos.write(buffer, 0, len);
-					}
-					return baos.toString(StandardCharsets.UTF_8);
-				}
+		byte[] compressed = Base64.getDecoder().decode(gz);
+		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
+		     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+
+			byte[] buffer = new byte[4096];
+			int len;
+			while ((len = gis.read(buffer)) != -1) {
+				baos.write(buffer, 0, len);
 			}
-			return new String(compressed, StandardCharsets.UTF_8);
-		} catch (IllegalArgumentException e) {
-			return gz;
+			return baos.toString(StandardCharsets.UTF_8);
 		}
 	}
 
