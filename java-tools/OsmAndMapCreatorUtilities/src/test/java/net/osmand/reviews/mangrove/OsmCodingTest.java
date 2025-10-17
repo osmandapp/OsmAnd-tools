@@ -2,9 +2,11 @@ package net.osmand.reviews.mangrove;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import net.osmand.data.LatLon;
 import org.junit.Test;
 
 import java.util.Map;
+import java.util.Set;
 
 import static net.osmand.reviews.OsmElementType.NODE;
 import static net.osmand.reviews.OsmElementType.WAY;
@@ -22,7 +24,7 @@ public final class OsmCodingTest {
                         "geo",
                         new Review.Geo(new Review.Geo.Coordinates(13.0955955, 63.3953391, 4326), 10)
                 ),
-                new OsmCoding.OsmPoi(63.3953391, 13.0955955, "Årelagat", NODE, 12017528501L)
+                new OsmCoding.OsmPoi(new LatLon(63.3953391, 13.0955955), "Årelagat", NODE, 12017528501L)
         );
     }
 
@@ -37,7 +39,7 @@ public final class OsmCodingTest {
                         "geo",
                         new Review.Geo(new Review.Geo.Coordinates(13.209174449999999, 63.2949083, 4326), 26)
                 ),
-                new OsmCoding.OsmPoi(63.2949083, 13.209174449999999, "Välaberget", WAY, 1295679398L));
+                new OsmCoding.OsmPoi(new LatLon(63.2949083, 13.209174449999999), "Välaberget", WAY, 1295679398L));
     }
 
     @Test
@@ -51,7 +53,7 @@ public final class OsmCodingTest {
                         "geo",
                         new Review.Geo(new Review.Geo.Coordinates(-9.2978562, 38.7474422, 4326), 10)
                 ),
-                new OsmCoding.OsmPoi(38.7474422, -9.2978562, "Tagus", NODE, 13158036298L)
+                new OsmCoding.OsmPoi(new LatLon(38.7474422, -9.2978562), "Tagus", NODE, 13158036298L)
         );
     }
 
@@ -66,7 +68,7 @@ public final class OsmCodingTest {
                         "geo",
                         new Review.Geo(new Review.Geo.Coordinates(11.56464365, 48.139196, 4326), 9)
                 ),
-                new OsmCoding.OsmPoi(48.139196, 11.56464365, "Pommesfreunde", WAY, 271078178L)
+                new OsmCoding.OsmPoi(new LatLon(48.139196, 11.56464365), "Pommesfreunde", WAY, 271078178L)
         );
     }
 
@@ -85,9 +87,37 @@ public final class OsmCodingTest {
         assertEquals(ImmutableMap.of(), pois);
     }
 
+    @Test
+    public void movedNodeUsesMostRecentlyReviewedCoordinates() {
+        Review newerReview = testReview(
+                "8tx08XqXVUFngd7aO7JU2xjS2czOYyYoW-81zJTs7CcVvgpq1gtjaksdOmNiM7109aCgBvBF_V_tyHZ2OgLdag", // real signature included for reference
+                1696523912L,
+                "geo:51.0662649,3.7382839?q=Eco-shop&u=10",
+                "https://mapcomplete.org/shops?z=12.8&lat=51.051741224340475&lon=3.75277168201535&filter-shops-shop-type=%7B%22search%22%3A%22second_hand%7Cthrift%22%7D&layer-pharmacy=false#node/10864373586",
+                "geo",
+                new Review.Geo(new Review.Geo.Coordinates(3.7382839, 51.0662649, 4326), 10)
+        );
+        Review olderReview = testReview(
+                "ejaBX5cyEoTEszz8SPdOBT8YOV45Q5oD61MM6riyaY_BCFJ8hNCehSKCqxZhEkxkjs3rWeBdiDt4jlz8BKp0aQ", // real signature included for reference
+                1683232712L,
+                "geo:51.0659562,3.7384766?q=Eco-shop&u=10",
+                "http://127.0.0.1:1234/theme.html?layout=shops&test=false&z=17&lat=51.06574&lon=3.73993&language=en&layer-range=false#node/10864373586",
+                "geo",
+                new Review.Geo(new Review.Geo.Coordinates(3.7384766, 51.0659562, 4326), 10)
+        );
+        testCoding(ImmutableSet.of(newerReview, olderReview),
+                ImmutableMap.of(newerReview, new OsmCoding.OsmPoi(new LatLon(51.0662649, 3.7382839), "Eco-shop", NODE, 10864373586L)));
+
+    }
+
     private static void testCoding(Review review, OsmCoding.OsmPoi expectedPoi) {
         Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(ImmutableSet.of(review));
         assertEquals(expectedPoi, pois.get(review));
+    }
+
+    private static void testCoding(Set<Review> reviews, Map<Review, OsmCoding.OsmPoi> expectedPois) {
+        Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(reviews);
+        assertEquals(expectedPois, pois);
     }
 
     private static Review testReview(String signature, long iat, String sub, String clientId, String scheme, Review.Geo geo) {

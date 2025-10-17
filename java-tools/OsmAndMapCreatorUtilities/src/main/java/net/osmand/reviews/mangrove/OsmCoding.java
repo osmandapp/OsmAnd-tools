@@ -1,14 +1,15 @@
 package net.osmand.reviews.mangrove;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import net.osmand.PlatformUtil;
+import net.osmand.data.LatLon;
 import net.osmand.reviews.OsmElementType;
 import org.apache.commons.logging.Log;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,11 +25,41 @@ final class OsmCoding {
      * only reviews whose OSM details were successfully resolved are returned.
      */
     public static Map<Review, OsmPoi> resolveOsmPois(Set<Review> reviews) {
-        ImmutableMap.Builder<Review, OsmPoi> result = ImmutableMap.builder();
+        Map<Review, OsmPoi> result = new HashMap<>();
+        // we conflate the ids for nodes/relations/ways in this map, because the poi database's unique constraint does not consider the element type
+        Map<Long, Set<OsmPoi>> poisById = new HashMap<>();
+        Map<OsmPoi, Long> poiLatestReviewIat = new HashMap<>();
         for (Review review : reviews) {
             OsmPoi poi = resolvePoi(review);
             if (poi != null) {
                 result.put(review, poi);
+
+                if (!poisById.containsKey(poi.osmId())) {
+                    poisById.put(poi.osmId(), new HashSet<>());
+                }
+                poisById.get(poi.osmId()).add(poi);
+                poiLatestReviewIat.put(poi, Long.max(review.payload().iat(), poiLatestReviewIat.getOrDefault(poi, Long.MIN_VALUE)));
+            }
+        }
+
+        Set<OsmPoi> poisToRemove = oldPoisSharingId(poisById, poiLatestReviewIat);
+        log.info(String.format("found %d old version(s) of of POIs", poisToRemove.size()));
+        for (Review review : reviews) {
+            if (result.containsKey(review) && poisToRemove.contains(result.get(review))) {
+                result.remove(review);
+            }
+        }
+
+        return ImmutableMap.copyOf(result);
+    }
+
+    private static Set<OsmPoi> oldPoisSharingId(Map<Long, Set<OsmPoi>> poisById, Map<OsmPoi, Long> poiLatestReviewIat) {
+        ImmutableSet.Builder<OsmPoi> result = ImmutableSet.builder();
+        for (Set<OsmPoi> poisSharingId : poisById.values()) {
+            if (poisSharingId.size() > 1) {
+                List<OsmPoi> orderedPois = new ArrayList<>(poisSharingId);
+                orderedPois.sort(Comparator.comparing(poiLatestReviewIat::get).reversed());
+                result.addAll(orderedPois.subList(1, orderedPois.size()));
             }
         }
         return result.build();
@@ -70,8 +101,10 @@ final class OsmCoding {
         }
 
         return new OsmPoi(
-                review.geo().coordinates().y(),
-                review.geo().coordinates().x(),
+                new LatLon(
+                        review.geo().coordinates().y(),
+                        review.geo().coordinates().x()
+                ),
                 name,
                 elementType,
                 osmId
@@ -93,12 +126,12 @@ final class OsmCoding {
         return null;
     }
 
-    public record OsmPoi(double lat,
-                         double lon,
+    public record OsmPoi(LatLon location,
                          String name,
                          OsmElementType elementType,
                          Long osmId) {
     }
 
-    private OsmCoding() {}
+    private OsmCoding() {
+    }
 }

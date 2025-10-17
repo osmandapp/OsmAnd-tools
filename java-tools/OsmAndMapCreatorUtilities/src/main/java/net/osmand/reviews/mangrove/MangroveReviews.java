@@ -97,7 +97,7 @@ public final class MangroveReviews {
     }
 
     private static ReviewedPlace emptyReviewedPlace(OsmCoding.OsmPoi poi) {
-        return new ReviewedPlace(poi.lat(), poi.lon(), poi.elementType(), poi.osmId(), new ArrayList<>());
+        return new ReviewedPlace(poi.location(), poi.elementType(), poi.osmId(), new ArrayList<>());
     }
 
     private static void generateOsmFile(Set<ReviewedPlace> places, File outputFile) throws IOException {
@@ -117,8 +117,8 @@ public final class MangroveReviews {
             serializer.startTag(null, "node");
             serializer.attribute(null, "visible", "true");
             serializer.attribute(null, "id", String.valueOf(place.osmId()));
-            serializer.attribute(null, "lat", String.valueOf(place.lat()));
-            serializer.attribute(null, "lon", String.valueOf(place.lon()));
+            serializer.attribute(null, "lat", String.valueOf(place.location().getLatitude()));
+            serializer.attribute(null, "lon", String.valueOf(place.location().getLongitude()));
             addTag(serializer, Tags.REVIEWS_MARKER_TAG, Tags.REVIEWS_MARKER_VALUE);
             addTag(serializer, Tags.REVIEWS_KEY, reviewCodec.toJson(place.reviews()));
             // TODO: summary info
