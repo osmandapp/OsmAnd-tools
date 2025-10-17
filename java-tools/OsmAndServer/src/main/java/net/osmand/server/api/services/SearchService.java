@@ -540,7 +540,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return ObfConstants.getOsmObjectId(amenity) == osmid && !amenity.getType().getKeyName().equals(WIKI_POI_TYPE);
+                        return ObfConstants.getOsmObjectId(amenity) == osmid;
                     }
                     
                     @Override
@@ -606,9 +606,23 @@ public class SearchService {
                             map.initCategories(p);
                             List<Amenity> poiRes = map.searchPoi(req, p);
                             if (!poiRes.isEmpty()) {
-                                res = new SearchResult();
-                                res.object = poiRes.get(0);
-                                break;
+                                SearchResult wikiRes = null;
+                                SearchResult nonWikiRes = null;
+
+                                for (Amenity poi : poiRes) {
+                                    if (WIKI_POI_TYPE.equals(poi.getType().getKeyName())) {
+                                        if (wikiRes == null) {
+                                            wikiRes = new SearchResult();
+                                            wikiRes.object = poi;
+                                        }
+                                    } else {
+                                        nonWikiRes = new SearchResult();
+                                        nonWikiRes.object = poi;
+                                        break;
+                                    }
+                                }
+
+                                res = nonWikiRes != null ? nonWikiRes : wikiRes;
                             }
                         }
                     }
