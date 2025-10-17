@@ -151,19 +151,17 @@ public interface BaseService {
 		return s.replaceAll(" {2,}", " ").trim();
 	}
 
-	default Path queryOverpass(String query) {
-		Path tempFile;
+	default int queryOverpass(Path tempFile, String query) {
 		String request = buildOverpassRequest(query);
 		try {
 			String overpassResponse =
 					getWebClient().post().uri("").bodyValue(request)
 							.retrieve().bodyToMono(String.class).toFuture().join();
-			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			getLogger().info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
-			return tempFile;
+			return rowCount;
 		} catch (Exception e) {
-			getLogger().error("Failed to query data from Overpass for {}", request, e);
+			getLogger().error("Failed to query data from Overpass: {}", request, e);
 			throw new RuntimeException("Failed to query from Overpass", e);
 		}
 	}
@@ -227,7 +225,7 @@ public interface BaseService {
 			q = "";
 		}
 		String qLower = q.toLowerCase();
-		boolean hasHeader = qLower.matches("^\\s*\\[out:[^]]+]\\s*\\[timeout:[^]]+]\\s*;.*");
+		boolean hasHeader = qLower.matches("(?s)^\\s*\\[out:[^]]+]\\s*\\[timeout:[^]]+]\\s*;.*");
 		if (!hasHeader) {
 			q = "[out:json][timeout:360];" + q;
 			qLower = q.toLowerCase();
