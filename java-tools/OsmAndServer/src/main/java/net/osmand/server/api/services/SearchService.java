@@ -280,18 +280,8 @@ public class SearchService {
     }
 
     public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
-        Feature wikiFeature = null;
-        Feature poiFeature = null;
-
-        if (type.equals(WIKI_POI_TYPE)) {
-            wikiFeature = getPoi(type, name, loc, null);
-        } else {
-            poiFeature = getPoi(type, name, loc, null);
-        }
-
-        if (wikiFeature == null && wikidataId != null) {
-            wikiFeature = getWikiPoiById(wikidataId, lang);
-        }
+        Feature poiFeature = getPoi(type, name, loc, null);
+        Feature wikiFeature = getWikiPoiById(wikidataId, lang);
 
         return mergeFeatures(wikiFeature, poiFeature);
     }
