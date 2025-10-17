@@ -1,5 +1,8 @@
 package net.osmand.wiki;
 
+import net.osmand.PlatformUtil;
+import org.apache.commons.logging.Log;
+
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
@@ -18,6 +21,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public abstract class AbstractWikiFilesDownloader {
+	private static final Log log = PlatformUtil.getLog(AbstractWikiFilesDownloader.class);
 
 	public static final String DUMPS_WIKIMEDIA_URL = "https://dumps.wikimedia.org/";
 	public static final String OTHER_INCR_URL = "other/incr/";
@@ -30,6 +34,7 @@ public abstract class AbstractWikiFilesDownloader {
 
 	public AbstractWikiFilesDownloader(File wikiDB, boolean daily) {
 		try {
+			log.info("Start %s download".formatted(getFilePrefix()));
 			maxId = daily ? 0 : getMaxIdFromDb(wikiDB);
 			List<FileForDBUpdate> updateFileList = new ArrayList<>();
 
@@ -50,6 +55,7 @@ public abstract class AbstractWikiFilesDownloader {
 			}
 			String destFolder = wikiDB.getParent();
 			downloadPageFiles(destFolder, updateFileList);
+			log.info("Finish %s download".formatted(getFilePrefix()));
 		} catch (SQLException | IOException e) {
 			e.printStackTrace();
 		}
