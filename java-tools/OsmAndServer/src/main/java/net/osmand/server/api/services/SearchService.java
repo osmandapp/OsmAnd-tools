@@ -1,10 +1,14 @@
 package net.osmand.server.api.services;
 
-import net.osmand.NativeLibrary;
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
+import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.data.*;
+import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
@@ -24,16 +28,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static net.osmand.data.City.CityType.getAllCityTypeStrings;
-import static net.osmand.data.MapObject.AMENITY_ID_RIGHT_SHIFT;
 import static net.osmand.data.MapObject.unzipContent;
-import static net.osmand.router.RouteResultPreparation.SHIFT_ID;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
+import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+
 @Service
 public class SearchService {
     
     @Autowired
     OsmAndMapsService osmAndMapsService;
+
+    @Autowired
+    WikiService wikiService;
     
     OsmandRegions osmandRegions;
     
@@ -44,17 +50,18 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
+    private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
-    private static final String SEARCH_LOCALE = "en";
+    private static final String DEFAULT_SEARCH_LANG = "en";
     private static final String AND_RES = "/androidResources/";
-    
-    private static final int DUPLICATE_SPLIT = 5;
-    public static final long RELATION_BIT = 1L << ObfConstants.SHIFT_MULTIPOLYGON_IDS - 1; //According IndexPoiCreator SHIFT_MULTIPOLYGON_IDS
-    public static final long SPLIT_BIT = 1L << ObfConstants.SHIFT_NON_SPLIT_EXISTING_IDS - 1; //According IndexVectorMapCreator
     
     private static final String DELIMITER = " ";
 
+    private static final String WIKI_POI_TYPE = "osmwiki";
+
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+
+	private OsmandRegions regions = null;
 
     public static class PoiSearchResult {
         
@@ -112,6 +119,14 @@ public class SearchService {
             return bbox;
         }
     }
+
+	public SearchService() {
+		try {
+			regions = PlatformUtil.getOsmandRegions();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
     
     public List<LatLon> getBboxCoords(List<String> coords) {
         List<LatLon> bbox = new ArrayList<>();
@@ -121,30 +136,61 @@ public class SearchService {
         }
         return bbox;
     }
-    
-    public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+
+	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false).results();
+
+		List<Feature> features = new ArrayList<>();
+		if (res != null && !res.isEmpty()) {
+			saveSearchResult(res, features);
+		}
+
+		return !features.isEmpty() ? features : Collections.emptyList();
+	}
+
+	private boolean isSeparated(BinaryMapIndexReader file) {
+		if (file == null)
+			return true;
+
+		BinaryMapIndexReader.MapIndex mapIndex = file.getMapIndexes().get(0);
+		if (mapIndex == null)
+			return true;
+
+		WorldRegion region = regions.getRegionDataByDownloadName(mapIndex.getName());
+		return region != null && (region.isRegionMapDownload() && !region.isRegionJoinMapDownload() ||
+				region.isRegionRoadsDownload() && !region.isRegionJoinRoadsDownload());
+	}
+
+	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
+
+    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return Collections.emptyList();
+            return new SearchResultWrapper(Collections.emptyList(), null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
-        searchUICore.getSearchSettings().setRegions(osmandRegions);
-        
-        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
+	    searchUICore.getSearchSettings().setRegions(osmandRegions);
+
+	    QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
-        List<Feature> features = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
             if (list.isEmpty()) {
-                return Collections.emptyList();
+                return new SearchResultWrapper(Collections.emptyList(), null);
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
+	        if (filterCombinedMap) {
+		        usedMapList = usedMapList.stream().filter(this::isSeparated).toList();
+	        }
             if (usedMapList.isEmpty()) {
-                return Collections.emptyList();
+                return new SearchResultWrapper(Collections.emptyList(), null);
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-            settings.setOfflineIndexes(usedMapList);
+	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
+	        settings.setStat(stat);
+
+	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
             searchUICore.updateSettings(settings);
             
@@ -153,23 +199,154 @@ public class SearchService {
             
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
-            List<SearchResult> res;
-            if (resultCollection != null) {
-                res = resultCollection.getCurrentSearchResults();
-                if (!res.isEmpty()) {
-                    res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
-                    res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
-                    saveSearchResult(res, features);
-                }
-            }
+
+	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
+	        res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
+	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
+			return new SearchResultWrapper(res, stat);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
-        if (!features.isEmpty()) {
-            return features;
-        } else {
-            return Collections.emptyList();
+    }
+
+    public Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
         }
+        QuadRect searchBbox = osmAndMapsService.points(null, new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE));
+        List<BinaryMapIndexReader> readers = new ArrayList<>();
+        Feature feature = null;
+
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapRefs = getMapsForSearch(searchBbox, false);
+            if (mapRefs.isEmpty()) {
+                return null;
+            }
+            readers = osmAndMapsService.getReaders(mapRefs, null);
+            if (readers.isEmpty()) {
+                return null;
+            }
+            SearchUICore searchUICore = prepareSearchUICoreForSearchByPoiType(
+                    readers, searchBbox, DEFAULT_SEARCH_LANG, loc.getLatitude(), loc.getLongitude());
+
+            // Find POIs by type
+            SearchUICore.SearchResultCollection rc =
+                    searchPoiByCategory(searchUICore, type, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB);
+            if (rc == null) {
+                return null;
+            }
+
+            if (name != null) {
+                feature = getPoiFeatureByName(rc, name);
+            } else if (osmId != null) {
+                feature = getPoiFeatureByOsmId(rc, osmId);
+            }
+
+        } finally {
+            osmAndMapsService.unlockReaders(readers);
+        }
+        return feature;
+    }
+
+    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (matchesName(a, name)) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId) {
+        for (SearchResult r : rc.getCurrentSearchResults()) {
+            if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
+                continue;
+            }
+            if (ObfConstants.getOsmObjectId(a) == osmId) {
+                Feature f = getPoiFeature(r);
+                if (f != null) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
+        Feature wikiFeature = null;
+        Feature poiFeature = null;
+
+        if (type.equals(WIKI_POI_TYPE)) {
+            wikiFeature = getPoi(type, name, loc, null);
+        } else {
+            poiFeature = getPoi(type, name, loc, null);
+        }
+
+        if (wikiFeature == null && wikidataId != null) {
+            wikiFeature = getWikiPoiById(wikidataId, lang);
+        }
+
+        return mergeFeatures(wikiFeature, poiFeature);
+    }
+
+    public static Feature mergeFeatures(Feature f1, Feature f2) {
+        if (f1 == null) return f2;
+        if (f2 == null) return f1;
+
+        Feature merged = new Feature(f1.geometry != null ? f1.geometry : f2.geometry);
+        merged.properties.putAll(f1.properties);
+        merged.prop("poiTags", f2.properties);
+        return merged;
+    }
+
+    private Feature getWikiPoiById(Long wikidataId, String lang) {
+        if (wikidataId == null) {
+            return null;
+        }
+        List<String> langs = lang != null && !lang.equals(DEFAULT_SEARCH_LANG)
+                ? List.of(lang, DEFAULT_SEARCH_LANG)
+                : List.of(DEFAULT_SEARCH_LANG);
+
+        String langListQuery = wikiService.getLangListQuery(langs);
+
+        String query =
+                "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
+                        "w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
+                        "w.search_lat AS lat, w.search_lon AS lon, " +
+                        "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, " +
+                        "indexOf(w.wikiArticleLangs, lang) AS ind, " +
+                        "w.wikiArticleContents[ind] AS content, " +
+                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
+                        "FROM wiki.wikidata w " +
+                        "WHERE w.id = " + wikidataId + " " +
+                        "ORDER BY w.elo DESC, w.qrank DESC";
+        FeatureCollection res = wikiService.getPoiData(null, null, query, "lat", "lon", langs);
+        return res.features.get(0);
+    }
+
+    private boolean matchesName(Amenity a, String name) {
+        if (name == null || name.isBlank()) return true;
+        String target = name.trim();
+
+        if (equalsIgnoreCaseSafe(a.getName(), target)) return true;
+        if (equalsIgnoreCaseSafe(a.getEnName(false), target)) return true;
+
+        Map<String, String> names = a.getNamesMap(true);
+        for (String v : names.values()) {
+            if (equalsIgnoreCaseSafe(v, target)) return true;
+        }
+        return false;
+    }
+
+    private boolean equalsIgnoreCaseSafe(String s, String t) {
+        return s != null && s.equalsIgnoreCase(t);
     }
 
     private SearchUICore.SearchResultCollection addPoiCategoriesToSearchResult(SearchUICore.SearchResultCollection resultCollection, String text, String locale, SearchUICore searchUICore) {
@@ -363,7 +540,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return getOsmObjectId(amenity) == osmid;
+                        return ObfConstants.getOsmObjectId(amenity) == osmid && !amenity.getType().getKeyName().equals(WIKI_POI_TYPE);
                     }
                     
                     @Override
@@ -427,7 +604,7 @@ public class SearchService {
                     for (BinaryIndexPart indexPart : map.getIndexes()) {
                         if (indexPart instanceof BinaryMapPoiReaderAdapter.PoiRegion p) {
                             map.initCategories(p);
-                            List<Amenity> poiRes = map.searchPoi(p, req);
+                            List<Amenity> poiRes = map.searchPoi(req, p);
                             if (!poiRes.isEmpty()) {
                                 res = new SearchResult();
                                 res.object = poiRes.get(0);
@@ -483,63 +660,75 @@ public class SearchService {
         return searchUICore.immediateSearch(text  + DELIMITER, null);
     }
     
-    public SearchUICore.SearchResultCollection searchCitiesByBbox(QuadRect searchBbox, List<BinaryMapIndexReader> mapList) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
-            return null;
-        }
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, false);
-        MapPoiTypes mapPoiTypes = searchUICore.getPoiTypes();
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
-        searchUICore.registerAPI(new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI));
-        
-        SearchSettings settings = searchUICore.getPhrase().getSettings();
-        settings.setRegions(osmandRegions);
-        settings.setOfflineIndexes(mapList);
-        
-        Set<String> types = getAllCityTypeStrings();
-        SearchUICore.SearchResultCollection res = searchWithBbox(searchUICore, settings, searchBbox, types);
-        
-        int attempts = 0;
-        while ((res == null || res.getCurrentSearchResults().isEmpty()) && attempts < 10) {
-            searchBbox = doubleBboxSize(searchBbox);
-            res = searchWithBbox(searchUICore, settings, searchBbox, types);
-            attempts++;
-        }
-        
-        return res;
-    }
-    
-    private SearchUICore.SearchResultCollection searchWithBbox(SearchUICore searchUICore, SearchSettings settings, QuadRect searchBbox, Set<String> types) {
-        searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-        SearchUICore.SearchResultCollection res = null;
-        for (String type : types) {
-            type = type.replace("_", " ");
-            if (res == null) {
-                res = searchUICore.immediateSearch(type, null);
-            } else {
-                SearchUICore.SearchResultCollection searchResults = searchUICore.immediateSearch(type, null);
-                res.addSearchResults(searchResults.getCurrentSearchResults(), false, true);
-            }
-        }
-        return res;
-    }
-    
-    private QuadRect doubleBboxSize(QuadRect bbox) {
-        double centerX = (bbox.left + bbox.right) / 2;
-        double centerY = (bbox.top + bbox.bottom) / 2;
-        double width = bbox.right - bbox.left;
-        double height = bbox.bottom - bbox.top;
-        
-        double newWidth = width * 2;
-        double newHeight = height * 2;
-        
-        return new QuadRect(
-                centerX - newWidth / 2,
-                centerY + newHeight / 2,
-                centerX + newWidth / 2,
-                centerY - newHeight / 2
-        );
-    }
+	private double getRating(Amenity sr, double lat, double lon) {
+		String populationS = sr.getAdditionalInfo("population");
+		City.CityType type = CityType.valueFromString(sr.getSubType());
+		long population = type.getPopulation();
+		if (populationS != null) {
+			populationS = populationS.replaceAll("\\D", "");
+			if (populationS.matches("\\d+")) {
+				population = Long.parseLong(populationS);
+			}
+		}
+		double distance = MapUtils.getDistance(sr.getLocation(), lat, lon) / 1000.0;
+		return Math.log10(population + 1.0) - distance;
+	}
+	
+	public Amenity searchCitiesByBbox(QuadRect searchBbox, double lat, double lon, List<BinaryMapIndexReader> mapList)
+			throws IOException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return null;
+		}
+		List<Amenity> modifiableFoundedPlaces = new ArrayList<>();
+
+		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+				MapUtils.get31TileNumberX(searchBbox.left), MapUtils.get31TileNumberX(searchBbox.right),
+				MapUtils.get31TileNumberY(searchBbox.top), MapUtils.get31TileNumberY(searchBbox.bottom), 15,
+				new SearchPoiTypeFilter() {
+
+					@Override
+					public boolean isEmpty() {
+						return false;
+					}
+
+					@Override
+					public boolean accept(PoiCategory type, String subcategory) {
+						if (type.getKeyName().equals("administrative")
+								&& CityType.valueFromString(subcategory) != null) {
+							return true;
+						}
+						return false;
+					}
+				}, new ResultMatcher<Amenity>() {
+
+					@Override
+					public boolean publish(Amenity object) {
+						modifiableFoundedPlaces.add(object);
+						return false;
+					}
+
+					@Override
+					public boolean isCancelled() {
+						return false;
+					}
+				});
+		for (BinaryMapIndexReader r : mapList) {
+			r.searchPoi(req);
+		}
+		modifiableFoundedPlaces.sort((o1, o2) -> {
+			if (o1 instanceof Amenity && o2 instanceof Amenity) {
+				double rating1 = getRating(o1, lat, lon);
+				double rating2 = getRating(o2, lat, lon);
+				return Double.compare(rating2, rating1);
+			}
+			return 0;
+		});
+		if (modifiableFoundedPlaces.size() > 0) {
+			return modifiableFoundedPlaces.get(0);
+		}
+
+		return null;
+	}
     
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {
@@ -550,7 +739,7 @@ public class SearchService {
     
     public List<String> getTopFilters() {
         List<String> filters = new ArrayList<>();
-        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), SEARCH_LOCALE, true);
+        SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, true);
         searchUICore.getPoiTypes().getTopVisibleFilters().forEach(f -> filters.add(f.getKeyName()));
         return filters;
     }
@@ -621,13 +810,13 @@ public class SearchService {
     }
 
     private MapPoiTypes getMapPoiTypes(String locale) {
-        locale = locale == null ? SEARCH_LOCALE : locale;
+        locale = locale == null ? DEFAULT_SEARCH_LANG : locale;
 
         return poiTypesByLocale.computeIfAbsent(locale, loc -> {
             MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
             mapPoiTypes.init();
             Map<String, String> translations = getTranslations(loc);
-            Map<String, String> enTranslations = getTranslations(SEARCH_LOCALE);
+            Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
             mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
             return mapPoiTypes;
         });
@@ -693,6 +882,9 @@ public class SearchService {
     private Map<String, String> getPoiTypeFields(Object obj) {
         Map<String, String> tags = new HashMap<>();
         if (obj instanceof PoiType type) {
+            if (type.isHidden()) {
+                return tags;
+            }
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
             tags.put(PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
             tags.put(PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
@@ -775,31 +967,37 @@ public class SearchService {
     
     private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
         for (SearchResult result : res) {
-            Feature feature;
-            if (result.objectType == ObjectType.POI) {
-                feature = getPoiFeature(result);
-            } else {
-                Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
-                feature = new Feature(geometry)
-                        .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
-                        .prop(PoiTypeField.NAME.getFieldName(), result.localeName);
-                if (result.objectType == ObjectType.STREET || result.objectType == ObjectType.HOUSE) {
-                    if (result.localeRelatedObjectName != null) {
-                        feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
-                    }
-                    SearchResult parentResult = result.parentSearchResult;
-                    if (parentResult != null && parentResult.localeRelatedObjectName != null) {
-                        feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
-                    }
-                }
-                Map<String, String> tags = getPoiTypeFields(result.object);
-                for (Map.Entry<String, String> entry : tags.entrySet()) {
-                    feature.prop(entry.getKey(), entry.getValue());
-                }
-            }
-            features.add(feature);
+            features.add(getFeature(result));
         }
     }
+
+	public Feature getFeature(SearchResult result) {
+		Feature feature;
+		if (result.objectType == ObjectType.POI) {
+			feature = getPoiFeature(result);
+		} else {
+			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
+			feature = new Feature(geometry)
+					.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+					.prop(PoiTypeField.NAME.getFieldName(), result.localeName);
+			if (result.objectType == ObjectType.STREET || result.objectType == ObjectType.HOUSE) {
+				if (result.localeRelatedObjectName != null) {
+					feature.prop(PoiTypeField.ADDRESS_1.getFieldName(), result.localeRelatedObjectName);
+				}
+				SearchResult parentResult = result.parentSearchResult;
+				if (parentResult != null && parentResult.localeRelatedObjectName != null) {
+					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
+				}
+			} else if (result.objectType == ObjectType.STREET_INTERSECTION) {
+                feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
+            }
+			Map<String, String> tags = getPoiTypeFields(result.object);
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				feature.prop(entry.getKey(), entry.getValue());
+			}
+		}
+		return feature;
+	}
     
     private Feature getPoiFeature(SearchResult result) {
         Amenity amenity = (Amenity) result.object;
@@ -816,7 +1014,12 @@ public class SearchService {
                     .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
                     .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
             Map<String, String> tags = amenity.getAmenityExtensions();
+            filterWikiTags(tags);
             for (Map.Entry<String, String> entry : tags.entrySet()) {
+                String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
+                if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+                        continue;
+                }
                 String value = unzipContent(entry.getValue());
                 feature.prop(entry.getKey(), value);
             }
@@ -831,6 +1034,14 @@ public class SearchService {
             feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
         }
         return feature;
+    }
+
+    private void filterWikiTags(Map<String, String> tags) {
+        tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")
+                || entry.getKey().startsWith("osm_tag_travel_topic")
+                || entry.getKey().startsWith("osm_tag_qrank")
+                || entry.getKey().startsWith("osm_tag_wiki_place")
+                || entry.getKey().startsWith("osm_tag_wiki_photo"));
     }
     
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
@@ -847,41 +1058,10 @@ public class SearchService {
     
     private String getOsmUrl(SearchResult result) {
         MapObject mapObject = (MapObject) result.object;
-        Entity.EntityType type = getOsmEntityType(mapObject);
+        Entity.EntityType type = ObfConstants.getOsmEntityType(mapObject);
         if (type != null) {
-            long osmId = getOsmObjectId(mapObject);
+            long osmId = ObfConstants.getOsmObjectId(mapObject);
             return "https://www.openstreetmap.org/" + type.name().toLowerCase(Locale.US) + "/" + osmId;
-        }
-        return null;
-    }
-    
-    public static long getOsmObjectId(MapObject object) {
-        long originalId = -1;
-        Long id = object.getId();
-        if (id != null) {
-            if (object instanceof NativeLibrary.RenderedObject) {
-                id >>= 1;
-            }
-            if (isShiftedID(id)) {
-                originalId = getOsmId(id);
-            } else {
-                int shift = object instanceof Amenity ? AMENITY_ID_RIGHT_SHIFT : SHIFT_ID;
-                originalId = id >> shift;
-            }
-        }
-        return originalId;
-    }
-    
-    public Entity.EntityType getOsmEntityType(MapObject object) {
-        if (isOsmUrlAvailable(object)) {
-            Long id = object.getId();
-            long originalId = id >> 1;
-            long relationShift = 1L << 41;
-            if (originalId > relationShift) {
-                return Entity.EntityType.RELATION;
-            } else {
-                return id % 2 == MapObject.WAY_MODULO_REMAINDER ? Entity.EntityType.WAY : Entity.EntityType.NODE;
-            }
         }
         return null;
     }
@@ -891,23 +1071,4 @@ public class SearchService {
         return id != null && id > 0;
     }
     
-    public static long getOsmId(long id) {
-        long clearBits = RELATION_BIT | SPLIT_BIT;
-        id = isShiftedID(id) ? (id & ~clearBits) >> DUPLICATE_SPLIT : id;
-        return id >> SHIFT_ID;
-    }
-    
-    public static boolean isShiftedID(long id) {
-        return isIdFromRelation(id) || isIdFromSplit(id);
-    }
-    
-    public static boolean isIdFromRelation(long id) {
-        return id > 0 && (id & RELATION_BIT) == RELATION_BIT;
-    }
-    
-    public static boolean isIdFromSplit(long id) {
-        return id > 0 && (id & SPLIT_BIT) == SPLIT_BIT;
-    }
-    
 }
-

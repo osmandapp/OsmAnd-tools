@@ -13,11 +13,26 @@ FULL_MODE='full_mode'
 LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
 
+# bands should correspond to c++ enum class WeatherBand in OsmAndCore/Map/GeoCommonTypes.h
+# add band with no data if not present
+# enum class WeatherBand
+# {
+#     Cloud = 1,
+#     Temperature = 2,
+#     Pressure = 3,
+#     WindSpeed = 4,
+#     Precipitation = 5,
+#     WindWestToEast = 6,
+#     WindSouthToNorth = 7
+# };
+BANDS_DESCRIPTIONS=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
+BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
+
 GFS_BANDS_FULL_NAMES=("TCDC:entire atmosphere" "TMP:2 m above ground" "PRMSL:mean sea level" "GUST:surface" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
 GFS_BANDS_SHORT_NAMES=("cloud" "temperature" "pressure" "wind" "precip" "windspeed_u" "windspeed_v")
 
 ECMWF_BANDS_FULL_NAMES=("TMP:2 m above ground" "PRMSL:mean sea level" "PRATE:surface" "UGRD:planetary boundary" "VGRD:planetary boundary")
-ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tp" "10u" "10v")
+ECMWF_BANDS_SHORT_NAMES_ORIG=("2t" "msl" "tprate" "10u" "10v")
 ECMWF_BANDS_SHORT_NAMES_SAVING=("temperature" "pressure" "precip" "windspeed_u" "windspeed_v")
 
 MINUTES_TO_KEEP_TIFF_FILES=${MINUTES_TO_KEEP_TIFF_FILES:-3600} # 60 hours (temporary due ECMWF old data available, default 1800 - 30 hours)
@@ -92,7 +107,7 @@ download() {
       echo
       echo "Download failed with code $HTTP_CODE ($URL) [$START_BYTE_OFFSET]-[$END_BYTE_OFFSET]"
       echo
-      cat "$INTERMEDIATE"
+      cat "$INTERMEDIATE" || true
       echo
       rm -vf "$INTERMEDIATE"
     fi
@@ -228,15 +243,6 @@ get_raw_gfs_files() {
 join_tiff_files() {
     echo "============================ join_tiff_files() ===================================="
     MODE=$1
-    local BANDS_SHORT_NAMES=()
-    local BANDS_DESCRIPTIONS=()
-    if [[ $MODE == "$GFS" ]]; then
-        BANDS_SHORT_NAMES=("${GFS_BANDS_SHORT_NAMES[@]}")
-        BANDS_DESCRIPTIONS=("${GFS_BANDS_FULL_NAMES[@]}")
-    elif [[ $MODE == "$ECMWF" ]]; then
-        BANDS_SHORT_NAMES=("${ECMWF_BANDS_SHORT_NAMES_SAVING[@]}")
-        BANDS_DESCRIPTIONS=("${ECMWF_BANDS_FULL_NAMES[@]}")
-    fi
 
     mkdir -p $TIFF_FOLDER/
     cd $TIFF_TEMP_FOLDER
@@ -250,22 +256,37 @@ join_tiff_files() {
 
         # Create channels list in correct order
         touch settings.txt
-        local ALL_CHANNEL_FILES_EXISTS=1
         local FILE_DATE_CP
+        TEMPLATE=""
+
+        # Find first valid file to use as TEMPLATE
         for i in ${!BANDS_SHORT_NAMES[@]}; do
-            if [ ! -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
-                ALL_CHANNEL_FILES_EXISTS=0
+            if [ -f "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" ]; then
+                TEMPLATE="${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
                 break
             fi
-            FILE_DATE_CP=${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff
-            echo "${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff" >> settings.txt
         done
 
-        if [ $ALL_CHANNEL_FILES_EXISTS == 0 ]; then
-            echo "Joining Error:  ${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff  not exists. Skip joining."
+        if [ -z "$TEMPLATE" ]; then
+            echo "Error: No valid rasters found for ${DATE_FOLDER}, cannot build template."
             cd ..
             continue
         fi
+
+        # Build the list of files (real or dummy)
+        for i in ${!BANDS_SHORT_NAMES[@]}; do
+            BAND_FILE="${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
+
+            if [ ! -f "$BAND_FILE" ]; then
+                DUMMY_FILE="__dummy_${BANDS_SHORT_NAMES[$i]}_${DATE_FOLDER}.tiff"
+                gdal_calc.py --calc="0" -A "$TEMPLATE" --outfile="$DUMMY_FILE" \
+                            --NoDataValue=0 --type=Float32
+                echo "$DUMMY_FILE" >> settings.txt
+            else
+                FILE_DATE_CP="$BAND_FILE"
+                echo "$BAND_FILE" >> settings.txt
+            fi
+        done
 
         # Create "Virtual Tiff" with layers order from settings.txt
         gdalbuildvrt bigtiff.vrt -separate -input_file_list settings.txt
@@ -311,7 +332,12 @@ split_tiles() {
         mkdir -p ${JOINED_TIFF_NAME}
         MAXVALUE=$((1<<${SPLIT_ZOOM_TIFF}))
 
-        "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 2 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        # Only disable statistics warning for ECMWF processing (which has dummy bands)
+        if [[ $SCRIPT_PROVIDER_MODE == $ECMWF ]]; then
+            "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 12 --disableStatWarning ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        else
+            "$THIS_LOCATION"/slicer.py --zoom ${SPLIT_ZOOM_TIFF} --extraPoints 12 ${JOINED_TIFF_NAME}.tiff ${JOINED_TIFF_NAME}/
+        fi
         # generate subgeotiffs into folder
         # 1440*720 / (48*48) = 450
         find ${JOINED_TIFF_NAME}/ -name "*.gz" -delete
@@ -447,7 +473,8 @@ get_raw_ecmwf_files() {
         if [[ -f "$DOWNLOAD_FOLDER/$FILETIME.index" ]]; then
             for i in ${!ECMWF_BANDS_SHORT_NAMES_ORIG[@]}; do
                 # Parse from index file start and end byte offset for needed band
-                local CHANNEL_LINE=$( cat $DOWNLOAD_FOLDER/$FILETIME.index | grep -A 0 "${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}" )
+                # Match exact JSON param value, e.g. "param":"2t" (avoid matching mx2t3)
+                local CHANNEL_LINE=$( grep -E '"param"\s*:\s*"'"${ECMWF_BANDS_SHORT_NAMES_ORIG[$i]}"'"' "$DOWNLOAD_FOLDER/$FILETIME.index" )
                 if [[ -z "$CHANNEL_LINE" ]]; then
                     echo
                     cat $DOWNLOAD_FOLDER/$FILETIME.index

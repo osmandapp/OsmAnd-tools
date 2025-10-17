@@ -98,6 +98,7 @@ public class HHRoutingOBFWriter {
 		File obfPolyFile = null;
 		File outFolder = null;
 		boolean updateExistingFiles = false;
+		boolean overwriteProfiles = false;
 		if (args.length == 0) {
 //			THREAD_POOL = 4;
 			updateExistingFiles = true;
@@ -125,10 +126,12 @@ public class HHRoutingOBFWriter {
 					updateExistingFiles = true;
 				} else if (arg.startsWith("--obf=")) {
 					obfPolyFile = new File(arg.substring("--obf=".length()));
+				} else if (arg.equals("--overwrite-profiles")) {
+					overwriteProfiles = true;
 				}
 			}
 		}
-		new HHRoutingOBFWriter(dbFile).writeFile(obfPolyFile, outFolder, updateExistingFiles);
+		new HHRoutingOBFWriter(dbFile).writeFile(obfPolyFile, outFolder, updateExistingFiles, overwriteProfiles);
 	}
 
 	
@@ -149,7 +152,7 @@ public class HHRoutingOBFWriter {
 		}
 	}
 	
-	public void writeFile(File obfPolyFileIn, File outFolder, boolean updateExistingFiles) throws IOException, SQLException, IllegalValueException {
+	public void writeFile(File obfPolyFileIn, File outFolder, boolean updateExistingFiles, boolean overwriteProfiles) throws IOException, SQLException, IllegalValueException {
 		if (THREAD_POOL > 1) {
 			System.err.println("Threads > 1 are may be not supported cause of current R-Tree limitations (needs to be tested)");
 //			THREAD_POOL = 1;
@@ -161,7 +164,7 @@ public class HHRoutingOBFWriter {
 				outFile.delete();
 			}
 			TLongObjectHashMap<NetworkDBPointWrite> pnts = convertPoints(points);
-			writeObfFileByBbox(toList(pnts), pnts, outFile, new QuadRect(), null);
+			writeObfFileByBbox(toList(pnts), pnts, outFile, new QuadRect(), null, overwriteProfiles);
 		} else {
 			if (outFolder == null) {
 				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
@@ -269,13 +272,13 @@ public class HHRoutingOBFWriter {
 							MapUtils.get31LongitudeX((int) bbox31.right), MapUtils.get31LatitudeY((int) bbox31.bottom));
 				}
 				if (THREAD_POOL > 1) {
-					AugmentObfTask task = new AugmentObfTask(this, outFile, bbox31, filteredPoints);
+					AugmentObfTask task = new AugmentObfTask(this, outFile, bbox31, filteredPoints, overwriteProfiles);
 					results.add(service.submit(task));
 				} else {
 					if (wPoints == null) {
 						wPoints = convertPoints(points);
 					}
-					String log = writeObfFileByBbox(toList(wPoints), wPoints, outFile, bbox31, filteredPoints);
+					String log = writeObfFileByBbox(toList(wPoints), wPoints, outFile, bbox31, filteredPoints, overwriteProfiles);
 					HHRoutingUtilities.logf(log.trim());
 				}
 			}
@@ -409,8 +412,8 @@ public class HHRoutingOBFWriter {
 	}
 	
 
-	private String writeObfFileByBbox(List<NetworkDBPointWrite> points, TLongObjectHashMap<NetworkDBPointWrite> pntsMap, File outFile, QuadRect bbox31, TLongArrayList filteredPoints)
-			throws SQLException, IOException, IllegalValueException {
+	private String writeObfFileByBbox(List<NetworkDBPointWrite> points, TLongObjectHashMap<NetworkDBPointWrite> pntsMap, File outFile, 
+			QuadRect bbox31, TLongArrayList filteredPoints, boolean overwrite) throws SQLException, IOException, IllegalValueException {
 		StringBuilder log = new StringBuilder();
 		String rTreeFile = outFile.getAbsolutePath() + ".rtree";
 		String rpTreeFile = outFile.getAbsolutePath() + ".rptree";
@@ -427,10 +430,14 @@ public class HHRoutingOBFWriter {
 						break;
 					}
 				}
-				if (edition == profileEdition) {
+				if (edition == profileEdition && !overwrite) {
 					log.append(String.format("Skip file %s as same hh routing profile (%s) already exist", outFile.getName(),
 							new Date(edition)));
 					// regenerate in case there is an issue with writer itself
+					return log.toString();
+				} else if(!overwrite && profileEdition > 0){
+					log.append(String.format("Skip file %s as same hh routing profile (%s) as date do not match!!!", outFile.getName(),
+							new Date(edition)));
 					return log.toString();
 				}
 				log.append((profileEdition > 0 ? "Replace" : "Augment") +" file with hh routing: " + outFile.getName()).append("\n");
@@ -694,12 +701,14 @@ public class HHRoutingOBFWriter {
 		private QuadRect bbox31;
 		private TLongArrayList filteredPoints;
 		private HHRoutingOBFWriter writer;
+		private boolean overwrite;
 
-		public AugmentObfTask(HHRoutingOBFWriter writer, File outFile, QuadRect bbox31, TLongArrayList filteredPoints) {
+		public AugmentObfTask(HHRoutingOBFWriter writer, File outFile, QuadRect bbox31, TLongArrayList filteredPoints, boolean overwrite) {
 			this.writer = writer;
 			this.outFile = outFile;
 			this.bbox31 = bbox31;
 			this.filteredPoints = filteredPoints;
+			this.overwrite = overwrite;
 		}
 
 		@Override
@@ -712,7 +721,7 @@ public class HHRoutingOBFWriter {
 				ctxPointsList = toList(ctxPoints);
 				context.set(ctxPoints);
 			}
-			return writer.writeObfFileByBbox(ctxPointsList, ctxPoints, outFile, bbox31, filteredPoints);
+			return writer.writeObfFileByBbox(ctxPointsList, ctxPoints, outFile, bbox31, filteredPoints, overwrite);
 		}
 	}
 

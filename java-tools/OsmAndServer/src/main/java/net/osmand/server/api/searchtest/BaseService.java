@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.data.LatLon;
 import net.osmand.server.controllers.pub.GeojsonClasses;
+import net.osmand.util.Algorithms;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -42,10 +43,6 @@ public interface BaseService {
 	enum ParamType {Before, After, Expand, Fold, ExpandOrFold, FoldOrExpand}
 
 	// -------------------- Utility methods (common) --------------------
-	default String pointToString(LatLon point) {
-		return String.format(Locale.US, "POINT(%f %f)", point.getLatitude(), point.getLongitude());
-	}
-
 	default LatLon getLatLon(GeojsonClasses.Feature feature) {
 		float[] point = "Point".equals(feature.geometry.type) ? (float[]) feature.geometry.coordinates :
 				((float[][]) feature.geometry.coordinates)[0];
@@ -95,18 +92,15 @@ public interface BaseService {
 
 	default String getHeader(Path filePath) throws IOException {
 		String fileName = filePath.getFileName().toString();
-		if (fileName.endsWith(".csv")) {
-			try (BufferedReader reader = Files.newBufferedReader(filePath)) {
-				return reader.readLine();
-			}
-		}
 		if (fileName.endsWith(".gz")) {
 			try (BufferedReader reader =
-						 new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(filePath))))) {
+					     new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(filePath))))) {
 				return reader.readLine();
 			}
 		}
-		return null;
+		try (BufferedReader reader = Files.newBufferedReader(filePath)) {
+			return reader.readLine();
+		}
 	}
 
 	JdbcTemplate getJdbcTemplate();
@@ -124,18 +118,52 @@ public interface BaseService {
 	 */
 	String getWebServerConfigDir();
 
+	/**
+	 * Sanitize a value for CSV output so that each record remains a single physical line.
+	 * Replaces newline-like and other ISO control characters (except TAB) with a space, then collapses repeated spaces.
+	 */
+	default String sanitizeCsvValue(String value) {
+		if (value == null) {
+			return null;
+		}
+		StringBuilder sb = new StringBuilder(value.length());
+		for (int i = 0; i < value.length(); i++) {
+			char ch = value.charAt(i);
+			switch (ch) {
+				case '\r':
+				case '\n':
+				case '\f': // form feed
+				case '\u000B': // vertical tab
+				case '\u0085': // NEL
+				case '\u2028': // line separator
+				case '\u2029': // paragraph separator
+					sb.append(' ');
+					break;
+				default:
+					if (Character.isISOControl(ch) && ch != '\t') {
+						sb.append(' ');
+					} else {
+						sb.append(ch);
+					}
+			}
+		}
+		String s = sb.toString();
+		return s.replaceAll(" {2,}", " ").trim();
+	}
+
 	default Path queryOverpass(String query) {
 		Path tempFile;
+		String request = buildOverpassRequest(query);
 		try {
 			String overpassResponse =
-					getWebClient().post().uri("").bodyValue("[out:json][timeout:25];" + query +
-							";out;").retrieve().bodyToMono(String.class).toFuture().join();
+					getWebClient().post().uri("").bodyValue(request)
+							.retrieve().bodyToMono(String.class).toFuture().join();
 			tempFile = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 			int rowCount = convertJsonToSaveInCsv(overpassResponse, tempFile);
 			getLogger().info("Wrote {} rows to temporary file: {}", rowCount, tempFile);
 			return tempFile;
 		} catch (Exception e) {
-			getLogger().error("Failed to query data from Overpass for {}", query, e);
+			getLogger().error("Failed to query data from Overpass for {}", request, e);
 			throw new RuntimeException("Failed to query from Overpass", e);
 		}
 	}
@@ -144,7 +172,8 @@ public interface BaseService {
 		JsonNode root = getObjectMapper().readTree(jsonResponse);
 		JsonNode elements = root.path("elements");
 
-		if (!elements.isArray()) {
+		if (!elements.isArray() || elements.isEmpty()) {
+			getLogger().error(jsonResponse);
 			return 0;
 		}
 
@@ -171,13 +200,46 @@ public interface BaseService {
 						case "lon" -> element.path("lon").asText();
 						default -> element.path("tags").path(header).asText(null);
 					};
-					record.add(value);
+					if (value == null && (header.equals("id") || header.equals("lat") || header.equals("lon"))) {
+						record = null;
+						break;
+					}
+					record.add(sanitizeCsvValue(value));
 				}
-				csvPrinter.printRecord(record);
-				rowCount++;
+				if (record != null) {
+					csvPrinter.printRecord(record);
+					rowCount++;
+				}
 			}
 		}
 		return rowCount;
+	}
+
+	/**
+	 * Build a valid Overpass QL request from a raw query snippet.
+	 * Ensures the standard prefix and an output clause are present.
+	 * - If rawQuery lacks a header like "[out:...][timeout:...];" it prepends "[out:json][timeout:360];".
+	 * - If there is no output clause ("out;"), it appends ";out;".
+	 */
+	default String buildOverpassRequest(String rawQuery) {
+		String q = Algorithms.trimIfNotNull(rawQuery);
+		if (Algorithms.isEmpty(q)) {
+			q = "";
+		}
+		String qLower = q.toLowerCase();
+		boolean hasHeader = qLower.matches("^\\s*\\[out:[^]]+]\\s*\\[timeout:[^]]+]\\s*;.*");
+		if (!hasHeader) {
+			q = "[out:json][timeout:360];" + q;
+			qLower = q.toLowerCase();
+		}
+		boolean hasOut = qLower.contains("out ") || qLower.contains("out;");
+		if (!hasOut) {
+			if (!q.endsWith(";")) {
+				q += ";";
+			}
+			q += "out;";
+		}
+		return q;
 	}
 
 	default Map<String, Integer> browseCsvFiles() throws IOException {
@@ -207,5 +269,13 @@ public interface BaseService {
 				throw new RuntimeException("Failed to count rows in CSV file", e);
 			}
 		});
+	}
+
+	default String getSystemBranch() {
+		String branch = System.getenv("SYSTEM_BRANCH");
+		if (Algorithms.isEmpty(branch)) {
+			branch = "master";
+		}
+		return branch;
 	}
 }

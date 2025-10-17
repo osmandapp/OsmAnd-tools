@@ -1,20 +1,19 @@
 package net.osmand.server.api.services;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
+import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
+import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
-import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
-import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -41,25 +42,11 @@ public class SearchTestService implements ReportService, DataService {
 	 * Lightweight DTO for listing test-cases with parent dataset name.
 	 */
 	public static class TestCaseItem {
-		public Long id;
-		public String name;
-		public String labels;
-		public Long datasetId;
-		public String datasetName;
-		public Long lastRunId;
-		public String status;
-		public LocalDateTime updated;
-		public String error;
-		public long total;
-		public long failed;
-		public long duration;
-
 		public TestCaseItem() {
 		}
-
 		public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-							Long lastRunId, String status, LocalDateTime updated, String error,
-							long total, long failed, long duration) {
+		                    Long lastRunId, String status, LocalDateTime updated, String error,
+		                    long total, long failed, long duration) {
 			this.id = id;
 			this.name = name;
 			this.labels = labels;
@@ -73,6 +60,18 @@ public class SearchTestService implements ReportService, DataService {
 			this.failed = failed;
 			this.duration = duration;
 		}
+		public Long id;
+		public String name;
+		public String labels;
+		public Long datasetId;
+		public String datasetName;
+		public Long lastRunId;
+		public String status;
+		public LocalDateTime updated;
+		public String error;
+		public long total;
+		public long failed;
+		public long duration;
 	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
@@ -88,7 +87,8 @@ public class SearchTestService implements ReportService, DataService {
 	private SearchTestCaseRepository testCaseRepo;
 	@Autowired
 	private SearchTestRunRepository runRepo;
-	@Autowired @Qualifier("searchTestJdbcTemplate")
+	@Autowired
+	@Qualifier("searchTestJdbcTemplate")
 	private JdbcTemplate jdbcTemplate;
 
 	@Value("${searchtest.csv.dir}")
@@ -97,14 +97,8 @@ public class SearchTestService implements ReportService, DataService {
 	private String webServerConfigDir;
 	@Value("${overpass.url}")
 	private String overpassApiUrl;
-	private final SearchService searchService;
 	@Autowired
 	private PolyglotEngine engine;
-
-	@Autowired
-	public SearchTestService(SearchService searchService) {
-		this.searchService = searchService;
-	}
 
 	@PostConstruct
 	protected void init() {
@@ -112,6 +106,24 @@ public class SearchTestService implements ReportService, DataService {
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+		// Ensure DB integrity
+		try {
+			jdbcTemplate.execute("DELETE FROM test_case WHERE dataset_id NOT IN (SELECT id FROM dataset)");
+			jdbcTemplate.execute("DELETE FROM gen_result WHERE case_id NOT IN (SELECT id FROM test_case)");
+			jdbcTemplate.execute("DELETE FROM run WHERE case_id NOT IN (SELECT id FROM test_case) OR status = 'RUNNING'");
+			jdbcTemplate.execute("UPDATE run SET status = 'FAILED' WHERE status = 'RUNNING'");
+			jdbcTemplate.execute("DELETE FROM run_result WHERE run_id NOT IN (SELECT id FROM run)");
+			// Remove duplicates (SQLite-compatible): keep the smallest id per (run_id, gen_id)
+			jdbcTemplate.execute("DELETE FROM run_result WHERE gen_id IS NOT NULL AND id NOT IN " +
+					"(SELECT MIN(id) FROM run_result WHERE gen_id IS NOT NULL GROUP BY run_id, gen_id)");
+			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
+		} catch (Exception e) {
+			LOGGER.warn("Could not ensure DB integrity.", e);
+		}
+	}
+
+	public SearchService getSearchService() {
+		return searchService;
 	}
 
 	public String getWebServerConfigDir() {
@@ -140,6 +152,10 @@ public class SearchTestService implements ReportService, DataService {
 
 	public SearchTestCaseRepository getTestCaseRepo() {
 		return testCaseRepo;
+	}
+
+	public SearchTestRunRepository getTestRunRepo() {
+		return runRepo;
 	}
 
 	public PolyglotEngine getEngine() {
@@ -192,7 +208,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 	}
 
-	@Async
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
@@ -215,6 +230,14 @@ public class SearchTestService implements ReportService, DataService {
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;
+		run.name = payload.name;
+		run.average = payload.average;
+		test.average = payload.average;
+		run.skipFound = payload.skipFound;
+		test.skipFound = payload.skipFound;
+		// Rerun support: persist reference run id if provided
+		run.rerunId = payload.rerunId;
+
 		String locale = payload.locale;
 		if (locale == null || locale.trim().isEmpty()) {
 			locale = "en";
@@ -222,8 +245,6 @@ public class SearchTestService implements ReportService, DataService {
 		run.locale = locale;
 		run.setNorthWest(payload.getNorthWest());
 		run.setSouthEast(payload.getSouthEast());
-		run.baseSearch = payload.baseSearch;
-		run.version = payload.version;
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
@@ -231,12 +252,9 @@ public class SearchTestService implements ReportService, DataService {
 		run.updated = run.created;
 		run = runRepo.save(run);
 
-		test.lastRunId = run.id;
 		test.locale = run.locale;
 		test.setNorthWest(run.getNorthWest());
 		test.setSouthEast(run.getSouthEast());
-		test.baseSearch = run.baseSearch;
-		test.version = run.version;
 		test.lat = run.lat;
 		test.lon = run.lon;
 		testCaseRepo.save(test);
@@ -247,10 +265,40 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, count FROM gen_result WHERE case_id = %d ORDER BY" +
-						" id", run.caseId);
+		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
+		if (run.rerunId != null) {
+			// Re-run uses items from a previous run's results by joining gen_result with run_result
+			if (run.skipFound == null || !run.skipFound) {
+				sql = String.format(
+					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d ORDER BY g.id",
+					run.rerunId);
+			} else {
+				sql = String.format(
+					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
+					run.rerunId);
+			}
+		}
+
 		try {
 			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			if (rows.isEmpty())
+				return;
+
+			LatLon srcPoint = null;
+			String[] srcBbox = null;
+			if (run.lat != null && run.lon != null)
+				srcPoint = new LatLon(run.lat, run.lon);
+			else if (run.average != null && run.average)
+				srcPoint = getAveragePoint(rows);
+			if (srcPoint != null) {
+				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
+						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
+			}
+
 			for (Map<String, Object> row : rows) {
 				String status;
 				try {
@@ -266,27 +314,30 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				long startTime = System.currentTimeMillis();
-				LatLon point = (run.lat == null || run.lon == null) ?
-						new LatLon((Double) row.get("lat"), (Double) row.get("lon")) :
-						new LatLon(run.lat, run.lon);
-
-				Integer id = (Integer) row.get("id");
+				Integer gen_id = (Integer) row.get("id");
 				String query = (String) row.get("query");
-				Map<String, Object> mapRow = objectMapper.readValue((String) row.get("row"), new TypeReference<>() {
-				});
-				int count = (Integer) row.get("count");
+				int count = (Integer) row.get("gen_count");
+				String rowJson = (String) row.get("row");
+				Map<String, Object> genRow = getObjectMapper().readValue(rowJson, Map.class);
+
+				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
+				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
+				String[] bbox = srcBbox != null ? srcBbox : new String[]{
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
 				try {
-					List<Feature> searchResults = Collections.emptyList();
+					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty())
-						searchResults = searchService.search(point.getLatitude(), point.getLongitude(),
-								query, run.locale, run.baseSearch, run.getNorthWest(), run.getSouthEast());
-					saveRunResults(id, count, run, query, mapRow, searchResults, point,
-							System.currentTimeMillis() - startTime, null);
+						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
+								query, run.locale, false, bbox[0], bbox[1], true);
+
+					saveRunResults(genRow, gen_id, count, run, query, searchResult, targetPoint, searchPoint,
+							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(id, count, run, query, mapRow, Collections.emptyList(), point,
-							System.currentTimeMillis() - startTime, e.getMessage() == null ? e.toString() :
-									e.getMessage());
+					saveRunResults(genRow, gen_id, count, run, query, null, targetPoint, searchPoint,
+							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
+							e.getMessage() == null ? e.toString() : e.getMessage());
 				}
 			}
 			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
@@ -342,7 +393,9 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	public Optional<TestCase> getTestCase(Long id) {
-		return testCaseRepo.findById(id);
+		Optional<TestCase> opt = testCaseRepo.findById(id);
+		opt.ifPresent(tc -> tc.lastRunId = runRepo.findLastRunId(tc.id));
+		return opt;
 	}
 
 	public Page<TestCaseItem> getAllTestCases(String name, String labels, Pageable pageable) {
@@ -371,16 +424,21 @@ public class SearchTestService implements ReportService, DataService {
 		for (TestCase tc : content) {
 			String datasetName = tc.datasetId == null ? null : dsNames.get(tc.datasetId);
 			Optional<TestCaseStatus> tcOpt = getTestCaseStatus(tc.id);
+			Long lastRunId = runRepo.findLastRunId(tc.id);
 			if (tcOpt.isEmpty())
 				continue;
 
 			TestCaseStatus tcStatus = tcOpt.get();
-			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName,
-					tc.lastRunId, tcStatus.status().name(), tc.updated,
-					tc.getError(), tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
+			items.add(new TestCaseItem(tc.id, tc.name, tc.labels, tc.datasetId, datasetName, lastRunId,
+					tcStatus.status().name(), tc.updated, tc.getError(),
+					tcStatus.processed(), tcStatus.failed(), tcStatus.duration()));
 		}
 
 		return new PageImpl<>(items, pageable, page.getTotalElements());
+	}
+
+	public Page<Run> getRuns(String name, String labels, Pageable pageable) {
+		return runRepo.findFiltered(name, labels, pageable);
 	}
 
 	public Page<Run> getRuns(Long caseId, Pageable pageable) {
@@ -389,10 +447,36 @@ public class SearchTestService implements ReportService, DataService {
 
 	@Async
 	public CompletableFuture<Void> deleteRun(Long id) {
+		String sql = "DELETE FROM run_result WHERE run_id = ?";
+		jdbcTemplate.update(sql, id);
+
 		return CompletableFuture.runAsync(() -> runRepo.deleteById(id));
 	}
 
 	public Optional<Run> getRun(Long id) {
 		return runRepo.findById(id);
+	}
+	private final SearchService searchService;
+
+	@Autowired
+	public SearchTestService(SearchService searchService) {
+		this.searchService = searchService;
+	}
+
+	private static LatLon getAveragePoint(List<Map<String, Object>> rows) {
+		double sumLat = 0.0, sumLon = 0.0;
+		for (Map<String, Object> r : rows) {
+			Object latObj = r.get("lat");
+			Object lonObj = r.get("lon");
+			if (latObj instanceof Double lat && lonObj instanceof Double lon) {
+				sumLat += lat;
+				sumLon += lon;
+			}
+		}
+		double roundedLat = BigDecimal.valueOf(sumLat /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		double roundedLon = BigDecimal.valueOf(sumLon /
+				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
+		return new LatLon(roundedLat, roundedLon);
 	}
 }

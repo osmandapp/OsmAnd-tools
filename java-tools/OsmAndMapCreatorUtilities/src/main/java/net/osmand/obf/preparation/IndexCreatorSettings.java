@@ -37,6 +37,8 @@ public class IndexCreatorSettings {
 	// mapping wikidata id <-> wikipedia articles
 	public String wikidataMappingUrl;
 	
+	public String wikirankingMappingUrl;
+	
 	// lst file <tag>,<value> to index and store as poi category like default - (toilets, cafe)
 	public String poiTopIndexUrl;
 	
@@ -80,6 +82,10 @@ public class IndexCreatorSettings {
 	public boolean ignorePropagate = false;
 
 	public boolean indexRouteRelations = true;
+	
+	public boolean poiGeocodingEnable = true; // enable detecting address for poi if possible 
+	
+	public boolean poiGeocodingPrecise = false; // to house number
 
 	public String getString(String key) {
 		// IndexCreator.INDEX_LO_LEVEL_WAYS

@@ -50,7 +50,7 @@ docs_dir = Path(input_dir, "main/docs")
 blog_dir = Path(input_dir, "main/blog")
 map_translations_dir = input_dir / "map/src/resources/translations"
 
-_marker = re.compile(r"^\s*source-hash: ([0-9A-Fa-f]+)\s*$", re.I)
+_marker = re.compile(r"^\s*(?:\[//\s*)?source-hash:\s*([0-9A-Fa-f]+)\s*(?:\s*]\s*:\s*#)?\s*$", re.I)
 HASH_ALGO = "blake2s"
 
 
@@ -210,7 +210,7 @@ def make_sync(original_dir: Path, target_dir: Path, patterns: List[str]) -> None
                 make_symlink(original_item, target_item)
                 continue
 
-            if not target_item.exists() or digest(original_item) != stored_digest(target_item):
+            if not target_item.exists():
                 shutil.copy2(original_item, target_item)
                 print(f">> File {original_item.name} is copied.")
 
@@ -252,6 +252,8 @@ def digest(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+def is_partial_mdx(path: Path):
+    return path.name.startswith("_") and path.suffix == ".mdx"
 
 def stored_digest(path: Path):
     if FORCE_TRANSLATION:
@@ -263,11 +265,12 @@ def stored_digest(path: Path):
                 json_code = json.load(fh)
                 return None if "sourceHash" not in json_code else json_code.get("sourceHash").get("message")
 
+            skip_n_line = 0 if is_partial_mdx(path) else 2
             i = 0
             for line in fh:
-                if i == 2:
-                    break
                 next_line = line
+                if i == skip_n_line:
+                    break
                 i += 1
 
         m = _marker.match(next_line)
@@ -281,21 +284,25 @@ def stored_digest(path: Path):
 IMPORT_RE = re.compile(r'^\s*import\s+.+?\s+from\s+[\'"].+?[\'"]\s*;?\s*$')
 
 
-def pull_imports(md_path: Path) -> Tuple[str, List[Tuple[int, str]]]:
-    """ Return (markdown_without_imports, list_of_(original_line_index, line_text)).  """
-    if not fnmatch.fnmatch(md_path.name, '*.md*'):
-        return md_path.read_text(encoding="utf-8"), []
+def pull_imports(file_path: Path) -> Tuple[str, List[Tuple[int, str]]]:
+    if not file_path.exists():
+        return "", []
 
-    imports: List[Tuple[int, str]] = []
+    """ Return (markdown_without_imports, list_of_(original_line_index, line_text)).  """
+    if not fnmatch.fnmatch(file_path.name, '*.md*'):
+        return file_path.read_text(encoding="utf-8"), []
+
+    import_lines: List[Tuple[int, str]] = []
     body_lines: List[str] = []
 
-    for i, line in enumerate(md_path.read_text(encoding="utf-8").splitlines()):
+    for i, line in enumerate(file_path.read_text(encoding="utf-8").splitlines()):
         if IMPORT_RE.match(line):
-            imports.append((i, line.rstrip("\n")))
+            import_lines.append((i, line.rstrip("\n")))
         else:
-            body_lines.append(line)
+            if not line.startswith('source-hash:'):
+                body_lines.append(line)
 
-    return "\n".join(body_lines), imports
+    return "\n".join(body_lines), import_lines
 
 
 def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
@@ -305,15 +312,44 @@ def reinsert_imports(content: str, imports: List[Tuple[int, str]]) -> str:
     if len(imports) == 0:
         return content
     lines = content.splitlines()
+    if len(lines) <= 1:
+        return content
 
-    idx = len(lines) - lines[::-1].index('---')
-    if idx == len(lines) + 1:
-        idx = 0
+    # Determine insertion index:
+    # 1) If content starts with YAML front matter (--- ... ---), insert after the closing '---'.
+    # 2) Else, if content starts with MDX comment lines like "[// ...]", insert after the last such line.
+    # 3) Otherwise, insert at the top of the document.
+    # Find the first non-empty line as the logical start
+    start = 0
+    while start < len(lines) and not (lines[start].startswith('[//') or lines[start].strip() == '---'):
+        start += 1
+
+    idx = start
+    if start < len(lines) and lines[start].strip() == '---':
+        # Find the closing '---' after the opening one
+        closing_idx = None
+        for j in range(start + 1, len(lines)):
+            if lines[j].strip() == '---':
+                closing_idx = j
+                break
+        idx = (closing_idx + 1) if closing_idx is not None else start
+    elif start < len(lines) and lines[start].lstrip().startswith('[//'):
+        # Advance past consecutive leading MDX comment lines
+        j = start
+        while j < len(lines) and lines[j].lstrip().startswith('[//'):
+            j += 1
+        idx = j
+
+    if idx + 1 < len(lines):
+        idx += 1
+
+    # Insert the imports preserving order
     for _, text in imports:
         lines.insert(idx, text)
         idx += 1
 
-    if lines[idx].strip() != "":
+    # Ensure a blank line after the imports block if the next line is not already blank
+    if idx < len(lines) and lines[idx].strip() != "":
         lines.insert(idx, "")
     return "\n".join(lines)
 
@@ -324,6 +360,9 @@ def save_dest(path, response, imports, digest_now):
             json_response = json.loads(response)
             json_response["sourceHash"] = {"message": digest_now}
             response = json.dumps(json_response, indent=2, ensure_ascii=False)
+        if is_partial_mdx(path):
+            line_break = '' if response.startswith('\n') else '\n'
+            response = f"[// source-hash: {digest_now}]:#{line_break}{response}"
         else:
             if not response.startswith('---'):
                 response = f"---\n\n---\n{response}"
@@ -338,14 +377,15 @@ def save_dest(path, response, imports, digest_now):
         f.write(response)
 
 
-def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: str) -> None:
+def make_translation(lang_code: str, prompt_name: str, src_dir: Path, dest_dir: Path, file_pattern: str) -> None:
     """
     Translate files in src_dir to dest_dir with a given prompt.
 
     The translation is done by calling the `llm.ask` function with the prompt and the content of the file.
     The translated content is written to the destination file with the same name as the source file.
 
-    :param prompt: The prompt to use for translation.
+    :param lang_code: The language code to use for translation.
+    :param prompt_name: The prompt name to use for translation.
     :param src_dir: The source directory.
     :param dest_dir: The destination directory.
     :param file_pattern: The file pattern to translate.
@@ -374,12 +414,24 @@ def make_translation(prompt: str, src_dir: Path, dest_dir: Path, file_pattern: s
             continue
 
         content, imports = pull_imports(src_path)  # separate content and imports
+        prev_content, _ = pull_imports(dest_path)
+        prev_content = prev_content if content != prev_content else ""
 
-        safe_max_tokens = max(512, len(content)) + 1024
+        safe_max_tokens = max(512, len(content) + len(prev_content)) + 1024
         temperature = 0.0 if src_path.suffix == '.json' else 0.1
-        print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} tokens, {temperature} temperature) is translating...", flush=True)
+        print(f"File {dest_path.name} ({len(content)} bytes, {safe_max_tokens} limit, {temperature} temperature) is translating...", flush=True)
 
-        response = llm.ask(prompt, content, safe_max_tokens, temperature)
+        prompt = prompts.get(f"{prompt_name}_{lang_code.upper()}", None)
+        prompt = prompt if prompt else prompts[prompt_name]
+        prompt = prompt.format(lang=langs[lang_code]["name"])
+
+        response = llm.ask(prompt,
+f"""Previous translated ({lang_code}) version:
+{prev_content}
+
+Source text (en) to translate:
+{content}""",
+                           safe_max_tokens, temperature)
         if response.startswith('```'):
             # Strip surrounding fenced code block with any language tag (e.g., ```json, ```uk, etc.)
             response = re.sub(r'^```[A-Za-z0-9_-]*\s*|\s*```$', '', response.strip(), flags=re.DOTALL)
@@ -476,8 +528,6 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         return
 
     print(f"Translation to '{lang_code}' is starting...", flush=True)
-    prompt = prompts.get(f"MD_PROMPT_{lang_code.upper()}", None)
-    prompt = prompt if prompt else prompts['MD_PROMPT'].format(lang=lang_name)
     if not INPUT_PATTERN:
         if not i18n_lang_dir.exists():
             create_i18n(i18n_lang_dir, lang_code, lang_name)
@@ -487,15 +537,15 @@ def process_lang(lang_code: str, lang_name: str, is_update: bool = False) -> Non
         make_sync(blog_dir, blog_lang_dir, extensions)
         make_sync(docs_dir, docs_lang_dir, extensions)
 
-        make_translation(prompts['CURRENT_JSON_PROMPT'].format(lang=lang_name), root_lang_dir, root_lang_dir, 'current.json')
-        make_translation(prompts['CATEGORY_JSON_PROMPT'].format(lang=lang_name), docs_dir, docs_lang_dir, '_*_.json')
-        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code,
+        make_translation(lang_code, 'CURRENT_JSON_PROMPT', root_lang_dir, root_lang_dir, 'current.json')
+        make_translation(lang_code, 'CATEGORY_JSON_PROMPT', docs_dir, docs_lang_dir, '_*_.json')
+        make_translation(lang_code, 'KEY_VALUE_JSON_PROMPT', map_translations_dir / "en", map_translations_dir / lang_code,
                          "web-translation.json")
-        make_translation(prompt, docs_dir, docs_lang_dir, '*.md*')
+        make_translation(lang_code, 'MD_PROMPT', docs_dir, docs_lang_dir, '*.md*')
     else:
-        make_translation(prompt, blog_dir, blog_lang_dir, INPUT_PATTERN)
-        make_translation(prompt, docs_dir, docs_lang_dir, INPUT_PATTERN)
-        make_translation(prompts['KEY_VALUE_JSON_PROMPT'].format(lang=lang_name), map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
+        make_translation(lang_code, 'MD_PROMPT', blog_dir, blog_lang_dir, INPUT_PATTERN)
+        make_translation(lang_code, 'MD_PROMPT', docs_dir, docs_lang_dir, INPUT_PATTERN)
+        make_translation(lang_code, 'KEY_VALUE_JSON_PROMPT', map_translations_dir / "en", map_translations_dir / lang_code, INPUT_PATTERN)
 
 
 if __name__ == "__main__":

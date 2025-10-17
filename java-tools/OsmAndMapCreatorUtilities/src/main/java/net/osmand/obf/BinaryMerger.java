@@ -8,8 +8,8 @@ import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
@@ -387,11 +387,11 @@ public class BinaryMerger {
 
 	private void preloadStreetsAndBuildings(BinaryMapIndexReader rindex, City city,
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes) throws IOException {
-		rindex.preloadStreets(city, null);
+		rindex.preloadStreets(city, null, null);
 		Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
 		Map<String, List<Node>> streetNodesN = new LinkedHashMap<String, List<Node>>();
 		for (Street street : city.getStreets()) {
-			rindex.preloadBuildings(street, null);
+			rindex.preloadBuildings(street, null, null);
 			ArrayList<Node> nns = new ArrayList<Node>();
 			for (Street is : street.getIntersectedStreets()) {
 				List<Node> list = streetNodesN.get(is.getName());
@@ -451,7 +451,10 @@ public class BinaryMerger {
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
 		}
-		for (int type : BinaryMapAddressReaderAdapter.CITY_TYPES) {
+		for (CityBlocks cityBlockType : CityBlocks.values()) {
+			if (!cityBlockType.cityGroupType) {
+				continue;
+			}
 			Map<City, BinaryMapIndexReader> cityMap = new HashMap<City, BinaryMapIndexReader>();
 			Map<Long, City> cityIds = new HashMap<Long, City>();
 			for (int i = 0; i < addressRegions.length; i++) {
@@ -460,14 +463,14 @@ public class BinaryMerger {
 					continue;
 				}
 				final BinaryMapIndexReader index = indexes[i];
-				for (City city : index.getCities(region, null, type)) {
+				for (City city : index.getCities(null, cityBlockType, region, null)) {
 					normalizePostcode(city, extractCountryName(index));
 					// weird code cause city ids can overlap
 					// probably code to merge cities below is not needed (it called mostly for postcodes)
 					if(cityIds.containsKey(city.getId())) {
-						index.preloadStreets(city, null);
+						index.preloadStreets(city, null, null);
 						City city2 = cityIds.get(city.getId());
-						cityMap.get(city2).preloadStreets(city2, null);
+						cityMap.get(city2).preloadStreets(city2, null, null);
 						if(city.getStreets().size() > city2.getStreets().size()) {
 							cityMap.remove(city2);
 							cityIds.put(city.getId(), city);
@@ -482,10 +485,10 @@ public class BinaryMerger {
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
 			Map<City, List<City>> mergeCityGroup = new HashMap<City, List<City>>();
 			Collections.sort(cities, MapObject.BY_NAME_COMPARATOR);
-			mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, type == BinaryMapAddressReaderAdapter.CITY_TOWN_TYPE);
+			mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, cityBlockType == CityBlocks.CITY_TOWN_TYPE);
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
-			writer.startCityBlockIndex(type);
+			writer.startCityBlockIndex(cityBlockType.index);
 			Map<City, Map<Street, List<Node>>> namesakesStreetNodes = new HashMap<City, Map<Street, List<Node>>>();
 			for (int i = 0; i < cities.size(); i++) {
 				City city = cities.get(i);
@@ -498,9 +501,7 @@ public class BinaryMerger {
 						city = mergeCities(city, namesake, namesakesStreetNodes);
 					}
 				}
-
-				int cityType = city.isPostcode() ? -1 : city.getType().ordinal();
-				BinaryFileReference ref = writer.writeCityHeader(city, cityType, tagRules);
+				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
 				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
@@ -595,7 +596,7 @@ public class BinaryMerger {
 					}));
 			set.addAll(file);
 		}
-		indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
+		indexPoiCreator.writeBinaryPoiIndex(null, writer, name, null);
 		indexPoiCreator.commitAndClosePoiFile(dateCreated);
 //		REMOVE_POI_DB = false;
 		if (REMOVE_POI_DB) {

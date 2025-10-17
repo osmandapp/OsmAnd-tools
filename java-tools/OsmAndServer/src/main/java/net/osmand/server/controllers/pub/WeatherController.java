@@ -35,6 +35,7 @@ import net.osmand.obf.preparation.IndexWeatherData.WeatherTiff;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import static net.osmand.data.City.CityType.valueFromString;
+import static net.osmand.obf.preparation.IndexWeatherData.bandIndexByCode;
 
 @Controller
 @RequestMapping("/weather-api")
@@ -74,7 +75,7 @@ public class WeatherController {
 	                                            @RequestParam String weatherType,
 	                                            @RequestParam(defaultValue = "false") boolean week) {
 		File folder = new File(weatherLocation + weatherType + "/tiff/");
-		List<Object[]> dt = new ArrayList<>();
+		List<WeatherPoint> dt = new ArrayList<>();
 		int increment = INITIAL_INCREMENT;
 		if (folder.exists()) {
 			Calendar c = Calendar.getInstance();
@@ -89,19 +90,14 @@ public class WeatherController {
 			while (true) {
 				File fl = new File(folder, sdf.format(c.getTime()) + "00.tiff");
 				if (fl.exists()) {
-					try {
-						Object[] data = new Object[8];
-						data[0] = c.getTimeInMillis();
-						data[1] = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
-						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl);
-						for (int i = 0; i < wt.getBands() && i < 5; i++) {
-							data[2 + i] = wt.getValue(i, lat, lon, weatherType);
-						}
-						data[7] = fl.lastModified();
-						dt.add(normalizeValues(data, weatherType, increment));
-					} catch (IOException e) {
-						LOGGER.warn(String.format("Error reading %s: %s", fl.getName(), e.getMessage()), e);
-					}
+						WeatherTiff wt = new IndexWeatherData.WeatherTiff(fl, true);
+
+						long ts   = c.getTimeInMillis();
+						String tm = sdf.format(c.getTime()).substring(4).replace('_', ' ') + ":00";
+						long fm   = fl.lastModified();
+
+						WeatherPoint row = buildPoint(wt, lat, lon, weatherType, ts, tm, fm, increment);
+						dt.add(row);
 				} else {
 					if (weatherType.equals(ECWMF_WEATHER_TYPE) && increment != ECWMF_INCREMENT) {
 						increment = ECWMF_INCREMENT;
@@ -119,16 +115,6 @@ public class WeatherController {
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(dt));
-	}
-	
-	private Object[] normalizeValues(Object[] data, String weatherType, int increment) {
-		int precipIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 4 : 6;
-		int pressureIndex = weatherType.equals(ECWMF_WEATHER_TYPE) ? 3 : 4;
-		increment = weatherType.equals(ECWMF_WEATHER_TYPE) ? increment : 1;
-		data[precipIndex] = ((double) data[precipIndex]) * 3600 / increment;
-		data[pressureIndex] = ((double) data[pressureIndex]) * 0.01;
-		
-		return data;
 	}
 	
 	static class AddressInfo {
@@ -179,8 +165,7 @@ public class WeatherController {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
-			SearchUICore.SearchResultCollection resultCollection = searchService.searchCitiesByBbox(searchBbox, usedMapList);
-			nearestPlace = getNearestPlace(resultCollection, lat, lon);
+			nearestPlace = searchService.searchCitiesByBbox(searchBbox, lat, lon, usedMapList);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
@@ -200,17 +185,7 @@ public class WeatherController {
 		return searchBbox;
 	}
 	
-	private long getPopulation(Amenity a) {
-		String population = a.getAdditionalInfo("population");
-		if (population != null) {
-			population = population.replaceAll("\\D", "");
-			if (population.matches("\\d+")) {
-				return Long.parseLong(population);
-			}
-		}
-		City.CityType type = valueFromString(a.getSubType());
-		return type.getPopulation();
-	}
+	
 	
 	private List<LatLon> getBbox(String nw, String se) {
 		List<LatLon> bbox = new ArrayList<>();
@@ -223,30 +198,72 @@ public class WeatherController {
 		return bbox;
 	}
 	
-	private Amenity getNearestPlace(SearchUICore.SearchResultCollection resultCollection, double centerLat, double centerLon) {
-		List<SearchResult> foundedPlaces = resultCollection.getCurrentSearchResults();
-		List<SearchResult> modifiableFoundedPlaces = new ArrayList<>(foundedPlaces);
-		
-		modifiableFoundedPlaces.sort((o1, o2) -> {
-			if (o1.object instanceof Amenity && o2.object instanceof Amenity) {
-				double rating1 = getRating(o1, centerLat, centerLon);
-				double rating2 = getRating(o2, centerLat, centerLon);
-				return Double.compare(rating2, rating1);
-			}
-			return 0;
-		});
-		if (!modifiableFoundedPlaces.isEmpty()) {
-			return (Amenity) modifiableFoundedPlaces.get(0).object;
-		}
-		return null;
-	}
 	
-	private double getRating(SearchResult sr, double centerLat, double centerLon) {
-		long population = getPopulation((Amenity) sr.object);
-		double lat1 = sr.location.getLatitude();
-		double lon1 = sr.location.getLongitude();
-		double distance = Math.sqrt(Math.pow(centerLat - lat1, 2) + Math.pow(centerLon - lon1, 2));
-		
-		return Math.log10(population + 1.0) - distance;
+
+	static class WeatherPoint {
+		long ts;
+		String time;
+		Double temp;
+		Double precip;
+		Double wind;
+		Double press;
+		Double cloud;
+		long fileModified;
+
+		WeatherPoint(long ts, String time) {
+			this.ts = ts;
+			this.time = time;
+		}
+
+		private static boolean isValid(Double v) {
+			return v != null && v != IndexWeatherData.INEXISTENT_VALUE;
+		}
+	}
+
+	private static WeatherPoint buildPoint(WeatherTiff wt,
+	                                       double lat, double lon,
+	                                       String weatherType,
+	                                       long ts, String time, long fileModified,
+	                                       int increment) {
+		Map<Integer, String> codes = wt.getBandData();
+		WeatherPoint wp = new WeatherPoint(ts, time);
+
+		Integer iTemp = bandIndexByCode(codes, IndexWeatherData.WeatherParam.TEMP.code);
+		Integer iPres = bandIndexByCode(codes, IndexWeatherData.WeatherParam.PRESSURE.code);
+		Integer iWind = bandIndexByCode(codes, IndexWeatherData.WeatherParam.WIND.code);
+		Integer iPrec = bandIndexByCode(codes, IndexWeatherData.WeatherParam.PRECIP.code);
+		Integer iCloud = bandIndexByCode(codes, IndexWeatherData.WeatherParam.CLOUD.code);
+
+		if (iTemp != null) wp.temp = wt.getValue(iTemp, lat, lon, weatherType);
+		if (iPres != null) wp.press = wt.getValue(iPres, lat, lon, weatherType);
+		if (iWind != null) wp.wind = wt.getValue(iWind, lat, lon, weatherType);
+		if (iPrec != null) wp.precip = wt.getValue(iPrec, lat, lon, weatherType);
+		if (iCloud != null) wp.cloud = wt.getValue(iCloud, lat, lon, weatherType);
+
+		wp.fileModified = fileModified;
+		normalizeValues(wp, weatherType, increment);
+		return wp;
+	}
+
+	private static void normalizeValues(WeatherPoint p, String weatherType, int increment) {
+		p.temp = WeatherPoint.isValid(p.temp) ? Math.round(p.temp * 1000.0) / 1000.0 : null;
+
+		if (WeatherPoint.isValid(p.precip)) {
+			final boolean isECWMF = ECWMF_WEATHER_TYPE.equals(weatherType);
+			// Divide by inc (for ECMWF the step is 3h or 6h) to normalize it to the average intensity per 1 hour, regardless of the larger forecast step.
+			int inc = isECWMF ? Math.max(1, increment) : 1;
+			// PRATE in the metadata is the precipitation rate in kg/m²/s (= mm/s). We multiply it by 3600 to convert it to mm/hour.
+			p.precip = p.precip * 3600.0 / inc;
+			p.precip = Math.round(p.precip * 1000.0) / 1000.0;
+		}
+
+		if (WeatherPoint.isValid(p.press)) {
+			// Convert PRATE in the metadata from Pascals (Pa) to the standard for weather maps, hectopascals (hPa).
+			p.press = p.press * 0.01;
+			p.press = Math.round(p.press * 1000.0) / 1000.0;
+		}
+
+		p.wind = WeatherPoint.isValid(p.wind) ? Math.round(p.wind * 1000.0) / 1000.0 : null;
+		p.cloud = WeatherPoint.isValid(p.cloud) ? Math.round(p.cloud * 1000.0) / 1000.0 : null;
 	}
 }

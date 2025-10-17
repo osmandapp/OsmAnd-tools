@@ -10,7 +10,6 @@ import java.util.Map;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
-import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapIndexReader;

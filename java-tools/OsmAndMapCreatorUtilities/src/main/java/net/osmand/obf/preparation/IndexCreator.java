@@ -3,15 +3,14 @@ package net.osmand.obf.preparation;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.MapZooms;
+import net.osmand.binary.ObfConstants;
 import net.osmand.impl.ConsoleProgressImplementation;
-import net.osmand.obf.preparation.OsmDbAccessor.OsmDbTagsPreparation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
@@ -28,11 +27,7 @@ import rtree.RTreeException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import java.io.*;
-import java.net.URL;
-import java.net.URLConnection;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.zip.GZIPInputStream;
@@ -288,8 +283,12 @@ public class IndexCreator {
 
 			@Override
 			public boolean acceptEntityToLoad(OsmBaseStorage storage, EntityId entityId, Entity entity) {
-				if (indexAddressCreator != null) {
-					indexAddressCreator.registerCityIfNeeded(entity);
+				if (indexAddressCreator != null && entityId.getType() == EntityType.NODE) {
+					Node n = (Node) entity;
+					if (!generateNewIds) {
+						n = new Node(n, n.getId() << ObfConstants.SHIFT_ID);
+					}
+					indexAddressCreator.registerCityNodes(n);
 				}
 				// accept to allow db creator parse it
 				return true;
@@ -333,9 +332,9 @@ public class IndexCreator {
 			boolean generateUniqueIdsForEachFile) throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		OsmDbAccessor accessor = new OsmDbAccessor();
 		if (settings.wikidataMappingUrl != null) {
-			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl));
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(settings.wikidataMappingUrl, settings.wikirankingMappingUrl));
 		} else if (!Algorithms.isEmpty(System.getenv("WIKIDATA_MAPPING_URL"))) {
-			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL")));
+			accessor.setTagsPrepration(new MissingWikiTagsProcessor(System.getenv("WIKIDATA_MAPPING_URL"), System.getenv("WIKIRANKING_MAPPING_URL")));
 		} else {
 			log.info("Not using wikidata database to map missing wikidata tags");
 		}
@@ -476,7 +475,7 @@ public class IndexCreator {
 			progress.startTask("Writing map index to binary file...", -1);
 			processor.writeBasemapFile(writer, regionName);
 			if (settings.indexPOI) {
-				poiCreator.writeBinaryPoiIndex(writer, regionName, progress);
+				poiCreator.writeBinaryPoiIndex(null, writer, regionName, progress);
 			}
 			progress.finishTask();
 			writer.close();
@@ -658,10 +657,11 @@ public class IndexCreator {
 					indexAddressCreator.writeBinaryAddressIndex(writer, regionName, progress);
 				}
 
+				// Order matters! Write POI after address / routing to allow use geocoding for POI
 				if (settings.indexPOI) {
 					setGeneralProgress(progress, "[95 of 100]");
 					progress.startTask("Writing poi index to binary file...", -1);
-					indexPoiCreator.writeBinaryPoiIndex(writer, regionName, progress);
+					indexPoiCreator.writeBinaryPoiIndex(mapFile, writer, regionName, progress);
 				}
 
 				if (settings.indexTransport) {
@@ -764,9 +764,8 @@ public class IndexCreator {
 				public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 					calculateRegionTagAndTransliterate(e, icc);
 					if (settings.indexAddress) {
-						// indexAddressCreator.indexAddressRelation((Relation) e, ctx); streets needs loaded boundaries
-						// !!!
-						indexAddressCreator.indexBoundariesRelation(e, ctx);
+						// indexAddressCreator.indexStreetRelation((Relation) e, ctx); streets needs loaded boundaries first !!!
+						indexAddressCreator.indexBoundaries(e, ctx);
 					}
 					if (settings.indexMap) {
 						if (!settings.keepOnlyRouteRelationObjects) {
@@ -802,7 +801,7 @@ public class IndexCreator {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 						if (settings.indexAddress) {
-							indexAddressCreator.indexBoundariesRelation(e, ctx);
+							indexAddressCreator.indexBoundaries(e, ctx);
 						}
 						if (settings.indexRouting) {
 							indexRouteCreator.indexLowEmissionZones(e, ctx);
@@ -822,7 +821,7 @@ public class IndexCreator {
 				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 					@Override
 					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-						indexAddressCreator.indexAddressRelation((Relation) e, ctx, icc);
+						indexAddressCreator.indexStreetRelation((Relation) e, ctx, icc);
 					}
 				});
 
@@ -855,14 +854,15 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-		settings.indexMap = true;
-//		settings.indexAddress = true;
+//		settings.indexMap = true;
+		settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
 //		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
+		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;
 
@@ -874,10 +874,11 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/Map.osm";
-//		String file = rootFolder + "../temp/divoka_sarka.osm";
+		String file = rootFolder + "../temp/us_penn.osm";
+//		String file = rootFolder + "../temp/london.osm";
+//		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
-//		String file = rootFolder + "../repos/resources/test-resources/synthetic_test_rendering.osm";
+//		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
 //		String file = rootFolder + "/maps/routes/nl_routes.osm.gz";
 

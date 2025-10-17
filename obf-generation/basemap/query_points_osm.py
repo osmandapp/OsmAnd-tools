@@ -66,7 +66,7 @@ def process_points(cond, filename, array):
 	cursor.execute(sql)
  	
 	node_id =-1000
-	parse = re.compile('(-?[\d|\.]+)\s(-?[\d|\.]+)')
+	parse = re.compile(r'(-?[\d.]+)\s(-?[\d.]+)')
 	for row in cursor:
 		checkForLargeState = False
 		node_id = row[1] #node_id - 1

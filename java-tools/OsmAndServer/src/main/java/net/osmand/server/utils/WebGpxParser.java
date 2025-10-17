@@ -462,6 +462,9 @@ public class WebGpxParser {
     public void addAdditionalInfo(List<WebTrack> tracks, GpxTrackAnalysis analysis, boolean addSpeed) {
         tracks.forEach(track -> {
             int pointsSize = 0;
+            if (track.points == null || track.points.isEmpty() || analysis == null || analysis.getPointAttributes().isEmpty()) {
+                return;
+            }
             for (Point point : track.points) {
                 if (point.geometry != null) {
                     for (Point p : point.geometry) {

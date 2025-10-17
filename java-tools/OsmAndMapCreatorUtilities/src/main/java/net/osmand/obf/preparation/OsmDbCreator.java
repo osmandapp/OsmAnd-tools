@@ -26,7 +26,6 @@ import org.apache.commons.logging.LogFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.sql.*;
-import java.util.HashMap;
 import java.util.Map.Entry;
 
 public class OsmDbCreator implements IOsmStorageFilter {
@@ -35,7 +34,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	public static String OSMAND_DELETE_VALUE = "delete";
 	
 	private static final Log log = LogFactory.getLog(OsmDbCreator.class);
-	public static final int SHIFT_ID = 6;
 	public static final int BATCH_SIZE_OSM = 100000;
 
 	// do not store these tags in the database, just ignore them
@@ -226,8 +224,8 @@ public class OsmDbCreator implements IOsmStorageFilter {
 			hashes.put(fid, hash);
 			return lid;
 		}
-		int l = (int) (hash & ((1 << (SHIFT_ID - 1)) - 1));
-		long cid = (id << SHIFT_ID) + (ord % 2) + (l << 1);
+		int l = (int) (hash & ((1 << (ObfConstants.SHIFT_ID - 1)) - 1));
+		long cid = (id << ObfConstants.SHIFT_ID) + (ord % 2) + (l << 1);
 		long fid = (id << 2) + ord;
 		generatedIds.put(fid, cid);
 		hashes.put(fid, hash);
@@ -453,7 +451,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				allWays++;
 				int ord = 0;
 				TLongArrayList nodeIds = ((Way) e).getNodeIds();
-				boolean city = CityType.valueFromString(((Way) e).getTag(OSMTagKey.PLACE)) != null;
+				boolean city = CityType.valueFromEntity(e) != null;
 				int boundary = ((Way) e).getTag(OSMTagKey.BOUNDARY) != null || city ? 1 : 0;
 				for (int j = 0; j < nodeIds.size(); j++) {
 					currentWaysCount++;

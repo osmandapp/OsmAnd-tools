@@ -1472,53 +1472,75 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		wc.wayMapIds.clear();
 		wc.wayMapIdsCache.clear();
 		wc.pointMapIds.clear();
-		for (int i = 0; i < parent.getTotalElements(); i++) {
-			if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
-				long id = e[i].getPtr();
-				// IndexRouteCreator.SELECT_STAT;
-				// "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
-				boolean retrieveObject = wc.retrieveObject(id);
-				if (retrieveObject) {
-					if (dataBlock == null) {
-						dataBlock = RouteDataBlock.newBuilder();
-						wc.stringTable.clear();
-						wc.wayMapIds.clear();
-						wc.wayMapIdsCache.clear();
-						wc.pointMapIds.clear();
-					}
-					int cid = wc.registerWayMapId(id);
-					List<RestrictionInfo> restrictions = wc.highwayRestrictions.get(id);
-					if (!basemap && restrictions != null) {
-						for (int li = 0; li < restrictions.size(); li++) {
-							RestrictionInfo rd = restrictions.get(li);
-							Builder restriction = RestrictionData.newBuilder();
-							restriction.setFrom(cid);
-							int toId = wc.registerWayMapId(rd.toWay);
-							restriction.setTo(toId);
-							restriction.setType(rd.type);
-							if(rd.viaWay != 0) {
-								int viaId = wc.registerWayMapId(rd.viaWay);
-								restriction.setVia(viaId);
-							}
-
-							dataBlock.addRestrictions(restriction.build());
-						}
-					}
-					RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), wc.wayTypes,
-							wc.points.toArray(new RoutePointToWrite[wc.points.size()]),
-							wc.wayNames, wc.stringTable, wc.pointNames, dataBlock, true, false);
-					if (routeData != null) {
-						dataBlock.addDataObjects(routeData);
-					}
-				} else {
-					if(wc.logMapDataWarn != null) {
-						wc.logMapDataWarn.error("Something goes wrong with id = " + id); //$NON-NLS-1$
-					} else {
-						System.err.println("Something goes wrong with id = " + id);
-					}
-				}
-			}
-		}
+        Set<Long> restrictionVia = new HashSet<>();
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i < parent.getTotalElements(); i++) {
+            if (e[i].getElementType() == rtree.Node.LEAF_NODE) {
+                long id = e[i].getPtr();
+                List<RestrictionInfo> restrictions = wc.highwayRestrictions.get(id);
+                if (restrictions != null) {
+                    for (int li = 0; li < restrictions.size(); li++) {
+                        RestrictionInfo rd = restrictions.get(li);
+                        if(rd.viaWay != 0) {
+                            restrictionVia.add(rd.viaWay);
+                        }
+                    }
+                }
+                ids.add(id);
+            }
+        }
+        if (!ids.isEmpty() && restrictionVia.contains(ids.get(0))) {
+            // set restrictionVia to the end of idTable (val.viaWay != 0)
+            for (int i = 1; i < ids.size(); i++) {
+                if (!restrictionVia.contains(ids.get(i))) {
+                    Collections.swap(ids, 0, i);
+                    break;
+                }
+            }
+        }
+        for (long id : ids) {
+            // IndexRouteCreator.SELECT_STAT;
+            // "SELECT types, pointTypes, pointIds, pointCoordinates, name FROM route_objects WHERE id = ?"
+            boolean retrieveObject = wc.retrieveObject(id);
+            if (retrieveObject) {
+                if (dataBlock == null) {
+                    dataBlock = RouteDataBlock.newBuilder();
+                    wc.stringTable.clear();
+                    wc.wayMapIds.clear();
+                    wc.wayMapIdsCache.clear();
+                    wc.pointMapIds.clear();
+                }
+                int cid = wc.registerWayMapId(id);
+                List<RestrictionInfo> restrictions = wc.highwayRestrictions.get(id);
+                if (!basemap && restrictions != null) {
+                    for (int li = 0; li < restrictions.size(); li++) {
+                        RestrictionInfo rd = restrictions.get(li);
+                        Builder restriction = RestrictionData.newBuilder();
+                        restriction.setFrom(cid);
+                        int toId = wc.registerWayMapId(rd.toWay);
+                        restriction.setTo(toId);
+                        restriction.setType(rd.type);
+                        if (rd.viaWay != 0) {
+                            int viaId = wc.registerWayMapId(rd.viaWay);
+                            restriction.setVia(viaId);
+                        }
+                        dataBlock.addRestrictions(restriction.build());
+                    }
+                }
+                RouteData routeData = writer.writeRouteData(cid, parentBounds.getMinX(), parentBounds.getMinY(), wc.wayTypes,
+                        wc.points.toArray(new RoutePointToWrite[wc.points.size()]),
+                        wc.wayNames, wc.stringTable, wc.pointNames, dataBlock, true, false);
+                if (routeData != null) {
+                    dataBlock.addDataObjects(routeData);
+                }
+            } else {
+                if (wc.logMapDataWarn != null) {
+                    wc.logMapDataWarn.error("Something goes wrong with id = " + id); //$NON-NLS-1$
+                } else {
+                    System.err.println("Something goes wrong with id = " + id);
+                }
+            }
+        }
 		if (dataBlock != null) {
 			IdTable.Builder idTable = IdTable.newBuilder();
 			long prev = 0;

@@ -128,7 +128,6 @@ public class IndexBatchCreator {
 		public boolean indexAddress = true;
 		public boolean indexMap = true;
 		public boolean indexRouting = true;
-        public boolean indexByProximity = true;
 	}
 	
 	private static class AwsPendingGeneration {
@@ -145,6 +144,7 @@ public class IndexBatchCreator {
 		public List<Bind> binds = new ArrayList<>();
 		public List<String> envs = new ArrayList<String>();
 		public CreateContainerResponse container;
+		public long startTime;
 	}
 	
 	private static class LocalPendingGeneration {
@@ -189,7 +189,6 @@ public class IndexBatchCreator {
 	boolean indexAddress = false;
 	boolean indexMap = false;
 	boolean indexRouting = false;
-	boolean indexByProximity = true;
 	private String wget;
 
 	private DBDialect osmDbDialect;
@@ -246,7 +245,6 @@ public class IndexBatchCreator {
 				|| process.getAttribute("indexRouting").equalsIgnoreCase("true");
 		indexTransport = Boolean.parseBoolean(process.getAttribute("indexTransport"));
 		indexAddress = Boolean.parseBoolean(process.getAttribute("indexAddress"));
-		indexByProximity = Boolean.parseBoolean(process.getAttribute("indexByProximity"));
 		parseProcessAttributes(process);
 
 		list = doc.getElementsByTagName("process_attributes");
@@ -612,8 +610,8 @@ public class IndexBatchCreator {
 		}
 		if (lastStarted != null && lastStarted.jd.freeRamToStopPerc > 0
 				&& freeRamPerc < lastStarted.jd.freeRamToStopPerc) {
-			log.warn(String.format("Low RAM detected (%d%% free). Stopping last started container %s to reschedule.",
-					freeRamPerc, lastStarted.name));
+			log.warn(String.format("Low RAM detected (%d%% free). Stopping last started container %s (%d seconds) to reschedule.",
+					freeRamPerc, lastStarted.name, (System.currentTimeMillis() - lastStarted.startTime)/ 1000));
 			try {
 				dockerClient.stopContainerCmd(lastStarted.container.getId()).exec();
 				dockerClient.removeContainerCmd(lastStarted.container.getId()).exec();
@@ -666,6 +664,7 @@ public class IndexBatchCreator {
 					// In future: we can find & remove container if it exists with same name
 					p.jd.pendingGenerations.remove(p);
 					dockerRescheduledGenerations.remove(p);
+					p.startTime = System.currentTimeMillis();
 					p.container = dockerClient.createContainerCmd(p.image).withBinds(p.binds).withCmd(p.cmd)
 							.withEnv(p.envs).withName(p.name).exec();
 					dockerClient.startContainerCmd(p.container.getId()).exec();
@@ -1136,7 +1135,6 @@ public class IndexBatchCreator {
 			final boolean indTransport = indexTransport && (rdata == null || rdata.indexTransport);
 			final boolean indMap = indexMap && (rdata == null || rdata.indexMap);
 			final boolean indRouting = indexRouting && (rdata == null || rdata.indexRouting);
-            final boolean indByProximity = indexByProximity && (rdata == null || rdata.indexByProximity);
 			if(!indAddr && !indPoi && !indTransport && !indMap && !indRouting) {
 				log.warn("! Skip country " + file.getName() + " because nothing to index !");
 				return;
@@ -1147,8 +1145,7 @@ public class IndexBatchCreator {
 			settings.indexPOI = indPoi;
 			settings.indexTransport = indTransport;
 			settings.indexRouting = indRouting;
-            settings.indexByProximity = indByProximity;
-			if(zoomWaySmoothness != null){
+			if (zoomWaySmoothness != null) {
 				settings.zoomWaySmoothness = zoomWaySmoothness;
 			}
 			boolean worldMaps = regionName.toLowerCase().contains("world") ;

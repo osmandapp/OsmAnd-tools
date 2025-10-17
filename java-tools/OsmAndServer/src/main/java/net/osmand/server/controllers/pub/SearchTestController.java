@@ -23,6 +23,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -56,8 +59,15 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/runs", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Page<Run>> getRuns(@PathVariable Long caseId, Pageable pageable) {
+	public ResponseEntity<Page<Run>> getRunsPerCase(@PathVariable Long caseId, Pageable pageable) {
 		return ResponseEntity.ok(testSearchService.getRuns(caseId, pageable));
+	}
+
+	@GetMapping(value = "/runs", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Page<Run>> getRuns(@RequestParam(required = false) String name,
+	                                         @RequestParam(required = false) String labels, Pageable pageable) {
+		return ResponseEntity.ok(testSearchService.getRuns(name, labels, pageable));
 	}
 
 	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -103,6 +113,13 @@ public class SearchTestController {
 		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
 	}
 
+	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<TestCase> updateTestCase(@PathVariable Long caseId,
+	                                                                @RequestBody Map<String, String> updatesPayload) {
+		return ResponseEntity.ok(testSearchService.updateTestCase(caseId, updatesPayload));
+	}
+
 	@PostMapping(value = "/runs/{runId:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Run>> cancelRun(@PathVariable Long runId) {
@@ -142,9 +159,13 @@ public class SearchTestController {
 	public void getDatasetSample(@PathVariable Long datasetId, HttpServletResponse response) throws IOException {
 		try {
 			String csvData = testSearchService.getDatasetSample(datasetId);
-			response.setContentType("text/csv");
+			response.setContentType("text/csv; charset=UTF-8");
+			response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 			response.setHeader("Content-Disposition", "attachment; filename=\"sample.csv\"");
-			response.getWriter().write(csvData);
+			try (OutputStreamWriter w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+				w.write(csvData);
+				w.flush();
+			}
 		} catch (RuntimeException e) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
 		}
@@ -197,68 +218,83 @@ public class SearchTestController {
 
 	@GetMapping(value = "/cases/{caseId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId,
-													   @RequestParam(defaultValue = "10") Integer placeLimit,
-													   @RequestParam(defaultValue = "50") Integer distLimit) {
+	public ResponseEntity<RunStatus> getTestCaseReport(@PathVariable Long caseId) {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		return testSearchService.getRunReport(caseId, tc.lastRunId, placeLimit, distLimit)
+		return testSearchService.getRunStatus(caseId, tc.lastRunId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/runs/{runId}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Run> getRun(@PathVariable Long runId) {
+		Run run = testSearchService.getRun(runId).orElseThrow(() ->
+				new RuntimeException("Run not found with id: " + runId));
+		return ResponseEntity.ok(run);
 	}
 
 	@GetMapping(value = "/runs/{runId}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId,
-												  @RequestParam(defaultValue = "10") Integer placeLimit,
-												  @RequestParam(defaultValue = "50") Integer distLimit) {
+	public ResponseEntity<RunStatus> getRunReport(@PathVariable Long runId) {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		return testSearchService.getRunReport(run.caseId, runId, placeLimit, distLimit)
+		return testSearchService.getRunStatus(run.caseId, runId)
 				.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+	}
+
+	@GetMapping(value = "/cases/{caseId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getTestCaseResults(@PathVariable Long caseId) throws IOException {
+		return ResponseEntity.ok(testSearchService.getTestCaseResults(caseId));
+	}
+
+	@GetMapping(value = "/runs/{runId}/results", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Map<String, Object>>> getRunResults(@PathVariable Long runId,
+	                                                               @RequestParam(defaultValue = "true") boolean isFull) throws IOException {
+		return ResponseEntity.ok(testSearchService.getRunResults(runId, isFull));
 	}
 
 	@GetMapping(value = "/runs/{runId}/download")
 	public void downloadRunReport(@PathVariable Long runId,
-								  @RequestParam(defaultValue = "10") Integer placeLimit,
-								  @RequestParam(defaultValue = "50") Integer distLimit,
-								  @RequestParam(defaultValue = "csv") String format,
 								  HttpServletResponse response) throws IOException {
 		Run run = testSearchService.getRun(runId).orElseThrow(() ->
 				new RuntimeException("Run not found with id: " + runId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
-		response.setContentType(contentType);
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, run.caseId, runId, format);
+		response.setContentType("text/csv; charset=UTF-8");
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadCsvResults(writer, run.caseId, runId);
+		}
 	}
 
 	@GetMapping(value = "/cases/{caseId}/download")
 	public void downloadTestCaseReport(@PathVariable Long caseId,
-									   @RequestParam(defaultValue = "10") Integer placeLimit,
-									   @RequestParam(defaultValue = "50") Integer distLimit,
-									   @RequestParam(defaultValue = "csv") String format,
 									   HttpServletResponse response) throws IOException {
 		TestCase tc = testSearchService.getTestCase(caseId).orElseThrow(() ->
 				new RuntimeException("TestCase not found with id: " + caseId));
-		String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
-		response.setContentType(contentType);
-		response.setHeader("Content-Disposition", "attachment; filename=\"report." + format + "\"");
-
-		testSearchService.downloadRawResults(response.getWriter(), placeLimit, distLimit, caseId, tc.lastRunId,
-				format);
+		response.setContentType("text/csv; charset=UTF-8");
+		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+		response.setHeader("Content-Disposition", "attachment; filename=report.csv");
+		try (OutputStreamWriter writer = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			testSearchService.downloadCsvResults(writer, caseId, tc.lastRunId);
+		}
 	}
 
-	@GetMapping(value = "/labels", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/cases/{caseId}/compare", produces = MediaType.APPLICATION_JSON_VALUE)
+	public void compareReport(@PathVariable Long caseId, @RequestParam Long[] runIds,
+	                                                                 HttpServletResponse response) throws IOException {
+		response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		response.setHeader("Content-Disposition", "attachment; filename=\"report.xlsx\"");
+		testSearchService.compareReport(response.getOutputStream(), caseId, runIds);
+	}
+
+	@GetMapping(value = "/branches", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String[]> getLabels() {
-		return ResponseEntity.ok(testSearchService.getAllLabels().toArray(new String[0]));
+	public ResponseEntity<List<String>> getBranches() {
+		return ResponseEntity.ok(Collections.singletonList(testSearchService.getSystemBranch()));
 	}
 
-	@GetMapping(value = "/versions", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<String[]> getVersions() {
-		return ResponseEntity.ok(new String[] {"EXPAND_COMMON_WORDS", "EXPAND_ABBREVIATIONS", "DEFAULT"});
-	}
 
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)

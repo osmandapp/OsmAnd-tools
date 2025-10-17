@@ -65,6 +65,10 @@ public class IndexCreationContext {
 		return indexCreator.indexPoiCreator;
 	}
 
+	IndexRouteRelationCreator getIndexRouteRelationCreator() {
+		return indexCreator.indexRouteRelationCreatorV2;
+	}
+
 	IndexVectorMapCreator getIndexMapCreator() {
 		return indexCreator.indexMapCreator;
 	}

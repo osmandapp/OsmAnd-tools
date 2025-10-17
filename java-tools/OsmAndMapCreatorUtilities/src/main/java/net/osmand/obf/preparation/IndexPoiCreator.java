@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -30,6 +32,8 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
@@ -57,6 +61,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
@@ -76,9 +81,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
+	private static final double GEOCODING_DISTANCE = 150;
+	
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
-	private static int DUPLICATE_SPLIT = 5;
 	public TLongHashSet generatedIds = new TLongHashSet();
 
 	private List<Amenity> tempAmenityList = new ArrayList<Amenity>();
@@ -100,7 +106,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
-	private final long PROPAGATED_NODE_BIT = 1L << (ObfConstants.SHIFT_PROPAGATED_NODE_IDS - 1);
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
@@ -184,19 +189,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		this.poiTypes = poiTypes;
 	}
 
-	private long assignIdForMultipolygon(Relation orig) {
-		long ll = orig.getId();
-		return genId(ObfConstants.SHIFT_MULTIPOLYGON_IDS, (ll << 6) );
-	}
-
-	private long genId(int baseShift, long id) {
-		long gen = (id << DUPLICATE_SPLIT) +  (1l << (baseShift - 1));
-		while (generatedIds.contains(gen)) {
-			gen += 2;
-		}
-		generatedIds.add(gen);
-		return gen;
-	}
 
 	public void iterateEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		if (e instanceof Relation && excludedRelations.contains(e.getId())) {
@@ -211,80 +203,30 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList.clear();
 		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
 		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
+		if (e instanceof Way way && ClickableWayTags.isClickableWayTags(null, tags)) {
+			tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
+			icc.getIndexRouteRelationCreator().collectElevationStatsForWays(List.of(way), tags, icc);
+		}
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (isOutOfRegionBbox(e, icc)) {
                 return;
             }
-			List<LatLon> centers = Collections.singletonList(null);
-			String memberIds = "";
-			if (e instanceof Relation relation) {
-				ctx.loadEntityRelation(relation);
-				boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
-				List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
-				if (adminCenters.size() == 1) {
-					centers = Collections.singletonList(adminCenters.get(0).getLatLon());
-				} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
-					MultipolygonBuilder original = new MultipolygonBuilder();
-					original.setId(relation.getId());
-					if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
-						Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
-						original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
-					} else {
-						original.createInnerAndOuterWays(relation);
-					}
-					List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
-					centers = new ArrayList<>();
-					for (Multipolygon m : multipolygons) {
-						assert m.getOuterRings().size() == 1;
-						if (!m.areRingsComplete()) {
-							log.warn("In multipolygon (POI)  " + relation.getId() + " there are incompleted ways");
-						}
-						Ring out = m.getOuterRings().get(0);
-						if (out.getBorder().size() == 0) {
-							log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
-							// don't index this
-							continue;
-						}
-                        List<List<Node>> innerWays = new ArrayList<>();
-                        for (Ring r : m.getInnerRings()) {
-                            innerWays.add(r.getBorder());
-                        }
-                        LatLon l = OsmMapUtils.getComplexPolyCenter(out.getBorder(), innerWays);
-                        centers.add(l);
-					}
-				} else if (OsmMapUtils.isSuperRoute(tags)) {
-					for (RelationMember members : relation.getMembers()) {
-						if (members.getEntityId().getType() == EntityType.RELATION) {
-							if (memberIds.length() > 0) {
-								memberIds += " ";
-							}
-							memberIds += "O" + members.getEntityId().getId(); // OSM route_id start from symbol "O"
-							if (centers.get(0) == null) {
-								Relation memberRel = (Relation) members.getEntity();
-								ctx.loadEntityRelation(memberRel);
-								centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel, true));
-							}
-						}
-					}
-				}
-			}
+			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
+			StringBuilder memberIds = new StringBuilder();
+			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds);
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
-			} else if(e instanceof Relation) {
+			} else if (id > 0) {
 //				id = GENERATE_OBJ_ID--;
-				id = assignIdForMultipolygon((Relation) e);
-			} else if(id > 0) {
-				boolean isPropagated = e.getId() > PROPAGATED_NODE_BIT;
-				if (isPropagated) {
-					id = e.getId();
-				} else {
-					// keep backward compatibility for ids (osm editing)
-					id = e.getId() >> (OsmDbCreator.SHIFT_ID - 1);
-					if (id % 2 != (e.getId() % 2)) {
-						id ^= 1;
+				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
+				if (e instanceof Relation) {
+					// other ids couldn't be duplicated 
+					while (generatedIds.contains(id)) {
+						id += 2;
 					}
+					generatedIds.add(id);
 				}
 			}
 
@@ -295,8 +237,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						continue;
 					}
 				}
-				for (int i = 0; i < centers.size(); i++) {
-                    LatLon cen = centers.get(i);
+				for (int i = 0; i < relationCenters.size(); i++) {
+                    LatLon cen = relationCenters.get(i);
 					if (cen != null) {
 						a.setLocation(cen);
 					}
@@ -304,7 +246,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                         continue;
                     }
     				EntityParser.parseMapObject(a, e, tags);
-    				if (centers.size() > 1) {
+    				if (relationCenters.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
                         long cenId = id + ((long) i * 2);
 						a.setId(cenId);
@@ -314,7 +256,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                         generatedIds.add(id);
                     }
 					if (!memberIds.isEmpty()) {
-						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds);
+						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds.toString());
 					}
 
    					try {
@@ -327,6 +269,62 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			}
 		}
+	}
+
+	private List<LatLon> collectRelationCenters(Entity e, OsmDbAccessorContext ctx, Map<String, String> tags,
+			List<LatLon> centers, StringBuilder memberIds) throws SQLException {
+		if (e instanceof Relation relation) {
+			ctx.loadEntityRelation(relation);
+			boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
+			List<Entity> adminCenters = relation.getMemberEntities("admin_centre");
+			if (adminCenters.size() == 1) {
+				centers = Collections.singletonList(adminCenters.get(0).getLatLon());
+			} else if (OsmMapUtils.isMultipolygon(tags) && !isAdministrative) {
+				MultipolygonBuilder original = new MultipolygonBuilder();
+				original.setId(relation.getId());
+				if (MultipolygonBuilder.isClimbingMultipolygon(relation)) {
+					Map<Long, Node> allNodes = ctx.retrieveAllRelationNodes((Relation) e);
+					original.createClimbingOuterWay(e, new ArrayList<>(allNodes.values()));
+				} else {
+					original.createInnerAndOuterWays(relation);
+				}
+				List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
+				centers = new ArrayList<>();
+				for (Multipolygon m : multipolygons) {
+					assert m.getOuterRings().size() == 1;
+					if (!m.areRingsComplete()) {
+						log.warn("In multipolygon (POI) " + relation.getId() + " there are incompleted ways");
+					}
+					Ring out = m.getOuterRings().get(0);
+					if (out.getBorder().size() == 0) {
+						log.warn("Multipolygon (POI) has an outer ring that can't be formed: " + relation.getId());
+						// don't index this
+						continue;
+					}
+		            List<List<Node>> innerWays = new ArrayList<>();
+		            for (Ring r : m.getInnerRings()) {
+		                innerWays.add(r.getBorder());
+		            }
+		            LatLon l = OsmMapUtils.getComplexPolyCenter(out.getBorder(), innerWays);
+		            centers.add(l);
+				}
+			} else if (OsmMapUtils.isSuperRoute(tags)) {
+				for (RelationMember members : relation.getMembers()) {
+					if (members.getEntityId().getType() == EntityType.RELATION) {
+						if (memberIds.length() > 0) {
+							memberIds.append(" ");
+						}
+						memberIds.append("O" + members.getEntityId().getId()); // OSM route_id start from symbol "O"
+						if (centers.get(0) == null) {
+							Relation memberRel = (Relation) members.getEntity();
+							ctx.loadEntityRelation(memberRel);
+							centers = Collections.singletonList(OsmMapUtils.getCenter(memberRel, true));
+						}
+					}
+				}
+			}
+		}
+		return centers;
 	}
 
 	public void iterateRelation(Relation e, OsmDbAccessorContext ctx) throws SQLException {
@@ -386,6 +384,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private static final char SPECIAL_CHAR = ((char) -1);
+
+	
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
 
@@ -543,8 +543,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public static class PoiCreatorCategories {
-		Map<String, Set<String>> categories = new HashMap<String, Set<String>>();
-		Set<PoiAdditionalType> additionalAttributes = new HashSet<PoiAdditionalType>();
+		Map<String, Set<String>> categories = new LinkedHashMap<String, Set<String>>();
+		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
 
 		// build indexes to write
@@ -644,7 +644,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryPoiIndex(BinaryMapIndexWriter writer, String regionName, IProgress progress) throws SQLException, IOException {
+	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName, 
+			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
 		}
@@ -661,7 +662,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTopIndexMap();
 		collectTagGroups();
 		// 0. process all entities
-		processPOIIntoTree(namesIndex, zoomToStart, bbox, rootZoomsTree);
+		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
@@ -724,7 +725,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
-					if (poi.id > PROPAGATED_NODE_BIT) {
+					if (poi.id > ObfConstants.PROPAGATE_NODE_BIT) {
 						continue;
 					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
@@ -751,7 +752,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (Algorithms.isEmpty(tagGroupIds)) {
 						tagGroupIds = parseTaggroups(rset.getString(6));
 					}
-					if (id > PROPAGATED_NODE_BIT) {
+					if (id > ObfConstants.PROPAGATE_NODE_BIT) {
 						continue;
 					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
@@ -793,7 +794,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		} else {
 			log.info("Not using global list of poi indexes");
 		}
-		topIndexAdditional = new HashMap<>();
+		topIndexAdditional = new LinkedHashMap<>();
 		ResultSet rs;
 		boolean isBrand = false;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
@@ -817,7 +818,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
 			}
 
-			Map<String, Map<String, Integer>> normalizedGroups = new HashMap<>();
             rs = poiConnection.createStatement().executeQuery("select count(*) as cnt, \"" + column + "\", *" +
                     " from poi where \"" + column + "\" is not NULL group by \"" + column+ "\" having cnt > " + minCount +
                     " order by cnt desc");
@@ -873,29 +873,41 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
-	private PoiAdditionalType retrieveAdditionalType(String key) {
-		for (PoiAdditionalType t : additionalTypesId) {
-			if (Algorithms.objectEquals(t.getTag(), key)) {
-				return t;
-			}
-		}
-		return null;
-	}
 
-	private void processPOIIntoTree(Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
-			Tree<PoiTileBox> rootZoomsTree) throws SQLException {
+	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
+			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
+		long geocodingTime = 0, geocodingCnt = 0, geocodingSuccess = 0, geoCitySuccess = 0, geoCityCnt = 0, geoCityTime = 0;
+		RoutingContext geocodingCtx = null;
+		GeocodingUtilities geocodingUtilities = new GeocodingUtilities();
+		BinaryMapIndexReader geoReader = null;
+		if (poiGeocoding != null && settings.poiGeocodingEnable) {
+			geoReader = new BinaryMapIndexReader(new RandomAccessFile(poiGeocoding, "r"),
+					poiGeocoding, false);
+			geoReader.init(false);
+			if (geoReader.containsAddressData() && geoReader.containsRouteData()) {
+				geocodingCtx = GeocodingUtilities.buildDefaultContextForPOI(geoReader);
+			}
+		}
+		if (geocodingCtx == null) {
+			log.info("Geocoding for POI is disabled");
+		} else {
+			log.info("Geocoding for POI is enabled");
+		}
 
 		int count = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
-		PoiAdditionalType nameRuleType = retrieveAdditionalType("name");
-		PoiAdditionalType nameEnRuleType = retrieveAdditionalType("name:en");
+		PoiAdditionalType nameRuleType = getOrCreate(Amenity.NAME, null, true);
+		PoiAdditionalType nameEnRuleType = getOrCreate("name:en", null, true);
+		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
+		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
+			LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
 			bbox.minX = Math.min(x, bbox.minX);
 			bbox.maxX = Math.max(x, bbox.maxX);
 			bbox.minY = Math.min(y, bbox.minY);
@@ -908,25 +920,54 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String type = rs.getString(3);
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
+			if (geocodingCtx != null && 
+					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
+					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {
+				long tm = System.currentTimeMillis();
+				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
+						latLon.getLatitude(), latLon.getLongitude(), false);
+				if (settings.poiGeocodingPrecise) {
+					res = geocodingUtilities.sortGeocodingResults(Collections.singletonList(geoReader), res);
+				}
+				geocodingCnt++;
+				if (res.size() > 0 && res.get(0).getDistance() < GEOCODING_DISTANCE) {
+					GeocodingResult geoRes = res.get(0);
+					if (geoRes.streetName != null) {
+						additionalTags.put(streetRuleType, geoRes.streetName);
+						if (geoRes.getBuildingString() != null) {
+							additionalTags.put(hnoRuleType, geoRes.getBuildingString());
+						}
+						geocodingSuccess++;
+					}
+				}
+				geocodingTime += (System.currentTimeMillis() - tm);
+			}
 
 			List<Integer> tagGroupIds = parseTaggroups(rs.getString(7));
 			List<PoiCreatorTagGroup> tagGroups = new ArrayList<>();
 			if (cityQuadTree != null) {
+				geoCityCnt++;
+				long tm = System.currentTimeMillis();
 				List<Multipolygon> result = new ArrayList<>();
 				cityQuadTree.queryInBox(new QuadRect(x, y, x, y), result);
+				boolean ok = false;
 				if (result.size() > 0) {
-					LatLon latLon = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
 					for (Multipolygon multipolygon : result) {
 						if (multipolygon.containsPoint(latLon)) {
 							if (!cityTagsGroup.containsKey(multipolygon)) {
 								log.error("Multipolygon for POI is not found!!! " + type + " " + subtype + " " + latLon.toString());
 							} else {
+								ok = true;
 								List<PoiCreatorTagGroup> list = cityTagsGroup.get(multipolygon);
 								tagGroups.addAll(list);
 							}
 						}
 					}
 				}
+				if (ok) {
+					geoCitySuccess++;
+				}
+				geoCityTime += (System.currentTimeMillis() - tm);
 			} else if (tagGroupsFromDB != null && tagGroupIds.size() > 0) {
 				for (int id : tagGroupIds) {
 					if (tagGroupsFromDB.containsKey(id)) {
@@ -1019,6 +1060,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
+		
+		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
+				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
 	}
 

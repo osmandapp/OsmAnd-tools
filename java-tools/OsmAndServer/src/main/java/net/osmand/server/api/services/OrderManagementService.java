@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import net.osmand.purchases.PurchaseHelper;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
@@ -200,9 +201,55 @@ public class OrderManagementService {
 		info.nickname = user.nickname;
 		info.tokenTime = user.tokenTime;
 		info.regTime = user.regTime;
-		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, null);
+		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, (String[]) null);
 		info.filesCount = res.totalFiles;
 		return info;
+	}
+
+	public List<String> getSkus(boolean isSub, boolean isInApp, String platform, PurchasesDataLoader purchasesDataLoader) {
+		if ("all".equalsIgnoreCase(platform)) {
+			// return all skus from DB
+			return getSkus(isSub, isInApp);
+		}
+
+		String wanted = platform.trim().toLowerCase();
+		if (wanted.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		if (isSub && !isInApp) {
+			Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+			return subMap.keySet().stream()
+					.map(OrderManagementService::safeSku)
+					.filter(Objects::nonNull)
+					.filter(sku -> normalizePlatform(PurchaseHelper.getPlatformBySku(sku)).equals(wanted))
+					.distinct()
+					.sorted()
+					.toList();
+		} else if (!isSub && isInApp) {
+			Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+			return inappMap.keySet().stream()
+					.map(OrderManagementService::safeSku)
+					.filter(Objects::nonNull)
+					.filter(sku -> normalizePlatform(PurchaseHelper.getPlatformBySku(sku)).equals(wanted))
+					.distinct()
+					.sorted()
+					.toList();
+		}
+		return Collections.emptyList();
+	}
+
+	private static String safeSku(String sku) {
+		return (sku == null || sku.isBlank()) ? null : sku.trim();
+	}
+
+	private static String normalizePlatform(String raw) {
+		if (raw == null) return "";
+		String p = raw.trim().toLowerCase();
+		if ("fastspring".equals(p)) return "web";
+		if ("google".equals(p)) return "android";
+		if ("apple".equals(p)) return "ios";
+		return p;
 	}
 
 	public List<String> getSkus(boolean isSub, boolean isInApp) {

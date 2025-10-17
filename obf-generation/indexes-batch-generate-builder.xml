@@ -10,7 +10,7 @@
 		directory_for_srtm_files="/home/relief-data/srtm/">
 		
 		
-		<external dockerSlots="56">
+		<external dockerSlots="52">
 			<job queue="gen-docker-small" slotsPerJob="2" name="{1}-{0}" sizeUpToMB="100" type="docker"
 					freeRamToStartPerc="15" freeRamToStopPerc="5" order="2">
 				<parameter k="image" v="osmandapp/osmand-mapcreator" />
@@ -21,6 +21,7 @@
 				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
 				<parameter k="env_4" v="POI_TOP_INDEXES_URL=https://builder.osmand.net/basemap/brands/brands.lst"/>
+				<parameter k="env_5" v="WIKIRANKING_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wiki_ranking.sqlitedb"/>
 				<filter exclude="world_seamarks" />
 			</job>
 			<job queue="gen-docker-large" slotsPerJob="3" name="{1}-{0}" sizeUpToMB="1500" type="docker" 
@@ -33,6 +34,7 @@
 				<parameter k="env_2" v="OVERPASS_URL=http://builder.osmand.net:8083/"/>
 				<parameter k="env_3" v="WIKIDATA_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wikidata_mapping.sqlitedb"/>
 				<parameter k="env_4" v="POI_TOP_INDEXES_URL=https://builder.osmand.net/basemap/brands/brands.lst"/>
+				<parameter k="env_5" v="WIKIRANKING_MAPPING_URL=https://builder.osmand.net/basemap/web-maps/wiki_ranking.sqlitedb"/>
 				<filter exclude="world_seamarks" />
 			</job>
 		</external>

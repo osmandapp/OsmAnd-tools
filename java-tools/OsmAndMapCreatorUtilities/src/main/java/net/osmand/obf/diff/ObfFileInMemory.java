@@ -190,7 +190,7 @@ public class ObfFileInMemory {
 					indexPoiCreator.insertAmenityIntoPoi(a);
 				}
 			}
-			indexPoiCreator.writeBinaryPoiIndex(writer, name, null);
+			indexPoiCreator.writeBinaryPoiIndex(null, writer, name, null);
 			indexPoiCreator.commitAndClosePoiFile(System.currentTimeMillis());
 			indexPoiCreator.removePoiFile();
 		}
@@ -612,7 +612,7 @@ public class ObfFileInMemory {
 				}
 			});
 		indexReader.initCategories(pr);
-		indexReader.searchPoi(pr, req);
+		indexReader.searchPoi(req, pr);
 		return local;
 	}
 
