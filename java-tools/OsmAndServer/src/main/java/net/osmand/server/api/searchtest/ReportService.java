@@ -71,7 +71,7 @@ public interface ReportService {
 			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
-			"oid", "res_count", "search_bbox"};
+			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -123,6 +123,7 @@ public interface ReportService {
 		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
 		exclude.add("web_type");
 		exclude.addAll(java.util.Arrays.asList(allCols));
+		List<String> outProps = Arrays.asList(OUT_PROPS);
 
 		return results.stream().map(srcRow -> {
 			String inRowJson = (String) srcRow.get("in_row");
@@ -131,12 +132,12 @@ public interface ReportService {
 			srcRow.remove("out_row");
 
 			Map<String, Object> row = new LinkedHashMap<>();
+			row.put("gen_id", srcRow.get("gen_id"));
 			if (inRowJson == null) return row;
 			for (String p : IN_PROPS)
 				if (srcRow.containsKey(p))
 					row.put(p, srcRow.get(p));
 
-			row.remove("gen_id");
 			try {
 				Map<String, Object> out = new LinkedHashMap<>();
 				if (outRowJson != null) {
@@ -152,8 +153,7 @@ public interface ReportService {
 						if (exclude.contains(fn))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (fn.startsWith("res_id") || fn.startsWith("res_place") || fn.startsWith("actual_place")
-								|| fn.startsWith("res_name")|| fn.startsWith("actual_id")) {
+						if (outProps.contains(fn)) {
 							row.put(fn, v.asText());
 						} else {
 							out.put(fn, v.asText());
