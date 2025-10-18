@@ -1340,9 +1340,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			retName = localeName.substring(0, i);
 			int j = localeName.indexOf(')', i);
 			if (j > -1) {
-				// avoid removing common words and selecting village "PA" 61 (VILLAGE)
-				// retName = retName.trim() + ' ' + localeName.substring(j);
-				retName = localeName.substring(j);
+				// remove
+				retName = retName.trim() + ' ' + localeName.substring(j + 1).trim();
 			}
 		}
 		return retName;
