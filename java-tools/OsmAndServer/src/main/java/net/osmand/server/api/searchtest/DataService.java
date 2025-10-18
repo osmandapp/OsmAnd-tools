@@ -13,6 +13,8 @@ import net.osmand.server.api.services.SearchService;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.csv.CSVParser;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -42,9 +44,11 @@ public interface DataService extends BaseService {
 
 		Path fullPath = null;
 		dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
+		int rowCount = -1;
 		try {
 			if (dataset.type == Dataset.Source.Overpass) {
-				fullPath = queryOverpass(dataset.source);
+				fullPath = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
+				rowCount = queryOverpass(fullPath, dataset.source);
 			} else {
 				fullPath = Path.of(getCsvDownloadingDir(), dataset.source);
 			}
@@ -55,7 +59,7 @@ public interface DataService extends BaseService {
 
 			String header = getHeader(fullPath);
 			if (header == null || header.trim().isEmpty()) {
-				dataset.setError("File doesn't have header.");
+				dataset.setError(rowCount == 0 ? "Source rows count is 0." : "File doesn't have header.");
 				return dataset;
 			}
 
@@ -87,9 +91,31 @@ public interface DataService extends BaseService {
 				dataset = getDatasetRepo().save(dataset);
 				getJdbcTemplate().update("DELETE FROM dataset_result WHERE dataset_id = ?", dataset.id);
 
+				char delim = delimiter.charAt(0);
+				CSVFormat format = CSVFormat.DEFAULT.builder()
+						.setDelimiter(delim)
+						.setQuote('"')
+						.setIgnoreSurroundingSpaces(false)
+						.setTrim(false)
+						.build();
+
 				List<Object[]> batchArgs = new ArrayList<>();
 				for (int i = 1; i < sample.size(); i++) {
-					String[] record = sample.get(i).split(delimiter);
+					String line = sample.get(i);
+					// Parse the CSV line using Apache Commons CSV to handle quoted fields with delimiters
+					String[] record;
+					try (CSVParser parser = CSVParser.parse(line, format)) {
+						List<org.apache.commons.csv.CSVRecord> recs = parser.getRecords();
+						if (recs.isEmpty()) {
+							record = new String[0];
+						} else {
+							org.apache.commons.csv.CSVRecord r = recs.get(0);
+							record = new String[r.size()];
+							for (int c = 0; c < r.size(); c++) {
+								record[c] = r.get(c);
+							}
+						}
+					}
 					String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
 					for (int j = 0; j < values.length && j < record.length; j++) {
 						values[j] = crop(unquote(record[j]), 255);
@@ -373,6 +399,8 @@ public interface DataService extends BaseService {
 			}
 
 			return sample;
+		} catch (EmptyResultDataAccessException e) {
+			return Collections.emptyMap();
 		} catch (Exception e) {
 			getLogger().error("Failed to retrieve sample row for dataset {} at position {}", datasetId, position, e);
 			throw new RuntimeException("Failed to retrieve dataset sample row: " + e.getMessage(), e);

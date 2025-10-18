@@ -280,18 +280,8 @@ public class SearchService {
     }
 
     public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
-        Feature wikiFeature = null;
-        Feature poiFeature = null;
-
-        if (type.equals(WIKI_POI_TYPE)) {
-            wikiFeature = getPoi(type, name, loc, null);
-        } else {
-            poiFeature = getPoi(type, name, loc, null);
-        }
-
-        if (wikiFeature == null && wikidataId != null) {
-            wikiFeature = getWikiPoiById(wikidataId, lang);
-        }
+        Feature poiFeature = getPoi(type, name, loc, null);
+        Feature wikiFeature = getWikiPoiById(wikidataId, lang);
 
         return mergeFeatures(wikiFeature, poiFeature);
     }
@@ -540,7 +530,7 @@ public class SearchService {
                 new ResultMatcher<>() {
                     @Override
                     public boolean publish(Amenity amenity) {
-                        return ObfConstants.getOsmObjectId(amenity) == osmid && !amenity.getType().getKeyName().equals(WIKI_POI_TYPE);
+                        return ObfConstants.getOsmObjectId(amenity) == osmid;
                     }
                     
                     @Override
@@ -606,9 +596,23 @@ public class SearchService {
                             map.initCategories(p);
                             List<Amenity> poiRes = map.searchPoi(req, p);
                             if (!poiRes.isEmpty()) {
-                                res = new SearchResult();
-                                res.object = poiRes.get(0);
-                                break;
+                                SearchResult wikiRes = null;
+                                SearchResult nonWikiRes = null;
+
+                                for (Amenity poi : poiRes) {
+                                    if (WIKI_POI_TYPE.equals(poi.getType().getKeyName())) {
+                                        if (wikiRes == null) {
+                                            wikiRes = new SearchResult();
+                                            wikiRes.object = poi;
+                                        }
+                                    } else {
+                                        nonWikiRes = new SearchResult();
+                                        nonWikiRes.object = poi;
+                                        break;
+                                    }
+                                }
+
+                                res = nonWikiRes != null ? nonWikiRes : wikiRes;
                             }
                         }
                     }

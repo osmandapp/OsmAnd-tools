@@ -2,11 +2,13 @@ package net.osmand.server.controllers.pub;
 
 
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -253,10 +255,10 @@ public class GpxController {
 	}
 
 	@PostMapping(path = "/save-track-data", produces = MediaType.APPLICATION_XML_VALUE)
-	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String gz,
+	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String data,
 	                                                           HttpSession httpSession) throws IOException {
-		String json = decompressGzipBase64(gz);
-		WebGpxParser.TrackData trackData = new Gson().fromJson(json, WebGpxParser.TrackData.class);
+
+		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
@@ -293,37 +295,19 @@ public class GpxController {
 	}
 
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
-	public ResponseEntity<String> getSrtmData(@RequestBody String gz) throws IOException {
-		String json = decompressGzipBase64(gz);
-
-		WebGpxParser.TrackData trackData = gson.fromJson(json, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getSrtmData(@RequestBody String data) throws IOException {
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
 	}
 	
 	@RequestMapping(path = {"/get-analysis"}, produces = "application/json")
-	public ResponseEntity<String> getAnalysis(@RequestBody String gz) throws IOException {
-		String json = decompressGzipBase64(gz);
-
-		WebGpxParser.TrackData trackData = gson.fromJson(json, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getAnalysis(@RequestBody String data) throws IOException {
+		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
-	}
-
-	private static String decompressGzipBase64(String gz) throws IOException {
-		byte[] compressed = Base64.getDecoder().decode(gz);
-		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
-		     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-
-			byte[] buffer = new byte[4096];
-			int len;
-			while ((len = gis.read(buffer)) != -1) {
-				baos.write(buffer, 0, len);
-			}
-			return baos.toString(StandardCharsets.UTF_8);
-		}
 	}
 
     private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
