@@ -1299,13 +1299,19 @@ public class OsmAndMapsService {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
 		List<File> filesToUse = getMaps(quadRect, bbox);
+		StringBuilder names = new StringBuilder();
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
 				files.add(ref);
+				if (f.getName().length() > 10) {
+					names.append(f.getName().substring(0, 10)).append("..,");
+				} else {
+					names.append(f.getName()).append(",");
+				}
 			}
 		}
-		LOGGER.info(String.format("Preparing %d files for %s", files.size(), reason));
+		LOGGER.info(String.format("Preparing %d files for %s: %s ", files.size(), reason, names));
 		return files;
 	}
 
