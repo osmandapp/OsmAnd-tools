@@ -8,7 +8,6 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.data.*;
 import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
-import net.osmand.map.WorldRegion;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
@@ -60,8 +59,6 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
-
-	private OsmandRegions regions = null;
 
     public static class PoiSearchResult {
         
@@ -122,7 +119,7 @@ public class SearchService {
 
 	public SearchService() {
 		try {
-			regions = PlatformUtil.getOsmandRegions();
+			osmandRegions = PlatformUtil.getOsmandRegions();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -148,19 +145,6 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-	private boolean isSeparated(BinaryMapIndexReader file) {
-		if (file == null)
-			return true;
-
-		BinaryMapIndexReader.MapIndex mapIndex = file.getMapIndexes().get(0);
-		if (mapIndex == null)
-			return true;
-
-		WorldRegion region = regions.getRegionDataByDownloadName(mapIndex.getName());
-		return region != null && (region.isRegionMapDownload() && !region.isRegionJoinMapDownload() ||
-				region.isRegionRoadsDownload() && !region.isRegionJoinRoadsDownload());
-	}
-
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
 
     public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
@@ -180,9 +164,6 @@ public class SearchService {
                 return new SearchResultWrapper(Collections.emptyList(), null);
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
-	        if (filterCombinedMap) {
-		        usedMapList = usedMapList.stream().filter(this::isSeparated).toList();
-	        }
             if (usedMapList.isEmpty()) {
                 return new SearchResultWrapper(Collections.emptyList(), null);
             }
@@ -637,7 +618,7 @@ public class SearchService {
             return List.of(basemap);
         } else {
             if (searchBbox != null) {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, 0, "search");
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, "search");
                 list.add(basemap);
                 return list;
             }
@@ -650,7 +631,7 @@ public class SearchService {
         if (baseSearch) {
             return List.of(basemap);
         } else {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, 0, "search");
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, "search");
             list.add(basemap);
             return list;
         }

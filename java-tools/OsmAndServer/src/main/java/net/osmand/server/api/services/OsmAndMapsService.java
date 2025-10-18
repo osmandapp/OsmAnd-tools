@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.util.MapUtils.rhumbDestinationPoint;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -25,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -636,7 +634,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "geocoding");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -684,7 +682,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, 0, "approximate");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, "approximate");
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -991,7 +989,7 @@ public class OsmAndMapsService {
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, 0, "routing");
+				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "routing");
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1297,10 +1295,10 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 
-	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps, String reason) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
-		List<File> filesToUse = getMaps(quadRect, bbox, maxNumberMaps);
+		List<File> filesToUse = getMaps(quadRect, bbox);
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
@@ -1311,7 +1309,7 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, int maxNumberMaps) throws IOException {
+	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox) throws IOException {
 		List<File> files = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
 			boolean intersects;
@@ -1327,7 +1325,7 @@ public class OsmAndMapsService {
 				}
 			}
 		}
-		return prepareMaps(files, bbox, maxNumberMaps);
+		return filterMap(files);
 	}
 
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
@@ -1341,33 +1339,18 @@ public class OsmAndMapsService {
 		throw new IOException("Base map not found! Add it in OBF dir.");
 	}
 
-	private List<File> prepareMaps(List<File> files, List<LatLon> bbox, int maxNumberMaps) throws IOException {
-		List<File> filesToUse = filterMap(files);
-		List<File> res;
-
-		if (!filesToUse.isEmpty() && maxNumberMaps != 0 && filesToUse.size() >= 4 && bbox != null) {
-			res = filterMapsByName(filesToUse, bbox);
-		} else {
-			res = filesToUse;
-		}
-		return res;
-	}
-
 	private List<File> filterMap(List<File> files) throws IOException {
 		List<File> res = new ArrayList<>();
 		if (osmandRegions == null) {
 			osmandRegions = new OsmandRegions();
 			osmandRegions.prepareFile();
 		}
-		TreeSet<String> allDwNames = new TreeSet<>();
-		for (File file : files) {
-			allDwNames.add(getDownloadNameByFileName(file.getName()));
-		}
+		
 		for (File file : files) {
 			String dwName = getDownloadNameByFileName(file.getName());
 			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
-			if (wr != null && wr.getSuperregion() != null && wr.getSuperregion().getRegionDownloadName() != null
-					&& allDwNames.contains(wr.getSuperregion().getRegionDownloadName())) {
+			if (wr != null && (wr.isRegionJoinMapDownload() || wr.isRegionJoinMapDownload())) {
+				// skip joint maps
 			} else {
 				res.add(file);
 			}
@@ -1383,59 +1366,6 @@ public class OsmAndMapsService {
 		return dwName;
 	}
 
-	public List<File> filterMapsByName(List<File> filesToUse, List<LatLon> bbox) throws IOException {
-		List<File> res = new ArrayList<>();
-		HashSet<String> regions = getRegionsNameByBbox(bbox);
-		for (File f : filesToUse) {
-			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
-			String name = ref.file.getName().toLowerCase().replace("_2.obf", "");
-			if (regions.contains(name)) {
-				res.add(f);
-			}
-		}
-		return res;
-	}
-
-	private HashSet<String> getRegionsNameByBbox(List<LatLon> bbox) throws IOException {
-		HashSet<String> regions = new HashSet<>();
-		if (osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
-		}
-		for (LatLon point : getPointsByBbox(bbox)) {
-			List<String> res = new ArrayList<>();
-			res = osmandRegions.getRegionsToDownload(point.getLatitude(), point.getLongitude(), res);
-			regions.addAll(res);
-		}
-		LOGGER.debug("Regions by bbox size " + regions.size());
-		return regions;
-	}
-
-	private List<LatLon> getPointsByBbox(List<LatLon> bbox) {
-		final int POINT_STEP_M = 20000;
-
-		List<LatLon> points = new ArrayList<>(bbox);
-		LatLon p1 = bbox.get(0);
-		LatLon p2 = bbox.get(1);
-
-		LatLon start = p1;
-		LatLon pointStep = start;
-		while (pointStep != null) {
-			LatLon res = rhumbDestinationPoint(pointStep, POINT_STEP_M, 180);
-			if (res.getLatitude() > p2.getLatitude()) {
-				points.add(res);
-				pointStep = res;
-			} else {
-				start = rhumbDestinationPoint(start, POINT_STEP_M, 90);
-				if (start.getLongitude() < p2.getLongitude()) {
-					pointStep = start;
-				} else {
-					pointStep = null;
-				}
-			}
-		}
-		return points;
-	}
 
 	public synchronized void initObfReaders() throws IOException {
 		if (cacheFiles != null) {
