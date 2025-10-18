@@ -14,6 +14,9 @@ import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.MapUtils;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
@@ -34,6 +37,8 @@ import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 @Service
 public class SearchService {
     
+	private static final Log LOGGER = LogFactory.getLog(SearchService.class);
+
     @Autowired
     OsmAndMapsService osmAndMapsService;
 
@@ -135,8 +140,14 @@ public class SearchService {
     }
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
-		List<SearchResult> res = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false).results();
-
+		long tm = System.currentTimeMillis();
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false);
+		List<SearchResult> res = searchResults.results();
+		if (System.currentTimeMillis() - tm > 1000) {
+			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
+					searchResults.results() == null ? 0 : searchResults.results().size(),
+					(System.currentTimeMillis() - tm) / 1000.0, searchResults.stat));
+		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
 			saveSearchResult(res, features);

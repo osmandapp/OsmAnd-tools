@@ -1304,8 +1304,8 @@ public class OsmAndMapsService {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
 				files.add(ref);
-				if (f.getName().length() > 10) {
-					names.append(f.getName().substring(0, 10)).append("..,");
+				if (f.getName().length() > 20) {
+					names.append(f.getName().substring(0, 20)).append("..,");
 				} else {
 					names.append(f.getName()).append(",");
 				}
