@@ -1333,14 +1333,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		o.setFileOffset((int) fileOffset);
 	}
 
-	private static String stripBraces(String localeName) {
+	private static String removeBraces(String localeName) {
 		int i = localeName.indexOf('(');
 		String retName = localeName;
 		if (i > -1) {
 			retName = localeName.substring(0, i);
 			int j = localeName.indexOf(')', i);
 			if (j > -1) {
-				retName = retName.trim() + ' ' + localeName.substring(j);
+				// avoid removing common words and selecting village "PA" 61 (VILLAGE)
+				// retName = retName.trim() + ' ' + localeName.substring(j);
+				retName = localeName.substring(j);
 			}
 		}
 		return retName;
@@ -1349,7 +1351,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
                                               IndexCreatorSettings settings) {
         name = Algorithms.normalizeSearchText(name);
-        name = stripBraces(name);
+        name = removeBraces(name);
 		Set<String> splitNames = splitNames(name);
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
@@ -1358,25 +1360,25 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
             }
         }
         List<String> namesToAdd = new ArrayList<>(splitNames);
-		// remove common words
+		// remove all common words (most common delete first) but leave at least 1
 		int pos = 0;
-		while(namesToAdd.size() > 1 && pos != -1) {
+		while (namesToAdd.size() > 1 && pos != -1) {
 			int prioP = Integer.MAX_VALUE;
 			pos = -1;
-			for(int k = 0; k < namesToAdd.size(); k++) {
+			for (int k = 0; k < namesToAdd.size(); k++) {
 				int prio = CommonWords.getCommon(namesToAdd.get(k));
-				if(prio != -1 && prio < prioP) {
+				if (prio != -1 && prio < prioP) {
 					pos = k;
 					prioP = prio;
 				}
 			}
-			if(pos != -1) {
+			if (pos != -1) {
 				namesToAdd.remove(pos);
 			}
 		}
 
 		// add to the map
-		for(String substr : namesToAdd) {
+		for (String substr : namesToAdd) {
 			if (substr.length() > settings.charsToBuildAddressNameIndex) {
 				substr = substr.substring(0, settings.charsToBuildAddressNameIndex);
 			}
