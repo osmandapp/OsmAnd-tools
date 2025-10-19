@@ -275,7 +275,7 @@ public interface DataService extends BaseService {
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 		Map<String, Object> row = new LinkedHashMap<>();
 		Result firstResult = finder.findFirstResult(searchResults, targetPoint, genRow);
-		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId);
+		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, genRow);
 
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;

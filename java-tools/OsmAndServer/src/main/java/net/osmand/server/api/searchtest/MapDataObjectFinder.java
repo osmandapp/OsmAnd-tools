@@ -212,7 +212,7 @@ public class MapDataObjectFinder {
 
 	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
-	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId) throws IOException {
+	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> genRow) throws IOException {
 		Result actualResult = null;
 		int resPlace;
 		BinaryMapIndexReader file = null;
@@ -238,6 +238,7 @@ public class MapDataObjectFinder {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcObj = o;
 				srcObjHno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
+				genRow.put("src_map_found", srcObjHno);
 				break;
 			}
 		}
@@ -245,6 +246,7 @@ public class MapDataObjectFinder {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcAmenity = o;
 				srcAmenityHno = srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
+				genRow.put("src_poi_found", srcAmenityHno);
 				break;
 			}
 		}
