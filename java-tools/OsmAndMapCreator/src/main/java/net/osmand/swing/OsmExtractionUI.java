@@ -318,9 +318,11 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    				text = text.substring(0, ps) + e.getKeyChar() + text.substring(ps);
 	    			}
 	    		}
-	    		SearchSettings settings = searchUICore.getPhrase().getSettings();
+	    		SearchSettings settings = searchUICore.getSearchSettings();
 	    		SearchStat stat = new SearchStat();
-	    		searchUICore.getPhrase().getSettings().setStat(stat);
+	    		settings.setStat(stat);
+	    		searchUICore.updateSettings(settings);
+	    		
 	    		if(settings.getRadiusLevel() != 1){
 	    			searchUICore.updateSettings(settings.setRadiusLevel(1));
 	    		}

@@ -336,6 +336,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityDataStorage.setCityBoundary(cityFound, boundary);
 				logBoundaryChanged(boundary, cityFound, n, old);
 			}
+			cityDataStorage.addNotAssignedBoundary(oldBoundary);
 		}
 		QuadRect bbox = boundary.getMultipolygon().getLatLonBbox();
 		cityFound.setBbox31(new int[] {
