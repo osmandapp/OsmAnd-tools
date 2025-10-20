@@ -207,7 +207,7 @@ public class UserdataService {
             }
 		}
 
-        UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false);
+        UserdataController.UserFilesResults res = generateFiles(user.id, null, false, false, Collections.emptySet());
         if (res.totalZipSize > MAXIMUM_ACCOUNT_SIZE) {
             throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
                     "Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
@@ -222,17 +222,17 @@ public class UserdataService {
 			}
 		}
         if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
-            UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES.toArray(new String[0]));
+            UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES);
             if (files.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
                 throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
         }
     }
 
-	public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, String... types) {
+	public UserdataController.UserFilesResults generateFiles(int userId, String name, boolean allVersions, boolean details, Set<String> types) {
 		List<CloudUserFilesRepository.UserFileNoData> allFiles = new ArrayList<>();
 		List<UserFileNoData> fl;
-		if (types != null) {
+		if (types != null && !types.isEmpty()) {
 			for (String t : types) {
 				fl = details ? filesRepository.listFilesByUseridWithDetails(userId, name, t) :
 						filesRepository.listFilesByUserid(userId, name, t);

@@ -114,7 +114,7 @@ public class UserdataController {
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
-		UserFilesResults res = userdataService.generateFiles(userId, null, false, false);
+		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, Collections.emptySet());
 		Iterator<UserFileNoData> it = res.uniqueFiles.iterator();
 		StringBuilder sb = new StringBuilder();
 		while (it.hasNext()) {
@@ -438,7 +438,8 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, type);
+		Set<String> types = type != null ? Set.of(type) : Collections.emptySet();
+		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

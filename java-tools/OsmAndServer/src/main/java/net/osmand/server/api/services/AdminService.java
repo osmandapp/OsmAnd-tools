@@ -142,7 +142,7 @@ public class AdminService {
 	}
 
 	private String createPayloadInfo(CloudUsersRepository.CloudUser pu) {
-		UserdataController.UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false);
+		UserdataController.UserFilesResults ufs = userdataService.generateFiles(pu.id, null, true, false, Collections.emptySet());
 		ufs.allFiles.clear();
 		ufs.uniqueFiles.clear();
 		return pu.email + " token:" + (Algorithms.isEmpty(pu.token) ? "none" : "sent") + " at "
