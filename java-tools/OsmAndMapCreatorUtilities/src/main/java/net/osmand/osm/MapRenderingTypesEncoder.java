@@ -1132,18 +1132,22 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 	private Map<String, String> addEleFeetTags(Map<String, String> tags) {
-		if (tags.containsKey("ele") && ! tags.containsKey("ele_feet")) {
-			tags = new LinkedHashMap<String, String>(tags);
-			String meters = tags.get("ele");
-			double m;
-			try {
-				m = Double.parseDouble(meters);
-			} catch (NumberFormatException e) {
-				return tags;
-			}
-			int feet = (int) (Math.round(m * 3.2808399));
-			tags.put("ele_feet", String.valueOf(feet));
+		final double FEET = 3.2808399;
+		double eleMeters = Algorithms.parseDoubleSilently(tags.get("ele"), Double.NaN);
+		double eleFeet = Algorithms.parseDoubleSilently(tags.get("ele_feet"), Double.NaN);
+
+		if (!Double.isNaN(eleMeters) && Double.isNaN(eleFeet)) {
+			eleFeet = eleMeters * FEET;
+		} else if (!Double.isNaN(eleFeet) && Double.isNaN(eleMeters)) {
+			eleMeters = eleFeet / FEET;
+		} else {
+			return tags;
 		}
+
+		tags = new LinkedHashMap<>(tags);
+		tags.put("ele", String.valueOf(Math.round(eleMeters)));
+		tags.put("ele_feet", String.valueOf(Math.round(eleFeet)));
+
 		return tags;
 	}
 
