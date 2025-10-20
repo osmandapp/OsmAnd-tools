@@ -56,6 +56,7 @@ public interface ReportService {
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
+			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, 
@@ -279,6 +280,7 @@ public interface ReportService {
 		distanceHistogram.put("Generated", 0);
 		distanceHistogram.put("Not Processed", 0);
 		distanceHistogram.put("Found", 0);
+		distanceHistogram.put("Partial", 0);
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				getJdbcTemplate().queryForList("SELECT \"group\", count(*) as cnt FROM (" + FULL_REPORT_SQL + ") GROUP BY " +
