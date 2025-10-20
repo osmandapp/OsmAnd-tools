@@ -332,8 +332,8 @@ public interface DataService extends BaseService {
 		}
 
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found) " +
-				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 		String rowJson = getObjectMapper().writeValueAsString(row);
 		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
@@ -342,7 +342,9 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
-				new java.sql.Timestamp(System.currentTimeMillis()), found);
+				new java.sql.Timestamp(System.currentTimeMillis()), found,
+				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
+				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null);
 	}
 
 	/**
