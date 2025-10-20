@@ -99,8 +99,8 @@ public class WebUserdataService {
 					continue;
 				}
 			}
-
-			UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, file.type);
+			Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
+			UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
 			if (res.uniqueFiles.isEmpty()) {
 				LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
 				continue;
