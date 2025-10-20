@@ -1,6 +1,6 @@
 package net.osmand.reviews.mangrove;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.base.Preconditions;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
@@ -88,16 +88,21 @@ public final class MangroveReviews {
             ReviewedPlace place = result.get(poi);
             place.reviews().add(mangroveReview.asOsmAndReview());
         }
-        // sort newest first
+        // sort reviews newest first
         for (ReviewedPlace place : result.values()) {
             place.reviews().sort(Comparator.comparing(net.osmand.reviews.Review::date).reversed());
         }
-        // TODO: calculate aggregate stats (average rating, number of reviews)
-        return ImmutableSet.copyOf(result.values());
+        return result.values().stream().map(MangroveReviews::calculateAggregateStats).collect(Collectors.toSet());
+    }
+
+    private static ReviewedPlace calculateAggregateStats(ReviewedPlace place) {
+        Preconditions.checkArgument(!place.reviews().isEmpty());
+        @SuppressWarnings("OptionalGetWithoutIsPresent") int averageRating = (int) Math.round(place.reviews().stream().mapToInt(net.osmand.reviews.Review::rating).average().getAsDouble());
+        return place.withAggregateRating(averageRating);
     }
 
     private static ReviewedPlace emptyReviewedPlace(OsmCoding.OsmPoi poi) {
-        return new ReviewedPlace(poi.location(), poi.elementType(), poi.osmId(), new ArrayList<>());
+        return new ReviewedPlace(poi.location(), poi.elementType(), poi.osmId(), ReviewedPlace.AGGREGATE_RATING_UNDEFINED, new ArrayList<>());
     }
 
     private static void generateOsmFile(Set<ReviewedPlace> places, File outputFile) throws IOException {
@@ -121,7 +126,7 @@ public final class MangroveReviews {
             serializer.attribute(null, "lon", String.valueOf(place.location().getLongitude()));
             addTag(serializer, Tags.REVIEWS_MARKER_TAG, Tags.REVIEWS_MARKER_VALUE);
             addTag(serializer, Tags.REVIEWS_KEY, reviewCodec.toJson(place.reviews()));
-            // TODO: summary info
+            addTag(serializer, Tags.REVIEWS_AGGREGATE_RATING_KEY, String.valueOf(place.aggregateRating()));
             serializer.endTag(null, "node");
         }
         serializer.endDocument();
@@ -145,6 +150,7 @@ public final class MangroveReviews {
         settings.indexRouting = false;
 
         IndexCreator creator = new IndexCreator(obf.getParentFile(), settings);
+        //noinspection ResultOfMethodCallIgnored
         new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
         creator.setMapFileName(obf.getName());
         creator.generateIndexes(osmGz,
