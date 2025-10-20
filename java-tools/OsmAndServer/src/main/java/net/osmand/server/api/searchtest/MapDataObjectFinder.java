@@ -228,7 +228,6 @@ public class MapDataObjectFinder {
 		for (SearchResult sr : searchResults) {
 			if (sr.file != null) {
 				files.add(sr.file);
-				break;
 			}
 		}
 		if (files.isEmpty()) {
