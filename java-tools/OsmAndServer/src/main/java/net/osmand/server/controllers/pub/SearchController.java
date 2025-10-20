@@ -93,15 +93,20 @@ public class SearchController {
         Feature poiSearchResult;
 
         if (pin == null || pin.isEmpty()) {
-            return ResponseEntity.badRequest().body("Missing or empty 'pin' parameter}");
+            return ResponseEntity.badRequest().body("Missing or empty 'pin' parameter");
         }
 
         String[] latlon = pin.split(",");
         if (latlon.length != 2) {
-            return ResponseEntity.badRequest().body("Invalid 'pin' format, expected 'lat,lon'}");
+            return ResponseEntity.badRequest().body("Invalid 'pin' format, expected 'lat,lon'");
         }
-        double lat = Double.parseDouble(latlon[0]);
-        double lng = Double.parseDouble(latlon[1]);
+        double lat, lng;
+        try {
+            lat = Double.parseDouble(latlon[0]);
+            lng = Double.parseDouble(latlon[1]);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
+        }
 
         if (wikidataId != null) {
             poiSearchResult = searchService.getWikiPoi(type, name, wikidataId, new LatLon(lat, lng), lang);
