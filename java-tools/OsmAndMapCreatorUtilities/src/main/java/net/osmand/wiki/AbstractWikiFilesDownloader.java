@@ -216,7 +216,11 @@ public abstract class AbstractWikiFilesDownloader {
 		String fileDate = line.replace("<a href=\"", "").replaceAll("/\">.+$", "");
 		LocalDate date = LocalDate.parse(fileDate, formatter);
 		FileForDBUpdate fileForUpdate = null;
-		if (date.isAfter(lastUpdateDate)) {
+
+		String beforeDate = "2025-10-08T00:30:00Z"; //todo remove [&& date.isBefore(beforeTestDate)] !!! for test only
+		Instant instant = Instant.parse(beforeDate); //
+		LocalDate beforeTestDate = instant.atZone(ZoneId.systemDefault()).toLocalDate(); //
+		if ((date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) && date.isBefore(beforeTestDate)) {
 			fileForUpdate = new FileForDBUpdate();
 			fileForUpdate.minPageId = 0;
 			fileForUpdate.maxPageId = Integer.MAX_VALUE;

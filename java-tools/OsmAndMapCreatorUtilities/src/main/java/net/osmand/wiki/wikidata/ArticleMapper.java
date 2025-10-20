@@ -18,9 +18,10 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 	public static final String[] PROP_IMAGE = {"P18", "P180"};
 	public static final String PROP_COMMON_CAT = "P373";
 	private final String PROP_COMMON_COORDS = "P625";
+	private static final String PROP_LICENSE = "P275"; //https://www.wikidata.org/wiki/Property:P275
 
 	@Override
-    public Article deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+	public Article deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
 		Article article = new Article();
 		try {
 			JsonObject obj = (JsonObject) json;
@@ -80,6 +81,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 				}
 				article.setSiteLinks(siteLinks);
 			}
+			Object statements = obj.get("statements");
+			if (statements instanceof JsonObject) {
+				JsonElement propLicense = ((JsonObject) statements).get(PROP_LICENSE);
+				JsonObject datavalue = propLicense.getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("mainsnak")
+						.getAsJsonObject("datavalue");
+				String licensePageQID = datavalue.getAsJsonObject("value").get("id").getAsString();
+				article.licenses.add(licensePageQID);
+			}
 		} catch (Exception e) {
 			errorCount++;
 			if (errorCount == ERROR_BATCH_SIZE) {
@@ -99,6 +108,11 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private String image;
 		private String imageProp;
 		private String commonCat;
+		private final List<String> licenses = new ArrayList<>();
+
+		public List<String> getLicenses() {
+			return licenses;
+		}
 
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
