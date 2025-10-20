@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -16,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -250,6 +250,15 @@ public class UserdataService {
 		sanitizeFileNames(allFiles);
 
 		return getUserFilesResults(allFiles, userId, allVersions);
+	}
+
+	public Set<String> parseFileTypes(String types) {
+		return (types != null)
+				? Arrays.stream(types.split(","))
+				.map(String::trim)
+				.filter(s -> !s.isEmpty())
+				.collect(Collectors.toCollection(HashSet::new))
+				: Collections.emptySet();
 	}
 
 	private void sanitizeFileNames(List<UserFileNoData> files) {

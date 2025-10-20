@@ -438,7 +438,7 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		Set<String> types = type != null ? Set.of(type) : Collections.emptySet();
+		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
