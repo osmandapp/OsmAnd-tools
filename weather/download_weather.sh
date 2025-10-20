@@ -48,7 +48,7 @@ NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
 
-SLEEP_BEFORE_CURL=1.0 # was 0.5
+SLEEP_BEFORE_CURL=1.5 # was 0.5 and 1.0...
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
