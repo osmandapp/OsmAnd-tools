@@ -1140,7 +1140,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			eleFeet = eleMeters * FEET;
 		} else if (!Double.isNaN(eleFeet) && Double.isNaN(eleMeters)) {
 			eleMeters = eleFeet / FEET;
-		} else {
+		} else if (Double.isNaN(eleMeters) && Double.isNaN(eleFeet)) {
 			return tags;
 		}
 
