@@ -258,10 +258,9 @@ public class UserdataService {
 		}
 
 		Set<String> result = new LinkedHashSet<>();
-		for (String part : types.split(",")) {
-			String trimmed = part.trim();
-			if (!trimmed.isEmpty()) {
-				result.add(trimmed);
+		for (String s : types.split(",")) {
+			if (!s.isBlank()) {
+				result.add(s.trim());
 			}
 		}
 		return result;
