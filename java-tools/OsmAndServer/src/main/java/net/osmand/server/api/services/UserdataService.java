@@ -253,12 +253,18 @@ public class UserdataService {
 	}
 
 	public Set<String> parseFileTypes(String types) {
-		return (types != null)
-				? Arrays.stream(types.split(","))
-				.map(String::trim)
-				.filter(s -> !s.isEmpty())
-				.collect(Collectors.toCollection(HashSet::new))
-				: Collections.emptySet();
+		if (types == null || types.isEmpty()) {
+			return Collections.emptySet();
+		}
+
+		Set<String> result = new LinkedHashSet<>();
+		for (String part : types.split(",")) {
+			String trimmed = part.trim();
+			if (!trimmed.isEmpty()) {
+				result.add(trimmed);
+			}
+		}
+		return result;
 	}
 
 	private void sanitizeFileNames(List<UserFileNoData> files) {
