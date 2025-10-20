@@ -85,13 +85,29 @@ public class SearchController {
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoi(@RequestParam String type,
-                                         @RequestParam double lat,
-                                         @RequestParam double lng,
+                                         @RequestParam String pin,
                                          @RequestParam (required = false) String name,
                                          @RequestParam (required = false) Long osmId,
                                          @RequestParam (required = false) Long wikidataId,
                                          @RequestParam (required = false) String lang) throws IOException {
         Feature poiSearchResult;
+
+        if (pin == null || pin.isEmpty()) {
+            return ResponseEntity.badRequest().body("Missing or empty 'pin' parameter");
+        }
+
+        String[] latlon = pin.split(",");
+        if (latlon.length != 2) {
+            return ResponseEntity.badRequest().body("Invalid 'pin' format, expected 'lat,lon'");
+        }
+        double lat, lng;
+        try {
+            lat = Double.parseDouble(latlon[0]);
+            lng = Double.parseDouble(latlon[1]);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
+        }
+
         if (wikidataId != null) {
             poiSearchResult = searchService.getWikiPoi(type, name, wikidataId, new LatLon(lat, lng), lang);
         } else {
