@@ -49,7 +49,9 @@ NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
 
-SLEEP_BEFORE_CURL=1.5 # was 0.5 and 1.0...
+SLEEP_CURL=${SLEEP_CURL:-0.5}
+SLEEP_RETRY=${SLEEP_RETRY:-60}
+DOWNLOAD_TRIES=${DOWNLOAD_TRIES:-5}
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
@@ -76,7 +78,7 @@ clean_temp_files_on_finish() {
         rm -rf $DOWNLOAD_FOLDER/* || true
     fi
     # Delete outdated tiff files if needed
-    sleep 5
+    #sleep 5
     find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete  || echo "Error: Temp file is already deleted"
     find . -type d -empty -delete  || echo "Error: Temp file is already deleted"
 }
@@ -90,7 +92,7 @@ download() {
 
     local INTERMEDIATE="$FILENAME.tmp"
 
-    sleep $SLEEP_BEFORE_CURL
+    sleep $SLEEP_CURL
 
     set +e
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
@@ -123,19 +125,14 @@ download_with_retry() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
-    echo "Download try 1: ${FILENAME}"
-    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    test -f "$FILENAME" && return
-
-    sleep 60
-    echo "Download try 2 (60s): ${FILENAME}"
-    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    test -f "$FILENAME" && return
-
-    sleep 900
-    echo "Download try 3 (900s): ${FILENAME}"
-    download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
-    test -f "$FILENAME" && return
+    for ((i=1; i<=DOWNLOAD_TRIES; i++)); do
+      echo "Download try $i: ${FILENAME}"
+      download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
+      test -f "$FILENAME" && return
+      ((SLEEP_WAIT=SLEEP_RETRY*i))
+      echo "Sleep $SLEEP_WAIT seconds..."
+      sleep $SLEEP_WAIT
+    done
 
     echo "Fatal Download Error: ${FILENAME} still not downloaded!"
     exit 1
@@ -194,7 +191,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER;
-        sleep 1
+        #sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -207,7 +204,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                sleep 1
+                #sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then
