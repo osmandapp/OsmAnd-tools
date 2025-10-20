@@ -37,38 +37,36 @@ public interface ReportService {
 			long processed,
 			long failed,
 			long duration,
-			double averagePlace,
 			long found,
+			long totalBytes,
+			long totalTime,
 			Map<String, Number> distanceHistogram,
 			TestCaseStatus generatedChart) {
 	}
 
 	Logger LOGGER = LoggerFactory.getLogger(ReportService.class);
 
-	String BASE_SQL = """
-			WITH result AS (
-				SELECT DENSE_RANK() OVER (ORDER BY g.ds_result_id) AS grp, ROW_NUMBER() OVER (PARTITION BY g.ds_result_id ORDER BY g.id) AS rn,
-					UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, g.id as gen_id,
-					g.gen_count, g.lat || ', ' || g.lon as lat_lon, r.lat || ', ' || r.lon as search_lat_lon, 
-					g.query, r.res_lat_lon, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, r.res_place, r.bbox as search_bbox,
-					r.res_count, g.row AS in_row, r.row AS out_row, 
-					CAST(COALESCE(json_extract(g.row, '$.id'), 0) AS INTEGER) AS id, r.found
-				FROM gen_result AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? ORDER BY g.id
+	String GEN_SQL = """
+			WITH gen AS (
+				SELECT DENSE_RANK() OVER (ORDER BY ds_result_id) AS ds_id, ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS tc_id,
+					id, gen_count, lat || ', ' || lon as lat_lon, query, row AS in_row, 
+					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) AS obj_id, error
+				FROM gen_result AS g WHERE case_id = ? ORDER BY g.id
 			)""";
-	String REPORT_SQL = BASE_SQL + """
+	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
-				WHEN gen_count <= 0 OR query IS NULL OR trim(query) = '' THEN 'Not Processed'
+				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 				ELSE 'Not Found'
-			END AS "group", type, grp || '.' || rn AS row_id, gen_id, lat_lon, query, id, in_row, res_count, res_place, res_distance, 
-			                search_lat_lon, search_bbox, res_lat_lon, out_row FROM result""";
+			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, 
+			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, 
+			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
-			 UNION SELECT 'Generated', CASE 
+			 UNION SELECT 'Generated' AS "group", CASE 
 			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
-				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END, 
-			DENSE_RANK() OVER (ORDER BY ds_result_id) || '.' || ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS row_id, id as gen_id, 
-			lat || ', ' || lon as lat_lon, query, CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) as id, 
-			row as in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen_result WHERE case_id = ? ORDER BY "group", gen_id""";
+				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
+			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id, 
+			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
 			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};
@@ -103,8 +101,8 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + run.caseId));
 
 		List<Map<String, Object>> list  = isFull ?
-			getJdbcTemplate().queryForList(FULL_REPORT_SQL, runId, run.caseId) :
-			getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", runId);
+			getJdbcTemplate().queryForList(FULL_REPORT_SQL, run.caseId, runId) :
+			getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id", run.caseId, runId);
 
 		return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
 	}
@@ -114,7 +112,7 @@ public interface ReportService {
 				new RuntimeException("TestCase not found with id: " + caseId));
 
 		List<Map<String, Object>> results = extendTo(getJdbcTemplate().queryForList(REPORT_SQL + " ORDER BY gen_id",
-						runId), getObjectMapper().readValue(test.allCols, String[].class));
+				caseId, runId), getObjectMapper().readValue(test.allCols, String[].class));
 		writeAsCsv(writer, results);
 	}
 
@@ -218,7 +216,9 @@ public interface ReportService {
 				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
 				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE COALESCE(found, res_distance <= 50)) AS found_count
+				    count(*) FILTER (WHERE COALESCE(found, res_distance <= 50)) AS found_count,
+					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
+					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
 				FROM
 				    run_result
 				WHERE
@@ -245,8 +245,14 @@ public interface ReportService {
 			number = ((Number) result.get("found_count"));
 			long found = number == null ? 0 : number.longValue();
 
+			number = ((Number) result.get("total_bytes"));
+			long totalBytes = number == null ? 0 : number.longValue();
+
+			number = ((Number) result.get("total_time"));
+			long totalTime = number == null ? 0 : number.longValue();
+
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					duration, 0, found, null, null);
+					duration, found, totalBytes, totalTime, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -276,19 +282,19 @@ public interface ReportService {
 		distanceHistogram.put("Not Found", 0);
 		List<Map<String, Object>> results =
 				getJdbcTemplate().queryForList("SELECT \"group\", count(*) as cnt FROM (" + FULL_REPORT_SQL + ") GROUP BY " +
-						"\"group\"", runId, caseId);
+						"\"group\"", caseId, runId);
 		for (Map<String, Object> values : results) {
 			distanceHistogram.put(values.get("group").toString(), ((Number) values.get("cnt")).longValue());
 		}
 
-		RunStatus finalStatus;
+		final RunStatus finalStatus;
 		if (status == null) {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
-					caseStatus.failed(), caseStatus.duration(), 0.0, 0, distanceHistogram, caseStatus);
+					caseStatus.failed(), caseStatus.duration(), 0, 0, 0, distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.averagePlace(), status.found(), distanceHistogram, optCase.get());
+					status.duration(), status.found(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}
