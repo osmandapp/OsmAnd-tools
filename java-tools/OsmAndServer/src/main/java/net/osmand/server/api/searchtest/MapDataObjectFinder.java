@@ -1,10 +1,13 @@
 package net.osmand.server.api.searchtest;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -108,7 +111,7 @@ public class MapDataObjectFinder {
 				// try to calculate precise id for first result 
 				// building name doesn't have unit probably it's a bug to fix, so we check with startsWith
 				if (firstResult.searchResult().file != null) {
-					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult.location);
+					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult.location, null);
 					Amenity am = null;
 					BinaryMapDataObject obj = null;
 					for (Amenity o : poi) {
@@ -118,7 +121,7 @@ public class MapDataObjectFinder {
 							break;
 						}
 					}
-					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult.location);
+					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult.location, null);
 					for (BinaryMapDataObject o : objects) {
 						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
@@ -148,7 +151,7 @@ public class MapDataObjectFinder {
 		return firstResult;
 	}
 	
-	private List<Amenity> getPoiObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
+	private List<Amenity> getPoiObjects(BinaryMapIndexReader file, LatLon targetPoint, List<Amenity> poi) throws IOException {
 		QuadRect quad = calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_PRECISE_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
 				get31TileNumberX(quad.left), get31TileNumberX(quad.right),
@@ -166,6 +169,9 @@ public class MapDataObjectFinder {
 					}
 				});
 		List<Amenity> res = file.searchPoi(request);
+		if (poi != null) {
+			res.addAll(poi);
+		}
 		Collections.sort(res, new Comparator<Amenity>() {
 
 			@Override
@@ -176,7 +182,7 @@ public class MapDataObjectFinder {
 		return res;
 	}
 
-	private List<BinaryMapDataObject> getMapObjects(BinaryMapIndexReader file, LatLon targetPoint) throws IOException {
+	private List<BinaryMapDataObject> getMapObjects(BinaryMapIndexReader file, LatLon targetPoint, List<BinaryMapDataObject> list) throws IOException {
 		QuadRect quad = calculateLatLonBbox(targetPoint.getLatitude(), targetPoint.getLongitude(), DIST_PRECISE_THRESHOLD_M);
 		BinaryMapIndexReader.SearchRequest<BinaryMapDataObject> request = BinaryMapIndexReader.buildSearchRequest(
 				get31TileNumberX(quad.left), get31TileNumberX(quad.right),
@@ -194,6 +200,9 @@ public class MapDataObjectFinder {
 					}
 				});
 		List<BinaryMapDataObject> res = file.searchMapIndex(request);
+		if (list != null) {
+			res.addAll(list);
+		}
 		sortPoints(targetPoint, res);
 		return res;
 	}
@@ -215,20 +224,23 @@ public class MapDataObjectFinder {
 	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> genRow) throws IOException {
 		Result actualResult = null;
 		int resPlace;
-		BinaryMapIndexReader file = null;
+		Set<BinaryMapIndexReader> files = new HashSet<>();
 		for (SearchResult sr : searchResults) {
 			if (sr.file != null) {
-				file = sr.file;
+				files.add(sr.file);
 				break;
 			}
 		}
-		if (file == null) {
+		if (files.isEmpty()) {
 			return null;
 		}
 		// Retrieve target map binary object - unnecessary step if store all tags earlier
-		
-		List<BinaryMapDataObject> objects = getMapObjects(file, targetPoint);
-		List<Amenity> poi = getPoiObjects(file, targetPoint);
+		List<BinaryMapDataObject> objects = null;
+		List<Amenity> poi = null;
+		for(BinaryMapIndexReader file : files) {
+			objects = getMapObjects(file, targetPoint, objects);
+			poi = getPoiObjects(file, targetPoint, poi);
+		}
 		
 		
 		BinaryMapDataObject srcObj = null;
