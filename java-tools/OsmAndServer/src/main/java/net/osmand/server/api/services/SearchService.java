@@ -273,16 +273,15 @@ public class SearchService {
 
     public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId) throws IOException {
         Feature poiFeature = getPoi(type, name, loc, osmId);
-        Long wikiId = wikidataId;
 
-        if (poiFeature != null && wikiId == null) {
+        if (poiFeature != null && wikidataId == null) {
             Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
             if (wikiIdFromOsm != null) {
-                wikiId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
+                wikidataId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
             }
         }
 
-        Feature wikiFeature = getWikiPoiById(wikiId);
+        Feature wikiFeature = getWikiPoiById(wikidataId);
         return mergeFeatures(wikiFeature, poiFeature);
     }
 
