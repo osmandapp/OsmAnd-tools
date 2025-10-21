@@ -271,10 +271,18 @@ public class SearchService {
         return null;
     }
 
-    public Feature getWikiPoi(String type, String name, Long wikidataId, LatLon loc, String lang) throws IOException {
-        Feature poiFeature = getPoi(type, name, loc, null);
-        Feature wikiFeature = getWikiPoiById(wikidataId, lang);
+    public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId) throws IOException {
+        Feature poiFeature = getPoi(type, name, loc, osmId);
+        Long wikiId = wikidataId;
 
+        if (poiFeature != null && wikiId == null) {
+            Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
+            if (wikiIdFromOsm != null) {
+                wikiId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
+            }
+        }
+
+        Feature wikiFeature = getWikiPoiById(wikiId);
         return mergeFeatures(wikiFeature, poiFeature);
     }
 
@@ -288,13 +296,11 @@ public class SearchService {
         return merged;
     }
 
-    private Feature getWikiPoiById(Long wikidataId, String lang) {
+    private Feature getWikiPoiById(Long wikidataId) {
         if (wikidataId == null) {
             return null;
         }
-        List<String> langs = lang != null && !lang.equals(DEFAULT_SEARCH_LANG)
-                ? List.of(lang, DEFAULT_SEARCH_LANG)
-                : List.of(DEFAULT_SEARCH_LANG);
+        List<String> langs = List.of(DEFAULT_SEARCH_LANG);
 
         String langListQuery = wikiService.getLangListQuery(langs);
 
