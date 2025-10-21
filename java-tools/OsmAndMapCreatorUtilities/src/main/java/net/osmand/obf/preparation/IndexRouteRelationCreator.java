@@ -5,6 +5,7 @@ import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.gpx.clickable.ClickableWayTags;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
@@ -14,6 +15,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -58,7 +60,9 @@ public class IndexRouteRelationCreator {
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
 	private static final String SHIELD_TEXT = "shield_text";
-	private static final String SHIELD_STUB_NAME = "shield_stub_name";
+	public static final String SHIELD_STUB_NAME = "shield_stub_name";
+	private static final String SHIELD_MAP_FG = "shield_map_fg";
+	private static final String SHIELD_MAP_BG = "shield_map_bg";
 
 	private static final String ROUTE = "route";
 
@@ -180,6 +184,31 @@ public class IndexRouteRelationCreator {
 			}
 			indexPoiCreator.iterateEntity(relation, ctx, icc);
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
+		}
+	}
+
+	protected void applyActivityMapShieldToNamelessWay(Map<String, String> tags) {
+		for (String nameTag : ClickableWayTags.REQUIRED_TAGS_ANY) {
+			if (tags.containsKey(nameTag)) {
+				return;
+			}
+		}
+		RouteActivity activity = null;
+		for (String clickableTag : ClickableWayTags.CLICKABLE_TAGS) {
+			if (tags.containsKey(clickableTag)) {
+				activity = routeActivityHelper.findActivityByTag(clickableTag);
+				if (activity != null) {
+					break;
+				}
+			}
+		}
+		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
+			String color = ClickableWayTags.getGpxColorByTags(tags);
+			if (color != null) {
+				tags.put(SHIELD_MAP_BG, "osmc_" + color + "_bg");
+				tags.put(SHIELD_MAP_FG, activity.getIconName());
+				tags.put(SHIELD_STUB_NAME, ".");
+			}
 		}
 	}
 

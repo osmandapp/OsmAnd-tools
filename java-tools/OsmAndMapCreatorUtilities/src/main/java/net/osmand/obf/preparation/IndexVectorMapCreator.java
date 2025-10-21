@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
+import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -56,6 +57,8 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
+
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.SHIELD_STUB_NAME;
 
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
@@ -725,6 +728,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
         if ((e instanceof Way || e instanceof Node) && !settings.keepOnlyRouteRelationObjects) {
             Map<String, String> tags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e, e.getTags());
+            if (e instanceof Way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
+                tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
+                icc.getIndexRouteRelationCreator().applyActivityMapShieldToNamelessWay(tags);
+            }
             // manipulate what kind of way to load
             long originalId = e.getId();
             long assignedId = e.getId();
