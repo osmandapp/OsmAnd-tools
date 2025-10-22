@@ -40,7 +40,17 @@ public class RoutingService {
     @Autowired
     WebGpxParser webGpxParser;
 
-	public List<WebGpxParser.Point> updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
+    public static class RouteResult {
+        public List<WebGpxParser.Point> points;
+        public List<GpxUtilities.RouteType> routeTypes;
+
+        public RouteResult(List<WebGpxParser.Point> points, List<GpxUtilities.RouteType> routeTypes) {
+            this.points = points;
+            this.routeTypes = routeTypes;
+        }
+    }
+
+	public RouteResult updateRouteBetweenPoints(LatLon startLatLon, LatLon endLatLon, String routeMode,
 			boolean hasRouting, boolean disableOldRouting, RouteCalculationProgress progress)
 			throws IOException, InterruptedException {
         Map<String, Object> props = new TreeMap<>();
@@ -50,7 +60,7 @@ public class RoutingService {
         List<WebGpxParser.Point> lineRes = getStraightLine(startLatLon.getLatitude(), startLatLon.getLongitude(),
                 endLatLon.getLatitude(), endLatLon.getLongitude());
         if (routeMode.equals(LINE_PROFILE_TYPE)) {
-            return lineRes;
+            return new RouteResult(lineRes, Collections.emptyList());
         } else {
             routeSegmentResults = osmAndMapsService.routing(disableOldRouting, routeMode, props, startLatLon, endLatLon,
                     Collections.emptyList(), Collections.emptyList(), progress);
@@ -58,15 +68,16 @@ public class RoutingService {
         }
 
         if (pointsRes.isEmpty()) {
-            return lineRes;
+            return new RouteResult(lineRes, Collections.emptyList());
         }
 
         TrkSegment seg = generateRouteSegments(routeSegmentResults, locations);
+        List<GpxUtilities.RouteType> routeTypes = seg.getRouteTypes();
         if (hasRouting) {
-            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes, true, null);
+            webGpxParser.addRouteSegmentsToPoints(seg, pointsRes, false, null);
         }
         addDistance(pointsRes);
-        return pointsRes;
+        return new RouteResult(pointsRes, routeTypes);
     }
 
     public synchronized List<WebGpxParser.Point> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
@@ -92,7 +103,8 @@ public class RoutingService {
             if (prevPoint.profile == null || prevPoint.profile.equals(LINE_PROFILE_TYPE)) {
                 currentPoint.geometry = (getStraightLine(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng));
             } else if (!prevPoint.profile.equals(GAP_PROFILE_TYPE)) {
-                currentPoint.geometry = (updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false, null));
+                RouteResult routeResult = updateRouteBetweenPoints(prevCoord, currentCoord, prevPoint.profile, true, false, null);
+                currentPoint.geometry = routeResult.points;
             }
             res.add(currentPoint);
         }
