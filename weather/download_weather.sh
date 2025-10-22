@@ -78,7 +78,7 @@ clean_temp_files_on_finish() {
         rm -rf $DOWNLOAD_FOLDER/* || true
     fi
     # Delete outdated tiff files if needed
-    #sleep 5
+    sleep 5
     find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete  || echo "Error: Temp file is already deleted"
     find . -type d -empty -delete  || echo "Error: Temp file is already deleted"
 }
@@ -193,7 +193,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER;
-        #sleep 1
+        sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -206,7 +206,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                #sleep 1
+                sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then
