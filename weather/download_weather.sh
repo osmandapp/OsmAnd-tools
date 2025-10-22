@@ -225,11 +225,11 @@ get_raw_gfs_files() {
                         return
                     fi
                 else
-                    echo "Error: Index file not downloaded. Skip downloading weather data."
+                    echo "Error: Index file (${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt) not downloaded. Skip downloading weather data."
                 fi
             done
         else
-            echo "Error: Index file not downloaded. Skip downloading weather data."
+            echo "Error: Index file ($FILETIME.index) not downloaded. Skip downloading weather data."
         fi
         cd ..;
 
