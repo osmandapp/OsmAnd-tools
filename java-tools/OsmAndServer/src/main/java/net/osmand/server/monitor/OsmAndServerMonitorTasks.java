@@ -71,6 +71,7 @@ public class OsmAndServerMonitorTasks {
 	private static final int TILEX_NUMBER = 268660;
 	private static final int TILEY_NUMBER = 175100;
 	private static final long INITIAL_TIMESTAMP_S = 1530840000;
+	private static final int TEST_BUILD_SERVER_HTTP_TIMEOUT = 30 * SECOND;
 
 	private static final int MAPS_COUNT_THRESHOLD = 700;
 
@@ -302,6 +303,8 @@ public class OsmAndServerMonitorTasks {
 
 				URL url = new URL(buildServer.jenkinsUrl + "/api/json");
 				HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+				connection.setConnectTimeout(TEST_BUILD_SERVER_HTTP_TIMEOUT);
+				connection.setReadTimeout(TEST_BUILD_SERVER_HTTP_TIMEOUT);
 				int code = connection.getResponseCode();
 
 				if (code == HttpURLConnection.HTTP_OK) {
@@ -316,6 +319,8 @@ public class OsmAndServerMonitorTasks {
 				if (jobsArray.isEmpty() && buildServer.statusJsonUrl != null) {
 					url = new URL(buildServer.statusJsonUrl);
 					connection = (HttpURLConnection) url.openConnection();
+					connection.setConnectTimeout(TEST_BUILD_SERVER_HTTP_TIMEOUT);
+					connection.setReadTimeout(TEST_BUILD_SERVER_HTTP_TIMEOUT);
 					InputStream is = connection.getInputStream();
 					jobsArray = new JSONArray(new JSONTokener(is));
 					is.close();
