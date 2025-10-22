@@ -327,6 +327,14 @@ public class UserSubscriptionService {
 	}
 
 	public SupporterDeviceSubscription revalidateFastSpringSubscription(SupporterDeviceSubscription s) {
+		// Don't validate if subscription is less than 15 minutes old
+		if (s.timestamp != null && FastSpringHelper.isTooEarlyToValidate(s.timestamp.getTime())) {
+			long timeSincePurchase = System.currentTimeMillis() - s.timestamp.getTime();
+			LOG.info(String.format("FastSpring subscription %s - %s is too recent (%d minutes old), skipping validation", 
+				s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
+			return s;
+		}
+		
 		try {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {

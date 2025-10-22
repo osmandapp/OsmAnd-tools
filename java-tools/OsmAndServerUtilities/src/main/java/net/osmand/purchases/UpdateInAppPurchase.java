@@ -172,7 +172,7 @@ public class UpdateInAppPurchase {
                 Timestamp checkTimeTs = rs.getTimestamp("checktime");
                 Boolean validBool = rs.getObject("valid", Boolean.class);
                 // Integer userId = rs.getObject("userid", Integer.class);
-                // Timestamp recordTimestamp = rs.getTimestamp("timestamp");
+                Timestamp recordTimestamp = rs.getTimestamp("timestamp");
 
                 long currentTime = System.currentTimeMillis();
                 long delayBetweenChecks = checkTimeTs == null ? MINIMUM_WAIT_TO_REVALIDATE : (currentTime - checkTimeTs.getTime());
@@ -182,6 +182,15 @@ public class UpdateInAppPurchase {
                 }
 
                 if (purchaseToken != null && purchaseToken.equals("manually-validated")) {
+                    continue;
+                }
+                
+                // Don't validate FastSpring purchases if they are less than 15 minutes old
+                if (PLATFORM_FASTSPRING.equalsIgnoreCase(platform) && recordTimestamp != null 
+                        && FastSpringHelper.isTooEarlyToValidate(recordTimestamp.getTime()) && !pms.verifyAll) {
+                    long timeSincePurchase = currentTime - recordTimestamp.getTime();
+                    System.out.printf("Skipping FastSpring IAP validation - purchase is too recent (%d minutes old): %s - %s%n",
+                            timeSincePurchase / (60 * 1000), sku, getHiddenOrderId(orderId));
                     continue;
                 }
 
