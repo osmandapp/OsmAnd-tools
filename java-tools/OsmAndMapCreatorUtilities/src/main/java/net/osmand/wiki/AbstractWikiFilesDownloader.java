@@ -31,16 +31,16 @@ public abstract class AbstractWikiFilesDownloader {
 	private final List<String> downloadedPageFiles = new ArrayList<>();
 	private long maxId = 0;
 	public final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
+	private static final String TIMESTAMP_FILE = "timestamp.txt";
 
 	public AbstractWikiFilesDownloader(File wikiDB, boolean daily) {
 		try {
 			log.info("Start %s download".formatted(getFilePrefix()));
 			maxId = daily ? 0 : getMaxIdFromDb(wikiDB);
 			List<FileForDBUpdate> updateFileList = new ArrayList<>();
-
+			String destFolder = wikiDB.getParent();
 			if (daily) {
-				long lastModifiedMillis = wikiDB.lastModified();
-				Instant instant = Instant.ofEpochMilli(lastModifiedMillis);
+				Instant instant = readTimestampFile(destFolder);
 				LocalDate lastModifiedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
 				updateFileList = getLatestFilesURL(getWikiIncrDirURL(), lastModifiedDate);
 			} else {
@@ -53,8 +53,10 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 				updateFileList = getWithoutRepeats(updateFileList);
 			}
-			String destFolder = wikiDB.getParent();
 			downloadPageFiles(destFolder, updateFileList);
+			if (daily) {
+				writeTimestampFile(destFolder);
+			}
 			log.info("Finish %s download".formatted(getFilePrefix()));
 		} catch (SQLException | IOException e) {
 			e.printStackTrace();
@@ -85,6 +87,24 @@ public abstract class AbstractWikiFilesDownloader {
 
 	public List<String> getDownloadedPageFiles() {
 		return downloadedPageFiles;
+	}
+
+	Instant readTimestampFile(String pathToTimestamp) {
+		Instant timestamp = Instant.EPOCH;
+		try (BufferedReader reader = new BufferedReader(new FileReader(new File(pathToTimestamp, TIMESTAMP_FILE)))) {
+			timestamp = Instant.parse(reader.readLine());
+		} catch (IOException e) {
+		}
+		return timestamp;
+	}
+
+	void writeTimestampFile(String pathToTimestamp) {
+		Instant now = Instant.now();
+		try (FileWriter writer = new FileWriter(new File(pathToTimestamp, TIMESTAMP_FILE))) {
+			writer.write(now.toString()); // e.g. "2025-10-22T11:24:56.123Z"
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private List<FileForDBUpdate> getWithoutRepeats(List<FileForDBUpdate> updateList) {
@@ -217,7 +237,7 @@ public abstract class AbstractWikiFilesDownloader {
 		LocalDate date = LocalDate.parse(fileDate, formatter);
 		FileForDBUpdate fileForUpdate = null;
 
-		String beforeDate = "2025-10-08T00:30:00Z"; //todo remove [&& date.isBefore(beforeTestDate)] !!! for test only
+		String beforeDate = "2025-10-17T00:30:00Z"; //todo remove [&& date.isBefore(beforeTestDate)] !!! for test only
 		Instant instant = Instant.parse(beforeDate); //
 		LocalDate beforeTestDate = instant.atZone(ZoneId.systemDefault()).toLocalDate(); //
 		if ((date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) && date.isBefore(beforeTestDate)) {
