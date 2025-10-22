@@ -2,11 +2,8 @@ package net.osmand.server.controllers.pub;
 
 
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -37,13 +34,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -301,13 +292,26 @@ public class GpxController {
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
 	}
-	
+
 	@RequestMapping(path = {"/get-analysis"}, produces = "application/json")
-	public ResponseEntity<String> getAnalysis(@RequestBody String data) throws IOException {
-		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getAnalysis(@RequestBody byte[] data) throws IOException {
+		String jsonData = decompressGzip(data);
+		WebGpxParser.TrackData trackData = gson.fromJson(jsonData, WebGpxParser.TrackData.class);
 		trackData = gpxService.addAnalysisData(trackData);
-		
+
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));
+	}
+
+	private static String decompressGzip(byte[] compressed) throws IOException {
+		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
+		     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+			byte[] buffer = new byte[4096];
+			int len;
+			while ((len = gis.read(buffer)) != -1) {
+				baos.write(buffer, 0, len);
+			}
+			return baos.toString(StandardCharsets.UTF_8);
+		}
 	}
 
     private double getCommonSavedFilesSize(List<GPXSessionFile> files) {
