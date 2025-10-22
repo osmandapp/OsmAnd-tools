@@ -14,6 +14,10 @@ LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
 USER_AGENT='Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0'
 
+SLEEP_CURL=${SLEEP_CURL:-0.5}
+SLEEP_RETRY=${SLEEP_RETRY:-45}
+DOWNLOAD_TRIES=${DOWNLOAD_TRIES:-10}
+
 # bands should correspond to c++ enum class WeatherBand in OsmAndCore/Map/GeoCommonTypes.h
 # add band with no data if not present
 # enum class WeatherBand
@@ -48,10 +52,6 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
-
-SLEEP_CURL=${SLEEP_CURL:-0.5}
-SLEEP_RETRY=${SLEEP_RETRY:-60}
-DOWNLOAD_TRIES=${DOWNLOAD_TRIES:-5}
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
