@@ -12,7 +12,7 @@ TIFF_TEMP_FOLDER="tiff_temp"
 FULL_MODE='full_mode'
 LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
-#USER_AGENT='Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0'
+USER_AGENT='Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0'
 
 # bands should correspond to c++ enum class WeatherBand in OsmAndCore/Map/GeoCommonTypes.h
 # add band with no data if not present
@@ -78,7 +78,7 @@ clean_temp_files_on_finish() {
         rm -rf $DOWNLOAD_FOLDER/* || true
     fi
     # Delete outdated tiff files if needed
-    sleep 5
+    #sleep 5
     find . -type f -mmin +${MINUTES_TO_KEEP_TIFF_FILES} -delete  || echo "Error: Temp file is already deleted"
     find . -type d -empty -delete  || echo "Error: Temp file is already deleted"
 }
@@ -97,12 +97,10 @@ download() {
     set +e
     if [ -z "$START_BYTE_OFFSET" ] && [ -z "$END_BYTE_OFFSET" ]; then
         # download whole file
-        HTTP_CODE=$(curl -k -L -w "%{http_code}" "$URL" --output "$INTERMEDIATE" --http1.1)
-        #HTTP_CODE=$(curl -A "$USER_AGENT" -k -L -w "%{http_code}" "$URL" --output "$INTERMEDIATE" --http1.1)
+        HTTP_CODE=$(curl -A "$USER_AGENT" -k -L -w "%{http_code}" "$URL" --output "$INTERMEDIATE" --http1.1)
     else
         # download part file by byte offset
-        HTTP_CODE=$(curl -k -L -w "%{http_code}" --range $START_BYTE_OFFSET-$END_BYTE_OFFSET "$URL" --output "$INTERMEDIATE" --http1.1)
-        #HTTP_CODE=$(curl -A "$USER_AGENT" -k -L -w "%{http_code}" --range $START_BYTE_OFFSET-$END_BYTE_OFFSET "$URL" --output "$INTERMEDIATE" --http1.1)
+        HTTP_CODE=$(curl -A "$USER_AGENT" -k -L -w "%{http_code}" --range $START_BYTE_OFFSET-$END_BYTE_OFFSET "$URL" --output "$INTERMEDIATE" --http1.1)
     fi
     set -e
 
@@ -193,7 +191,7 @@ get_raw_gfs_files() {
 
         # Download index file
         cd $DOWNLOAD_FOLDER;
-        sleep 1
+        #sleep 1
         download_with_retry "$FILETIME.index" "$FILE_INDEX_URL"
 
         # Download needed bands forecast data
@@ -206,7 +204,7 @@ get_raw_gfs_files() {
 
                 # Make partial download for needed band data only
                 # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20211207/00/atmos/gfs.t00z.pgrb2.0p25.f000
-                sleep 1
+                #sleep 1
                 download_with_retry "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" "$FILE_DATA_URL" $START_BYTE_OFFSET $END_BYTE_OFFSET
 
                 if [[ -f "${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt" ]]; then
@@ -385,8 +383,7 @@ find_latest_ecmwf_forecat_date() {
         local CHECKING_FILE_URL="https://data.ecmwf.int/forecasts/"$SEARCHING_DATE"/"$SEARCHING_RND_HOURS"z/ifs/0p25/oper/"$SEARCHING_DATE$SEARCHING_RND_HOURS"0000-"$CHECKING_FORECAST_TIME"h-oper-fc.index"
 
         set +e
-        local HEAD_RESPONSE=$(curl -s -I -L $CHECKING_FILE_URL | head -1)
-        #local HEAD_RESPONSE=$(curl -A "$USER_AGENT" -s -I -L $CHECKING_FILE_URL | head -1)
+        local HEAD_RESPONSE=$(curl -A "$USER_AGENT" -s -I -L $CHECKING_FILE_URL | head -1)
         set -e
 
         if [[ $HEAD_RESPONSE =~ "200" ]]; then
@@ -433,8 +430,7 @@ get_raw_ecmwf_files() {
     local BASE_URL="https://data.ecmwf.int/forecasts/"$FORECAST_DATE"/"$FORECAST_RND_TIME"z/ifs/0p25/oper/"
 
     set +e
-    local FILE_ARRAY=($(curl -s $BASE_URL | grep -o '>[^<]*</a>' | sed -e 's/^>//' -e 's/<\/a>$//' | grep -v -E '^\.|/$'))
-    #local FILE_ARRAY=($(curl -A "$USER_AGENT" -s $BASE_URL | grep -o '>[^<]*</a>' | sed -e 's/^>//' -e 's/<\/a>$//' | grep -v -E '^\.|/$'))
+    local FILE_ARRAY=($(curl -A "$USER_AGENT" -s $BASE_URL | grep -o '>[^<]*</a>' | sed -e 's/^>//' -e 's/<\/a>$//' | grep -v -E '^\.|/$'))
     set -e
 
     # Download forecast files
@@ -545,7 +541,7 @@ get_raw_ecmwf_files() {
 
 export LC_ALL=en_US.UTF-8
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
-    mkdir -p "$ROOT_FOLDER/$ECMWF"
+    mkdir -p "$ROOT_FOLDER/$GFS"
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start $DOWNLOAD_MODE
     get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1
