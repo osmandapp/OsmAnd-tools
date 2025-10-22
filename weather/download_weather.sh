@@ -125,11 +125,11 @@ download_with_retry() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
-    for ((i=1; i<=DOWNLOAD_TRIES; i++)); do
-      echo "Download try $i: ${FILENAME}"
+    for ((try=1; try<=DOWNLOAD_TRIES; try++)); do
+      echo "Download try $try: ${FILENAME}"
       download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
       test -f "$FILENAME" && return
-      ((SLEEP_WAIT=SLEEP_RETRY*i))
+      ((SLEEP_WAIT=SLEEP_RETRY*try))
       echo "Sleep $SLEEP_WAIT seconds..."
       sleep $SLEEP_WAIT
     done
