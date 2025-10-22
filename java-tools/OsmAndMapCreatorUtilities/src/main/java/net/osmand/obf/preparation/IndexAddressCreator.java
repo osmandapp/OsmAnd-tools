@@ -160,6 +160,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) { 
 						String lower = c.getName().toLowerCase();
+						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva 
 						if (!nameContains(boundaryName, lower) && !nameContains(altBoundaryName, lower)) {
 							String msg = String.format("Ignore boundary '%s' admin center  for city '%s' name doesn't match", 
 									boundary.getName(), c.getName());
