@@ -161,7 +161,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) { 
 						String cityLower = c.getName().toLowerCase();
 						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva 
-						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower)) {
+						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
+								!nameContains(cityLower, boundaryName)) {
 							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match", 
 									boundary.getName(), ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), c.getName());
 							if (logMapDataWarn != null) {
@@ -224,12 +225,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private boolean nameContains(String boundaryName, String lower) {
-		if (Algorithms.isEmpty(boundaryName)) {
+	private boolean nameContains(String part, String fullString) {
+		if (Algorithms.isEmpty(part)) {
 			return false;
 		}
-		return boundaryName.equals(lower) || boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
-				|| boundaryName.contains(" " + lower + " ");
+		return part.equals(fullString) || part.startsWith(fullString + " ") || part.endsWith(" " + fullString)
+				|| part.contains(" " + fullString + " ");
 	}
 
 
