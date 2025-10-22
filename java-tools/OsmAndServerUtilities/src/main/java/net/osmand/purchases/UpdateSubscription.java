@@ -279,6 +279,17 @@ public class UpdateSubscription {
 				// in case validate all (ignore minimum waiting time)
 				continue;
 			}
+			
+			// Don't validate FastSpring subscriptions if they are less than 15 minutes old
+			if (this.subType == SubscriptionType.FASTSPRING && regTime != null 
+					&& FastSpringHelper.isTooEarlyToValidate(regTime.getTime()) && !pms.verifyAll && !forceCheckOrderId) {
+				long timeSincePurchase = currentTime - regTime.getTime();
+				String hiddenOrderId = orderId != null ? (orderId.substring(0, Math.min(orderId.length(), 18)) + "...") : orderId;
+				System.out.printf("Skipping FastSpring subscription validation - subscription is too recent (%d minutes old): %s - %s%n",
+						timeSincePurchase / (60 * 1000), sku, hiddenOrderId);
+				continue;
+			}
+			
 			boolean activeNow = false;
 			if (checkTime != null && startTime != null && expireTime != null && expireTime.getTime() >= currentTime) {
 				activeNow = true;

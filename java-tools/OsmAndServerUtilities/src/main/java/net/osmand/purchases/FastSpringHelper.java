@@ -29,8 +29,22 @@ public class FastSpringHelper {
 			"net.osmand.fastspring.subscription.pro.annual.test",
 			"net.osmand.fastspring.subscription.maps.annual");
 
+	// Minimum delay (15 minutes) before validating a FastSpring purchase/subscription
+	// to allow FastSpring systems to process the order
+	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
+
 	private static final String API_BASE = "https://api.fastspring.com";
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
+
+	/**
+	 * Check if the purchase/subscription is too recent to validate
+	 * @param recordTimestampMillis timestamp when the record was created in our database
+	 * @return true if it's too early to validate (less than 15 minutes old), false if validation can proceed
+	 */
+	public static boolean isTooEarlyToValidate(long recordTimestampMillis) {
+		long timeSincePurchase = System.currentTimeMillis() - recordTimestampMillis;
+		return timeSincePurchase < MINIMUM_VALIDATION_DELAY_MILLIS;
+	}
 
 	public static void main(String[] args) throws IOException {
 		if (args.length == 0) {
