@@ -57,7 +57,7 @@ public interface ReportService {
 			 SELECT CASE
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
-			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'			    
+			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, 
 			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, 
