@@ -226,9 +226,12 @@ public class OsmAndServerMonitorTasks {
 			LOG.error(e.getMessage(), e);
 		}
 	}
+
+	private String previousBroadcastMessage;
 	
 	private void sendBroadcastMessage(String string) {
-		if (telegram != null) {
+		if (telegram != null && !string.equals(previousBroadcastMessage)) {
+			previousBroadcastMessage = string;
 			telegram.sendBroadcastMessage(string);
 			telegram.sendChannelMessage(publishChannel, EmojiConstants.ROBOT_EMOJI + string);
 		}
