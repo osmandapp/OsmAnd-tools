@@ -1562,16 +1562,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				readStreetsAndBuildingsForCity(streetBuildingsStat, city, suburb, waynodesStat, streetNodes, visitedStreets, uniqueNames);
 			}
 		}
-		mergeStreetsWithSameNames(streetNodes, uniqueNames);
+		uniqueNames.values().stream().forEach(streets -> mergeStreets(streets, streetNodes));
 		return new ArrayList<>(streetNodes.keySet());
-	}
-
-	private void mergeStreetsWithSameNames(Map<Street, List<Node>> streetNodes, Map<String, List<Street>> uniqueNames) {
-		uniqueNames.keySet()
-				.stream()
-				.map(uniqueNames::get)
-				.filter(streets -> streets.size() > 1)
-				.forEach(streets -> mergeStreets(streets, streetNodes));
 	}
 
 	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes) {
