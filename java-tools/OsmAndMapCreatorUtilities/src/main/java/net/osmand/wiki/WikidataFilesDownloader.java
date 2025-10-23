@@ -18,7 +18,7 @@ public class WikidataFilesDownloader extends AbstractWikiFilesDownloader {
 	private static final Log log = PlatformUtil.getLog(WikidataFilesDownloader.class);
 
 	public WikidataFilesDownloader(File wikiDB, boolean daily) {
-		super(wikiDB, daily);
+		super(wikiDB, daily, null);
 	}
 
 	public String getFilePrefix() {
@@ -45,7 +45,7 @@ public class WikidataFilesDownloader extends AbstractWikiFilesDownloader {
 	}
 
 	public long getMaxPageId() throws IOException {
-		String s = "https://www.wikidata.org/wiki/Special:EntityData/Q" + getMaxId() + ".json";
+		String s = "https://www.wikidata.org/wiki/Special:EntityData/Q" + getMaxQId() + ".json";
 		URL url = new URL(s);
 		URLConnection connection = url.openConnection();
 		connection.setRequestProperty("User-Agent", USER_AGENT);

@@ -1601,11 +1601,11 @@ public class WikiDatabasePreparation {
 		osmCoordinates.parse(wikidataDB.getParentFile());
 		WikidataFilesDownloader wfd = new WikidataFilesDownloader(wikidataDB, dailyUpdate);
 		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
-		long maxId = wfd.getMaxId();
+		long maxQId = wfd.getMaxQId();
 		log.info("Updating wikidata...");
 		for (String fileName : downloadedPageFiles) {
 			log.info("Updating from " + fileName);
-			processWikidata(wikidataDB, fileName, osmCoordinates, maxId);
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId);
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);

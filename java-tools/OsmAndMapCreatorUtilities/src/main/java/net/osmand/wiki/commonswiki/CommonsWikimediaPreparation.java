@@ -1,13 +1,11 @@
 package net.osmand.wiki.commonswiki;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.wiki.AbstractWikiFilesDownloader;
+import net.osmand.wiki.AbstractWikiFilesDownloader.DownloadHandler;
 import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.wikidata.ArticleMapper;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -21,7 +19,6 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,11 +30,10 @@ public class CommonsWikimediaPreparation {
 	private static final int THREAD_COUNT = 8;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
-	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "", "");
+	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
 	private static final AtomicLong articlesCount = new AtomicLong(0);
 
-	public static final String DATA_SOURCE = "commonswiki-latest-pages-articles.xml.gz";
-	public static final String RESULT_SQLITE = "wikidata_commons_osm.sqlitedb";
+	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
 
@@ -61,7 +57,7 @@ public class CommonsWikimediaPreparation {
 		}
 
 		if (mode.isEmpty() || folder.isEmpty()) {
-			throw new RuntimeException("Correct arguments weren't supplied");
+			printHelpException("Correct arguments weren't supplied");
 		}
 
 		final String sqliteFileName = database.isEmpty() ? folder + RESULT_SQLITE : database;
@@ -70,46 +66,65 @@ public class CommonsWikimediaPreparation {
 		try {
 			switch (mode) {
 				case "parse-img-meta":
-					String commonWikiArticles = folder + DATA_SOURCE;
-					p.parseCommonArticles(commonWikiArticles, commonsWikiDB, recreateDb);
+					p.updateCommonsWiki(commonsWikiDB, true, false);
 					break;
 				case "update-img-meta":
 					p.updateCommonsWiki(commonsWikiDB, recreateDb, false);
 					break;
 				case "update-img-meta-daily":
-					p.updateCommonsWiki(commonsWikiDB, recreateDb, true);
+					p.updateCommonsWiki(commonsWikiDB, false, true);
 					break;
 				default:
-					throw new RuntimeException("Unknown mode: " + mode);
+					printHelpException("Unknown mode: " + mode);
 			}
 		} catch (ParserConfigurationException | SAXException | IOException | SQLException | InterruptedException e) {
 			throw new RuntimeException("Error during parsing: " + e.getMessage(), e);
 		}
 	}
 
+	private static void printHelpException(String errorMessage) {
+		String helpMessage = """
+		--mode=parse-img-meta
+		  Recreates the RESULT_SQLITE database and downloads, then parses commonswiki-latest-pages-articles.xml.gz
+		  from https://dumps.wikimedia.org/commonswiki/latest/ in parts.
+		
+		--mode=update-img-meta
+		  Downloads and parses commonswiki-latest-pages-articles.xml.gz
+		  from https://dumps.wikimedia.org/commonswiki/latest/ in parts.
+		  If a part is already downloaded, it is not re-downloaded. Parsing starts immediately.
+		
+		--mode=update-img-meta-daily
+		  Downloads and parses commonswiki-[date]-pages-meta-hist-incr.xml.bz2
+		  from https://dumps.wikimedia.org/other/incr/commonswiki/[date]/,
+		  starting from the date after the one recorded in timestamp.txt.
+		""";
+		System.out.println(helpMessage);
+		throw new RuntimeException(errorMessage);
+	}
+
+
 	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
-		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate);
-		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
-//		long maxId = wfd.getMaxId();
-		initDatabase(commonsWikiDB.getAbsolutePath(), recreateDb);
+		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
+		initDatabase(commonsWikiDBPath, recreateDb);
 		ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
-		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDB.getAbsolutePath()));
+		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
 		writerThread.start();
 		log.info("Updating wikidata...");
-		for (String fileName : downloadedPageFiles) {
+		DownloadHandler dh = fileName -> {
 			log.info("Updating from " + fileName);
-			executor.submit(() -> parseCommonArticles(fileName, commonsWikiDB, recreateDb));
-		}
+			executor.submit(() -> parseCommonArticles(fileName));
+		};
+		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate, dh);
 		executor.shutdown();
 		executor.awaitTermination(24, TimeUnit.HOURS);
-//		wfd.removeDownloadedPages();
+		wfd.removeDownloadedPages();
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
-		createIndex(commonsWikiDB.getAbsolutePath());
+		createIndex(commonsWikiDBPath);
 		log.info("========= All tasks done in %.0fs total parsed %d articles =========%n"
-				.formatted((System.currentTimeMillis() - start) / 1000.0 , articlesCount.get()));
+				.formatted((System.currentTimeMillis() - start) / 1000.0, articlesCount.get()));
 	}
 
 	private static void initDatabase(String sqliteFileName, boolean recreateDb) throws SQLException {
@@ -131,8 +146,7 @@ public class CommonsWikimediaPreparation {
 					author text, \
 					date text, \
 					license text, \
-					description text, \
-					p275 text)""");
+					description text)""");
 		}
 	}
 
@@ -141,14 +155,13 @@ public class CommonsWikimediaPreparation {
 		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log)) {
 			conn.setAutoCommit(false);
 			try (PreparedStatement insertStatement = conn.prepareStatement("""
-							INSERT INTO common_meta(id, name, author,  date, license, description, p275) VALUES (?, ?, ?, ?, ?, ?, ?) \
-							ON CONFLICT(id) DO UPDATE SET \
-							name = excluded.name, \
-							author = excluded.author, \
-							date = excluded.date, \
-							license = excluded.license, \
-							description = excluded.description, \
-							p275 = excluded.p275""")) {
+					INSERT INTO common_meta(id, name, author,  date, license, description) VALUES (?, ?, ?, ?, ?, ?) \
+					ON CONFLICT(id) DO UPDATE SET \
+					name = excluded.name, \
+					author = excluded.author, \
+					date = excluded.date, \
+					license = excluded.license, \
+					description = excluded.description;""")) {
 
 				int counter = 0;
 
@@ -162,7 +175,6 @@ public class CommonsWikimediaPreparation {
 					insertStatement.setString(4, a.date);
 					insertStatement.setString(5, a.license);
 					insertStatement.setString(6, a.description);
-					insertStatement.setString(7, a.p275);
 					insertStatement.addBatch();
 					counter++;
 
@@ -196,10 +208,10 @@ public class CommonsWikimediaPreparation {
 		}
 	}
 
-	private record Article(Long id, String title, String author, String date, String license, String description, String p275) {
+	private record Article(Long id, String title, String author, String date, String license, String description) {
 	}
 
-	private void parseCommonArticles(String articles, File commonsWikiDB, boolean recreateDb) {
+	private void parseCommonArticles(String articles) {
 		try {
 			SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 			FileProgressImplementation progress = new FileProgressImplementation("Read commonswiki articles file", new File(articles));
@@ -207,7 +219,6 @@ public class CommonsWikimediaPreparation {
 			InputSource is = getInputSource(streamFile);
 			final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress);
 			sx.parse(is, handler);
-//			createIndex(commonsWikiDB.getAbsolutePath());
 		} catch (ParserConfigurationException | SQLException | IOException | SAXException e) {
 			throw new RuntimeException(e);
 		}
@@ -224,17 +235,13 @@ public class CommonsWikimediaPreparation {
 		private final StringBuilder format = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
 		private final StringBuilder id = new StringBuilder();
-		ArticleMapper.Article article;
 		private final FileProgressImplementation progress;
-		private final Gson gson;
-		StringBuilder metaContent = new StringBuilder();
 
 		private final StringBuilder textContent = new StringBuilder();
 
 		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) throws SQLException {
 			this.saxParser = saxParser;
 			this.progress = progress;
-			gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		}
 
 		@Override
@@ -260,17 +267,12 @@ public class CommonsWikimediaPreparation {
 						}
 					}
 					case "text" -> {
-//						if (!pageTextParsed) {
+						if (!pageTextParsed) {
 							textContent.setLength(0);
 							ctext = textContent;
-//						}
+						}
 					}
-					case "format"-> {
-						format.setLength(0);
-						ctext = format;
-					}
-
-						default -> {
+					default -> {
 						// do nothing
 					}
 				}
@@ -293,20 +295,13 @@ public class CommonsWikimediaPreparation {
 						page = false;
 						pageIdParsed = false;
 						pageTextParsed = false;
-						parseMeta(metaContent, article);
-						metaContent.setLength(0);
 						progress.update();
 					}
-					case "title", "ns", "id", "format" -> ctext = null;
+					case "title", "ns", "id" -> ctext = null;
 					case "text" -> {
 						if (!pageTextParsed) {
-							metaContent.append(textContent);
+							parseMeta();
 							pageTextParsed = true;
-						} else {
-							if (!format.toString().equals("application/json")) {
-								return;
-							}
-							article = processJsonPage( ctext.toString());
 						}
 					}
 					default -> {
@@ -316,11 +311,7 @@ public class CommonsWikimediaPreparation {
 			}
 		}
 
-		public ArticleMapper.Article processJsonPage(String json) {
-			return gson.fromJson(json, ArticleMapper.Article.class);
-		}
-		
-		private void parseMeta(StringBuilder metaContent, ArticleMapper.Article article) {
+		private void parseMeta() {
 			try {
 				if (FILE_NAMESPACE.contentEquals(ns)) {
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
@@ -328,7 +319,7 @@ public class CommonsWikimediaPreparation {
 						return;
 					}
 					Map<String, String> meta = new HashMap<>();
-					WikiDatabasePreparation.removeMacroBlocks(metaContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
+					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.getOrDefault("author", "");
 					String license = meta.getOrDefault("license", "");
@@ -336,7 +327,7 @@ public class CommonsWikimediaPreparation {
 					String date = meta.getOrDefault("date", "");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
-								author, date, license, description, article.getLicenses().toString()));
+								author, date, license, description));
 						if (articlesCount.incrementAndGet() % 100000 == 0) {
 							System.out.println(articlesCount.get() + " Articles processed");
 						}

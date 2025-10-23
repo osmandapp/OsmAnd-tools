@@ -33,27 +33,20 @@ public abstract class AbstractWikiFilesDownloader {
 	public final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 	private static final String TIMESTAMP_FILE = "timestamp.txt";
 
-	public AbstractWikiFilesDownloader(File wikiDB, boolean daily) {
+	public AbstractWikiFilesDownloader(File wikiDB, boolean daily, DownloadHandler dh) {
 		try {
 			log.info("Start %s download".formatted(getFilePrefix()));
 			maxId = daily ? 0 : getMaxIdFromDb(wikiDB);
-			List<FileForDBUpdate> updateFileList = new ArrayList<>();
+			List<FileForDBUpdate> updateFileList;
 			String destFolder = wikiDB.getParent();
 			if (daily) {
 				Instant instant = readTimestampFile(destFolder);
 				LocalDate lastModifiedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
 				updateFileList = getLatestFilesURL(getWikiIncrDirURL(), lastModifiedDate);
 			} else {
-				long maxPageId = getMaxPageId();
-				List<FileForDBUpdate> pages = readFilesUrl(getWikiLatestDirURL());
-				for (FileForDBUpdate p : pages) {
-					if (maxPageId < p.maxPageId || maxPageId < p.minPageId) {
-						updateFileList.add(p);
-					}
-				}
-				updateFileList = getWithoutRepeats(updateFileList);
+				updateFileList = readFilesUrl(getWikiLatestDirURL());
 			}
-			downloadPageFiles(destFolder, updateFileList);
+			downloadPageFiles(destFolder, updateFileList, dh);
 			if (daily) {
 				writeTimestampFile(destFolder);
 			}
@@ -81,7 +74,7 @@ public abstract class AbstractWikiFilesDownloader {
 		return getFilePrefix() + LATEST_PAGES_XML_BZ_2_PATTERNS;
 	}
 
-	public long getMaxId() {
+	public long getMaxQId() {
 		return maxId;
 	}
 
@@ -107,38 +100,7 @@ public abstract class AbstractWikiFilesDownloader {
 		}
 	}
 
-	private List<FileForDBUpdate> getWithoutRepeats(List<FileForDBUpdate> updateList) {
-		List<Long> min = new ArrayList<>();
-		long repeatedMin = 0;
-		for (FileForDBUpdate p : updateList) {
-			if (min.contains(p.minPageId)) {
-				repeatedMin = p.minPageId;
-				break;
-			}
-			min.add(p.minPageId);
-		}
-		if (repeatedMin > 0) {
-			List<FileForDBUpdate> res = new ArrayList<>();
-			long max = 0;
-			for (FileForDBUpdate p : updateList) {
-				if (p.minPageId != repeatedMin) {
-					res.add(p);
-				} else {
-					max = Math.max(max, p.maxPageId);
-				}
-			}
-			for (FileForDBUpdate p : updateList) {
-				if (p.maxPageId == max) {
-					res.add(p);
-					break;
-				}
-			}
-			return res;
-		}
-		return updateList;
-	}
-
-	private void downloadPageFiles(String destFolder, List<FileForDBUpdate> updateList) throws IOException {
+	private void downloadPageFiles(String destFolder, List<FileForDBUpdate> updateList, DownloadHandler dh) throws IOException {
 		for (FileForDBUpdate p : updateList) {
 			String fileName = p.url.substring(p.url.lastIndexOf("/") + 1);
 			String gzFile = fileName.replace(".bz2", ".gz");
@@ -147,6 +109,9 @@ public abstract class AbstractWikiFilesDownloader {
 			if (gz.exists()) {
 				System.out.println(gzFile + " already downloaded");
 				downloadedPageFiles.add(gzFile);
+				if (dh != null) {
+					dh.onFinishDownload(gzFile);
+				}
 				continue;
 			}
 			String cmd = "curl -A \"" + USER_AGENT + "\" " + p.url + " | bzcat | gzip -1 ";
@@ -165,6 +130,9 @@ public abstract class AbstractWikiFilesDownloader {
 			gzout.close();
 			System.out.println(gzFile + " downloading is finished");
 			downloadedPageFiles.add(gzFile);
+			if (dh != null) {
+				dh.onFinishDownload(gzFile);
+			}
 		}
 	}
 
@@ -183,7 +151,7 @@ public abstract class AbstractWikiFilesDownloader {
 		URLConnection connection = new URL(wikiUrl).openConnection();
 		connection.setRequestProperty("User-Agent", USER_AGENT);
 		connection.connect();
-
+		long maxPageId = getMaxPageId();
 		InputStream inputStream = connection.getInputStream();
 		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, Charset.forName("UTF-8")));
 
@@ -192,8 +160,16 @@ public abstract class AbstractWikiFilesDownloader {
 		while ((line = r.readLine()) != null) {
 			Matcher matcher = pattern.matcher(line);
 			if (matcher.find()) {
-				FileForDBUpdate fileForUpdate = getLatestFile(wikiUrl, line);
-				result.add(fileForUpdate);
+				String data = line.replace("<a href=\"", "").replaceAll("\">.+$", "");
+				String p = data.replaceAll(".+xml-", "").replaceAll("\\.bz2", "");
+				String[] pages = p.split("p");
+				int min = Integer.parseInt(pages[1]);
+				int max = Integer.parseInt(pages[2]);
+				FileForDBUpdate fileForUpdate = new FileForDBUpdate();
+				fileForUpdate.url = wikiUrl + data;
+				if (maxPageId < max || maxPageId < min) {
+					result.add(fileForUpdate);
+				}
 			}
 		}
 		return result;
@@ -220,38 +196,23 @@ public abstract class AbstractWikiFilesDownloader {
 		return result;
 	}
 
-	private FileForDBUpdate getLatestFile(String wikiUrl, String line) {
-		String data = line.replace("<a href=\"", "").replaceAll("\">.+$", "");
-		String p = data.replaceAll(".+xml-", "").replaceAll("\\.bz2", "");
-		String[] pagesId = p.split("p");
-		FileForDBUpdate fileForUpdate = new FileForDBUpdate();
-		fileForUpdate.minPageId = Integer.parseInt(pagesId[1]);
-		fileForUpdate.maxPageId = Integer.parseInt(pagesId[2]);
-		fileForUpdate.url = wikiUrl + data;
-		return fileForUpdate;
-	}
-
 	private FileForDBUpdate getIncrFile(String wikiUrl, String line, LocalDate lastUpdateDate) {
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 		String fileDate = line.replace("<a href=\"", "").replaceAll("/\">.+$", "");
 		LocalDate date = LocalDate.parse(fileDate, formatter);
 		FileForDBUpdate fileForUpdate = null;
-
-		String beforeDate = "2025-10-17T00:30:00Z"; //todo remove [&& date.isBefore(beforeTestDate)] !!! for test only
-		Instant instant = Instant.parse(beforeDate); //
-		LocalDate beforeTestDate = instant.atZone(ZoneId.systemDefault()).toLocalDate(); //
-		if ((date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) && date.isBefore(beforeTestDate)) {
+		if (date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) {
 			fileForUpdate = new FileForDBUpdate();
-			fileForUpdate.minPageId = 0;
-			fileForUpdate.maxPageId = Integer.MAX_VALUE;
 			fileForUpdate.url = wikiUrl + fileDate + "/" + getFilePrefix() + "-" + fileDate + PAGES_INCR_XML_BZ_2_SUFFIX;
 		}
 		return fileForUpdate;
 	}
 
+	public interface DownloadHandler {
+		void onFinishDownload(String fileName);
+	}
+
 	private static class FileForDBUpdate {
-		long minPageId;
-		long maxPageId;
 		String url;
 	}
 }
