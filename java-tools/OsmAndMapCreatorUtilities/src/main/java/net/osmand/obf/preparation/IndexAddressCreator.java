@@ -1601,6 +1601,28 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				i++;
 			}
 		}
+		// remove braces for unique street
+		if (streets.size() == 1) {
+			Street s = streets.get(0);
+			s.setName(stripBraces(s.getName()));
+			Map<String, String> namesMap = s.getNamesMap(true);
+			for (Entry<String, String> e : namesMap.entrySet()) {
+				s.setName(e.getKey(), stripBraces(e.getValue()));
+			}
+		}
+	}
+	
+	private static String stripBraces(String localeName) {
+		int i = localeName.indexOf('(');
+		String retName = localeName;
+		if (i > -1) {
+			retName = localeName.substring(0, i);
+			int j = localeName.indexOf(')', i);
+			if (j > -1) {
+				retName = (retName.trim() + ' ' + localeName.substring(j + 1)).trim();
+			}
+		}
+		return retName;
 	}
 
 	private double getDistance(Street s, Street c, Map<Street, List<Node>> streetNodes) {
@@ -1650,7 +1672,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
-					street.setName(lang, names.get(lang) + cityPart);
+					if (!langAttributes.contains(lang)) {
+						street.setName(lang, names.get(lang) + cityPart);
+					}
 				}
 				streetNodes.put(street, thisWayNodes);
 				city.registerStreet(street);
