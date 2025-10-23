@@ -41,7 +41,7 @@ public class ObfChecker {
 //        --profile="$PROFILE" --min-dist=1 --no-conditionals \
 //        --max-dist=50 2>&1
 		if (args.length == 1 && args[0].equals("--test")) {
-			args = new String[] { System.getProperty("maps.dir") + "Ukraine_kyiv_europe_2_.obf" };
+			args = new String[] { System.getProperty("maps.dir") + "Us_california_northamerica_2.road.obf" };
 		}
 		Map<String, String> argMap = new LinkedHashMap<String, String>();
 		List<String> files = new ArrayList<String>();
@@ -135,7 +135,7 @@ public class ObfChecker {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
-			if (!checkSimpleAddress(index, address, false)) {
+			if (!checkSimpleAddress(index, address, true)) {
 				ok = false;
 			}
 		}
@@ -165,11 +165,8 @@ public class ObfChecker {
 					}
 					streetInd++;
 					if (set.contains(s.getName())) {
-						if(errInd % 5 == 0) {
-							errors.append("\n");
-						}
-						errors.append(
-								String.format(" %d. duplicate street '%s' in '%s'", errInd++, s.getName(), c.getName()));
+						String err = String.format(" %d. duplicate street '%s' in '%s'", errInd++, s.getName(), c.getName());
+						addErr(errors, errInd, err);
 					}
 					set.add(s.getName());
 					if (!checkDuplicateBuildings) {
@@ -183,13 +180,11 @@ public class ObfChecker {
 						} else {
 							double dist = MapUtils.getDistance(b.getLocation(), bld.getLocation());
 							if (dist > MAX_BUILDING_DISTANCE) {
-								if (errInd % 5 == 0) {
-									errors.append("\n");
-								}
-								errors.append(String.format(" %d. Buildings '%s' ('%s' in '%s') too far %.2f km (%.5f, %.5f - %.5f, %.5f) ", errInd++,
+								String err = String.format(" %d. Buildings '%s' ('%s' in '%s') too far %.2f km (%.5f, %.5f - %.5f, %.5f) ", errInd++,
 										b.getName(), s.getName(), c.getName(), dist / 1000, 
 										b.getLocation().getLatitude(), b.getLocation().getLongitude(), 
-										bld.getLocation().getLatitude(), bld.getLocation().getLongitude() ));
+										bld.getLocation().getLatitude(), bld.getLocation().getLongitude() );
+								addErr(errors, errInd, err);
 							}
 						}
 					}
@@ -203,6 +198,14 @@ public class ObfChecker {
 		}
 //		return errors.isEmpty();
 		return true;
+	}
+
+	private static void addErr(StringBuilder errors, int errInd, String err) {
+		if (errInd % 5 == 0) {
+			errors.append("\n");
+		} else if (errors.length() < 1_000_000) {
+			errors.append(err);
+		}
 	}
 
 	private static boolean checkHHRegion(BinaryMapIndexReader index, HHRouteRegion hr) throws IOException {
