@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import com.google.gson.Gson;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
@@ -12,6 +13,8 @@ import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.render.RenderingRuleSearchRequest;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
@@ -28,6 +31,7 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.*;
 
+import static net.osmand.data.Amenity.*;
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
 
 public class IndexRouteRelationCreator {
@@ -76,6 +80,7 @@ public class IndexRouteRelationCreator {
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
 	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+	public static final String WPT_EXTRA_TAGS = "wpt_extra_tags"; // pass tags to WptPt using JSON
 
 	private static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
 	public static final String COLOR = "color"; // osmand:color
@@ -85,6 +90,11 @@ public class IndexRouteRelationCreator {
 	private static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
 	private static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
 	private static final String[] COLOR_TAGS_FOR_MAP_SECTION = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
+
+	public static final Map<String, String> SKIP_RELATION_NODE_BY_TAGS = Map.of(
+			"information", "guidepost"
+			// ...
+	);
 
 	private static final Map<String, String> OSMC_TAGS_TO_SHIELD_PROPS = Map.of(
 			"osmc_text", "shield_text",
@@ -114,6 +124,31 @@ public class IndexRouteRelationCreator {
 
 	private final static NumberFormat distanceKmFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 
+	private final Gson gson = new Gson();
+	private final int ICON_SEARCH_ZOOM = 19;
+	private final RenderingRulesStorage renderingRules;
+	private final RenderingRuleSearchRequest searchRequest;
+
+	public static final String[] CUSTOM_STYLES = {
+			"default.render.xml",
+			"routes.addon.render.xml"
+			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
+	};
+	public static final Map<String, String> CUSTOM_PROPERTIES = Map.of(
+			// default.render.xml:
+			"whiteWaterSports", "true",
+			// routes.addon.render.xml:
+			"showCycleRoutes", "true",
+			"showMtbRoutes", "true",
+			"hikingRoutesOSMC", "walkingRoutesOSMC",
+			"showDirtbikeTrails", "true",
+			"horseRoutes", "true",
+			"showFitnessTrails", "true",
+			"showRunningRoutes", "true"
+			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
+	);
+
+
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
 									 Long lastModifiedDate) {
@@ -121,6 +156,9 @@ public class IndexRouteRelationCreator {
 		this.indexMapCreator = indexMapCreator;
 		this.transformer = indexMapCreator.tagsTransformer;
 		this.renderingTypes = indexMapCreator.renderingTypes;
+		this.renderingRules = RenderingRulesStorage.initWithStylesFromResources(CUSTOM_STYLES);
+		this.searchRequest = RenderingRuleSearchRequest
+				.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, CUSTOM_PROPERTIES);
 		this.lastModifiedDate = lastModifiedDate;
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 	}
@@ -136,6 +174,7 @@ public class IndexRouteRelationCreator {
 		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
+//			List<Node> pointsOfRelationNodes = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
 			TLongHashSet geometryBeforeCompletion = new TLongHashSet();
@@ -149,6 +188,7 @@ public class IndexRouteRelationCreator {
 				return; // incomplete relation
 			}
 
+//			collectOsmRouteRelationNodes(relation, pointsOfRelationNodes);
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
 			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags, hash);
 
@@ -172,6 +212,12 @@ public class IndexRouteRelationCreator {
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
+//			for (Node node : pointsOfRelationNodes) {
+//				// FIXME: unique id or another approach for node.id required here
+//				// When the same Node is the member of different Relations, we got the error:
+//				// A PRIMARY KEY constraint failed (UNIQUE constraint failed: poi.id, poi.type, poi.subtype)
+//				indexPoiCreator.iterateEntity(node, ctx, icc);
+//			}
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
 		}
 		if (OsmMapUtils.isSuperRoute(relation.getTags())) {
@@ -449,6 +495,46 @@ public class IndexRouteRelationCreator {
 		}
 
 		commonTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
+	}
+
+	private void collectOsmRouteRelationNodes(Relation relation, List<Node> pointsOfRelationNodes) {
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Node node) {
+				boolean allowThisNode = true;
+				for (Map.Entry<String, String> skip : SKIP_RELATION_NODE_BY_TAGS.entrySet()) {
+					if (skip.getValue().equals(node.getTag(skip.getKey()))) {
+						allowThisNode = false;
+						break;
+					}
+				}
+				if (allowThisNode) {
+					Node routeTrackPoint = new Node(node.getLatitude(), node.getLongitude(), node.getId());
+
+					final Map<String, String> transformedTags = renderingTypes.transformTags(node.getTags(),
+							Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+					String gpxIcon = searchRequest.searchIconByTags(transformedTags);
+
+					if (gpxIcon != null) {
+						Map<String, String> combinedTags = new LinkedHashMap<>(transformedTags);
+
+						Map<String, String> importantRelationTags = new LinkedHashMap<>(relation.getTags());
+						importantRelationTags.keySet().retainAll(Set.of(OPERATOR));
+						combinedTags.putAll(importantRelationTags);
+
+						Map<String, String> directlyPassedTags = new LinkedHashMap<>(transformedTags);
+						directlyPassedTags.keySet().retainAll(Set.of(NAME, DESCRIPTION));
+
+						routeTrackPoint.putTag(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
+						routeTrackPoint.putTag(WPT_EXTRA_TAGS, gson.toJson(combinedTags));
+						routeTrackPoint.getModifiableTags().putAll(directlyPassedTags);
+						routeTrackPoint.putTag(ROUTE_TYPE, "track_point");
+						routeTrackPoint.putTag("icon", gpxIcon);
+
+						pointsOfRelationNodes.add(routeTrackPoint);
+					}
+				}
+			}
+		}
 	}
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,

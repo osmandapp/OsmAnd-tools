@@ -60,7 +60,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
-import static net.osmand.obf.preparation.IndexRouteRelationCreator.ROUTE_ID_TAG;
+import static net.osmand.obf.preparation.IndexRouteRelationCreator.*;
 import static net.osmand.router.RouteExporter.OSMAND_ROUTER_V2;
 import static net.osmand.shared.gpx.GpxFile.XML_COLON;
 import static net.osmand.shared.gpx.GpxUtilities.OSMAND_EXTENSIONS_PREFIX;
@@ -133,8 +133,9 @@ public class RouteRelationExtractor {
 		gpxDirectoryPath = tmpDirectoryPath + "/" + basename + "-gpx";
 
 		renderingTypes = new MapRenderingTypesEncoder("basemap");
-		renderingRules = RenderingRulesStorage.initWithStylesFromResources(customStyles);
-		searchRequest = RenderingRuleSearchRequest.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, customProperties);
+		renderingRules = RenderingRulesStorage.initWithStylesFromResources(CUSTOM_STYLES);
+		searchRequest = RenderingRuleSearchRequest
+				.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, CUSTOM_PROPERTIES);
 	}
 
 	private void cleanupTmpFiles() throws IOException {
@@ -415,16 +416,11 @@ public class RouteRelationExtractor {
 
 	final String[] nodeNameTags = { "name", "name:en" }; // no more ref here
 
-	final Map<String, String> skipNodeByTags = Map.of(
-			"information", "guidepost"
-			// ...
-	);
-
 	private void addNode(GpxFile gpxFile, Node node) {
 		if (node != null && !node.getTags().isEmpty()) {
-			for (String k : skipNodeByTags.keySet()) {
+			for (String k : SKIP_RELATION_NODE_BY_TAGS.keySet()) {
 				final String nodeTagValue = node.getTags().get(k);
-				if (nodeTagValue != null && nodeTagValue.equals(skipNodeByTags.get(k))) {
+				if (nodeTagValue != null && nodeTagValue.equals(SKIP_RELATION_NODE_BY_TAGS.get(k))) {
 					return;
 				}
 			}
