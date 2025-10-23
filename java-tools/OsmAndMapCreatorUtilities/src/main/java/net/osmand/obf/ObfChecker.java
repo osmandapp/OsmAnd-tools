@@ -157,7 +157,6 @@ public class ObfChecker {
 				cityInd++;
 				index.preloadStreets(c, null, true, null);
 				TreeSet<String> set = new TreeSet<>();
-				
 				for (Street s : c.getStreets()) {
 					// to do ignore for now
 					if (s.getName().startsWith("<")) {
@@ -165,7 +164,8 @@ public class ObfChecker {
 					}
 					streetInd++;
 					if (set.contains(s.getName())) {
-						String err = String.format(" %d. duplicate street '%s' in '%s'", errInd++, s.getName(), c.getName());
+						String err = String.format(" %d. duplicate street '%s' in '%s'", errInd++, s.getName(),
+								c.getName());
 						addErr(errors, errInd, err);
 					}
 					set.add(s.getName());
@@ -180,15 +180,17 @@ public class ObfChecker {
 						} else {
 							double dist = MapUtils.getDistance(b.getLocation(), bld.getLocation());
 							if (dist > MAX_BUILDING_DISTANCE) {
-								String err = String.format(" %d. Buildings '%s' ('%s' in '%s') too far %.2f km (%.5f, %.5f - %.5f, %.5f) ", errInd++,
-										b.getName(), s.getName(), c.getName(), dist / 1000, 
-										b.getLocation().getLatitude(), b.getLocation().getLongitude(), 
-										bld.getLocation().getLatitude(), bld.getLocation().getLongitude() );
+								String err = String.format(
+										" %d. Buildings '%s' ('%s' in '%s') too far %.2f km (%.5f, %.5f - %.5f, %.5f) ",
+										errInd++, b.getName(), s.getName(), c.getName(), dist / 1000,
+										b.getLocation().getLatitude(), b.getLocation().getLongitude(),
+										bld.getLocation().getLatitude(), bld.getLocation().getLongitude());
 								addErr(errors, errInd, err);
 							}
 						}
 					}
 				}
+				c.getStreets().clear(); // free memory
 			}
 		}
 		if (!errors.isEmpty()) {
