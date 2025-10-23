@@ -226,13 +226,11 @@ public class CommonsWikimediaPreparation {
 
 	private static class CommonsWikiHandler extends DefaultHandler {
 		private final SAXParser saxParser;
-		private PreparedStatement prepContent;
 		private boolean page = false;
 		private boolean pageIdParsed = false;
 		private boolean pageTextParsed = false;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
-		private final StringBuilder format = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
 		private final StringBuilder id = new StringBuilder();
 		private final FileProgressImplementation progress;
