@@ -8,11 +8,14 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -30,7 +33,7 @@ public abstract class AbstractWikiFilesDownloader {
 	private static final String LATEST_PAGES_XML_BZ_2_PATTERNS = "-latest-pages-articles\\d+\\.xml.+bz2\"";
 	private final List<String> downloadedPageFiles = new ArrayList<>();
 	private long maxId = 0;
-	public final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
+	public final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
 	private static final String TIMESTAMP_FILE = "timestamp.txt";
 
 	public AbstractWikiFilesDownloader(File wikiDB, boolean daily, DownloadHandler dh) {
@@ -83,12 +86,19 @@ public abstract class AbstractWikiFilesDownloader {
 	}
 
 	Instant readTimestampFile(String pathToTimestamp) {
-		Instant timestamp = Instant.EPOCH;
-		try (BufferedReader reader = new BufferedReader(new FileReader(new File(pathToTimestamp, TIMESTAMP_FILE)))) {
-			timestamp = Instant.parse(reader.readLine());
-		} catch (IOException e) {
+		Path timestampFile = Path.of(pathToTimestamp, TIMESTAMP_FILE);
+		if (!Files.exists(timestampFile)) {
+			return Instant.EPOCH;
 		}
-		return timestamp;
+		try (BufferedReader reader = Files.newBufferedReader(timestampFile)) {
+			String line = reader.readLine();
+			if (line == null || line.isBlank()) {
+				return Instant.EPOCH;
+			}
+			return Instant.parse(line.trim());
+		} catch (IOException | DateTimeParseException e) {
+			return Instant.EPOCH;
+		}
 	}
 
 	void writeTimestampFile(String pathToTimestamp) {
@@ -176,12 +186,14 @@ public abstract class AbstractWikiFilesDownloader {
 	}
 
 	private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate) throws IOException {
+		// https://dumps.wikimedia.org/other/incr/commonswiki/
+		// pattern for <a href="20250926/">20250926/</a> find subfolder whose name is a date
 		Pattern pattern = Pattern.compile("<a href=\"\\d{8}/\">\\d{8}/</a>");
 		URLConnection connection = new URL(wikiUrl).openConnection();
 		connection.setRequestProperty("User-Agent", USER_AGENT);
 		connection.connect();
 		InputStream inputStream = connection.getInputStream();
-		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, Charset.forName("UTF-8")));
+		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
 		String line;
 		List<FileForDBUpdate> result = new ArrayList<>();
 		while ((line = r.readLine()) != null) {

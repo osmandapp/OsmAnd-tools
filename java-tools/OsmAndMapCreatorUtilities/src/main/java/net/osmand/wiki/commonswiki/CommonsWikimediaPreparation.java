@@ -27,7 +27,7 @@ import java.util.zip.GZIPInputStream;
 
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
-	private static final int THREAD_COUNT = 8;
+	private static final int DEFAULT_THREADS = 8;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
@@ -42,6 +42,7 @@ public class CommonsWikimediaPreparation {
 		String mode = "";
 		String database = "";
 		boolean recreateDb = false;
+		int threads = DEFAULT_THREADS;
 
 		for (String arg : args) {
 			String val = arg.substring(arg.indexOf("=") + 1);
@@ -53,6 +54,8 @@ public class CommonsWikimediaPreparation {
 				database = val;
 			} else if (arg.startsWith("--recreate_db")) {
 				recreateDb = true;
+			} else if (arg.startsWith("--threads")) {
+				threads = Integer.parseInt(val);
 			}
 		}
 
@@ -60,19 +63,20 @@ public class CommonsWikimediaPreparation {
 			printHelpException("Correct arguments weren't supplied");
 		}
 
-		final String sqliteFileName = database.isEmpty() ? folder + RESULT_SQLITE : database;
+		File commonsWikiDB = database.isEmpty() 
+				? new File(folder, RESULT_SQLITE) 
+				: new File(database);
 		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
-		File commonsWikiDB = new File(sqliteFileName);
 		try {
 			switch (mode) {
 				case "parse-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, true, false);
+					p.updateCommonsWiki(commonsWikiDB, true, false, threads);
 					break;
 				case "update-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, recreateDb, false);
+					p.updateCommonsWiki(commonsWikiDB, recreateDb, false, threads);
 					break;
 				case "update-img-meta-daily":
-					p.updateCommonsWiki(commonsWikiDB, false, true);
+					p.updateCommonsWiki(commonsWikiDB, false, true, threads);
 					break;
 				default:
 					printHelpException("Unknown mode: " + mode);
@@ -103,12 +107,12 @@ public class CommonsWikimediaPreparation {
 	}
 
 
-	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate)
+	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate, int threads)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
 		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
 		initDatabase(commonsWikiDBPath, recreateDb);
-		ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+		ExecutorService executor = Executors.newFixedThreadPool(threads);
 		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
 		writerThread.start();
 		log.info("Updating wikidata...");
@@ -123,7 +127,7 @@ public class CommonsWikimediaPreparation {
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
 		createIndex(commonsWikiDBPath);
-		log.info("========= All tasks done in %.0fs total parsed %d articles =========%n"
+		log.info("========= All tasks done in %.0fs total parsed %d articles ========="
 				.formatted((System.currentTimeMillis() - start) / 1000.0, articlesCount.get()));
 	}
 
@@ -132,7 +136,7 @@ public class CommonsWikimediaPreparation {
 		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log);
 			 Statement stmt = conn.createStatement()) {
 			stmt.execute("PRAGMA journal_mode = WAL;");
-			stmt.execute("PRAGMA synchronous = NORMAL;");
+			stmt.execute("PRAGMA synchronous = OFF;");
 			stmt.execute("PRAGMA busy_timeout = 5000;");
 			if (recreateDb) {
 				log.info("========= DROP old TABLE common_meta =========");
@@ -155,7 +159,7 @@ public class CommonsWikimediaPreparation {
 		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log)) {
 			conn.setAutoCommit(false);
 			try (PreparedStatement insertStatement = conn.prepareStatement("""
-					INSERT INTO common_meta(id, name, author,  date, license, description) VALUES (?, ?, ?, ?, ?, ?) \
+					INSERT INTO common_meta(id, name, author, date, license, description) VALUES (?, ?, ?, ?, ?, ?) \
 					ON CONFLICT(id) DO UPDATE SET \
 					name = excluded.name, \
 					author = excluded.author, \
@@ -226,7 +230,7 @@ public class CommonsWikimediaPreparation {
 
 	private static class CommonsWikiHandler extends DefaultHandler {
 		private final SAXParser saxParser;
-		private boolean page = false;
+		private boolean pageTag = false;
 		private boolean pageIdParsed = false;
 		private boolean pageTextParsed = false;
 		private StringBuilder ctext = null;
@@ -245,8 +249,8 @@ public class CommonsWikimediaPreparation {
 		@Override
 		public void startElement(String uri, String localName, String qName, Attributes attributes) {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			if (!page) {
-				page = name.equals("page");
+			if (!pageTag) {
+				pageTag = name.equals("page");
 			} else {
 				switch (name) {
 					case "title" -> {
@@ -270,16 +274,13 @@ public class CommonsWikimediaPreparation {
 							ctext = textContent;
 						}
 					}
-					default -> {
-						// do nothing
-					}
 				}
 			}
 		}
 
 		@Override
 		public void characters(char[] ch, int start, int length) {
-			if (page && ctext != null) {
+			if (pageTag && ctext != null) {
 				ctext.append(ch, start, length);
 			}
 		}
@@ -287,10 +288,10 @@ public class CommonsWikimediaPreparation {
 		@Override
 		public void endElement(String uri, String localName, String qName) {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
-			if (page) {
+			if (pageTag) {
 				switch (name) {
 					case "page" -> {
-						page = false;
+						pageTag = false;
 						pageIdParsed = false;
 						pageTextParsed = false;
 						progress.update();
@@ -301,9 +302,6 @@ public class CommonsWikimediaPreparation {
 							parseMeta();
 							pageTextParsed = true;
 						}
-					}
-					default -> {
-						// do nothing
 					}
 				}
 			}
@@ -342,8 +340,6 @@ public class CommonsWikimediaPreparation {
 	private static InputSource getInputSource(InputStream streamFile) throws IOException {
 		GZIPInputStream zis = new GZIPInputStream(streamFile);
 		Reader reader = new InputStreamReader(zis, StandardCharsets.UTF_8);
-		InputSource is = new InputSource(reader);
-		is.setEncoding("UTF-8");
-		return is;
+		return new InputSource(reader);
 	}
 }

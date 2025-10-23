@@ -39,7 +39,7 @@ public class WikidataFilesDownloader extends AbstractWikiFilesDownloader {
 		}
 		conn.close();
 		if (maxQId == 0) {
-			throw new RuntimeException("Could not get max QiD from " + wikiSqlite.getAbsolutePath());
+			throw new RuntimeException("Could not get last article name (id) from " + wikiSqlite.getAbsolutePath());
 		}
 		return maxQId;
 	}
@@ -59,6 +59,6 @@ public class WikidataFilesDownloader extends AbstractWikiFilesDownloader {
 				return jsonPageId.asLong();
 			}
 		}
-		throw new RuntimeException("Could not get max id for updating from " + s);
+		throw new RuntimeException("Could not get max page id for updating from " + s);
 	}
 }
