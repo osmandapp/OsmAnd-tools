@@ -89,7 +89,7 @@ public interface ReportService {
 		// Do not rely on transient TestCase.lastRunId; load the latest run id explicitly
 		Long lastRunId = getTestRunRepo().findLastRunId(caseId);
 		if (lastRunId == null) {
-			List<Map<String, Object>> list = getJdbcTemplate().queryForList(FULL_REPORT_SQL, -1, caseId);
+			List<Map<String, Object>> list = getJdbcTemplate().queryForList(FULL_REPORT_SQL, caseId, -1);
 			return extendTo(list, getObjectMapper().readValue(test.allCols, String[].class));
 		}
 		return getRunResults(lastRunId, true);

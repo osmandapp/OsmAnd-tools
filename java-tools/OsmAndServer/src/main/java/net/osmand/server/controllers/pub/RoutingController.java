@@ -347,13 +347,13 @@ public class RoutingController {
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
 		boolean disableOldRouting = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
-		List<WebGpxParser.Point> trackPointsRes =
+		RoutingService.RouteResult routeResult =
 				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, disableOldRouting, progress);
-		if (trackPointsRes.size() <= 2 && disableOldRouting) { // report limit error
-			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes, "msg",
+		if (routeResult.points.size() <= 2 && disableOldRouting) { // report limit error
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", routeResult.points, "routeTypes", routeResult.routeTypes, "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
-			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", trackPointsRes)));
+			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("points", routeResult.points, "routeTypes", routeResult.routeTypes)));
 		}
 	}
 
