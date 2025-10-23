@@ -14,6 +14,10 @@ LATEST_MODE='latest_mode'
 BROKEN_RAW_FILES='broken_raw_files'
 USER_AGENT='Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0'
 
+SLEEP_CURL=${SLEEP_CURL:-0.5}
+SLEEP_RETRY=${SLEEP_RETRY:-45}
+DOWNLOAD_TRIES=${DOWNLOAD_TRIES:-10}
+
 # bands should correspond to c++ enum class WeatherBand in OsmAndCore/Map/GeoCommonTypes.h
 # add band with no data if not present
 # enum class WeatherBand
@@ -48,10 +52,6 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 DEBUG_M0DE=0
-
-SLEEP_CURL=${SLEEP_CURL:-0.5}
-SLEEP_RETRY=${SLEEP_RETRY:-60}
-DOWNLOAD_TRIES=${DOWNLOAD_TRIES:-5}
 
 setup_folders_on_start() {
     mkdir -p "$ROOT_FOLDER/$GFS"
@@ -125,11 +125,11 @@ download_with_retry() {
     local START_BYTE_OFFSET=$3
     local END_BYTE_OFFSET=$4
 
-    for ((i=1; i<=DOWNLOAD_TRIES; i++)); do
-      echo "Download try $i: ${FILENAME}"
+    for ((try=1; try<=DOWNLOAD_TRIES; try++)); do
+      echo "Download try $try: ${FILENAME}"
       download $FILENAME $URL $START_BYTE_OFFSET $END_BYTE_OFFSET
       test -f "$FILENAME" && return
-      ((SLEEP_WAIT=SLEEP_RETRY*i))
+      ((SLEEP_WAIT=SLEEP_RETRY*try))
       echo "Sleep $SLEEP_WAIT seconds..."
       sleep $SLEEP_WAIT
     done
@@ -223,11 +223,11 @@ get_raw_gfs_files() {
                         return
                     fi
                 else
-                    echo "Error: Index file not downloaded. Skip downloading weather data."
+                    echo "Error: Index file (${GFS_BANDS_SHORT_NAMES[$i]}_$FILETIME.gt) not downloaded. Skip downloading weather data."
                 fi
             done
         else
-            echo "Error: Index file not downloaded. Skip downloading weather data."
+            echo "Error: Index file ($FILETIME.index) not downloaded. Skip downloading weather data."
         fi
         cd ..;
 
@@ -541,7 +541,7 @@ get_raw_ecmwf_files() {
 
 export LC_ALL=en_US.UTF-8
 if [[ $SCRIPT_PROVIDER_MODE == $GFS ]]; then
-    mkdir -p "$ROOT_FOLDER/$ECMWF"
+    mkdir -p "$ROOT_FOLDER/$GFS"
     cd "$ROOT_FOLDER/$GFS"
     setup_folders_on_start $DOWNLOAD_MODE
     get_raw_gfs_files 0 $HOURS_1H_TO_DOWNLOAD 1

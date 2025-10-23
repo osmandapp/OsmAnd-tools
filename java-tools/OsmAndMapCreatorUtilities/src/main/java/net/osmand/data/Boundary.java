@@ -8,7 +8,9 @@ public class Boundary {
 	private String name;
 	private String altName;
 	private int adminLevel;
+	
 
+	private long labelId;
 	private long adminCenterId;
 	private CityType cityType;
 	private Multipolygon multipolygon;
@@ -77,11 +79,23 @@ public class Boundary {
 	}
 
 	public boolean hasAdminCenterId() {
-		return adminCenterId != 0;
+		return adminCenterId != 0 || hasLabelId();
 	}
 
 	public long getAdminCenterId() {
-		return adminCenterId;
+		return adminCenterId != 0 ? adminCenterId : labelId;
+	}
+	
+	public void setLabelId(long l) {
+		this.labelId = l;
+	}
+
+	public boolean hasLabelId() {
+		return labelId != 0;
+	}
+
+	public long getLabelId() {
+		return labelId;
 	}
 
 	public void setCityType(CityType cityType) {

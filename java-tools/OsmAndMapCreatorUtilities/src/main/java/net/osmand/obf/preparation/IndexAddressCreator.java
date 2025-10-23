@@ -158,7 +158,20 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
-					if (c.getId() == boundary.getAdminCenterId()) {
+					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) { 
+						String cityLower = c.getName().toLowerCase();
+						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva 
+						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
+								!nameContains(cityLower, boundaryName)) {
+							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match", 
+									boundary.getName(), ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), c.getName());
+							if (logMapDataWarn != null) {
+								logMapDataWarn.info(msg);
+							} else {
+								log.info(msg);
+							}
+							continue;
+						}
 						boundary.setCityType(c.getType());
 						cityFound = c;
 						break;
@@ -198,6 +211,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(cityFound.getId());
+				boundary.setLabelId(cityFound.getId());
 			} 
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
@@ -211,12 +225,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private boolean nameContains(String boundaryName, String lower) {
-		if (Algorithms.isEmpty(boundaryName)) {
+	private boolean nameContains(String part, String fullString) {
+		if (Algorithms.isEmpty(part)) {
 			return false;
 		}
-		return boundaryName.startsWith(lower + " ") || boundaryName.endsWith(" " + lower)
-				|| boundaryName.contains(" " + lower + " ");
+		return part.equals(fullString) || part.startsWith(fullString + " ") || part.endsWith(" " + fullString)
+				|| part.contains(" " + fullString + " ");
 	}
 
 
@@ -371,6 +385,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 		long centerId = 0;
+		long labelId = 0;
 		CityType ct = CityType.valueFromEntity(e);
 		// if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
@@ -401,8 +416,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					} else if (es.getEntity() instanceof Node &&
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
 						centerId = ObfConstants.createMapObjectIdFromOsmAndEntity(es.getEntity());
-					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()) && centerId == 0)) {
-						centerId = ObfConstants.createMapObjectIdFromOsmAndEntity(es.getEntity());
+					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()))) {
+						labelId = ObfConstants.createMapObjectIdFromOsmAndEntity(es.getEntity());
 					}
 				}
 			} else if (e instanceof Way) {
@@ -417,6 +432,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				boundary.setCityType(CityType.CENSUS);
 			} else {
 				boundary.setCityType(ct);
+			}
+			if(labelId != 0) {
+				boundary.setLabelId(labelId);
 			}
 			if (centerId != 0) {
 				boundary.setAdminCenterId(centerId);
@@ -1396,6 +1414,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
     private static Set<String> splitNames(String name) {
+//    	return SearchCoreFactory.splitAddressSearchNames(name);
         int prev = -1;
         Set<String> namesToAdd = new HashSet<>();
 
