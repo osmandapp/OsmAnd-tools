@@ -105,6 +105,14 @@ public class IndexRouteRelationCreator {
 			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
 	);
 
+	private static final Map<String, String> NO_SYMBOL_ROUTE_SHIELD_COLORS = Map.of(
+			"default", "black",
+			"fitness_trail", "blue",
+			"hiking", "green",
+			"mtb", "red"
+			// ...
+	);
+
 	private static final String OSMC_ICON_PREFIX = "osmc_";
 	private static final String OSMC_ICON_BG_SUFFIX = "_bg";
 	private static final Set<String> SHIELD_BG_ICONS = Set.of("shield_bg");
@@ -233,7 +241,23 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	protected void applyActivityMapShieldToNamelessWay(Map<String, String> tags) {
+	private void applyShieldTagsToNoSymbolRoute(Map<String, String> shieldTags, Map<String, String> relationTags) {
+		String routeType = relationTags.get(ROUTE);
+		if (routeType == null || shieldTags.containsKey(SHIELD_FG) || shieldTags.containsKey(SHIELD_BG)) {
+			return;
+		}
+		RouteActivity activity = routeActivityHelper.findActivityByTag(routeType);
+		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
+			String color = NO_SYMBOL_ROUTE_SHIELD_COLORS.get(routeType);
+			if (color == null) {
+				color = NO_SYMBOL_ROUTE_SHIELD_COLORS.get("default");
+			}
+			shieldTags.put(SHIELD_BG, "osmc_" + color + "_bg");
+			shieldTags.put(SHIELD_FG, activity.getIconName());
+		}
+	}
+
+	protected void applyActivityMapShieldToNamelessClickableWay(Map<String, String> tags) {
 		for (String nameTag : ClickableWayTags.REQUIRED_TAGS_ANY) {
 			if (tags.containsKey(nameTag)) {
 				return;
@@ -553,6 +577,7 @@ public class IndexRouteRelationCreator {
 				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			}
 		}
+		applyShieldTagsToNoSymbolRoute(shieldTags, relation.getTags());
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId(), hash);
 	}
 

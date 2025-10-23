@@ -373,6 +373,7 @@ public class RouteRelationExtractor {
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				gpxExtensions.putAll(IndexRouteRelationCreator.getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
+				// TODO IndexRouteRelationCreator.applyShieldTagsToNoSymbolRoute (needs routeActivityHelper)
 			} else if (entry.getKey().getType() == Entity.EntityType.NODE) {
 				addNode(gpxFile, (Node) entry.getValue());
 			}
