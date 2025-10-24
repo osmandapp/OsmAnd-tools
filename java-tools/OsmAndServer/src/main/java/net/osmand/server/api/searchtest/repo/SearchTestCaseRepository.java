@@ -23,14 +23,21 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column
 		public String locale;
 
+		// if 'Search Around' = 'Global'        then average = true, (lat, lon) == null, shift == null
+		// if 'Search Around' = 'Custom'        then average = null, (lat, lon) != null, shift == null
+		// if 'Search Around' = 'Individual'    then average = null, (lat, lon) == null, shift >= 0
 		@Column()
 		public Boolean average;
-
+		
 		@Column()
 		public Double lat;
 
 		@Column()
 		public Double lon;
+
+		@Column()
+		public Integer shift;
+
 
 		@Column(name = "north_west")
 		private String northWest;
