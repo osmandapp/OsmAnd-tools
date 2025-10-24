@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -73,6 +74,11 @@ public class DownloadIndex {
 
 	public void setDate(long timestamp) {
 		this.date = DATE_FORMAT.format(new Date(timestamp));
+	}
+	
+	public void setDateByString(String s) throws ParseException {
+		this.date = s;
+		this.timestamp = DATE_FORMAT.parse(s).getTime();
 	}
 
 	public void setSize(double size) {
