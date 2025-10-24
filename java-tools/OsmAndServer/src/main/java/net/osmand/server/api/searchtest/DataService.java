@@ -317,8 +317,6 @@ public interface DataService extends BaseService {
 			row.put("res_id", firstResult.toIdString());
 			row.put("res_place", firstResult.toPlaceString());
 			row.put("res_name", firstResult.placeName());
-			final BinaryNodeInspector inspector = BinaryNodeInspector.getInstance(firstResult.searchResult().file);
-			row.put("presence", inspector.find(targetPoint, genRow));
 			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 				SearchResult sr = searchResults.get(dupInd);
 				actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
