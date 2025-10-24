@@ -47,11 +47,12 @@ public class CommonsWikimediaPreparation {
 			printHelp();
 			System.exit(0);
 		}
-		String folder = opts.getOrDefault("--dir=","");
-		String mode = opts.getOrDefault("--mode=","");
-		String database = opts.getOrDefault("--result_db=","");
+		String folder = opts.getOrDefault("--dir","");
+		String mode = opts.getOrDefault("--mode","");
+		String database = opts.getOrDefault("--result_db","");
 		boolean recreateDb = opts.getBoolean("--recreate_db");
-		int threads = opts.getIntOrDefault("--threads=", DEFAULT_THREADS);
+		boolean keepFiles = opts.getBoolean("--keep_files");
+		int threads = opts.getIntOrDefault("--threads", DEFAULT_THREADS);
 
 		if (mode.isEmpty() || folder.isEmpty()) {
 			printHelp();
@@ -65,13 +66,13 @@ public class CommonsWikimediaPreparation {
 		try {
 			switch (mode) {
 				case "parse-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, true, false, threads);
+					p.updateCommonsWiki(commonsWikiDB, true, false, keepFiles, threads);
 					break;
 				case "update-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, recreateDb, false, threads);
+					p.updateCommonsWiki(commonsWikiDB, recreateDb, false, keepFiles, threads);
 					break;
 				case "update-img-meta-daily":
-					p.updateCommonsWiki(commonsWikiDB, false, true, threads);
+					p.updateCommonsWiki(commonsWikiDB, false, true, keepFiles, threads);
 					break;
 				default:
 					printHelp();
@@ -92,6 +93,7 @@ public class CommonsWikimediaPreparation {
 		--dir=/path/to/wiki_files/*.xml.gz
 		--result_db=/path/to/result_db/meta_commonswiki.sqlite
 		--recreate_db recreate meta_commonswiki.sqlite
+		--keep_files keep downloaded files instead of deleting them
 		--threads=8 number of parsing threads
 		
 		--mode=parse-img-meta
@@ -110,7 +112,8 @@ public class CommonsWikimediaPreparation {
 		""");
 	}
 
-	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate, int threads)
+	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate,boolean keepFiles,
+								   int threads)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
 		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
@@ -125,8 +128,11 @@ public class CommonsWikimediaPreparation {
 		};
 		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate, dh);
 		executor.shutdown();
-		executor.awaitTermination(24, TimeUnit.HOURS);
-		wfd.removeDownloadedPages();
+		while(!executor.awaitTermination(1, TimeUnit.DAYS));
+		
+		if (!keepFiles) {
+			wfd.removeDownloadedPages();
+		}
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
 		createIndex(commonsWikiDBPath);

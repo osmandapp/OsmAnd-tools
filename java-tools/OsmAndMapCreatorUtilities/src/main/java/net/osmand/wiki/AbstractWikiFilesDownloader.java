@@ -5,9 +5,8 @@ import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +34,10 @@ public abstract class AbstractWikiFilesDownloader {
 	private long maxId = 0;
 	public final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
 	private static final String TIMESTAMP_FILE = "timestamp.txt";
+	private static final int INITIAL_WAIT_TIME_MS = 1000;
+	private static final int MAX_RETRIES = 5;
+	private static final int CONNECT_TIMEOUT = 30000;
+	private static final int READ_TIMEOUT = CONNECT_TIMEOUT * 2;
 
 	public AbstractWikiFilesDownloader(File wikiDB, boolean daily, DownloadHandler dh) {
 		try {
@@ -56,6 +59,8 @@ public abstract class AbstractWikiFilesDownloader {
 			log.info("Finish %s download".formatted(getFilePrefix()));
 		} catch (SQLException | IOException e) {
 			e.printStackTrace();
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -150,16 +155,12 @@ public abstract class AbstractWikiFilesDownloader {
 		}
 	}
 
-	private List<FileForDBUpdate> readFilesUrl(String wikiUrl) throws IOException {
-
+	private List<FileForDBUpdate> readFilesUrl(String wikiUrl) throws IOException, InterruptedException {
 		Pattern pattern = Pattern.compile(getLatestFilesPattern());
-		URLConnection connection = new URL(wikiUrl).openConnection();
-		connection.setRequestProperty("User-Agent", USER_AGENT);
-		connection.connect();
+		HttpURLConnection connection = openConnectionWithRetry(wikiUrl);
 		long maxPageId = getMaxPageId();
 		InputStream inputStream = connection.getInputStream();
-		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, Charset.forName("UTF-8")));
-
+		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
 		String line;
 		List<FileForDBUpdate> result = new ArrayList<>();
 		while ((line = r.readLine()) != null) {
@@ -177,16 +178,15 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 			}
 		}
+		connection.disconnect();
 		return result;
 	}
 
-	private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate) throws IOException {
+	private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate) throws IOException, InterruptedException {
 		// https://dumps.wikimedia.org/other/incr/commonswiki/
 		// pattern for <a href="20250926/">20250926/</a> find subfolder whose name is a date
 		Pattern pattern = Pattern.compile("<a href=\"\\d{8}/\">\\d{8}/</a>");
-		URLConnection connection = new URL(wikiUrl).openConnection();
-		connection.setRequestProperty("User-Agent", USER_AGENT);
-		connection.connect();
+		HttpURLConnection connection = openConnectionWithRetry(wikiUrl);
 		InputStream inputStream = connection.getInputStream();
 		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
 		String line;
@@ -200,6 +200,7 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 			}
 		}
+		connection.disconnect();
 		return result;
 	}
 
@@ -221,5 +222,46 @@ public abstract class AbstractWikiFilesDownloader {
 
 	private static class FileForDBUpdate {
 		String url;
+	}
+
+	public HttpURLConnection openConnectionWithRetry(String urlString)
+			throws IOException, InterruptedException {
+		int attempt = 0;
+		long waitTime = INITIAL_WAIT_TIME_MS;
+
+		while (true) {
+			attempt++;
+			HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
+			connection.setRequestProperty("User-Agent", USER_AGENT);
+			connection.setConnectTimeout(CONNECT_TIMEOUT);
+			connection.setReadTimeout(READ_TIMEOUT);
+
+			try {
+				int code = connection.getResponseCode();
+				if (code == HttpURLConnection.HTTP_OK) {
+					return connection;
+				} else if (code == 429) {
+					String retryAfter = connection.getHeaderField("Retry-After");
+					long waitSeconds = retryAfter != null ? Long.parseLong(retryAfter) : waitTime / 1000;
+					System.err.printf("429 Too Many Requests (attempt %d). Waiting %ds...%n", attempt, waitSeconds);
+					Thread.sleep(waitSeconds * 1000);
+					waitTime *= 2;
+				} else if (code >= 500 && code < 600) {
+					System.err.printf("Server error %d (attempt %d). Retrying in %d ms...%n",
+							code, attempt, waitTime);
+					Thread.sleep(waitTime);
+					waitTime *= 2;
+				} else {
+					throw new IOException("HTTP error " + code + " for URL " + urlString);
+				}
+			} catch (IOException e) {
+				connection.disconnect();
+				if (attempt >= MAX_RETRIES)
+					throw new IOException("Failed after retries: " + e.getMessage(), e);
+				System.err.printf("Connection error (attempt %d): %s%n", attempt, e.getMessage());
+				Thread.sleep(waitTime);
+				waitTime *= 2;
+			}
+		}
 	}
 }
