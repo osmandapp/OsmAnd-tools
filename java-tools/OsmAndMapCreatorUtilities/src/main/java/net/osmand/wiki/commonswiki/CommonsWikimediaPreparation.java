@@ -1,5 +1,6 @@
 package net.osmand.wiki.commonswiki;
 
+import net.osmand.MainUtilities;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.obf.preparation.DBDialect;
@@ -38,33 +39,27 @@ public class CommonsWikimediaPreparation {
 	public static final String FILE = "File:";
 
 	public static void main(String[] args) {
-		String folder = "";
-		String mode = "";
-		String database = "";
-		boolean recreateDb = false;
-		int threads = DEFAULT_THREADS;
+		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
+	}
 
-		for (String arg : args) {
-			String val = arg.substring(arg.indexOf("=") + 1);
-			if (arg.startsWith("--dir=")) {
-				folder = val;
-			} else if (arg.startsWith("--mode=")) {
-				mode = val;
-			} else if (arg.startsWith("--result_db=")) {
-				database = val;
-			} else if (arg.startsWith("--recreate_db")) {
-				recreateDb = true;
-			} else if (arg.startsWith("--threads")) {
-				threads = Integer.parseInt(val);
-			}
+	private static void applyCommandLineOpts(MainUtilities.CommandLineOpts opts) {
+		if (opts.getBoolean("--help")) {
+			printHelp();
+			System.exit(0);
 		}
+		String folder = opts.getOrDefault("--dir=","");
+		String mode = opts.getOrDefault("--mode=","");
+		String database = opts.getOrDefault("--result_db=","");
+		boolean recreateDb = opts.getBoolean("--recreate_db");
+		int threads = opts.getIntOrDefault("--threads=", DEFAULT_THREADS);
 
 		if (mode.isEmpty() || folder.isEmpty()) {
-			printHelpException("Correct arguments weren't supplied");
+			printHelp();
+			throw new RuntimeException("Correct arguments weren't supplied");
 		}
 
-		File commonsWikiDB = database.isEmpty() 
-				? new File(folder, RESULT_SQLITE) 
+		File commonsWikiDB = database.isEmpty()
+				? new File(folder, RESULT_SQLITE)
 				: new File(database);
 		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
 		try {
@@ -79,15 +74,26 @@ public class CommonsWikimediaPreparation {
 					p.updateCommonsWiki(commonsWikiDB, false, true, threads);
 					break;
 				default:
-					printHelpException("Unknown mode: " + mode);
+					printHelp();
+					throw new RuntimeException("Unknown mode: " + mode);
 			}
 		} catch (ParserConfigurationException | SAXException | IOException | SQLException | InterruptedException e) {
 			throw new RuntimeException("Error during parsing: " + e.getMessage(), e);
 		}
 	}
 
-	private static void printHelpException(String errorMessage) {
-		String helpMessage = """
+	private static void printHelp() {
+		System.out.println("""
+		Usage: process-commonswiki [--options]
+		
+		<dir> and <mode> are mandatory options
+		
+		--help print this help
+		--dir=/path/to/wiki_files/*.xml.gz
+		--result_db=/path/to/result_db/meta_commonswiki.sqlite
+		--recreate_db recreate meta_commonswiki.sqlite
+		--threads=8 number of parsing threads
+		
 		--mode=parse-img-meta
 		  Recreates the RESULT_SQLITE database and downloads, then parses commonswiki-latest-pages-articles.xml.gz
 		  from https://dumps.wikimedia.org/commonswiki/latest/ in parts.
@@ -101,11 +107,8 @@ public class CommonsWikimediaPreparation {
 		  Downloads and parses commonswiki-[date]-pages-meta-hist-incr.xml.bz2
 		  from https://dumps.wikimedia.org/other/incr/commonswiki/[date]/,
 		  starting from the date after the one recorded in timestamp.txt.
-		""";
-		System.out.println(helpMessage);
-		throw new RuntimeException(errorMessage);
+		""");
 	}
-
 
 	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate, int threads)
 			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {

@@ -1,6 +1,7 @@
 package net.osmand.wiki;
 
 import net.osmand.PlatformUtil;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 
 import java.io.*;
@@ -20,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public abstract class AbstractWikiFilesDownloader {
@@ -124,20 +124,15 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 				continue;
 			}
-			String cmd = "curl -A \"" + USER_AGENT + "\" " + p.url + " | bzcat | gzip -1 ";
-			System.out.println("Download " + p.url);
-			System.out.println(cmd);
-			Process process = Runtime.getRuntime().exec(new String[]{"bash", "-c", cmd});
-			BufferedReader reader = new BufferedReader(
-					new InputStreamReader(new GZIPInputStream(process.getInputStream())));
-
-			GZIPOutputStream gzout = new GZIPOutputStream(new FileOutputStream(gzFile));
-			String line;
-			while ((line = reader.readLine()) != null) {
-				line = line + System.lineSeparator();
-				gzout.write(line.getBytes(StandardCharsets.UTF_8));
+			try (InputStream in = new BufferedInputStream(new URL(p.url).openStream());
+				 BZip2CompressorInputStream bzIn = new BZip2CompressorInputStream(in);
+				 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(gzFile))) {
+				byte[] buffer = new byte[8192];
+				int n;
+				while ((n = bzIn.read(buffer)) != -1) {
+					gzOut.write(buffer, 0, n);
+				}
 			}
-			gzout.close();
 			System.out.println(gzFile + " downloading is finished");
 			downloadedPageFiles.add(gzFile);
 			if (dh != null) {

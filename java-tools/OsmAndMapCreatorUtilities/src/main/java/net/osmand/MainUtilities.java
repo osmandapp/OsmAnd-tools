@@ -257,8 +257,24 @@ public class MainUtilities {
 			return opts.get(key);
 		}
 
+		public String getOrDefault(String key, String defValue) {
+			return  opts.getOrDefault(key, defValue);
+		}
+
 		public boolean getBoolean(String key) {
 			return "true".equals(getOpt(key));
+		}
+
+		public int getIntOrDefault(String key, int defValue) {
+			String val = getOpt(key);
+			if (val == null) {
+				return defValue;
+			}
+			try {
+				return Integer.parseInt(val.trim());
+			} catch (NumberFormatException e) {
+				return defValue;
+			}
 		}
 
 		public void setOpt(String key, String val) {
@@ -475,5 +491,6 @@ public class MainUtilities {
 		System.out.println("\t\t random-route-tester --help # generate random routes and run java/cpp/hh comparison");
 		System.out.println("\t\t random-click-generator --help # generate random clicks for AutoRegressionTests");
 		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
+		System.out.println("\t\t process-commonswiki --help # download and parse commonswiki pages into meta_commonswiki.sqlite ");
 	}
 }
