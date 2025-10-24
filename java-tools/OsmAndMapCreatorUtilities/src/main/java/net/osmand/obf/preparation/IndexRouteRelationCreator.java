@@ -86,6 +86,7 @@ public class IndexRouteRelationCreator {
 	public static final String COLOR = "color"; // osmand:color
 	private static final String COLOUR = "colour"; // osmand:colour
 	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
+	public static final String OSMC_SYMBOL = "osmc:symbol";
 
 	private static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
 	private static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
@@ -241,11 +242,32 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	private void applyShieldTagsToNoSymbolRoute(Map<String, String> shieldTags, Map<String, String> relationTags) {
+	private void applyShieldTagsBySymbolOrActivity(Map<String, String> shieldTags, Map<String, String> relationTags) {
 		String routeType = relationTags.get(ROUTE);
 		if (routeType == null || shieldTags.containsKey(SHIELD_FG) || shieldTags.containsKey(SHIELD_BG)) {
-			return;
+			return; // shield is already calculated based on Ways of v1 routes
 		}
+
+		String osmcSymbol = relationTags.get(OSMC_SYMBOL);
+		if (osmcSymbol != null) {
+			Map<String, String> osmcTags = renderingTypes.transformOsmcAndColorTags(Map.of(OSMC_SYMBOL, osmcSymbol));
+			for (String tag : osmcTags.keySet()) {
+				for (String match : OSMC_TAGS_TO_SHIELD_PROPS.keySet()) {
+					if (tag.equals(match)) {
+						final String key = OSMC_TAGS_TO_SHIELD_PROPS.get(match);
+						final String prefix =
+								(SHIELD_BG_ICONS.contains(key) || SHIELD_FG_ICONS.contains(key)) ? OSMC_ICON_PREFIX : "";
+						final String suffix = SHIELD_BG_ICONS.contains(key) ? OSMC_ICON_BG_SUFFIX : "";
+						final String val = prefix + osmcTags.get(tag) + suffix;
+						shieldTags.putIfAbsent(key, val);
+					}
+				}
+			}
+			if (shieldTags.containsKey(SHIELD_FG) || shieldTags.containsKey(SHIELD_BG)) {
+				return; // got shield based on osmc:symbol
+			}
+		}
+
 		RouteActivity activity = routeActivityHelper.findActivityByTag(routeType);
 		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
 			String color = NO_SYMBOL_ROUTE_SHIELD_COLORS.get(routeType);
@@ -577,7 +599,7 @@ public class IndexRouteRelationCreator {
 				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			}
 		}
-		applyShieldTagsToNoSymbolRoute(shieldTags, relation.getTags());
+		applyShieldTagsBySymbolOrActivity(shieldTags, relation.getTags());
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId(), hash);
 	}
 
