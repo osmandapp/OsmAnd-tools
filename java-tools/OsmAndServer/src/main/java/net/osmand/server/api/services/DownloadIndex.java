@@ -179,16 +179,19 @@ public class DownloadIndex {
 	
 	public static class DownloadIndexSizeAdapter extends XmlAdapter<String, Double> {
 
-		private static final double MB =  1 << 20;
+		private static final double MB = 1 << 20;
 
 		@Override
 		public Double unmarshal(String v) throws Exception {
+			if (v == null || v.length() == 0) {
+				return null;
+			}
 			return Double.parseDouble(v);
 		}
 
 		@Override
 		public String marshal(Double v) throws Exception {
-			return String.format(Locale.US, "%.1f", v / MB);
+			return v == null ? "" : String.format(Locale.US, "%.1f", v / MB);
 		}
 	}
 	

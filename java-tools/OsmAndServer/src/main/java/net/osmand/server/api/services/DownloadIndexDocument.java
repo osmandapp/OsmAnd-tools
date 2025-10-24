@@ -68,7 +68,6 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "weather")
 	private List<DownloadIndex> weather = new ArrayList<>();
 	
-	
 	@XmlElement(name = "deleted_region")
 	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
 	
