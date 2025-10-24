@@ -1574,18 +1574,11 @@ public class WikiDatabasePreparation {
 			break;
 		case "update-wikidata":
 			wikidataDB = new File(wikidataSqliteName);
-			log.info("Process OSM coordinates...");
-			osmCoordinates.parse(wikidataDB.getParentFile());
-			WikiDatabaseUpdater wdu = new WikiDatabaseUpdater(wikidataDB);
-			List<String> downloadedPages = wdu.getDownloadedPages();
-			long maxQId = wdu.getMaxQId();
-			log.info("Updating wikidata...");
-			for (String f : downloadedPages) {
-				log.info("Updating " + f);
-				processWikidata(wikidataDB, f, osmCoordinates, maxQId);
-			}
-			wdu.removeDownloadedPages();
-			createOSMWikidataTable(wikidataDB, osmCoordinates);
+			updateWikidata(osmCoordinates, wikidataDB, false);
+			break; 
+		case "update-wikidata-daily":
+			wikidataDB = new File(wikidataSqliteName);
+			updateWikidata(osmCoordinates, wikidataDB, true);
 			break;
 		case "process-wikipedia":
 			log.info("Processing wikipedia...");
@@ -1600,6 +1593,22 @@ public class WikiDatabasePreparation {
 			createWikidataMapping(wikidataDB, wikidataFolder);
 			break;
 		}
+	}
+
+	private static void updateWikidata(OsmCoordinatesByTag osmCoordinates, File wikidataDB, boolean dailyUpdate) 
+			throws SQLException, ParserConfigurationException, SAXException, IOException {
+		log.info("Process OSM coordinates...");
+		osmCoordinates.parse(wikidataDB.getParentFile());
+		WikidataFilesDownloader wfd = new WikidataFilesDownloader(wikidataDB, dailyUpdate);
+		List<String> downloadedPageFiles = wfd.getDownloadedPageFiles();
+		long maxQId = wfd.getMaxQId();
+		log.info("Updating wikidata...");
+		for (String fileName : downloadedPageFiles) {
+			log.info("Updating from " + fileName);
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId);
+		}
+		wfd.removeDownloadedPages();
+		createOSMWikidataTable(wikidataDB, osmCoordinates);
 	}
 
 	protected static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
