@@ -4,26 +4,36 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
+import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.Street;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.util.MapUtils;
 
 public class ObfChecker {
 
 	private static int LIMIT_HH_POINTS_NEEDED = 100_000; 
+	private static int MAX_BUILDING_DISTANCE = 100; 
+	
 	public static void main(String[] args) {
 		// TODO
 //		OsmAndMapCreator/utilities.sh random-route-tester \
@@ -31,7 +41,7 @@ public class ObfChecker {
 //        --profile="$PROFILE" --min-dist=1 --no-conditionals \
 //        --max-dist=50 2>&1
 		if (args.length == 1 && args[0].equals("--test")) {
-			args = new String[] { System.getProperty("maps.dir") + "Canada_nunavut_northamerica_2.obf" };
+			args = new String[] { System.getProperty("maps.dir") + "Us_california_northamerica_2.road.obf" };
 		}
 		Map<String, String> argMap = new LinkedHashMap<String, String>();
 		List<String> files = new ArrayList<String>();
@@ -125,10 +135,79 @@ public class ObfChecker {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
+			if (!checkSimpleAddress(index, address, true)) {
+				ok = false;
+			}
 		}
-		
+
 		index.close();
 		return ok;
+	}
+
+	private static boolean checkSimpleAddress(BinaryMapIndexReader index, AddressRegion address, boolean checkDuplicateBuildings) throws IOException {
+		StringBuilder errors = new StringBuilder();
+		int cityInd = 0, streetInd = 0;
+		int errInd = 0;
+		// CityBlocks.VILLAGES_TYPE duplicate street
+		long time = System.currentTimeMillis();
+//		for (CityBlocks cityType : EnumSet.of(CityBlocks.CITY_TOWN_TYPE, CityBlocks.POSTCODES_TYPE)) {
+		for (CityBlocks cityType : EnumSet.of(CityBlocks.CITY_TOWN_TYPE, CityBlocks.POSTCODES_TYPE, CityBlocks.VILLAGES_TYPE )) {
+			List<City> cities = index.getCities(null, cityType, address, null);
+			for (City c : cities) {
+				cityInd++;
+				index.preloadStreets(c, null, true, null);
+				TreeSet<String> set = new TreeSet<>();
+				for (Street s : c.getStreets()) {
+					// to do ignore for now
+					if (s.getName().startsWith("<")) {
+						continue;
+					}
+					streetInd++;
+					if (set.contains(s.getName())) {
+						String err = String.format(" %d. duplicate street '%s' in '%s'", errInd++, s.getName(),
+								c.getName());
+						addErr(errors, errInd, err);
+					}
+					set.add(s.getName());
+					if (!checkDuplicateBuildings) {
+						continue;
+					}
+					Map<String, Building> map = new TreeMap<>();
+					for (Building b : s.getBuildings()) {
+						Building bld = map.get(b.getName());
+						if (bld == null) {
+							map.put(b.getName(), b);
+						} else {
+							double dist = MapUtils.getDistance(b.getLocation(), bld.getLocation());
+							if (dist > MAX_BUILDING_DISTANCE) {
+								String err = String.format(
+										" %d. Buildings '%s' ('%s' in '%s') too far %.2f km (%.5f, %.5f - %.5f, %.5f) ",
+										errInd++, b.getName(), s.getName(), c.getName(), dist / 1000,
+										b.getLocation().getLatitude(), b.getLocation().getLongitude(),
+										bld.getLocation().getLatitude(), bld.getLocation().getLongitude());
+								addErr(errors, errInd, err);
+							}
+						}
+					}
+				}
+				c.getStreets().clear(); // free memory
+			}
+		}
+		if (!errors.isEmpty()) {
+			System.err.printf("Checked %d cities, %d streets (%.1f s) - found %d errors in address section\n", cityInd, streetInd,
+					(System.currentTimeMillis() - time) / 1000.0f, errInd);
+//			System.err.println("Errors in address section: " + errors);
+		}
+//		return errors.isEmpty();
+		return true;
+	}
+
+	private static void addErr(StringBuilder errors, int errInd, String err) {
+		if (errInd % 5 == 0) {
+			errors.append("\n");
+		} else if (errors.length() < 1_000_000) {
+			errors.append(err);
+		}
 	}
 
 	private static boolean checkHHRegion(BinaryMapIndexReader index, HHRouteRegion hr) throws IOException {

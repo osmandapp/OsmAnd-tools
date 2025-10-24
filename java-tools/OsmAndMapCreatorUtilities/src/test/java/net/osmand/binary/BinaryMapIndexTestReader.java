@@ -99,10 +99,10 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
 			BinaryMapAddressReaderAdapter.AddressRegion region = new BinaryMapAddressReaderAdapter.AddressRegion();
 			region.name = Algorithms.getFileNameWithoutExtension(jsonFile);
-			region.left31 = 0;
-			region.top31 = 0;
-			region.right31 = Integer.MAX_VALUE;
-			region.bottom31 = Integer.MAX_VALUE;
+//			region.left31 = 0;
+//			region.top31 = 0;
+//			region.right31 = Integer.MAX_VALUE;
+//			region.bottom31 = Integer.MAX_VALUE;
 			region.attributeTagsTable = new ArrayList<>(attributeTagsTable);
 			reader.addressIndexes.add(region);
 			reader.indexes.add(region);
@@ -193,10 +193,6 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		return true;
 	}
 
-	@Override
-	public boolean containsAddressData(int left31x, int top31y, int right31x, int bottom31y) {
-		return true;
-	}
 
 	@Override
 	public boolean containsMapData(int tile31x, int tile31y, int zoom) {
