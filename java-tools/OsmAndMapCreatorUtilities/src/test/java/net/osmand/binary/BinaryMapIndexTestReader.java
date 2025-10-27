@@ -129,7 +129,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
 
 	@Override
-	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks cityType) throws IOException {
+	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks cityType, BinaryMapAddressReaderAdapter.AddressRegion onlyRegion, SearchStat searchStat) throws IOException {
 		for (City city : cities) {
 			if (resultMatcher != null) {
 				resultMatcher.publish(city);
