@@ -109,6 +109,10 @@ public class Boundary {
 	public LatLon getCenterPoint() {
 		return multipolygon.getCenterPoint();
 	}
+	
+	public LatLon getPolyCenterPoint() {
+		return multipolygon.getPolyCenter();
+	}
 
 	public Multipolygon getMultipolygon() {
 		return multipolygon;

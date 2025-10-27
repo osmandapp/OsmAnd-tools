@@ -426,7 +426,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			Boundary boundary = new Boundary(m);
 			boundary.setName(bname);
-			boundary.setAltName(e.getTag("short_name")); // Goteborg
+			boundary.setAltName(e.getTag("short_name")); // Goteborg, Esslingen
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			boundary.setBoundaryId(ObfConstants.createMapObjectIdFromOsmAndEntity(e));
 			if (ct == null && census) {
@@ -1244,7 +1244,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			City city = new City(CityType.BOUNDARY);
 			cityDataStorage.assignBbox(city, b);
 			city.setId(b.getBoundaryId());
-			city.setLocation(b.getCenterPoint());
+//			b.getAdminCenterId(); // could be improved by admin center ?
+			city.setLocation(b.getPolyCenterPoint());
 			city.setName(b.getName());
 			if (b.hasAdminLevel()) {
 				city.setName("admin_level", b.getAdminLevel() + ""); // to retrieve later

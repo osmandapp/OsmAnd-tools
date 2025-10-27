@@ -99,19 +99,18 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress", "-vcities", "-vstreetgroups",// "-vcitynames",
-					"-vstreets",  "-vbuildings",// "-vintersections",
+//					"-vstreets",  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
 //					"-latlon=41.4,-75.7,0.05",
-//					"-latlon=45.445189,12.323986,0.05",
+//					"-latlon=48.804242,9.215574,0.005",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					
-					System.getProperty("maps.dir") + "Oakville.obf"
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_3.obf"
+					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_3.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
