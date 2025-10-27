@@ -60,6 +60,7 @@ public class IndexRouteRelationCreator {
 	};
 
 	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = false;
+	private static final boolean COLLECT_OSM_ROUTE_RELATION_NODES = false; // TODO implement unique node.id before use
 
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
@@ -181,7 +182,7 @@ public class IndexRouteRelationCreator {
 		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
-//			List<Node> pointsOfRelationNodes = new ArrayList<>();
+			List<Node> pointsOfRelationNodes = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
 			TLongHashSet geometryBeforeCompletion = new TLongHashSet();
@@ -195,7 +196,9 @@ public class IndexRouteRelationCreator {
 				return; // incomplete relation
 			}
 
-//			collectOsmRouteRelationNodes(relation, pointsOfRelationNodes);
+			if (COLLECT_OSM_ROUTE_RELATION_NODES) {
+				collectOsmRouteRelationNodes(relation, pointsOfRelationNodes);
+			}
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
 			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags, hash);
 
@@ -219,12 +222,11 @@ public class IndexRouteRelationCreator {
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
-//			for (Node node : pointsOfRelationNodes) {
-//				// FIXME: unique id or another approach for node.id required here
-//				// When the same Node is the member of different Relations, we got the error:
-//				// A PRIMARY KEY constraint failed (UNIQUE constraint failed: poi.id, poi.type, poi.subtype)
-//				indexPoiCreator.iterateEntity(node, ctx, icc);
-//			}
+			if (COLLECT_OSM_ROUTE_RELATION_NODES) {
+				for (Node node : pointsOfRelationNodes) {
+					indexPoiCreator.iterateEntity(node, ctx, icc);
+				}
+			}
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
 		}
 		if (OsmMapUtils.isSuperRoute(relation.getTags())) {
