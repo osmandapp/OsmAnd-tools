@@ -258,7 +258,7 @@ public class MainUtilities {
 		}
 
 		public String getOrDefault(String key, String defValue) {
-			return  opts.getOrDefault(key, defValue);
+			return opts.getOrDefault(key, defValue);
 		}
 
 		public boolean getBoolean(String key) {
