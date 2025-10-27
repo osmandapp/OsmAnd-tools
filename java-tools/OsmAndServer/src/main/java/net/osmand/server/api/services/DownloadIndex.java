@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -73,6 +74,11 @@ public class DownloadIndex {
 
 	public void setDate(long timestamp) {
 		this.date = DATE_FORMAT.format(new Date(timestamp));
+	}
+	
+	public void setDateByString(String s) throws ParseException {
+		this.date = s;
+		this.timestamp = DATE_FORMAT.parse(s).getTime();
 	}
 
 	public void setSize(double size) {
@@ -173,16 +179,19 @@ public class DownloadIndex {
 	
 	public static class DownloadIndexSizeAdapter extends XmlAdapter<String, Double> {
 
-		private static final double MB =  1 << 20;
+		private static final double MB = 1 << 20;
 
 		@Override
 		public Double unmarshal(String v) throws Exception {
+			if (v == null || v.length() == 0) {
+				return null;
+			}
 			return Double.parseDouble(v);
 		}
 
 		@Override
 		public String marshal(Double v) throws Exception {
-			return String.format(Locale.US, "%.1f", v / MB);
+			return v == null ? "" : String.format(Locale.US, "%.1f", v / MB);
 		}
 	}
 	

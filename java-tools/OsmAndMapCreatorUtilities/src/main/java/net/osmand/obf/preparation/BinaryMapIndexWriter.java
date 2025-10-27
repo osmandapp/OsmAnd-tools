@@ -1168,6 +1168,9 @@ public class BinaryMapIndexWriter {
 			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes,
 			Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
+		if (street.getName().startsWith("Burnhamthorpe")) {
+			System.out.println("--- ");
+		}
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
 		streetBuilder.setName(street.getName());
 		if (checkEnNameToWrite(street)) {

@@ -874,7 +874,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/korntal.osm";
+		String file = rootFolder + "../temp/oakville.osm";
 //		String file = rootFolder + "../temp/ost.osm";
 //		String file = rootFolder + "../temp/london.osm";
 //		String file = rootFolder + "../temp/andorra_europe.pbf";

@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -8,6 +9,8 @@ import java.util.List;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+
+import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
 @XmlRootElement(name = "osmand_regions")
 public class DownloadIndexDocument {
@@ -65,6 +68,32 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "weather")
 	private List<DownloadIndex> weather = new ArrayList<>();
 	
+	@XmlElement(name = "deleted_region")
+	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
+	
+	
+	public void setOudatedMaps() {
+		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
+		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
+		addDeletedMap("India_asia.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+		/// ..
+	}
+	
+	
+	private void addDeletedMap(String name, DownloadType tp, String date) {
+		try {
+			DownloadIndex di = new DownloadIndex();
+			di.setName(name);
+			di.setDateByString(date);
+			di.setType(tp);
+			deletedMaps.add(di);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+	}
+
+
 	public void prepareMaps() {
 		sortMaps(maps);
 		sortMaps(roadMaps);
@@ -184,4 +213,6 @@ public class DownloadIndexDocument {
 	public void setGentime(String gentime) {
 		this.gentime = gentime;
 	}
+
+	
 }

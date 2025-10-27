@@ -406,6 +406,7 @@ public class DownloadIndexesService  {
 			marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
 			doc.setMapVersion(1);
 			doc.setTimestamp(new SimpleDateFormat("dd.MM.yyyy HH:mm:ss").format(new Date()));
+			doc.setOudatedMaps();
 			doc.setGentime(String.format("%.1f",
 					((System.currentTimeMillis() - start) / 1000.0)));
 			marshaller.marshal(doc, file);

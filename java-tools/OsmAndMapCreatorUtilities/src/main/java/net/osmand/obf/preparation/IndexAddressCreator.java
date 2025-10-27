@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+
 import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
@@ -820,6 +821,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			interpolationByHouseNumber = getInterpolationByHouseNumber(e);
 		}
 		if (e instanceof Way && (interpolation != null || interpolationByHouseNumber != null)) {
+			
 			BuildingInterpolation type = null;
 			int interpolationInterval = 0;
 			try {
@@ -860,6 +862,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, place, null, l, icc);
 						if (!idsOfStreet.isEmpty()) {
+							if (Algorithms.extractFirstIntegerNumber(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER)) > 
+								Algorithms.extractFirstIntegerNumber(second.getTag(OSMTagKey.ADDR_HOUSE_NUMBER))) {
+								Node t = second;
+								second = first;
+								first = t;
+							}
 							Building building = EntityParser.parseBuilding(first);
 							building.setInterpolationInterval(interpolationInterval);
 							building.setInterpolationType(type);
