@@ -155,7 +155,7 @@ public class IndexRouteRelationCreator {
 			"showRunningRoutes", "true"
 			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
 	);
-
+	public static final String DEFAULT_CLICKABLE_WAY_ACTIVITY_COLOR = "red";
 
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
@@ -288,9 +288,13 @@ public class IndexRouteRelationCreator {
 			}
 		}
 		RouteActivity activity = null;
-		for (String clickableTag : ClickableWayTags.CLICKABLE_TAGS) {
-			if (tags.containsKey(clickableTag)) {
-				activity = routeActivityHelper.findActivityByTag(clickableTag);
+		for (String clickableTagValue : ClickableWayTags.CLICKABLE_TAGS) {
+			String[] tagValue = clickableTagValue.split("=");
+			boolean found = tagValue.length < 2
+					? tags.containsKey(clickableTagValue) // tag or tag:value
+					: tagValue[1].equals(tags.get(tagValue[0])); // tag=value (snowmobile=yes)
+			if (found) {
+				activity = routeActivityHelper.findActivityByTag(clickableTagValue);
 				if (activity != null) {
 					break;
 				}
@@ -298,11 +302,12 @@ public class IndexRouteRelationCreator {
 		}
 		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
 			String color = ClickableWayTags.getGpxColorByTags(tags);
-			if (color != null) {
-				tags.put(SHIELD_BG, "osmc_" + color + "_bg");
-				tags.put(SHIELD_FG, activity.getIconName());
-				tags.put(SHIELD_STUB_NAME, ".");
+			if (color == null) {
+				color = DEFAULT_CLICKABLE_WAY_ACTIVITY_COLOR;
 			}
+			tags.put(SHIELD_BG, "osmc_" + color + "_bg");
+			tags.put(SHIELD_FG, activity.getIconName());
+			tags.put(SHIELD_STUB_NAME, ".");
 		}
 	}
 
