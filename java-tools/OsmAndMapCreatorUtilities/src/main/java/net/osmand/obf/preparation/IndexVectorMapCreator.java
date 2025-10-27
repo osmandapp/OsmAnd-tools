@@ -730,7 +730,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             Map<String, String> tags = tagsTransformer.addPropogatedTags(renderingTypes, EntityConvertApplyType.MAP, e, e.getTags());
             if (e instanceof Way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
                 tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
-                icc.getIndexRouteRelationCreator().applyActivityMapShieldToNamelessClickableWay(tags);
+                icc.getIndexRouteRelationCreator().applyActivityMapShieldToClickableWay(tags, false);
             }
             // manipulate what kind of way to load
             long originalId = e.getId();

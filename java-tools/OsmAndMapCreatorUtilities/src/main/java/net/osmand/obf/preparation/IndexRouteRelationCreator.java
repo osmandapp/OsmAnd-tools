@@ -65,8 +65,6 @@ public class IndexRouteRelationCreator {
 	private static final String SHIELD_BG = "shield_bg";
 	private static final String SHIELD_TEXT = "shield_text";
 	public static final String SHIELD_STUB_NAME = "shield_stub_name";
-	private static final String SHIELD_MAP_FG = "shield_map_fg";
-	private static final String SHIELD_MAP_BG = "shield_map_bg";
 
 	private static final String ROUTE = "route";
 
@@ -279,10 +277,12 @@ public class IndexRouteRelationCreator {
 		}
 	}
 
-	protected void applyActivityMapShieldToNamelessClickableWay(Map<String, String> tags) {
-		for (String nameTag : ClickableWayTags.REQUIRED_TAGS_ANY) {
-			if (tags.containsKey(nameTag)) {
-				return;
+	protected void applyActivityMapShieldToClickableWay(Map<String, String> tags, boolean applyOnNamelessOnly) {
+		if (applyOnNamelessOnly) {
+			for (String nameTag : ClickableWayTags.REQUIRED_TAGS_ANY) {
+				if (tags.containsKey(nameTag)) {
+					return;
+				}
 			}
 		}
 		RouteActivity activity = null;
@@ -297,8 +297,8 @@ public class IndexRouteRelationCreator {
 		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
 			String color = ClickableWayTags.getGpxColorByTags(tags);
 			if (color != null) {
-				tags.put(SHIELD_MAP_BG, "osmc_" + color + "_bg");
-				tags.put(SHIELD_MAP_FG, activity.getIconName());
+				tags.put(SHIELD_BG, "osmc_" + color + "_bg");
+				tags.put(SHIELD_FG, activity.getIconName());
 				tags.put(SHIELD_STUB_NAME, ".");
 			}
 		}
