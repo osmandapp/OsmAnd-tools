@@ -208,6 +208,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (e instanceof Way way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
 			tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
 			icc.getIndexRouteRelationCreator().collectElevationStatsForWays(List.of(way), tags, icc);
+			icc.getIndexRouteRelationCreator().applyActivityMapShieldToClickableWay(tags, false);
 		}
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
