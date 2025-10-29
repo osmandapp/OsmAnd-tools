@@ -137,7 +137,7 @@ public class CalculateOsmChangesets {
 					}
 					url += toQuery.remove(0);
 				}
-				Thread.sleep(1000);
+				Thread.sleep(500);
 				LOG.info("Query " + url);
 				HttpsURLConnection con = (HttpsURLConnection) new URL(url).openConnection();
 				con.setHostnameVerifier(new HostnameVerifier() {
