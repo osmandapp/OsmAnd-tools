@@ -540,8 +540,9 @@ public class WikiService {
 				imageDetails.put("date", rs.getString("date"));
 				imageDetails.put("author", rs.getString("author"));
 				imageDetails.put("license", getLicense(rs.getString("license")));
+				imageDetails.put("description", rs.getString("description"));
 				imageDetails.put("imageTitle", imageTitle);
-				
+
 				imagesWithDetails.add(imageDetails);
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
@@ -591,13 +592,13 @@ public class WikiService {
 
 		String query;
 		if (hasWikidataId) {
-			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF + 
+			query = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
+					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF +
 					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
 			params.add(wikidataId);
 		} else if (hasCategory) {
 			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
-			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
+			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, '' AS description, c.views as views"
 					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
 					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
 					+ " ORDER BY views DESC, imgName ASC LIMIT " + LIMIT_PHOTOS_QUERY;
@@ -620,12 +621,12 @@ public class WikiService {
 				rowCallbackHandler
 		);
 	}
-	
+
 	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
 		if (imagesWithDetails.isEmpty()) {
 			return;
 		}
-		
+
 		String photoTitle = getPhotoTitleFromWikidata(wikidataId);
 		if (photoTitle == null) {
 			return;
@@ -638,7 +639,7 @@ public class WikiService {
 		imagesWithDetails.addAll(partitioned.get(true));
 		imagesWithDetails.addAll(partitioned.get(false));
 	}
-	
+
 	private String getPhotoTitleFromWikidata(String wikidataId) {
 		if (wikidataId.startsWith("Q")) {
 			wikidataId = wikidataId.substring(1);
@@ -691,6 +692,7 @@ public class WikiService {
 			feature.properties.put("date", metadata.getDate());
 			feature.properties.put("author", metadata.getAuthor());
 			feature.properties.put("license", metadata.getLicense());
+			feature.properties.put("description", metadata.getDescription());
 			feature.properties.put("mediaId", imageDetails.getMediaId());
 			return feature;
 		}).toList();
