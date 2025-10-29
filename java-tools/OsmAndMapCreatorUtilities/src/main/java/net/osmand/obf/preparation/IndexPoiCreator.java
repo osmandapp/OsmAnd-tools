@@ -205,11 +205,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tempAmenityList.clear();
 		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
 		tags = renderingTypes.transformTags(tags, EntityType.valueOf(e), EntityConvertApplyType.POI);
-		if (e instanceof Way way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
-			tags = new LinkedHashMap<>(tags); // modifiable copy of Collections.unmodifiableMap
-			icc.getIndexRouteRelationCreator().collectElevationStatsForWays(List.of(way), tags, icc);
-			icc.getIndexRouteRelationCreator().applyActivityMapShieldToClickableWay(tags, false);
-		}
+		tags = icc.getIndexRouteRelationCreator().addClickableWayTags(icc, e, tags, true);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if (isOutOfRegionBbox(e, icc)) {

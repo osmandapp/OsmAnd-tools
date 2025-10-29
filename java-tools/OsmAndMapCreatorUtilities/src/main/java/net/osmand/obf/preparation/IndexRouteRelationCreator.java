@@ -779,4 +779,16 @@ public class IndexRouteRelationCreator {
 	public void closeAllStatements() {
 
 	}
+
+	public Map<String, String> addClickableWayTags(IndexCreationContext icc, Entity entity,
+	                                               Map<String, String> tags, boolean collectElevationMetrics) {
+		if (entity instanceof Way way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
+			tags = new LinkedHashMap<>(tags);
+			applyActivityMapShieldToClickableWay(tags, false);
+			if (collectElevationMetrics) {
+				collectElevationStatsForWays(List.of(way), tags, icc);
+			}
+		}
+		return tags;
+	}
 }
