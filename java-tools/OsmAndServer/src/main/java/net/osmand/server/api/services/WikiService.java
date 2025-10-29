@@ -541,13 +541,18 @@ public class WikiService {
 				imageDetails.put("author", rs.getString("author"));
 				imageDetails.put("license", getLicense(rs.getString("license")));
 				imageDetails.put("description", rs.getString("description"));
-				
+				imageDetails.put("imageTitle", imageTitle);
+
 				imagesWithDetails.add(imageDetails);
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
 				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
 			queryImagesByWikidataAndCategory(articleId, categoryName, h);
+
+			if (articleId != null && !Algorithms.isEmpty(articleId)) {
+				moveWikidataPhotoToFirst(imagesWithDetails, articleId);
+			}
 		}
 		return imagesWithDetails;
 	}
@@ -574,20 +579,23 @@ public class WikiService {
 		jdbcTemplate.query(query, pss, rowCallbackHandler);
 	}
 
-	private void queryImagesByWikidataAndCategory(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+	private void queryImagesByWikidataAndCategory(String wikidataId, String categoryName, RowCallbackHandler rowCallbackHandler) {
 		List<Object> params = new ArrayList<>();
-		boolean hasArticleId = articleId != null && !Algorithms.isEmpty(articleId);
+
+		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
-		if (hasArticleId) {
+
+		if (hasWikidataId) {
 			// Remove "Q" prefix from Wikidata ID if present
-			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
+			wikidataId = wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
 		}
+
 		String query;
-		if (hasArticleId) {
+		if (hasWikidataId) {
 			query = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF + 
+					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF +
 					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(articleId);
+			params.add(wikidataId);
 		} else if (hasCategory) {
 			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
 			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, '' AS description, c.views as views"
@@ -612,6 +620,39 @@ public class WikiService {
 				},
 				rowCallbackHandler
 		);
+	}
+
+	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
+		if (imagesWithDetails.isEmpty()) {
+			return;
+		}
+
+		String photoTitle = getPhotoTitleFromWikidata(wikidataId);
+		if (photoTitle == null) {
+			return;
+		}
+
+		Map<Boolean, List<Map<String, Object>>> partitioned = imagesWithDetails.stream()
+				.collect(Collectors.partitioningBy(img -> photoTitle.equals(img.get("imageTitle"))));
+
+		imagesWithDetails.clear();
+		imagesWithDetails.addAll(partitioned.get(true));
+		imagesWithDetails.addAll(partitioned.get(false));
+	}
+
+	private String getPhotoTitleFromWikidata(String wikidataId) {
+		if (wikidataId.startsWith("Q")) {
+			wikidataId = wikidataId.substring(1);
+		}
+		String query = "SELECT photoTitle FROM wiki.wikidata WHERE id = ? LIMIT 1";
+		try {
+			return jdbcTemplate.queryForObject(query, String.class, wikidataId);
+		} catch (EmptyResultDataAccessException e) {
+			return null;
+		} catch (Exception e) {
+			log.error("Error getting photoTitle from wikidata for id: " + wikidataId, e);
+			return null;
+		}
 	}
 
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
