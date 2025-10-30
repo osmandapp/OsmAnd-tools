@@ -200,7 +200,6 @@ def process_place(run_id, place_info, is_selected, media_ids):
                     place_run['duration'] = res['duration']
                     place_run['prompt_tokens'] = res['prompt_tokens']
                     place_run['completion_tokens'] = res['completion_tokens']
-                    place_run['cached_tokens'] = res['cached_tokens']
             except (
                     openai.PermissionDeniedError,
                     openai.AuthenticationError,
@@ -212,7 +211,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
             except RuntimeError as e:
                 place_run['error'] = f"{e}"
                 insert_place_batch(place_run, [])
-                return False, place_run
+                return True, place_run
 
             if not res or 'results' not in res or not res['results'] or res['results'] is None:
                 print(f"#{current_thread().name}. Warning: SKIPPED place {place_id} because of incorrect LLM response.")
@@ -300,5 +299,7 @@ if __name__ == "__main__":
     try:
         with executor:
             score_places()
+        if stop_immediately:
+            raise SystemExit(1)
     finally:
         is_done = True
