@@ -3,7 +3,6 @@ import queue
 import threading
 import time
 from concurrent.futures import Future
-from time import sleep
 from typing import Callable, List, Dict, Tuple
 
 
@@ -102,45 +101,3 @@ class BoundedThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
                 return [v for k, v in self.futures.items() if not k.done()]
             else:
                 return [v for k, v in self.futures.items() if not k.done() and time.time() - v[0] > timeout]
-
-
-def task(arg1, arg2):
-    print(f"#{threading.current_thread().name}. Processing: {(arg1, arg2)} ...")
-    if arg2 == 3:
-        raise Exception("Error in task: arg2 == 3")
-    sleep(5)
-    print(f"#{threading.current_thread().name}. Done: {(arg1, arg2)}")
-
-
-def done_callback(future):
-    # Ensure the task is fully settled and any exception is consumed here.
-    # This prevents unhandled exceptions from being raised elsewhere while still reporting status.
-    try:
-        if future.cancelled():
-            print(f"#{threading.current_thread().name}. Task was cancelled")
-            return
-        # This will raise if the task failed; we catch below so the pool can proceed normally.
-        _ = future.result()
-        print(f"#{threading.current_thread().name}. Task finished successfully")
-    except Exception as e:
-        # Report the error but do not re-raise, so the executor can release permits and continue.
-        print(f"#{threading.current_thread().name}. Task failed with error: {e}")
-
-
-def main():
-    tasks = [('id', 1), ('id', 2), ('id', 3), ('id', 4), ('id', 5), ('id', 6), ('id', 7), ('id', 8), ('id', 9), ('id', 10)]
-    # Create a fixed-size blocking queue
-    with BoundedThreadPoolExecutor(task, done_callback, 2, "Thread") as e:
-        # Add tasks to the queue (blocks if queue is full)
-        timeout = 2
-        start_time = time.time()
-        for i in tasks:
-            print(f"Main: Attempting to add task {i}...")
-            e.submit(*i)  # Blocks here if queue is full
-            print(f"Main: Successfully added task {i}")
-            if time.time() - start_time > timeout:
-                print(f"Delayed tasks: {[arg2 for arg1, arg2 in e.undone_futures_args(timeout)]}.")
-
-
-if __name__ == "__main__":
-    main()
