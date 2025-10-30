@@ -541,7 +541,6 @@ public class WikiService {
 				imageDetails.put("author", rs.getString("author"));
 				imageDetails.put("license", getLicense(rs.getString("license")));
 				imageDetails.put("description", rs.getString("description"));
-				imageDetails.put("imageTitle", imageTitle);
 
 				imagesWithDetails.add(imageDetails);
 			};
@@ -627,31 +626,61 @@ public class WikiService {
 			return;
 		}
 
-		String photoTitle = getPhotoTitleFromWikidata(wikidataId);
-		if (photoTitle == null) {
+		Long photoId = getPhotoIdFromWikidata(wikidataId);
+		if (photoId == null) {
 			return;
 		}
 
 		Map<Boolean, List<Map<String, Object>>> partitioned = imagesWithDetails.stream()
-				.collect(Collectors.partitioningBy(img -> photoTitle.equals(img.get("imageTitle"))));
+				.collect(Collectors.partitioningBy(img -> photoId.equals(img.get("mediaId"))));
+
+		List<Map<String, Object>> matched = partitioned.get(true);
+		if (matched.isEmpty()) {
+			Map<String, Object> wikidataPhoto = fetchWikidataPhoto(photoId);
+			if (wikidataPhoto != null && !wikidataPhoto.isEmpty()) {
+				matched.add(wikidataPhoto);
+			}
+		}
 
 		imagesWithDetails.clear();
-		imagesWithDetails.addAll(partitioned.get(true));
+		imagesWithDetails.addAll(matched);
 		imagesWithDetails.addAll(partitioned.get(false));
 	}
 
-	private String getPhotoTitleFromWikidata(String wikidataId) {
+	private Long getPhotoIdFromWikidata(String wikidataId) {
 		if (wikidataId.startsWith("Q")) {
 			wikidataId = wikidataId.substring(1);
 		}
-		String query = "SELECT photoTitle FROM wiki.wikidata WHERE id = ? LIMIT 1";
+		String query = "SELECT photoId FROM wiki.wikidata WHERE id = ? LIMIT 1";
 		try {
-			return jdbcTemplate.queryForObject(query, String.class, wikidataId);
+			return jdbcTemplate.queryForObject(query, Long.class, wikidataId);
 		} catch (EmptyResultDataAccessException e) {
 			return null;
 		} catch (Exception e) {
-			log.error("Error getting photoTitle from wikidata for id: " + wikidataId, e);
+			log.error("Error getting photoId from wikidata for id: " + wikidataId, e);
 			return null;
+		}
+	}
+
+	private Map<String, Object> fetchWikidataPhoto(Long mediaId) {
+		String query = "SELECT mediaId, imageTitle, date, author, license, description " +
+				"FROM top_images_final WHERE mediaId = ? LIMIT 1";
+		try {
+			return jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
+				Map<String, Object> imageDetails = new HashMap<>();
+				imageDetails.put("mediaId", rs.getLong("mediaId"));
+				imageDetails.put("image", createImageUrl(rs.getString("imageTitle")));
+				imageDetails.put("date", rs.getString("date"));
+				imageDetails.put("author", rs.getString("author"));
+				imageDetails.put("license", getLicense(rs.getString("license")));
+				imageDetails.put("description", rs.getString("description"));
+				return imageDetails;
+			}, mediaId);
+		} catch (EmptyResultDataAccessException e) {
+			return Collections.emptyMap();
+		} catch (Exception e) {
+			log.error("Error fetching photo by mediaId: " + mediaId, e);
+			return Collections.emptyMap();
 		}
 	}
 
