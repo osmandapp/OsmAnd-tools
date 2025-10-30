@@ -272,7 +272,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
 
         place_run['error'] = f"{e}"
         insert_place_batch(place_run, [])
-        return False, place_run
+        return True, place_run
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
