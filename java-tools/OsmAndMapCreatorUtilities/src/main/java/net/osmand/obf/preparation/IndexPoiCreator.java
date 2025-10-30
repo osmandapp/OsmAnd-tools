@@ -1157,7 +1157,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		public int getRating() {
 			int rt = 0;
 			for (PoiAdditionalType t : additionalTags.keySet()) {
-				if (t.getTag().equals("travel_elo")) {
+				if (t.getTag().equals(Amenity.TRAVEL_ELO)) {
 					try {
 						rt = Integer.parseInt(additionalTags.get(t));
 					} catch (NumberFormatException e) {

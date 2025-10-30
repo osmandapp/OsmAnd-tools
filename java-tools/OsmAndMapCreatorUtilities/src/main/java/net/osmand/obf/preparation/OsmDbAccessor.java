@@ -53,6 +53,8 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 	public interface OsmDbTagsPreparation {
 
 		void processTags(Entity e);
+
+		default void newIteration(EntityType type) {} ;
 		
 	}
 
@@ -254,6 +256,9 @@ public class OsmDbAccessor implements OsmDbAccessorContext {
 		int count = 0;
 		if (realCounts) {
 			computeRealCounts();
+		}
+		if (tagsPrepration != null) {
+			tagsPrepration.newIteration(type);
 		}
 
 		BlockingQueue<Entity> toProcess = new ArrayBlockingQueue<Entity>(100000);

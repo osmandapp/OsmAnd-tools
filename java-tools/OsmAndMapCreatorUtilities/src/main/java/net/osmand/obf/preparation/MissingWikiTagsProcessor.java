@@ -14,6 +14,7 @@ import org.apache.commons.logging.LogFactory;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbTagsPreparation;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.util.Algorithms;
 
@@ -30,6 +31,11 @@ public class MissingWikiTagsProcessor implements OsmDbTagsPreparation {
 	public MissingWikiTagsProcessor(String wikidataMappingUrl, String wikirankingUrl) {
 		this.wikidataMappingUrl = wikidataMappingUrl;
 		this.wikirankingUrl = wikirankingUrl;
+	}
+	
+	@Override
+	public void newIteration(EntityType type) {
+		assignedWids.clear();
 	}
 
 	

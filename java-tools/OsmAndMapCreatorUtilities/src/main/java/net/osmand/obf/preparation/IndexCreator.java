@@ -854,14 +854,16 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-//		settings.indexMap = true;
-		settings.indexAddress = true;
+		settings.indexMap = true;
+//		settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
-//		settings.indexRouting = true;
+		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
+		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
+		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
 		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;
@@ -874,8 +876,8 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-//		String file = rootFolder + "../temp/oakville.osm";
-		String file = rootFolder + "../temp/stuttgart.osm";
+		String file = rootFolder + "../temp/ukraine_kyiv-city_europe.pbf";
+//		String file = rootFolder + "../temp/stuttgart.osm";
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
