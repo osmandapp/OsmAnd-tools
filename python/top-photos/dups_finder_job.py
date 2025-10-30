@@ -156,6 +156,8 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
         traceback.print_exc()
         print(f"#{current_thread().name}. Error for place Q{place_id}: {e}")
         insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, f"{e}", SAVE_SCORE_ENV)
+        return True, place_id
+
     return False, place_id
 
 
@@ -232,5 +234,7 @@ if __name__ == "__main__":
     try:
         with executor:
             find_duplicates()
+        if stop_immediately:
+            raise SystemExit(1)
     finally:
         is_done = True
