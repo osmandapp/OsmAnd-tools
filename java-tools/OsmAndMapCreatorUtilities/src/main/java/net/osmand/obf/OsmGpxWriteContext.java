@@ -504,7 +504,7 @@ public class OsmGpxWriteContext {
 		Map<String, String> pointExtraTags = new LinkedHashMap<>();
 		addExtensionsTags(pointPoiTags, pointExtraTags, p.getExtensionsToRead());
 		if (!pointExtraTags.isEmpty()) {
-			tagValue(serializer, "wpt_extra_tags", gson.toJson(pointExtraTags));
+			tagValue(serializer, WPT_EXTRA_TAGS, gson.toJson(pointExtraTags));
 		}
 		serializeTags(pointPoiTags);
 

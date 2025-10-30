@@ -246,10 +246,10 @@ public class GpxController {
 	}
 
 	@PostMapping(path = "/save-track-data", produces = MediaType.APPLICATION_XML_VALUE)
-	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody String data,
+	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody byte[] data,
 	                                                           HttpSession httpSession) throws IOException {
-
-		WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+		String jsonData = decompressGzip(data);
+		WebGpxParser.TrackData trackData = new Gson().fromJson(jsonData, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
@@ -286,8 +286,9 @@ public class GpxController {
 	}
 
 	@RequestMapping(path = {"/get-srtm-data"}, produces = "application/json")
-	public ResponseEntity<String> getSrtmData(@RequestBody String data) throws IOException {
-		WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
+	public ResponseEntity<String> getSrtmData(@RequestBody byte[] data) throws IOException {
+		String jsonData = decompressGzip(data);
+		WebGpxParser.TrackData trackData = gson.fromJson(jsonData, WebGpxParser.TrackData.class);
 		trackData = gpxService.addSrtmData(trackData);
 		
 		return ResponseEntity.ok(gsonWithNans.toJson(Map.of("data", trackData)));

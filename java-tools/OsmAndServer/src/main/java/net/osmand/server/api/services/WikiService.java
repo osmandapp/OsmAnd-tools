@@ -540,13 +540,18 @@ public class WikiService {
 				imageDetails.put("date", rs.getString("date"));
 				imageDetails.put("author", rs.getString("author"));
 				imageDetails.put("license", getLicense(rs.getString("license")));
-				
+				imageDetails.put("description", rs.getString("description"));
+
 				imagesWithDetails.add(imageDetails);
 			};
 			if (Algorithms.isEmpty(articleId) && !Algorithms.isEmpty(wiki)) {
 				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
 			queryImagesByWikidataAndCategory(articleId, categoryName, h);
+
+			if (articleId != null && !Algorithms.isEmpty(articleId)) {
+				moveWikidataPhotoToFirst(imagesWithDetails, articleId);
+			}
 		}
 		return imagesWithDetails;
 	}
@@ -573,23 +578,26 @@ public class WikiService {
 		jdbcTemplate.query(query, pss, rowCallbackHandler);
 	}
 
-	private void queryImagesByWikidataAndCategory(String articleId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+	private void queryImagesByWikidataAndCategory(String wikidataId, String categoryName, RowCallbackHandler rowCallbackHandler) {
 		List<Object> params = new ArrayList<>();
-		boolean hasArticleId = articleId != null && !Algorithms.isEmpty(articleId);
+
+		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
-		if (hasArticleId) {
+
+		if (hasWikidataId) {
 			// Remove "Q" prefix from Wikidata ID if present
-			articleId = articleId.startsWith("Q") ? articleId.substring(1) : articleId;
+			wikidataId = wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
 		}
+
 		String query;
-		if (hasArticleId) {
-			query = "SELECT mediaId, imageTitle, date, author, license, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF + 
+		if (hasWikidataId) {
+			query = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
+					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF +
 					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(articleId);
+			params.add(wikidataId);
 		} else if (hasCategory) {
 			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
-			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, c.views as views"
+			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, '' AS description, c.views as views"
 					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
 					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
 					+ " ORDER BY views DESC, imgName ASC LIMIT " + LIMIT_PHOTOS_QUERY;
@@ -611,6 +619,69 @@ public class WikiService {
 				},
 				rowCallbackHandler
 		);
+	}
+
+	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
+		if (imagesWithDetails.isEmpty()) {
+			return;
+		}
+
+		Long photoId = getPhotoIdFromWikidata(wikidataId);
+		if (photoId == null) {
+			return;
+		}
+
+		Map<Boolean, List<Map<String, Object>>> partitioned = imagesWithDetails.stream()
+				.collect(Collectors.partitioningBy(img -> photoId.equals(img.get("mediaId"))));
+
+		List<Map<String, Object>> matched = partitioned.get(true);
+		if (matched.isEmpty()) {
+			Map<String, Object> wikidataPhoto = fetchWikidataPhoto(photoId);
+			if (wikidataPhoto != null && !wikidataPhoto.isEmpty()) {
+				matched.add(wikidataPhoto);
+			}
+		}
+
+		imagesWithDetails.clear();
+		imagesWithDetails.addAll(matched);
+		imagesWithDetails.addAll(partitioned.get(false));
+	}
+
+	private Long getPhotoIdFromWikidata(String wikidataId) {
+		if (wikidataId.startsWith("Q")) {
+			wikidataId = wikidataId.substring(1);
+		}
+		String query = "SELECT photoId FROM wiki.wikidata WHERE id = ? LIMIT 1";
+		try {
+			return jdbcTemplate.queryForObject(query, Long.class, wikidataId);
+		} catch (EmptyResultDataAccessException e) {
+			return null;
+		} catch (Exception e) {
+			log.error("Error getting photoId from wikidata for id: " + wikidataId, e);
+			return null;
+		}
+	}
+
+	private Map<String, Object> fetchWikidataPhoto(Long mediaId) {
+		String query = "SELECT mediaId, imageTitle, date, author, license, description " +
+				"FROM top_images_final WHERE mediaId = ? LIMIT 1";
+		try {
+			return jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
+				Map<String, Object> imageDetails = new HashMap<>();
+				imageDetails.put("mediaId", rs.getLong("mediaId"));
+				imageDetails.put("image", createImageUrl(rs.getString("imageTitle")));
+				imageDetails.put("date", rs.getString("date"));
+				imageDetails.put("author", rs.getString("author"));
+				imageDetails.put("license", getLicense(rs.getString("license")));
+				imageDetails.put("description", rs.getString("description"));
+				return imageDetails;
+			}, mediaId);
+		} catch (EmptyResultDataAccessException e) {
+			return Collections.emptyMap();
+		} catch (Exception e) {
+			log.error("Error fetching photo by mediaId: " + mediaId, e);
+			return Collections.emptyMap();
+		}
 	}
 
 	private String retrieveArticleIdFromWikiUrl(String wiki) {
@@ -650,6 +721,7 @@ public class WikiService {
 			feature.properties.put("date", metadata.getDate());
 			feature.properties.put("author", metadata.getAuthor());
 			feature.properties.put("license", metadata.getLicense());
+			feature.properties.put("description", metadata.getDescription());
 			feature.properties.put("mediaId", imageDetails.getMediaId());
 			return feature;
 		}).toList();

@@ -11,9 +11,9 @@ import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
+import net.osmand.obf.preparation.IndexRouteRelationCreator;
 import net.osmand.render.RenderingRuleSearchRequest;
 import net.osmand.render.RenderingRulesStorage;
-import net.osmand.routes.RouteRelationExtractor;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -57,8 +57,8 @@ public class RandomClickGenerator {
 	private RandomClickGenerator(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
 
-		String[] styles = RouteRelationExtractor.customStyles;
-		Map<String, String> properties = RouteRelationExtractor.customProperties;
+		String[] styles = IndexRouteRelationCreator.CUSTOM_STYLES;
+		Map<String, String> properties = IndexRouteRelationCreator.CUSTOM_PROPERTIES;
 		RenderingRulesStorage renderingRules = RenderingRulesStorage.initWithStylesFromResources(styles);
 		renderingSearchRequest = RenderingRuleSearchRequest.initWithCustomProperties(renderingRules, zoom, properties);
 	}

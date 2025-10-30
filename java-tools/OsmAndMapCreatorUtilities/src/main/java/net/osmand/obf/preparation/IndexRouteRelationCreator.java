@@ -1,19 +1,24 @@
 package net.osmand.obf.preparation;
 
+import com.google.gson.Gson;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.gpx.clickable.ClickableWayTags;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.OsmRouteType;
 import net.osmand.osm.RelationTagsPropagation;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.render.RenderingRuleSearchRequest;
+import net.osmand.render.RenderingRulesStorage;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,6 +31,7 @@ import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.*;
 
+import static net.osmand.data.Amenity.*;
 import static net.osmand.shared.gpx.GpxUtilities.ACTIVITY_TYPE;
 
 public class IndexRouteRelationCreator {
@@ -54,11 +60,12 @@ public class IndexRouteRelationCreator {
 	};
 
 	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = false;
+	private static final boolean COLLECT_OSM_ROUTE_RELATION_NODES = false; // TODO implement unique node.id before use
 
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
 	private static final String SHIELD_TEXT = "shield_text";
-	private static final String SHIELD_STUB_NAME = "shield_stub_name";
+	public static final String SHIELD_STUB_NAME = "shield_stub_name";
 
 	private static final String ROUTE = "route";
 
@@ -72,15 +79,22 @@ public class IndexRouteRelationCreator {
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
 	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+	public static final String WPT_EXTRA_TAGS = "wpt_extra_tags"; // pass tags to WptPt using JSON
 
 	private static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
 	public static final String COLOR = "color"; // osmand:color
 	private static final String COLOUR = "colour"; // osmand:colour
 	public static final String DISPLAYCOLOR = "displaycolor"; // osmand:displaycolor / original gpxx:DisplayColor
+	public static final String OSMC_SYMBOL = "osmc:symbol";
 
 	private static final String OSMAND_ACTIVITY = ACTIVITY_TYPE;
 	private static final String ROUTE_ACTIVITY_TYPE = "route_activity_type";
 	private static final String[] COLOR_TAGS_FOR_MAP_SECTION = {TRACK_COLOR, SHIELD_WAYCOLOR, COLOR, COLOUR, DISPLAYCOLOR};
+
+	public static final Map<String, String> SKIP_RELATION_NODE_BY_TAGS = Map.of(
+			"information", "guidepost"
+			// ...
+	);
 
 	private static final Map<String, String> OSMC_TAGS_TO_SHIELD_PROPS = Map.of(
 			"osmc_text", "shield_text",
@@ -89,6 +103,14 @@ public class IndexRouteRelationCreator {
 			"osmc_foreground2", "shield_fg_2",
 			"osmc_textcolor", "shield_textcolor",
 			"osmc_waycolor", "shield_waycolor" // waycolor is a part of osmc:symbol and must be applied to whole way
+	);
+
+	private static final Map<String, String> NO_SYMBOL_ROUTE_SHIELD_COLORS = Map.of(
+			"default", "black",
+			"fitness_trail", "blue",
+			"hiking", "green",
+			"mtb", "red"
+			// ...
 	);
 
 	private static final String OSMC_ICON_PREFIX = "osmc_";
@@ -110,6 +132,31 @@ public class IndexRouteRelationCreator {
 
 	private final static NumberFormat distanceKmFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 
+	private final Gson gson = new Gson();
+	private final int ICON_SEARCH_ZOOM = 19;
+	private final RenderingRulesStorage renderingRules;
+	private final RenderingRuleSearchRequest searchRequest;
+
+	public static final String[] CUSTOM_STYLES = {
+			"default.render.xml",
+			"routes.addon.render.xml"
+			// "skimap.render.xml" // ski-style could work instead of default.render.xml but not together
+	};
+	public static final Map<String, String> CUSTOM_PROPERTIES = Map.of(
+			// default.render.xml:
+			"whiteWaterSports", "true",
+			// routes.addon.render.xml:
+			"showCycleRoutes", "true",
+			"showMtbRoutes", "true",
+			"hikingRoutesOSMC", "walkingRoutesOSMC",
+			"showDirtbikeTrails", "true",
+			"horseRoutes", "true",
+			"showFitnessTrails", "true",
+			"showRunningRoutes", "true"
+			// "pisteRoutes", "true" // skimap.render.xml conflicts with default
+	);
+	public static final String DEFAULT_CLICKABLE_WAY_ACTIVITY_COLOR = "red";
+
 	public IndexRouteRelationCreator(@Nonnull IndexPoiCreator indexPoiCreator,
 	                                 @Nonnull IndexVectorMapCreator indexMapCreator,
 									 Long lastModifiedDate) {
@@ -117,6 +164,9 @@ public class IndexRouteRelationCreator {
 		this.indexMapCreator = indexMapCreator;
 		this.transformer = indexMapCreator.tagsTransformer;
 		this.renderingTypes = indexMapCreator.renderingTypes;
+		this.renderingRules = RenderingRulesStorage.initWithStylesFromResources(CUSTOM_STYLES);
+		this.searchRequest = RenderingRuleSearchRequest
+				.initWithCustomProperties(renderingRules, ICON_SEARCH_ZOOM, CUSTOM_PROPERTIES);
 		this.lastModifiedDate = lastModifiedDate;
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 	}
@@ -132,6 +182,7 @@ public class IndexRouteRelationCreator {
 		if ("route".equals(relation.getTag("type"))) {
 			List<Way> joinedWays = new ArrayList<>();
 			List<Node> pointsForPoiSearch = new ArrayList<>();
+			List<Node> pointsOfRelationNodes = new ArrayList<>();
 			Map<String, String> preparedTags = new LinkedHashMap<>();
 
 			TLongHashSet geometryBeforeCompletion = new TLongHashSet();
@@ -145,6 +196,9 @@ public class IndexRouteRelationCreator {
 				return; // incomplete relation
 			}
 
+			if (COLLECT_OSM_ROUTE_RELATION_NODES) {
+				collectOsmRouteRelationNodes(relation, pointsOfRelationNodes);
+			}
 			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
 			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags, hash);
 
@@ -168,6 +222,11 @@ public class IndexRouteRelationCreator {
 					indexPoiCreator.iterateEntity(node, ctx, icc);
 				}
 			}
+			if (COLLECT_OSM_ROUTE_RELATION_NODES) {
+				for (Node node : pointsOfRelationNodes) {
+					indexPoiCreator.iterateEntity(node, ctx, icc);
+				}
+			}
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
 		}
 		if (OsmMapUtils.isSuperRoute(relation.getTags())) {
@@ -180,6 +239,75 @@ public class IndexRouteRelationCreator {
 			}
 			indexPoiCreator.iterateEntity(relation, ctx, icc);
 			indexPoiCreator.excludeFromMainIteration(relation.getId());
+		}
+	}
+
+	private void applyShieldTagsBySymbolOrActivity(Map<String, String> shieldTags, Map<String, String> relationTags) {
+		String routeType = relationTags.get(ROUTE);
+		if (routeType == null || shieldTags.containsKey(SHIELD_FG) || shieldTags.containsKey(SHIELD_BG)) {
+			return; // shield is already calculated based on Ways of v1 routes
+		}
+
+		String osmcSymbol = relationTags.get(OSMC_SYMBOL);
+		if (osmcSymbol != null) {
+			Map<String, String> osmcTags = renderingTypes.transformOsmcAndColorTags(Map.of(OSMC_SYMBOL, osmcSymbol));
+			for (String tag : osmcTags.keySet()) {
+				for (String match : OSMC_TAGS_TO_SHIELD_PROPS.keySet()) {
+					if (tag.equals(match)) {
+						final String key = OSMC_TAGS_TO_SHIELD_PROPS.get(match);
+						final String prefix =
+								(SHIELD_BG_ICONS.contains(key) || SHIELD_FG_ICONS.contains(key)) ? OSMC_ICON_PREFIX : "";
+						final String suffix = SHIELD_BG_ICONS.contains(key) ? OSMC_ICON_BG_SUFFIX : "";
+						final String val = prefix + osmcTags.get(tag) + suffix;
+						shieldTags.putIfAbsent(key, val);
+					}
+				}
+			}
+			if (shieldTags.containsKey(SHIELD_FG) || shieldTags.containsKey(SHIELD_BG)) {
+				return; // got shield based on osmc:symbol
+			}
+		}
+
+		RouteActivity activity = routeActivityHelper.findActivityByTag(routeType);
+		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
+			String color = NO_SYMBOL_ROUTE_SHIELD_COLORS.get(routeType);
+			if (color == null) {
+				color = NO_SYMBOL_ROUTE_SHIELD_COLORS.get("default");
+			}
+			shieldTags.put(SHIELD_BG, "osmc_" + color + "_bg");
+			shieldTags.put(SHIELD_FG, activity.getIconName());
+		}
+	}
+
+	protected void applyActivityMapShieldToClickableWay(Map<String, String> tags, boolean applyOnNamelessOnly) {
+		if (applyOnNamelessOnly) {
+			for (String nameTag : ClickableWayTags.REQUIRED_TAGS_ANY) {
+				if (tags.containsKey(nameTag)) {
+					return;
+				}
+			}
+		}
+		RouteActivity activity = null;
+		for (String clickableTagValue : ClickableWayTags.CLICKABLE_TAGS) {
+			String[] tagValue = clickableTagValue.split("=");
+			boolean found = tagValue.length < 2
+					? tags.containsKey(clickableTagValue) // tag or tag:value
+					: tagValue[1].equals(tags.get(tagValue[0])); // tag=value (snowmobile=yes)
+			if (found) {
+				activity = routeActivityHelper.findActivityByTag(clickableTagValue);
+				if (activity != null) {
+					break;
+				}
+			}
+		}
+		if (activity != null && !Algorithms.isEmpty(activity.getIconName())) {
+			String color = ClickableWayTags.getGpxColorByTags(tags);
+			if (color == null) {
+				color = DEFAULT_CLICKABLE_WAY_ACTIVITY_COLOR;
+			}
+			tags.put(SHIELD_BG, "osmc_" + color + "_bg");
+			tags.put(SHIELD_FG, activity.getIconName());
+			tags.put(SHIELD_STUB_NAME, ".");
 		}
 	}
 
@@ -422,6 +550,46 @@ public class IndexRouteRelationCreator {
 		commonTags.putIfAbsent(ROUTE_TYPE, "other"); // unknown / default
 	}
 
+	private void collectOsmRouteRelationNodes(Relation relation, List<Node> pointsOfRelationNodes) {
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Node node) {
+				boolean allowThisNode = true;
+				for (Map.Entry<String, String> skip : SKIP_RELATION_NODE_BY_TAGS.entrySet()) {
+					if (skip.getValue().equals(node.getTag(skip.getKey()))) {
+						allowThisNode = false;
+						break;
+					}
+				}
+				if (allowThisNode) {
+					Node routeTrackPoint = new Node(node.getLatitude(), node.getLongitude(), node.getId());
+
+					final Map<String, String> transformedTags = renderingTypes.transformTags(node.getTags(),
+							Entity.EntityType.NODE, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+					String gpxIcon = searchRequest.searchIconByTags(transformedTags);
+
+					if (gpxIcon != null) {
+						Map<String, String> combinedTags = new LinkedHashMap<>(transformedTags);
+
+						Map<String, String> importantRelationTags = new LinkedHashMap<>(relation.getTags());
+						importantRelationTags.keySet().retainAll(Set.of(OPERATOR));
+						combinedTags.putAll(importantRelationTags);
+
+						Map<String, String> directlyPassedTags = new LinkedHashMap<>(transformedTags);
+						directlyPassedTags.keySet().retainAll(Set.of(NAME, DESCRIPTION));
+
+						routeTrackPoint.putTag(ROUTE_ID_TAG, Amenity.ROUTE_ID_OSM_PREFIX + relation.getId());
+						routeTrackPoint.putTag(WPT_EXTRA_TAGS, gson.toJson(combinedTags));
+						routeTrackPoint.getModifiableTags().putAll(directlyPassedTags);
+						routeTrackPoint.putTag(ROUTE_TYPE, "track_point");
+						routeTrackPoint.putTag("icon", gpxIcon);
+
+						pointsOfRelationNodes.add(routeTrackPoint);
+					}
+				}
+			}
+		}
+	}
+
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
 	                                            @Nonnull List<Way> joinedWays,
 	                                            @Nonnull Map<String, String> shieldTags, int hash) {
@@ -438,6 +606,7 @@ public class IndexRouteRelationCreator {
 				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			}
 		}
+		applyShieldTagsBySymbolOrActivity(shieldTags, relation.getTags());
 		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId(), hash);
 	}
 
@@ -609,5 +778,17 @@ public class IndexRouteRelationCreator {
 
 	public void closeAllStatements() {
 
+	}
+
+	public Map<String, String> addClickableWayTags(IndexCreationContext icc, Entity entity,
+	                                               Map<String, String> tags, boolean collectElevationMetrics) {
+		if (entity instanceof Way way && ClickableWayTags.isClickableWayTags(SHIELD_STUB_NAME, tags)) {
+			tags = new LinkedHashMap<>(tags);
+			applyActivityMapShieldToClickableWay(tags, false);
+			if (collectElevationMetrics) {
+				collectElevationStatsForWays(List.of(way), tags, icc);
+			}
+		}
+		return tags;
 	}
 }

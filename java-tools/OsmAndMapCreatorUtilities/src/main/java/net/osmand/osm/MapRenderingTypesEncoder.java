@@ -1388,12 +1388,10 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 
 	public Map<String, String> transformOsmcAndColorTags(Map<String, String> tags) {
 		if (tags.containsKey("osmc:symbol")) {
-
 			tags = new LinkedHashMap<>(tags);
 			String value = tags.get("osmc:symbol");
 			OsmcSymbol osmcSymbol = new OsmcSymbol(value);
 			osmcSymbol.addOsmcNewTags(tags);
-
 		} else if (tags.containsKey("route") && !tags.containsKey("name") && !tags.containsKey("ref")) {
 			String route = tags.get("route");
 			String foreground = OSMC_NO_NAME_FOREGROUND.get(route);
@@ -1408,7 +1406,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				tags.put("osmc_order", "1");
 			}
 		} else if (tags.containsKey("route") && (tags.get("route").equals("hiking") || tags.get("route").equals("mtb") || tags.get("route").equals("bicycle") || tags.get("route").equals("horse") || tags.get("route").equals("running"))) {
-
 			if (tags.containsKey("ref")) {
 				tags = new LinkedHashMap<>(tags);
 				String ref = tags.get("ref");
