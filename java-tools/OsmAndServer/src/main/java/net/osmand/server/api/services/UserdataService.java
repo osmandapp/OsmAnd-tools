@@ -594,7 +594,7 @@ public class UserdataService {
     }
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
-                        CloudUserDevicesRepository.CloudUserDevice dev, Boolean simplified) throws IOException {
+                        CloudUserDevicesRepository.CloudUserDevice dev, boolean simplified) throws IOException {
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -624,7 +624,7 @@ public class UserdataService {
 			}
 
 			// Simplify GPX file
-			if (simplified != null && simplified && "GPX".equalsIgnoreCase(type) && bin != null) {
+			if (simplified && "GPX".equalsIgnoreCase(type) && bin != null) {
 				InputStream sourceStream = gzin ? new GZIPInputStream(bin) : bin;
 				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(sourceStream));
 				if (gpxFile.getError() == null) {

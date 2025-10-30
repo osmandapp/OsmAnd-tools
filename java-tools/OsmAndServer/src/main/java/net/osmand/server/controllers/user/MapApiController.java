@@ -397,7 +397,8 @@ public class MapApiController {
 			userFile = userdataService.getUserFile(name, type, updatetime, dev);
 		}
 		if (userFile != null) {
-			userdataService.getFile(userFile, response, request, name, type, dev, simplified);
+			boolean isSimplified = simplified != null && simplified;
+			userdataService.getFile(userFile, response, request, name, type, dev, isSimplified);
 		}
 	}
 
@@ -415,7 +416,7 @@ public class MapApiController {
 		}
 		CloudUserFilesRepository.UserFile userFile = userdataService.getFilePrevVersion(name, type, updatetime, dev);
 		if (userFile != null) {
-			userdataService.getFile(userFile, response, request, name, type, dev, null);
+			userdataService.getFile(userFile, response, request, name, type, dev, false);
 		}
 	}
 	
