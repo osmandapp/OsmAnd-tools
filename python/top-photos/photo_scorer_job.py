@@ -3,6 +3,7 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from json import JSONDecodeError
 from threading import current_thread
 from typing import List
 
@@ -208,6 +209,10 @@ def process_place(run_id, place_info, is_selected, media_ids):
             ) as e:
                 print(f"#{current_thread().name}. STOPPED place {place_id}! Error: {e}")
                 return True, place_run
+            except JSONDecodeError as e:
+                place_run['error'] = f"{e}"
+                insert_place_batch(place_run, [])
+                return False, place_run
             except RuntimeError as e:
                 place_run['error'] = f"{e}"
                 insert_place_batch(place_run, [])
