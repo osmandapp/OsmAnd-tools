@@ -81,10 +81,16 @@ class BoundedThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
             raise
 
     def _done_callback(self, future):
+        # Release permit first so queue progress isn't blocked by callback work
         self.semaphore.release()
-        self.done_callback(future)
-        with self.lock:
-            del self.futures[future]
+        try:
+            self.done_callback(future)
+        except Exception as cb_err:
+            # Swallow callback exceptions to avoid disrupting the executor's internal machinery
+            print(f"Callback error: {cb_err}")
+        finally:
+            with self.lock:
+                self.futures.pop(future, None)
 
     def futures_timeout_args(self) -> Dict[Future, Tuple[float, Tuple]]:
         with self.lock:
@@ -100,12 +106,25 @@ class BoundedThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
 
 def task(arg1, arg2):
     print(f"#{threading.current_thread().name}. Processing: {(arg1, arg2)} ...")
+    if arg2 == 3:
+        raise Exception("Error in task: arg2 == 3")
     sleep(5)
     print(f"#{threading.current_thread().name}. Done: {(arg1, arg2)}")
 
 
 def done_callback(future):
-    pass
+    # Ensure the task is fully settled and any exception is consumed here.
+    # This prevents unhandled exceptions from being raised elsewhere while still reporting status.
+    try:
+        if future.cancelled():
+            print(f"#{threading.current_thread().name}. Task was cancelled")
+            return
+        # This will raise if the task failed; we catch below so the pool can proceed normally.
+        _ = future.result()
+        print(f"#{threading.current_thread().name}. Task finished successfully")
+    except Exception as e:
+        # Report the error but do not re-raise, so the executor can release permits and continue.
+        print(f"#{threading.current_thread().name}. Task failed with error: {e}")
 
 
 def main():
