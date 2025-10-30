@@ -422,7 +422,7 @@ public class UserdataController {
 		if (dev != null) {
 			CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (userFile != null) {
-				userdataService.getFile(userFile, response, request, name, type, dev);
+				userdataService.getFile(userFile, response, request, name, type, dev, null);
 			}
 		}
 	}

@@ -594,7 +594,7 @@ public class UserdataService {
     }
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
-                        CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+                        CloudUserDevicesRepository.CloudUserDevice dev, Boolean simplified) throws IOException {
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -621,6 +621,30 @@ public class UserdataService {
 				}
 			} else {
 				bin = getInputStream(dev, userFile);
+			}
+
+			// Simplify GPX file
+			if (simplified != null && simplified && "GPX".equalsIgnoreCase(type) && bin != null) {
+				InputStream sourceStream = gzin ? new GZIPInputStream(bin) : bin;
+				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(Okio.source(sourceStream));
+				if (gpxFile.getError() == null) {
+					GpxFile simplifiedGpx = gpxService.createSimplifiedGpxFile(gpxFile);
+					File tmpGpx = File.createTempFile("simplified_", ".gpx");
+					Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), simplifiedGpx);
+					if (exception == null) {
+						if (fileToDelete != null) {
+							try {
+								Files.delete(fileToDelete.toPath());
+							} catch (IOException e) {
+								LOG.warn("Could not delete temp file: " + fileToDelete.getAbsolutePath(), e);
+							}
+						}
+						fileToDelete = tmpGpx;
+						bin.close();
+						bin = new FileInputStream(tmpGpx);
+						gzin = false;
+					}
+				}
 			}
 
             String safeDownloadName = URLEncoder.encode(sanitizeEncode(userFile.name));
