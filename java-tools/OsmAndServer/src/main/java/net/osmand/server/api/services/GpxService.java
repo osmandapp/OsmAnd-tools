@@ -320,4 +320,30 @@ public class GpxService {
         }
         return tmpGpx;
     }
+
+    public GpxFile createSimplifiedGpxFile(GpxFile gpxFile) {
+        GpxFile simplified = new GpxFile(null);
+
+        simplified.setMetadata(gpxFile.getMetadata());
+
+        List<WptPt> points = gpxFile.getPointsList();
+        if (!points.isEmpty()) {
+            simplified.addPoints(points);
+        }
+
+        if (!gpxFile.getTracks().isEmpty()) {
+            Track track = new Track();
+            simplified.getTracks().add(track);
+            
+            for (Track t : gpxFile.getTracks()) {
+                for (TrkSegment segment : t.getSegments()) {
+                    TrkSegment newSegment = new TrkSegment();
+                    newSegment.getPoints().addAll(segment.getPoints());
+                    track.getSegments().add(newSegment);
+                }
+            }
+        }
+        
+        return simplified;
+    }
 }
