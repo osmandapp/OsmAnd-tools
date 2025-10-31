@@ -10,6 +10,7 @@ from typing import List
 import clickhouse_connect
 import openai
 import requests
+from httpx import RemoteProtocolError
 
 from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor  # Relative import when running as module
 from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
@@ -209,11 +210,11 @@ def process_place(run_id, place_info, is_selected, media_ids):
             ) as e:
                 print(f"#{current_thread().name}. STOPPED place {place_id}! Error: {e}")
                 return True, place_run
-            except JSONDecodeError as e:
-                place_run['error'] = f"{e}"
-                insert_place_batch(place_run, [])
-                return False, place_run
-            except RuntimeError as e:
+            except (
+                    RuntimeError, # PROHIBITED_CONTENT or other application error
+                    JSONDecodeError, # LLM protocol decoding errors
+                    RemoteProtocolError # LLM protocol connection errors (incomplete chunked read)
+            ) as e:
                 place_run['error'] = f"{e}"
                 insert_place_batch(place_run, [])
                 return False, place_run
