@@ -216,7 +216,9 @@ public class PropagateToNodes {
 			case CENTER:
 				if (allIds.size() == 2) {
 					getNode(resultWay, w, 0, 1).applyRule(rule, w.getTags());
-				} else {
+				} else if (allIds.get(0) != allIds.get(allIds.size() - 1)) {
+					// Propagate Node to the approximate midpoint if the Way is not closed (line).
+					// Rendering styles should display icons for closed Ways without relying on propagated Nodes.
 					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule, w.getTags());
 				}
 				break;
