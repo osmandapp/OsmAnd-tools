@@ -247,11 +247,15 @@ public class GpxController {
 
 	@PostMapping(path = "/save-track-data", produces = MediaType.APPLICATION_XML_VALUE)
 	public ResponseEntity<StreamingResponseBody> saveTrackData(@RequestBody byte[] data,
+															   @RequestParam Boolean simplified,
 	                                                           HttpSession httpSession) throws IOException {
 		String jsonData = decompressGzip(data);
 		WebGpxParser.TrackData trackData = new Gson().fromJson(jsonData, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
+		if (simplified != null && simplified) {
+			gpxFile = gpxService.createSimplifiedGpxFile(gpxFile);
+		}
 		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
 
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);

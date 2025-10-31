@@ -380,6 +380,7 @@ public class MapApiController {
 	public void getFile(HttpServletResponse response, HttpServletRequest request,
 	                    @RequestParam String name,
 	                    @RequestParam String type,
+	                    @RequestParam(required = false) Boolean simplified,
 	                    @RequestParam(required = false) Long updatetime,
 	                    @RequestParam(required = false) Boolean shared) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -396,7 +397,8 @@ public class MapApiController {
 			userFile = userdataService.getUserFile(name, type, updatetime, dev);
 		}
 		if (userFile != null) {
-			userdataService.getFile(userFile, response, request, name, type, dev);
+			boolean isSimplified = simplified != null && simplified;
+			userdataService.getFile(userFile, response, request, name, type, dev, isSimplified);
 		}
 	}
 
@@ -414,7 +416,7 @@ public class MapApiController {
 		}
 		CloudUserFilesRepository.UserFile userFile = userdataService.getFilePrevVersion(name, type, updatetime, dev);
 		if (userFile != null) {
-			userdataService.getFile(userFile, response, request, name, type, dev);
+			userdataService.getFile(userFile, response, request, name, type, dev, false);
 		}
 	}
 	

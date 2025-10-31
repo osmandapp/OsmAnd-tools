@@ -14,6 +14,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -110,8 +111,8 @@ public class SearchTestService implements ReportService, DataService {
 		try {
 			jdbcTemplate.execute("DELETE FROM test_case WHERE dataset_id NOT IN (SELECT id FROM dataset)");
 			jdbcTemplate.execute("DELETE FROM gen_result WHERE case_id NOT IN (SELECT id FROM test_case)");
-			jdbcTemplate.execute("DELETE FROM run WHERE case_id NOT IN (SELECT id FROM test_case) OR status = 'RUNNING'");
 			jdbcTemplate.execute("UPDATE run SET status = 'FAILED' WHERE status = 'RUNNING'");
+			jdbcTemplate.execute("DELETE FROM run WHERE case_id NOT IN (SELECT id FROM test_case) OR status = 'RUNNING'");
 			jdbcTemplate.execute("DELETE FROM run_result WHERE run_id NOT IN (SELECT id FROM run)");
 			// Remove duplicates (SQLite-compatible): keep the smallest id per (run_id, gen_id)
 			jdbcTemplate.execute("DELETE FROM run_result WHERE gen_id IS NOT NULL AND id NOT IN " +
@@ -232,10 +233,6 @@ public class SearchTestService implements ReportService, DataService {
 		run.caseId = caseId;
 		run.datasetId = test.datasetId;
 		run.name = payload.name;
-		run.average = payload.average;
-		test.average = payload.average;
-		run.skipFound = payload.skipFound;
-		test.skipFound = payload.skipFound;
 		// Rerun support: persist reference run id if provided
 		run.rerunId = payload.rerunId;
 
@@ -244,6 +241,12 @@ public class SearchTestService implements ReportService, DataService {
 			locale = "en";
 		}
 		run.locale = locale;
+		run.average = payload.average;
+		test.average = payload.average;
+		run.skipFound = payload.skipFound;
+		test.skipFound = payload.skipFound;
+		run.shift = payload.shift;
+		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
 		run.setSouthEast(payload.getSouthEast());
 		// Persist optional lat/lon overrides if provided
@@ -322,6 +325,12 @@ public class SearchTestService implements ReportService, DataService {
 				Map<String, Object> genRow = getObjectMapper().readValue(rowJson, Map.class);
 
 				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
+				if (run.shift != null && run.shift >= 0.0) {
+					double maxShiftMeters = run.shift * 1000.0;
+					srcPoint = MapUtils.rhumbDestinationPoint(targetPoint,
+							Math.sqrt(Math.random()) * maxShiftMeters, // [0, R] with uniform area
+							Math.random() * 360.0); // [0, 360]
+				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
