@@ -1048,6 +1048,15 @@ public class SearchService {
     public String getPoiAddress(LatLon location) throws IOException, InterruptedException {
         if (location != null) {
             List<GeocodingUtilities.GeocodingResult> list = osmAndMapsService.geocoding(location.getLatitude(), location.getLongitude());
+            
+            LOGGER.info("getPoiAddress: Found " + list.size() + " addresses for location " + location);
+            list.forEach(geocodingResult -> {
+                String mapName = geocodingResult.point.getRoad().region.getName();
+                LOGGER.info("getPoiAddress: Address: " + geocodingResult.toString() + 
+                        ", distance: " + geocodingResult.getDistance() + 
+                        ", map: " + mapName);
+            });
+            
             Optional<GeocodingUtilities.GeocodingResult> nearestResult = list.stream()
                     .min(Comparator.comparingDouble(GeocodingUtilities.GeocodingResult::getDistance));
             if (nearestResult.isPresent()) {
