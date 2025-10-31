@@ -3,12 +3,14 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from json import JSONDecodeError
 from threading import current_thread
 from typing import List
 
 import clickhouse_connect
 import openai
 import requests
+from httpx import RemoteProtocolError
 
 from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor  # Relative import when running as module
 from python.lib.database_api import insert_place_batch, get_run_max_id, get_places_per_quad, get_image_scores, MIN_ELO_SUBTYPE, \
@@ -200,7 +202,6 @@ def process_place(run_id, place_info, is_selected, media_ids):
                     place_run['duration'] = res['duration']
                     place_run['prompt_tokens'] = res['prompt_tokens']
                     place_run['completion_tokens'] = res['completion_tokens']
-                    place_run['cached_tokens'] = res['cached_tokens']
             except (
                     openai.PermissionDeniedError,
                     openai.AuthenticationError,
@@ -209,7 +210,11 @@ def process_place(run_id, place_info, is_selected, media_ids):
             ) as e:
                 print(f"#{current_thread().name}. STOPPED place {place_id}! Error: {e}")
                 return True, place_run
-            except RuntimeError as e:
+            except (
+                    RuntimeError, # PROHIBITED_CONTENT or other application error
+                    JSONDecodeError, # LLM protocol decoding errors
+                    RemoteProtocolError # LLM protocol connection errors (incomplete chunked read)
+            ) as e:
                 place_run['error'] = f"{e}"
                 insert_place_batch(place_run, [])
                 return False, place_run
@@ -273,7 +278,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
 
         place_run['error'] = f"{e}"
         insert_place_batch(place_run, [])
-        return False, place_run
+        return True, place_run
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
@@ -300,5 +305,7 @@ if __name__ == "__main__":
     try:
         with executor:
             score_places()
+        if stop_immediately:
+            raise SystemExit(1)
     finally:
         is_done = True

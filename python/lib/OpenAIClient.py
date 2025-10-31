@@ -20,7 +20,6 @@ LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 120))
 class OpenAIClient:
     prompt_tokens = 0
     completion_tokens = 0
-    cached_tokens = 0
     duration = 0
     provider = None
 
@@ -42,7 +41,6 @@ class OpenAIClient:
     def _init(self):
         self.prompt_tokens = 0
         self.completion_tokens = 0
-        self.cached_tokens = 0
         self.duration = 0
 
     def ask(self, system_prompt: str, user_query: str, max_tokens: int = MAX_TOKENS, temperature: float = -1.0):
@@ -65,8 +63,6 @@ class OpenAIClient:
             if response.usage:
                 self.prompt_tokens = response.usage.prompt_tokens
                 self.completion_tokens = response.usage.completion_tokens
-                if response.usage.prompt_tokens_details:
-                    self.cached_tokens = response.usage.prompt_tokens_details.cached_tokens
             return response.choices[0].message.content
         finally:
             self.duration = time.time() - start_time
@@ -91,8 +87,6 @@ class OpenAIClient:
         if response.usage:
             self.prompt_tokens = response.usage.prompt_tokens
             self.completion_tokens = response.usage.completion_tokens
-            if response.usage.prompt_tokens_details:
-                self.cached_tokens = response.usage.prompt_tokens_details.cached_tokens
         self.duration = time.time() - start_time
 
         print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}. Images: {init_enum}-{i + 1}", flush=True)
