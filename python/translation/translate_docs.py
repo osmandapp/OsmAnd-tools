@@ -358,7 +358,7 @@ def save_dest(path, response, imports, digest_now):
             json_response = json.loads(response)
             json_response["sourceHash"] = {"message": digest_now}
             response = json.dumps(json_response, indent=2, ensure_ascii=False)
-        if is_partial_mdx(path):
+        elif is_partial_mdx(path):
             line_break = '' if response.startswith('\n') else '\n'
             response = f"[// source-hash: {digest_now}]:#{line_break}{response}"
         else:
