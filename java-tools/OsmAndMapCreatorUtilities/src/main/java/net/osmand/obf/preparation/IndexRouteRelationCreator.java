@@ -60,7 +60,7 @@ public class IndexRouteRelationCreator {
 	};
 
 	private static final boolean DEBUG_GENERATE_ROUTE_SEGMENT = false;
-	private static final boolean COLLECT_OSM_ROUTE_RELATION_NODES = false; // TODO implement unique node.id before use
+	private static final boolean COLLECT_OSM_ROUTE_RELATION_NODES = false; // Don't forget to implement unique node.id before use !!
 
 	private static final String SHIELD_FG = "shield_fg";
 	private static final String SHIELD_BG = "shield_bg";
