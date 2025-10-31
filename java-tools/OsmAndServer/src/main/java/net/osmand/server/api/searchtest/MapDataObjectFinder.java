@@ -74,26 +74,12 @@ public class MapDataObjectFinder {
 		}
 		
 		public String placeName() {
-			
-			String name = "";
-			if (searchResult != null) {
-				return searchResult.toString();
-//				name = searchResult.localeName;
-//				if (!Algorithms.isEmpty(searchResult.localeRelatedObjectName)) {
-//					name += " " + searchResult.localeRelatedObjectName;
-//				}
-//				if (searchResult.objectType == ObjectType.HOUSE) {
-//					if (searchResult.relatedObject instanceof Street) {
-//						name += " " + ((Street) searchResult.relatedObject).getCity().getName();
-//					}
-//				}
-			}
-			return name;
+			return searchResult != null ? searchResult.toString() : "";
 		}
 	}
 
 	
-	public Result findFirstResult(List<SearchResult> searchResults, LatLon targetPoint, Map<String, Object> row) throws IOException {
+	public Result findFirstResult(List<SearchResult> searchResults, Map<String, Object> row) throws IOException {
 		Result firstResult = null;
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {

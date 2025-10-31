@@ -262,7 +262,8 @@ public interface DataService extends BaseService {
 	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
-	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query, SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
+	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query,
+	                            SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
 	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		final MapDataObjectFinder finder = new MapDataObjectFinder();
 		long datasetId;
@@ -274,7 +275,7 @@ public interface DataService extends BaseService {
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 		Map<String, Object> row = new LinkedHashMap<>();
-		Result firstResult = finder.findFirstResult(searchResults, targetPoint, row);
+		Result firstResult = finder.findFirstResult(searchResults, row);
 		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, row);
 
 		int resultsCount = searchResults.size();
