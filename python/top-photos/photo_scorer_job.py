@@ -216,7 +216,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
             except RuntimeError as e:
                 place_run['error'] = f"{e}"
                 insert_place_batch(place_run, [])
-                return True, place_run
+                return False, place_run
 
             if not res or 'results' not in res or not res['results'] or res['results'] is None:
                 print(f"#{current_thread().name}. Warning: SKIPPED place {place_id} because of incorrect LLM response.")
