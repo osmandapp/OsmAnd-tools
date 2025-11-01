@@ -72,11 +72,11 @@ public class DownloadIndexDocument {
 	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
 	
 	
-	public void setOudatedMaps() {
-		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
-		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
-		addDeletedMap("India_asia.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
-		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+	public void setOutdatedMaps() {
+//		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
+//		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
+//		addDeletedMap("India_asia.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+//		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		/// ..
 	}
 	
