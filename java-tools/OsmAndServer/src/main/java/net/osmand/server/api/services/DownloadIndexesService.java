@@ -128,7 +128,6 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.HEIGHTMAP);
 		loadIndexesFromDir(doc.getWeather(), rootFolder, DownloadType.WEATHER);
 		loadIndexesFromDir(doc.getHeightmap(), rootFolder, DownloadType.GEOTIFF);
-		set
 		DownloadFreeMapsConfig free = getSettings().freemaps;
 		for (DownloadIndex di : doc.getAllMaps()) {
 			mapSizesCache.put(di.getName(), di.getSize());
