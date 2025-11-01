@@ -68,25 +68,25 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "weather")
 	private List<DownloadIndex> weather = new ArrayList<>();
 	
-	@XmlElement(name = "deleted_region")
+	@XmlElement(name = "deleted_map")
 	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
 	
 	
 	public void setOutdatedMaps() {
-//		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
-//		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
-//		addDeletedMap("India_asia.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
-//		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
+		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
+		addDeletedMap("India_asia.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
+		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		/// ..
 	}
 	
 	
-	private void addDeletedMap(String name, DownloadType tp, String date) {
+	private void addDeletedMap(String name, DownloadType oldType, String date) {
 		try {
 			DownloadIndex di = new DownloadIndex();
 			di.setName(name);
 			di.setDateByString(date);
-			di.setType(tp);
+			di.setType(DownloadType.DELETED_MAP);
 			deletedMaps.add(di);
 		} catch (ParseException e) {
 			e.printStackTrace();
