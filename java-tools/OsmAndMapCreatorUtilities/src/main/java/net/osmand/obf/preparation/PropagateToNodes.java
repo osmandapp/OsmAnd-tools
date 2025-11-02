@@ -169,7 +169,7 @@ public class PropagateToNodes {
 			MapRenderingTypes.MapRulType ruleType = entry.getValue();
 			for (PropagateToNode d : ruleType.getPropagateToNodes()) {
 				PropagateRule rule = new PropagateRule(d.propagateToNodes, d.propagateToNodesPrefix,
-						d.propagateNetworkIf, d.propagateIf, d.propagateAlsoTags);
+						d.propagateNetworkIf, d.propagateIf, d.propagateAlsoTags, d.propagateAvoidPolygons);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
 				rule.value = split[1];
@@ -216,9 +216,8 @@ public class PropagateToNodes {
 			case CENTER:
 				if (allIds.size() == 2) {
 					getNode(resultWay, w, 0, 1).applyRule(rule, w.getTags());
-				} else if (allIds.get(0) != allIds.get(allIds.size() - 1)) {
-					// Propagate Node to the approximate midpoint if the Way is not closed (line).
-					// Rendering styles should display icons for closed Ways without relying on propagated Nodes.
+				} else if (!rule.avoidPolygons || allIds.get(0) != allIds.get(allIds.size() - 1)) {
+					// Propagate to the approximate midpoint ("closed" ways regulated by propagateAvoidPolygons)
 					getNode(resultWay, w, allIds.size() / 2, allIds.size() / 2).applyRule(rule, w.getTags());
 				}
 				break;
@@ -309,13 +308,14 @@ public class PropagateToNodes {
 		public String value;
 		public final PropagateToNodesType type;
 		public String tagPrefix;
+		public final boolean avoidPolygons;
 		public Map<String, String> propMapIf;
 		public Map<String, String> propNetworkIf;
 		public Set<String> propAlso;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix,
 				Map<String, String> propNetworkIf, Map<String, String> propMapIf, 
-				String[] propAlsoTags) {
+				String[] propAlsoTags, boolean avoidPolygons) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
 			this.propMapIf = propMapIf;
@@ -323,6 +323,7 @@ public class PropagateToNodes {
 				this.propAlso = new HashSet<>(Arrays.asList(propAlsoTags));
 			}
 			this.propNetworkIf = propNetworkIf;
+			this.avoidPolygons = avoidPolygons;
 		}
 
 		public String getPropagateValue() {
