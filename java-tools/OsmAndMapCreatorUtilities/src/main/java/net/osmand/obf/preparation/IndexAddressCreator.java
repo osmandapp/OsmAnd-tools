@@ -1669,12 +1669,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				String district = set.getString(12);
 				String cityPart = district == null || district.equals(city.getName()) ? "" : " (" + district + ")";
 				if (mainCity != city && cityPart.length() == 0) {
-					cityPart = " (" + city.getName() + ")";;
+					cityPart = " (" + city.getName() + ")";
 				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
 					if (!langAttributes.contains(lang)) {
-						street.setName(lang, names.get(lang) + cityPart);
+						String cityLangPart = cityPart;
+						String cityLangName = city.getName(lang, true);
+						if (!Algorithms.isEmpty(cityLangName)) {
+							cityLangPart = " (" + cityLangName + ")";
+						}
+						street.setName(lang, names.get(lang) + cityLangPart);
 					}
 				}
 				streetNodes.put(street, thisWayNodes);
