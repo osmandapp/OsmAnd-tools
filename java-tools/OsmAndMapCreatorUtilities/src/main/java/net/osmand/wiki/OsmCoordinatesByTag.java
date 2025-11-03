@@ -81,6 +81,7 @@ public class OsmCoordinatesByTag {
 		public String tagsJson;
 		public OsmLatLonId next;
 		public Amenity amenity;
+		public String fallbackTitles;
 		
 		public String toString(String key) {
 			OsmLatLonId ol = this;

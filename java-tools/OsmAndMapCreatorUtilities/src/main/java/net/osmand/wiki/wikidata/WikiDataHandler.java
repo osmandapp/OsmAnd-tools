@@ -2,14 +2,17 @@ package net.osmand.wiki.wikidata;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.parsers.SAXParser;
 
+import com.google.gson.reflect.TypeToken;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -75,11 +78,11 @@ public class WikiDataHandler extends DefaultHandler {
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
-				+ " osmtype int, osmid bigint, poitype text, poisubtype text, labels text)");
+				+ " osmtype int, osmid bigint, poitype text, poisubtype text, fallbackTitles text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labels) "
+		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, fallbackTitles) "
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
@@ -212,6 +215,15 @@ public class WikiDataHandler extends DefaultHandler {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
+			Map<String, String> amenityNames = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getNamesMap(true) : null;
+			Gson gson = new Gson();
+			Type type = new TypeToken<Map<String, String>>(){}.getType();
+			Map<String, String> labels = gson.fromJson(article.getLabels(), type);
+			String fallbackTitles = null;
+			if(amenityNames != null) {
+				amenityNames.putAll(labels);
+				fallbackTitles = gson.toJson(amenityNames);
+			}
 			int ind = 0;
 			coordsPrep.setLong(++ind, id);
 			coordsPrep.setString(++ind, title.toString());
@@ -223,7 +235,7 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
-			coordsPrep.setString(++ind, article.getLabels());
+			coordsPrep.setString(++ind, fallbackTitles);
 
 			addBatch(coordsPrep, coordsBatch);
 			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
