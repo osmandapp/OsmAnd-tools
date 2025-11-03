@@ -881,7 +881,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
-		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
+		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER), 
+				e.getTag(OSMTagKey.ADDR_UNIT));
 
 		String streetOrPlace = null;
 		boolean place = false;
@@ -1024,14 +1025,17 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return null;
 	}
 
-	private String normalizeHousenumber(String hno) {
-		if(hno != null) {
-			if(hno.toLowerCase().endsWith("bis")) {
-				hno = hno.substring(0, hno.length() - "bis".length()).trim() + " bis";
-			} else if(hno.toLowerCase().endsWith("quater")) {
-				hno = hno.substring(0, hno.length() - "quater".length()).trim() + " quater";
-			} else if(hno.toLowerCase().endsWith("ter")) {
-				hno = hno.substring(0, hno.length() - "ter".length()).trim() + " ter";
+	private String normalizeHousenumber(String hno, String unit) {
+		String suffix = Algorithms.isEmpty(unit) ? "" : ("-" + unit);
+		if (hno != null) {
+			if (hno.toLowerCase().endsWith("bis")) {
+				hno = hno.substring(0, hno.length() - "bis".length()).trim() + suffix + " bis";
+			} else if (hno.toLowerCase().endsWith("quater")) {
+				hno = hno.substring(0, hno.length() - "quater".length()).trim() + suffix + " quater";
+			} else if (hno.toLowerCase().endsWith("ter")) {
+				hno = hno.substring(0, hno.length() - "ter".length()).trim() + suffix + " ter";
+			} else {
+				hno = hno + suffix;
 			}
 		}
 		return hno;
