@@ -63,23 +63,44 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 					}
 				}
 			}
-			Object links = obj.get("sitelinks");
-			if (links != null) {
-				List<SiteLink> siteLinks = new ArrayList<>();
-				if (links instanceof JsonObject) {
-					for (Map.Entry<String, JsonElement> entry : ((JsonObject) links).getAsJsonObject().entrySet()) {
-						String lang = entry.getKey().replace("wiki", "");
-						if (lang.equals("commons")) {
-							continue;
-						}
-						String title = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
-						siteLinks.add(new SiteLink(lang, title));
-					}
-				} else if (links instanceof JsonArray && ((JsonArray) links).size() > 0) {
-					throw new IllegalArgumentException();
+		Object labels = obj.get("labels");
+		if (labels != null && labels instanceof JsonObject) {
+			JsonObject labelsObj = (JsonObject) labels;
+			// Try to get English label first
+			if (labelsObj.has("en")) {
+				JsonElement enLabel = labelsObj.get("en");
+				if (enLabel.isJsonObject() && enLabel.getAsJsonObject().has("value")) {
+					article.setLabel(enLabel.getAsJsonObject().get("value").getAsString());
 				}
-				article.setSiteLinks(siteLinks);
 			}
+			// If no English label, get first available
+			if (article.getLabel() == null && labelsObj.size() > 0) {
+				for (Map.Entry<String, JsonElement> entry : labelsObj.entrySet()) {
+					JsonElement labelEntry = entry.getValue();
+					if (labelEntry.isJsonObject() && labelEntry.getAsJsonObject().has("value")) {
+						article.setLabel(labelEntry.getAsJsonObject().get("value").getAsString());
+						break;
+					}
+				}
+			}
+		}
+		Object links = obj.get("sitelinks");
+		if (links != null) {
+			List<SiteLink> siteLinks = new ArrayList<>();
+			if (links instanceof JsonObject) {
+				for (Map.Entry<String, JsonElement> entry : ((JsonObject) links).getAsJsonObject().entrySet()) {
+					String lang = entry.getKey().replace("wiki", "");
+					if (lang.equals("commons")) {
+						continue;
+					}
+					String title = entry.getValue().getAsJsonObject().getAsJsonPrimitive("title").getAsString();
+					siteLinks.add(new SiteLink(lang, title));
+				}
+			} else if (links instanceof JsonArray && ((JsonArray) links).size() > 0) {
+				throw new IllegalArgumentException();
+			}
+			article.setSiteLinks(siteLinks);
+		}
 		} catch (Exception e) {
 			errorCount++;
 			if (errorCount == ERROR_BATCH_SIZE) {
@@ -99,6 +120,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private String image;
 		private String imageProp;
 		private String commonCat;
+		private String label;
 
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
@@ -146,6 +168,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 
 		public void setImageProp(String imageProp) {
 			this.imageProp = imageProp;
+		}
+
+		public String getLabel() {
+			return label;
+		}
+
+		public void setLabel(String label) {
+			this.label = label;
 		}
 	}
 

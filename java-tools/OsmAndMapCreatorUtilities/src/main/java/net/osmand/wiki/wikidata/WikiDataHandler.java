@@ -75,12 +75,12 @@ public class WikiDataHandler extends DefaultHandler {
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
-				+ " osmtype int, osmid bigint, poitype text, poisubtype text)");
+				+ " osmtype int, osmid bigint, poitype text, poisubtype text, label text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype) "
-				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, label) "
+				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
@@ -223,6 +223,7 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
+			coordsPrep.setString(++ind, article.getLabel());
 
 			addBatch(coordsPrep, coordsBatch);
 			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);

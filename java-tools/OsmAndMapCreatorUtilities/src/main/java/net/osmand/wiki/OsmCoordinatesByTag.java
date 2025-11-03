@@ -77,6 +77,7 @@ public class OsmCoordinatesByTag {
 		public long wikidataId;
 		public String wikiCommonsImg;
 		public String wikiCommonsCat;
+		public String wikiLabel;
 		public String tagsJson;
 		public OsmLatLonId next;
 		public Amenity amenity;
@@ -205,10 +206,17 @@ public class OsmCoordinatesByTag {
 				osmLatLonId.wikiCommonsImg = wikiCommonsTags.get("img");
 				osmLatLonId.wikiCommonsCat = wikiCommonsTags.get("cat");
 				osmLatLonId.tagsJson = gson.toJson(etags);
+				String osmName = entity.getTag("name");
+				if (osmName != null && !osmName.isEmpty()) {
+					osmLatLonId.wikiLabel = osmName;
+				}
 				alist.clear();
 				alist = EntityParser.parseAmenities(poiTypes, entity, etags, alist);
 				if (alist.size() > 0) {
 					osmLatLonId.amenity = alist.get(0);
+					if (osmLatLonId.amenity.getName() != null && !osmLatLonId.amenity.getName().isEmpty()) {
+						osmLatLonId.wikiLabel = osmLatLonId.amenity.getName();
+					}
 				}
 				OsmLatLonId oldValue = coordinates.put(key, osmLatLonId);
 				osmLatLonId.next = oldValue;

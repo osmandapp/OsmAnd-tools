@@ -1688,18 +1688,23 @@ public class WikiDatabasePreparation {
 		Connection commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataDB.getAbsolutePath(), log);
 		Statement st = commonsWikiConn.createStatement();
 		ResultSet rs = st
-				.executeQuery("SELECT C.id,M.lang,M.title FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
+				.executeQuery("SELECT C.id,M.lang,M.title,C.label FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
 		Map<Long, OsmLatLonId> res = new TreeMap<>();
+		Map<Long, String> labels = new TreeMap<>();
 		int scan = 0;
 		long time = System.currentTimeMillis();
 		while (rs.next()) {
 			long wid = rs.getLong(1);
 			String articleLang = rs.getString(2);
 			String articleTitle = rs.getString(3);
+			String label = rs.getString(4);
 			if (++scan % 500000 == 0) {
 				System.out.println("Scanning wiki to merge with OSM... " + scan + " "
 						+ (System.currentTimeMillis() - time) + " ms");
 				time = System.currentTimeMillis();
+			}
+			if (label != null) {
+				labels.put(wid, label);
 			}
 			if (articleLang != null) {
 				setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
@@ -1709,6 +1714,17 @@ public class WikiDatabasePreparation {
 			}
 			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
 		}
+		// Set wikidata labels for all objects that don't have OSM name
+		for (Map.Entry<Long, String> entry : labels.entrySet()) {
+			for (OsmLatLonId o : res.values()) {
+				if (o.wikidataId == entry.getKey()) {
+					// Priority: OSM name (already in wikiLabel from OsmCoordinatesByTag) -> Wikidata label
+					if (o.wikiLabel == null || o.wikiLabel.isEmpty()) {
+						o.wikiLabel = entry.getValue();
+					}
+				}
+			}
+		}
 		try {
 			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
 		} catch (SQLException e) {
@@ -1716,12 +1732,15 @@ public class WikiDatabasePreparation {
 			System.err.println("Table osm_wikidata doesn't exist");
 		}
 		st.execute(
-				"CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string)");
+				"CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string, osmname string)");
 		st.close();
 		PreparedStatement ps = commonsWikiConn
-				.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+				.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		int batch = 0;
 		for (OsmLatLonId o : res.values()) {
+			// wikiLabel already contains: OSM name (priority) or will be filled with Wikidata label (fallback)
+			String osmName = o.wikiLabel;
+			
 			ps.setLong(1, o.id);
 			ps.setInt(2, o.type);
 			ps.setLong(3, o.wikidataId);
@@ -1732,6 +1751,7 @@ public class WikiDatabasePreparation {
 			ps.setString(8, o.amenity == null ? null : o.amenity.getSubType());
 			ps.setString(9, o.wikiCommonsImg);
 			ps.setString(10, o.wikiCommonsCat);
+			ps.setString(11, osmName);
 			ps.addBatch();
 			if (batch++ >= 1000) {
 				ps.executeBatch();
