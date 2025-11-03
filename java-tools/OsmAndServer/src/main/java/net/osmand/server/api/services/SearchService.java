@@ -420,6 +420,8 @@ public class SearchService {
 
         settings.setOfflineIndexes(readers);
         searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
+        
+        searchUICore.init();
 
         return searchUICore;
     }
