@@ -8,9 +8,12 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -178,14 +181,25 @@ public class MapTransportLayer implements MapPanelLayer {
 		
 		nextRoute.setVisible(r != null);
 		infoButton.setVisible(r != null);
-		if(r != null) {
+		if (r != null) {
 			String refs = "";
+			List<TransportRouteResult> alternativeRoutes = r.getAlternativeRoutes();
 			for(int i = 0; i < r.getSegments().size(); i++) {
 				TransportRouteResultSegment res = r.getSegments().get(i);
+				Set<String> segmentRefs = new LinkedHashSet<String>();
+				segmentRefs.add(res.route.getRef());
+				for(TransportRouteResult alt : alternativeRoutes) {
+					TransportRouteResultSegment altSeg = alt.getSegments().get(i);
+					segmentRefs.add(altSeg.route.getRef());
+				}
 				if(i > 0) {
 					refs += ", ";
 				}
-				refs += res.route.getRef() ;
+				if (segmentRefs.size() > 1) {
+					refs += segmentRefs.toString();
+				} else {
+					refs += res.route.getRef();
+				}
 			}
 			infoButton.setText(String.format("%d. %.1f min (T %.1f min, W %.1f min): %s", currentRoute + 1,
 					r.getRouteTime() / 60.0, r.getTravelTime() / 60.0, r.getWalkTime() / 60.0, refs));
