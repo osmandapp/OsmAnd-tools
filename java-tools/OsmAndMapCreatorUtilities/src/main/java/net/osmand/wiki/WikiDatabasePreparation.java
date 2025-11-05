@@ -1705,6 +1705,7 @@ public class WikiDatabasePreparation {
 				setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
 				setWikidataId(res, c.getCoordinates("wikipedia", articleLang + ":" + articleTitle), wid);
 				setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+				setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
 			}
 			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
 		}
@@ -1714,9 +1715,8 @@ public class WikiDatabasePreparation {
 			// ignore
 			System.err.println("Table osm_wikidata doesn't exist");
 		}
-		st.execute("""
-				CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, \
-				tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string""");
+		st.execute(
+				"CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string)");
 		st.close();
 		PreparedStatement ps = commonsWikiConn
 				.prepareStatement("INSERT INTO osm_wikidata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
