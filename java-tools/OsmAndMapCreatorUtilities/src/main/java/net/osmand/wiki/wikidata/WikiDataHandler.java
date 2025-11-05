@@ -6,9 +6,7 @@ import java.lang.reflect.Type;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.xml.parsers.SAXParser;
 
@@ -215,15 +213,21 @@ public class WikiDataHandler extends DefaultHandler {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
-			Map<String, String> amenityNames = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getNamesMap(true) : null;
-			Gson gson = new Gson();
-			Type type = new TypeToken<Map<String, String>>(){}.getType();
-			Map<String, String> labels = gson.fromJson(article.getLabels(), type);
-			String fallbackTitles = null;
-			if(amenityNames != null) {
-				amenityNames.putAll(labels);
-				fallbackTitles = gson.toJson(amenityNames);
+			Type type = new TypeToken<LinkedHashMap<String, String>>() {
+			}.getType();
+			LinkedHashMap<String, String> labels = gson.fromJson(article.getLabels(), type);
+			LinkedHashMap<String, String> merged = null;
+			if (osmCoordinates != null && osmCoordinates.amenity != null) {
+				Map<String, String> names = osmCoordinates.amenity.getNamesMap(true);
+				if (names != null) {
+					merged = new LinkedHashMap<>(names);
+				}
 			}
+			if (labels != null) {
+				if (merged == null) merged = new LinkedHashMap<>();
+				merged.putAll(labels);
+			}
+			String fallbackTitles = merged != null ? gson.toJson(merged) : null;
 			int ind = 0;
 			coordsPrep.setLong(++ind, id);
 			coordsPrep.setString(++ind, title.toString());
