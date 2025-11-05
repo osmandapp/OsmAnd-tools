@@ -2,7 +2,6 @@ package net.osmand.wiki.wikidata;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -10,7 +9,6 @@ import java.util.*;
 
 import javax.xml.parsers.SAXParser;
 
-import com.google.gson.reflect.TypeToken;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
