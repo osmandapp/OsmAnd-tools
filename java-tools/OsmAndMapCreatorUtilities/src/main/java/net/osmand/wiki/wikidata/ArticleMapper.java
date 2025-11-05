@@ -99,7 +99,9 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 					JsonObject jsonObject = entry.getValue().getAsJsonObject();
 					String lang = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY).getAsString();
 					String value = jsonObject.getAsJsonPrimitive(VALUE_KEY).getAsString();
-					labelMap.put(lang, value);
+					if (!lang.isEmpty() && !value.isEmpty()) {
+						labelMap.put(lang, value);
+					}
 				}
 				article.setLabels(labelMap);
 			}

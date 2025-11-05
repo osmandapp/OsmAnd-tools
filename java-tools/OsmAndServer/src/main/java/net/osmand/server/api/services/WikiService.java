@@ -255,7 +255,7 @@ public class WikiService {
 				"arrayFirst(x -> has(w.wikiArticleLangs, x), " + langList + ") AS lang, " +
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
-				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.fallbackTitles " +
+				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson " +
 				"FROM " + table + " AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
@@ -377,24 +377,24 @@ public class WikiService {
 			private static void fillWikiTitle(ResultSet rs, Feature f, int i, List<String> langPriority) throws SQLException {
 				String title = rs.getString(i);
 				if (title == null || title.isEmpty()) {
-					String fallbackJson = rs.getString("fallbackTitles");
-					if (fallbackJson != null && !fallbackJson.isEmpty()) {
+					String labelsJson = rs.getString("labelsJson");
+					if (labelsJson != null && !labelsJson.isEmpty()) {
 						Gson gson = new Gson();
 						Type type = new TypeToken<Map<String, String>>() {
 						}.getType();
-						Map<String, String> titles = gson.fromJson(fallbackJson, type);
-						if (titles != null && !titles.isEmpty()) {
+						Map<String, String> langTitleMap = gson.fromJson(labelsJson, type);
+						if (langTitleMap != null && !langTitleMap.isEmpty()) {
 							for (String lang : langPriority) {
-								if (titles.containsKey(lang)) {
-									title = titles.get(lang);
+								if (langTitleMap.containsKey(lang)) {
+									title = langTitleMap.get(lang);
 									break;
 								}
 							}
 							if (title == null) {
-								title = titles.get("en");
+								title = langTitleMap.get("en");
 							}
-							if (title == null && titles.entrySet().iterator().hasNext()) {
-								title = titles.entrySet().iterator().next().getValue();
+							if (title == null && langTitleMap.entrySet().iterator().hasNext()) {
+								title = langTitleMap.entrySet().iterator().next().getValue();
 							}
 						}
 					}
