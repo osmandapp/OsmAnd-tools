@@ -4,6 +4,7 @@ import com.google.gson.*;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +23,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 	public static final String VALUE_KEY = "value";
 	public static final String LATITUDE_KEY = "latitude";
 	public static final String LONGITUDE_KEY = "longitude";
+	public static final String LANGUAGE_KEY = "language";
 	private static int errorCount;
 	private static final Log log = PlatformUtil.getLog(ArticleMapper.class);
 	public static final String[] PROP_IMAGE = {"P18", "P180"};
@@ -91,17 +93,18 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			} else if (object instanceof JsonArray links && !links.isEmpty()) {
 				throw new IllegalArgumentException("Unexpected sitelinks array format");
 			}
-
 			object = obj.get(LABELS_KEY);
 			if (object instanceof JsonObject labels) {
-				StringBuilder sb = new StringBuilder();
+				Map<String, String> labelMap = new LinkedHashMap<>();
 				for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
-					if (!sb.isEmpty()) {
-						sb.append(",");
+					JsonObject jsonObject = entry.getValue().getAsJsonObject();
+					if (jsonObject != null) {
+						String lang = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY).getAsString();
+						String value = jsonObject.getAsJsonPrimitive(VALUE_KEY).getAsString();
+						labelMap.put(lang, value);
 					}
-					sb.append(entry.getValue().toString());
 				}
-				article.setLabels(sb.toString());
+				article.setLabels(labelMap);
 			}
 		} catch (Exception e) {
 			errorCount++;
@@ -122,7 +125,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private String image;
 		private String imageProp;
 		private String commonCat;
-		private String labels;
+		private Map<String, String> labels;
 
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
@@ -172,11 +175,11 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			this.imageProp = imageProp;
 		}
 
-		public String getLabels() {
+		public Map<String, String> getLabels() {
 			return labels;
 		}
 
-		public void setLabels(String labels) {
+		public void setLabels(Map<String, String> labels) {
 			this.labels = labels;
 		}
 	}

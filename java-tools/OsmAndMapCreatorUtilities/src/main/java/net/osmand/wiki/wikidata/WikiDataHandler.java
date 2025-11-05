@@ -213,10 +213,8 @@ public class WikiDataHandler extends DefaultHandler {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
-			Type type = new TypeToken<LinkedHashMap<String, String>>() {
-			}.getType();
-			LinkedHashMap<String, String> labels = gson.fromJson(article.getLabels(), type);
-			LinkedHashMap<String, String> merged = null;
+			Map<String, String> labels = article.getLabels();
+			Map<String, String> merged = null;
 			if (osmCoordinates != null && osmCoordinates.amenity != null) {
 				Map<String, String> names = osmCoordinates.amenity.getNamesMap(true);
 				if (names != null) {
