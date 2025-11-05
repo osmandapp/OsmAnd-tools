@@ -5,8 +5,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import javax.xml.parsers.SAXParser;
 
@@ -75,12 +74,12 @@ public class WikiDataHandler extends DefaultHandler {
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
-				+ " osmtype int, osmid bigint, poitype text, poisubtype text)");
+				+ " osmtype int, osmid bigint, poitype text, poisubtype text, fallbackTitles text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype) "
-				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, fallbackTitles) "
+				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
@@ -212,6 +211,19 @@ public class WikiDataHandler extends DefaultHandler {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
+			Map<String, String> labels = article.getLabels();
+			Map<String, String> merged = null;
+			if (osmCoordinates != null && osmCoordinates.amenity != null) {
+				Map<String, String> names = osmCoordinates.amenity.getNamesMap(true);
+				if (names != null) {
+					merged = new LinkedHashMap<>(names);
+				}
+			}
+			if (labels != null) {
+				if (merged == null) merged = new LinkedHashMap<>();
+				merged.putAll(labels);
+			}
+			String fallbackTitles = merged != null ? gson.toJson(merged) : null;
 			int ind = 0;
 			coordsPrep.setLong(++ind, id);
 			coordsPrep.setString(++ind, title.toString());
@@ -223,6 +235,7 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
+			coordsPrep.setString(++ind, fallbackTitles);
 
 			addBatch(coordsPrep, coordsBatch);
 			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
@@ -233,8 +246,8 @@ public class WikiDataHandler extends DefaultHandler {
 			}
 			for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
 				mappingPrep.setLong(1, id);
-				mappingPrep.setString(2, siteLink.lang);
-				mappingPrep.setString(3, siteLink.title);
+				mappingPrep.setString(2, siteLink.lang());
+				mappingPrep.setString(3, siteLink.title());
 				addBatch(mappingPrep, mappingBatch);
 			}
 			if (article.getImage() != null) {
@@ -258,8 +271,8 @@ public class WikiDataHandler extends DefaultHandler {
 
 	private OsmLatLonId getOsmCoordinates(long wid, ArticleMapper.Article article, OsmLatLonId osmCoordinates) {
 		for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
-			String articleTitle = siteLink.title;
-			String articleLang = siteLink.lang;
+			String articleTitle = siteLink.title();
+			String articleLang = siteLink.lang();
 			osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia:" + articleLang, articleTitle);
 			if (osmCoordinates == null) {
 				osmCoordinates = osmWikiCoordinates.getCoordinates("wikipedia", articleLang + ":" + articleTitle);
