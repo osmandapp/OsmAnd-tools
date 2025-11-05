@@ -50,9 +50,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 						article.setLon(lon);
 					}
 				}
-				JsonArray propImage;
 				for (String property : PROP_IMAGE) {
-					propImage = claims.getAsJsonArray(property);
+					JsonArray propImage = claims.getAsJsonArray(property);
 					if (propImage != null) {
 						JsonObject imageDataValue = propImage.get(0).getAsJsonObject().getAsJsonObject(MAINSNAK_KEY)
 								.getAsJsonObject(DATAVALUE_KEY);
@@ -98,11 +97,9 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 				Map<String, String> labelMap = new LinkedHashMap<>();
 				for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
 					JsonObject jsonObject = entry.getValue().getAsJsonObject();
-					if (jsonObject != null) {
-						String lang = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY).getAsString();
-						String value = jsonObject.getAsJsonPrimitive(VALUE_KEY).getAsString();
-						labelMap.put(lang, value);
-					}
+					String lang = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY).getAsString();
+					String value = jsonObject.getAsJsonPrimitive(VALUE_KEY).getAsString();
+					labelMap.put(lang, value);
 				}
 				article.setLabels(labelMap);
 			}

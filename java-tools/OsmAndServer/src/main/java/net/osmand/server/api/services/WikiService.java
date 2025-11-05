@@ -393,7 +393,7 @@ public class WikiService {
 							if (title == null) {
 								title = titles.get("en");
 							}
-							if (title == null) {
+							if (title == null && titles.entrySet().iterator().hasNext()) {
 								title = titles.entrySet().iterator().next().getValue();
 							}
 						}
