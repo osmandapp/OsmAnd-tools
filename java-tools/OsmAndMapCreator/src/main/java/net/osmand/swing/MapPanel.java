@@ -1043,9 +1043,10 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 		@Override
 		public void mouseClicked(MouseEvent e) {
 			requestFocus();
-
-            printer.searchAndPrintObjects(e);
-			printer.clearPOIs();
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				printer.searchAndPrintObjects(e);
+				printer.clearPOIs();
+			}
         }
 
 		public void dragTo(Point p){
@@ -1089,13 +1090,14 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 			setLatLon(lat, lon);
 			super.mouseWheelMoved(e);
 		}
+		
 		@Override
 		public void mousePressed(MouseEvent e) {
-			if(e.getButton() == MouseEvent.BUTTON3){
-				if(startDragging == null){
-					startDragging  = e.getPoint();
+			if (e.getButton() == MouseEvent.BUTTON3) {
+				if (startDragging == null) {
+					startDragging = e.getPoint();
 				}
-			} else if(e.getButton() == MouseEvent.BUTTON1){
+			} else if (e.getButton() == MouseEvent.BUTTON1) {
 				startSelecting = e.getPoint();
 			}
 			willBePopupShown = true;
