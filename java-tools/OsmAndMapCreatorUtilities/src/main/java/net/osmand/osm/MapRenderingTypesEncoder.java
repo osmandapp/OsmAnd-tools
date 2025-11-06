@@ -305,6 +305,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				val = simplifyDirection(val);
 			}
 			MapRulType rType = getMapRuleType(tag, val);
+
+			// amenity=cafe;coworking_space, etc
+			if (rType == null && val.contains(";")) {
+				for (String v : val.split(";")) {
+					rType = getMapRuleType(tag, v);
+					if (rType != null) {
+						break;
+					}
+				}
+			}
+
 			if (rType != null) {
 				if (rType.minzoom > zoom || rType.maxzoom < zoom) {
 					continue;
