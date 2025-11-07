@@ -97,10 +97,14 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 				Map<String, String> labelMap = new LinkedHashMap<>();
 				for (Map.Entry<String, JsonElement> entry : labels.entrySet()) {
 					JsonObject jsonObject = entry.getValue().getAsJsonObject();
-					String lang = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY).getAsString();
-					String value = jsonObject.getAsJsonPrimitive(VALUE_KEY).getAsString();
-					if (!lang.isEmpty() && !value.isEmpty()) {
-						labelMap.put(lang, value);
+					JsonPrimitive langPrim = jsonObject.getAsJsonPrimitive(LANGUAGE_KEY);
+					JsonPrimitive valuePrim = jsonObject.getAsJsonPrimitive(VALUE_KEY);
+					if (langPrim != null && valuePrim != null) {
+						String lang = langPrim.getAsString();
+						String value = valuePrim.getAsString();
+						if (!lang.isEmpty() && !value.isEmpty()) {
+							labelMap.put(lang, value);
+						}
 					}
 				}
 				article.setLabels(labelMap);
