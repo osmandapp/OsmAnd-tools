@@ -1381,8 +1381,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
     private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
                                               IndexCreatorSettings settings) {
+    	name = removeBraces(name);
         name = Algorithms.normalizeSearchText(name);
-        name = removeBraces(name);
 		Set<String> splitNames = splitNames(name);
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
