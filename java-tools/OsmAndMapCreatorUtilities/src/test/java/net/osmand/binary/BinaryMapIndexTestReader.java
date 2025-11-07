@@ -126,16 +126,31 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		return req.getSearchResults();
 	}
 
+	private static boolean compareType(City.CityType type, int blockType) {
+		if (blockType == 0)
+			return type == City.CityType.BOUNDARY;
+		if (blockType == 1)
+			return type == City.CityType.CITY || type == City.CityType.TOWN ;
+		if (blockType == 2)
+			return type == City.CityType.POSTCODE;
+		if (blockType == 3)
+			return type == City.CityType.VILLAGE || type == City.CityType.HAMLET;
 
+		throw new IllegalArgumentException("Not supported: " + type.name() + " == " + blockType);
+	}
 
 	@Override
-	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks type, BinaryMapAddressReaderAdapter.AddressRegion onlyRegion, SearchStat stat) throws IOException {
+	public List<City> getCities(SearchRequest<City> resultMatcher, CityBlocks type, BinaryMapAddressReaderAdapter.AddressRegion onlyRegion, SearchStat stat) {
+		List<City> cs = new ArrayList<>();
 		for (City city : cities) {
+			if (!compareType(city.getType(), type.index))
+				continue;
 			if (resultMatcher != null) {
 				resultMatcher.publish(city);
 			}
+			cs.add(city);
 		}
-		return cities;
+		return cs;
 	}
 
 
