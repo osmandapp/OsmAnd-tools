@@ -452,7 +452,7 @@ public class BinaryMerger {
 			tagRules.put(it.next(), it.previousIndex());
 		}
 		for (CityBlocks cityBlockType : CityBlocks.values()) {
-			if (!cityBlockType.cityGroupType) {
+			if (!cityBlockType.cityGroupType && cityBlockType != CityBlocks.BOUNDARY_TYPE) {
 				continue;
 			}
 			Map<City, BinaryMapIndexReader> cityMap = new HashMap<City, BinaryMapIndexReader>();
