@@ -1,0 +1,7 @@
+# the tools distribution
+OsmAndMapCreator/
+
+# downloaded and generated files
+mangrove-*.json
+*.reviews.obf
+*.reviews.osm.gz
