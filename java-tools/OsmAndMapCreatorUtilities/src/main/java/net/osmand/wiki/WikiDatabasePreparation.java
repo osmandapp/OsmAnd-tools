@@ -1715,7 +1715,7 @@ public class WikiDatabasePreparation {
 			System.err.println("Table osm_wikidata doesn't exist");
 		}
 		st.execute("""
-				CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, \
+				CREATE TABLE osm_wikidata(osmid bigint, osmtype int, wikidataid bigint, lat double, long double, 
 				tags string, poitype string, poisubtype string, wikiCommonsImg string, wikiCommonsCat string""");
 		st.close();
 		PreparedStatement ps = commonsWikiConn
