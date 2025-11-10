@@ -13,9 +13,7 @@ import java.util.List;
 record Review(
         @NotNull String signature,
         @NotNull String kid,
-        @NotNull Payload payload,
-        String scheme,
-        Geo geo
+        @NotNull Payload payload
 ) {
     public record Payload(
             long iat,
@@ -189,75 +187,10 @@ record Review(
         }
     }
 
-    public record Geo(
-            Coordinates coordinates,
-            Integer uncertainty
-    ) {
-        public record Coordinates(
-                double x,
-                double y,
-                int srid
-        ) {
-            public static final class Builder {
-                private Double x = null;
-                private Double y = null;
-                private Integer srid = null;
-
-                public Builder withX(double x) {
-                    this.x = x;
-                    return this;
-                }
-
-                public Builder withY(double y) {
-                    this.y = y;
-                    return this;
-                }
-
-                public Builder withSrid(int srid) {
-                    this.srid = srid;
-                    return this;
-                }
-
-                public Coordinates build() {
-                    return new Coordinates(x, y, srid);
-                }
-            }
-
-            public static Builder builder() {
-                return new Builder();
-            }
-        }
-
-        public static final class Builder {
-            private Coordinates coordinates = null;
-            private Integer uncertainty = null;
-
-            public Builder withCoordinates(Coordinates.Builder coordinates) {
-                this.coordinates = coordinates.build();
-                return this;
-            }
-
-            public Builder withUncertainty(Integer uncertainty) {
-                this.uncertainty = uncertainty;
-                return this;
-            }
-
-            public Geo build() {
-                return new Geo(coordinates, uncertainty);
-            }
-        }
-
-        public static Builder builder() {
-            return new Builder();
-        }
-    }
-
     public static final class Builder {
         private String signature = null;
         private String kid = null;
         private Payload payload = null;
-        private String scheme = null;
-        private Geo geo = null;
 
         public Builder withSignature(String signature) {
             this.signature = signature;
@@ -274,18 +207,8 @@ record Review(
             return this;
         }
 
-        public Builder withScheme(String scheme) {
-            this.scheme = scheme;
-            return this;
-        }
-
-        public Builder withGeo(Geo.Builder geo) {
-            this.geo = geo.build();
-            return this;
-        }
-
         public Review build() {
-            return new Review(signature, kid, payload, scheme, geo);
+            return new Review(signature, kid, payload);
         }
     }
 
@@ -294,15 +217,7 @@ record Review(
     }
 
     public Review withPayload(Payload payload) {
-        return new Review(signature, kid, payload, scheme, geo);
-    }
-
-    public Review withScheme(String scheme) {
-        return new Review(signature, kid, payload, scheme, geo);
-    }
-
-    public Review withGeo(Geo geo) {
-        return new Review(signature, kid, payload, scheme, geo);
+        return new Review(signature, kid, payload);
     }
 
     public net.osmand.reviews.Review asOsmAndReview() {

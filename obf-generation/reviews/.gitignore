@@ -5,3 +5,4 @@ OsmAndMapCreator/
 mangrove-*.json
 *.reviews.obf
 *.reviews.osm.gz
+regions.ocbf

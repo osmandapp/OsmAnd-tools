@@ -7,8 +7,6 @@ import net.osmand.data.LatLon;
 import net.osmand.reviews.OsmElementType;
 import org.apache.commons.logging.Log;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,10 +64,9 @@ final class OsmCoding {
     }
 
     private static final Pattern MAPCOMPLETE_CLIENT_ID_ELEMENT_PATTERN = Pattern.compile("#(?<type>node|relation|way)/(?<id>\\d+)$");
-    private static final Pattern GEO_SUB_NAME_PATTERN = Pattern.compile("[?&]q=(?<qValue>[^&]*)");
 
     private static OsmPoi resolvePoi(Review review) {
-        if (!review.scheme().equals("geo") || review.payload().metadata() == null || review.payload().metadata().clientId() == null) {
+        if (!review.payload().sub().startsWith("geo:") || review.payload().metadata() == null || review.payload().metadata().clientId() == null) {
             return null;
         }
 
@@ -95,15 +92,16 @@ final class OsmCoding {
 
         osmId = Long.parseLong(osmIdStr);
 
-        String name = nameFromSub(review.payload().sub());
+        GeoUri geo = GeoUri.parseUrlEncoded(review.payload().sub());
+        String name = nameFromSub(geo);
         if (name == null) {
             return null;
         }
 
         return new OsmPoi(
                 new LatLon(
-                        review.geo().coordinates().y(),
-                        review.geo().coordinates().x()
+                        geo.latitude(),
+                        geo.longitude()
                 ),
                 name,
                 elementType,
@@ -111,18 +109,12 @@ final class OsmCoding {
         );
     }
 
-    private static String nameFromSub(String sub) {
-        Matcher matcher = GEO_SUB_NAME_PATTERN.matcher(sub);
-        if (matcher.find()) {
-            try {
-                String encodedValue = matcher.group("qValue");
-                return URLDecoder.decode(encodedValue, StandardCharsets.UTF_8);
-            } catch (IllegalArgumentException e) {
-                log.error(String.format("can't decode name from sub '%s'", sub), e);
-                return null;
-            }
+    private static String nameFromSub(GeoUri geo) {
+        String name = geo.parameters().get("q");
+        if (name != null) {
+            return name;
         }
-        log.error(String.format("name not found in sub '%s'", sub));
+        log.warn(String.format("name not found in sub '%s'", geo));
         return null;
     }
 

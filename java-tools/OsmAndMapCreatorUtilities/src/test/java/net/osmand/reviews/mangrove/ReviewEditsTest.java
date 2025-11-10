@@ -128,9 +128,7 @@ public class ReviewEditsTest {
                                 edit.payload().metadata().nickname(),
                                 edit.payload().metadata().preferredUsername()
                         )
-                ),
-                original.scheme(),  // <-- scheme is extracted from sub, so must be consistent
-                original.geo()  // <-- geo is extracted from sub, so must be consistent
+                )
         );
     }
 
@@ -155,9 +153,7 @@ public class ReviewEditsTest {
                                 "nickname" + seqNum,
                                 "preferredUsername" + seqNum
                         )
-                ),
-                "scheme" + seqNum,
-                new Review.Geo(null, null)
+                )
         );
     }
 }

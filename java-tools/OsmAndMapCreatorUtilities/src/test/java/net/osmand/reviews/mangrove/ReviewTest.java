@@ -49,9 +49,7 @@ public class ReviewTest {
                                 nickname,
                                 null
                         )
-                ),
-                "sub",
-                null
+                )
         );
     }
 }

@@ -21,8 +21,6 @@ final class ReviewsParser {
         ImageList,
         Image,
         Metadata,
-        Geo,
-        Coordinates,
         Final
     }
 
@@ -72,8 +70,6 @@ final class ReviewsParser {
         ImmutableList.Builder<Review.Payload.Image> images = null;
         Review.Payload.Image.Builder image = null;
         Review.Payload.Metadata.Builder metadata = null;
-        Review.Geo.Builder geo = null;
-        Review.Geo.Coordinates.Builder coordinates = null;
 
         while (!parser.isClosed()) {
             JsonToken token = parser.nextToken();
@@ -92,8 +88,7 @@ final class ReviewsParser {
                                     consume(parser, state, START_ARRAY);
                                     state = State.ReviewList;
                                 }
-                                case "issuers" -> skip(parser);
-                                case "maresi_subjects" -> skip(parser);
+                                case "issuers", "maresi_subjects" -> skip(parser);
                                 default -> unexpectedField(state, parser.currentName());
                             }
                         }
@@ -124,12 +119,6 @@ final class ReviewsParser {
                                     consume(parser, state, START_OBJECT);
                                     payload = Review.Payload.builder();
                                     state = State.Payload;
-                                }
-                                case "scheme" -> review.withScheme(parser.nextTextValue());
-                                case "geo" -> {
-                                    consume(parser, state, START_OBJECT);
-                                    geo = Review.Geo.builder();
-                                    state = State.Geo;
                                 }
                                 default -> unexpectedField(state, parser.currentName());
                             }
@@ -232,46 +221,6 @@ final class ReviewsParser {
                         default -> unexpectedToken(state, token);
                     }
                 }
-                case Geo -> {
-                    switch (token) {
-                        case FIELD_NAME -> {
-                            switch (parser.currentName()) {
-                                case "coordinates" -> {
-                                    if (!isNull(parser, state, START_OBJECT)) {
-                                        coordinates = Review.Geo.Coordinates.builder();
-                                        state = State.Coordinates;
-                                    }
-                                }
-                                case "uncertainty" -> geo.withUncertainty(nextIntValueOrNull(parser, state));
-                                default -> unexpectedField(state, parser.currentName());
-                            }
-                        }
-                        case END_OBJECT -> {
-                            review.withGeo(geo);
-                            geo = null;
-                            state = State.Review;
-                        }
-                        default -> unexpectedToken(state, token);
-                    }
-                }
-                case Coordinates -> {
-                    switch (token) {
-                        case FIELD_NAME -> {
-                            switch (parser.currentName()) {
-                                case "x" -> coordinates.withX(nextDoubleValue(parser, state));
-                                case "y" -> coordinates.withY(nextDoubleValue(parser, state));
-                                case "srid" -> coordinates.withSrid(nextIntValue(parser, state));
-                                default -> unexpectedField(state, parser.currentName());
-                            }
-                        }
-                        case END_OBJECT -> {
-                            geo.withCoordinates(coordinates);
-                            coordinates = null;
-                            state = State.Geo;
-                        }
-                        default -> unexpectedToken(state, token);
-                    }
-                }
                 default -> throw new RuntimeException(String.format("TODO: %s", state));
             }
         }
@@ -326,12 +275,6 @@ final class ReviewsParser {
             case VALUE_NUMBER_INT -> { return parser.getLongValue(); }
             default -> throw new ParseException(state, String.format("expected INT, got %s", token));
         }
-    }
-
-    private static double nextDoubleValue(JsonParser parser, State state) throws IOException, ParseException {
-        JsonToken token = parser.nextToken();
-        if (token != VALUE_NUMBER_FLOAT) throw new ParseException(state, String.format("expected FLOAT, got %s", token));
-        return parser.getDoubleValue();
     }
 
     private static boolean nextBooleanValue(JsonParser parser) throws IOException {

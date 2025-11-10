@@ -21,8 +21,6 @@ final class ReviewEdits {
      * <ul>
      *     <li><code>payload.sub</code></li>
      *     <li><code>payload.metadata.client_id</code></li>
-     *     <li><code>scheme</code></li>
-     *     <li><code>geo</code></li>
      * </ul>
      * <p>
      * from the edited review to the edit, then removes the edited review from the set. In case of multiple parallel edits of the same review, only the latest one (by <code>payload.iat</code>) is left.
@@ -79,9 +77,7 @@ final class ReviewEdits {
                         edit.payload()
                                 .withSub(root.payload().sub())
                                 .withMetadata(edit.payload().metadata().withClientId(root.payload().metadata().clientId()))
-                )
-                .withScheme(root.scheme())
-                .withGeo((root.geo()));
+                );
     }
 
     /**
