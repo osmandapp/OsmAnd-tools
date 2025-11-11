@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import java.io.*;
+import java.lang.reflect.Type;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
@@ -14,6 +15,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiImage;
@@ -61,6 +63,7 @@ public class WikiService {
 	private static final String SIMILARITY_CF = "0.975";
 
 	private static final Pattern DIGITS = Pattern.compile("\\d+");
+	private static final Gson gson = new Gson();
 
 
 	private final Map<String, String> licenseMap = new HashMap<>();
@@ -253,7 +256,7 @@ public class WikiService {
 				"arrayFirst(x -> has(w.wikiArticleLangs, x), " + langList + ") AS lang, " +
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
-				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
+				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson " +
 				"FROM " + table + " AS w " +
 				"PREWHERE (w.search_lat BETWEEN ? AND ? AND w.search_lon BETWEEN ? AND ?) " +
 				(showAll ? "" : filterQuery) +
@@ -362,14 +365,41 @@ public class WikiService {
 						case "wikiArticles" -> fillWikiArticles(rs, i, f, langPriority);
 						case "availableLangs" -> f.properties.put("wikiLangs", rs.getString(i));
 						case "wvLinks" -> fillWvLinks(rs, i, f, langPriority);
-						case "wikiTitle" -> f.properties.putIfAbsent("wikiTitle", rs.getString(i));
-						case "wikiDesc" ->  f.properties.putIfAbsent("wikiDesc", rs.getString(i));
-						case "wikiLang" ->  f.properties.putIfAbsent("wikiLang", rs.getString(i));
+						case "wikiTitle" -> fillWikiTitle(rs, f, i, langPriority);
+						case "wikiDesc" -> f.properties.putIfAbsent("wikiDesc", rs.getString(i));
+						case "wikiLang" -> f.properties.putIfAbsent("wikiLang", rs.getString(i));
 						case "poisubtype" -> fillPoiSubtype(rs.getString(i), f);
 						default -> f.properties.put(col, rs.getString(i));
 					}
 				}
 				return f;
+			}
+
+			private static void fillWikiTitle(ResultSet rs, Feature f, int i, List<String> langPriority) throws SQLException {
+				String title = rs.getString(i);
+				if (title == null || title.isEmpty()) {
+					String labelsJson = rs.getString("labelsJson");
+					if (labelsJson != null && !labelsJson.isEmpty()) {
+						Type type = new TypeToken<Map<String, String>>() {
+						}.getType();
+						Map<String, String> langTitleMap = gson.fromJson(labelsJson, type);
+						if (langTitleMap != null && !langTitleMap.isEmpty()) {
+							for (String lang : langPriority) {
+								if (langTitleMap.containsKey(lang)) {
+									title = langTitleMap.get(lang);
+									break;
+								}
+							}
+							if (title == null) {
+								title = langTitleMap.get("en");
+							}
+							if (title == null) {
+								title = langTitleMap.entrySet().iterator().next().getValue();
+							}
+						}
+					}
+				}
+				f.properties.putIfAbsent("wikiTitle", title);
 			}
 		};
 
@@ -739,7 +769,6 @@ public class WikiService {
 		final String VALUE = "value";
 
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-			Gson gson = new Gson();
 			JsonObject jsonObject = gson.fromJson(reader, JsonObject.class);
 			JsonArray bindings = jsonObject.getAsJsonObject("results").getAsJsonArray("bindings");
 			for (JsonElement element : bindings) {
