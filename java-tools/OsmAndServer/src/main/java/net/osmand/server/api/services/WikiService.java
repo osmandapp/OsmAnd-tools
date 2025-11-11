@@ -63,6 +63,7 @@ public class WikiService {
 	private static final String SIMILARITY_CF = "0.975";
 
 	private static final Pattern DIGITS = Pattern.compile("\\d+");
+	private static final Gson gson = new Gson();
 
 
 	private final Map<String, String> licenseMap = new HashMap<>();
@@ -379,7 +380,6 @@ public class WikiService {
 				if (title == null || title.isEmpty()) {
 					String labelsJson = rs.getString("labelsJson");
 					if (labelsJson != null && !labelsJson.isEmpty()) {
-						Gson gson = new Gson();
 						Type type = new TypeToken<Map<String, String>>() {
 						}.getType();
 						Map<String, String> langTitleMap = gson.fromJson(labelsJson, type);
@@ -393,7 +393,7 @@ public class WikiService {
 							if (title == null) {
 								title = langTitleMap.get("en");
 							}
-							if (title == null && langTitleMap.entrySet().iterator().hasNext()) {
+							if (title == null) {
 								title = langTitleMap.entrySet().iterator().next().getValue();
 							}
 						}
@@ -769,7 +769,6 @@ public class WikiService {
 		final String VALUE = "value";
 
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-			Gson gson = new Gson();
 			JsonObject jsonObject = gson.fromJson(reader, JsonObject.class);
 			JsonArray bindings = jsonObject.getAsJsonObject("results").getAsJsonArray("bindings");
 			for (JsonElement element : bindings) {
