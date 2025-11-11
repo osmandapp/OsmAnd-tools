@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
-import net.osmand.reviews.OsmElementType;
+import net.osmand.osm.edit.Entity;
 import org.apache.commons.logging.Log;
 
 import java.util.*;
@@ -70,7 +70,7 @@ final class OsmCoding {
             return null;
         }
 
-        OsmElementType elementType;
+        Entity.EntityType elementType;
         long osmId;
         Matcher osmIdMatcher = MAPCOMPLETE_CLIENT_ID_ELEMENT_PATTERN.matcher(review.payload().metadata().clientId());
         if (!osmIdMatcher.find()) {
@@ -81,9 +81,9 @@ final class OsmCoding {
         String osmIdStr = osmIdMatcher.group("id");
 
         switch (elementTypeStr) {
-            case "node" -> elementType = OsmElementType.NODE;
-            case "relation" -> elementType = OsmElementType.RELATION;
-            case "way" -> elementType = OsmElementType.WAY;
+            case "node" -> elementType = Entity.EntityType.NODE;
+            case "relation" -> elementType = Entity.EntityType.RELATION;
+            case "way" -> elementType = Entity.EntityType.WAY;
             default -> {
                 log.error(String.format("unexpected element type: '%s'", osmIdMatcher.group(1)));
                 return null;
@@ -120,7 +120,7 @@ final class OsmCoding {
 
     public record OsmPoi(LatLon location,
                          String name,
-                         OsmElementType elementType,
+                         Entity.EntityType elementType,
                          Long osmId) {
     }
 

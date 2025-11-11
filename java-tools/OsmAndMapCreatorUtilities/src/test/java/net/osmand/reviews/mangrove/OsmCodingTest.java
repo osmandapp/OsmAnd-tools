@@ -8,8 +8,8 @@ import org.junit.Test;
 import java.util.Map;
 import java.util.Set;
 
-import static net.osmand.reviews.OsmElementType.NODE;
-import static net.osmand.reviews.OsmElementType.WAY;
+import static net.osmand.osm.edit.Entity.EntityType.NODE;
+import static net.osmand.osm.edit.Entity.EntityType.WAY;
 import static org.junit.Assert.assertEquals;
 
 public final class OsmCodingTest {

@@ -21,6 +21,7 @@ final class ReviewsParser {
         ImageList,
         Image,
         Metadata,
+        Geo,
         Final
     }
 
@@ -70,6 +71,7 @@ final class ReviewsParser {
         ImmutableList.Builder<Review.Payload.Image> images = null;
         Review.Payload.Image.Builder image = null;
         Review.Payload.Metadata.Builder metadata = null;
+        int skipNestLevel = 0;
 
         while (!parser.isClosed()) {
             JsonToken token = parser.nextToken();
@@ -113,13 +115,17 @@ final class ReviewsParser {
                         case FIELD_NAME -> {
                             switch (parser.currentName()) {
                                 case "signature" -> review.withSignature(parser.nextTextValue());
-                                case "jwt" -> skip(parser);
                                 case "kid" -> review.withKid(parser.nextTextValue());
                                 case "payload" -> {
                                     consume(parser, state, START_OBJECT);
                                     payload = Review.Payload.builder();
                                     state = State.Payload;
                                 }
+                                case "geo" -> {
+                                    consume(parser, state, START_OBJECT);
+                                    state = State.Geo;
+                                }
+                                case "jwt", "scheme" -> skip(parser);
                                 default -> unexpectedField(state, parser.currentName());
                             }
                         }
@@ -221,7 +227,20 @@ final class ReviewsParser {
                         default -> unexpectedToken(state, token);
                     }
                 }
-                default -> throw new RuntimeException(String.format("TODO: %s", state));
+                case Geo -> {
+                    // skip this and all nested objects
+                    switch (token) {
+                        case START_OBJECT -> skipNestLevel += 1;
+                        case END_OBJECT -> {
+                            if (skipNestLevel == 0) {
+                                state = State.Review;
+                            } else {
+                                skipNestLevel -= 1;
+                            }
+                        }
+                    }
+                }
+                default -> throw new IllegalStateException(String.format("Unhandled state: %s", state));
             }
         }
         // end of review list
