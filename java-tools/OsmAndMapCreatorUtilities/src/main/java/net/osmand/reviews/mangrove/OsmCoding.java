@@ -19,8 +19,8 @@ final class OsmCoding {
      * only works for reviews that contain OSM ids in their metadata.
      *
      * @param reviews a set of reviews
-     * @return a map of review to a {@code ReviewedPlace} describing the OpenStreetMap POI to which the review applies. The {@code ReviewedPlace} will have an empty list of reviews.
-     * only reviews whose OSM details were successfully resolved are returned.
+     * @return a map of review to a {@code OsmPoi} describing the OpenStreetMap POI to which the review applies. Only reviews whose OSM
+     * details were successfully resolved are returned.
      */
     public static Map<Review, OsmPoi> resolveOsmPois(Set<Review> reviews) {
         Map<Review, OsmPoi> result = new HashMap<>();
