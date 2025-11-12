@@ -54,7 +54,6 @@ public class VectorTileController {
 
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
-		Map<String, VectorStyle> snapshot;
 		synchronized (config.style) {
 			for (VectorStyle vectorStyle : config.style.values()) {
 				vectorStyle.properties.clear();
@@ -66,9 +65,8 @@ public class VectorTileController {
 					}
 				}
 			}
-			snapshot = new TreeMap<>(config.style);
+			return ResponseEntity.ok(gson.toJson(config.style));
 		}
-		return ResponseEntity.ok(gson.toJson(snapshot));
 	}
 
 	@RequestMapping(path = "/{style}/{z}/{x}/{y}.png", produces = MediaType.IMAGE_PNG_VALUE)
