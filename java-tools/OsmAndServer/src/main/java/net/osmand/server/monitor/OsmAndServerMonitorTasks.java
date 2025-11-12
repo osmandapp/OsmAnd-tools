@@ -94,7 +94,7 @@ public class OsmAndServerMonitorTasks {
 	private static final String[] JAVA_HOSTS_TO_RESTART = new String[]{
 			"https://osmand.net:8095/job/WebSite_OsmAndServer/",
 			"https://builder.osmand.net:8080/job/WebSite_OsmAndServer/",
-			"https://maptile.osmand.net:8080/job/WebSite_OsmAndServer/"
+			"https://maptile.osmand.net:8080/job/Web_UpdateOsmAndServer/"
 	};
 
 	private static final String TILE_SERVER = "https://tile.osmand.net/hd/";
