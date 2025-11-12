@@ -52,17 +52,19 @@ public class VectorTileController {
 
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<?> getStyles() {
-		for (VectorStyle vectorStyle : config.style.values()) {
-			vectorStyle.properties.clear();
-			for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
-				if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
-						&& !"ui_hidden".equals(p.getCategory())) {
-					p.setCategory(Algorithms.capitalizeFirstLetter(p.getCategory().replace('_', ' ')));
-					vectorStyle.properties.add(p);
+		synchronized (config.style) {
+			for (VectorStyle vectorStyle : config.style.values()) {
+				vectorStyle.properties.clear();
+				for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
+					if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
+							&& !"ui_hidden".equals(p.getCategory())) {
+						p.setCategory(Algorithms.capitalizeFirstLetter(p.getCategory().replace('_', ' ')));
+						vectorStyle.properties.add(p);
+					}
 				}
 			}
+			return ResponseEntity.ok(gson.toJson(config.style));
 		}
-		return ResponseEntity.ok(gson.toJson(config.style));
 	}
 
 	@RequestMapping(path = "/{style}/{z}/{x}/{y}.png", produces = MediaType.IMAGE_PNG_VALUE)
