@@ -3,8 +3,6 @@ package net.osmand.server.controllers.pub;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Map;
-import java.util.TreeMap;
 
 import javax.imageio.ImageIO;
 
