@@ -41,7 +41,7 @@ public class TileServerConfig {
 
 	protected static final Log LOGGER = LogFactory.getLog(TileServerConfig.class);
 
-	public Map<String, VectorStyle> style = new TreeMap<>();
+	public final Map<String, VectorStyle> style = new TreeMap<>();
 
 	public void setStyle(Map<String, String> style) {
 		for (Map.Entry<String, String> e : style.entrySet()) {
