@@ -1034,7 +1034,7 @@ public class SearchService {
             for (Map.Entry<String, String> entry : typeTags.entrySet()) {
                 feature.prop(entry.getKey(), entry.getValue());
             }
-            feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
+            feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
         }
         return feature;
     }
