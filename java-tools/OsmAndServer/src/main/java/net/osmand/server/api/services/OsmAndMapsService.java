@@ -1355,7 +1355,7 @@ public class OsmAndMapsService {
 		for (File file : files) {
 			String dwName = getDownloadNameByFileName(file.getName());
 			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
-			if (wr != null && (wr.isRegionJoinMapDownload() || wr.isRegionJoinMapDownload())) {
+			if (wr != null && (wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload())) {
 				// skip joint maps
 			} else {
 				res.add(file);
