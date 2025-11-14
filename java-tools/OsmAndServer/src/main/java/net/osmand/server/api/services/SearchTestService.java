@@ -339,7 +339,7 @@ public class SearchTestService implements ReportService, DataService {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty())
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true);
+								query, run.locale, false, bbox[0], bbox[1], true, true);
 
 					saveRunResults(genRow, gen_id, count, run, query, searchResult, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
