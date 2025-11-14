@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -530,7 +531,9 @@ public class OsmAndMapsService {
 	public synchronized void checkZippedFiles() throws IOException {
 		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
 			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
-			for (File zipFile : new File(tileConfig.obfZipLocation).listFiles()) {
+			File[] zipFiles = new File(tileConfig.obfZipLocation).listFiles();
+			List<File> zipWithoutJointMaps = zipFiles != null ? filterMap(Arrays.asList(zipFiles)) : new ArrayList<>();
+			for (File zipFile : zipWithoutJointMaps) {
 				if (zipFile.getName().endsWith(".obf.zip")) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(tileConfig.obfLocation, fn);
@@ -1351,14 +1354,18 @@ public class OsmAndMapsService {
 			osmandRegions = new OsmandRegions();
 			osmandRegions.prepareFile();
 		}
-		
 		for (File file : files) {
-			String dwName = getDownloadNameByFileName(file.getName());
-			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
-			if (wr != null && (wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload())) {
-				LOGGER.error("Joint map filtered: " + file.getName());
-			} else {
-				res.add(file);
+			String obfFileName = file.getName().replaceFirst(".zip", "");
+			if (obfFileName.endsWith(".obf")) {
+				String dwName = getDownloadNameByFileName(obfFileName);
+				WorldRegion wr = osmandRegions.getRegionDataByDownloadName(dwName);
+				if (wr != null && (wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload())) {
+					if (file.getName().endsWith(".obf")) {
+						LOGGER.error("Deprecated joint OBF filtered: " + file.getName());
+					}
+				} else {
+					res.add(file); // allow non-joint maps only
+				}
 			}
 		}
 		return res;
