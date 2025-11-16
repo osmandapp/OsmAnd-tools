@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
+import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.ObfConstants;
@@ -983,7 +984,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// if we saved address ways we could checked that we registered before
 			boolean exist = streetDAO.findStreetNode(e);
 
-
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
@@ -1397,7 +1397,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int prioP = Integer.MAX_VALUE;
 			pos = -1;
 			for (int k = 0; k < namesToAdd.size(); k++) {
-				int prio = CommonWords.getCommon(namesToAdd.get(k));
+				String word = namesToAdd.get(k);
+				int prio = CommonWords.getCommon(word);
+				if (Abbreviations.isConjunction(word)) {
+					prio = 0;
+				}
 				if (prio != -1 && prio < prioP) {
 					pos = k;
 					prioP = prio;
