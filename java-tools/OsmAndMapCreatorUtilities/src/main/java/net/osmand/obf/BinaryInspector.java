@@ -160,6 +160,7 @@ public class BinaryInspector {
 		boolean vhhrouting;
 		boolean vmapObjects;
 		boolean vmapCoordinates;
+		boolean vfulldictionary;
 		boolean vstats;
 		boolean osm;
 		FileOutputStream osmOut = null;
@@ -220,6 +221,8 @@ public class BinaryInspector {
 					vintersections = true;
 				} else if (params[i].equals("-vmap")) {
 					vmap = true;
+				} else if (params[i].equals("-vfulldictionary")) {
+					vfulldictionary = true;
 				} else if (params[i].equals("-vstats")) {
 					vstats = true;
 				} else if (params[i].equals("-vrouting")) {
@@ -651,8 +654,10 @@ public class BinaryInspector {
 				continue;
 			}
 			String t = rtr.getTag();
-			if (t.contains(":")) {
-				t = t.substring(0, t.indexOf(":"));
+			if (!vInfo.vfulldictionary) {
+				if (t.contains(":")) {
+					t = t.substring(0, t.indexOf(":"));
+				}
 			}
 			t += "-" + ind++;
 			if (mp.containsKey(t)) {
@@ -686,8 +691,10 @@ public class BinaryInspector {
 				continue;
 			}
 			String t = rtr.tag;
-			if (t.contains(":")) {
-				t = t.substring(0, t.indexOf(":"));
+			if (!vInfo.vfulldictionary) {
+				if (t.contains(":")) {
+					t = t.substring(0, t.indexOf(":"));
+				}
 			}
 //			System.out.println(rtr.tag + " " + rtr.value);
 //			t += "-" + rtr.value;
@@ -1596,7 +1603,7 @@ public class BinaryInspector {
 		}
 		System.out.println("Inspector is console utility for working with binary indexes of OsmAnd.");
 		System.out.println("It allows print info about file, extract parts and merge indexes.");
-		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
+		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vfulldictionary] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
 		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )* [--date=...]");

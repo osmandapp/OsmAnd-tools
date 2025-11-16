@@ -141,7 +141,7 @@ public class SearchService {
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false);
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false, false);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
@@ -158,15 +158,19 @@ public class SearchService {
 
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
 
-    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
+    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
+                                             String northWest, String southEast, boolean filterCombinedMap,
+                                             boolean unlimited) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResultWrapper(Collections.emptyList(), null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
-        searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
-	    searchUICore.getSearchSettings().setRegions(osmandRegions);
+        if (!unlimited) {
+            searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
+        }
+        searchUICore.getSearchSettings().setRegions(osmandRegions);
 
-	    QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
+        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
@@ -1034,7 +1038,7 @@ public class SearchService {
             for (Map.Entry<String, String> entry : typeTags.entrySet()) {
                 feature.prop(entry.getKey(), entry.getValue());
             }
-            feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
+            feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
         }
         return feature;
     }

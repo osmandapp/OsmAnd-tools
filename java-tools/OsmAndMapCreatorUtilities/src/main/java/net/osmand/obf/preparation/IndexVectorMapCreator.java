@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
-import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -57,8 +56,6 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
-
-import static net.osmand.obf.preparation.IndexRouteRelationCreator.SHIELD_STUB_NAME;
 
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
@@ -157,19 +154,33 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc)
             throws SQLException {
-        if (e instanceof Relation) {
+        if (e instanceof Relation relation) {
             long ts = System.currentTimeMillis();
+            processBuildingTypeRelationRole(relation, ctx);
             Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION,
                     EntityConvertApplyType.MAP);
             if (!settings.keepOnlyRouteRelationObjects && settings.indexMultipolygon) {
-                indexMultiPolygon((Relation) e, tags, ctx);
+                indexMultiPolygon(relation, tags, ctx);
             }
-            tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
+            tagsTransformer.handleRelationPropogatedTags(relation, renderingTypes, ctx, EntityConvertApplyType.MAP);
             long tm = (System.currentTimeMillis() - ts) / 1000;
             if (tm > 15) {
                 log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
             }
             handlePublicTransportStopExits(e, ctx);
+        }
+    }
+
+    private void processBuildingTypeRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+        if (OSMTagKey.BUILDING.getValue().equals(e.getTag(OSMTagKey.TYPE))) {
+            ctx.loadEntityRelation(e);
+            for (RelationMember entry : e.getMembers()) {
+                String role = entry.getRole();
+                if (!Algorithms.isEmpty(role)) {
+                    PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
+                    p.putThroughTags.put("role", role);
+                }
+            }
         }
     }
 
