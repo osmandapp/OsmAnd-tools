@@ -55,7 +55,7 @@ class RandomRouteEntry {
 				(start.getLongitude() + finish.getLongitude()) / 2
 		);
 
-		String hasVia = via.size() > 0 ? "&via=" : "";
+		String hasVia = !via.isEmpty() ? "&via=" : "";
 
 		List<String> viaList = new ArrayList<>();
 		via.forEach(ll -> viaList.add(String.format("%f,%f", ll.getLatitude(), ll.getLongitude())));
@@ -79,7 +79,7 @@ class RandomRouteEntry {
 			typeParams.add("calcmode:" + (car2phase ? "COMPLEX" : "NORMAL"));
 		}
 
-		String hasParams = typeParams.size() > 0 ? "&params=" : "";
+		String hasParams = !typeParams.isEmpty() ? "&params=" : "";
 		String PARAMS = String.join(",", typeParams); // site will fix it to "profile,params"
 
 		// detect proto: 1) default "https" 2) "http" for localhost 3) might be already included in domain
@@ -154,10 +154,10 @@ class RandomRouteResult {
 class RandomRouteReport {
 	private String text;
 	private String html;
-	private String htmlDomain;
-	private boolean car2phase;
-	private double deviationRed;
-	private double deviationYellow;
+	private final String htmlDomain;
+	private final boolean car2phase;
+	private final double deviationRed;
+	private final double deviationYellow;
 	private int failedResults, deviatedResults;
 
 	RandomRouteReport(long runTime, int nObf, int nRoutes, double red, double yellow, String htmlDomain, boolean car2phase) {
@@ -196,7 +196,7 @@ class RandomRouteReport {
 		);
 	}
 
-	String resultPrimaryHtml(int n, RandomRouteResult primary) {
+	String resultPrimaryHtml(RandomRouteResult primary) {
 		String mapCreatorProfileParams = getMapCreatorProfileParams(primary.entry);
 
 		String start = String.format("%f,%f", primary.entry.start.getLatitude(), primary.entry.start.getLongitude());
@@ -225,7 +225,7 @@ class RandomRouteReport {
 
 	void resultPrimary(int n, RandomRouteResult primary) {
 		text += resultPrimaryText(n, primary) + "\n";
-		html += resultPrimaryHtml(n, primary);
+		html += resultPrimaryHtml(primary);
 	}
 
 	void resultCompare(int n, RandomRouteResult result, RandomRouteResult primary) {
@@ -247,7 +247,7 @@ class RandomRouteReport {
 				String.format("<td><font color=%s>%s</font></td>", colorDistance, sDistance) +    // 3
 				String.format("<td>%d</td>", result.visitedSegments) +                            // 4
 				String.format("<td>%.1f</td>", result.runTime / 1000F) +                          // 5
-				String.format("<td colspan=4>&nbsp;</td>") +                                      // 6-9
+				"<td colspan=4>&nbsp;</td>" +                                                     // 6-9
 				"</tr>\n";
 
 		text += String.format("%d:%s cost %s dist %s segments=%d seconds=%.1f\n",
@@ -304,13 +304,15 @@ class RandomRouteReport {
 
 	void flush(String htmlFileName) throws IOException {
 		FileWriter writer = new FileWriter(htmlFileName);
-		html += "</table><br>\n" +
-				"cost - cost of all segments (seconds)<br>\n" +
-				"dist - distance of geometry (meters)<br>\n" +
-				"vis - count of visited segments<br>\n" +
-				"s - route calc time (seconds)<br>\n" +
-				"via - number of inter points<br>\n" +
-				"</body></html>\n";
+		html += """
+				</table><br>
+				cost - cost of all segments (seconds)<br>
+				dist - distance of geometry (meters)<br>
+				vis - count of visited segments<br>
+				s - route calc time (seconds)<br>
+				via - number of inter points<br>
+				</body></html>
+				""";
 		System.err.printf("\n%s", text);
 		writer.write(html);
 		writer.close();
