@@ -4,6 +4,8 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingContext;
+import net.osmand.router.TransportRoutePlanner;
+import net.osmand.router.TransportRouteResult;
 import net.osmand.util.MapUtils;
 
 import java.io.FileWriter;
@@ -19,7 +21,8 @@ class RandomRouteEntry {
 	String profile = "car";
 	List<String> params = new ArrayList<>();
 
-	List<RandomRouteResult> results = new ArrayList<>();
+	List<RandomRouteResult> routeResults = new ArrayList<>();
+	List<RandomRouteResult> transportResults = new ArrayList<>();
 
 	Map<String, String> mapParams() {
 		Map<String, String> map = new HashMap<>();
@@ -32,6 +35,10 @@ class RandomRouteEntry {
 			}
 		});
 		return map;
+	}
+
+	public boolean isPublicTransport() {
+		return RandomRouteTester.PUBLIC_TRANSPORT_PROFILE.equals(profile);
 	}
 
 	public String toString() {
@@ -101,6 +108,18 @@ class RandomRouteResult {
 	float distance; // meters
 	RandomRouteEntry entry; // ref to the parent: start, finish, etc
 
+	// Public Transport Result
+	RandomRouteResult(String type, RandomRouteEntry entry, long runTime, List<TransportRouteResult> results) {
+		this.type = type;
+		this.entry = entry;
+		this.runTime = runTime;
+
+		visitedSegments = results.size();
+		cost = calcTransportRouteAvgCost(results);
+		distance = calcTransportRouteAvgDistance(results);
+	}
+
+	// BRP/HH Routing Result
 	RandomRouteResult(String type, RandomRouteEntry entry, long runTime,
 	                  RoutingContext ctx, List<RouteSegmentResult> segments) {
 		this.type = type;
@@ -121,6 +140,32 @@ class RandomRouteResult {
 				System.err.printf("WARN: %s got different distance (%f != %f)\n", type, this.distance, untrustedDistance);
 			}
 		}
+	}
+
+	private double calcTransportRouteAvgCost(List<TransportRouteResult> results) {
+		double cost = 0;
+		if (!results.isEmpty()) {
+			for (TransportRouteResult r : results) {
+				cost += r.getRouteTime();
+			}
+			cost /= results.size();
+		}
+		return cost;
+	}
+
+	private float calcTransportRouteAvgDistance(List<TransportRouteResult> results) {
+		double dist = 0;
+		if (!results.isEmpty()) {
+			for (TransportRouteResult r : results) {
+				for (TransportRoutePlanner.TransportRouteResultSegment segment : r.getSegments()) {
+					dist += segment.travelDistApproximate;
+					dist += segment.walkDist;
+				}
+				dist += r.getFinishWalkDist();
+			}
+			dist /= results.size();
+		}
+		return (float)dist;
 	}
 
 	private float calcSegmentDistance(RouteSegmentResult rr) {
@@ -306,9 +351,9 @@ class RandomRouteReport {
 		FileWriter writer = new FileWriter(htmlFileName);
 		html += """
 				</table><br>
-				cost - cost of all segments (seconds)<br>
-				dist - distance of geometry (meters)<br>
-				vis - count of visited segments<br>
+				cost - cost of all segments (seconds) | avg cost among all PT (public transport) routes<br>
+				dist - distance of geometry (meters) | avg distance among all PT routes<br>
+				vis - count of visited segments | number of found PT routes<br>
 				s - route calc time (seconds)<br>
 				via - number of inter points<br>
 				</body></html>
