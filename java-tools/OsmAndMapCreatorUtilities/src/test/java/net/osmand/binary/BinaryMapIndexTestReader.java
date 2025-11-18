@@ -134,7 +134,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		if (blockType == 2)
 			return type == City.CityType.POSTCODE;
 		if (blockType == 3)
-			return type == City.CityType.VILLAGE || type == City.CityType.HAMLET;
+			return type == City.CityType.VILLAGE || type == City.CityType.HAMLET || type == City.CityType.SUBURB;
 
 		throw new IllegalArgumentException("Not supported: " + type.name() + " == " + blockType);
 	}
