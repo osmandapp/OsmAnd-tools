@@ -180,7 +180,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private void processBuildingRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
         boolean hasTypeBuilding = BUILDING.equals(e.getTag(OSMTagKey.TYPE));
         boolean hasMultipolygonBuilding = MULTIPOLYGON.equals(e.getTag(OSMTagKey.TYPE))
-                && (YES.equals(e.getTag(BUILDING)) || YES.equals(e.getTag(BUILDING_PART)));
+                && (e.getTag(BUILDING) != null || e.getTag(BUILDING_PART) != null);
         if (hasTypeBuilding || hasMultipolygonBuilding) {
             ctx.loadEntityRelation(e);
             for (RelationMember entry : e.getMembers()) {
