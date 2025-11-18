@@ -73,6 +73,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private MapZooms mapZooms;
     private IndexCreatorSettings settings;
 
+    private static final String YES = "yes";
+    private static final String ROLE = "role";
+    private static final String BUILDING = "building";
+    private static final String BUILDING_PART = "building:part";
+
+    private static final String MULTIPOLYGON = "multipolygon";
     Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 
     // local purpose to speed up processing cache allocation
@@ -156,7 +162,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             throws SQLException {
         if (e instanceof Relation relation) {
             long ts = System.currentTimeMillis();
-            processBuildingTypeRelationRole(relation, ctx);
+            processBuildingRelationRole(relation, ctx);
             Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION,
                     EntityConvertApplyType.MAP);
             if (!settings.keepOnlyRouteRelationObjects && settings.indexMultipolygon) {
@@ -171,14 +177,17 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
     }
 
-    private void processBuildingTypeRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-        if (OSMTagKey.BUILDING.getValue().equals(e.getTag(OSMTagKey.TYPE))) {
+    private void processBuildingRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+        boolean hasTypeBuilding = BUILDING.equals(e.getTag(OSMTagKey.TYPE));
+        boolean hasMultipolygonBuilding = MULTIPOLYGON.equals(e.getTag(OSMTagKey.TYPE))
+                && (YES.equals(e.getTag(BUILDING)) || YES.equals(e.getTag(BUILDING_PART)));
+        if (hasTypeBuilding || hasMultipolygonBuilding) {
             ctx.loadEntityRelation(e);
             for (RelationMember entry : e.getMembers()) {
                 String role = entry.getRole();
                 if (!Algorithms.isEmpty(role)) {
                     PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
-                    p.putThroughTags.put("role", role);
+                    p.putThroughTags.put(ROLE + "_" + role, YES);
                 }
             }
         }
@@ -229,7 +238,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         tags = new LinkedHashMap<>(tags);
         // some big islands are marked as multipolygon - don't process them (only keep
         // coastlines)
-        boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue()))
+        boolean polygonIsland = MULTIPOLYGON.equals(tags.get(OSMTagKey.TYPE.getValue()))
                 && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
         ctx.loadEntityRelation(e);
         //
