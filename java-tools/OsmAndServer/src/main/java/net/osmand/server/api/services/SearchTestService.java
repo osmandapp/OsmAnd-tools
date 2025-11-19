@@ -3,7 +3,6 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
@@ -36,6 +35,11 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class SearchTestService implements ReportService, DataService {
@@ -76,6 +80,8 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+	private static volatile ExecutorService EXECUTOR;
+
 	@Autowired
 	private ObjectMapper objectMapper;
 	@Autowired
@@ -121,6 +127,31 @@ public class SearchTestService implements ReportService, DataService {
 			jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS gen_result_index on gen_result(case_id, ds_result_id, id)");
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
+		}
+		initializeExecutor();
+	}
+
+	private void initializeExecutor() {
+		if (EXECUTOR != null) return;
+		synchronized (SearchTestService.class) {
+			if (EXECUTOR != null)
+				return;
+			int defaultThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
+			String env = System.getenv("MAX_THREAD_NUMBER");
+			int threads;
+			try {
+				threads = (env == null || env.isBlank()) ? defaultThreads : Math.max(1, Integer.parseInt(env.trim()));
+			} catch (NumberFormatException nfe) {
+				threads = defaultThreads;
+			}
+			ThreadFactory tf = r -> {
+				Thread t = new Thread(r);
+				t.setName("search-test-exec-" + t.getId());
+				t.setDaemon(true);
+				return t;
+			};
+			EXECUTOR = new ThreadPoolExecutor(threads, threads,	60L, TimeUnit.SECONDS,
+					new LinkedBlockingQueue<>(), tf);
 		}
 	}
 
@@ -268,25 +299,58 @@ public class SearchTestService implements ReportService, DataService {
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
+	private static final int BATCH_SIZE = 100;
+
 	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
+		String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
 			if (run.skipFound == null || !run.skipFound) {
-				sql = String.format(
-					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d ORDER BY g.id",
-					run.rerunId);
+				sql = "SELECT count(*) FROM gen_result g " +
+						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
 			} else {
-				sql = String.format(
-					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
-					run.rerunId);
+				sql = "SELECT count(*) FROM gen_result g " +
+						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
+			}
+		}
+		long count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
+
+		List<CompletableFuture<Void>> futures = new ArrayList<>();
+		for (int offset = 0; offset < count; offset += BATCH_SIZE) {
+			final int off = offset;
+			futures.add(CompletableFuture.runAsync(() -> run(run, off), EXECUTOR));
+		}
+
+		try {
+			CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
+				run.status = Run.Status.COMPLETED;
+			}
+		} catch (Exception ex) {
+			LOGGER.error("Evaluation failed for test-case {}", run.id, ex);
+			run.setError(ex.getMessage());
+			run.status = Run.Status.FAILED;
+		} finally {
+			run.timestamp = LocalDateTime.now();
+			runRepo.save(run);
+		}
+	}
+
+	private void run(Run run, int offset) {
+		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
+		if (run.rerunId != null) {
+			// Re-run uses items from a previous run's results by joining gen_result with run_result
+			if (run.skipFound == null || !run.skipFound) {
+				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
+			} else {
+				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
 			}
 		}
 
 		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql + " LIMIT " + BATCH_SIZE + " OFFSET " + offset, run.caseId);
 			if (rows.isEmpty())
 				return;
 
@@ -339,7 +403,7 @@ public class SearchTestService implements ReportService, DataService {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty())
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true, true);
+								query, run.locale, false, bbox[0], bbox[1], true);
 
 					saveRunResults(genRow, gen_id, count, run, query, searchResult, targetPoint, searchPoint,
 							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
@@ -350,12 +414,10 @@ public class SearchTestService implements ReportService, DataService {
 							e.getMessage() == null ? e.toString() : e.getMessage());
 				}
 			}
-			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
-				run.status = Run.Status.COMPLETED;
-			}
 		} catch (Exception e) {
-			LOGGER.error("Evaluation failed for test-case {}", run.id, e);
+			LOGGER.error("Evaluation batch failed for run {} at offset {}", run.id, offset, e);
 			run.setError(e.getMessage());
+			run.status = Run.Status.FAILED;
 		} finally {
 			run.timestamp = LocalDateTime.now();
 			runRepo.save(run);
