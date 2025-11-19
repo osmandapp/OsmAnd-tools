@@ -1009,37 +1009,37 @@ public class SearchService {
     private Feature getPoiFeature(SearchResult result) {
         Amenity amenity = (Amenity) result.object;
         PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-        Feature feature = null;
-        if (poiType != null) {
-            feature = new Feature(Geometry.point(amenity.getLocation()))
-                    .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
-                    .prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
-                    .prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
-                    .prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
-                    .prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType))
-                    .prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
-                    .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
-                    .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
-            Map<String, String> tags = amenity.getAmenityExtensions();
-            filterWikiTags(tags);
-            for (Map.Entry<String, String> entry : tags.entrySet()) {
-                String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
-                if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
-                        continue;
-                }
-                String value = unzipContent(entry.getValue());
-                feature.prop(entry.getKey(), value);
+        Feature feature = new Feature(Geometry.point(amenity.getLocation()))
+                .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+                .prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
+                .prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
+                .prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
+                .prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType))
+                .prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
+                .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
+                .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
+        Map<String, String> tags = amenity.getAmenityExtensions();
+        filterWikiTags(tags);
+        for (Map.Entry<String, String> entry : tags.entrySet()) {
+            String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
+            if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+                    continue;
             }
-            Map<String, String> names = amenity.getNamesMap(true);
-            for (Map.Entry<String, String> entry : names.entrySet()) {
-                feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
-            }
-            Map<String, String> typeTags = getPoiTypeFields(poiType);
-            for (Map.Entry<String, String> entry : typeTags.entrySet()) {
-                feature.prop(entry.getKey(), entry.getValue());
-            }
-            feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
+            String value = unzipContent(entry.getValue());
+            feature.prop(entry.getKey(), value);
         }
+        Map<String, String> names = amenity.getNamesMap(true);
+        for (Map.Entry<String, String> entry : names.entrySet()) {
+            feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
+        }
+	    if (poiType != null) {
+		    Map<String, String> typeTags = getPoiTypeFields(poiType);
+		    for (Map.Entry<String, String> entry : typeTags.entrySet()) {
+			    feature.prop(entry.getKey(), entry.getValue());
+		    }
+	    }
+        feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
+
         return feature;
     }
 
