@@ -1,5 +1,7 @@
 package net.osmand.wiki.commonswiki;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import net.osmand.MainUtilities;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
@@ -17,6 +19,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.*;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.HashMap;
@@ -329,6 +332,7 @@ public class CommonsWikimediaPreparation {
 					String author = meta.getOrDefault("author", "");
 					String license = meta.getOrDefault("license", "");
 					String description = meta.getOrDefault("description", "");
+					description = normalizeLang(description);
 					String date = meta.getOrDefault("date", "");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
@@ -343,6 +347,31 @@ public class CommonsWikimediaPreparation {
 			} catch (Exception exception) {
 				log.error(exception.getMessage() + " on page id : " + id + " title : " + title, exception);
 			}
+		}
+	}
+
+	public static String normalizeLang(String jsonStr) {
+		if (jsonStr == null || jsonStr.trim().isEmpty()) {
+			return "{}";
+		}
+		final Gson gson = new Gson();
+		try {
+			Type mapType = new TypeToken<Map<String, String>>() {
+			}.getType();
+			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
+			Map<String, String> normalized = new HashMap<>();
+
+			for (Map.Entry<String, String> e : parsed.entrySet()) {
+				String lang = e.getKey().trim();
+				lang = WikiToBcp47.convertWikiToBCP47(lang);
+				normalized.put(lang, e.getValue());
+			}
+
+			return gson.toJson(normalized);
+
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			return jsonStr;
 		}
 	}
 
