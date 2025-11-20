@@ -295,33 +295,37 @@ public class SearchTestService implements ReportService, DataService {
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> run(finalRun));
+		CompletableFuture.runAsync(() -> run(finalRun, payload.chunksCount == null ? 1 : payload.chunksCount));
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private static final int BATCH_SIZE = 100;
-
-	private void run(Run run) {
-		String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
-		if (run.rerunId != null) {
-			// Re-run uses items from a previous run's results by joining gen_result with run_result
-			if (run.skipFound == null || !run.skipFound) {
-				sql = "SELECT count(*) FROM gen_result g " +
-						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
-			} else {
-				sql = "SELECT count(*) FROM gen_result g " +
-						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
-			}
-		}
-		long count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
-
+	private void run(Run run, int chunksCount) {
 		List<CompletableFuture<Void>> futures = new ArrayList<>();
-		for (int offset = 0; offset < count; offset += BATCH_SIZE) {
-			final int off = offset;
-			futures.add(CompletableFuture.runAsync(() -> run(run, off), EXECUTOR));
-		}
-
 		try {
+			if (chunksCount > 1) {
+				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
+				final long count;
+				if (run.rerunId != null) {
+					// Re-run uses items from a previous run's results by joining gen_result with run_result
+					if (run.skipFound == null || !run.skipFound) {
+						sql = "SELECT count(*) FROM gen_result g " +
+								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
+					} else {
+						sql = "SELECT count(*) FROM gen_result g " +
+								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
+					}
+					count = jdbcTemplate.queryForObject(sql, Long.class, run.rerunId);
+				} else
+					count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
+
+				int chunkSize = (int) count / chunksCount + 1;
+				for (int offset = 0; offset < count; offset += chunkSize) {
+					final int off = offset;
+					futures.add(CompletableFuture.runAsync(() -> run(run, chunkSize, off), EXECUTOR));
+				}
+			} else
+				futures.add(CompletableFuture.runAsync(() -> run(run, -1, 0), EXECUTOR));
+
 			CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
 				run.status = Run.Status.COMPLETED;
@@ -336,7 +340,7 @@ public class SearchTestService implements ReportService, DataService {
 		}
 	}
 
-	private void run(Run run, int offset) {
+	private void run(Run run, int limit, int offset) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
@@ -350,7 +354,9 @@ public class SearchTestService implements ReportService, DataService {
 		}
 
 		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql + " LIMIT " + BATCH_SIZE + " OFFSET " + offset, run.caseId);
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+					sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : ""),
+					run.rerunId != null ? run.rerunId : run.caseId);
 			if (rows.isEmpty())
 				return;
 
