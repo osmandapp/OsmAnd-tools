@@ -314,7 +314,7 @@ public class SearchService {
                         "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, " +
                         "indexOf(w.wikiArticleLangs, lang) AS ind, " +
                         "w.wikiArticleContents[ind] AS content, " +
-                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
+                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson " +
                         "FROM wiki.wikidata w " +
                         "WHERE w.id = " + wikidataId + " " +
                         "ORDER BY w.elo DESC, w.qrank DESC";
@@ -1006,42 +1006,52 @@ public class SearchService {
 		return feature;
 	}
     
-    private Feature getPoiFeature(SearchResult result) {
-        Amenity amenity = (Amenity) result.object;
-        PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-        Feature feature = null;
-        if (poiType != null) {
-            feature = new Feature(Geometry.point(amenity.getLocation()))
-                    .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
-                    .prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
-                    .prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
-                    .prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
-                    .prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType))
-                    .prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
-                    .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
-                    .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
-            Map<String, String> tags = amenity.getAmenityExtensions();
-            filterWikiTags(tags);
-            for (Map.Entry<String, String> entry : tags.entrySet()) {
-                String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
-                if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
-                        continue;
-                }
-                String value = unzipContent(entry.getValue());
-                feature.prop(entry.getKey(), value);
-            }
-            Map<String, String> names = amenity.getNamesMap(true);
-            for (Map.Entry<String, String> entry : names.entrySet()) {
-                feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
-            }
-            Map<String, String> typeTags = getPoiTypeFields(poiType);
-            for (Map.Entry<String, String> entry : typeTags.entrySet()) {
-                feature.prop(entry.getKey(), entry.getValue());
-            }
-            feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
-        }
-        return feature;
-    }
+	private Feature getPoiFeature(SearchResult result) {
+		Amenity amenity = (Amenity) result.object;
+		Feature feature = null;
+
+		feature = new Feature(Geometry.point(amenity.getLocation()))
+				.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+				.prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
+				.prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
+				.prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
+
+				.prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
+				.prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
+				.prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
+		
+
+		Map<String, String> tags = amenity.getAmenityExtensions();
+		filterWikiTags(tags);
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length())
+					: entry.getKey();
+			if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+				continue;
+			}
+			String value = unzipContent(entry.getValue());
+			feature.prop(entry.getKey(), value);
+		}
+		Map<String, String> names = amenity.getNamesMap(true);
+		for (Map.Entry<String, String> entry : names.entrySet()) {
+			feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
+		}
+		feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
+		String subType = amenity.getSubType();
+		if (subType != null && subType.indexOf(';') != -1) {
+			subType = subType.substring(0, subType.indexOf(';'));
+		}
+		PoiType poiType = amenity.getType().getPoiTypeByKeyName(subType);
+		if (poiType != null) {
+			feature.prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType));
+			Map<String, String> typeTags = getPoiTypeFields(poiType);
+			for (Map.Entry<String, String> entry : typeTags.entrySet()) {
+				feature.prop(entry.getKey(), entry.getValue());
+			}
+
+		}
+		return feature;
+	}
 
     private void filterWikiTags(Map<String, String> tags) {
         tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")
