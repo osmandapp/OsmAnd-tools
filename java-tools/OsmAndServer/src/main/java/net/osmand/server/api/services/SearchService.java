@@ -310,7 +310,7 @@ public class SearchService {
                         "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, " +
                         "indexOf(w.wikiArticleLangs, lang) AS ind, " +
                         "w.wikiArticleContents[ind] AS content, " +
-                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank " +
+                        "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson " +
                         "FROM wiki.wikidata w " +
                         "WHERE w.id = " + wikidataId + " " +
                         "ORDER BY w.elo DESC, w.qrank DESC";
