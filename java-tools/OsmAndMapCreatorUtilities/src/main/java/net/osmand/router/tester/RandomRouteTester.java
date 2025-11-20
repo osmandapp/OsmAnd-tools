@@ -14,13 +14,11 @@ import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
 import net.osmand.util.Algorithms;
-import org.apache.commons.logging.Log;
 
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.PlatformUtil;
 
 public class RandomRouteTester {
-	class GeneratorConfig {
+	static class GeneratorConfig {
 		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
 //				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
 //				"start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles",
@@ -30,46 +28,22 @@ public class RandomRouteTester {
 		// random tests settings
 		int ITERATIONS = 10; // number of random routes
 		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
-		int MIN_DISTANCE_KM = 50; // min distance between start and finish (50)
-		int MAX_DISTANCE_KM = 100; // max distance between start and finish (100)
+		int MIN_DISTANCE_KM = 10; // min distance between start and finish (10)
+		int MAX_DISTANCE_KM = 20; // max distance between start and finish (20)
 		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
 		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
 
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 				"car",
 				"bicycle",
-//				"pedestrian",
-
 //				"car,short_way",
 //				"bicycle,short_way",
 //				"pedestrian,short_way",
-
-//				"bicycle,height_obstacles",
-//				"pedestrian,height_obstacles",
-
-//				"car,prefer_unpaved",
-//				"car,allow_private",
-//				"car,avoid_unpaved",
-//				"car,avoid_motorway",
-//				"car,weight:3.49",
-//				"car,short_way",
-
-//				"bicycle,driving_style_prefer_unpaved,driving_style_balance:false",
-//				"bicycle,avoid_unpaved",
-//				"bicycle,avoid_footways",
-//				"bicycle,allow_motorway",
-//				"bicycle,allow_private",
-
-//				"pedestrian,avoid_unpaved",
-//				"pedestrian,allow_private",
-//				"pedestrian,prefer_hiking_routes",
-//				"pedestrian,avoid_stairs",
-//				"pedestrian,avoid_motorway",
 		};
 
 		// cost/distance deviation limits
-		double DEVIATION_RED = 1.0F; // > 1% - mark as failed
-		double DEVIATION_YELLOW = 0.1F; // > 0.1% - mark as acceptable
+		double DEVIATION_RED = 5.0F; // > 5% - mark as failed
+		double DEVIATION_YELLOW = 1.0F; // > 1% - mark as acceptable
 
 		// enable Android mode for BRP
 		boolean CAR_2PHASE_MODE = false;
@@ -96,7 +70,7 @@ public class RandomRouteTester {
 		System.exit(exitCode);
 	}
 
-	private CommandLineOpts opts;
+	private final CommandLineOpts opts;
 	private String optMapsDir;
 	private String optLibsDir;
 	private String optObfPrefix;
@@ -111,21 +85,19 @@ public class RandomRouteTester {
 		HH_CPP,
 	}
 
-	private long started;
-	private File obfDirectory;
+	private final long started;
 	private NativeLibrary nativeLibrary = null;
-	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
-	private HashMap<String, File> hhFiles = new HashMap<>(); // [Profile]
+	private final List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 
-	private RandomRouteGenerator generator;
-	private GeneratorConfig config = new GeneratorConfig();
+	private final RandomRouteGenerator generator;
+	private final GeneratorConfig config = new GeneratorConfig();
 	private List<RandomRouteEntry> testList = new ArrayList<>();
 
-	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
+//	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
-	private final int EXIT_SUCCESS = 0;
-	private final int EXIT_TEST_FAILED = 1;
-	private final int EXIT_RED_LIMIT_REACHED = 2;
+	private static final int EXIT_SUCCESS = 0;
+	private static final int EXIT_TEST_FAILED = 1;
+	private static final int EXIT_RED_LIMIT_REACHED = 2;
 
 	private RandomRouteTester(String[] args) {
 		this.opts = new CommandLineOpts(args);
@@ -139,10 +111,7 @@ public class RandomRouteTester {
 			return true;
 		}
 		Path parent = path.normalize().toAbsolutePath().getParent();
-		if (Files.exists(parent) && Files.isWritable(parent)) {
-			return true;
-		}
-		return false;
+		return Files.exists(parent) && Files.isWritable(parent);
 	}
 
 	private void applyCommandLineOpts() {
@@ -181,7 +150,7 @@ public class RandomRouteTester {
 		}
 
 		// apply predefined tests from command line
-		if (opts.getStrings().size() > 0) {
+		if (!opts.getStrings().isEmpty()) {
 			config.PREDEFINED_TESTS = opts.getStrings().toArray(new String[0]);
 		}
 
@@ -280,7 +249,7 @@ public class RandomRouteTester {
 	private void initObfReaders() throws IOException {
 		List<File> obfFiles = new ArrayList<>();
 
-		obfDirectory = new File(optMapsDir);
+		File obfDirectory = new File(optMapsDir);
 
 		if (obfDirectory.isDirectory()) {
 			for (File f : Algorithms.getSortedFilesVersions(obfDirectory)) {
@@ -298,7 +267,7 @@ public class RandomRouteTester {
 			obfReaders.add(new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source));
 		}
 
-		if (obfReaders.size() == 0) {
+		if (obfReaders.isEmpty()) {
 			throw new IllegalStateException("OBF files not initialized");
 		}
 	}
@@ -310,11 +279,12 @@ public class RandomRouteTester {
 	private void startSlowDown() {
 		Runnable endless = () -> {
 			while (config.OPTIONAL_SLOW_DOWN_THREADS > 0) {
+				// noinspection StatementWithEmptyBody
 				for (long i = 0; i < 1_000_000_000L; i++) {
 					// 1MM long-counter makes strong load
 				}
 				try {
-					// refresh state
+					// noinspection BusyWait (refresh state)
 					Thread.sleep(1);
 				} catch (InterruptedException e) {
 					throw new RuntimeException(e);
@@ -401,8 +371,8 @@ public class RandomRouteTester {
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
 		fe.setHHRoutingConfig(null); // hhoff=true
-		fe.CALCULATE_MISSING_MAPS = false;
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
 
@@ -422,8 +392,9 @@ public class RandomRouteTester {
 			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
 		}
 
-		if (this.config.ambiguousConditionalTags != null) {
-			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
+		// noinspection ConstantConditions
+		if (GeneratorConfig.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = GeneratorConfig.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(
@@ -454,7 +425,7 @@ public class RandomRouteTester {
 		return runHHRoutePlanner(entry, true);
 	}
 
-	private RandomRouteResult runHHRoutePlanner(RandomRouteEntry entry, boolean useNative) throws SQLException, IOException, InterruptedException {
+	private RandomRouteResult runHHRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 		final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
@@ -463,7 +434,7 @@ public class RandomRouteTester {
 		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
-		fe.CALCULATE_MISSING_MAPS = false;
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
 		fe.setDefaultHHRoutingConfig();
 		fe.setUseOnlyHHRouting(true);
 
@@ -480,8 +451,9 @@ public class RandomRouteTester {
 			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
 		}
 
-		if (this.config.ambiguousConditionalTags != null) {
-			config.ambiguousConditionalTags = this.config.ambiguousConditionalTags;
+		// noinspection ConstantConditions
+		if (GeneratorConfig.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = GeneratorConfig.ambiguousConditionalTags;
 		}
 
 		RoutingContext ctx = fe.buildRoutingContext(

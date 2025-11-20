@@ -12,8 +12,8 @@ import java.io.IOException;
 import java.util.*;
 
 class RandomRouteGenerator {
-	private RandomRouteTester.GeneratorConfig config;
-	private List<RandomRouteEntry> testList = new ArrayList<>();
+	private final RandomRouteTester.GeneratorConfig config;
+	private final List<RandomRouteEntry> testList = new ArrayList<>();
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 
 	RandomRouteGenerator(RandomRouteTester.GeneratorConfig config) {
@@ -123,7 +123,7 @@ class RandomRouteGenerator {
 								),
 								((BinaryMapRouteReaderAdapter.RouteRegion) p).getSubregions()
 						);
-				index.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
+				index.loadRouteIndexData(regions, new ResultMatcher<>() {
 					@Override
 					public boolean publish(RouteDataObject obj) {
 						for (int i = 0; i < obj.getTypes().length; i++) {
@@ -160,7 +160,7 @@ class RandomRouteGenerator {
 	}
 
 	private void replenishRandomPoints(List<LatLon> randomPoints) throws IOException {
-		if (obfReaders.size() == 0) {
+		if (obfReaders.isEmpty()) {
 			throw new IllegalStateException("OBF files not initialized (replenishRandomPoints)");
 		}
 
@@ -168,10 +168,10 @@ class RandomRouteGenerator {
 
 		int pointsToRead = 30 * Math.min(config.ITERATIONS, 10); // read up to 30 x ITERATIONS points every time
 		int pointsPerObf = pointsToRead / obfReaders.size(); // how many to read per one obf
-		pointsPerObf = pointsPerObf > 10 ? pointsPerObf : 10; // as minimum as 10
+		pointsPerObf = Math.max(pointsPerObf, 10); // as max as 10
 
-		for (int o = 0; o < obfReaders.size(); o++) {
-			getObfHighwayRoadRandomPoints(obfReaders.get(o), randomPoints, pointsPerObf, seed);
+		for (BinaryMapIndexReader obfReader : obfReaders) {
+			getObfHighwayRoadRandomPoints(obfReader, randomPoints, pointsPerObf, seed);
 		}
 	}
 
@@ -241,7 +241,7 @@ class RandomRouteGenerator {
 				if (!pointFound) {
 					restart = true;
 					break;
-				} else if (point != null) {
+				} else {
 					prevPoint = point;
 					avoidDupes.add(point);
 					if (nNextPoints > 0) {
@@ -249,8 +249,6 @@ class RandomRouteGenerator {
 					} else {
 						entry.finish = point;
 					}
-				} else {
-					throw new IllegalStateException("Unable to find points after start");
 				}
 			}
 

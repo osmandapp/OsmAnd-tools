@@ -141,7 +141,7 @@ public class SearchService {
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false);
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false, false);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
@@ -158,15 +158,19 @@ public class SearchService {
 
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
 
-    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast, boolean filterCombinedMap) throws IOException {
+    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
+                                             String northWest, String southEast, boolean filterCombinedMap,
+                                             boolean unlimited) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResultWrapper(Collections.emptyList(), null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
-        searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
-	    searchUICore.getSearchSettings().setRegions(osmandRegions);
+        if (!unlimited) {
+            searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
+        }
+        searchUICore.getSearchSettings().setRegions(osmandRegions);
 
-	    QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
+        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
                 new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
@@ -1002,42 +1006,52 @@ public class SearchService {
 		return feature;
 	}
     
-    private Feature getPoiFeature(SearchResult result) {
-        Amenity amenity = (Amenity) result.object;
-        PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-        Feature feature = null;
-        if (poiType != null) {
-            feature = new Feature(Geometry.point(amenity.getLocation()))
-                    .prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
-                    .prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
-                    .prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
-                    .prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
-                    .prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType))
-                    .prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
-                    .prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
-                    .prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
-            Map<String, String> tags = amenity.getAmenityExtensions();
-            filterWikiTags(tags);
-            for (Map.Entry<String, String> entry : tags.entrySet()) {
-                String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length()) : entry.getKey();
-                if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
-                        continue;
-                }
-                String value = unzipContent(entry.getValue());
-                feature.prop(entry.getKey(), value);
-            }
-            Map<String, String> names = amenity.getNamesMap(true);
-            for (Map.Entry<String, String> entry : names.entrySet()) {
-                feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
-            }
-            Map<String, String> typeTags = getPoiTypeFields(poiType);
-            for (Map.Entry<String, String> entry : typeTags.entrySet()) {
-                feature.prop(entry.getKey(), entry.getValue());
-            }
-            feature.prop(PoiTypeField.CITY.getFieldName(), result.alternateName);
-        }
-        return feature;
-    }
+	private Feature getPoiFeature(SearchResult result) {
+		Amenity amenity = (Amenity) result.object;
+		Feature feature = null;
+
+		feature = new Feature(Geometry.point(amenity.getLocation()))
+				.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
+				.prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
+				.prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
+				.prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
+
+				.prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
+				.prop(PoiTypeField.POI_SUBTYPE.getFieldName(), amenity.getSubType())
+				.prop(PoiTypeField.POI_OSM_URL.getFieldName(), getOsmUrl(result));
+		
+
+		Map<String, String> tags = amenity.getAmenityExtensions();
+		filterWikiTags(tags);
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length())
+					: entry.getKey();
+			if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+				continue;
+			}
+			String value = unzipContent(entry.getValue());
+			feature.prop(entry.getKey(), value);
+		}
+		Map<String, String> names = amenity.getNamesMap(true);
+		for (Map.Entry<String, String> entry : names.entrySet()) {
+			feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
+		}
+		feature.prop(PoiTypeField.CITY.getFieldName(), result.addressName);
+		String subType = amenity.getSubType();
+		if (subType != null && subType.indexOf(';') != -1) {
+			subType = subType.substring(0, subType.indexOf(';'));
+		}
+		PoiType poiType = amenity.getType().getPoiTypeByKeyName(subType);
+		if (poiType != null) {
+			feature.prop(PoiTypeField.POI_ICON_NAME.getFieldName(), getIconName(poiType));
+			Map<String, String> typeTags = getPoiTypeFields(poiType);
+			for (Map.Entry<String, String> entry : typeTags.entrySet()) {
+				feature.prop(entry.getKey(), entry.getValue());
+			}
+
+		}
+		return feature;
+	}
 
     private void filterWikiTags(Map<String, String> tags) {
         tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")

@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.data.*;
-import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -58,8 +57,6 @@ import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
 
-import static net.osmand.obf.preparation.IndexRouteRelationCreator.SHIELD_STUB_NAME;
-
 public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     private final static Log log = LogFactory.getLog(IndexVectorMapCreator.class);
@@ -76,6 +73,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private MapZooms mapZooms;
     private IndexCreatorSettings settings;
 
+    private static final String YES = "yes";
+    private static final String ROLE = "role";
+    private static final String BUILDING = "building";
+    private static final String BUILDING_PART = "building:part";
+
+    private static final String MULTIPOLYGON = "multipolygon";
     Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
 
     // local purpose to speed up processing cache allocation
@@ -157,19 +160,36 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     public void indexMapRelationsAndMultiPolygons(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc)
             throws SQLException {
-        if (e instanceof Relation) {
+        if (e instanceof Relation relation) {
             long ts = System.currentTimeMillis();
+            processBuildingRelationRole(relation, ctx);
             Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION,
                     EntityConvertApplyType.MAP);
             if (!settings.keepOnlyRouteRelationObjects && settings.indexMultipolygon) {
-                indexMultiPolygon((Relation) e, tags, ctx);
+                indexMultiPolygon(relation, tags, ctx);
             }
-            tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.MAP);
+            tagsTransformer.handleRelationPropogatedTags(relation, renderingTypes, ctx, EntityConvertApplyType.MAP);
             long tm = (System.currentTimeMillis() - ts) / 1000;
             if (tm > 15) {
                 log.warn(String.format("Relation %d took %d seconds to process", e.getId(), tm));
             }
             handlePublicTransportStopExits(e, ctx);
+        }
+    }
+
+    private void processBuildingRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+        boolean hasTypeBuilding = BUILDING.equals(e.getTag(OSMTagKey.TYPE));
+        boolean hasMultipolygonBuilding = MULTIPOLYGON.equals(e.getTag(OSMTagKey.TYPE))
+                && (e.getTag(BUILDING) != null || e.getTag(BUILDING_PART) != null);
+        if (hasTypeBuilding || hasMultipolygonBuilding) {
+            ctx.loadEntityRelation(e);
+            for (RelationMember entry : e.getMembers()) {
+                String role = entry.getRole();
+                if (!Algorithms.isEmpty(role)) {
+                    PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
+                    p.putThroughTags.put(ROLE + "_" + role, YES);
+                }
+            }
         }
     }
 
@@ -218,7 +238,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         tags = new LinkedHashMap<>(tags);
         // some big islands are marked as multipolygon - don't process them (only keep
         // coastlines)
-        boolean polygonIsland = "multipolygon".equals(tags.get(OSMTagKey.TYPE.getValue()))
+        boolean polygonIsland = MULTIPOLYGON.equals(tags.get(OSMTagKey.TYPE.getValue()))
                 && "island".equals(tags.get(OSMTagKey.PLACE.getValue()));
         ctx.loadEntityRelation(e);
         //
