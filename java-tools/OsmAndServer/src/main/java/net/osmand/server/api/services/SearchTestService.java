@@ -13,6 +13,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,14 +137,9 @@ public class SearchTestService implements ReportService, DataService {
 		synchronized (SearchTestService.class) {
 			if (EXECUTOR != null)
 				return;
-			int defaultThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
-			String env = System.getenv("MAX_THREAD_NUMBER");
-			int threads;
-			try {
-				threads = (env == null || env.isBlank()) ? defaultThreads : Math.max(1, Integer.parseInt(env.trim()));
-			} catch (NumberFormatException nfe) {
-				threads = defaultThreads;
-			}
+
+			int threads = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
+					Math.max(1, Runtime.getRuntime().availableProcessors()));;
 			ThreadFactory tf = r -> {
 				Thread t = new Thread(r);
 				t.setName("search-test-exec-" + t.getId());
@@ -292,14 +288,16 @@ public class SearchTestService implements ReportService, DataService {
 		test.setSouthEast(run.getSouthEast());
 		test.lat = run.lat;
 		test.lon = run.lon;
+		test.chunksCount = payload.chunksCount;
+		run.chunksCount = payload.chunksCount;
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> run(finalRun, payload.chunksCount == null ? 1 : payload.chunksCount));
+		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.chunksCount == null ? 1 : payload.chunksCount));
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private void run(Run run, int chunksCount) {
+	private void doMainRun(Run run, int chunksCount) {
 		List<CompletableFuture<Void>> futures = new ArrayList<>();
 		try {
 			if (chunksCount > 1) {
@@ -320,11 +318,11 @@ public class SearchTestService implements ReportService, DataService {
 
 				int chunkSize = (int) count / chunksCount + 1;
 				for (int offset = 0; offset < count; offset += chunkSize) {
-					final int off = offset;
-					futures.add(CompletableFuture.runAsync(() -> run(run, chunkSize, off), EXECUTOR));
+					final int offsetLength = offset;
+					futures.add(CompletableFuture.runAsync(() -> runChunk(run, chunkSize, offsetLength), EXECUTOR));
 				}
 			} else
-				futures.add(CompletableFuture.runAsync(() -> run(run, -1, 0), EXECUTOR));
+				futures.add(CompletableFuture.runAsync(() -> runChunk(run, -1, 0), EXECUTOR));
 
 			CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
@@ -340,7 +338,7 @@ public class SearchTestService implements ReportService, DataService {
 		}
 	}
 
-	private void run(Run run, int limit, int offset) {
+	private void runChunk(Run run, int limit, int offset) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
