@@ -3,7 +3,6 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
@@ -14,13 +13,13 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -35,7 +34,8 @@ import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class SearchTestService implements ReportService, DataService {
@@ -76,6 +76,15 @@ public class SearchTestService implements ReportService, DataService {
 	}
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+	private static volatile ExecutorService EXECUTOR;
+	private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
+
+	// Batch insert support for run_result
+	private static final int RUN_RESULT_BATCH_SIZE = 10;
+
+	private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+
 	@Autowired
 	private ObjectMapper objectMapper;
 	@Autowired
@@ -121,6 +130,28 @@ public class SearchTestService implements ReportService, DataService {
 			jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS gen_result_index on gen_result(case_id, ds_result_id, id)");
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
+		}
+		initializeExecutor();
+	}
+
+	private void initializeExecutor() {
+		if (EXECUTOR != null) return;
+		synchronized (SearchTestService.class) {
+			if (EXECUTOR != null)
+				return;
+
+			int threads = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
+					Math.max(1, Runtime.getRuntime().availableProcessors()));;
+			ThreadFactory tf = r -> {
+				Thread t = new Thread(r);
+				t.setName("search-test-exec-" + t.getId());
+				t.setDaemon(true);
+				return t;
+			};
+			EXECUTOR = new ThreadPoolExecutor(threads, threads,	60L, TimeUnit.SECONDS,
+					new LinkedBlockingQueue<>(), tf);
+			// Cleanup in-memory status flag
+			runStatusFlags.clear();
 		}
 	}
 
@@ -193,8 +224,6 @@ public class SearchTestService implements ReportService, DataService {
 				dataset.testRow = test.testRow;
 				test.allCols = dataset.allCols;
 
-				test.created = LocalDateTime.now();
-				test.updated = test.created;
 				test = testCaseRepo.save(test);
 				datasetRepo.saveAndFlush(dataset);
 
@@ -252,8 +281,6 @@ public class SearchTestService implements ReportService, DataService {
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
-		run.created = LocalDateTime.now();
-		run.updated = run.created;
 		run = runRepo.save(run);
 
 		test.locale = run.locale;
@@ -261,32 +288,90 @@ public class SearchTestService implements ReportService, DataService {
 		test.setSouthEast(run.getSouthEast());
 		test.lat = run.lat;
 		test.lon = run.lon;
+		test.chunksCount = payload.chunksCount;
+		run.chunksCount = payload.chunksCount;
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> run(finalRun));
+		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.chunksCount == null ? 1 : payload.chunksCount));
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private void run(Run run) {
-		String sql = String.format("SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = %d ORDER BY id", run.caseId);
+	private void doMainRun(Run run, int chunksCount) {
+		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
+		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
+				new AtomicReference<>(Run.Status.RUNNING));
+		try {
+			run.start = LocalDateTime.now();
+			run.finish = LocalDateTime.now();
+			if (chunksCount > 1) {
+				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
+				final long count;
+				if (run.rerunId != null) {
+					// Re-run uses items from a previous run's results by joining gen_result with run_result
+					if (run.skipFound == null || !run.skipFound) {
+						sql = "SELECT count(*) FROM gen_result g " +
+								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
+					} else {
+						sql = "SELECT count(*) FROM gen_result g " +
+								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
+					}
+					count = jdbcTemplate.queryForObject(sql, Long.class, run.rerunId);
+				} else
+					count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
+
+				int chunkSize = (int) count / chunksCount + 1;
+				for (int offset = 0; offset < count; offset += chunkSize) {
+					final int offsetLength = offset;
+					runTasks.add(CompletableFuture.runAsync(() -> runChunk(run, chunkSize, offsetLength, statusRef), EXECUTOR));
+				}
+			} else
+				runTasks.add(CompletableFuture.runAsync(() -> runChunk(run, -1, 0, statusRef), EXECUTOR));
+
+			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
+			List<Object[]> remainingBatches = runResultBatches.remove(run.id);
+			if (remainingBatches != null && !remainingBatches.isEmpty()) {
+				submitBatchSave(run, remainingBatches);
+			}
+			List<CompletableFuture<Void>> saveTasks = runResultBatchTasks.remove(run.id);
+			if (saveTasks != null && !saveTasks.isEmpty()) {
+				CompletableFuture.allOf(saveTasks.toArray(new CompletableFuture[0])).join();
+			}
+			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
+				run.status = Run.Status.COMPLETED;
+			}
+		} catch (Exception ex) {
+			LOGGER.error("Evaluation failed for test-case {}", run.id, ex);
+			run.setError(ex.getMessage());
+			run.status = Run.Status.FAILED;
+		} finally {
+			run.finish = LocalDateTime.now();
+
+			runRepo.save(run);
+ 			// Cleanup in-memory status flag
+ 			runStatusFlags.remove(run.id);
+			runResultBatches.remove(run.id);
+			runResultBatchTasks.remove(run.id);
+		}
+	}
+
+	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef) {
+		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
 			if (run.skipFound == null || !run.skipFound) {
-				sql = String.format(
-					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d ORDER BY g.id",
-					run.rerunId);
+				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
 			} else {
-				sql = String.format(
-					"SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = %d AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id",
-					run.rerunId);
+				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
+					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
 			}
 		}
 
 		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+					sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : ""),
+					run.rerunId != null ? run.rerunId : run.caseId);
 			if (rows.isEmpty())
 				return;
 
@@ -304,17 +389,11 @@ public class SearchTestService implements ReportService, DataService {
 			}
 
 			for (Map<String, Object> row : rows) {
-				String status;
-				try {
-					status = jdbcTemplate.queryForObject("SELECT status FROM run WHERE id = ?", String.class, run.id);
-				} catch (EmptyResultDataAccessException ex) {
-					LOGGER.info("Run {} was deleted. Stopping execution.", run.id);
-					return;
-				}
-				if (!Run.Status.RUNNING.name().equals(status)) {
-					run.status = Run.Status.valueOf(status);
-					LOGGER.info("Run {} was cancelled. Stopping execution.", run.id);
-					break; // Exit the loop if the test-case has been cancelled
+				Run.Status current = statusRef.get();
+				if (current != Run.Status.RUNNING) {
+					run.status = current;
+					LOGGER.info("Run {} was stopped with status {}. Stopping execution.", run.id, current);
+					break;
 				}
 
 				long startTime = System.currentTimeMillis();
@@ -339,28 +418,56 @@ public class SearchTestService implements ReportService, DataService {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty())
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true, true);
+								query, run.locale, false, bbox[0], bbox[1], true);
 
-					saveRunResults(genRow, gen_id, count, run, query, searchResult, targetPoint, searchPoint,
-							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
+					Object[] args = collectRunResults(genRow, gen_id, count, run, query, searchResult,
+							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
+					enqueueRunResult(run, args);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					saveRunResults(genRow, gen_id, count, run, query, null, targetPoint, searchPoint,
-							System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
+					Object[] args = collectRunResults(genRow, gen_id, count, run, query, null,
+							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
+					enqueueRunResult(run, args);
 				}
 			}
-			if (run.status != Run.Status.CANCELED && run.status != Run.Status.FAILED) {
-				run.status = Run.Status.COMPLETED;
-			}
 		} catch (Exception e) {
-			LOGGER.error("Evaluation failed for test-case {}", run.id, e);
+			LOGGER.error("Evaluation batch failed for run {} at offset {}", run.id, offset, e);
 			run.setError(e.getMessage());
-		} finally {
-			run.timestamp = LocalDateTime.now();
-			runRepo.save(run);
+			run.status = Run.Status.FAILED;
 		}
 	}
+
+ 	private void enqueueRunResult(Run run, Object[] args) {
+ 		List<Object[]> buffer = runResultBatches.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>()));
+ 		buffer.add(args);
+ 		if (buffer.size() >= RUN_RESULT_BATCH_SIZE) {
+ 			List<Object[]> toSave;
+ 			synchronized (buffer) {
+ 				toSave = new ArrayList<>(buffer);
+ 				buffer.clear();
+ 			}
+ 			submitBatchSave(run, toSave);
+ 		}
+ 	}
+
+ 	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
+	    String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
+			    "duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
+			    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+ 		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+ 			try {
+ 				jdbcTemplate.batchUpdate(sql, batchArgs);
+ 			} catch (Exception ex) {
+ 				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
+ 			} finally {
+				 run.finish = LocalDateTime.now();
+				 runRepo.save(run);
+		    }
+ 		}, EXECUTOR);
+ 		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
+ 	}
 
 	@Async
 	public CompletableFuture<Run> cancelRun(Long runId) {
@@ -374,7 +481,10 @@ public class SearchTestService implements ReportService, DataService {
 				jdbcTemplate.update(sql, Run.Status.CANCELED, updated, runId);
 
 				run.status = Run.Status.CANCELED;
-				run.updated = updated.toLocalDateTime();
+				AtomicReference<Run.Status> ref = runStatusFlags.get(runId);
+				if (ref != null) {
+					ref.set(Run.Status.CANCELED);
+				}
 				return run;
 			}
 			return run;

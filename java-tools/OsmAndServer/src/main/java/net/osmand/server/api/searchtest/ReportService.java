@@ -37,6 +37,7 @@ public interface ReportService {
 			long processed,
 			long failed,
 			long duration,
+			long searchDuration,
 			long found,
 			long partial,
 			long totalBytes,
@@ -217,7 +218,8 @@ public interface ReportService {
 				    count(*) AS total,
 				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
+					COALESCE((select finish - start from run where id = run_id), sum(duration)) AS time_duration,
+				    sum(duration) AS search_duration,
 				    count(*) FILTER (WHERE COALESCE(found, res_distance <= 50)) AS found_count,
 					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
 					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
@@ -242,8 +244,10 @@ public interface ReportService {
 			number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("duration"));
-			long duration = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("search_duration"));
+			long searchDuration = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("time_duration"));
+			long timeDuration = number == null ? 0 : number.longValue();
 
 			number = ((Number) result.get("found_count"));
 			long found = number == null ? 0 : number.longValue();
@@ -258,7 +262,7 @@ public interface ReportService {
 			long totalTime = number == null ? 0 : number.longValue();
 
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					duration, found, partial, totalBytes, totalTime, null, null);
+					timeDuration, searchDuration, found, partial, totalBytes, totalTime, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -298,10 +302,10 @@ public interface ReportService {
 		if (status == null) {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
-					caseStatus.failed(), caseStatus.duration(), 0, 0, 0, 0, distanceHistogram, caseStatus);
+					caseStatus.failed(), caseStatus.duration(), caseStatus.duration(), 0, 0, 0, 0, distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.found(), status.partial(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
+					status.duration(), status.searchDuration, status.found(), status.partial(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}

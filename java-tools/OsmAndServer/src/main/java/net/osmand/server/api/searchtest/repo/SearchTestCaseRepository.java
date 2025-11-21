@@ -38,7 +38,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column()
 		public Integer shift;
 
-
 		@Column(name = "north_west")
 		private String northWest;
 
@@ -70,6 +69,9 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		public void setSouthEast(String val) {
 			this.southEast = val != null && val.trim().isEmpty() ? null : val;
 		}
+
+		@Column(name = "chunks_count")
+		public Integer chunksCount;
 	}
 
 	@Entity(name = "TestCase")
