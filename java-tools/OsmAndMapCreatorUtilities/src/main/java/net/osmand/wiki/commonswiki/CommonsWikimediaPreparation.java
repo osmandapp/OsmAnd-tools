@@ -41,6 +41,9 @@ public class CommonsWikimediaPreparation {
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
 
+	private static final Gson gson = new Gson();
+	private static final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
+
 	public static void main(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
 	}
@@ -354,21 +357,18 @@ public class CommonsWikimediaPreparation {
 		if (jsonStr == null || jsonStr.trim().isEmpty()) {
 			return "{}";
 		}
-		final Gson gson = new Gson();
 		try {
-			Type mapType = new TypeToken<Map<String, String>>() {
-			}.getType();
 			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
+			if (parsed == null || parsed.isEmpty()) {
+				return "{}";
+			}
 			Map<String, String> normalized = new HashMap<>();
-
 			for (Map.Entry<String, String> e : parsed.entrySet()) {
 				String lang = e.getKey().trim();
 				lang = WikiToBcp47.convertWikiToBCP47(lang);
 				normalized.put(lang, e.getValue());
 			}
-
 			return gson.toJson(normalized);
-
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			return jsonStr;

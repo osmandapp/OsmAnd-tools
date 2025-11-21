@@ -37,22 +37,16 @@ public class WikiToBcp47 {
 
 	public static String convertWikiToBCP47(String wiki) {
 		if (wiki == null || wiki.isEmpty()) return "en";
-
 		wiki = wiki.replace('_', '-').toLowerCase(Locale.ROOT);
-
 		if (SPECIAL_MAP.containsKey(wiki))
 			return SPECIAL_MAP.get(wiki);
-
 		String[] parts = wiki.split("-");
-
 		if (parts.length == 1) {
 			return parts[0];
 		}
-
 		String lang = parts[0];
 		String script = null;
 		String region = null;
-
 		for (int i = 1; i < parts.length; i++) {
 			String p = parts[i];
 			if (p.length() == 4) {
@@ -65,13 +59,10 @@ public class WikiToBcp47 {
 				region = p.toUpperCase(Locale.ROOT);
 			}
 		}
-
 		StringBuilder tag = new StringBuilder(lang);
 		if (script != null) tag.append("-").append(script);
 		if (region != null) tag.append("-").append(region);
-
 		String finalTag = tag.toString();
-
 		return isValidBCP47(finalTag) ? finalTag : lang;
 	}
 }
