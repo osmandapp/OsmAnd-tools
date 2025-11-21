@@ -364,9 +364,9 @@ public class CommonsWikimediaPreparation {
 			}
 			Map<String, String> normalized = new HashMap<>();
 			for (Map.Entry<String, String> e : parsed.entrySet()) {
-				String lang = e.getKey().trim();
-				lang = WikiToBcp47.convertWikiToBCP47(lang);
-				normalized.put(lang, e.getValue());
+				String wikiLangCode = e.getKey().trim();
+				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
+				normalized.put(bcp47, e.getValue());
 			}
 			return gson.toJson(normalized);
 		} catch (Exception ex) {
