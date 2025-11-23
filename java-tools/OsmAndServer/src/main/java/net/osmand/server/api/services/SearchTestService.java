@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.DataService;
+import net.osmand.server.api.searchtest.MapDataObjectFinder;
 import net.osmand.server.api.searchtest.PolyglotEngine;
 import net.osmand.server.api.searchtest.ReportService;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -131,28 +132,24 @@ public class SearchTestService implements ReportService, DataService {
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
 		}
-		initializeExecutor();
+		// Cleanup in-memory status flag
+		runStatusFlags.clear();
+
+		EXECUTOR = createExecutor();
 	}
 
-	private void initializeExecutor() {
-		if (EXECUTOR != null) return;
-		synchronized (SearchTestService.class) {
-			if (EXECUTOR != null)
-				return;
-
-			int threads = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
-					Math.max(1, Runtime.getRuntime().availableProcessors()));;
-			ThreadFactory tf = r -> {
-				Thread t = new Thread(r);
-				t.setName("search-test-exec-" + t.getId());
-				t.setDaemon(true);
-				return t;
-			};
-			EXECUTOR = new ThreadPoolExecutor(threads, threads,	60L, TimeUnit.SECONDS,
+	private ExecutorService createExecutor() {
+		int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
+				Math.max(1, Runtime.getRuntime().availableProcessors()));;
+		ThreadFactory tf = r -> {
+			Thread t = new Thread(r);
+			t.setName("search-test-exec-" + t.getId());
+			t.setDaemon(true);
+			return t;
+		};
+		LOGGER.info("Global search-test executor created with pool size = {}", maxCount);
+		return new ThreadPoolExecutor(maxCount, maxCount,60L, TimeUnit.SECONDS,
 					new LinkedBlockingQueue<>(), tf);
-			// Cleanup in-memory status flag
-			runStatusFlags.clear();
-		}
 	}
 
 	public SearchService getSearchService() {
@@ -288,23 +285,37 @@ public class SearchTestService implements ReportService, DataService {
 		test.setSouthEast(run.getSouthEast());
 		test.lat = run.lat;
 		test.lon = run.lon;
-		test.chunksCount = payload.chunksCount;
-		run.chunksCount = payload.chunksCount;
+		test.threadsCount = payload.threadsCount;
+		run.threadsCount = payload.threadsCount;
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.chunksCount == null ? 1 : payload.chunksCount));
+		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.threadsCount == null ? 1 : payload.threadsCount));
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private void doMainRun(Run run, int chunksCount) {
+	private static final int CHUNK_SIZE = 100;
+
+	private void doMainRun(Run run, int threadsCount) {
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
+		// Local per-run limited executor built on top of the global EXECUTOR
+		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
+		final Semaphore permits = new Semaphore(maxParallel);
+		final Executor localExecutor = command -> EXECUTOR.execute(() -> {
+			permits.acquireUninterruptibly();
+			try {
+				command.run();
+			} finally {
+				permits.release();
+			}
+		});
+
 		try {
 			run.start = LocalDateTime.now();
 			run.finish = LocalDateTime.now();
-			if (chunksCount > 1) {
+			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
 				if (run.rerunId != null) {
@@ -320,13 +331,15 @@ public class SearchTestService implements ReportService, DataService {
 				} else
 					count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
 
-				int chunkSize = (int) count / chunksCount + 1;
+				final int chunkSize = Math.min((int) (count / maxParallel) + 1, CHUNK_SIZE);
 				for (int offset = 0; offset < count; offset += chunkSize) {
 					final int offsetLength = offset;
-					runTasks.add(CompletableFuture.runAsync(() -> runChunk(run, chunkSize, offsetLength, statusRef), EXECUTOR));
+					runTasks.add(CompletableFuture.runAsync(() ->
+							runChunk(run, chunkSize, offsetLength, statusRef), localExecutor));
 				}
 			} else
-				runTasks.add(CompletableFuture.runAsync(() -> runChunk(run, -1, 0, statusRef), EXECUTOR));
+				runTasks.add(CompletableFuture.runAsync(() ->
+						runChunk(run, -1, 0, statusRef), localExecutor));
 
 			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
 			List<Object[]> remainingBatches = runResultBatches.remove(run.id);
@@ -414,18 +427,29 @@ public class SearchTestService implements ReportService, DataService {
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
+
+				Map<String, Object> newRow = new LinkedHashMap<>();
+				long datasetId;
+				try {
+					datasetId = Long.parseLong((String) genRow.get("id"));
+				} catch (NumberFormatException e) {
+					datasetId = -1;
+				}
+
+				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
 				try {
 					SearchService.SearchResultWrapper searchResult = null;
-					if (query != null && !query.trim().isEmpty())
+					if (query != null && !query.trim().isEmpty()) {
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true);
+								query, run.locale, false, bbox[0], bbox[1], true, finder);
+					}
 
-					Object[] args = collectRunResults(genRow, gen_id, count, run, query, searchResult,
+					Object[] args = collectRunResults(finder, gen_id, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 					enqueueRunResult(run, args);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					Object[] args = collectRunResults(genRow, gen_id, count, run, query, null,
+					Object[] args = collectRunResults(finder, gen_id, count, run, query, null,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
 					enqueueRunResult(run, args);

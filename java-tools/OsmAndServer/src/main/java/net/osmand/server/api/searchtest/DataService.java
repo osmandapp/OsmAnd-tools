@@ -37,8 +37,6 @@ public interface DataService extends BaseService {
 
 	PolyglotEngine getEngine();
 
-	SearchService getSearchService();
-
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
 
@@ -262,21 +260,14 @@ public interface DataService extends BaseService {
 	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
-	default Object[] collectRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query,
+	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
-		final MapDataObjectFinder finder = new MapDataObjectFinder();
-		long datasetId;
-		try {
-			datasetId = Long.parseLong((String) genRow.get("id"));
-		} catch (NumberFormatException e) {
-			datasetId = -1;
-		}
-
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
-		Map<String, Object> row = new LinkedHashMap<>();
-		Result firstResult = finder.findFirstResult(searchResults, row);
-		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, row);
+
+		Map<String, Object> row = finder.getRow();
+		Result firstResult = finder.getFirstResult();
+		Result actualResult = finder.getActualResult();
 
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;

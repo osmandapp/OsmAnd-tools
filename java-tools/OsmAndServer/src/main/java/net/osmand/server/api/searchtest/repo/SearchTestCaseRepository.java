@@ -70,8 +70,8 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 			this.southEast = val != null && val.trim().isEmpty() ? null : val;
 		}
 
-		@Column(name = "chunks_count")
-		public Integer chunksCount;
+		@Column(name = "threads_count")
+		public Integer threadsCount;
 	}
 
 	@Entity(name = "TestCase")
