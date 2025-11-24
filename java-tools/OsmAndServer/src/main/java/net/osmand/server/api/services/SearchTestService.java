@@ -110,6 +110,8 @@ public class SearchTestService implements ReportService, DataService {
 	private String overpassApiUrl;
 	@Autowired
 	private PolyglotEngine engine;
+	@Autowired
+	private OsmAndMapsService mapsService;
 
 	@PostConstruct
 	protected void init() {
@@ -150,6 +152,10 @@ public class SearchTestService implements ReportService, DataService {
 		LOGGER.info("Global search-test executor created with pool size = {}", maxCount);
 		return new ThreadPoolExecutor(maxCount, maxCount,60L, TimeUnit.SECONDS,
 					new LinkedBlockingQueue<>(), tf);
+	}
+
+	public OsmAndMapsService getMapsService() {
+		return mapsService;
 	}
 
 	public SearchService getSearchService() {

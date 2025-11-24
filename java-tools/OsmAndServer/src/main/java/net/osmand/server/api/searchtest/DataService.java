@@ -1,6 +1,9 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.data.LatLon;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
@@ -9,6 +12,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
@@ -19,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.file.Files;
@@ -28,6 +33,8 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public interface DataService extends BaseService {
 
@@ -489,42 +496,104 @@ public interface DataService extends BaseService {
 		return n > 0;
 	}
 
-	default List<String> getBranches() {
-		try {
-			String sql = "SELECT DISTINCT name FROM run WHERE name IS NOT NULL AND TRIM(name) <> '' ORDER BY name";
-			return getJdbcTemplate().queryForList(sql, String.class);
-		} catch (Exception e) {
-			getLogger().error("Failed to retrieve branches", e);
-			throw new RuntimeException("Failed to retrieve branches: " + e.getMessage(), e);
-		}
+	OsmAndMapsService getMapsService();
+
+	double SEARCH_RADIUS_DEGREE = 1.5;
+
+	default List<String> getOBFs(Double lat, Double lon) throws IOException {
+		QuadRect points = getMapsService().points(null, new LatLon(
+						lat == null ? MapUtils.MAX_LATITUDE : lat + SEARCH_RADIUS_DEGREE,
+						lon == null ? MapUtils.MIN_LONGITUDE : lon - SEARCH_RADIUS_DEGREE),
+				new LatLon(lat == null ? MapUtils.MIN_LATITUDE : lat - SEARCH_RADIUS_DEGREE,
+						lon == null ? MapUtils.MAX_LONGITUDE : lon + SEARCH_RADIUS_DEGREE));
+
+		List<String> obfList = new ArrayList<>();
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(points, null,
+				"search-test");
+		for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
+			obfList.add(ref.getFile().getAbsolutePath());
+		return obfList;
 	}
 
-	default List<String> getAllLabels() {
-		try {
-			String sql = "SELECT labels FROM dataset";
-			List<String> rows = getJdbcTemplate().queryForList(sql, String.class);
-			sql = "SELECT labels FROM test_case";
-			rows.addAll(getJdbcTemplate().queryForList(sql, String.class));
+	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
+	record StreetAddress(String name, List<String> houses) {}
 
-			Set<String> set = new LinkedHashSet<>();
-			for (String label : rows) {
-				if (label == null) {
-					continue;
-				}
-				for (String l : label.split("[#,]+")) { // split by '#' or ',', treat consecutive as one
-					String t = l.trim();
-					if (!t.isEmpty()) {
-						set.add(t);
+	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundary, String cityRegExp, String streetRegExp, String houseRegExp) {
+		List<CityAddress> results = new ArrayList<>();
+		if (cityRegExp == null || cityRegExp.trim().isEmpty())
+			return results;
+
+		File file = new File(obf);
+		try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(file.getAbsolutePath(), "r")) {
+			final Pattern cityPattern, streetPattern, housePattern;
+			try {
+				cityPattern = Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
+				streetPattern = streetRegExp == null || streetRegExp.trim().isEmpty()
+					? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
+				housePattern = houseRegExp == null || houseRegExp.trim().isEmpty()
+					? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
+			} catch (PatternSyntaxException e) {
+				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
+			}
+
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			for (BinaryIndexPart p : index.getIndexes()) {
+				if (p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+					for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+						if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
+							continue;
+
+						final List<City> cities = index.getCities(null, type, region, null);
+						for (City c : cities) {
+							final String cityName = c.getName(lang);
+							if (cityName == null || !cityPattern.matcher(cityName).find())
+								continue;
+
+							List<StreetAddress> streets = new ArrayList<>();
+							if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE || c.getType() == City.CityType.BOUNDARY) {
+								if (!includesBoundary)
+									continue;
+								results.add(new CityAddress(cityName, streets, true));
+							} else
+								results.add(new CityAddress(cityName, streets, false));
+							if (streetRegExp == null || streetRegExp.trim().isEmpty())
+								continue;
+
+							index.preloadStreets(c, null, null);
+							for (Street s : new ArrayList<>(c.getStreets())) {
+								List<String> buildings = new ArrayList<>();
+								final String streetName = s.getName(lang);
+								if (streetName == null || (streetPattern != null && !streetPattern.matcher(streetName).find())) {
+									continue;
+								}
+								StreetAddress street = new StreetAddress(streetName, buildings);
+								streets.add(street);
+
+								if (houseRegExp == null || houseRegExp.trim().isEmpty())
+									continue;
+
+								index.preloadBuildings(s, null, null);
+								final List<Building> bs = s.getBuildings();
+								if (bs != null && !bs.isEmpty()) {
+									for (Building b : bs) {
+										final String houseName = b.getName(lang);
+										if (houseName == null) {
+											continue;
+										}
+										if (housePattern == null || housePattern.matcher(houseName).find()) {
+											buildings.add(houseName);
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
-
-			List<String> results = new ArrayList<>(set);
-			results.sort(null);
 			return results;
 		} catch (Exception e) {
-			getLogger().error("Failed to retrieve labels", e);
-			throw new RuntimeException("Failed to retrieve labels: " + e.getMessage(), e);
+			getLogger().error("Failed to read OBF {}", file, e);
+			throw new RuntimeException("Failed to read OBF: " + e.getMessage(), e);
 		}
 	}
 

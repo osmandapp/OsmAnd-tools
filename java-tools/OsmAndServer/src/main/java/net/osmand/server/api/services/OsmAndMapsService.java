@@ -350,6 +350,10 @@ public class OsmAndMapsService {
 			}
 			return cnt;
 		}
+
+		public File getFile() {
+			return file;
+		}
 	}
 
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
