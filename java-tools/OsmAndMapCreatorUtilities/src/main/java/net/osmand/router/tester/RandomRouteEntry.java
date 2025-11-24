@@ -114,9 +114,9 @@ class RandomRouteResult {
 		this.entry = entry;
 		this.runTime = runTime;
 
-		visitedSegments = results.size();
 		cost = calcTransportRouteAvgCost(results);
 		distance = calcTransportRouteAvgDistance(results);
+		visitedSegments = calcTransportRouteResultsWithAlternatives(results);
 	}
 
 	// BRP/HH Routing Result
@@ -142,13 +142,30 @@ class RandomRouteResult {
 		}
 	}
 
+	private int calcTransportRouteResultsWithAlternatives(List<TransportRouteResult> results) {
+		int counter = results.size();
+		for (TransportRouteResult r : results) {
+			counter += r.getAlternativeRoutes().size();
+		}
+		return counter;
+	}
+
 	private double calcTransportRouteAvgCost(List<TransportRouteResult> results) {
 		double cost = 0;
 		if (!results.isEmpty()) {
+			int counter = results.size();
 			for (TransportRouteResult r : results) {
 				cost += r.getRouteTime();
+
+				List<TransportRouteResult> alternatives = r.getAlternativeRoutes();
+				if (!alternatives.isEmpty()) {
+					counter += alternatives.size();
+					for (TransportRouteResult alt : alternatives) {
+						cost += alt.getRouteTime();
+					}
+				}
 			}
-			cost /= results.size();
+			cost /= counter;
 		}
 		return cost;
 	}
@@ -156,14 +173,25 @@ class RandomRouteResult {
 	private float calcTransportRouteAvgDistance(List<TransportRouteResult> results) {
 		double dist = 0;
 		if (!results.isEmpty()) {
+			int counter = results.size();
 			for (TransportRouteResult r : results) {
 				for (TransportRoutePlanner.TransportRouteResultSegment segment : r.getSegments()) {
-					dist += segment.travelDistApproximate;
-					dist += segment.walkDist;
+					dist += segment.travelDistApproximate + segment.walkDist;
 				}
 				dist += r.getFinishWalkDist();
+
+				List<TransportRouteResult> alternatives = r.getAlternativeRoutes();
+				if (!alternatives.isEmpty()) {
+					counter += alternatives.size();
+					for (TransportRouteResult alt : alternatives) {
+						for (TransportRoutePlanner.TransportRouteResultSegment segment : alt.getSegments()) {
+							dist += segment.travelDistApproximate + segment.walkDist;
+						}
+						dist += alt.getFinishWalkDist();
+					}
+				}
 			}
-			dist /= results.size();
+			dist /= counter;
 		}
 		return (float)dist;
 	}
