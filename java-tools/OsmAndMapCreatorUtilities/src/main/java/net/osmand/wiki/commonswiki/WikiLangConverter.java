@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class WikiLangConverter {
 
+	public static boolean DEBUG = false;
 	private static final Map<String, String> CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, String> SPECIAL_MAP = new HashMap<>() {{
 		put("no", "nb");
@@ -83,11 +84,11 @@ public class WikiLangConverter {
 			ULocale locale = ULocale.forLanguageTag(key);
 			String tag = locale.toLanguageTag();
 			if ("und".equals(tag)) {
-				return key;
+				return DEBUG ? "und:" + key : key;
 			}
 			return fixLegacyCodes(tag);
 		} catch (Exception e) {
-			return "en";
+			return DEBUG ? "und:" + key : key;
 		}
 	}
 
