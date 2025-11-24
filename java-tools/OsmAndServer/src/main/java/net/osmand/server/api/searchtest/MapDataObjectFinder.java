@@ -1,13 +1,8 @@
 package net.osmand.server.api.searchtest;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Consumer;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -26,13 +21,26 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import static net.osmand.util.MapUtils.*;
-public class MapDataObjectFinder {
+
+public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 	public enum ResultType {
 		Best,
 		ById,
 		ByTag,
 		ByDist,
 		Error
+	}
+
+	private final LatLon targetPoint;
+	private final Map<String, Object> row;
+	private final long datasetId;
+
+	private Result firstResult = null, actualResult = null;
+
+	public MapDataObjectFinder(LatLon targetPoint, Map<String, Object> row, long datasetId) {
+		this.targetPoint = targetPoint;
+		this.row = row;
+		this.datasetId = datasetId;
 	}
 
 	public record Result(ResultType type, Object exact, int place, SearchResult searchResult) {
@@ -78,8 +86,7 @@ public class MapDataObjectFinder {
 		}
 	}
 
-	
-	public Result findFirstResult(List<SearchResult> searchResults, Map<String, Object> row) throws IOException {
+	private Result findFirstResult(List<SearchResult> searchResults) throws IOException {
 		Result firstResult = null;
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {
@@ -158,13 +165,7 @@ public class MapDataObjectFinder {
 		if (poi != null) {
 			res.addAll(poi);
 		}
-		Collections.sort(res, new Comparator<Amenity>() {
-
-			@Override
-			public int compare(Amenity o1, Amenity o2) {
-				return Double.compare(getDistance(targetPoint, o1.getLocation()), getDistance(targetPoint, o2.getLocation()));
-			}
-		});
+		res.sort(Comparator.comparingDouble(o -> getDistance(targetPoint, o.getLocation())));
 		return res;
 	}
 
@@ -194,20 +195,12 @@ public class MapDataObjectFinder {
 	}
 
 	private void sortPoints(LatLon targetPoint, List<BinaryMapDataObject> res) {
-		Collections.sort(res, new Comparator<BinaryMapDataObject>() {
-
-			@Override
-			public int compare(BinaryMapDataObject o1, BinaryMapDataObject o2) {
-				return Double.compare(getDistance(targetPoint, o1.getLabelLatLon()),
-						getDistance(targetPoint, o2.getLabelLatLon()));
-			}
-		});
+		res.sort(Comparator.comparingDouble(o -> getDistance(targetPoint, o.getLabelLatLon())));
 	}
-
 
 	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
-	public Result findActualResult(List<SearchResult> searchResults, LatLon targetPoint, long datasetId, Map<String, Object> genRow) throws IOException {
+	private Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		Result actualResult = null;
 		int resPlace;
 		Set<BinaryMapIndexReader> files = new HashSet<>();
@@ -226,8 +219,7 @@ public class MapDataObjectFinder {
 			objects = getMapObjects(file, targetPoint, objects);
 			poi = getPoiObjects(file, targetPoint, poi);
 		}
-		
-		
+
 		BinaryMapDataObject srcObj = null;
 		Amenity srcAmenity = null;
 		String srcAmenityHno = null, srcObjHno = null;
@@ -235,7 +227,7 @@ public class MapDataObjectFinder {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcObj = o;
 				srcObjHno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-				genRow.put("src_map_found", srcObjHno);
+				row.put("src_map_found", srcObjHno);
 				break;
 			}
 		}
@@ -243,7 +235,7 @@ public class MapDataObjectFinder {
 			if (ObfConstants.getOsmObjectId(o) == datasetId) {
 				srcAmenity = o;
 				srcAmenityHno = srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
-				genRow.put("src_poi_found", srcAmenityHno);
+				row.put("src_poi_found", srcAmenityHno);
 				break;
 			}
 		}
@@ -273,5 +265,26 @@ public class MapDataObjectFinder {
 			resPlace++;
 		}
 		return actualResult;
+	}
+
+	public void accept(List<SearchResult> searchResults) {
+		try {
+			firstResult = findFirstResult(searchResults);
+			actualResult = findActualResult(searchResults);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public Result getFirstResult() {
+		return firstResult;
+	}
+
+	public Result getActualResult() {
+		return actualResult;
+	}
+
+	public Map<String, Object> getRow() {
+		return row;
 	}
 }

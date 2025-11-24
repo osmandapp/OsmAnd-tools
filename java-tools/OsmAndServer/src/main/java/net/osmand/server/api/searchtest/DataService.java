@@ -37,8 +37,6 @@ public interface DataService extends BaseService {
 
 	PolyglotEngine getEngine();
 
-	SearchService getSearchService();
-
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
 
@@ -262,21 +260,14 @@ public interface DataService extends BaseService {
 	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
-	default void saveRunResults(Map<String, Object> genRow, long genId, int count, Run run, String query,
-	                            SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
-	                            LatLon searchPoint, long duration, String bbox, String error) throws IOException {
-		final MapDataObjectFinder finder = new MapDataObjectFinder();
-		long datasetId;
-		try {
-			datasetId = Long.parseLong((String) genRow.get("id"));
-		} catch (NumberFormatException e) {
-			datasetId = -1;
-		}
-
+	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
+	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
+	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
-		Map<String, Object> row = new LinkedHashMap<>();
-		Result firstResult = finder.findFirstResult(searchResults, row);
-		Result actualResult = finder.findActualResult(searchResults, targetPoint, datasetId, row);
+
+		Map<String, Object> row = finder.getRow();
+		Result firstResult = finder.getFirstResult();
+		Result actualResult = finder.getActualResult();
 
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
@@ -331,13 +322,9 @@ public interface DataService extends BaseService {
 			}
 			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
 		}
-
-		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
-				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
-				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
 		String rowJson = getObjectMapper().writeValueAsString(row);
-		getJdbcTemplate().update(sql, genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
+
+		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
 				resultsCount,
 				distance, resultPoint, resPlace,
 				searchPoint == null ? null : searchPoint.getLatitude(),
@@ -345,7 +332,8 @@ public interface DataService extends BaseService {
 				bbox,
 				new java.sql.Timestamp(System.currentTimeMillis()), found,
 				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
-				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null);
+				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null
+		};
 	}
 
 	/**
