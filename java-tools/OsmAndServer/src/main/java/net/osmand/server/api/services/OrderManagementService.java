@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import net.osmand.purchases.FastSpringHelper;
 import net.osmand.purchases.PurchaseHelper;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
@@ -19,6 +20,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
+import static net.osmand.purchases.UpdateSubscription.MINIMUM_WAIT_TO_REVALIDATE;
 
 @Service
 public class OrderManagementService {
@@ -426,6 +429,64 @@ public class OrderManagementService {
 		orderInfoRepository.saveAndFlush(oi);
 
 		return true;
+	}
+
+	@Transactional
+	public void revalidateFastspringPurchase(AdminService.Purchase purchase) {
+		if (purchase == null || purchase.orderId == null || purchase.sku == null) {
+			return;
+		}
+
+		boolean isSubscriptionSku = FastSpringHelper.subscriptionSkuMap.contains(purchase.sku);
+		if (isSubscriptionSku) {
+			resetFastSpringSubscriptionRecord(purchase);
+			return;
+		}
+
+		boolean isInAppSku = FastSpringHelper.productSkuMap.contains(purchase.sku);
+		if (isInAppSku) {
+			resetFastSpringInAppRecord(purchase);
+		}
+	}
+
+	public void resetFastSpringSubscriptionRecord(AdminService.Purchase purchase) {
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
+				subscriptionsRepository.findByOrderIdAndSku(purchase.orderId, purchase.sku);
+		if (subs == null || subs.isEmpty()) {
+			return;
+		}
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
+			sub.valid = null;
+			if (shouldReset(sub.checktime)) {
+				sub.checktime = null;
+			}
+		}
+		subscriptionsRepository.saveAll(subs);
+		subscriptionsRepository.flush();
+	}
+
+	private void resetFastSpringInAppRecord(AdminService.Purchase purchase) {
+		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> inApps =
+				deviceInAppPurchasesRepository.findByOrderIdAndSku(purchase.orderId, purchase.sku);
+		if (inApps == null || inApps.isEmpty()) {
+			return;
+		}
+
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inApp : inApps) {
+			inApp.valid = null;
+			if (shouldReset(inApp.checktime)) {
+				inApp.checktime = null;
+			}
+		}
+		deviceInAppPurchasesRepository.saveAll(inApps);
+		deviceInAppPurchasesRepository.flush();
+	}
+
+	private boolean shouldReset(Date checkTime) {
+		if (checkTime == null) {
+			return false;
+		}
+		return (System.currentTimeMillis() - checkTime.getTime()) <= MINIMUM_WAIT_TO_REVALIDATE;
 	}
 }
 
