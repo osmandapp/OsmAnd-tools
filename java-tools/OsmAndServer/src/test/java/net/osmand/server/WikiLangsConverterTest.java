@@ -14,6 +14,8 @@ import org.springframework.test.context.junit4.SpringRunner;
 import java.lang.reflect.Type;
 import java.util.*;
 
+import static net.osmand.wiki.commonswiki.WikiLangConverter.UNDEFINED_MARK;
+
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -58,7 +60,7 @@ public class WikiLangsConverterTest {
 	}
 
 	public void parseAndProcessDescriptions() {
-		String sql = "SELECT description, mediaId FROM top_images_final LIMIT 60000";
+		String sql = "SELECT description, mediaId FROM top_images_final";
 
 		jdbcTemplate.query(sql, rs -> {
 			String description = rs.getString(1);
@@ -83,8 +85,8 @@ public class WikiLangsConverterTest {
 				String wikiLangCode = e.getKey().trim();
 				String description = e.getValue();
 				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
-				if (bcp47.startsWith("und:")) {
-					bcp47 = bcp47.replaceFirst("und:", "");
+				if (bcp47.startsWith(UNDEFINED_MARK)) {
+					bcp47 = bcp47.replaceFirst(UNDEFINED_MARK, "");
 					undefined.merge(bcp47, new LogInfo(description, pageId), (oldVal, newVal) -> oldVal.incr());
 				} else {
 					valid.merge(bcp47, new LogInfo("", pageId), (oldVal, newVal) -> oldVal.incr());

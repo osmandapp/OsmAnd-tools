@@ -11,10 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class WikiLangConverter {
 
-
 	private static final Gson gson = new Gson();
 	private static final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
+	public static final String UNDEFINED_TAG = "und";
+	public static final String UNDEFINED_MARK = "und:"; // used for logging purpose only
 	public static boolean DEBUG = false;
+	
 	private static final Map<String, String> langCodeCache = new ConcurrentHashMap<>();
 	private static final Map<String, String> specialCodeMap = new HashMap<>() {{
 		put("no", "nb");
@@ -70,31 +72,24 @@ public class WikiLangConverter {
 	}};
 
 	public static String toBcp47FromWiki(String wikiCode) {
-		if (wikiCode == null || wikiCode.isEmpty() || wikiCode.trim().isEmpty()) {
-			return "en";
-		}
-		if (langCodeCache.containsKey(wikiCode)) {
-			return langCodeCache.get(wikiCode);
-		}
-		String result = computeBcp47(wikiCode);
-		langCodeCache.put(wikiCode, result);
-		return result;
+		return langCodeCache.computeIfAbsent(wikiCode, WikiLangConverter::computeBcp47);
 	}
 
 	private static String computeBcp47(String wikiCode) {
 		String key = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
-		if (specialCodeMap.containsKey(key)) {
-			return specialCodeMap.get(key);
+		String specialCode = specialCodeMap.get(key);
+		if (specialCode != null) {
+			return specialCode;
 		}
 		try {
 			ULocale locale = ULocale.forLanguageTag(key);
 			String tag = locale.toLanguageTag();
-			if ("und".equals(tag)) {
-				return DEBUG ? "und:" + key : key;
+			if (UNDEFINED_TAG.equals(tag)) {
+				return DEBUG ? UNDEFINED_MARK + key : "";
 			}
 			return fixLegacyCodes(tag);
 		} catch (Exception e) {
-			return DEBUG ? "und:" + key : key;
+			return DEBUG ? UNDEFINED_MARK + key : "";
 		}
 	}
 
@@ -128,7 +123,6 @@ public class WikiLangConverter {
 			}
 			return gson.toJson(normalized);
 		} catch (Exception ex) {
-			ex.printStackTrace();
 			return jsonStr;
 		}
 	}

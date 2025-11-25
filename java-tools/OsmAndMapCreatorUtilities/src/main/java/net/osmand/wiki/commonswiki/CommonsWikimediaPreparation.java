@@ -329,8 +329,7 @@ public class CommonsWikimediaPreparation {
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.getOrDefault("author", "");
 					String license = meta.getOrDefault("license", "");
-					String description = meta.getOrDefault("description", "");
-					description = WikiLangConverter.normalizeLang(description);
+					String description = WikiLangConverter.normalizeLang(meta.getOrDefault("description", ""));
 					String date = meta.getOrDefault("date", "");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
