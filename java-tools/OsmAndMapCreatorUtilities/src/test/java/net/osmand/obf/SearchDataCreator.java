@@ -40,9 +40,8 @@ class SearchDataCreator extends BinaryMerger {
 		// test cases show info
 		if (args.length == 1 && "test".equals(args[0])) {
 			in.merger(new String[]{
-					"D:\\Projects\\git\\Osmand\\resources\\test-resources\\search\\eiffel.obf",
-					"D:\\Projects\\OsmAnd\\test-cases\\eiffel.json",
-					"D:\\Projects\\OsmAnd\\test-cases\\louvre.json",
+					"/Users/alexey/OsmAnd/resources/test-resources/search/hisar.obf",
+					"/Users/alexey/OsmAnd/resources/test-resources/search/hisar.data.json",
 			});
 		} else {
 			in.merger(args);
@@ -93,7 +92,7 @@ class SearchDataCreator extends BinaryMerger {
 		inputStream.close();
 
 		if (!outputFile.delete()) {
-			//throw new IOException("Cannot delete file " + outputFile);
+			throw new IOException("Cannot delete file " + outputFile);
 		}
 	}
 }
