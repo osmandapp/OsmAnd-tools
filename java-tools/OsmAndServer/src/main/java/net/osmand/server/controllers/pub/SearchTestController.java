@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
+import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
@@ -295,7 +296,6 @@ public class SearchTestController {
 		return ResponseEntity.ok(Collections.singletonList(testSearchService.getSystemBranch()));
 	}
 
-
 	// --- Dataset management -------------------------------------------------
 	@GetMapping(value = "/datasets", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
@@ -327,5 +327,27 @@ public class SearchTestController {
 	public ResponseEntity<Void> deleteDataset(@PathVariable Long datasetId) {
 		boolean deleted = testSearchService.deleteDataset(datasetId);
 		return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+	}
+
+	@GetMapping(value = "/obfs", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<String>> getOBFs(
+			@RequestParam(required = false) Double radius,
+			@RequestParam(required = false) Double lat,
+			@RequestParam(required = false) Double lon) throws IOException {
+		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon));
+	}
+
+	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	                 @RequestParam(required = false) String lang,
+	                 @RequestParam(required = false) String cityRegExp,
+	                 @RequestParam(required = false) String streetRegExp,
+	                 @RequestParam(required = false) String houseRegExp) {
+		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
+				includesBoundary != null && includesBoundary,
+				cityRegExp, streetRegExp, houseRegExp));
 	}
 }
