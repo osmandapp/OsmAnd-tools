@@ -500,11 +500,13 @@ public interface DataService extends BaseService {
 
 	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
 		radius = radius == null ? 1.5 : radius;
-		QuadRect points = getMapsService().points(null, new LatLon(
-						lat == null ? MapUtils.MAX_LATITUDE : lat + radius,
-						lon == null ? MapUtils.MIN_LONGITUDE : lon - radius),
-				new LatLon(lat == null ? MapUtils.MIN_LATITUDE : lat - radius,
-						lon == null ? MapUtils.MAX_LONGITUDE : lon + radius));
+		double latPlusRadius = (lat == null ? MapUtils.MAX_LATITUDE : lat) + radius;
+		double lonMinusRadius = (lon == null ? MapUtils.MIN_LONGITUDE : lon) - radius;
+		double latMinusRadius = (lat == null ? MapUtils.MIN_LATITUDE : lat) - radius;
+		double lonPlusRadius = (lon == null ? MapUtils.MAX_LONGITUDE : lon) + radius;
+		QuadRect points = getMapsService().points(null,
+				new LatLon(latPlusRadius, lonMinusRadius),
+				new LatLon(latMinusRadius, lonPlusRadius));
 
 		List<String> obfList = new ArrayList<>();
 		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(points, null,
@@ -537,62 +539,66 @@ public interface DataService extends BaseService {
 			}
 
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
-			for (BinaryIndexPart p : index.getIndexes()) {
-				if (p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
-					for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
-						if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
-							continue;
-
-						final List<City> cities = index.getCities(null, type, region, null);
-						for (City c : cities) {
-							final String cityName = c.getName(lang);
-							List<StreetAddress> streets = new ArrayList<>();
-							if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
+			try {
+				for (BinaryIndexPart p : index.getIndexes()) {
+					if (p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+						for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+							if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
 								continue;
 
-							boolean boundary = false;
-							if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE || c.getType() == City.CityType.BOUNDARY) {
-								if (!includesBoundary)
-									continue;
-								boundary = true;
-							}
-
-							if (isStreetEmpty && isHouseEmpty) {
-								results.add(new CityAddress(cityName, streets, boundary));
-								continue;
-							}
-
-							index.preloadStreets(c, null, null);
-							for (Street s : new ArrayList<>(c.getStreets())) {
-								List<String> buildings = new ArrayList<>();
-								final String streetName = s.getName(lang);
-								if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
+							final List<City> cities = index.getCities(null, type, region, null);
+							for (City c : cities) {
+								final String cityName = c.getName(lang);
+								List<StreetAddress> streets = new ArrayList<>();
+								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
 									continue;
 
-								if (isHouseEmpty) {
-									streets.add(new StreetAddress(streetName, buildings));
+								boolean boundary = false;
+								if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE || c.getType() == City.CityType.BOUNDARY) {
+									if (!includesBoundary)
+										continue;
+									boundary = true;
+								}
+
+								if (isStreetEmpty && isHouseEmpty) {
+									results.add(new CityAddress(cityName, streets, boundary));
 									continue;
 								}
 
-								index.preloadBuildings(s, null, null);
-								final List<Building> bs = s.getBuildings();
-								if (bs != null && !bs.isEmpty()) {
-									for (Building b : bs) {
-										final String houseName = b.getName(lang);
-										if (houseName != null && housePattern.matcher(houseName).find())
-											buildings.add(houseName);
+								index.preloadStreets(c, null, null);
+								for (Street s : new ArrayList<>(c.getStreets())) {
+									List<String> buildings = new ArrayList<>();
+									final String streetName = s.getName(lang);
+									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
+										continue;
+
+									if (isHouseEmpty) {
+										streets.add(new StreetAddress(streetName, buildings));
+										continue;
+									}
+
+									index.preloadBuildings(s, null, null);
+									final List<Building> bs = s.getBuildings();
+									if (bs != null && !bs.isEmpty()) {
+										for (Building b : bs) {
+											final String houseName = b.getName(lang);
+											if (houseName != null && housePattern.matcher(houseName).find())
+												buildings.add(houseName);
+										}
+									}
+									if (!buildings.isEmpty()) {
+										StreetAddress street = new StreetAddress(streetName, buildings);
+										streets.add(street);
 									}
 								}
-								if (!buildings.isEmpty()) {
-									StreetAddress street = new StreetAddress(streetName, buildings);
-									streets.add(street);
-								}
+								if (!streets.isEmpty())
+									results.add(new CityAddress(cityName, streets, boundary));
 							}
-							if (!streets.isEmpty())
-								results.add(new CityAddress(cityName, streets, boundary));
 						}
 					}
 				}
+			} finally {
+				index.close();
 			}
 			// Sort results by city name (case-insensitive)
 			results.sort(Comparator.comparing(CityAddress::name, String.CASE_INSENSITIVE_ORDER));

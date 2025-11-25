@@ -154,6 +154,7 @@ public class SearchTestService implements ReportService, DataService {
 					new LinkedBlockingQueue<>(), tf);
 	}
 
+	@Override
 	public OsmAndMapsService getMapsService() {
 		return mapsService;
 	}

@@ -341,12 +341,12 @@ public class SearchTestController {
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
-	                                                                  @RequestParam Boolean includesBoundary,
-	                                                                  @RequestParam(required = false) String lang,
-	                                                                 @RequestParam(required = false) String cityRegExp,
-	                                                                 @RequestParam(required = false) String streetRegExp,
-	                                                                 @RequestParam(required = false) String houseRegExp) {
-		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "end" : lang,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	                 @RequestParam(required = false) String lang,
+	                 @RequestParam(required = false) String cityRegExp,
+	                 @RequestParam(required = false) String streetRegExp,
+	                 @RequestParam(required = false) String houseRegExp) {
+		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
 				includesBoundary != null && includesBoundary,
 				cityRegExp, streetRegExp, houseRegExp));
 	}
