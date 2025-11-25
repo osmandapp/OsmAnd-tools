@@ -554,7 +554,8 @@ public interface DataService extends BaseService {
 									continue;
 
 								boolean boundary = false;
-								if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE || c.getType() == City.CityType.BOUNDARY) {
+								if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE ||
+										c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE) {
 									if (!includesBoundary)
 										continue;
 									boundary = true;
