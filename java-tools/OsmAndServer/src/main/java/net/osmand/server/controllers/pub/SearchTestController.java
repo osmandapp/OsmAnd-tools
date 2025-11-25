@@ -331,9 +331,11 @@ public class SearchTestController {
 
 	@GetMapping(value = "/obfs", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<String>> getOBFs(@RequestParam(required = false) Double lat,
-	                                            @RequestParam(required = false) Double lon) throws IOException {
-		return ResponseEntity.ok(testSearchService.getOBFs(lat, lon));
+	public ResponseEntity<List<String>> getOBFs(
+			@RequestParam(required = false) Double radius,
+			@RequestParam(required = false) Double lat,
+			@RequestParam(required = false) Double lon) throws IOException {
+		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon));
 	}
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)

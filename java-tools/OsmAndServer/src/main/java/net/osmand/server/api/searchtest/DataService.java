@@ -498,14 +498,13 @@ public interface DataService extends BaseService {
 
 	OsmAndMapsService getMapsService();
 
-	double SEARCH_RADIUS_DEGREE = 1.5;
-
-	default List<String> getOBFs(Double lat, Double lon) throws IOException {
+	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
+		radius = radius == null ? 1.5 : radius;
 		QuadRect points = getMapsService().points(null, new LatLon(
-						lat == null ? MapUtils.MAX_LATITUDE : lat + SEARCH_RADIUS_DEGREE,
-						lon == null ? MapUtils.MIN_LONGITUDE : lon - SEARCH_RADIUS_DEGREE),
-				new LatLon(lat == null ? MapUtils.MIN_LATITUDE : lat - SEARCH_RADIUS_DEGREE,
-						lon == null ? MapUtils.MAX_LONGITUDE : lon + SEARCH_RADIUS_DEGREE));
+						lat == null ? MapUtils.MAX_LATITUDE : lat + radius,
+						lon == null ? MapUtils.MIN_LONGITUDE : lon - radius),
+				new LatLon(lat == null ? MapUtils.MIN_LATITUDE : lat - radius,
+						lon == null ? MapUtils.MAX_LONGITUDE : lon + radius));
 
 		List<String> obfList = new ArrayList<>();
 		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(points, null,
@@ -520,18 +519,19 @@ public interface DataService extends BaseService {
 
 	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundary, String cityRegExp, String streetRegExp, String houseRegExp) {
 		List<CityAddress> results = new ArrayList<>();
-		if (cityRegExp == null || cityRegExp.trim().isEmpty())
+		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
+		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
+		boolean isHouseEmpty = houseRegExp == null || houseRegExp.trim().isEmpty();
+		if (isCityEmpty && isStreetEmpty)
 			return results;
 
 		File file = new File(obf);
 		try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(file.getAbsolutePath(), "r")) {
 			final Pattern cityPattern, streetPattern, housePattern;
 			try {
-				cityPattern = Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
-				streetPattern = streetRegExp == null || streetRegExp.trim().isEmpty()
-					? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
-				housePattern = houseRegExp == null || houseRegExp.trim().isEmpty()
-					? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
+				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
+				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
+				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
 			} catch (PatternSyntaxException e) {
 				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
 			}
@@ -546,50 +546,56 @@ public interface DataService extends BaseService {
 						final List<City> cities = index.getCities(null, type, region, null);
 						for (City c : cities) {
 							final String cityName = c.getName(lang);
-							if (cityName == null || !cityPattern.matcher(cityName).find())
+							List<StreetAddress> streets = new ArrayList<>();
+							if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
 								continue;
 
-							List<StreetAddress> streets = new ArrayList<>();
+							boolean boundary = false;
 							if (type == BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE || c.getType() == City.CityType.BOUNDARY) {
 								if (!includesBoundary)
 									continue;
-								results.add(new CityAddress(cityName, streets, true));
-							} else
-								results.add(new CityAddress(cityName, streets, false));
-							if (streetRegExp == null || streetRegExp.trim().isEmpty())
+								boundary = true;
+							}
+
+							if (isStreetEmpty && isHouseEmpty) {
+								results.add(new CityAddress(cityName, streets, boundary));
 								continue;
+							}
 
 							index.preloadStreets(c, null, null);
 							for (Street s : new ArrayList<>(c.getStreets())) {
 								List<String> buildings = new ArrayList<>();
 								final String streetName = s.getName(lang);
-								if (streetName == null || (streetPattern != null && !streetPattern.matcher(streetName).find())) {
+								if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
+									continue;
+
+								if (isHouseEmpty) {
+									streets.add(new StreetAddress(streetName, buildings));
 									continue;
 								}
-								StreetAddress street = new StreetAddress(streetName, buildings);
-								streets.add(street);
-
-								if (houseRegExp == null || houseRegExp.trim().isEmpty())
-									continue;
 
 								index.preloadBuildings(s, null, null);
 								final List<Building> bs = s.getBuildings();
 								if (bs != null && !bs.isEmpty()) {
 									for (Building b : bs) {
 										final String houseName = b.getName(lang);
-										if (houseName == null) {
-											continue;
-										}
-										if (housePattern == null || housePattern.matcher(houseName).find()) {
+										if (houseName != null && housePattern.matcher(houseName).find())
 											buildings.add(houseName);
-										}
 									}
 								}
+								if (!buildings.isEmpty()) {
+									StreetAddress street = new StreetAddress(streetName, buildings);
+									streets.add(street);
+								}
 							}
+							if (!streets.isEmpty())
+								results.add(new CityAddress(cityName, streets, boundary));
 						}
 					}
 				}
 			}
+			// Sort results by city name (case-insensitive)
+			results.sort(Comparator.comparing(CityAddress::name, String.CASE_INSENSITIVE_ORDER));
 			return results;
 		} catch (Exception e) {
 			getLogger().error("Failed to read OBF {}", file, e);
