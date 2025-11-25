@@ -1,16 +1,22 @@
 package net.osmand.wiki.commonswiki;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.ibm.icu.util.ULocale;
 
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WikiLangConverter {
 
+
+	private static final Gson gson = new Gson();
+	private static final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
 	public static boolean DEBUG = false;
-	private static final Map<String, String> CACHE = new ConcurrentHashMap<>();
-	private static final Map<String, String> SPECIAL_MAP = new HashMap<>() {{
+	private static final Map<String, String> langCodeCache = new ConcurrentHashMap<>();
+	private static final Map<String, String> specialCodeMap = new HashMap<>() {{
 		put("no", "nb");
 		put("sh", "sr-Latn");
 		put("simple", "en-simple");
@@ -67,18 +73,18 @@ public class WikiLangConverter {
 		if (wikiCode == null || wikiCode.isEmpty() || wikiCode.trim().isEmpty()) {
 			return "en";
 		}
-		if (CACHE.containsKey(wikiCode)) {
-			return CACHE.get(wikiCode);
+		if (langCodeCache.containsKey(wikiCode)) {
+			return langCodeCache.get(wikiCode);
 		}
 		String result = computeBcp47(wikiCode);
-		CACHE.put(wikiCode, result);
+		langCodeCache.put(wikiCode, result);
 		return result;
 	}
 
 	private static String computeBcp47(String wikiCode) {
 		String key = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
-		if (SPECIAL_MAP.containsKey(key)) {
-			return SPECIAL_MAP.get(key);
+		if (specialCodeMap.containsKey(key)) {
+			return specialCodeMap.get(key);
 		}
 		try {
 			ULocale locale = ULocale.forLanguageTag(key);
@@ -93,7 +99,6 @@ public class WikiLangConverter {
 	}
 
 	private static String fixLegacyCodes(String tag) {
-		if (tag == null || tag.isEmpty()) return tag;
 		if (tag.equals("in") || tag.startsWith("in-")) {
 			return "id" + tag.substring(2);
 		}
@@ -104,5 +109,27 @@ public class WikiLangConverter {
 			return "yi" + tag.substring(2);
 		}
 		return tag;
+	}
+
+	public static String normalizeLang(String jsonStr) {
+		if (jsonStr == null || jsonStr.trim().isEmpty()) {
+			return "";
+		}
+		try {
+			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
+			if (parsed == null || parsed.isEmpty()) {
+				return "";
+			}
+			Map<String, String> normalized = new HashMap<>();
+			for (Map.Entry<String, String> e : parsed.entrySet()) {
+				String wikiLangCode = e.getKey().trim();
+				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
+				normalized.put(bcp47, e.getValue());
+			}
+			return gson.toJson(normalized);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			return jsonStr;
+		}
 	}
 }

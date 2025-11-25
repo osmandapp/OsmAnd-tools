@@ -28,11 +28,11 @@ public class WikiLangsConverterTest {
 	}.getType();
 
 	long count = 0;
-	Map<String, Stat> valid = new HashMap<>();
-	Map<String, Stat> undefined = new HashMap<>();
+	Map<String, LogInfo> valid = new HashMap<>();
+	Map<String, LogInfo> undefined = new HashMap<>();
 
 	@Test
-	public void testSaveUser() {
+	public void validateLanguageCode() {
 
 		String query = "SELECT count(description) FROM top_images_final";
 		Long total = jdbcTemplate.queryForObject(query, Long.class);
@@ -40,79 +40,73 @@ public class WikiLangsConverterTest {
 		WikiLangConverter.DEBUG = true;
 		parseAndProcessDescriptions();
 		System.out.printf("Total valid code : %d%n", valid.size());
-		System.out.println("lang code,  count  , pageId , description");
+		System.out.println("lang code,  count  , pageId");
 		valid.entrySet().stream()
-				.sorted(Comparator.comparingInt((Map.Entry<String, Stat> e) -> e.getValue().count).reversed())
+				.sorted(Comparator.comparingInt((Map.Entry<String, LogInfo> e) -> e.getValue().count).reversed())
 				.forEach(e -> {
-					Stat stat = e.getValue();
-					System.out.println(e.getKey() + ", " + stat.count + ", " + stat.pageId + ", \"" + stat.description + "\"");
+					LogInfo logInfo = e.getValue();
+					System.out.println(e.getKey() + ", " + logInfo.count + ", " + logInfo.pageId);
 				});
 		System.out.printf("Total undefined code : %d%n", undefined.size());
 		System.out.println("lang code,  count  , pageId , description");
 		undefined.entrySet().stream()
-				.sorted(Comparator.comparingInt((Map.Entry<String, Stat> e) -> e.getValue().count).reversed())
+				.sorted(Comparator.comparingInt((Map.Entry<String, LogInfo> e) -> e.getValue().count).reversed())
 				.forEach(e -> {
-					Stat stat = e.getValue();
-					System.out.println(e.getKey() + ", " + stat.count + ", " + stat.pageId + ", \"" + stat.description + "\"");
+					LogInfo logInfo = e.getValue();
+					System.out.println(e.getKey() + ", " + logInfo.count + ", " + logInfo.pageId + ", \"" + logInfo.description + "\"");
 				});
 	}
 
 	public void parseAndProcessDescriptions() {
-		String sql = "SELECT description, mediaId FROM top_images_final";
+		String sql = "SELECT description, mediaId FROM top_images_final LIMIT 60000";
 
 		jdbcTemplate.query(sql, rs -> {
 			String description = rs.getString(1);
 			String pageId = rs.getString(2);
-			normalizeLang(description, pageId);
+			validateLang(description, pageId);
 		});
 	}
 
-	public String normalizeLang(String jsonStr, String pageId) {
+	public void validateLang(String jsonStr, String pageId) {
 		if (jsonStr == null || jsonStr.trim().isEmpty()) {
-			return "{}";
+			return;
 		}
 		try {
 			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
 			if (parsed == null || parsed.isEmpty()) {
-				return "{}";
+				return;
 			}
 			if (++count % 100000 == 0) {
 				System.out.println("Parsing: " + count + " valid code " + valid.size() + " undefined code " + undefined.size());
 			}
-
-			Map<String, String> normalized = new HashMap<>();
 			for (Map.Entry<String, String> e : parsed.entrySet()) {
 				String wikiLangCode = e.getKey().trim();
 				String description = e.getValue();
 				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
 				if (bcp47.startsWith("und:")) {
 					bcp47 = bcp47.replaceFirst("und:", "");
-					undefined.merge(bcp47, new Stat(description, pageId), (oldVal, newVal) -> oldVal.incr());
+					undefined.merge(bcp47, new LogInfo(description, pageId), (oldVal, newVal) -> oldVal.incr());
 				} else {
-					valid.merge(bcp47, new Stat(description, pageId), (oldVal, newVal) -> oldVal.incr());
+					valid.merge(bcp47, new LogInfo("", pageId), (oldVal, newVal) -> oldVal.incr());
 				}
-				normalized.put(bcp47, description);
 			}
-			return gson.toJson(normalized);
 		} catch (Exception ex) {
 			ex.printStackTrace();
-			return jsonStr;
 		}
 	}
 
-	static final class Stat {
+	static final class LogInfo {
 		public int count;
 		public String description;
 		public String pageId;
 
-
-		public Stat(String description, String pageId) {
+		public LogInfo(String description, String pageId) {
 			this.description = description;
 			this.pageId = pageId;
 			incr();
 		}
 
-		public Stat incr() {
+		public LogInfo incr() {
 			count++;
 			return this;
 		}
