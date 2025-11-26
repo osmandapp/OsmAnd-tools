@@ -4,23 +4,27 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.ibm.icu.util.ULocale;
 import net.osmand.util.Algorithms;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class WikiLangConverter {
 
 	public static final String UNDEFINED_TAG = "und";
 	public static final String UNDEFINED_MARK = "und:"; // used for logging purpose only
+	private static final Logger log = LoggerFactory.getLogger(WikiLangConverter.class);
 	public static boolean DEBUG = false;
 
 	private static final Gson gson = new Gson();
 	private static final Type mapType = new TypeToken<Map<String, String>>() {
 	}.getType();
-	private static final Map<String, String> langCodeCache = new ConcurrentHashMap<>();
-	private static final Map<String, String> specialCodeMap = Map.ofEntries(
+	private static final Map<String, String> bcp47CodeCache = new ConcurrentHashMap<>();
+	private static final Map<String, String> wikiToBcp47Map = Map.ofEntries(
 			Map.entry("no", "nb"),
 			Map.entry("sh", "sr-Latn"),
 			Map.entry("simple", "en-simple"),
@@ -74,12 +78,12 @@ public class WikiLangConverter {
 	);
 
 	public static String normalizeLang(String jsonStr) {
-		if (jsonStr == null || jsonStr.trim().isEmpty()) {
+		if (Algorithms.isBlank(jsonStr)) {
 			return "";
 		}
 		try {
 			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
-			if (parsed == null || parsed.isEmpty()) {
+			if (Algorithms.isEmpty(parsed)) {
 				return "";
 			}
 			Map<String, String> normalized = new HashMap<>();
@@ -95,6 +99,7 @@ public class WikiLangConverter {
 			}
 			return gson.toJson(normalized);
 		} catch (Exception ex) {
+			log.info(ex.getMessage());
 			return jsonStr;
 		}
 	}
@@ -103,7 +108,7 @@ public class WikiLangConverter {
 	 * Converts a Wikipedia/Wikimedia language code to a BCP 47 language tag.
 	 * <p>
 	 * If the code is recognized, returns the corresponding BCP 47 tag.
-	 * If the code is not recognized, returns empty string (or "und:" + code in DEBUG mode).
+	 * If the code is not recognized, returns null (or "und:" + code in DEBUG mode).
 	 * <p>
 	 * Examples of conversions:
 	 * <ul>
@@ -113,30 +118,29 @@ public class WikiLangConverter {
 	 * </ul>
 	 *
 	 * @param wikiCode the Wikipedia/Wikimedia language code to convert
-	 * @return the BCP 47 language tag, or the empty string if it cannot be recognized
+	 * @return the BCP 47 language tag, or the null if it cannot be recognized
 	 * (or prefixed with "und:" in DEBUG mode)
 	 */
 
 	public static String toBcp47FromWiki(String wikiCode) {
-		return langCodeCache.computeIfAbsent(wikiCode, WikiLangConverter::computeBcp47);
+		return bcp47CodeCache.computeIfAbsent(wikiCode, WikiLangConverter::computeBcp47);
 	}
 
 	private static String computeBcp47(String wikiCode) {
-		String key = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
-		String specialCode = specialCodeMap.get(key);
-		if (specialCode != null) {
-			return specialCode;
+		wikiCode = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
+		String bcp47code = wikiToBcp47Map.get(wikiCode);
+		if (bcp47code != null) {
+			return bcp47code;
 		}
 		try {
-			ULocale locale = ULocale.forLanguageTag(key);
-			String languageTag = locale.toLanguageTag();
-			if (UNDEFINED_TAG.equals(languageTag)) {
+			ULocale uLocale = ULocale.forLanguageTag(wikiCode);
+			bcp47code = uLocale.toLanguageTag();
+			if (UNDEFINED_TAG.equals(bcp47code)) {
 				return debugInfo(wikiCode);
-			} else {
-				languageTag = fixLegacyCodes(languageTag);
-				return languageTag;
 			}
-		} catch (Exception e) {
+			return Objects.requireNonNullElse(fixLegacyCodes(bcp47code), bcp47code);
+		} catch (Exception ex) {
+			log.info(ex.getMessage());
 			return debugInfo(wikiCode);
 		}
 	}
@@ -151,7 +155,7 @@ public class WikiLangConverter {
 			case "in" -> "id" + tag.substring(2); // Indonesian
 			case "iw" -> "he" + tag.substring(2); // Hebrew
 			case "ji" -> "yi" + tag.substring(2); // Yiddish
-			default -> tag;
+			default -> null;
 		};
 	}
 }

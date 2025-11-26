@@ -1,10 +1,10 @@
-package net.osmand.server;
+package net.osmand.server.wiki;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.wiki.commonswiki.WikiLangConverter;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.jupiter.api.Disabled;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -13,14 +13,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.lang.reflect.Type;
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 
 import static net.osmand.wiki.commonswiki.WikiLangConverter.UNDEFINED_MARK;
 
-@Disabled
+@Ignore
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class WikiLangsConverterTest {
+public class WikiLangConverterTest {
 
 	@Autowired
 	@Qualifier("wikiJdbcTemplate")
