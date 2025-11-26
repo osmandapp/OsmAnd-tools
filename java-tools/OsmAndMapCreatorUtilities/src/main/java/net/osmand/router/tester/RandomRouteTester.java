@@ -423,8 +423,13 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 
 		RoutingConfiguration.Builder builder = RoutingConfiguration.getDefault();
+
 		GeneralRouter ptRouter = builder.getRouter(PUBLIC_TRANSPORT_PROFILE);
-		TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(ptRouter, entry.mapParams());
+		Map<String, String> routeParameters = getDefaultParameters(ptRouter);
+		routeParameters.putAll(entry.mapParams());
+
+		TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(ptRouter, routeParameters);
+
 		TransportRoutingContext ctx = new TransportRoutingContext(cfg, nativeLibrary,
 				obfReaders.toArray(new BinaryMapIndexReader[0]));
 		TransportRoutePlanner planner = new TransportRoutePlanner();
@@ -444,6 +449,22 @@ public class RandomRouteTester {
 
 		long runTime = System.currentTimeMillis() - started;
 		return new RandomRouteResult(useNative ? "transport-cpp" : "transport-java", entry, runTime, results);
+	}
+
+	private Map<String, String> getDefaultParameters(GeneralRouter router) {
+		Map<String, String> params = new LinkedHashMap<>();
+		for (Map.Entry<String, GeneralRouter.RoutingParameter> entry : router.getParameters().entrySet()) {
+			String key = entry.getKey();
+			GeneralRouter.RoutingParameter rp = entry.getValue();
+			if (rp.getType() == GeneralRouter.RoutingParameterType.BOOLEAN) {
+				if (rp.getDefaultBoolean()) {
+					params.put(key, "true");
+				}
+			} else if (rp.getDefaultNumeric() > 0) {
+				params.put(key, rp.getDefaultString());
+			}
+		}
+		return params;
 	}
 
 	private RandomRouteResult runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
