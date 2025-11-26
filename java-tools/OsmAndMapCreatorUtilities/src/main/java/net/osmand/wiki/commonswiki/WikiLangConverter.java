@@ -143,7 +143,7 @@ public class WikiLangConverter {
 	 * </ul>
 	 *
 	 * @param wikiCode the Wikipedia/Wikimedia language code to convert
-	 * @return the BCP 47 language tag, or the null if it cannot be recognized
+	 * @return the BCP 47 language tag, or null if it cannot be recognized
 	 * (or prefixed with "und:" in DEBUG mode)
 	 */
 
@@ -163,8 +163,8 @@ public class WikiLangConverter {
 			if (UNDEFINED_TAG.equals(bcp47code)) {
 				return debugInfo(wikiCode);
 			}
-			String fixedLanguageTag = fixLegacyCodes(bcp47code);
-			return fixedLanguageTag != null ? fixedLanguageTag : bcp47code;
+			String fixedBcp47code = fixLegacyCodes(bcp47code);
+			return fixedBcp47code != null ? fixedBcp47code : bcp47code;
 		} catch (Exception ex) {
 			log.info(ex.getMessage());
 			return debugInfo(wikiCode);

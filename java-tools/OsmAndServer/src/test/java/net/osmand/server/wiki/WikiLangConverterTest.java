@@ -91,7 +91,7 @@ public class WikiLangConverterTest {
 				String wikiLangCode = e.getKey().trim();
 				String description = e.getValue();
 				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
-				if (bcp47.startsWith(UNDEFINED_MARK)) {
+				if (bcp47 != null && bcp47.startsWith(UNDEFINED_MARK)) {
 					bcp47 = bcp47.replaceFirst(UNDEFINED_MARK, "");
 					undefined.merge(bcp47, new LogInfo(description, pageId), (oldVal, newVal) -> oldVal.incr());
 				} else {
