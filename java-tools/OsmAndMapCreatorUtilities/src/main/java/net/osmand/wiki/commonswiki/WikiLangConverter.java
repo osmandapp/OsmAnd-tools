@@ -3,6 +3,7 @@ package net.osmand.wiki.commonswiki;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.ibm.icu.util.ULocale;
+import net.osmand.util.Algorithms;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -11,12 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class WikiLangConverter {
 
-	private static final Gson gson = new Gson();
-	private static final Type mapType = new TypeToken<Map<String, String>>() {}.getType();
 	public static final String UNDEFINED_TAG = "und";
 	public static final String UNDEFINED_MARK = "und:"; // used for logging purpose only
 	public static boolean DEBUG = false;
 
+	private static final Gson gson = new Gson();
+	private static final Type mapType = new TypeToken<Map<String, String>>() {
+	}.getType();
 	private static final Map<String, String> langCodeCache = new ConcurrentHashMap<>();
 	private static final Map<String, String> specialCodeMap = Map.ofEntries(
 			Map.entry("no", "nb"),
@@ -71,6 +73,32 @@ public class WikiLangConverter {
 			Map.entry("ju", "jv")
 	);
 
+	public static String normalizeLang(String jsonStr) {
+		if (jsonStr == null || jsonStr.trim().isEmpty()) {
+			return "";
+		}
+		try {
+			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
+			if (parsed == null || parsed.isEmpty()) {
+				return "";
+			}
+			Map<String, String> normalized = new HashMap<>();
+			for (Map.Entry<String, String> e : parsed.entrySet()) {
+				String wikiLangCode = e.getKey().trim();
+				String description = e.getValue();
+				if (!Algorithms.isEmpty(description)) {
+					wikiLangCode = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
+				}
+				if (wikiLangCode != null) {
+					normalized.put(wikiLangCode, description);
+				}
+			}
+			return gson.toJson(normalized);
+		} catch (Exception ex) {
+			return jsonStr;
+		}
+	}
+
 	/**
 	 * Converts a Wikipedia/Wikimedia language code to a BCP 47 language tag.
 	 * <p>
@@ -101,14 +129,20 @@ public class WikiLangConverter {
 		}
 		try {
 			ULocale locale = ULocale.forLanguageTag(key);
-			String tag = locale.toLanguageTag();
-			if (UNDEFINED_TAG.equals(tag)) {
-				return DEBUG ? UNDEFINED_MARK + key : "";
+			String languageTag = locale.toLanguageTag();
+			if (UNDEFINED_TAG.equals(languageTag)) {
+				return debugInfo(wikiCode);
+			} else {
+				languageTag = fixLegacyCodes(languageTag);
+				return languageTag;
 			}
-			return fixLegacyCodes(tag);
 		} catch (Exception e) {
-			return DEBUG ? UNDEFINED_MARK + key : "";
+			return debugInfo(wikiCode);
 		}
+	}
+
+	private static String debugInfo(String wikiCode) {
+		return DEBUG ? UNDEFINED_MARK + wikiCode : null;
 	}
 
 	private static String fixLegacyCodes(String tag) {
@@ -119,26 +153,5 @@ public class WikiLangConverter {
 			case "ji" -> "yi" + tag.substring(2); // Yiddish
 			default -> tag;
 		};
-	}
-
-	public static String normalizeLang(String jsonStr) {
-		if (jsonStr == null || jsonStr.trim().isEmpty()) {
-			return "";
-		}
-		try {
-			Map<String, String> parsed = gson.fromJson(jsonStr, mapType);
-			if (parsed == null || parsed.isEmpty()) {
-				return "";
-			}
-			Map<String, String> normalized = new HashMap<>();
-			for (Map.Entry<String, String> e : parsed.entrySet()) {
-				String wikiLangCode = e.getKey().trim();
-				String bcp47 = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
-				normalized.put(bcp47, e.getValue());
-			}
-			return gson.toJson(normalized);
-		} catch (Exception ex) {
-			return jsonStr;
-		}
 	}
 }
