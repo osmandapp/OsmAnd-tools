@@ -18,6 +18,7 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,10 +26,12 @@ import org.springframework.scheduling.annotation.Async;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -110,11 +113,11 @@ public interface DataService extends BaseService {
 					// Parse the CSV line using Apache Commons CSV to handle quoted fields with delimiters
 					String[] record;
 					try (CSVParser parser = CSVParser.parse(line, format)) {
-						List<org.apache.commons.csv.CSVRecord> recs = parser.getRecords();
+						List<CSVRecord> recs = parser.getRecords();
 						if (recs.isEmpty()) {
 							record = new String[0];
 						} else {
-							org.apache.commons.csv.CSVRecord r = recs.get(0);
+							CSVRecord r = recs.get(0);
 							record = new String[r.size()];
 							for (int c = 0; c < r.size(); c++) {
 								record[c] = r.get(c);
@@ -260,7 +263,7 @@ public interface DataService extends BaseService {
 			getJdbcTemplate().update(sql, row.dsResultId(), row.count(), test.id, test.datasetId, rowJson, query, row.error(),
 					row.duration(),
 					row.point().getLatitude(), row.point().getLongitude(),
-					new java.sql.Timestamp(System.currentTimeMillis()));
+					new Timestamp(System.currentTimeMillis()));
 		}
 	}
 
@@ -337,7 +340,7 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
-				new java.sql.Timestamp(System.currentTimeMillis()), found,
+				new Timestamp(System.currentTimeMillis()), found,
 				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
 				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null
 		};
@@ -528,7 +531,7 @@ public interface DataService extends BaseService {
 			return results;
 
 		File file = new File(obf);
-		try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(file.getAbsolutePath(), "r")) {
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
 			final Pattern cityPattern, streetPattern, housePattern;
 			try {
 				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
@@ -614,5 +617,48 @@ public interface DataService extends BaseService {
 			return "";
 		}
 		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+	}
+
+	SearchService getSearchService();
+
+	default ResultMetric toMetric(SearchResult r) {
+		return new ResultMetric(r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
+				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0);
+	}
+
+	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight, Collection<String> otherWordsMatch, double distance) {}
+	record HouseResult(String name, String type, Record parent, ResultMetric metric) {}
+	record StreetResult(String name, String type, Record parent, ResultMetric metric) {}
+	record CityResult(String name, String type, ResultMetric metric) {}
+	record POIResult(String name, String type, ResultMetric metric) {}
+	record UnknownResult(String name, String type, ResultMetric metric) {}
+
+	default List<Record> getResults(Double lat, Double lon, String query, String lang) throws IOException {
+		SearchService.SearchResultWrapper result = getSearchService()
+				.searchResults(lat, lon, query, lang, false, null, null, true, null);
+
+		List<Record> results = new ArrayList<>();
+		for (SearchResult r : result.results()) {
+			Record rec = toResult(r);
+			results.add(rec);
+		}
+		return results;
+	}
+
+	default Record toResult(SearchResult r) {
+		ResultMetric metric = toMetric(r);
+		String type = r.objectType.name().toLowerCase();
+		if (r.object instanceof Amenity a)
+			return new POIResult(a.getName(), type, metric);
+		if (r.object instanceof City c)
+			return new CityResult(c.getName(), type, metric);
+
+		Record parent = r.parentSearchResult == null ? null : toResult(r.parentSearchResult);
+		if (r.object instanceof Street s)
+			return new StreetResult(s.getName(), type, parent, metric);
+		if (r.object instanceof Building b)
+			return new HouseResult(r.toString(), type, parent, metric);
+
+		return new UnknownResult(r.toString(), type, metric);
 	}
 }

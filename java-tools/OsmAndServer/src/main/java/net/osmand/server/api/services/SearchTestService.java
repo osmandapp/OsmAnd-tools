@@ -159,6 +159,7 @@ public class SearchTestService implements ReportService, DataService {
 		return mapsService;
 	}
 
+	@Override
 	public SearchService getSearchService() {
 		return searchService;
 	}

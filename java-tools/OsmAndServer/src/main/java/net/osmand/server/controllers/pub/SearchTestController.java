@@ -350,4 +350,14 @@ public class SearchTestController {
 				includesBoundary != null && includesBoundary,
 				cityRegExp, streetRegExp, houseRegExp));
 	}
+
+	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Record>> getResults(
+			@RequestParam String query,
+			@RequestParam(required = false) String lang,
+			@RequestParam Double lat,
+			@RequestParam Double lon) throws IOException {
+		return ResponseEntity.ok(testSearchService.getResults(lat, lon, query, lang));
+	}
 }
