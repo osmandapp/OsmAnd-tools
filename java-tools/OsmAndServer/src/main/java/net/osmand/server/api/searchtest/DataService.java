@@ -623,10 +623,13 @@ public interface DataService extends BaseService {
 
 	default ResultMetric toMetric(SearchResult r) {
 		return new ResultMetric(r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
-				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0);
+				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(),
+				MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0,
+				r.completeMatchRes.allWordsEqual, r.completeMatchRes.allWordsInPhraseAreInResult);
 	}
 
-	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight, Collection<String> otherWordsMatch, double distance) {}
+	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
+	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
 	record HouseResult(String name, String type, Record parent, ResultMetric metric) {}
 	record StreetResult(String name, String type, Record parent, ResultMetric metric) {}
 	record CityResult(String name, String type, ResultMetric metric) {}
