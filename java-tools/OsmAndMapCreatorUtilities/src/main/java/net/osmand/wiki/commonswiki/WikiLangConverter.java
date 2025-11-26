@@ -10,14 +10,28 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Converter for Wikipedia language codes to BCP 47 format.
+ * <p>
+ * This class provides methods to convert Wikipedia language codes (which may include
+ * non-standard or legacy codes) to their corresponding BCP 47 language tags.
+ * <p>
+ * Special mappings are handled via the {@code SPECIAL_MAP}, which contains Wikipedia codes
+ * that do not directly map to BCP 47 and require custom conversion.
+ * <p>
+ * The {@code CACHE} is used to store previously converted codes for performance optimization.
+ * <p>
+ * Thread safety is guaranteed for the caching mechanism by using a {@link ConcurrentHashMap}.
+ */
 
 public class WikiLangConverter {
 
 	public static final String UNDEFINED_TAG = "und";
 	public static final String UNDEFINED_MARK = "und:"; // used for logging purpose only
 	private static final Logger log = LoggerFactory.getLogger(WikiLangConverter.class);
+	public static final int REPLACED_CODE_LENGTH = "in".length();
 	public static boolean DEBUG = false;
 
 	private static final Gson gson = new Gson();
@@ -77,6 +91,16 @@ public class WikiLangConverter {
 			Map.entry("ju", "jv")
 	);
 
+	/**
+	 * Normalizes the language codes in a JSON string mapping language codes to descriptions.
+	 * Converts wiki language codes to BCP 47 format.
+	 *
+	 * @param jsonStr a JSON string containing language code to description mappings
+	 * @return a JSON string with language codes converted to BCP 47 format;
+	 * returns the original string on parse errors;
+	 * returns "" for null or empty input, or if the parsed map is empty
+	 */
+
 	public static String normalizeLang(String jsonStr) {
 		if (Algorithms.isBlank(jsonStr)) {
 			return "";
@@ -90,11 +114,12 @@ public class WikiLangConverter {
 			for (Map.Entry<String, String> e : parsed.entrySet()) {
 				String wikiLangCode = e.getKey().trim();
 				String description = e.getValue();
-				if (!Algorithms.isEmpty(description)) {
-					wikiLangCode = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
+				String bcp47Code = null;
+				if (!Algorithms.isBlank(description)) {
+					bcp47Code = WikiLangConverter.toBcp47FromWiki(wikiLangCode);
 				}
-				if (wikiLangCode != null) {
-					normalized.put(wikiLangCode, description);
+				if (!Algorithms.isBlank(bcp47Code)) {
+					normalized.put(bcp47Code, description);
 				}
 			}
 			return gson.toJson(normalized);
@@ -127,18 +152,19 @@ public class WikiLangConverter {
 	}
 
 	private static String computeBcp47(String wikiCode) {
-		wikiCode = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
-		String bcp47code = wikiToBcp47Map.get(wikiCode);
+		String preparedWikiCode = wikiCode.replace('_', '-').toLowerCase(java.util.Locale.ROOT);
+		String bcp47code = wikiToBcp47Map.get(preparedWikiCode);
 		if (bcp47code != null) {
 			return bcp47code;
 		}
 		try {
-			ULocale uLocale = ULocale.forLanguageTag(wikiCode);
+			ULocale uLocale = ULocale.forLanguageTag(preparedWikiCode);
 			bcp47code = uLocale.toLanguageTag();
 			if (UNDEFINED_TAG.equals(bcp47code)) {
 				return debugInfo(wikiCode);
 			}
-			return Objects.requireNonNullElse(fixLegacyCodes(bcp47code), bcp47code);
+			String fixedLanguageTag = fixLegacyCodes(bcp47code);
+			return fixedLanguageTag != null ? fixedLanguageTag : bcp47code;
 		} catch (Exception ex) {
 			log.info(ex.getMessage());
 			return debugInfo(wikiCode);
@@ -151,10 +177,10 @@ public class WikiLangConverter {
 
 	private static String fixLegacyCodes(String tag) {
 		// Mapping of deprecated ISO 639 codes to their replacements
-		return switch (tag.length() >= 2 ? tag.substring(0, 2) : tag) {
-			case "in" -> "id" + tag.substring(2); // Indonesian
-			case "iw" -> "he" + tag.substring(2); // Hebrew
-			case "ji" -> "yi" + tag.substring(2); // Yiddish
+		return switch (tag.length() >= REPLACED_CODE_LENGTH ? tag.substring(0, REPLACED_CODE_LENGTH) : tag) {
+			case "in" -> "id" + tag.substring(REPLACED_CODE_LENGTH); // Indonesian
+			case "iw" -> "he" + tag.substring(REPLACED_CODE_LENGTH); // Hebrew
+			case "ji" -> "yi" + tag.substring(REPLACED_CODE_LENGTH); // Yiddish
 			default -> null;
 		};
 	}

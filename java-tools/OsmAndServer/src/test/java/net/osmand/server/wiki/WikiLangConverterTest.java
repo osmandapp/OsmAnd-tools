@@ -6,6 +6,8 @@ import net.osmand.wiki.commonswiki.WikiLangConverter;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +26,7 @@ import static net.osmand.wiki.commonswiki.WikiLangConverter.UNDEFINED_MARK;
 @SpringBootTest
 public class WikiLangConverterTest {
 
+	private static final Logger log = LoggerFactory.getLogger(WikiLangConverterTest.class);
 	@Autowired
 	@Qualifier("wikiJdbcTemplate")
 	JdbcTemplate jdbcTemplate;
@@ -41,10 +44,10 @@ public class WikiLangConverterTest {
 
 		String query = "SELECT count(description) FROM top_images_final";
 		Long total = jdbcTemplate.queryForObject(query, Long.class);
-		System.out.printf("Total descriptions : %,d%n", total);
+		System.out.printf("Total descriptions : %,d\n", total);
 		WikiLangConverter.DEBUG = true;
 		parseAndProcessDescriptions();
-		System.out.printf("Total valid code : %d%n", valid.size());
+		System.out.printf("Total valid code : %d\n", valid.size());
 		System.out.println("lang code,  count  , pageId");
 		valid.entrySet().stream()
 				.sorted(Comparator.comparingInt((Map.Entry<String, LogInfo> e) -> e.getValue().count).reversed())
@@ -52,7 +55,7 @@ public class WikiLangConverterTest {
 					LogInfo logInfo = e.getValue();
 					System.out.println(e.getKey() + ", " + logInfo.count + ", " + logInfo.pageId);
 				});
-		System.out.printf("Total undefined code : %d%n", undefined.size());
+		System.out.printf("Total undefined code : %d\n", undefined.size());
 		System.out.println("lang code,  count  , pageId , description");
 		undefined.entrySet().stream()
 				.sorted(Comparator.comparingInt((Map.Entry<String, LogInfo> e) -> e.getValue().count).reversed())
@@ -96,7 +99,7 @@ public class WikiLangConverterTest {
 				}
 			}
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			log.info("Parsing error in description : {} \npage Id : {} \n{}", jsonStr, pageId, ex.getMessage());
 		}
 	}
 
