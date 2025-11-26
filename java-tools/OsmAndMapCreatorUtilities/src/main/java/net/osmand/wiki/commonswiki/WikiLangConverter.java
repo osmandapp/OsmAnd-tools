@@ -16,7 +16,7 @@ public class WikiLangConverter {
 	public static final String UNDEFINED_TAG = "und";
 	public static final String UNDEFINED_MARK = "und:"; // used for logging purpose only
 	public static boolean DEBUG = false;
-	
+
 	private static final Map<String, String> langCodeCache = new ConcurrentHashMap<>();
 	private static final Map<String, String> specialCodeMap = Map.ofEntries(
 			Map.entry("no", "nb"),
@@ -86,7 +86,7 @@ public class WikiLangConverter {
 	 *
 	 * @param wikiCode the Wikipedia/Wikimedia language code to convert
 	 * @return the BCP 47 language tag, or the empty string if it cannot be recognized
-	 *         (or prefixed with "und:" in DEBUG mode)
+	 * (or prefixed with "und:" in DEBUG mode)
 	 */
 
 	public static String toBcp47FromWiki(String wikiCode) {
@@ -112,16 +112,13 @@ public class WikiLangConverter {
 	}
 
 	private static String fixLegacyCodes(String tag) {
-		if (tag.equals("in") || tag.startsWith("in-")) {
-			return "id" + tag.substring(2);
-		}
-		if (tag.equals("iw") || tag.startsWith("iw-")) {
-			return "he" + tag.substring(2);
-		}
-		if (tag.equals("ji") || tag.startsWith("ji-")) {
-			return "yi" + tag.substring(2);
-		}
-		return tag;
+		// Mapping of deprecated ISO 639 codes to their replacements
+		return switch (tag.length() >= 2 ? tag.substring(0, 2) : tag) {
+			case "in" -> "id" + tag.substring(2); // Indonesian
+			case "iw" -> "he" + tag.substring(2); // Hebrew
+			case "ji" -> "yi" + tag.substring(2); // Yiddish
+			default -> tag;
+		};
 	}
 
 	public static String normalizeLang(String jsonStr) {

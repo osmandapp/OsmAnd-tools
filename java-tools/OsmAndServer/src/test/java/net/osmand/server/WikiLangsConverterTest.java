@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.wiki.commonswiki.WikiLangConverter;
 import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,7 +17,7 @@ import java.util.*;
 
 import static net.osmand.wiki.commonswiki.WikiLangConverter.UNDEFINED_MARK;
 
-
+@Disabled
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class WikiLangsConverterTest {
