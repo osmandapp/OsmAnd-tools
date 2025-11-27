@@ -8,7 +8,6 @@ from threading import current_thread
 from typing import List, Tuple, Dict
 
 import clickhouse_connect
-import clickhouse_driver
 import faiss
 import numpy as np
 import requests
@@ -173,18 +172,24 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
 
 stop_immediately = False
 total_place_count = 0
+abnormal = False
 
 
 def done_callback(future):
-    global stop_immediately, total_place_count
+    global stop_immediately, total_place_count, abnormal
 
-    stop, place = future.result()
-    if stop:
-        stop_immediately = True
-    total_place_count += 1
+    try:
+        stop, place = future.result()
+        if stop:
+            stop_immediately = True
+        total_place_count += 1
+    except Exception:
+        # Unexpected error surfaced from worker -> mark abnormal to exit with code 1
+        traceback.print_exc()
+        abnormal = True
 
 
-def find_duplicates():
+def find_duplicates() -> bool:
     run_id = get_dups_run_max_id() + 1
     media_ids = [int(p.strip()) for p in SELECTED_MEDIA_IDS.split(',') if p.strip() != '']
     place_ids = [str(p.strip()) for p in SELECTED_PLACE_IDS.split(',') if p.strip() != '']
@@ -214,10 +219,12 @@ def find_duplicates():
     except Exception as e:
         traceback.print_exc()
         print(f"Error processing batch: {e}")
+        return True
 
     print(
         f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
         flush=True)
+    return False
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
@@ -243,8 +250,9 @@ if __name__ == "__main__":
     status_thread.start()
     try:
         with executor:
-            find_duplicates()
-        if stop_immediately:
+            # Combine abnormal from batch-level and worker-level exceptions
+            abnormal = find_duplicates() or abnormal
+        if stop_immediately or abnormal:
             raise SystemExit(1)
     finally:
         is_done = True
