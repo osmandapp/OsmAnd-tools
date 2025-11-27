@@ -353,7 +353,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Record>> getResults(
+	public ResponseEntity<DataService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam Double lat,

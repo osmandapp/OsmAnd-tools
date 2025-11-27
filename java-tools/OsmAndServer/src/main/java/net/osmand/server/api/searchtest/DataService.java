@@ -628,6 +628,7 @@ public interface DataService extends BaseService {
 				r.completeMatchRes.allWordsEqual, r.completeMatchRes.allWordsInPhraseAreInResult);
 	}
 
+	record ResultsWithStats(List<Record> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
 	record HouseResult(String name, String type, Record parent, ResultMetric metric) {}
@@ -636,7 +637,7 @@ public interface DataService extends BaseService {
 	record POIResult(String name, String type, ResultMetric metric) {}
 	record UnknownResult(String name, String type, ResultMetric metric) {}
 
-	default List<Record> getResults(Double lat, Double lon, String query, String lang) throws IOException {
+	default ResultsWithStats getResults(Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
 				.searchResults(lat, lon, query, lang, false, null, null, true, null);
 
@@ -645,7 +646,7 @@ public interface DataService extends BaseService {
 			Record rec = toResult(r);
 			results.add(rec);
 		}
-		return results;
+		return new ResultsWithStats(results, result.stat().wordsByApis);
 	}
 
 	default Record toResult(SearchResult r) {
