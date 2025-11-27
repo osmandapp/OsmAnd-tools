@@ -123,7 +123,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					", " + Algorithms.encodeMap(c.getNamesMap(true)) +
 					", " + CityType.valueToString(c.getType()) + ")");
 		}
-		regCity(c, e);		
+		regCity(c, e);
 		writeCity(c);
 		commitWriteCity();
 		return c;
@@ -154,18 +154,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
-			// assumption order of citiesToSearch not important as we do step by step 
+			// assumption order of citiesToSearch not important as we do step by step
 			City cityFound = null;
 			String boundaryName = boundary.getName().toLowerCase();
 			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
-					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) { 
+					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) {
 						String cityLower = c.getName().toLowerCase();
-						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva 
+						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva
 						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
 								!nameContains(cityLower, boundaryName)) {
-							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match", 
+							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match",
 									boundary.getName(), ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), c.getName());
 							if (logMapDataWarn != null) {
 								logMapDataWarn.info(msg);
@@ -205,7 +205,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			// Monaco doesn't have place=town point, but has boundary with tags & admin_level
 			// However it could be wrong create point if the boundary doesn't match center point
-			 // assume all cities should have proper NODE (don't create node for it) 
+			 // assume all cities should have proper NODE (don't create node for it)
 			if (cityFound == null && boundary.getCityType() != CityType.CITY &&
 					boundary.getCityType() != null) {
 				if (e instanceof Relation) {
@@ -214,7 +214,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				cityFound = createMissingCity(e, boundary.getCityType());
 				boundary.setAdminCenterId(cityFound.getId());
 				boundary.setLabelId(cityFound.getId());
-			} 
+			}
 			if (cityFound != null) {
 				putCityBoundary(boundary, cityFound);
 				// don't attach cities to large boundaries
@@ -365,7 +365,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private void logBoundaryChanged(Boundary boundary, City cityFound, int priority, int oldpriority) {
-		String s = String.format("boundary '%s' id %d - priority:%d", boundary.toString(), 
+		String s = String.format("boundary '%s' id %d - priority:%d", boundary.toString(),
 				ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), priority);
 		if (cityFound == null) {
 			s = "No city for " + s;
@@ -530,7 +530,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			return null;
 		}
 		name = name.trim();
-		name = name.replace("’", "'");
+        name = Algorithms.normalizeSearchText(name);
 		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
@@ -651,7 +651,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			if (result.isEmpty() && topAnyCity != null && relAnyDistance > threshold) {
-				// add only 1 city if no matched by boundary and centers are too far 
+				// add only 1 city if no matched by boundary and centers are too far
 				result.add(topAnyCity);
 			} else {
 				// add all closest cities without boundaries or at least 1 closest
@@ -703,7 +703,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			throws SQLException {
 		String cityPart;
 		boolean place = names != null && names.containsKey("name:" + PLACE_ATTR);
-		
+
 		// don't assign suburbs for existing places
 		if (settings.indexByProximity && !place) {
 			cityPart = findCityPart(location, city);
@@ -766,7 +766,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			public int compare(City o1, City o2) {
 				return Integer.compare(order(o1), order(o2));
 			}
-			
+
 		});
 		// 2. check by proper boundaries first
 		Iterator<City> it = subcities.iterator();
@@ -793,7 +793,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		// 3. check by proximity 
+		// 3. check by proximity
 		double dist = Double.MAX_VALUE;
 		if (!found) {
 			// take closest suburb if nothing matched by boundary
@@ -822,7 +822,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			interpolationByHouseNumber = getInterpolationByHouseNumber(e);
 		}
 		if (e instanceof Way && (interpolation != null || interpolationByHouseNumber != null)) {
-			
+
 			BuildingInterpolation type = null;
 			int interpolationInterval = 0;
 			try {
@@ -863,7 +863,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, place, null, l, icc);
 						if (!idsOfStreet.isEmpty()) {
-							if (Algorithms.extractFirstIntegerNumber(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER)) > 
+							if (Algorithms.extractFirstIntegerNumber(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER)) >
 								Algorithms.extractFirstIntegerNumber(second.getTag(OSMTagKey.ADDR_HOUSE_NUMBER))) {
 								Node t = second;
 								second = first;
@@ -882,7 +882,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
-		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER), 
+		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER),
 				e.getTag(OSMTagKey.ADDR_UNIT));
 
 		String streetOrPlace = null;
@@ -901,7 +901,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		String city = e.getTag(OSMTagKey.ADDR_CITY);
 		String suburb = e.getTag(OSMTagKey.ADDR_SUBURB);
 		boolean emptyCityPlace = Algorithms.isEmpty(streetOrPlace) && Algorithms.isEmpty(city) && Algorithms.isEmpty(suburb);
-		// ignore is_in tag as mostly duplicated 
+		// ignore is_in tag as mostly duplicated
 		if ((houseName != null || houseNumber != null) && !emptyCityPlace) {
 			if (e instanceof Relation) {
 				ctx.loadEntityRelation((Relation) e);
@@ -1073,7 +1073,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return m;
 	}
 
-	private boolean isStreetTag(String highwayValue) { 
+	private boolean isStreetTag(String highwayValue) {
 		// exclude cycleways as we don't have houses related with them
 		return !"platform".equals(highwayValue) && !"cycleway".equals(highwayValue);
 	}
@@ -1235,7 +1235,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			writer.writeCityIndex(postCode, streets, null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
-		
+
 		// write unassigned boundaries
 		writer.startCityBlockIndex(CityBlocks.BOUNDARY_TYPE.index);
 		refs = new ArrayList<BinaryFileReference>();
@@ -1279,7 +1279,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (City c : boundariesAsCities) {
 			refs.add(writer.writeCityHeader(c, c.getType().ordinal(), tagRules));
 		}
-		
+
 		for (int i = 0; i < boundariesAsCities.size(); i++) {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);
@@ -1479,7 +1479,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			Map<Street, List<Node>> streetNodes = new LinkedHashMap<Street, List<Node>>();
-			// Collect all NEIGHBOURHOOD, SUBURBS, .. that are part of City to add all streets 
+			// Collect all NEIGHBOURHOOD, SUBURBS, .. that are part of City to add all streets
 			// That's not needed when multipolygon boundaries are created though needed Node is_in Node
 			Boundary boundary = cityDataStorage.getBoundaryByCity(city);
 			List<City> listSuburbs = null;
@@ -1620,7 +1620,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 		}
 	}
-	
+
 	private static String stripBraces(String localeName) {
 		int i = localeName.indexOf('(');
 		String retName = localeName;
