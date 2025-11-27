@@ -1,10 +1,9 @@
 package net.osmand.server.controllers.pub;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import net.osmand.PlatformUtil;
 import net.osmand.purchases.FastSpringHelper;
+import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -17,8 +16,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.util.*;
 
 @Controller
@@ -42,6 +39,9 @@ public class FastSpringController {
 
 	@Autowired
 	protected Gson gson;
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 
@@ -103,8 +103,10 @@ public class FastSpringController {
 								subscription.userId = userId;
 								subscription.valid = true;
 
+								setInitialSubscriptionDates(subscription, sku);
+
 								subscriptions.add(subscription);
-								LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", email, data.reference));
+								LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", email, data.reference));
 							}
 						} else {
 							LOGGER.error("FastSpring: Unknown product " + sku);
@@ -126,6 +128,27 @@ public class FastSpringController {
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	/**
+	 * Set initial starttime and expiretime for FastSpring subscription based on SKU metadata.
+	 * This allows the subscription to be active immediately without waiting for the first validation (12 hours).
+	 * The dates will be updated with actual values from FastSpring API during the first validation (after 15 minutes).
+	 */
+	private void setInitialSubscriptionDates(DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription, String sku) {
+		subscription.starttime = subscription.timestamp;
+		PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sku);
+		if (skuData != null) {
+			Calendar cal = Calendar.getInstance();
+			cal.setTime(subscription.starttime);
+			if ("month".equals(skuData.durationUnit())) {
+				cal.add(Calendar.MONTH, skuData.duration());
+			} else if ("year".equals(skuData.durationUnit())) {
+				cal.add(Calendar.YEAR, skuData.duration());
+			}
+			subscription.expiretime = cal.getTime();
+			subscription.autorenewing = true; // assume autorenew by default
+		}
 	}
 
 	public static class FastSpringOrderCompletedRequest {
