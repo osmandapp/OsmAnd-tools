@@ -637,9 +637,9 @@ public interface DataService extends BaseService {
 	record POIResult(String name, String type, ResultMetric metric) {}
 	record UnknownResult(String name, String type, ResultMetric metric) {}
 
-	default ResultsWithStats getResults(Double lat, Double lon, String query, String lang) throws IOException {
+	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, lang, false, null, null, true, null);
+				.searchResults(lat, lon, query, lang, false, radius, null, null, true, null);
 
 		List<Record> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {

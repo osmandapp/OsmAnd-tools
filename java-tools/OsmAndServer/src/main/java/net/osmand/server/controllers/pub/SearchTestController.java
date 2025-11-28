@@ -356,8 +356,10 @@ public class SearchTestController {
 	public ResponseEntity<DataService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) Double radius,
 			@RequestParam Double lat,
 			@RequestParam Double lon) throws IOException {
-		return ResponseEntity.ok(testSearchService.getResults(lat, lon, query, lang));
+		radius = radius == null ? 1.0 : radius;
+		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
 	}
 }
