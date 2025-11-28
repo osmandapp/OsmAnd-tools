@@ -351,6 +351,8 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp));
 	}
 
+	private static final double SEARCH_RADIUS_DEGREE = 1.0;
+
 	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<DataService.ResultsWithStats> getResults(
@@ -359,7 +361,7 @@ public class SearchTestController {
 			@RequestParam(required = false) Double radius,
 			@RequestParam Double lat,
 			@RequestParam Double lon) throws IOException {
-		radius = radius == null ? 1.0 : radius;
+		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
 		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
 	}
 }
