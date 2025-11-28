@@ -12,7 +12,7 @@ import faiss
 import numpy as np
 import requests
 import torch
-from clickhouse_driver.errors import SocketTimeoutError
+from clickhouse_driver.errors import SocketTimeoutError, ServerException
 from transformers import CLIPModel, CLIPImageProcessor
 
 from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor
@@ -152,7 +152,8 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
         except (
                 requests.exceptions.ConnectionError,
                 clickhouse_connect.driver.exceptions.DatabaseError,
-                SocketTimeoutError
+                SocketTimeoutError,
+                ServerException
         ) as e:
             print(f"#{current_thread().name}. Warning: Could not process place Q{place_id}: {e} Attempt {attempt} from 3. Need to wait 30 sec and retry again ...")
             time.sleep(30)
@@ -165,7 +166,6 @@ def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]
             print(f"#{current_thread().name}. Error for place Q{place_id}: {e}")
             insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, f"{e}", SAVE_SCORE_ENV)
             return False, place_id
-        return True, place_id
 
     return False, place_id
 
