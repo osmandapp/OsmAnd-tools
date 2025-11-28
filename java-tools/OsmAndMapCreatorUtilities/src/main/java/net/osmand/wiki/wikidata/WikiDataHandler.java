@@ -9,6 +9,7 @@ import java.util.*;
 
 import javax.xml.parsers.SAXParser;
 
+import net.osmand.wiki.WikiLangConverter;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -75,12 +76,12 @@ public class WikiDataHandler extends DefaultHandler {
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
 				+ " osmtype int, osmid bigint, poitype text, poisubtype text, labelsJson text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, bcp47Lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
 		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson) "
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
+		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, bcp47Lang, title) VALUES (?, ?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
@@ -102,6 +103,7 @@ public class WikiDataHandler extends DefaultHandler {
     public void finish() throws SQLException {
         log.info("Total accepted: " + count);
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
+        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_bcp47_title_idx ON wiki_mapping(bcp47Lang, title)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
@@ -245,9 +247,11 @@ public class WikiDataHandler extends DefaultHandler {
 				addBatch(wikiRegionPrep, regionBatch);
 			}
 			for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
+				String siteLang = siteLink.lang();
 				mappingPrep.setLong(1, id);
-				mappingPrep.setString(2, siteLink.lang());
-				mappingPrep.setString(3, siteLink.title());
+				mappingPrep.setString(2, siteLang);
+				mappingPrep.setString(3, WikiLangConverter.toBcp47FromWiki(siteLang));
+				mappingPrep.setString(4, siteLink.title());
 				addBatch(mappingPrep, mappingBatch);
 			}
 			if (article.getImage() != null) {

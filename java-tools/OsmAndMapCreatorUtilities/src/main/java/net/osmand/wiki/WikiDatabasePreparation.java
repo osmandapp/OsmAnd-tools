@@ -1745,7 +1745,7 @@ public class WikiDatabasePreparation {
 	public static void createWikidataMapping(File sourceDb, String wikidataFolder) throws SQLException {
 		Connection srcConn = DBDialect.SQLITE.getDatabaseConnection(sourceDb.getAbsolutePath(), log);
 		Statement srcSt = srcConn.createStatement();
-		ResultSet rs = srcSt.executeQuery("SELECT id, lang, title FROM wiki_mapping");
+		ResultSet rs = srcSt.executeQuery("SELECT id, lang, bcp47Lang, title FROM wiki_mapping");
 
 		File mappingFile = new File(wikidataFolder, WIKIDATA_MAPPING_SQLITE);
 		if (mappingFile.exists()) {
@@ -1755,17 +1755,19 @@ public class WikiDatabasePreparation {
 
 		Statement mapSt = mappingConn.createStatement();
 		mapSt.execute("DROP TABLE IF EXISTS wiki_mapping");
-		mapSt.execute("CREATE TABLE wiki_mapping(id LONG, lang TEXT, title TEXT)");
+		mapSt.execute("CREATE TABLE wiki_mapping(id LONG, lang TEXT, bcp47Lang TEXT, title TEXT)");
 		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_id ON wiki_mapping(id)");
 		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_lang_title ON wiki_mapping(lang, title)");
+		mapSt.execute("CREATE INDEX IF NOT EXISTS idx_wm_bcp47_title ON wiki_mapping(bcp47Lang, title)");
 
 		PreparedStatement ps = mappingConn
-				.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES(?, ?, ?)");
+				.prepareStatement("INSERT INTO wiki_mapping(id, lang, bcp47Lang, title) VALUES(?, ?, ?, ?)");
 		int batch = 0;
 		while (rs.next()) {
 			ps.setLong(1, rs.getLong("id"));
 			ps.setString(2, rs.getString("lang"));
-			ps.setString(3, rs.getString("title"));
+			ps.setString(3, rs.getString("bcp47Lang"));
+			ps.setString(4, rs.getString("title"));
 			ps.addBatch();
 			if (++batch % 1000 == 0) {
 				ps.executeBatch();
