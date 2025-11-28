@@ -1,4 +1,4 @@
-package net.osmand.wiki.commonswiki;
+package net.osmand.wiki;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
