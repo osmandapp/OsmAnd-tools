@@ -628,41 +628,27 @@ public interface DataService extends BaseService {
 				r.completeMatchRes.allWordsEqual, r.completeMatchRes.allWordsInPhraseAreInResult);
 	}
 
-	record ResultsWithStats(List<Record> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
+	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
-	record HouseResult(String name, String type, Record parent, ResultMetric metric) {}
-	record StreetResult(String name, String type, Record parent, ResultMetric metric) {}
-	record CityResult(String name, String type, ResultMetric metric) {}
-	record POIResult(String name, String type, ResultMetric metric) {}
-	record UnknownResult(String name, String type, ResultMetric metric) {}
+	record AddressResult(String name, String type, Record parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
 				.searchResults(lat, lon, query, lang, false, radius, null, null, true, null);
 
-		List<Record> results = new ArrayList<>();
+		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
-			Record rec = toResult(r);
+			AddressResult rec = toResult(r);
 			results.add(rec);
 		}
 		return new ResultsWithStats(results, result.stat().wordsByApis);
 	}
 
-	default Record toResult(SearchResult r) {
+	default AddressResult toResult(SearchResult r) {
 		ResultMetric metric = toMetric(r);
 		String type = r.objectType.name().toLowerCase();
-		if (r.object instanceof Amenity a)
-			return new POIResult(a.getName(), type, metric);
-		if (r.object instanceof City c)
-			return new CityResult(c.getName(), type, metric);
-
 		Record parent = r.parentSearchResult == null ? null : toResult(r.parentSearchResult);
-		if (r.object instanceof Street s)
-			return new StreetResult(s.getName(), type, parent, metric);
-		if (r.object instanceof Building b)
-			return new HouseResult(r.toString(), type, parent, metric);
-
-		return new UnknownResult(r.toString(), type, metric);
+		return new AddressResult(r.toString(), type, parent, metric);
 	}
 }
