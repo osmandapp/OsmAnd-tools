@@ -350,4 +350,18 @@ public class SearchTestController {
 				includesBoundary != null && includesBoundary,
 				cityRegExp, streetRegExp, houseRegExp));
 	}
+
+	private static final double SEARCH_RADIUS_DEGREE = 1.0;
+
+	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<DataService.ResultsWithStats> getResults(
+			@RequestParam String query,
+			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon) throws IOException {
+		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
+		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
+	}
 }

@@ -142,7 +142,7 @@ public class SearchService {
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false, null);
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, SEARCH_RADIUS_DEGREE, northWest, southEast, false, null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
@@ -160,7 +160,7 @@ public class SearchService {
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
 
     public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
-                                             String northWest, String southEast,
+                                             double radius, String northWest, String southEast,
                                              boolean unlimited, Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResultWrapper(Collections.emptyList(), null);
@@ -171,8 +171,8 @@ public class SearchService {
         }
         searchUICore.getSearchSettings().setRegions(osmandRegions);
 
-        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + SEARCH_RADIUS_DEGREE, lon - SEARCH_RADIUS_DEGREE),
-                new LatLon(lat - SEARCH_RADIUS_DEGREE, lon + SEARCH_RADIUS_DEGREE));
+        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + radius, lon - radius),
+                new LatLon(lat - radius, lon + radius));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
