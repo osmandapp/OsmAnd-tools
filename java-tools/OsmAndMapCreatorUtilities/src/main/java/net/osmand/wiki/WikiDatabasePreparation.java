@@ -85,6 +85,12 @@ public class WikiDatabasePreparation {
 	
 	public static final String DEFAULT_STRING = "Unknown";
 	public static final String DEFAULT_LANG = "en";
+	
+	// Metadata field names for information-like templates
+	private static final String FIELD_AUTHOR = "author";
+	private static final String FIELD_PHOTOGRAPHER = "photographer";
+	private static final String FIELD_DATE = "date";
+	private static final String FIELD_DESCRIPTION = "description";
 
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT,
@@ -318,7 +324,7 @@ public class WikiDatabasePreparation {
 					parseAndAppendWeatherTable(val, bld);
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
-				} else if (vallc.startsWith(TAG_INFORMATION) || vallc.startsWith(TAG_ARTWORK)) {
+				} else if (vallc.startsWith(TAG_INFORMATION) || vallc.startsWith(TAG_ARTWORK) || vallc.startsWith("photograph") || vallc.startsWith("milim") || isInformationLikeTemplate(vallc)) {
 					parseInformationBlock(val, lang, webBlockResults, allLangs);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
@@ -425,6 +431,16 @@ public class WikiDatabasePreparation {
 	 * @param lang            The target language code to extract the description
 	 * @param webBlockResults A map to store the parsed author, date, and description fields
 	 */
+	/**
+	 * Checks if a template is information-like by looking for common metadata fields.
+	 * This allows processing templates like Book, Map, etc. that contain author/date/description fields.
+	 */
+	private static boolean isInformationLikeTemplate(String vallc) {
+		// Quick check: look for common metadata field names in the template
+		return vallc.contains("|" + FIELD_AUTHOR + "=") || vallc.contains("|" + FIELD_PHOTOGRAPHER + "=") || 
+			   vallc.contains("|" + FIELD_DATE + "=") || vallc.contains("|" + FIELD_DESCRIPTION + "=");
+	}
+
 	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs) throws IOException {
 		
 		if (webBlockResults == null) {
@@ -435,58 +451,47 @@ public class WikiDatabasePreparation {
 		String date = DEFAULT_STRING;
 		Map<String, String> description = new HashMap<>();
 		
-		final String INFORMATION = "Information";
-		final String ARTWORK = "Artwork";
-		final String AUTHOR = "author";
-		final String DATE = "date";
-		final String DESCRIPTION = "description";
-		
 		// Clean up the input string by removing extra spaces and newlines
 		val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
 		
 		List<String> parts = splitByPipeOutsideBraces(val, true);
 		
-		boolean inInformationBlock = false;
-		
+		// Process all parts looking for metadata fields (no need to check template name)
 		for (String line : parts) {
 			line = line.trim();
-			if (line.startsWith(INFORMATION) || line.startsWith(ARTWORK)) {
-				inInformationBlock = true;
-			}
+			String lineLc = line.toLowerCase();
 			
-			if (inInformationBlock) {
-				if (line.toLowerCase().startsWith(AUTHOR)) {
-					author = AuthorParser.parse(line);
-				}
-				if (line.toLowerCase().startsWith(DATE)) {
-					date = parseDate(line);
-				}
-				if (line.toLowerCase().startsWith(DESCRIPTION)) {
-					description = parseDescription(line);
-				}
+			if (lineLc.startsWith(FIELD_AUTHOR) || lineLc.startsWith(FIELD_PHOTOGRAPHER)) {
+				author = AuthorParser.parse(line);
+			}
+			if (lineLc.startsWith(FIELD_DATE)) {
+				date = parseDate(line);
+			}
+			if (lineLc.startsWith(FIELD_DESCRIPTION)) {
+				description = parseDescription(line);
 			}
 		}
         
-        webBlockResults.put(AUTHOR, author);
-        webBlockResults.put(DATE, date);
+        webBlockResults.put(FIELD_AUTHOR, author);
+        webBlockResults.put(FIELD_DATE, date);
 
 		if (Boolean.TRUE.equals(allLangs)) {
-			webBlockResults.put(DESCRIPTION, new Gson().toJson(description));
+			webBlockResults.put(FIELD_DESCRIPTION, new Gson().toJson(description));
 		} else {
 			for (Map.Entry<String, String> entry : description.entrySet()) {
 				if (entry.getKey().equals(lang)) {
-					webBlockResults.put(DESCRIPTION, entry.getValue());
+					webBlockResults.put(FIELD_DESCRIPTION, entry.getValue());
 				}
 			}
 
 			// If no description was found in the target language, fallback to English description (default language)
-			if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-				webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
+			if (!webBlockResults.containsKey(FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+				webBlockResults.put(FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
 			}
 
 			// If no description for English either, fallback to the first available description
-			if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
-				webBlockResults.put(DESCRIPTION, description.values().iterator().next());
+			if (!webBlockResults.containsKey(FIELD_DESCRIPTION) && !description.isEmpty()) {
+				webBlockResults.put(FIELD_DESCRIPTION, description.values().iterator().next());
 			}
 		}
     }

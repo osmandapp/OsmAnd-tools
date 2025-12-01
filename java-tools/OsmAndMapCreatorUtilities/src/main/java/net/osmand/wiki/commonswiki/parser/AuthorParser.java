@@ -37,12 +37,19 @@ public final class AuthorParser {
 
 	private static String stripAuthorPrefix(String line) {
 		line = line.trim();
-		if (line.toLowerCase().startsWith("author=")) {
+		String lineLc = line.toLowerCase();
+		if (lineLc.startsWith("author=")) {
 			return line.substring(7).trim();
-		} else if (line.startsWith("|") && line.substring(1).trim().toLowerCase().startsWith("author=")) {
-			int eqPos = line.indexOf("=");
-			if (eqPos != -1) {
-				return line.substring(eqPos + 1).trim();
+		} else if (lineLc.startsWith("photographer=")) {
+			return line.substring(13).trim();
+		} else if (line.startsWith("|")) {
+			String afterPipe = line.substring(1).trim();
+			String afterPipeLc = afterPipe.toLowerCase();
+			if (afterPipeLc.startsWith("author=") || afterPipeLc.startsWith("photographer=")) {
+				int eqPos = line.indexOf("=");
+				if (eqPos != -1) {
+					return line.substring(eqPos + 1).trim();
+				}
 			}
 		}
 		return line;

@@ -134,6 +134,21 @@ public class WikiAuthorParsingTest {
 		assertEquals("State Emergency Service of Ukraine", webResults.get("author"));
 	}
 
+	@Test
+	public void test18() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockPhotograph("|photographer=[https://500px.com/franciscoanzola Francisco Anzola]\n"), webResults);
+		assertEquals("Francisco Anzola", webResults.get("author"));
+	}
+
+	@Test
+	public void test19() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockMilim("|author=Petty Officer 1st Class Keith L. Darby\n|date=2009-07-24\n"), webResults);
+		assertEquals("Petty Officer 1st Class Keith L. Darby", webResults.get("author"));
+		assertEquals("2009-07-24", webResults.get("date"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
@@ -153,6 +168,22 @@ public class WikiAuthorParsingTest {
 	private static String artworkBlock(String content) {
 		return "=={{int:filedesc}}==\n" +
 				"{{Artwork\n" +
+				content +
+				"}}\n" +
+				"\n";
+	}
+
+	private static String blockPhotograph(String content) {
+		return "== {{int:filedesc}} ==\n" +
+				"{{Photograph\n" +
+				content +
+				"}}\n" +
+				"\n";
+	}
+
+	private static String blockMilim(String content) {
+		return "== {{int:filedesc}} ==\n" +
+				"{{milim\n" +
 				content +
 				"}}\n" +
 				"\n";
