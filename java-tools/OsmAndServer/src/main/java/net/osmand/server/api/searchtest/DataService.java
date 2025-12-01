@@ -622,15 +622,15 @@ public interface DataService extends BaseService {
 	SearchService getSearchService();
 
 	default ResultMetric toMetric(SearchResult r) {
-		return new ResultMetric(r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
-				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(),
+		return new ResultMetric(r.file == null ? "" : r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
+				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), r.location == null ? null :
 				MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0,
 				r.completeMatchRes.allWordsEqual, r.completeMatchRes.allWordsInPhraseAreInResult);
 	}
 
 	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
-	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
+	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
