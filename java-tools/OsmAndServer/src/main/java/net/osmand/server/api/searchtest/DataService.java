@@ -631,7 +631,7 @@ public interface DataService extends BaseService {
 	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, Record parent, ResultMetric metric) {}
+	record AddressResult(String name, String type, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
@@ -639,16 +639,24 @@ public interface DataService extends BaseService {
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
-			AddressResult rec = toResult(r);
+			AddressResult rec = toResult(r, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
 			results.add(rec);
 		}
 		return new ResultsWithStats(results, result.stat().wordsByApis);
 	}
 
-	default AddressResult toResult(SearchResult r) {
-		ResultMetric metric = toMetric(r);
-		String type = r.objectType.name().toLowerCase();
-		Record parent = r.parentSearchResult == null ? null : toResult(r.parentSearchResult);
-		return new AddressResult(r.toString(), type, parent, metric);
-	}
+    private AddressResult toResult(SearchResult r, java.util.Set<SearchResult> seen) {
+        if (r == null || r == r.parentSearchResult)
+            return null;
+
+	    ResultMetric metric = toMetric(r);
+	    String type = r.objectType.name().toLowerCase();
+
+	    // If we've already visited this node, break the cycle by not traversing further
+        if (!seen.add(r))
+            return new AddressResult(r.toString(), type, null, metric);
+
+	    AddressResult parent = toResult(r.parentSearchResult, seen);
+        return new AddressResult(r.toString(), type, parent, metric);
+    }
 }
