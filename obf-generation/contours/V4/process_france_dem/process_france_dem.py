@@ -2010,6 +2010,7 @@ class FranceDEMProcessor:
                 '-co', 'TILED=YES',
                 '-co', 'BLOCKXSIZE=256',
                 '-co', 'BLOCKYSIZE=256',
+                '-r', 'cubic',
                 '--config', 'GDAL_NUM_THREADS', 'ALL_CPUS',
                 '--config', 'GDAL_CACHEMAX', '2048',
                 merged_vrt, merged_tiff
