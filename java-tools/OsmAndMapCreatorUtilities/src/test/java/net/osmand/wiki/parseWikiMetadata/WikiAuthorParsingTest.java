@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
-import org.junit.Ignore;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiAuthorParsingTest {
@@ -59,63 +58,80 @@ public class WikiAuthorParsingTest {
 	}
 
 	@Test
-	public void test13() throws IOException, SQLException {
+	public void test7() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=[[User:Name]]\n"), webResults);
 		assertEquals("Name", webResults.get("author"));
 	}
 
 	@Test
-	public void test14() throws IOException, SQLException {
+	public void test8() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=[https://example.com SomeUser]\n"), webResults);
 		assertEquals("SomeUser", webResults.get("author"));
 	}
 
 	@Test
-	public void test7() throws IOException, SQLException {
+	public void test9() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author={{User:Name}}\n"), webResults);
 		assertEquals("Name", webResults.get("author"));
 	}
-	
-	@Ignore
+
 	@Test
-	public void test8() throws IOException, SQLException {
+	public void test10() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=[https://example.com]\n"), webResults);
 		assertEquals("Unknown", webResults.get("author"));
 	}
 
-	@Ignore
 	@Test
-	public void test9() throws IOException, SQLException {
+	public void test11() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author={{FlickreviewR|author=Adam Jones, Ph.D. - Global Photo Archive|other=value}}\n"), webResults);
 		assertEquals("Adam Jones", webResults.get("author"));
 	}
 
 	@Test
-	public void test10() throws IOException, SQLException {
+	public void test12() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author={{User:Ralf Roletschek/Autor}}\n"), webResults);
 		assertEquals("Ralf Roletschek", webResults.get("author"));
 	}
 
-	@Ignore
 	@Test
-	public void test11() throws IOException, SQLException {
+	public void test13() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=Name edited by Someone\n"), webResults);
 		assertEquals("Name", webResults.get("author"));
 	}
 
-	@Ignore
 	@Test
-	public void test12() throws IOException, SQLException {
+	public void test14() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=Publisher:Name\n"), webResults);
 		assertEquals("Name", webResults.get("author"));
+	}
+
+	@Test
+	public void test15() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author={{creator:Diego Delso}}\n"), webResults);
+		assertEquals("Diego Delso", webResults.get("author"));
+	}
+
+	@Test
+	public void test16() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=[[:en:State Emergency Service of Ukraine|State Emergency Service of Ukraine]]\n"), webResults);
+		assertEquals("State Emergency Service of Ukraine", webResults.get("author"));
+	}
+
+	@Test
+	public void test17() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=[[:en:State Emergency Service of Ukraine]]\n"), webResults);
+		assertEquals("State Emergency Service of Ukraine", webResults.get("author"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

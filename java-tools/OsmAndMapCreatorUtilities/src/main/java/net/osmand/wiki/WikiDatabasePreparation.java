@@ -64,6 +64,7 @@ import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
+import net.osmand.wiki.commonswiki.parser.AuthorParser;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
 public class WikiDatabasePreparation {
@@ -455,7 +456,7 @@ public class WikiDatabasePreparation {
 			
 			if (inInformationBlock) {
 				if (line.toLowerCase().startsWith(AUTHOR)) {
-					author = parseAuthor(line);
+					author = AuthorParser.parse(line);
 				}
 				if (line.toLowerCase().startsWith(DATE)) {
 					date = parseDate(line);
@@ -548,7 +549,7 @@ public class WikiDatabasePreparation {
 		}
 	}
 	
-	private static List<String> splitByPipeOutsideBraces(String input, boolean splitByPipe) {
+	public static List<String> splitByPipeOutsideBraces(String input, boolean splitByPipe) {
 		List<String> parts = new ArrayList<>();
 		StringBuilder currentPart = new StringBuilder();
 		int curlyBraceDepth = 0;  // To track the nesting level inside {{ }}
@@ -595,94 +596,6 @@ public class WikiDatabasePreparation {
 		
 		return parts;
 	}
-	
-	/**
-	 * Examples:
-	 * |author=[https://web.archive.org/web/20161031223609/http://www.panoramio.com/user/4678999?with_photo_id=118704129 Ben Bender] => Ben Bender
-	 * |author={{Creator:Johannes Petrus Albertus Antonietti}} => Johannes Petrus Albertus Antonietti
-	 * |author=[[User:PersianDutchNetwork|PersianDutchNetwork]] => PersianDutchNetwork
-	 * |author=[[User]] => User  // case when there's no pipe character
-	 * |author=[https://example.com SomeUser] => SomeUser
-	 * |author=[https://example.com] => Unknown  // when there is no name after the URL
-	 * |author={{User:Ralf Roletschek/Autor}} => Ralf Roletschek  // specific case for User template
-	 * |author={{self2|GFDL|cc-by-sa-3.0|author=[[User:Butko|Andrew Butko]]}} => Andrew Butko
-	 * |author={{FlickreviewR|author=Adam Jones, Ph.D. - Global Photo Archive|...}} => Adam Jones, Ph.D.  // Stop at first comma
-	 */
-	private static String parseAuthor(String line) {
-		String author = DEFAULT_STRING;
-		
-		if (line.toLowerCase().matches(".*author\\s*=\\s*.*")) {
-			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
-		}
-		
-		List<String> templatesToHandle = Arrays.asList("User", "Creator");
-		List<String> parts = splitByPipeOutsideBraces(line, true);
-		
-		for (String part : parts) {
-			if (part.contains("edited by")) {
-				part = part.substring(0, part.indexOf("edited by")).trim();
-			}
-			if (part.startsWith("Publisher:")) {
-				part = part.substring("Publisher:".length()).trim();
-			}
-			if (part.startsWith("{{") && part.contains("|")) {
-				if (part.contains("author=")) {
-					String authorPart = part.substring(part.indexOf("author=") + 7).trim();
-					if (authorPart.contains("[[") && authorPart.contains("]]")) {
-						int start = authorPart.indexOf("[[") + 2;
-						int end = authorPart.indexOf("]]");
-						author = authorPart.substring(start, end).split("\\|").length > 1
-								? authorPart.split("\\|")[1].trim()
-								: authorPart.substring(start, end).trim();
-					} else if (authorPart.contains(",")) {
-						author = authorPart.split(",")[0].trim();
-					} else {
-						author = authorPart.trim();
-					}
-				} else {
-					int start = part.indexOf("|") + 1;
-					int end = part.lastIndexOf("}}");
-					if (end != -1 && start < end) {
-						author = part.substring(start, end).trim();
-					}
-				}
-				break;
-			} else if (part.startsWith("[http") && part.contains(" ")) {
-				author = part.substring(part.indexOf(" ") + 1, part.indexOf("]")).trim();
-				break;
-			} else if (part.startsWith("[http") && !part.contains(" ")) {
-				author = DEFAULT_STRING;
-				break;
-			}
-			
-			for (String template : templatesToHandle) {
-				if (part.startsWith("{{" + template + ":") || part.startsWith("[[" + template + ":")) {
-					int start = part.indexOf(":") + 1;
-					int end = part.indexOf("/", start);
-					
-					if (end == -1) {
-						end = part.indexOf(part.startsWith("{{") ? "}}" : "]]", start);
-					}
-					
-					String userSection = part.substring(start, end).trim();
-					
-					if (userSection.contains("|")) {
-						author = userSection.split("\\|")[1].trim();
-					} else {
-						author = userSection.trim();
-					}
-					break;
-				}
-			}
-		}
-		
-		if (parts.size() == 1 && author.equals(DEFAULT_STRING)) {
-			author = parts.get(0).trim();
-		}
-		author = author.replaceAll("\\[+|]+", "");
-		return author;
-	}
-	
 	
 	/**
 	 * Examples:
@@ -2088,3 +2001,4 @@ public class WikiDatabasePreparation {
 	}
 
 }
+
