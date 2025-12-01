@@ -631,7 +631,7 @@ public interface DataService extends BaseService {
 	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, AddressResult parent, ResultMetric metric) {}
+	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
@@ -654,9 +654,9 @@ public interface DataService extends BaseService {
 
 	    // If we've already visited this node, break the cycle by not traversing further
         if (!seen.add(r))
-            return new AddressResult(r.toString(), type, null, metric);
+            return new AddressResult(r.toString(), type, r.addressName, null, metric);
 
 	    AddressResult parent = toResult(r.parentSearchResult, seen);
-        return new AddressResult(r.toString(), type, parent, metric);
+        return new AddressResult(r.toString(), type, r.addressName, parent, metric);
     }
 }
