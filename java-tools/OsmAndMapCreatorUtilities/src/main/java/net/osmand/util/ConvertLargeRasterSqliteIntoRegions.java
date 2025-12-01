@@ -76,7 +76,7 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		File sqliteFile = new File(args[0]);
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
-		String filter = null; // mauritius
+		Set<String> filters = new HashSet<>(); // mauritius
 		String prefix = "Hillshade_";
 		String regionAttribute = null;
 		
@@ -100,9 +100,12 @@ public class ConvertLargeRasterSqliteIntoRegions {
 				regionAttribute = args[i].substring("--region-ocbf-attr=".length());
 				
 			} else if (args[i].startsWith("--filter=")) {
-				filter = args[i].substring("--filter=".length());
-				if (filter.length() == 0) {
-					filter = null;
+				String f = args[i].substring("--filter=".length());
+				if(f.length() > 0) {
+					String[] fs = f.split(",");
+					for (String ff : fs) {
+						filters.add(ff.trim());
+					}
 				}
 			}
 		}
@@ -117,8 +120,20 @@ public class ConvertLargeRasterSqliteIntoRegions {
 		Set<String> failedCountries = new HashSet<String>();
 		for (String fullName : allCountries.keySet()) {
 			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
-			if (fullName == null || (filter != null && !fullName.contains(filter))) {
+			if (fullName == null) {
 				continue;
+			}
+			if (!filters.isEmpty()) {
+				boolean matches = false;
+				for (String filt : filters) {
+					if (fullName.contains(filt)) {
+						matches = true;
+						break;
+					}
+				}
+				if (!matches) {
+					continue;
+				}
 			}
 			BinaryMapDataObject rc = null;
 			for (BinaryMapDataObject r : lst) {

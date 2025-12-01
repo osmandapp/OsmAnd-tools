@@ -89,11 +89,33 @@ public class TileListsForRegions {
 		int boundary = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1;
 		Set<String> failedCountries = new HashSet<String>();
+		Set<String> filters = new HashSet<String>();
+		if (filter != null) {
+			String[] split = filter.split(",");
+			for (String s : split) {
+				String trimmed = s.trim();
+				if (!trimmed.isEmpty()) {
+					filters.add(trimmed);
+				}
+			}
+		}
 		for (String fullName : allCountries.keySet()) {
-			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
-			if (fullName == null || (filter != null && !fullName.contains(filter))) {
+			if (fullName == null) {
 				continue;
 			}
+			boolean matches = filters.isEmpty();
+			if (!matches) {
+				for (String f : filters) {
+					if (fullName.contains(f)) {
+						matches = true;
+						break;
+					}
+				}
+			}
+			if (!matches) {
+				continue;
+			}
+			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
 			BinaryMapDataObject rc = null;
 			for (BinaryMapDataObject r : lst) {
 				if (!r.containsType(boundary)) {

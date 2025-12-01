@@ -12,6 +12,7 @@ import faiss
 import numpy as np
 import requests
 import torch
+from clickhouse_driver.errors import SocketTimeoutError, ServerException
 from transformers import CLIPModel, CLIPImageProcessor
 
 from python.lib.QueueThreadPoolExecutor import BoundedThreadPoolExecutor
@@ -108,73 +109,87 @@ def _get_images(image_paths: List[ImageItem]) -> Tuple[List, List[str], List[int
 def process_place(run_id: int, place_id, is_selected: bool, media_ids: List[int]):
     started = datetime.now()
     start_time = time.time()
-    try:
-        paths = get_image_dups(place_id)
-        if len(media_ids) > 0:
-            new_paths = [row.path for row in paths if row.media_id in media_ids]
-        elif not is_selected:
-            new_paths = [row.path for row in paths if not row.is_processed]
-        else:
-            new_paths = []
+    for attempt in range(1, 4):
+        try:
+            paths = get_image_dups(place_id)
+            if len(media_ids) > 0:
+                new_paths = [row.path for row in paths if row.media_id in media_ids]
+            elif not is_selected:
+                new_paths = [row.path for row in paths if not row.is_processed]
+            else:
+                new_paths = []
 
-        if not is_selected and len(new_paths) == 0:
-            print(f"#{current_thread().name}. Place {place_id} is up to date. Time: {(time.time() - start_time):.0f}s", flush=True)
+            if not is_selected and len(new_paths) == 0:
+                print(f"#{current_thread().name}. Place {place_id} is up to date. Time: {(time.time() - start_time):.0f}s", flush=True)
+                return False, place_id
+
+            print(
+                f"#{current_thread().name}. Place {place_id} with {len(paths)}/{len(new_paths)} images are going to be loaded. Expected time: {(len(paths) / 60 * 0.55):.1f}min",
+                flush=True)
+            images, image_paths, sizes = _get_images(paths)
+            if len(images) == 0:
+                print(f"#{current_thread().name}. Warning: Place Q{place_id} with {len(images)} images is skipped.")
+                insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, "No images.", SAVE_SCORE_ENV)
+                return False, place_id
+
+            rng = range(len(images)) if len(new_paths) == 0 else [image_paths.index(n) for n in new_paths if n in image_paths]
+            sims = duplicates_similarity(images, image_paths, rng)
+
+            sims_sym = [(k, v) for k, v in sims.items() if (k[1], k[0]) not in sims]
+            for k, v in sims_sym:
+                sims[k[1], k[0]] = v
+
+            sim_maps = {n: [] for n in image_paths}
+            for k, v in sims.items():
+                sim_maps[k[0]].append((k[1], v))
+            sim_maps = {k: v for k, v in sim_maps.items() if len(v) > 0}
+
+            insert_dups(run_id, place_id, {image_paths[i]: s for i, s in enumerate(sizes)}, sim_maps, started, time.time() - start_time, '', SAVE_SCORE_ENV)
+            print(
+                f"#{current_thread().name}. Place {place_id} with {len(images)}/{len(sim_maps)} image's similarity are saved. Time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
+                flush=True)
             return False, place_id
-
-        print(
-            f"#{current_thread().name}. Place {place_id} with {len(paths)}/{len(new_paths)} images are going to be loaded. Expected time: {(len(paths) / 60 * 0.55):.1f}min",
-            flush=True)
-        images, image_paths, sizes = _get_images(paths)
-        if len(images) == 0:
-            print(f"#{current_thread().name}. Warning: Place Q{place_id} with {len(images)} images is skipped.")
-            insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, "No images.", SAVE_SCORE_ENV)
+        except (
+                requests.exceptions.ConnectionError,
+                clickhouse_connect.driver.exceptions.DatabaseError,
+                SocketTimeoutError,
+                ServerException
+        ) as e:
+            print(f"#{current_thread().name}. Warning: Could not process place Q{place_id}: {e} Attempt {attempt} from 3. Need to wait 30 sec and retry again ...")
+            time.sleep(30)
+            if attempt == 3:
+                print(f"#{current_thread().name}. STOPPED place {place_id} after 3 attempts due to repeated connection/database timeout errors.")
+                insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, f"{e}", SAVE_SCORE_ENV)
+                return True, place_id
+        except Exception as e:
+            traceback.print_exc()
+            print(f"#{current_thread().name}. Error for place Q{place_id}: {e}")
+            insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, f"{e}", SAVE_SCORE_ENV)
             return False, place_id
-
-        rng = range(len(images)) if len(new_paths) == 0 else [image_paths.index(n) for n in new_paths if n in image_paths]
-        sims = duplicates_similarity(images, image_paths, rng)
-
-        sims_sym = [(k, v) for k, v in sims.items() if (k[1], k[0]) not in sims]
-        for k, v in sims_sym:
-            sims[k[1], k[0]] = v
-
-        sim_maps = {n: [] for n in image_paths}
-        for k, v in sims.items():
-            sim_maps[k[0]].append((k[1], v))
-        sim_maps = {k: v for k, v in sim_maps.items() if len(v) > 0}
-
-        insert_dups(run_id, place_id, {image_paths[i]: s for i, s in enumerate(sizes)}, sim_maps, started, time.time() - start_time, '', SAVE_SCORE_ENV)
-        print(
-            f"#{current_thread().name}. Place {place_id} with {len(images)}/{len(sim_maps)} image's similarity are saved. Time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
-            flush=True)
-    except (
-            requests.exceptions.ConnectionError,
-            clickhouse_connect.driver.exceptions.DatabaseError,
-    ) as e:
-        print(f"#{current_thread().name}. Warning: Could not process place Q{place_id}: {e}. Need to wait 30 sec and retry again ...")
-        time.sleep(30)
-    except Exception as e:
-        traceback.print_exc()
-        print(f"#{current_thread().name}. Error for place Q{place_id}: {e}")
-        insert_dups(run_id, place_id, {}, {}, started, time.time() - start_time, f"{e}", SAVE_SCORE_ENV)
-        return True, place_id
 
     return False, place_id
 
 
 stop_immediately = False
 total_place_count = 0
+abnormal = False
 
 
 def done_callback(future):
-    global stop_immediately, total_place_count
+    global stop_immediately, total_place_count, abnormal
 
-    stop, place = future.result()
-    if stop:
-        stop_immediately = True
-    total_place_count += 1
+    try:
+        stop, place = future.result()
+        if stop:
+            stop_immediately = True
+        total_place_count += 1
+    except Exception:
+        # Unexpected error surfaced from worker -> mark abnormal to exit with code 1
+        traceback.print_exc()
+        abnormal = True
 
 
-def find_duplicates():
+def find_duplicates() -> bool:
     run_id = get_dups_run_max_id() + 1
     media_ids = [int(p.strip()) for p in SELECTED_MEDIA_IDS.split(',') if p.strip() != '']
     place_ids = [str(p.strip()) for p in SELECTED_PLACE_IDS.split(',') if p.strip() != '']
@@ -204,10 +219,12 @@ def find_duplicates():
     except Exception as e:
         traceback.print_exc()
         print(f"Error processing batch: {e}")
+        return True
 
     print(
         f"Run #{run_id} finished. Places: {total_place_count}. Stop: {stop_immediately}, Total time: {(time.time() - start_time):.0f}s, Timestamp: {datetime.now()}",
         flush=True)
+    return False
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
@@ -233,8 +250,9 @@ if __name__ == "__main__":
     status_thread.start()
     try:
         with executor:
-            find_duplicates()
-        if stop_immediately:
+            # Combine abnormal from batch-level and worker-level exceptions
+            abnormal = find_duplicates() or abnormal
+        if stop_immediately or abnormal:
             raise SystemExit(1)
     finally:
         is_done = True

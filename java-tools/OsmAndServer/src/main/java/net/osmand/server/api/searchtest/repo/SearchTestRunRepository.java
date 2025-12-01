@@ -48,18 +48,17 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 		@JoinColumn(name = "dataset_id", referencedColumnName = "id", insertable = false, updatable = false)
 		public Dataset dataset;
 
-		@CreationTimestamp
-		public LocalDateTime timestamp;
-
 		@Enumerated(EnumType.STRING)
 		@Column(nullable = false)
 		public Status status;
 
 		@CreationTimestamp
 		public LocalDateTime created;
-
 		@UpdateTimestamp
 		public LocalDateTime updated;
+
+		public LocalDateTime start;
+		public LocalDateTime finish;
 
 		@Column(columnDefinition = "TEXT")
 		private String error;

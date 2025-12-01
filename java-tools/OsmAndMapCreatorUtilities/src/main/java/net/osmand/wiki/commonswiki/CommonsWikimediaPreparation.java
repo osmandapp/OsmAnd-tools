@@ -38,6 +38,7 @@ public class CommonsWikimediaPreparation {
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
 
+
 	public static void main(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
 	}
