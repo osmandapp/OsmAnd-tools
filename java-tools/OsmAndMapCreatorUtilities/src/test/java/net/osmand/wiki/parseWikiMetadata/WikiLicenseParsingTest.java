@@ -64,6 +64,23 @@ public class WikiLicenseParsingTest {
 		assertEquals("NO KNOWN COPYRIGHT RESTRICTIONS", webResults.get("license"));
 	}
 
+	@Test
+	public void test8() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockPhotograph("| Permission     = {{Cc-by-3.0}}\n"), webResults);
+		assertEquals("CC-BY-3.0", webResults.get("license"));
+	}
+
+	@Test
+	public void test9() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockMilim("| author = Author\n") +
+				"== {{int:license-header}} ==\n" +
+				"{{PD-USGov-Military-Navy}}\n" +
+				"\n", webResults);
+		assertEquals("PD USGOV-MILITARY-NAVY", webResults.get("license"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
@@ -82,6 +99,22 @@ public class WikiLicenseParsingTest {
 	private static String informationBlock(String content) {
 		return "=={{int:filedesc}}==\n" +
 				"{{Information\n" +
+				content +
+				"}}\n" +
+				"\n";
+	}
+
+	private static String blockPhotograph(String content) {
+		return "== {{int:filedesc}} ==\n" +
+				"{{Photograph\n" +
+				content +
+				"}}\n" +
+				"\n";
+	}
+
+	private static String blockMilim(String content) {
+		return "== {{int:filedesc}} ==\n" +
+				"{{milim\n" +
 				content +
 				"}}\n" +
 				"\n";
