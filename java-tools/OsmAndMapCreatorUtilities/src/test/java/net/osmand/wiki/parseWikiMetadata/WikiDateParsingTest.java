@@ -53,7 +53,7 @@ public class WikiDateParsingTest {
 	@Test
 	public void test6() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(informationBlock("|date={{Taken on|2014-03-09|location=Netherlands}}\n"), webResults);
+		invoke(informationBlock("|date={{Taken on|2014-03-09|location=Test Location}}\n"), webResults);
 		assertEquals("2014-03-09", webResults.get("date"));
 	}
 

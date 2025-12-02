@@ -18,7 +18,7 @@ public class WikiLicenseParsingTest {
 	@Test
 	public void test1() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(licenseBlockWithTemplate("{{Self|author={{user at project|MelvinvdC|wikipedia|nl}}|GFDL|CC-BY-SA-2.5|migration=relicense}}"), webResults);
+		invoke(licenseBlockWithTemplate("{{Self|author={{user at project|TestUser|testwiki|en}}|GFDL|CC-BY-SA-2.5|migration=relicense}}"), webResults);
 		assertEquals("SELF - GFDL - CC BY-SA-2.5 - MIGRATION=RELICENSE", webResults.get("license"));
 	}
 
@@ -53,14 +53,14 @@ public class WikiLicenseParsingTest {
 	@Test
 	public void test6() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(informationBlock("|permission={{cc-by-sa-3.0|ekstijn}}\n"), webResults);
+		invoke(informationBlock("|permission={{cc-by-sa-3.0|TestUser}}\n"), webResults);
 		assertEquals("CC-BY-SA-3.0", webResults.get("license"));
 	}
 
 	@Test
 	public void test7() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(informationBlock("|permission={{User:FlickreviewR/reviewed-pass|Nationaal Archief|https://flickr.com/photos/29998366@N02/2949392968|2016-11-27 10:53:09|No known copyright restrictions|}}\n"), webResults);
+		invoke(informationBlock("|permission={{User:FlickreviewR/reviewed-pass|Test Archive|https://example.com/photo/123|2016-11-27 10:53:09|No known copyright restrictions|}}\n"), webResults);
 		assertEquals("NO KNOWN COPYRIGHT RESTRICTIONS", webResults.get("license"));
 	}
 

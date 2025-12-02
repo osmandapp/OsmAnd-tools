@@ -18,8 +18,8 @@ public class WikiDescriptionParsingTest {
 	@Test
 	public void test1() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(informationBlock("|description={{uk|1=Kyiv Pechersk Lavra}}\n"), webResults, "uk");
-		assertEquals("Kyiv Pechersk Lavra", webResults.get("description"));
+		invoke(informationBlock("|description={{uk|1=Test Place}}\n"), webResults, "uk");
+		assertEquals("Test Place", webResults.get("description"));
 	}
 
 	@Test
@@ -46,8 +46,8 @@ public class WikiDescriptionParsingTest {
 	@Test
 	public void test5() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(blockPhotograph("| Description    = 500px provided description: Kyiv [#church ,#cathedral ,#eastern orthodox ,#Ukraine ,#Kyiv ,#Kiev ,#St. Sophia]\n"), webResults, "en");
-		assertEquals("Kyiv [#church ,#cathedral ,#eastern orthodox ,#Ukraine ,#Kyiv ,#Kiev ,#St. Sophia]", webResults.get("description"));
+		invoke(blockPhotograph("| Description    = 500px provided description: TestCity [#tag1 ,#tag2 ,#tag3]\n"), webResults, "en");
+		assertEquals("TestCity [#tag1 ,#tag2 ,#tag3]", webResults.get("description"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults, String lang)
