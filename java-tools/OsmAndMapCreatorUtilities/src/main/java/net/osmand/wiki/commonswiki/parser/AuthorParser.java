@@ -245,8 +245,11 @@ public final class AuthorParser {
 
 	private static String extractNameFromWikiLink(String linkText) {
 		if (linkText.contains(":")) {
-			int lastColonPos = linkText.lastIndexOf(":");
-			return cleanAuthor(linkText.substring(lastColonPos + 1).trim());
+			if (linkText.startsWith(":")) {
+				linkText = linkText.substring(1);
+			}
+			String[] parts = linkText.split(":");
+			return cleanAuthor(parts[parts.length - 1].trim());
 		}
 		return cleanAuthor(linkText);
 	}

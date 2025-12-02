@@ -170,6 +170,13 @@ public class WikiAuthorParsingTest {
 		assertEquals("TestAuthor (1920-1993)", webResults.get("author"));
 	}
 
+	@Test
+	public void test23() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=[[:nl:Gebruiker:TestUser]]\n"), webResults);
+		assertEquals("TestUser", webResults.get("author"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
