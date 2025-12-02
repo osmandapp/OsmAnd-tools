@@ -149,6 +149,27 @@ public class WikiAuthorParsingTest {
 		assertEquals("2009-07-24", webResults.get("date"));
 	}
 
+	@Test
+	public void test20() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author={{Author assumed|[[User:TestUser~commonswiki|TestUser~commonswiki]]}}\n"), webResults);
+		assertEquals("TestUser~commonswiki", webResults.get("author"));
+	}
+
+	@Test
+	public void test21() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author={{various}}\n"), webResults);
+		assertEquals("various", webResults.get("author"));
+	}
+
+	@Test
+	public void test22() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=[[:Category:TestAuthor|TestAuthor (1920-1993)]]\n"), webResults);
+		assertEquals("TestAuthor (1920-1993)", webResults.get("author"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

@@ -71,6 +71,15 @@ public final class AuthorParser {
 			return fromAuthorParam;
 		}
 
+		// Try to extract author from template parameters (skip template name)
+		for (int i = 1; i < params.size(); i++) {
+			String param = params.get(i).trim();
+			String result = tryPartFormats(param);
+			if (result != null) {
+				return result;
+			}
+		}
+
 		return tryUserCreatorFromTemplateName(params.get(0).trim());
 	}
 
@@ -102,6 +111,11 @@ public final class AuthorParser {
 		String extracted = extractUserCreatorName(content);
 		if (extracted != null) {
 			return cleanAuthor(extracted);
+		}
+
+		// For simple templates like {{various}}, return the template name
+		if (isSimpleText(content)) {
+			return cleanAuthor(content);
 		}
 
 		return null;

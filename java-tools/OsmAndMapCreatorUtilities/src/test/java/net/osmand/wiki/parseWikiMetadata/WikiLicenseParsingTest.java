@@ -81,6 +81,16 @@ public class WikiLicenseParsingTest {
 		assertEquals("PD USGOV-MILITARY-NAVY", webResults.get("license"));
 	}
 
+	@Test
+	public void test10() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author={{unknown|author}}\n") +
+				"== {{int:license-header}} ==\n" +
+				"{{PD-art}}\n" +
+				"\n", webResults);
+		assertEquals("PD ART", webResults.get("license"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
