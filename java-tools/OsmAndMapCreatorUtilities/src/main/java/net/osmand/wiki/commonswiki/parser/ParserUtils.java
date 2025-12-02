@@ -35,27 +35,29 @@ public final class ParserUtils {
 
 		line = line.trim();
 		String lineLc = line.toLowerCase();
-		String fieldNameLc = fieldName.toLowerCase() + "=";
+		String fieldNameLc = fieldName.toLowerCase();
 
-		// Check if line starts with field name followed by =
-		if (lineLc.startsWith(fieldNameLc)) {
-			return line.substring(fieldName.length() + 1).trim();
-		}
-
-		// Check if line starts with |fieldName=
+		// Remove leading '|' if present
 		if (line.startsWith("|")) {
-			String afterPipe = line.substring(1).trim();
-			if (afterPipe.toLowerCase().startsWith(fieldNameLc)) {
-				int eqPos = line.indexOf("=");
-				if (eqPos != -1) {
-					return line.substring(eqPos + 1).trim();
-				}
-			}
+			line = line.substring(1).trim();
+			lineLc = line.toLowerCase();
 		}
 
-		// Check if field name appears anywhere in the line (for regex matching with spaces)
-		if (lineLc.matches(".*" + fieldName.toLowerCase() + "\\s*=\\s*.*")) {
-			return line.replaceFirst("(?i).*" + fieldName + "\\s*=\\s*", "").trim();
+		// Try to find the field name case-insensitively and then the '=' after it
+		int idx = lineLc.indexOf(fieldNameLc);
+		while (idx != -1) {
+			int afterName = idx + fieldNameLc.length();
+			// Next non-space char after field name must be '=' to be considered a match
+			int pos = afterName;
+			while (pos < lineLc.length() && Character.isWhitespace(lineLc.charAt(pos))) {
+				pos++;
+			}
+			if (pos < lineLc.length() && lineLc.charAt(pos) == '=') {
+				// Extract everything after '=' as value
+				return line.substring(pos + 1).trim();
+			}
+			// Look for next occurrence to avoid ReDoS-style regexes
+			idx = lineLc.indexOf(fieldNameLc, afterName);
 		}
 
 		return null;
