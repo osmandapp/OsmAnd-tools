@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.*;
 
 import javax.xml.parsers.SAXParser;
@@ -74,11 +75,13 @@ public class WikiDataHandler extends DefaultHandler {
 		this.lastProcessedId = lastProcessedId;
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
-				+ " osmtype int, osmid bigint, poitype text, poisubtype text, labelsJson text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, bcp47Lang text, title text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
+		try (Statement stmt = conn.createStatement()) {
+			stmt.execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, " +
+					"wlat double, wlon double, osmtype int, osmid bigint, poitype text, poisubtype text, labelsJson text)");
+			stmt.execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, bcp47Lang text, title text)");
+			stmt.execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
+			stmt.execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
+		}
 		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson) "
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, bcp47Lang, title) VALUES (?, ?, ?, ?)");
@@ -100,27 +103,28 @@ public class WikiDataHandler extends DefaultHandler {
         }
     }
 
-    public void finish() throws SQLException {
-        log.info("Total accepted: " + count);
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_bcp47_title_idx ON wiki_mapping(bcp47Lang, title)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
-        conn.createStatement().execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
-	    conn.createStatement().execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_region_idx on wiki_region(id, regionName)");
-		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS wikidata_properties_idx on wikidata_properties(id)");
-
-        coordsPrep.executeBatch();
-        mappingPrep.executeBatch();
-        if (!conn.getAutoCommit()) {
-            conn.commit();
-        }
-        mappingPrep.close();
-        coordsPrep.close();
-        conn.close();
-    }
+	public void finish() throws SQLException {
+		log.info("Total accepted: " + count);
+		try (Statement stmt = conn.createStatement()) {
+			stmt.execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS map_bcp47_title_idx ON wiki_mapping(bcp47Lang, title)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
+			stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_region_idx on wiki_region(id, regionName)");
+			stmt.execute("CREATE INDEX IF NOT EXISTS wikidata_properties_idx on wikidata_properties(id)");
+		}
+		coordsPrep.executeBatch();
+		mappingPrep.executeBatch();
+		if (!conn.getAutoCommit()) {
+			conn.commit();
+		}
+		mappingPrep.close();
+		coordsPrep.close();
+		conn.close();
+	}
 
     public void setLastProcessedId(Long lastProcessedId) {
 		this.lastProcessedId = lastProcessedId;
