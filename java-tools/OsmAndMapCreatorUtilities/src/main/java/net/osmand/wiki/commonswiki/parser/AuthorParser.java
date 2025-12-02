@@ -5,6 +5,9 @@ import java.util.List;
 
 import net.osmand.wiki.WikiDatabasePreparation;
 
+import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_AUTHOR;
+import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_PHOTOGRAPHER;
+
 /**
  * Parser for Wikimedia/Commons author fields (e.g. values of the {@code |author=} parameter
  * inside {{Information}} / {{Artwork}} templates).
@@ -13,6 +16,10 @@ import net.osmand.wiki.WikiDatabasePreparation;
  * templates (Creator/User/self/FlickreviewR, etc.), wikilinks, external links and plain text.
  */
 public final class AuthorParser {
+
+	private AuthorParser() {
+		// Utility class - no instantiation
+	}
 
 	public static String parse(String line) {
 		String normalized = stripAuthorPrefix(line);
@@ -36,23 +43,15 @@ public final class AuthorParser {
 	}
 
 	private static String stripAuthorPrefix(String line) {
-		line = line.trim();
-		String lineLc = line.toLowerCase();
-		if (lineLc.startsWith("author=")) {
-			return line.substring(7).trim();
-		} else if (lineLc.startsWith("photographer=")) {
-			return line.substring(13).trim();
-		} else if (line.startsWith("|")) {
-			String afterPipe = line.substring(1).trim();
-			String afterPipeLc = afterPipe.toLowerCase();
-			if (afterPipeLc.startsWith("author=") || afterPipeLc.startsWith("photographer=")) {
-				int eqPos = line.indexOf("=");
-				if (eqPos != -1) {
-					return line.substring(eqPos + 1).trim();
-				}
-			}
+		String authorValue = ParserUtils.extractFieldValue(line, FIELD_AUTHOR);
+		if (authorValue != null) {
+			return authorValue;
 		}
-		return line;
+		String photographerValue = ParserUtils.extractFieldValue(line, FIELD_PHOTOGRAPHER);
+		if (photographerValue != null) {
+			return photographerValue;
+		}
+		return line.trim();
 	}
 
 	private static String tryFromTemplateWithPipes(String line) {
@@ -61,7 +60,7 @@ public final class AuthorParser {
 		}
 
 		String templateContent = line.substring(2, line.length() - 2);
-		List<String> params = WikiDatabasePreparation.splitByPipeOutsideBraces(templateContent, true);
+		List<String> params = ParserUtils.splitByPipeOutsideBraces(templateContent, true);
 
 		if (params.isEmpty()) {
 			return null;
@@ -124,7 +123,7 @@ public final class AuthorParser {
 	}
 
 	private static String tryFromParts(String line) {
-		List<String> parts = WikiDatabasePreparation.splitByPipeOutsideBraces(line, true);
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(line, true);
 
 		for (String part : parts) {
 			String result = tryPartFormats(part.trim());
@@ -221,7 +220,7 @@ public final class AuthorParser {
 		}
 
 		String linkContent = part.substring(2, part.length() - 2);
-		List<String> linkParts = WikiDatabasePreparation.splitByPipeOutsideBraces(linkContent, true);
+		List<String> linkParts = ParserUtils.splitByPipeOutsideBraces(linkContent, true);
 
 		if (linkParts.size() > 1) {
 			return cleanAuthor(linkParts.get(1).trim());
@@ -274,7 +273,7 @@ public final class AuthorParser {
 	}
 
 	private static String extractUserSectionName(String userSection) {
-		List<String> userParts = WikiDatabasePreparation.splitByPipeOutsideBraces(userSection, true);
+		List<String> userParts = ParserUtils.splitByPipeOutsideBraces(userSection, true);
 		if (userParts.size() > 1) {
 			return cleanAuthor(userParts.get(1).trim());
 		}
@@ -316,15 +315,11 @@ public final class AuthorParser {
 	 * Cleans up the author string, removing brackets and extra formatting.
 	 */
 	private static String cleanAuthor(String author) {
-		if (author.equals(WikiDatabasePreparation.DEFAULT_STRING)) {
-			return author;
+		if (author == null || author.equals(WikiDatabasePreparation.DEFAULT_STRING)) {
+			return WikiDatabasePreparation.DEFAULT_STRING;
 		}
-		// Remove brackets and pipes
-		author = author.replaceAll("\\[+|]+", "");
-		// Remove template markers if any
-		author = author.replaceAll("\\{\\{|\\}\\}", "");
-		// Clean up whitespace
-		author = author.trim();
+		String cleaned = ParserUtils.removeWikiMarkup(author);
+		author = cleaned.trim();
 		return author.isEmpty() ? WikiDatabasePreparation.DEFAULT_STRING : author;
 	}
 }

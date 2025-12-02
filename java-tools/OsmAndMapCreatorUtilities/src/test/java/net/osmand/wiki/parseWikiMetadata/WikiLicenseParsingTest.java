@@ -1,7 +1,6 @@
 package net.osmand.wiki.parseWikiMetadata;
 
 import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -44,28 +43,25 @@ public class WikiLicenseParsingTest {
 		assertEquals("RCE-LICENSE", webResults.get("license"));
 	}
 
-	@Ignore
 	@Test
 	public void test5() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|license={{cc-by-sa-3.0|Author Name}}\n"), webResults);
-		assertEquals("cc-by-sa-3.0", webResults.get("license"));
+		assertEquals("CC-BY-SA-3.0", webResults.get("license"));
 	}
 
-	@Ignore
 	@Test
 	public void test6() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|permission={{cc-by-sa-3.0|ekstijn}}\n"), webResults);
-		assertEquals("cc-by-sa-3.0", webResults.get("license"));
+		assertEquals("CC-BY-SA-3.0", webResults.get("license"));
 	}
 
-	@Ignore
 	@Test
 	public void test7() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|permission={{User:FlickreviewR/reviewed-pass|Nationaal Archief|https://flickr.com/photos/29998366@N02/2949392968|2016-11-27 10:53:09|No known copyright restrictions|}}\n"), webResults);
-		assertEquals("No known copyright restrictions", webResults.get("license"));
+		assertEquals("NO KNOWN COPYRIGHT RESTRICTIONS", webResults.get("license"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

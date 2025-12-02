@@ -57,6 +57,13 @@ public class WikiDateParsingTest {
 		assertEquals("2014-03-09", webResults.get("date"));
 	}
 
+	@Test
+	public void test7() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockPhotograph("|Date=2017-09-15 09:36:26 (UTC)\n"), webResults);
+		assertEquals("2017-09-15", webResults.get("date"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
@@ -68,6 +75,14 @@ public class WikiDateParsingTest {
 	private static String informationBlock(String content) {
 		return "=={{int:filedesc}}==\n" +
 				"{{Information\n" +
+				content +
+				"}}\n" +
+				"\n";
+	}
+
+	private static String blockPhotograph(String content) {
+		return "== {{int:filedesc}} ==\n" +
+				"{{Photograph\n" +
 				content +
 				"}}\n" +
 				"\n";
