@@ -19,7 +19,7 @@ public class WikiLicenseParsingTest {
 	public void test1() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(licenseBlockWithTemplate("{{Self|author={{user at project|TestUser|testwiki|en}}|GFDL|CC-BY-SA-2.5|migration=relicense}}"), webResults);
-		assertEquals("SELF - GFDL - CC BY-SA-2.5 - MIGRATION=RELICENSE", webResults.get("license"));
+		assertEquals("SELF - GFDL - CC BY-SA-2.5", webResults.get("license"));
 	}
 
 	@Test
@@ -99,6 +99,16 @@ public class WikiLicenseParsingTest {
 				"{{FlickreviewR|status=passed|author=TestAuthor|sourceurl=https://example.com/photo|archive=|reviewdate=2023-07-01 18:54:15|reviewlicense=Public Domain Mark|reviewer=FlickreviewR 2}}{{PD-USGov-DOS}}\n" +
 				"\n", webResults);
 		assertEquals("PD USGOV-DOS", webResults.get("license"));
+	}
+
+	@Test
+	public void test12() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author={{Creator:Test Author}}\n") +
+				"=={{int:license-header}}==\n" +
+				"{{PD-Art-two-auto|deathyear=1887}}\n" +
+				"\n", webResults);
+		assertEquals("PD ART-TWO-AUTO", webResults.get("license"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

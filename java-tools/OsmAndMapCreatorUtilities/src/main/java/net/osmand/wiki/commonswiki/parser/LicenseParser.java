@@ -114,11 +114,16 @@ public final class LicenseParser {
 
 		String cleaned = ParserUtils.removeWikiLinkBrackets(license);
 
-		return cleaned
+		String upper = cleaned
 				.replace("CC-", "CC ")
 				.replace("PD-", "PD ")
 				.replace("-expired", " expired")
 				.toUpperCase();
+
+		// Remove any trailing parameters like " - param=value"
+		upper = upper.replaceAll("\\s+-\\s+[A-Z0-9_]+=.*$", "");
+
+		return upper;
 	}
 
 	private static String cleanBlock(String block) {
