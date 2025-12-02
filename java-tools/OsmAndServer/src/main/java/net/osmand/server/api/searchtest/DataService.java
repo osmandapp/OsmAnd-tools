@@ -522,7 +522,7 @@ public interface DataService extends BaseService {
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
 	record StreetAddress(String name, List<String> houses) {}
 
-	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundary, String cityRegExp, String streetRegExp, String houseRegExp) {
+	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp) {
 		List<CityAddress> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
 		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
@@ -551,17 +551,17 @@ public interface DataService extends BaseService {
 
 							final List<City> cities = index.getCities(null, type, region, null);
 							for (City c : cities) {
+								boolean boundary = false;
+								if (c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE) {
+									if (!includesBoundaryPostcode)
+										continue;
+									boundary = c.getType() == City.CityType.BOUNDARY;
+								}
+
 								final String cityName = c.getName(lang);
 								List<StreetAddress> streets = new ArrayList<>();
 								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
 									continue;
-
-								boolean boundary = false;
-								if (c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE) {
-									if (!includesBoundary)
-										continue;
-									boundary = true;
-								}
 
 								if (isStreetEmpty && isHouseEmpty) {
 									results.add(new CityAddress(cityName, streets, boundary));
