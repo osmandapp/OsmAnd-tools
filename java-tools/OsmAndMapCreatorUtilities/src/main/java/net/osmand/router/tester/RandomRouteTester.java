@@ -20,6 +20,8 @@ import net.osmand.util.MapUtils;
 
 public class RandomRouteTester {
 	static final String PUBLIC_TRANSPORT_PROFILE = "public_transport";
+	static final String PUBLIC_TRANSPORT_PROFILE_UNLIMITED = PUBLIC_TRANSPORT_PROFILE + ",pt_limit=0,pt_exclude=0";
+
 	static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
 	static class GeneratorConfig {
@@ -38,14 +40,12 @@ public class RandomRouteTester {
 		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
 
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
-
-				PUBLIC_TRANSPORT_PROFILE, // disable other profiles to test Public Transport routes
-
-//				"car",
+				"car",
 //				"bicycle",
 //				"car,short_way",
 //				"bicycle,short_way",
 //				"pedestrian,short_way",
+//				PUBLIC_TRANSPORT_PROFILE_UNLIMITED, // disable other profiles to test PT routes
 		};
 
 		// cost/distance deviation limits
