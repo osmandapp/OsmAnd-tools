@@ -71,7 +71,8 @@ public final class ParserUtils {
 		if (text == null) {
 			return null;
 		}
-		return text.replaceAll("\\[+|]+", "");
+		// Remove any '[' or ']' characters (used as wiki link delimiters)
+		return text.replaceAll("[\\[\\]]+", "");
 	}
 
 	/**
