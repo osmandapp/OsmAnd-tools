@@ -140,9 +140,18 @@ public final class DescriptionParser {
 		
 		// Remove leading/trailing newlines and whitespace
 		description = description.trim();
-		
+
 		if (description.startsWith("{{")) {
-			return; // Skip if it's a template we can't parse
+			String plainText = renderWikiText(description);
+			plainText = plainText.trim();
+			// If bliki returned empty string or "Template:..." (unknown template), extract template name
+			if (plainText.isEmpty() || plainText.startsWith("Template:")) {
+				plainText = extractTemplateName(description);
+			}
+			if (!plainText.isEmpty()) {
+				result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
+			}
+			return;
 		}
 
 		// Remove prefix pattern like "X provided description: " if present
@@ -171,6 +180,26 @@ public final class DescriptionParser {
 	private static String renderWikiText(String description) throws IOException {
 		WikiModel wikiModel = new WikiModel("", "");
 		return wikiModel.render(new PlainTextConverter(true), description);
+	}
+
+	/**
+	 * Extracts template name from a template when bliki can't render it properly.
+	 * For {{TemplateName|param1|param2}}, returns "TemplateName".
+	 */
+	private static String extractTemplateName(String template) {
+		if (!template.startsWith("{{") || !template.endsWith("}}")) {
+			return "";
+		}
+		
+		String content = template.substring(2, template.length() - 2).trim();
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(content, true);
+		
+		if (parts.isEmpty()) {
+			return "";
+		}
+		
+		// Return the template name (first part)
+		return parts.get(0).trim();
 	}
 
 	private static List<String> extractLinks(String description) {

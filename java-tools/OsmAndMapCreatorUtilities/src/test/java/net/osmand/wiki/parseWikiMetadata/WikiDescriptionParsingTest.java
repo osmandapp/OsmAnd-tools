@@ -50,6 +50,14 @@ public class WikiDescriptionParsingTest {
 		assertEquals("TestCity [#tag1 ,#tag2 ,#tag3]", webResults.get("description"));
 	}
 
+	@Test
+	public void test6() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description={{Monument Ukraine|80-391-0151}}\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("Monument Ukraine", result);
+	}
+
 	private void invoke(String text, Map<String, String> webResults, String lang)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
