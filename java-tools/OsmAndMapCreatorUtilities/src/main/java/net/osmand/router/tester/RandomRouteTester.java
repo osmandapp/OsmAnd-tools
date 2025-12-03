@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 import net.osmand.MainUtilities.CommandLineOpts;
+import net.osmand.PlatformUtil;
 import net.osmand.router.*;
 import net.osmand.NativeLibrary;
 import net.osmand.util.Algorithms;
@@ -60,6 +61,8 @@ public class RandomRouteTester {
 	}
 
 	public static int run(String[] args) throws Exception {
+		PlatformUtil.initDisposableOsmandRegions();
+
 		RandomRouteTester test = new RandomRouteTester(args);
 
 		test.applyCommandLineOpts();
