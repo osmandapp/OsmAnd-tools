@@ -30,6 +30,7 @@ public final class DescriptionParser {
 
 	private static final int MAX_LANGUAGE_CODE_LENGTH = 5;
 	private static final Pattern LINK_PATTERN = Pattern.compile("\\[(https?://\\S+)\\s([^]]+)]");
+	private static final Pattern PROVIDED_DESC_PATTERN = Pattern.compile("\\w+\\s+provided\\s+description\\s*:", Pattern.CASE_INSENSITIVE);
 
 	private DescriptionParser() {
 		// Utility class - no instantiation
@@ -157,8 +158,7 @@ public final class DescriptionParser {
 		// Remove prefix pattern like "X provided description: " if present
 		// This handles cases like "500px provided description: text" -> "text"
 		// Pattern: word(s) + "provided description:" (case-insensitive)
-		Pattern providedDescPattern = Pattern.compile("\\w+\\s+provided\\s+description\\s*:", Pattern.CASE_INSENSITIVE);
-		Matcher matcher = providedDescPattern.matcher(description);
+		Matcher matcher = PROVIDED_DESC_PATTERN.matcher(description);
 		if (matcher.find() && matcher.start() < description.length() / 3) {
 			// Only apply if pattern is in the first third (likely a prefix)
 			description = description.substring(matcher.end()).trim();
