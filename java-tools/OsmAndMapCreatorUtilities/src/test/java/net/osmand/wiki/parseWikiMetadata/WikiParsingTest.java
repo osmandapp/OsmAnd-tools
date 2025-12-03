@@ -19,7 +19,35 @@ public class WikiParsingTest {
 	public void test1() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(textWithNowikiAndUnbalancedBraces(), webResults, "en");
-		assertEquals("Test", webResults.get("description"));
+		assertEquals("Base description", webResults.get("description"));
+	}
+
+	@Test
+	public void test2() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(textWithNowikiWithoutClosingTag(), webResults, "en");
+		assertEquals("Base description", webResults.get("description"));
+	}
+
+	@Test
+	public void test3() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(textWithMultipleNowikiBlocks(), webResults, "en");
+		assertEquals("Base description", webResults.get("description"));
+	}
+
+	@Test
+	public void test4() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(textWithMixedCaseNowiki(), webResults, "en");
+		assertEquals("Base description", webResults.get("description"));
+	}
+
+	@Test
+	public void test5() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(textWithEmptyNowiki(), webResults, "en");
+		assertEquals("Base description", webResults.get("description"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults, String lang)
@@ -30,16 +58,46 @@ public class WikiParsingTest {
 		WikiDatabasePreparation.prepareMetaData(webResults);
 	}
 
-	private static String textWithNowikiAndUnbalancedBraces() {
+	private static String baseInformationBlock() {
 		return "=={{int:filedesc}}==\n" +
 				"{{Information\n" +
-				"|Description=Test\n" +
-				"}}\n" +
+				"|Description=Base description\n" +
+				"}}\n";
+	}
+
+	private static String textWithNowikiAndUnbalancedBraces() {
+		return baseInformationBlock() +
 				"\n" +
 				"== {{original upload log}} ==\n" +
 				"''<nowiki>{{Information |Description= [[:ua:TestTopic|Test topic]]-3 regions of Exampleland. " +
 				"|Source=http://example.org/wiki/File:Test_Regions.png |Date=2006-01-26 |Author=[[User:FictionalUser]] " +
 				"|Permission={{GFDL-with-disclaimers|</nowiki>''\n";
+	}
+
+	private static String textWithNowikiWithoutClosingTag() {
+		return baseInformationBlock() +
+				"\n" +
+				"<nowiki>{{Unclosed template with {{braces}\n";
+	}
+
+	private static String textWithMultipleNowikiBlocks() {
+		return baseInformationBlock() +
+				"\n" +
+				"<nowiki>First nowiki block {{with braces}}</nowiki>\n" +
+				"Some normal text between.\n" +
+				"<nowiki>Second nowiki block {{also with braces}}</nowiki>\n";
+	}
+
+	private static String textWithMixedCaseNowiki() {
+		return baseInformationBlock() +
+				"\n" +
+				"<NoWiki>Upper/mixed case nowiki {{braces}}</NoWIKI>\n";
+	}
+
+	private static String textWithEmptyNowiki() {
+		return baseInformationBlock() +
+				"\n" +
+				"<nowiki></nowiki>\n";
 	}
 }
 
