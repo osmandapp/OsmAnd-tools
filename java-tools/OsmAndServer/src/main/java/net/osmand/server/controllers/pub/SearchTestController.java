@@ -364,4 +364,21 @@ public class SearchTestController {
 		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
 		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
 	}
+
+	@GetMapping(value = "/unit-test", produces = "application/zip")
+	@ResponseBody
+	public void downloadUnitTest(
+			@RequestParam String query,
+			@RequestParam(required = false) String name,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon,
+			HttpServletResponse response) throws IOException {
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
+		// Template only: write a ZIP containing 2 entries
+		//  - report.json (JSON metadata)
+		//  - data.zip.gz (gzip-compressed data archive)
+	}
+
 }
