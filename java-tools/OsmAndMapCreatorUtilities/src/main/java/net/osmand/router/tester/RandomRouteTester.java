@@ -56,6 +56,10 @@ public class RandomRouteTester {
 	}
 
 	public static void main(String[] args) throws Exception {
+		System.exit(run(args));
+	}
+
+	public static int run(String[] args) throws Exception {
 		RandomRouteTester test = new RandomRouteTester(args);
 
 		test.applyCommandLineOpts();
@@ -66,8 +70,7 @@ public class RandomRouteTester {
 		test.collectRoutes();
 		test.stopSlowDown();
 
-		int exitCode = test.reportResult();
-		System.exit(exitCode);
+		return test.reportResult();
 	}
 
 	private final CommandLineOpts opts;
@@ -95,9 +98,9 @@ public class RandomRouteTester {
 
 //	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
-	private static final int EXIT_SUCCESS = 0;
-	private static final int EXIT_TEST_FAILED = 1;
-	private static final int EXIT_RED_LIMIT_REACHED = 2;
+	public static final int EXIT_SUCCESS = 0;
+	public static final int EXIT_TEST_FAILED = 1;
+	public static final int EXIT_RED_LIMIT_REACHED = 2;
 
 	private RandomRouteTester(String[] args) {
 		this.opts = new CommandLineOpts(args);
@@ -187,6 +190,8 @@ public class RandomRouteTester {
 					"--html-report=/path/to/report.html (rr-report.html)",
 					"--html-domain=test.osmand.net (used in html-report)",
 					"--libs-dir=/path/to/native/libs/dir (default auto)",
+					"--no-native-library useful for Java-only tests",
+					"--no-html-report do not create any report",
 					"",
 					"--iterations=N",
 					"--min-dist=N km",
@@ -235,7 +240,9 @@ public class RandomRouteTester {
 			report.entryClose();
 		}
 
-		report.flush(optHtmlReport);
+		if (opts.getOpt("--no-html-report") == null) {
+			report.flush(optHtmlReport);
+		}
 
 		if (report.isFailed()) {
 			return EXIT_TEST_FAILED;
@@ -263,7 +270,9 @@ public class RandomRouteTester {
 
 		for (File source : obfFiles) {
 			System.out.printf("Use OBF %s...\n", source.getName());
-			Objects.requireNonNull(nativeLibrary).initMapFile(source.getAbsolutePath(), true);
+			if (nativeLibrary != null) {
+				nativeLibrary.initMapFile(source.getAbsolutePath(), true);
+			}
 			obfReaders.add(new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source));
 		}
 
@@ -475,6 +484,9 @@ public class RandomRouteTester {
 	}
 
 	private void loadNativeLibrary() {
+		if (opts.getOpt("--no-native-library") != null) {
+			return;
+		}
 		String nativePath = getNativeLibPath();
 		if (NativeLibrary.loadOldLib(nativePath)) {
 			nativeLibrary = new NativeLibrary();

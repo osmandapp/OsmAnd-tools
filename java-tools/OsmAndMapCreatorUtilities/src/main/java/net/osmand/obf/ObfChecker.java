@@ -27,6 +27,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.util.MapUtils;
 
 public class ObfChecker {
@@ -140,6 +141,8 @@ public class ObfChecker {
 			}
 		}
 
+		ok &= runRandomRouteTester(oFile);
+
 		index.close();
 		return ok;
 	}
@@ -229,4 +232,26 @@ public class ObfChecker {
 		}
 		return true;
 	}
+
+	private static boolean runRandomRouteTester(File oFile) throws Exception {
+		String directory = oFile.getAbsoluteFile().getParent();
+		String filename = oFile.getName();
+		String [] args = {
+				"--maps-dir=" + directory,
+				"--obf-prefix=" + filename,
+				"--no-native-library",
+				"--no-html-report",
+				"--avoid-brp-java",
+				"--avoid-brp-cpp",
+				"--avoid-hh-cpp",
+
+				"--iterations=1",
+				"--min-dist=10",
+				"--max-dist=20",
+
+				"--profile=car",
+		};
+		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
+	}
+
 }
