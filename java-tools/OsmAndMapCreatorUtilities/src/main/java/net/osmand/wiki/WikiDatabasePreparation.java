@@ -240,6 +240,9 @@ public class WikiDatabasePreparation {
 			if (isCommentOpen(text, leftChars, i)) {
 				int endI = skipComment(text, i + 3);
 				text.replace(i, endI + 1, "");
+			} else if (isNowikiOpen(text, i)) {
+				int endI = skipNowiki(text, i);
+				text.replace(i, endI + 1, "");
 			} else {
 				i++;
 			}
@@ -527,6 +530,31 @@ public class WikiDatabasePreparation {
 			i++;
 		}
 		return i;
+	}
+
+	private static boolean isNowikiOpen(StringBuilder text, int i) {
+		int len = text.length();
+		if (i + 7 >= len) {
+			return false;
+		}
+		String maybeTag = text.substring(i, i + 8);
+		return maybeTag.equalsIgnoreCase("<nowiki>");
+	}
+
+	private static int skipNowiki(StringBuilder text, int i) {
+		int len = text.length();
+		int pos = i + 8; // after "<nowiki>"
+		while (pos < len) {
+			if (pos + 8 < len) {
+				String maybeClose = text.substring(pos, pos + 9);
+				if (maybeClose.equalsIgnoreCase("</nowiki>")) {
+					return pos + 8;
+				}
+			}
+			pos++;
+		}
+		// If no closing tag found, skip to end
+		return len - 1;
 	}
 
 	private static boolean isCommentClosed(StringBuilder text, int i) {
