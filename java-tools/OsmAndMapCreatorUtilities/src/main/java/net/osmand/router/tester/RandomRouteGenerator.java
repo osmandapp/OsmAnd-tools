@@ -255,7 +255,7 @@ class RandomRouteGenerator {
 		Set<LatLon> avoidDupes = new HashSet<>();
 
 		int replenishCounter = 0;
-		final int REPLENISH_LIMIT = 10; // avoid looping in case of bad config
+		final int REPLENISH_LIMIT = 25; // avoid looping in case of bad config
 		replenishRandomPoints(randomPoints); // read initial random points list
 
 		for (int i = 0; i < config.ITERATIONS; i++) {

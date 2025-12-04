@@ -32,7 +32,7 @@ import net.osmand.util.MapUtils;
 
 public class ObfChecker {
 
-	private static final int LIMIT_HH_POINTS_NEEDED = 100_000;
+	private static final int LIMIT_HH_POINTS_NEEDED = 150_000; // skip Falkland-islands, Greenland, etc
 	private static final int MAX_BUILDING_DISTANCE = 100;
 
 	public static void main(String[] args) {
@@ -109,7 +109,7 @@ public class ObfChecker {
 			}
 		}
 		
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && /*(car == null || bicycle == null) && */!world) {
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && !world) {
 			int cnt = 0;
 			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
 			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
@@ -131,9 +131,6 @@ public class ObfChecker {
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 			}
 		}
-//		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED) {
-//			ok &= runRandomRouteTester(oFile);
-//		}
 		ok &= checkNull(oFile, mi, "Missing Map section");
 		if (!world) {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
@@ -250,12 +247,11 @@ public class ObfChecker {
 				"--use-hh-points", // load random points from HH-sections only
 				"--max-shift=1000", // random shift to activate A* calculations (m)
 
-				"--iterations=10",
-				"--stop-at-first-route",
-
 				"--profile=car",
+				"--iterations=10",
 				"--min-dist=5", // km
-				"--max-dist=10", // km
+				"--max-dist=100", // km
+				"--stop-at-first-route",
 		};
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
 	}

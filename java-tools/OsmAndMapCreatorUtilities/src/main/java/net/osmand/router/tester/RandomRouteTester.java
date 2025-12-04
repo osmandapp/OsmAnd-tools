@@ -297,7 +297,7 @@ public class RandomRouteTester {
 		}
 
 		for (File source : obfFiles) {
-			System.out.printf("Use OBF %s...\n", source.getName());
+			System.out.printf("Use OBF %s ...\n", source.getName());
 			if (nativeLibrary != null) {
 				nativeLibrary.initMapFile(source.getAbsolutePath(), true);
 			}
