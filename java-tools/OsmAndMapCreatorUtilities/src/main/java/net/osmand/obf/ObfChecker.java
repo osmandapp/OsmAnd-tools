@@ -109,7 +109,7 @@ public class ObfChecker {
 			}
 		}
 		
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && (car == null || bicycle == null) && !world) {
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED * 2 && /*(car == null || bicycle == null) && */!world) {
 			int cnt = 0;
 			SearchRequest<RouteDataObject> sr = BinaryMapIndexReader.buildSearchRouteRequest(0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
 			List<RouteSubregion> regions = index.searchRouteIndexTree(sr,  routeRegion.getSubregions());
@@ -125,14 +125,15 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
+				ok &= runRandomRouteTester(oFile);
 				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 			}
 		}
-		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED) {
-			ok &= runRandomRouteTester(oFile);
-		}
+//		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED) {
+//			ok &= runRandomRouteTester(oFile);
+//		}
 		ok &= checkNull(oFile, mi, "Missing Map section");
 		if (!world) {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
@@ -247,10 +248,10 @@ public class ObfChecker {
 				"--avoid-hh-cpp",
 
 				"--use-hh-points", // load random points from HH-section only
-				"--max-shift=5000", // 5 km random shift to activate A* calculations
+				"--max-shift=500", // random shift to activate A* calculations
 
-				"--min-dist=10", // min 10km
-				"--max-dist=20", // max 20km
+				"--min-dist=5", // min
+				"--max-dist=10", // max
 				"--iterations=1",
 				"--profile=car",
 		};
