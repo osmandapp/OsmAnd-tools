@@ -1,5 +1,6 @@
 package net.osmand.router.tester;
 
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter;
 import net.osmand.binary.BinaryIndexPart;
@@ -8,8 +9,10 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.map.WorldRegion;
 import net.osmand.router.HHRouteDataStructure;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import java.io.IOException;
@@ -117,6 +120,21 @@ class RandomRouteGenerator {
 	private void hhRandomPointsReader(BinaryMapIndexReader index, List<LatLon> randomPoints, int limit, int seed) throws IOException {
 		int added = 0;
 		List<BinaryIndexPart> parts = index.getIndexes();
+
+		Set<String> routingIndexNames = new HashSet<>();
+		for (BinaryIndexPart part : parts) {
+				if (part instanceof BinaryMapRouteReaderAdapter.RouteRegion that) {
+				routingIndexNames.add(that.getName());
+			}
+		}
+		Set<WorldRegion> regions = new HashSet<>();
+		for (String regionName : routingIndexNames) {
+			WorldRegion region = PlatformUtil.getOsmandRegions().getRegionDataByDownloadName(regionName);
+			if (region != null) {
+				regions.add(region);
+			}
+		}
+
 		Collections.shuffle(parts, new Random(fixedRandom(parts.size(), RandomActions.HH_SHUFFLE_INDEXES, 0, seed)));
 		for (int i = 0; i < parts.size(); i++) {
 			BinaryIndexPart part = parts.get(i);
@@ -127,15 +145,27 @@ class RandomRouteGenerator {
 				long shuffleSeed = fixedRandom(points.size(), RandomActions.HH_SHUFFLE_POINTS, i, seed);
 				Collections.shuffle(points, new Random(shuffleSeed));
 				for (HHRouteDataStructure.NetworkDBPoint p : points) {
-					double lat = MapUtils.get31LatitudeY(p.startY);
-					double lon = MapUtils.get31LongitudeX(p.startX);
-					randomPoints.add(new LatLon(lat, lon));
-					if (added++ > limit) {
-						return;
+					LatLon ll = new LatLon(MapUtils.get31LatitudeY(p.startY), MapUtils.get31LongitudeX(p.startX));
+					if (isPointInsideRegionsPolygons(ll, regions)) {
+						randomPoints.add(ll);
+						if (added++ > limit) {
+							return;
+						}
 					}
 				}
 			}
 		}
+	}
+
+	private boolean isPointInsideRegionsPolygons(LatLon point, Set<WorldRegion> regions) {
+		for (WorldRegion r : regions) {
+			for (List<LatLon> polygon : r.getPolygons()) {
+				if (Algorithms.isPointInsidePolygon(point, polygon)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private void getObfHighwayRoadRandomPoints(
