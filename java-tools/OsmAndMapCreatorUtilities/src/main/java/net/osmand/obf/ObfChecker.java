@@ -247,13 +247,15 @@ public class ObfChecker {
 				"--avoid-brp-cpp",
 				"--avoid-hh-cpp",
 
-				"--use-hh-points", // load random points from HH-section only
-				"--max-shift=500", // random shift to activate A* calculations
+				"--use-hh-points", // load random points from HH-sections only
+				"--max-shift=1000", // random shift to activate A* calculations (m)
 
-				"--min-dist=5", // min
-				"--max-dist=10", // max
-				"--iterations=1",
+				"--iterations=10",
+				"--stop-at-first-route",
+
 				"--profile=car",
+				"--min-dist=5", // km
+				"--max-dist=10", // km
 		};
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
 	}

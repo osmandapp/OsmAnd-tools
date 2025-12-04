@@ -95,6 +95,7 @@ public class RandomRouteTester {
 	private String optHtmlDomain;
 	private boolean optNoHtmlReport;
 	private boolean optNoNativeLibrary;
+	private boolean optStopAtFirstRoute;
 	private PrimaryRouting optPrimaryRouting;
 
 	private enum PrimaryRouting {
@@ -148,6 +149,7 @@ public class RandomRouteTester {
 
 		optNoHtmlReport = opts.getBoolean("--no-html-report");
 		optNoNativeLibrary = opts.getBoolean("--no-native-library");
+		optStopAtFirstRoute = opts.getBoolean("--stop-at-first-route");
 
 		if (opts.getBoolean("--use-hh-points")) {
 			config.optRandomPointsSource = RandomPointsSource.HH_SECTION_POINTS;
@@ -223,6 +225,7 @@ public class RandomRouteTester {
 					"--max-shift=N meters",
 					"--max-inter=N number",
 					"--profile=profile,settings,key:value force one profile",
+					"--stop-at-first-route stop iterations and return 1st calculated route",
 					"",
 					"--primary=(brp-java|brp-cpp|hh-java|hh-cpp) compare others against this",
 					"--avoid-brp-java avoid BinaryRoutePlanner (java)",
@@ -388,6 +391,10 @@ public class RandomRouteTester {
 					System.err.println(RandomRouteReport.resultPrimaryText(i + 1, entry.results.get(j)));
 				}
 				System.err.println("---------------------------------------------------------------------------------");
+			}
+			if (optStopAtFirstRoute && !entry.results.isEmpty() && entry.results.get(0).distance > 0) {
+				testList = new ArrayList<>(List.of(entry));
+				break;
 			}
 		}
 	}
