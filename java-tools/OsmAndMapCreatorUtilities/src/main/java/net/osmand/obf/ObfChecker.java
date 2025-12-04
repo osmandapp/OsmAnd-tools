@@ -32,9 +32,9 @@ import net.osmand.util.MapUtils;
 
 public class ObfChecker {
 
-	private static int LIMIT_HH_POINTS_NEEDED = 100_000; 
-	private static int MAX_BUILDING_DISTANCE = 100; 
-	
+	private static final int LIMIT_HH_POINTS_NEEDED = 100_000;
+	private static final int MAX_BUILDING_DISTANCE = 100;
+
 	public static void main(String[] args) {
 		// TODO
 //		OsmAndMapCreator/utilities.sh random-route-tester \
@@ -44,8 +44,8 @@ public class ObfChecker {
 		if (args.length == 1 && args[0].equals("--test")) {
 			args = new String[] { System.getProperty("maps.dir") + "Us_california_northamerica_2.road.obf" };
 		}
-		Map<String, String> argMap = new LinkedHashMap<String, String>();
-		List<String> files = new ArrayList<String>();
+		Map<String, String> argMap = new LinkedHashMap<>();
+		List<String> files = new ArrayList<>();
 		for (String a : args) {
 			if (a.startsWith("--")) {
 				String[] k = a.substring(2).split("=");
@@ -92,8 +92,7 @@ public class ObfChecker {
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if (p instanceof MapIndex) {
 				mi = (MapIndex) p;
-			} else if (p instanceof HHRouteRegion) {
-				HHRouteRegion hr = (HHRouteRegion) p;
+			} else if (p instanceof HHRouteRegion hr) {
 				if (hr.profile.equals("car")) {
 					car = hr;
 				} else if (hr.profile.equals("bicycle")) {
@@ -131,6 +130,9 @@ public class ObfChecker {
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
 			}
 		}
+		if (routeSectionSize > LIMIT_HH_POINTS_NEEDED) {
+			ok &= runRandomRouteTester(oFile);
+		}
 		ok &= checkNull(oFile, mi, "Missing Map section");
 		if (!world) {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
@@ -140,8 +142,6 @@ public class ObfChecker {
 				ok = false;
 			}
 		}
-
-		ok &= runRandomRouteTester(oFile);
 
 		index.close();
 		return ok;
@@ -218,7 +218,7 @@ public class ObfChecker {
 		TLongObjectHashMap<NetworkDBPoint> pnts = index.initHHPoints(hr, (short) 0, NetworkDBPoint.class);
 		for (NetworkDBPoint pnt : pnts.valueCollection()) {
 			if (pnt.dualPoint == null) {
-				System.err.printf("Error in map %s - %s missing dual point \n", index.getFile().getName(), pnt.toString());
+				System.err.printf("Error in map %s - %s missing dual point \n", index.getFile().getName(), pnt);
 				ok = false;
 			}
 		}
@@ -246,12 +246,12 @@ public class ObfChecker {
 				"--avoid-brp-cpp",
 				"--avoid-hh-cpp",
 
-				"--use-hh-points", // use HH-only random route points
-				"--max-shift=5000", // 5km random shift from HH points
+				"--use-hh-points", // load random points from HH-section only
+				"--max-shift=5000", // 5 km random shift to activate A* calculations
 
+				"--min-dist=10", // min 10km
+				"--max-dist=20", // max 20km
 				"--iterations=1",
-				"--min-dist=10",
-				"--max-dist=20",
 				"--profile=car",
 		};
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
