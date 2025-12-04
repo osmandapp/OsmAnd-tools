@@ -82,13 +82,21 @@ public class RandomRouteTester {
 	private String optObfPrefix;
 	private String optHtmlReport;
 	private String optHtmlDomain;
+	private boolean optNoHtmlReport;
+	private boolean optNoNativeLibrary;
 	private PrimaryRouting optPrimaryRouting;
+	private RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
 
 	private enum PrimaryRouting {
 		BRP_JAVA,
 		BRP_CPP,
 		HH_JAVA,
 		HH_CPP,
+	}
+
+	private enum RandomPointsSource {
+		ROUTE_SECTION_POINTS,
+		HH_SECTION_POINTS,
 	}
 
 	private final long started;
@@ -122,12 +130,18 @@ public class RandomRouteTester {
 
 	private void applyCommandLineOpts() {
 		// apply system options
-		optMapsDir = Objects.requireNonNullElse(opts.getOpt("--maps-dir"), "./");
-		optObfPrefix = Objects.requireNonNullElse(opts.getOpt("--obf-prefix"), "");
-		optHtmlReport = Objects.requireNonNullElse(opts.getOpt("--html-report"), "rr-report.html");
-		optHtmlDomain = Objects.requireNonNullElse(opts.getOpt("--html-domain"), "test.osmand.net");
-		optLibsDir = Objects.requireNonNullElse(
-				opts.getOpt("--libs-dir"), optMapsDir + "/../core-legacy/binaries");
+		optMapsDir = opts.getOrDefault("--maps-dir", "./");
+		optObfPrefix = opts.getOrDefault("--obf-prefix", "");
+		optHtmlReport = opts.getOrDefault("--html-report", "rr-report.html");
+		optHtmlDomain = opts.getOrDefault("--html-domain", "test.osmand.net");
+		optLibsDir = opts.getOrDefault("--libs-dir", optMapsDir + "/../core-legacy/binaries");
+
+		optNoHtmlReport = opts.getBoolean("--no-html-report");
+		optNoNativeLibrary = opts.getBoolean("--no-native-library");
+
+		if (opts.getBoolean("--use-hh-points")) {
+			optRandomPointsSource = RandomPointsSource.HH_SECTION_POINTS;
+		}
 
 		// validate
 		if (!isFileWriteable(optHtmlReport)) {
@@ -135,20 +149,15 @@ public class RandomRouteTester {
 		}
 
 		// apply generator options
-		config.ITERATIONS = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--iterations"), String.valueOf(config.ITERATIONS)));
-		config.MIN_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--min-dist"), String.valueOf(config.MIN_DISTANCE_KM)));
-		config.MAX_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-dist"), String.valueOf(config.MAX_DISTANCE_KM)));
-		config.MAX_INTER_POINTS = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-inter"), String.valueOf(config.MAX_INTER_POINTS)));
-		config.MAX_SHIFT_ALL_POINTS_M = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-shift"), String.valueOf(config.MAX_SHIFT_ALL_POINTS_M)));
-		config.DEVIATION_RED = Double.parseDouble(Objects.requireNonNullElse(
-				opts.getOpt("--red"), String.valueOf(config.DEVIATION_RED)));
-		config.DEVIATION_YELLOW = Double.parseDouble(Objects.requireNonNullElse(
-				opts.getOpt("--yellow"), String.valueOf(config.DEVIATION_YELLOW)));
+		config.ITERATIONS = opts.getIntOrDefault("--iterations", config.ITERATIONS);
+		config.MIN_DISTANCE_KM = opts.getIntOrDefault("--min-dist", config.MIN_DISTANCE_KM);
+		config.MAX_DISTANCE_KM = opts.getIntOrDefault("--max-dist", config.MAX_DISTANCE_KM);
+		config.MAX_INTER_POINTS = opts.getIntOrDefault("--max-inter", config.MAX_INTER_POINTS);
+		config.MAX_SHIFT_ALL_POINTS_M = opts.getIntOrDefault("--max-shift", config.MAX_SHIFT_ALL_POINTS_M);
+
+		config.DEVIATION_RED = Algorithms.parseDoubleSilently(opts.getOpt("--red"), config.DEVIATION_RED);
+		config.DEVIATION_YELLOW = Algorithms.parseDoubleSilently(opts.getOpt("--yellow"), config.DEVIATION_YELLOW);
+
 		if (opts.getOpt("--profile") != null) {
 			config.RANDOM_PROFILES = new String[]{
 					opts.getOpt("--profile")
@@ -173,15 +182,15 @@ public class RandomRouteTester {
 			}
 		}
 
-		if (opts.getOpt("--car-2phase") != null) {
+		if (opts.getBoolean("--car-2phase")) {
 			config.CAR_2PHASE_MODE = true;
 		}
 
-		if (opts.getOpt("--no-conditionals") != null) {
+		if (opts.getBoolean("--no-conditionals")) {
 			config.USE_TIME_CONDITIONAL_ROUTING = 0;
 		}
 
-		if (opts.getOpt("--help") != null) {
+		if (opts.getBoolean("--help")) {
 			System.err.printf("%s\n", String.join("\n",
 					"",
 					"Usage: random-route-tester [--options] [TEST_ROUTE(s)]",
@@ -190,11 +199,13 @@ public class RandomRouteTester {
 					"",
 					"--maps-dir=/path/to/directory/with/*.obf (default ./)",
 					"--obf-prefix=prefix to filter obf files (default all)",
+					"",
+					"--no-html-report do not create html report",
 					"--html-report=/path/to/report.html (rr-report.html)",
-					"--html-domain=test.osmand.net (used in html-report)",
-					"--libs-dir=/path/to/native/libs/dir (default auto)",
+					"--html-domain=test.osmand.net (route-href in html-report)",
+					"",
 					"--no-native-library useful for Java-only tests",
-					"--no-html-report do not create any report",
+					"--libs-dir=/path/to/native/libs/dir (default auto)",
 					"",
 					"--iterations=N",
 					"--min-dist=N km",
@@ -209,6 +220,7 @@ public class RandomRouteTester {
 					"--avoid-hh-java avoid HHRoutePlanner (java)",
 					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
 					"",
+					"--use-hh-points use random HH-points instead of highway-points",
 					"--car-2phase use COMPLEX mode for car (Android default)",
 					"--no-conditionals disable *:conditional restrictions",
 					"",
@@ -243,7 +255,7 @@ public class RandomRouteTester {
 			report.entryClose();
 		}
 
-		if (opts.getOpt("--no-html-report") == null) {
+		if (!optNoHtmlReport) {
 			report.flush(optHtmlReport);
 		}
 
@@ -345,16 +357,16 @@ public class RandomRouteTester {
 				}
 
 				// process --avoid-xxx options
-				if (opts.getOpt("--avoid-brp-java") == null) {
+				if (!opts.getBoolean("--avoid-brp-java")) {
 					entry.results.add(runBinaryRoutePlannerJava(entry));
 				}
-				if (opts.getOpt("--avoid-brp-cpp") == null) {
+				if (!opts.getBoolean("--avoid-brp-cpp")) {
 					entry.results.add(runBinaryRoutePlannerCpp(entry));
 				}
-				if (opts.getOpt("--avoid-hh-java") == null) {
+				if (!opts.getBoolean("--avoid-hh-java")) {
 					entry.results.add(runHHRoutePlannerJava(entry));
 				}
-				if (opts.getOpt("--avoid-hh-cpp") == null) {
+				if (!opts.getBoolean("--avoid-hh-cpp")) {
 					entry.results.add(runHHRoutePlannerCpp(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
@@ -487,7 +499,7 @@ public class RandomRouteTester {
 	}
 
 	private void loadNativeLibrary() {
-		if (opts.getOpt("--no-native-library") != null) {
+		if (optNoNativeLibrary) {
 			return;
 		}
 		String nativePath = getNativeLibPath();

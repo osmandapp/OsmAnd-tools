@@ -94,7 +94,7 @@ class RandomRouteGenerator {
 	}
 
 	// return fixed (pseudo) random int >=0 and < bound
-	// use current week number + action (enum) + i + j as the random seed
+	// use current week number + action (enum) + i + j as a random seed
 	private int fixedRandom(int bound, RandomActions action, long i, long j) {
 		final long week = Calendar.getInstance().get(Calendar.WEEK_OF_YEAR); // 1-52 (reset seed every week)
 		final long seed = (week << 56) + ((long) action.ordinal() << 48) + (i << 1) + j;
@@ -103,7 +103,6 @@ class RandomRouteGenerator {
 
 	private void getObfHighwayRoadRandomPoints(
 			BinaryMapIndexReader index, List<LatLon> randomPoints, int limit, int seed) throws IOException {
-
 
 		class Counter {
 			private int value;

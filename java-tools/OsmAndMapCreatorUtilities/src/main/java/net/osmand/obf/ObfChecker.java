@@ -241,14 +241,17 @@ public class ObfChecker {
 				"--obf-prefix=" + filename,
 				"--no-native-library",
 				"--no-html-report",
+
 				"--avoid-brp-java",
 				"--avoid-brp-cpp",
 				"--avoid-hh-cpp",
 
+				"--use-hh-points", // use HH-only random route points
+				"--max-shift=5000", // 5km random shift from HH points
+
 				"--iterations=1",
 				"--min-dist=10",
 				"--max-dist=20",
-
 				"--profile=car",
 		};
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
