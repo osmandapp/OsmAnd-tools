@@ -8,12 +8,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.PlatformUtil;
-import net.osmand.router.*;
 import net.osmand.NativeLibrary;
+import net.osmand.router.HHRouteDataStructure;
+import net.osmand.router.HHRoutePlanner;
+import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 
 import net.osmand.binary.BinaryMapIndexReader;
@@ -52,8 +61,10 @@ public class RandomRouteTester {
 //		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
 //		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
 
-		final static Map <String, String> ambiguousConditionalTags = null;
+		final static Map<String, String> ambiguousConditionalTags = null;
 //		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
+
+		RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -85,7 +96,6 @@ public class RandomRouteTester {
 	private boolean optNoHtmlReport;
 	private boolean optNoNativeLibrary;
 	private PrimaryRouting optPrimaryRouting;
-	private RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
 
 	private enum PrimaryRouting {
 		BRP_JAVA,
@@ -94,7 +104,7 @@ public class RandomRouteTester {
 		HH_CPP,
 	}
 
-	private enum RandomPointsSource {
+	public enum RandomPointsSource {
 		ROUTE_SECTION_POINTS,
 		HH_SECTION_POINTS,
 	}
@@ -140,7 +150,7 @@ public class RandomRouteTester {
 		optNoNativeLibrary = opts.getBoolean("--no-native-library");
 
 		if (opts.getBoolean("--use-hh-points")) {
-			optRandomPointsSource = RandomPointsSource.HH_SECTION_POINTS;
+			config.optRandomPointsSource = RandomPointsSource.HH_SECTION_POINTS;
 		}
 
 		// validate

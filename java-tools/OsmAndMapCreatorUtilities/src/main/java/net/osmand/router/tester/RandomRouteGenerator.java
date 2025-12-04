@@ -1,15 +1,26 @@
 package net.osmand.router.tester;
 
 import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryHHRouteReaderAdapter;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
+import net.osmand.binary.ObfConstants;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
+import net.osmand.router.HHRouteDataStructure;
+import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.util.MapUtils;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
 
 class RandomRouteGenerator {
 	private final RandomRouteTester.GeneratorConfig config;
@@ -91,6 +102,8 @@ class RandomRouteGenerator {
 		GET_POINTS,
 		GET_PROFILE,
 		SHIFT_METERS,
+		HH_SHUFFLE_INDEXES,
+		HH_SHUFFLE_POINTS,
 	}
 
 	// return fixed (pseudo) random int >=0 and < bound
@@ -101,9 +114,32 @@ class RandomRouteGenerator {
 		return bound > 0 ? Math.abs(new Random(seed).nextInt()) % bound : 0;
 	}
 
+	private void hhRandomPointsReader(BinaryMapIndexReader index, List<LatLon> randomPoints, int limit, int seed) throws IOException {
+		int added = 0;
+		List<BinaryIndexPart> parts = index.getIndexes();
+		Collections.shuffle(parts, new Random(fixedRandom(parts.size(), RandomActions.HH_SHUFFLE_INDEXES, 0, seed)));
+		for (int i = 0; i < parts.size(); i++) {
+			BinaryIndexPart part = parts.get(i);
+			if (part instanceof BinaryHHRouteReaderAdapter.HHRouteRegion that) {
+				List<NetworkDBPoint> points =
+						new ArrayList<>(index.initHHPoints(that, (short) 0, NetworkDBPoint.class).valueCollection());
+				points.sort(Comparator.comparingLong(a -> a.roadId)); // sort before pseudo shuffle for predetermination
+				long shuffleSeed = fixedRandom(points.size(), RandomActions.HH_SHUFFLE_POINTS, i, seed);
+				Collections.shuffle(points, new Random(shuffleSeed));
+				for (HHRouteDataStructure.NetworkDBPoint p : points) {
+					double lat = MapUtils.get31LatitudeY(p.startY);
+					double lon = MapUtils.get31LongitudeX(p.startX);
+					randomPoints.add(new LatLon(lat, lon));
+					if (added++ > limit) {
+						return;
+					}
+				}
+			}
+		}
+	}
+
 	private void getObfHighwayRoadRandomPoints(
 			BinaryMapIndexReader index, List<LatLon> randomPoints, int limit, int seed) throws IOException {
-
 		class Counter {
 			private int value;
 		}
@@ -132,8 +168,7 @@ class RandomRouteGenerator {
 							if ("highway".equals(rr.getTag()) &&
 									("primary".equals(rr.getValue()) || "secondary".equals(rr.getValue()))
 							) {
-								final int SHIFT_ID = 6;
-								final long osmId = obj.getId() >> SHIFT_ID;
+								final long osmId = obj.getId() >> ObfConstants.SHIFT_ID;
 								if (osmId % pointSkipDivisor == 0) {
 									int nPoints = obj.pointsX.length;
 									// use object id and seed (number of class randomPoints) as a unique random seed
@@ -170,11 +205,14 @@ class RandomRouteGenerator {
 		pointsPerObf = Math.max(pointsPerObf, 10); // as max as 10
 
 		for (BinaryMapIndexReader obfReader : obfReaders) {
-			getObfHighwayRoadRandomPoints(obfReader, randomPoints, pointsPerObf, seed);
+			switch (config.optRandomPointsSource) {
+				case ROUTE_SECTION_POINTS -> getObfHighwayRoadRandomPoints(obfReader, randomPoints, pointsPerObf, seed);
+				case HH_SECTION_POINTS -> hhRandomPointsReader(obfReader, randomPoints, pointsPerObf, seed);
+			}
 		}
 	}
 
-	// cut down LatLon precision via %f
+	// decrease LatLon precision via %f
 	private LatLon roundLatLonViaString(LatLon ll) {
 		String str = String.format("%f,%f", ll.getLatitude(), ll.getLongitude());
 		double lat = Double.parseDouble(str.split(",")[0]);
@@ -289,4 +327,5 @@ class RandomRouteGenerator {
 			}
 		}
 	}
+
 }
