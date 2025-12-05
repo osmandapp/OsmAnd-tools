@@ -8,6 +8,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -16,7 +17,9 @@ import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -26,6 +29,8 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.util.MapUtils;
@@ -33,14 +38,14 @@ import net.osmand.util.MapUtils;
 public class ObfChecker {
 
 	private static final int LIMIT_HH_POINTS_NEEDED = 150_000; // skip Falkland-islands, Greenland, etc
+
 	private static final int MAX_BUILDING_DISTANCE = 100;
 
+	private static final int MAX_POI_TYPES = 5000;
+	private static final int MAX_MAP_RULES = 5000;
+	private static final int MAX_ROUTE_RULES = 10000;
+
 	public static void main(String[] args) {
-		// TODO
-//		OsmAndMapCreator/utilities.sh random-route-tester \
-//        --maps-dir="$OBF_FOLDER" --iterations=3 --obf-prefix="$FILE" \
-//        --profile="$PROFILE" --min-dist=1 --no-conditionals \
-//        --max-dist=50 2>&1
 		if (args.length == 1 && args[0].equals("--test")) {
 			args = new String[] { System.getProperty("maps.dir") + "Us_california_northamerica_2.road.obf" };
 		}
@@ -90,8 +95,10 @@ public class ObfChecker {
 		AddressRegion address = null;
 		boolean world = oFile.getName().toLowerCase().startsWith("world");
 		for (BinaryIndexPart p : index.getIndexes()) {
-			if (p instanceof MapIndex) {
-				mi = (MapIndex) p;
+			if (p instanceof MapIndex that) {
+				mi = that;
+				int mapRulesSize = calcMapIndexRulesSize(index, that);
+				ok &= checkSizeLimit(that.getName(), "map rules", mapRulesSize, MAX_MAP_RULES);
 			} else if (p instanceof HHRouteRegion hr) {
 				if (hr.profile.equals("car")) {
 					car = hr;
@@ -99,13 +106,16 @@ public class ObfChecker {
 					bicycle = hr;
 				}
 				ok &= checkHHRegion(index, hr);
-			} else if (p instanceof PoiRegion) {
-				poi = (PoiRegion) p;
+			} else if (p instanceof PoiRegion that) {
+				poi = that;
+				int poiTypesSize = calcPoiIndexTypesSize(index, that);
+				ok &= checkSizeLimit(that.getName(), "poi types", poiTypesSize, MAX_POI_TYPES);
 			} else if (p instanceof AddressRegion) {
 				address = (AddressRegion) p;
-			} else if (p instanceof RouteRegion) {
-				routeRegion = (RouteRegion) p;
+			} else if (p instanceof RouteRegion that) {
+				routeRegion = that;
 				routeSectionSize = p.getLength();
+				ok &= checkSizeLimit(that.getName(), "route rules", that.quickGetEncodingRulesSize(), MAX_ROUTE_RULES);
 			}
 		}
 		
@@ -136,9 +146,7 @@ public class ObfChecker {
 			ok &= checkNull(oFile, poi, "Missing Poi section");
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
-			if (!checkSimpleAddress(index, address, true)) {
-				ok = false;
-			}
+			ok &= checkSimpleAddress(index, address, true);
 		}
 
 		index.close();
@@ -254,6 +262,57 @@ public class ObfChecker {
 				"--stop-at-first-route",
 		};
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
+	}
+
+	private static boolean checkSizeLimit(String map, String name, int test, int max) {
+		if (test > max) {
+			System.err.printf("[%s] %s size %d exceed limit %s\n", map, name, test, max);
+			return false;
+		}
+		return true;
+	}
+
+	private static int calcMapIndexRulesSize(BinaryMapIndexReader index, MapIndex mapIndex) throws IOException {
+		SearchRequest<BinaryMapDataObject> req = BinaryMapIndexReader.buildSearchRequest(0, 0, 0, 0, 0, null);
+		index.searchMapIndex(req, mapIndex); // no actual search, just initialize rules
+		return mapIndex.decodingRules.size();
+	}
+
+	private static int calcPoiIndexTypesSize(BinaryMapIndexReader index, PoiRegion p) throws IOException {
+		int total = 0;
+
+		index.initCategories(p);
+		List<String> cs = p.getCategories();
+		List<List<String>> subcategories = p.getSubcategories();
+
+		for (int i = 0; i < cs.size(); i++) {
+			total += subcategories.get(i).size();
+		}
+
+		int singleVals = 0;
+		Set<String> text = new TreeSet<>();
+		Set<String> refs = new TreeSet<>();
+		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+		for (BinaryMapPoiReaderAdapter.PoiSubType st : p.getSubTypes()) {
+			if (st.text) {
+				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
+				if (ref != null && !ref.isAdditional()) {
+					refs.add(st.name);
+				} else {
+					text.add(st.name);
+				}
+			} else if (st.possibleValues.size() == 1) {
+				singleVals++;
+			} else {
+				total += st.possibleValues.size();
+			}
+		}
+
+		total += refs.size();
+		total += text.size();
+		total += singleVals;
+
+		return total;
 	}
 
 }
