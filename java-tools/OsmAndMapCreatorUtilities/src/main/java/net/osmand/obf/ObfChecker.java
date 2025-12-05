@@ -328,8 +328,9 @@ public class ObfChecker {
 	}
 
 	private static double getQuadRectArea(QuadRect qr) {
-		double x = MapUtils.measuredDist31((int) qr.left, (int) qr.top, (int) qr.right, (int) qr.top);
-		double y = MapUtils.measuredDist31((int) qr.left, (int) qr.top, (int) qr.left, (int) qr.bottom);
+		// do not use MapUtils.measuredDist31() for x31/y31 area calculations
+		double x = MapUtils.squareRootDist31((int) qr.left, (int) qr.top, (int) qr.right, (int) qr.top);
+		double y = MapUtils.squareRootDist31((int) qr.left, (int) qr.top, (int) qr.left, (int) qr.bottom);
 		return x * y;
 	}
 
@@ -338,6 +339,7 @@ public class ObfChecker {
 			bboxMap.expand(r.getLeft(), r.getTop(), r.getRight(), r.getBottom());
 		}
 		bboxMapAreaMax = Math.max(getQuadRectArea(bboxMap), bboxMapAreaMax);
+//		System.err.printf("WARN: XXX map = %.2f km\n", bboxMapAreaMax / (1000 * 1000));
 	}
 
 	private static void calcMaxRouteBboxArea(RouteRegion routeRegion) {
@@ -348,11 +350,13 @@ public class ObfChecker {
 			bboxRoute.expand(r.left, r.top, r.right, r.bottom);
 		}
 		bboxRouteAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxRouteAreaMax);
+//		System.err.printf("WARN: XXX routing = %.2f km\n", bboxRouteAreaMax / (1000 * 1000));
 	}
 
 	private static void calcMaxPoiBboxArea(PoiRegion p) {
 		bboxPoi.expand(p.getLeft31(), p.getTop31(), p.getRight31(), p.getBottom31());
 		bboxPoiAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxPoiAreaMax);
+//		System.err.printf("WARN: XXX poi = %.2f km\n", bboxPoiAreaMax / (1000 * 1000));
 	}
 
 	private static boolean checkBboxAreasMinMaxRatio(String map) {
