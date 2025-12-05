@@ -3,8 +3,6 @@ package net.osmand.wiki.commonswiki.parser;
 import java.util.Arrays;
 import java.util.List;
 
-import net.osmand.wiki.WikiDatabasePreparation;
-
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_AUTHOR;
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_PHOTOGRAPHER;
 
@@ -39,7 +37,7 @@ public final class AuthorParser {
 			}
 		}
 
-		return WikiDatabasePreparation.DEFAULT_STRING;
+		return null;
 	}
 
 	private static String stripAuthorPrefix(String line) {
@@ -89,7 +87,7 @@ public final class AuthorParser {
 			if (param.toLowerCase().startsWith("author=")) {
 				String authorValue = param.substring(7).trim();
 				String author = processAuthorValue(authorValue);
-				if (!author.equals(WikiDatabasePreparation.DEFAULT_STRING)) {
+				if (author != null) {
 					return cleanAuthor(author);
 				}
 			}
@@ -222,7 +220,7 @@ public final class AuthorParser {
 			}
 		} else {
 			// [https://...] - no text
-			return WikiDatabasePreparation.DEFAULT_STRING;
+			return null;
 		}
 
 		return null;
@@ -302,7 +300,7 @@ public final class AuthorParser {
 	 */
 	private static String processAuthorValue(String authorPart) {
 		if (authorPart.isEmpty()) {
-			return WikiDatabasePreparation.DEFAULT_STRING;
+			return null;
 		}
 
 		// Handle [[User:Name|DisplayName]] or [[User:Name]] - reuse wiki link parsing
@@ -332,12 +330,12 @@ public final class AuthorParser {
 	 * Cleans up the author string, removing brackets and extra formatting.
 	 */
 	private static String cleanAuthor(String author) {
-		if (author == null || author.equals(WikiDatabasePreparation.DEFAULT_STRING)) {
-			return WikiDatabasePreparation.DEFAULT_STRING;
+		if (author == null) {
+			return null;
 		}
 		String cleaned = ParserUtils.removeWikiMarkup(author);
 		author = cleaned.trim();
-		return author.isEmpty() ? WikiDatabasePreparation.DEFAULT_STRING : author;
+		return author.isEmpty() ? null : author;
 	}
 }
 

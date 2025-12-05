@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiDateParsingTest {
@@ -62,6 +63,13 @@ public class WikiDateParsingTest {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(blockPhotograph("|Date=2017-09-15 09:36:26 (UTC)\n"), webResults);
 		assertEquals("2017-09-15", webResults.get("date"));
+	}
+
+	@Test
+	public void test8() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description=Test description\n|author=Test Author\n"), webResults);
+		assertNull("Date should be null when not found", webResults.get("date"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)
