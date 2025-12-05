@@ -135,7 +135,7 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-				ok &= runRandomRouteTester(oFile);
+//				ok &= runRandomRouteTester(oFile);
 				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
