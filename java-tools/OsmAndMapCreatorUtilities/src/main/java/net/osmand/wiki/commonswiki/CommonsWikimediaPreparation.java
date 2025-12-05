@@ -335,11 +335,11 @@ public class CommonsWikimediaPreparation {
 		private void parseMeta() {
 			try {
 				if (FILE_NAMESPACE.contentEquals(ns)) {
-					totalPagesCount.incrementAndGet();
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
 					if (imageTitle == null) {
 						return;
 					}
+					totalPagesCount.incrementAndGet();
 					Map<String, String> meta = new HashMap<>();
 					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true, errorContentBracesCount, false);
 					WikiDatabasePreparation.prepareMetaData(meta);
