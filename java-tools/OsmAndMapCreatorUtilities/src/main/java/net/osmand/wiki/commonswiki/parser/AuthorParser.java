@@ -234,6 +234,10 @@ public final class AuthorParser {
 		String linkContent = part.substring(2, part.length() - 2);
 		List<String> linkParts = ParserUtils.splitByPipeOutsideBraces(linkContent, true);
 
+		if (linkParts.isEmpty()) {
+			return null;
+		}
+
 		if (linkParts.size() > 1) {
 			return cleanAuthor(linkParts.get(1).trim());
 		}
