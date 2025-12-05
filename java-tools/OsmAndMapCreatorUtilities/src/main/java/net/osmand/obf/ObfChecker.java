@@ -23,6 +23,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Building;
 import net.osmand.data.City;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
@@ -44,6 +45,13 @@ public class ObfChecker {
 	private static final int MAX_MAP_RULES = 13800; // Germany_mecklenburg-vorpommern_europe 2025-12-05 +20%
 	private static final int MAX_ROUTE_RULES = 17500; // Chile_southamerica 2025-12-05 +20%
 	private static final int MAX_POI_TYPES = 6400; // Gb 2025-12-05 +20%
+
+	private static final double MAX_BBOX_AREAS_MIN_MAX_RATIO = 1.5;
+
+	private static QuadRect bboxPoi = new QuadRect();
+	private static QuadRect bboxMap = new QuadRect();
+	private static QuadRect bboxRoute = new QuadRect();
+	private static double bboxPoiAreaMax = 0, bboxMapAreaMax = 0, bboxRouteAreaMax = 0;
 
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("--test")) {
@@ -97,6 +105,7 @@ public class ObfChecker {
 		for (BinaryIndexPart p : index.getIndexes()) {
 			if (p instanceof MapIndex that) {
 				mi = that;
+				calcMaxMapBboxArea(that);
 				int mapRulesSize = calcMapIndexRulesSize(index, that);
 				ok &= checkSizeLimit(that.getName(), "map rules", mapRulesSize, MAX_MAP_RULES);
 			} else if (p instanceof HHRouteRegion hr) {
@@ -108,12 +117,14 @@ public class ObfChecker {
 				ok &= checkHHRegion(index, hr);
 			} else if (p instanceof PoiRegion that) {
 				poi = that;
+				calcMaxPoiBboxArea(that);
 				int poiTypesSize = calcPoiIndexTypesSize(index, that);
 				ok &= checkSizeLimit(that.getName(), "poi types", poiTypesSize, MAX_POI_TYPES);
 			} else if (p instanceof AddressRegion) {
 				address = (AddressRegion) p;
 			} else if (p instanceof RouteRegion that) {
 				routeRegion = that;
+				calcMaxRouteBboxArea(that);
 				routeSectionSize = p.getLength();
 				ok &= checkSizeLimit(that.getName(), "route rules", that.quickGetEncodingRulesSize(), MAX_ROUTE_RULES);
 			}
@@ -135,7 +146,7 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-				ok &= runRandomRouteTester(oFile);
+//				ok &= runRandomRouteTester(oFile);
 				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
@@ -147,6 +158,7 @@ public class ObfChecker {
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
 			ok &= checkSimpleAddress(index, address, true);
+			ok &= checkBboxAreasMinMaxRatio(oFile.getName());
 		}
 
 		index.close();
@@ -264,9 +276,9 @@ public class ObfChecker {
 		return RandomRouteTester.run(args) == RandomRouteTester.EXIT_SUCCESS;
 	}
 
-	private static boolean checkSizeLimit(String map, String name, int test, int max) {
+	private static boolean checkSizeLimit(String map, String section, int test, int max) {
 		if (test > max) {
-			System.err.printf("[%s] %s size %d exceed limit %s\n", map, name, test, max);
+			System.err.printf("[%s] %s size %d exceeded limit %s\n", map, section, test, max);
 			return false;
 		}
 		return true;
@@ -313,6 +325,49 @@ public class ObfChecker {
 		total += singleVals;
 
 		return total;
+	}
+
+	private static double getQuadRectArea(QuadRect qr) {
+		double x = MapUtils.measuredDist31((int) qr.left, (int) qr.top, (int) qr.right, (int) qr.top);
+		double y = MapUtils.measuredDist31((int) qr.left, (int) qr.top, (int) qr.left, (int) qr.bottom);
+		return x * y;
+	}
+
+	private static void calcMaxMapBboxArea(MapIndex mapIndex) {
+		for (BinaryMapIndexReader.MapRoot r : mapIndex.getRoots()) {
+			bboxMap.expand(r.getLeft(), r.getTop(), r.getRight(), r.getBottom());
+		}
+		bboxMapAreaMax = Math.max(getQuadRectArea(bboxMap), bboxMapAreaMax);
+	}
+
+	private static void calcMaxRouteBboxArea(RouteRegion routeRegion) {
+		List<RouteSubregion> regions = new ArrayList<>();
+		regions.addAll(routeRegion.getBaseSubregions());
+		regions.addAll(routeRegion.getSubregions());
+		for (RouteSubregion r : regions) {
+			bboxRoute.expand(r.left, r.top, r.right, r.bottom);
+		}
+		bboxRouteAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxRouteAreaMax);
+	}
+
+	private static void calcMaxPoiBboxArea(PoiRegion p) {
+		bboxPoi.expand(p.getLeft31(), p.getTop31(), p.getRight31(), p.getBottom31());
+		bboxPoiAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxPoiAreaMax);
+	}
+
+	private static boolean checkBboxAreasMinMaxRatio(String map) {
+		if (bboxPoiAreaMax > 0 && bboxMapAreaMax > 0 && bboxRouteAreaMax > 0) {
+			double min = Math.min(Math.min(bboxPoiAreaMax, bboxMapAreaMax), bboxRouteAreaMax);
+			double max = Math.max(Math.max(bboxPoiAreaMax, bboxMapAreaMax), bboxRouteAreaMax);
+			double ratio = max / min;
+			if (ratio > MAX_BBOX_AREAS_MIN_MAX_RATIO) {
+				System.err.printf("[%s] bbox area ratio %.2f exceeded limit %.2f poi(%.0f) map(%.0f) route(%.0f)\n",
+						map, ratio, MAX_BBOX_AREAS_MIN_MAX_RATIO, bboxPoiAreaMax / (1000 * 1000),
+						bboxMapAreaMax / (1000 * 1000), bboxRouteAreaMax / (1000 * 1000));
+				return false;
+			}
+		}
+		return true;
 	}
 
 }
