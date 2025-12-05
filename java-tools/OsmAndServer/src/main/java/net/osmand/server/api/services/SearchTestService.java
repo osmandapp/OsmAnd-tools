@@ -451,6 +451,7 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				Object[] args = null;
 				try {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
@@ -458,15 +459,18 @@ public class SearchTestService implements ReportService, DataService {
 								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder);
 					}
 
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, searchResult,
+					args = collectRunResults(finder, gen_id, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
-					enqueueRunResult(run, args);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, null,
-							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
-							e.getMessage() == null ? e.toString() : e.getMessage());
-					enqueueRunResult(run, args);
+					args = new Object[] {gen_id, count, run.datasetId, run.id, run.caseId, query, "",
+							e.getMessage() == null ? e.toString() : e.getMessage(), System.currentTimeMillis() - startTime,
+							0, null, null, null,
+							searchPoint.getLatitude(), searchPoint.getLongitude(), bbox[0] + "; " + bbox[1],
+							new Timestamp(System.currentTimeMillis()), false, null, null};
+				} finally {
+					if (args != null)
+						enqueueRunResult(run, args);
 				}
 			}
 		} catch (Exception e) {

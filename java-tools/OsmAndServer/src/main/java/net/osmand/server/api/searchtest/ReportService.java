@@ -370,7 +370,7 @@ public interface ReportService {
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId), allCols));
+						REPORT_SQL + " ORDER BY gen_id", caseId, runId), allCols));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?",
 						String.class, runId));
 			}

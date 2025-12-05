@@ -284,53 +284,60 @@ public interface DataService extends BaseService {
 		String resultPoint = null;
 		boolean found = false;
 		if (firstResult != null) {
-			int dupCount = 0;
-			double closestDuplicate = MapUtils.getDistance(targetPoint, firstResult.searchResult().location);
-			int dupInd = firstResult.place() - 1;
-			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
-			for (int i = firstResult.place(); i < searchResults.size(); i++) {
-				SearchResult sr = searchResults.get(i);
-				double dist = MapUtils.getDistance(firstResult.searchResult().location, sr.location);
-				if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
-					dupCount++;
-				} else {
-					break;
-				}
-				if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
-					closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
-					dupInd = i;
-				}
-			}
-			resPlace = firstResult.place();
 			LatLon resPoint = firstResult.searchResult().location;
-			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
-			distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
+			if (resPoint != null) {
+				int dupCount = 0;
+				double closestDuplicate = MapUtils.getDistance(targetPoint, resPoint);
+				int dupInd = firstResult.place() - 1;
+				String resName = firstResult.searchResult().toString(); // to do check to string is not too much
+				for (int i = firstResult.place(); i < searchResults.size(); i++) {
+					SearchResult sr = searchResults.get(i);
+					double dist = MapUtils.getDistance(resPoint, sr.location);
+					if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
+						dupCount++;
+					} else {
+						break;
+					}
+					if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
+						closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
+						dupInd = i;
+					}
+				}
+				resPlace = firstResult.place();
 
-			if (dupCount > 0) {
-				row.put("dup_count", dupCount);
+				resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
+				distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
+
+				if (dupCount > 0) {
+					row.put("dup_count", dupCount);
+				}
+				if (searchResult != null && searchResult.stat() != null) {
+					row.put("stat_bytes", searchResult.stat().totalBytes);
+					row.put("stat_time", searchResult.stat().totalTime);
+				}
+				row.put("time", duration);
+				row.put("web_type", firstResult.searchResult().objectType);
+				row.put("res_id", firstResult.toIdString());
+				row.put("res_place", firstResult.toPlaceString());
+				row.put("res_name", firstResult.placeName());
+				if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
+					SearchResult sr = searchResults.get(dupInd);
+					actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
+				}
+				if (actualResult != null) {
+					row.put("actual_place", actualResult.toPlaceString());
+					row.put("actual_id", actualResult.toIdString());
+					row.put("actual_name", actualResult.placeName());
+					LatLon pnt = actualResult.searchResult().location;
+					row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
+					found = actualResult.place() <= dupCount + firstResult.place();
+				}
+				found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
+			} else {
+				error = "Result point location is null";
 			}
-			if (searchResult != null && searchResult.stat() != null) {
-				row.put("stat_bytes", searchResult.stat().totalBytes);
-				row.put("stat_time", searchResult.stat().totalTime);
-			}
-			row.put("time", duration);
-			row.put("web_type", firstResult.searchResult().objectType);
-			row.put("res_id", firstResult.toIdString());
-			row.put("res_place", firstResult.toPlaceString());
-			row.put("res_name", firstResult.placeName());
-			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
-				SearchResult sr = searchResults.get(dupInd);
-				actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
-			}
-			if (actualResult != null) {
-				row.put("actual_place", actualResult.toPlaceString());
-				row.put("actual_id", actualResult.toIdString());
-				row.put("actual_name", actualResult.placeName());
-				LatLon pnt = actualResult.searchResult().location;
-				row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
-				found = actualResult.place() <= dupCount + firstResult.place();
-			}
-			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
+		} else {
+			error = "Search result is missing";
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
 
