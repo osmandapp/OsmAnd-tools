@@ -66,6 +66,22 @@ public class WikiDescriptionParsingTest {
 		assertNull("Description should be null when not found", webResults.get("description"));
 	}
 
+	@Test
+	public void test8() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{en|Paris: Eiffel tower}} {{de|Paris: Eiffelturm}} {{pl|Wieża Eiffla w Paryżu}} {{fi|Eiffel-torni Pariisissa}} {{ru|Эйфелева башня в Париже}}\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("Paris: Eiffel tower", result);
+	}
+
+	@Test
+	public void test9() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("| Description = Paris from the Arc de Triomphe\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("Paris from the Arc de Triomphe", result);
+	}
+
 	private void invoke(String text, Map<String, String> webResults, String lang)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
