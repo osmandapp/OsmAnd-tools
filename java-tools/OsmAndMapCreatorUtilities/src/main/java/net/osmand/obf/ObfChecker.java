@@ -46,11 +46,13 @@ public class ObfChecker {
 	private static final int MAX_ROUTE_RULES = 17500; // Chile_southamerica 2025-12-05 +20%
 	private static final int MAX_POI_TYPES = 6400; // Gb 2025-12-05 +20%
 
-	private static final double MAX_BBOX_AREAS_MIN_MAX_RATIO = 1.5;
+	// TODO how to calculate and compare Island territories
+	// TODO fix Berlin vs https://www.openstreetmap.org/relation/13218198
+	private static final double MAX_BBOX_AREAS_MIN_MAX_RATIO = 0; // disabled
 
-	private static QuadRect bboxPoi = new QuadRect();
-	private static QuadRect bboxMap = new QuadRect();
-	private static QuadRect bboxRoute = new QuadRect();
+	private static final QuadRect bboxPoi = new QuadRect();
+	private static final QuadRect bboxMap = new QuadRect();
+	private static final QuadRect bboxRoute = new QuadRect();
 	private static double bboxPoiAreaMax = 0, bboxMapAreaMax = 0, bboxRouteAreaMax = 0;
 
 	public static void main(String[] args) {
@@ -146,7 +148,7 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-//				ok &= runRandomRouteTester(oFile);
+				ok &= runRandomRouteTester(oFile);
 				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
@@ -158,7 +160,9 @@ public class ObfChecker {
 			ok &= checkNull(oFile, address, "Missing address section");
 			ok &= checkNull(oFile, routeRegion, "Missing routing section");
 			ok &= checkSimpleAddress(index, address, true);
-			ok &= checkBboxAreasMinMaxRatio(oFile.getName());
+			if (MAX_BBOX_AREAS_MIN_MAX_RATIO > 0) {
+				ok &= checkBboxAreasMinMaxRatio(oFile.getName());
+			}
 		}
 
 		index.close();
@@ -339,7 +343,6 @@ public class ObfChecker {
 			bboxMap.expand(r.getLeft(), r.getTop(), r.getRight(), r.getBottom());
 		}
 		bboxMapAreaMax = Math.max(getQuadRectArea(bboxMap), bboxMapAreaMax);
-//		System.err.printf("WARN: XXX map = %.2f km\n", bboxMapAreaMax / (1000 * 1000));
 	}
 
 	private static void calcMaxRouteBboxArea(RouteRegion routeRegion) {
@@ -350,13 +353,11 @@ public class ObfChecker {
 			bboxRoute.expand(r.left, r.top, r.right, r.bottom);
 		}
 		bboxRouteAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxRouteAreaMax);
-//		System.err.printf("WARN: XXX routing = %.2f km\n", bboxRouteAreaMax / (1000 * 1000));
 	}
 
 	private static void calcMaxPoiBboxArea(PoiRegion p) {
 		bboxPoi.expand(p.getLeft31(), p.getTop31(), p.getRight31(), p.getBottom31());
 		bboxPoiAreaMax = Math.max(getQuadRectArea(bboxRoute), bboxPoiAreaMax);
-//		System.err.printf("WARN: XXX poi = %.2f km\n", bboxPoiAreaMax / (1000 * 1000));
 	}
 
 	private static boolean checkBboxAreasMinMaxRatio(String map) {
