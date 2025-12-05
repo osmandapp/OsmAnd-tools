@@ -327,10 +327,10 @@ public class CommonsWikimediaPreparation {
 					Map<String, String> meta = new HashMap<>();
 					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
-					String author = meta.getOrDefault("author", "");
-					String license = meta.getOrDefault("license", "");
-					String description = meta.getOrDefault("description", "");
-					String date = meta.getOrDefault("date", "");
+					String author = meta.get("author");
+					String license = meta.get("license");
+					String description = meta.get("description");
+					String date = meta.get("date");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
 								author, date, license, description));

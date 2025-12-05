@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiDescriptionParsingTest {
@@ -56,6 +57,13 @@ public class WikiDescriptionParsingTest {
 		invoke(informationBlock("|description={{Monument Ukraine|80-391-0151}}\n"), webResults, "en");
 		String result = webResults.get("description");
 		assertEquals("Monument Ukraine", result);
+	}
+
+	@Test
+	public void test7() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=Test Author\n|date=2023-01-01\n"), webResults, "en");
+		assertNull("Description should be null when not found", webResults.get("description"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults, String lang)

@@ -173,8 +173,9 @@ public final class DescriptionParser {
 		if (!links.isEmpty()) {
 			plainText = appendLinks(plainText, links);
 		}
-
-		result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
+		if (!plainText.isEmpty()) {
+			result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
+		}
 	}
 
 	private static String renderWikiText(String description) throws IOException {

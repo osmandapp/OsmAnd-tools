@@ -83,8 +83,7 @@ public class WikiDatabasePreparation {
 	private static final int OPTIMAL_SHORT_DESCR = 250;
 	private static final int OPTIMAL_LONG_DESCR = 500;
 	private static final int SHORT_PARAGRAPH = 10;
-	
-	public static final String DEFAULT_STRING = "Unknown";
+
 	public static final String DEFAULT_LANG = "en";
 	
 
@@ -412,8 +411,8 @@ public class WikiDatabasePreparation {
 			return;
 		}
 		
-		String author = DEFAULT_STRING;
-		String date = DEFAULT_STRING;
+		String author = null;
+		String date = null;
 		String license = null;
 		Map<String, String> description = new HashMap<>();
 		
@@ -446,30 +445,35 @@ public class WikiDatabasePreparation {
 				}
 			}
 		}
-        
-        webBlockResults.put(ParserUtils.FIELD_AUTHOR, author);
-        webBlockResults.put(ParserUtils.FIELD_DATE, date);
+
+		if (author != null) {
+			webBlockResults.put(ParserUtils.FIELD_AUTHOR, author);
+		}
+		if (date != null) {
+			webBlockResults.put(ParserUtils.FIELD_DATE, date);
+		}
 		if (license != null) {
 			webBlockResults.put(ParserUtils.FIELD_LICENSE, license);
 		}
-
-		if (Boolean.TRUE.equals(allLangs)) {
-			webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, new Gson().toJson(description));
-		} else {
-			for (Map.Entry<String, String> entry : description.entrySet()) {
-				if (entry.getKey().equals(lang)) {
-					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, entry.getValue());
+		if (!description.isEmpty()) {
+			if (Boolean.TRUE.equals(allLangs)) {
+				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, new Gson().toJson(description));
+			} else {
+				for (Map.Entry<String, String> entry : description.entrySet()) {
+					if (entry.getKey().equals(lang)) {
+						webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, entry.getValue());
+					}
 				}
-			}
 
-			// If no description was found in the target language, fallback to English description (default language)
-			if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
-			}
+				// If no description was found in the target language, fallback to English description (default language)
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
+				}
 
-			// If no description for English either, fallback to the first available description
-			if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && !description.isEmpty()) {
-				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.values().iterator().next());
+				// If no description for English either, fallback to the first available description
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && !description.isEmpty()) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.values().iterator().next());
+				}
 			}
 		}
     }

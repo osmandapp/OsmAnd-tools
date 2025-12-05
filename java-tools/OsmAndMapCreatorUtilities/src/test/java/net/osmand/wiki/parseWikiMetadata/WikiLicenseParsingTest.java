@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiLicenseParsingTest {
@@ -109,6 +110,13 @@ public class WikiLicenseParsingTest {
 				"{{PD-Art-two-auto|deathyear=1887}}\n" +
 				"\n", webResults);
 		assertEquals("PD ART-TWO-AUTO", webResults.get("license"));
+	}
+
+	@Test
+	public void test13() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description=Test description\n|author=Test Author\n|date=2023-01-01\n"), webResults);
+		assertNull("License should be null when not found", webResults.get("license"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

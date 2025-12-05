@@ -2,8 +2,6 @@ package net.osmand.wiki.commonswiki.parser;
 
 import java.util.Arrays;
 
-import net.osmand.wiki.WikiDatabasePreparation;
-
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DATE;
 
 /**
@@ -25,7 +23,7 @@ public final class DateParser {
 	public static String parse(String line) {
 		String dateValue = extractDateValue(line);
 		if (dateValue == null || dateValue.isEmpty()) {
-			return WikiDatabasePreparation.DEFAULT_STRING;
+			return null;
 		}
 
 		String date = parseDateFromValue(dateValue);
@@ -47,7 +45,7 @@ public final class DateParser {
 	private static String parseDateFromTemplate(String dateValue) {
 		String templateContent = ParserUtils.extractTemplateContent(dateValue);
 		if (templateContent == null) {
-			return WikiDatabasePreparation.DEFAULT_STRING;
+			return null;
 		}
 
 		String[] parts = templateContent.split("\\|");
@@ -64,7 +62,7 @@ public final class DateParser {
 			}
 		}
 
-		return WikiDatabasePreparation.DEFAULT_STRING;
+		return null;
 	}
 
 	private static String parseDateFromPlainText(String dateValue) {
@@ -75,7 +73,7 @@ public final class DateParser {
 
 	private static String cleanDate(String date) {
 		if (date == null || date.isEmpty()) {
-			return WikiDatabasePreparation.DEFAULT_STRING;
+			return null;
 		}
 		return ParserUtils.removeWikiLinkBrackets(date);
 	}
