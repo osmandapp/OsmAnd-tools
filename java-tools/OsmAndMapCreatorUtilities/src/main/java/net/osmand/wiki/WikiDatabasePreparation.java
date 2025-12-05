@@ -23,6 +23,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -220,6 +221,20 @@ public class WikiDatabasePreparation {
 	                                       @Nullable WikiDBBrowser browser,
 	                                       @Nullable Boolean allLangs)
 			throws IOException, SQLException {
+		return removeMacroBlocks(text, webBlockResults, blockResults, pois, lang, title, browser, allLangs, null, true);
+	}
+
+	public static String removeMacroBlocks(StringBuilder text,
+	                                       @Nullable Map<String, String> webBlockResults,
+	                                       Map<WikivoyageTemplates, List<String>> blockResults,
+	                                       @Nullable List<Map<PoiFieldType, Object>> pois,
+	                                       String lang,
+	                                       String title,
+	                                       @Nullable WikiDBBrowser browser,
+	                                       @Nullable Boolean allLangs,
+	                                       @Nullable AtomicLong errorContentBracesCounter,
+	                                       boolean logErrorContentBraces)
+			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -257,8 +272,13 @@ public class WikiDatabasePreparation {
 			cursor = i;
 			if (i >= text.length()) {
 				if (openCnt > 0) {
-					String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
-					log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
+					if (logErrorContentBraces) {
+						String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
+						log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
+					}
+					if (errorContentBracesCounter != null) {
+						errorContentBracesCounter.incrementAndGet();
+					}
 					// start over again
 					errorBracesCnt.add(beginInd);
 					beginInd = openCnt = i = 0;

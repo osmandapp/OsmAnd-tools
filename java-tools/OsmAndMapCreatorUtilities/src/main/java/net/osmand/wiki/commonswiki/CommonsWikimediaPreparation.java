@@ -33,6 +33,10 @@ public class CommonsWikimediaPreparation {
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
 	private static final AtomicLong articlesCount = new AtomicLong(0);
+	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
+	private static final AtomicLong totalPagesCount = new AtomicLong(0);
+	private static final AtomicLong errorContentBracesCount = new AtomicLong(0);
+	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
@@ -137,8 +141,15 @@ public class CommonsWikimediaPreparation {
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
 		createIndex(commonsWikiDBPath);
-		log.info("========= All tasks done in %.0fs total parsed %d articles ========="
-				.formatted((System.currentTimeMillis() - start) / 1000.0, articlesCount.get()));
+		log.info("========= All tasks done in %.0fs ========="
+				.formatted((System.currentTimeMillis() - start) / 1000.0));
+		log.info("========= Statistics =========");
+		log.info("Total pages with namespace=6: " + totalPagesCount.get());
+		log.info("Added to queue: " + articlesCount.get());
+		log.info("Written to database: " + writtenToDatabaseCount.get());
+		log.info("Errors 'Error content braces': " + errorContentBracesCount.get());
+		log.info("Other errors: " + otherErrorsCount.get());
+		log.info("========= End Statistics =========");
 	}
 
 	private static void initDatabase(String sqliteFileName, boolean recreateDb) throws SQLException {
@@ -195,12 +206,16 @@ public class CommonsWikimediaPreparation {
 					if (counter % BATCH_SIZE == 0) {
 						insertStatement.executeBatch();
 						conn.commit();
+						writtenToDatabaseCount.addAndGet(counter);
 						counter = 0;
 					}
 				}
 
-				insertStatement.executeBatch();
-				conn.commit();
+				if (counter > 0) {
+					insertStatement.executeBatch();
+					conn.commit();
+					writtenToDatabaseCount.addAndGet(counter);
+				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -320,12 +335,13 @@ public class CommonsWikimediaPreparation {
 		private void parseMeta() {
 			try {
 				if (FILE_NAMESPACE.contentEquals(ns)) {
+					totalPagesCount.incrementAndGet();
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
 					if (imageTitle == null) {
 						return;
 					}
 					Map<String, String> meta = new HashMap<>();
-					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
+					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true, errorContentBracesCount, false);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.get("author");
 					String license = meta.get("license");
@@ -342,6 +358,7 @@ public class CommonsWikimediaPreparation {
 					}
 				}
 			} catch (Exception exception) {
+				otherErrorsCount.incrementAndGet();
 				log.error(exception.getMessage() + " on page id : " + id + " title : " + title, exception);
 			}
 		}
