@@ -41,9 +41,9 @@ public class ObfChecker {
 
 	private static final int MAX_BUILDING_DISTANCE = 100;
 
-	private static final int MAX_POI_TYPES = 5000;
-	private static final int MAX_MAP_RULES = 5000;
-	private static final int MAX_ROUTE_RULES = 10000;
+	private static final int MAX_MAP_RULES = 13800; // Germany_mecklenburg-vorpommern_europe 2025-12-05 +20%
+	private static final int MAX_ROUTE_RULES = 17500; // Chile_southamerica 2025-12-05 +20%
+	private static final int MAX_POI_TYPES = 6400; // Gb 2025-12-05 +20%
 
 	public static void main(String[] args) {
 		if (args.length == 1 && args[0].equals("--test")) {
@@ -135,7 +135,7 @@ public class ObfChecker {
 				}
 			}
 			if (cnt > LIMIT_HH_POINTS_NEEDED) {
-//				ok &= runRandomRouteTester(oFile);
+				ok &= runRandomRouteTester(oFile);
 				ok &= checkNull(oFile, car, "Missing HH route section for car - route section bytes: " + routeSectionSize);
 				ok &= checkNull(oFile, bicycle,
 						"Missing HH route section for bicycle - route section bytes: " + routeSectionSize);
