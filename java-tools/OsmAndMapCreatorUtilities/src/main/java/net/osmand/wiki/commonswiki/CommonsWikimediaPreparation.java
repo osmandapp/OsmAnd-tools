@@ -7,6 +7,7 @@ import net.osmand.obf.preparation.DBDialect;
 import net.osmand.wiki.AbstractWikiFilesDownloader;
 import net.osmand.wiki.AbstractWikiFilesDownloader.DownloadHandler;
 import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.WikiLangConverter;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -329,7 +330,7 @@ public class CommonsWikimediaPreparation {
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.getOrDefault("author", "");
 					String license = meta.getOrDefault("license", "");
-					String description = meta.getOrDefault("description", "");
+					String description = WikiLangConverter.normalizeLang(meta.getOrDefault("description", ""));
 					String date = meta.getOrDefault("date", "");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),

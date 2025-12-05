@@ -2,7 +2,7 @@ package net.osmand.server.wiki;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import net.osmand.wiki.commonswiki.WikiLangConverter;
+import net.osmand.wiki.WikiLangConverter;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -19,7 +19,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-import static net.osmand.wiki.commonswiki.WikiLangConverter.UNDEFINED_MARK;
+import static net.osmand.wiki.WikiLangConverter.UNDEFINED_MARK;
 
 @Ignore
 @RunWith(SpringRunner.class)

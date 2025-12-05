@@ -33,7 +33,7 @@ public class IndexCreatorSettings {
 	// gtfs data for public transport
 	public File gtfsData;
 	
-	// sqlite file with wiki_mapping(id bigint, lang text, title text);
+	// sqlite file with wiki_mapping(id bigint, lang text, bcp47Lang text, title text);
 	// mapping wikidata id <-> wikipedia articles
 	public String wikidataMappingUrl;
 	
