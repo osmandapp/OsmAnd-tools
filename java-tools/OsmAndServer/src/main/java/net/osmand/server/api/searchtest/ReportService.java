@@ -67,8 +67,9 @@ public interface ReportService {
 			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE 
-			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
-				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
+			    WHEN error IS NOT NULL THEN 'Error' 
+			    WHEN gen_count <= 0 THEN 'Filtered'
+				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id, 
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
@@ -176,8 +177,8 @@ public interface ReportService {
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE (gen_count = -1 or query IS NULL) and error IS NULL) AS filtered,
-				    count(*) FILTER (WHERE gen_count = 0 or trim(query) = '') AS empty,
+				    count(*) FILTER (WHERE gen_count <= 0 and error IS NULL) AS filtered,
+				    count(*) FILTER (WHERE gen_count > 0 and error IS NULL and (query IS NULL or trim(query) = '')) AS empty,
 				    sum(duration) AS duration
 				FROM
 				    gen_result
