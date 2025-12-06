@@ -340,15 +340,16 @@ public class SearchTestController {
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
-	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
-	                 @RequestParam(required = false) String houseRegExp) {
+	                 @RequestParam(required = false) String houseRegExp,
+	                 @RequestParam(required = false) String poiRegExp) {
 		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
-				includesBoundary != null && includesBoundary,
-				cityRegExp, streetRegExp, houseRegExp));
+				includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
+				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
 	private static final double SEARCH_RADIUS_DEGREE = 1.0;

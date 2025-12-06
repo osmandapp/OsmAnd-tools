@@ -1,8 +1,10 @@
 package net.osmand.server.api.searchtest;
 
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
@@ -14,6 +16,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -527,23 +530,26 @@ public interface DataService extends BaseService {
 	}
 
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record StreetAddress(String name, List<String> houses) {}
+	record Address(String name, LatLon point) {}
+	record StreetAddress(String name, List<Address> houses) {}
 
-	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp) {
-		List<CityAddress> results = new ArrayList<>();
+	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
+		List<Record> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
 		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
 		boolean isHouseEmpty = houseRegExp == null || houseRegExp.trim().isEmpty();
-		if (isCityEmpty && isStreetEmpty)
+		boolean isPoiEmpty = poiRegExp == null || poiRegExp.trim().isEmpty();
+		if (isCityEmpty && isStreetEmpty && isPoiEmpty)
 			return results;
 
 		File file = new File(obf);
 		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			final Pattern cityPattern, streetPattern, housePattern;
+			final Pattern cityPattern, streetPattern, housePattern, poiPattern;
 			try {
 				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
 				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
 				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
+				poiPattern = !(isCityEmpty || isStreetEmpty) || !isHouseEmpty || isPoiEmpty ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
 			} catch (PatternSyntaxException e) {
 				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
 			}
@@ -551,7 +557,7 @@ public interface DataService extends BaseService {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
 			try {
 				for (BinaryIndexPart p : index.getIndexes()) {
-					if (p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+					if (poiPattern == null && p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
 						for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
 							if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
 								continue;
@@ -577,7 +583,7 @@ public interface DataService extends BaseService {
 
 								index.preloadStreets(c, null, null);
 								for (Street s : new ArrayList<>(c.getStreets())) {
-									List<String> buildings = new ArrayList<>();
+									List<Address> buildings = new ArrayList<>();
 									final String streetName = s.getName(lang);
 									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
 										continue;
@@ -593,7 +599,7 @@ public interface DataService extends BaseService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(houseName);
+												buildings.add(new Address(houseName, b.getLocation()));
 										}
 									}
 									if (!buildings.isEmpty()) {
@@ -605,17 +611,34 @@ public interface DataService extends BaseService {
 									results.add(new CityAddress(cityName, streets, boundary));
 							}
 						}
+					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
+						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
+								null, null);
+						for (Amenity amenity : index.searchPoi(req, poi)) {
+							final String poiName = amenity.getName(lang);
+							if (!poiPattern.matcher(poiName).find())
+								continue;
+							results.add(new Address(poiName, amenity.getLocation()));
+						}
 					}
 				}
 			} finally {
 				index.close();
 			}
-			// Sort results by city name (case-insensitive)
-			results.sort(Comparator.comparing(CityAddress::name, String.CASE_INSENSITIVE_ORDER));
+			// Sort results by name (case-insensitive) for CityAddress and Address records
+			results.sort(Comparator.comparing(o -> {
+				if (o instanceof CityAddress ca) {
+					return ca.name();
+				} else if (o instanceof Address a) {
+					return a.name();
+				}
+				return "";
+			}, String.CASE_INSENSITIVE_ORDER));
 			return results;
 		} catch (Exception e) {
 			getLogger().error("Failed to read OBF {}", file, e);
-			throw new RuntimeException("Failed to read OBF: " + e.getMessage(), e);
+			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
 		}
 	}
 
