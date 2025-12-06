@@ -340,14 +340,46 @@ public class SearchTestController {
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
-	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
-	                 @RequestParam(required = false) String houseRegExp) {
+	                 @RequestParam(required = false) String houseRegExp,
+	                 @RequestParam(required = false) String poiRegExp) {
 		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
-				includesBoundary != null && includesBoundary,
-				cityRegExp, streetRegExp, houseRegExp));
+				includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
+				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
+
+	private static final double SEARCH_RADIUS_DEGREE = 1.0;
+
+	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<DataService.ResultsWithStats> getResults(
+			@RequestParam String query,
+			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon) throws IOException {
+		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
+		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
+	}
+
+	@GetMapping(value = "/unit-test", produces = "application/zip")
+	@ResponseBody
+	public void downloadUnitTest(
+			@RequestParam String query,
+			@RequestParam(required = false) String name,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon,
+			HttpServletResponse response) throws IOException {
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
+		// Template only: write a ZIP containing 2 entries
+		//  - report.json (JSON metadata)
+		//  - data.zip.gz (gzip-compressed data archive)
+	}
+
 }

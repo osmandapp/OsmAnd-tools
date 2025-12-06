@@ -159,6 +159,7 @@ public class SearchTestService implements ReportService, DataService {
 		return mapsService;
 	}
 
+	@Override
 	public SearchService getSearchService() {
 		return searchService;
 	}
@@ -375,6 +376,8 @@ public class SearchTestService implements ReportService, DataService {
 		}
 	}
 
+	private static final double SEARCH_RADIUS_DEGREE = 1.5;
+
 	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
@@ -404,8 +407,10 @@ public class SearchTestService implements ReportService, DataService {
 			if (srcPoint != null) {
 				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
 						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() - SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() + SEARCH_RADIUS_DEGREE)};
 			}
 
 			for (Map<String, Object> row : rows) {
@@ -432,8 +437,10 @@ public class SearchTestService implements ReportService, DataService {
 				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() - SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() + SEARCH_RADIUS_DEGREE)};
 
 				Map<String, Object> newRow = new LinkedHashMap<>();
 				long datasetId;
@@ -444,22 +451,26 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				Object[] args = null;
 				try {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true, finder);
+								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder);
 					}
 
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, searchResult,
+					args = collectRunResults(finder, gen_id, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
-					enqueueRunResult(run, args);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, null,
-							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
-							e.getMessage() == null ? e.toString() : e.getMessage());
-					enqueueRunResult(run, args);
+					args = new Object[] {gen_id, count, run.datasetId, run.id, run.caseId, query, "",
+							e.getMessage() == null ? e.toString() : e.getMessage(), System.currentTimeMillis() - startTime,
+							0, null, null, null,
+							searchPoint.getLatitude(), searchPoint.getLongitude(), bbox[0] + "; " + bbox[1],
+							new Timestamp(System.currentTimeMillis()), false, null, null};
+				} finally {
+					if (args != null)
+						enqueueRunResult(run, args);
 				}
 			}
 		} catch (Exception e) {
@@ -492,10 +503,7 @@ public class SearchTestService implements ReportService, DataService {
  				jdbcTemplate.batchUpdate(sql, batchArgs);
  			} catch (Exception ex) {
  				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
- 			} finally {
-				 run.finish = LocalDateTime.now();
-				 runRepo.save(run);
-		    }
+ 			}
  		}, EXECUTOR);
  		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
  	}
