@@ -90,6 +90,30 @@ public class WikiDescriptionParsingTest {
 		assertEquals("A Paris Métro Line 6 train as it crosses the Pont de Bir-Hakeim to reach the rive droite", result);
 	}
 
+	@Test
+	public void test11() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{uk|1=[[w:uk:Софія Київська|Софія Київська]] — головний храм історичної Київської митрополії. Сьогодні використовується лише як музей, м. Київ}}\n"), webResults, "uk");
+		String result = webResults.get("description");
+		assertEquals("Софія Київська — головний храм історичної Київської митрополії. Сьогодні використовується лише як музей, м. Київ", result);
+	}
+
+	@Test
+	public void test12() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{en|View of Kiev seen from the belltower of the [[:en:Saint Sophia Cathedral in Kiev|Saint Sophia Monastery]] in [[Kiev]], the capital of [[Ukraine]].}}\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("View of Kiev seen from the belltower of the Saint Sophia Monastery in Kiev, the capital of Ukraine.", result);
+	}
+
+	@Test
+	public void test13() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockPhotograph("| description = {{mld|en=Saint Sophia's Cathedral, Kiev|fr=Cathédrale Sainte-Sophie de Kiev.}}\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("Saint Sophia's Cathedral, Kiev", result);
+	}
+
 	private void invoke(String text, Map<String, String> webResults, String lang)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

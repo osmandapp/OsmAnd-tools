@@ -50,8 +50,11 @@ public final class DescriptionParser {
 		Map<String, String> result = new HashMap<>();
 		String descriptionBlock = line;
 
-		// Parse multilingual descriptions in format {{lang|1=text}}
-		descriptionBlock = parseMultilingualDescriptions(descriptionBlock, result);
+		if (descriptionBlock.contains("{{mld|") || descriptionBlock.contains("{{MLD|")) {
+			parseMldDescription(descriptionBlock, result);
+		} else {
+			descriptionBlock = parseMultilingualDescriptions(descriptionBlock, result);
+		}
 
 		// If no multilingual descriptions found, parse as plain text
 		if (result.isEmpty()) {
@@ -61,14 +64,78 @@ public final class DescriptionParser {
 		return result;
 	}
 
+	private static void parseMldDescription(String descriptionBlock, Map<String, String> result) {
+		// Find mld template: {{mld|en=text|fr=text|...}}
+		int mldStart = descriptionBlock.indexOf("{{mld|");
+		if (mldStart == -1) {
+			mldStart = descriptionBlock.indexOf("{{MLD|");
+		}
+		if (mldStart == -1) {
+			return;
+		}
+
+		// Find the end of mld template
+		int openBraces = 1;
+		int currentIndex = mldStart + 6; // Skip "{{mld|" or "{{MLD|"
+		int mldEnd = -1;
+
+		while (openBraces > 0 && currentIndex < descriptionBlock.length() - 1) {
+			if (descriptionBlock.charAt(currentIndex) == '{' && descriptionBlock.charAt(currentIndex + 1) == '{') {
+				openBraces++;
+				currentIndex += 2;
+			} else if (descriptionBlock.charAt(currentIndex) == '}' && descriptionBlock.charAt(currentIndex + 1) == '}') {
+				openBraces--;
+				if (openBraces == 0) {
+					mldEnd = currentIndex;
+					break;
+				}
+				currentIndex += 2;
+			} else {
+				currentIndex++;
+			}
+		}
+
+		if (mldEnd == -1) {
+			return;
+		}
+
+		String mldContent = descriptionBlock.substring(mldStart + 6, mldEnd);
+		
+		// Split by | and parse lang=text pairs
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(mldContent, true);
+		for (String part : parts) {
+			part = part.trim();
+			int equalsIndex = part.indexOf('=');
+			if (equalsIndex > 0 && equalsIndex < part.length() - 1) {
+				String lang = part.substring(0, equalsIndex).trim();
+				String text = part.substring(equalsIndex + 1).trim();
+				if (lang.length() <= MAX_LANGUAGE_CODE_LENGTH && !text.isEmpty()) {
+					String cleanedText = renderWikiText(text, null);
+					if (cleanedText == null || cleanedText.isEmpty() || cleanedText.startsWith("Template:")) {
+						cleanedText = cleanDescriptionText(text);
+					} else {
+						cleanedText = cleanedText.trim();
+					}
+					if (!cleanedText.isEmpty()) {
+						result.put(lang, cleanedText);
+					}
+				}
+			}
+		}
+	}
+
 	private static String parseMultilingualDescriptions(String descriptionBlock, Map<String, String> result) {
 		while (descriptionBlock.contains("{{") && descriptionBlock.contains("}}")) {
 			LanguageBlock block = extractLanguageBlock(descriptionBlock);
 			if (block == null) {
 				break;
 			}
-
-			String cleanedDescription = cleanDescriptionText(block.content);
+			String cleanedDescription = renderWikiText(block.content, null);
+			if (cleanedDescription == null || cleanedDescription.isEmpty() || cleanedDescription.startsWith("Template:")) {
+				cleanedDescription = cleanDescriptionText(block.content);
+			} else {
+				cleanedDescription = cleanedDescription.trim();
+			}
 			result.put(block.language, cleanedDescription);
 			descriptionBlock = descriptionBlock.substring(block.endIndex).trim();
 		}
@@ -108,28 +175,31 @@ public final class DescriptionParser {
 
 	private static int findDescriptionEnd(String descriptionBlock, int startIndex) {
 		int openBraces = 1;
-		int currentIndex = startIndex;
-
-		while (openBraces > 0 && currentIndex < descriptionBlock.length()) {
-			if (descriptionBlock.startsWith("{{", currentIndex)) {
+		
+		for (int i = startIndex; i < descriptionBlock.length() - 1; i++) {
+			if (descriptionBlock.charAt(i) == '{' && descriptionBlock.charAt(i + 1) == '{') {
 				openBraces++;
-				currentIndex += 2;
-			} else if (descriptionBlock.startsWith("}}", currentIndex)) {
+				i++; // Skip next char as we already checked it
+			} else if (descriptionBlock.charAt(i) == '}' && descriptionBlock.charAt(i + 1) == '}') {
 				openBraces--;
-				currentIndex += 2;
-			} else {
-				currentIndex++;
+				if (openBraces == 0) {
+					// Return index before the closing }}, not including them
+					return i;
+				}
+				i++; // Skip next char as we already checked it
 			}
 		}
-
-		return openBraces == 0 ? currentIndex : -1;
+		
+		return -1; // Not found
 	}
 
 	private static String cleanDescriptionText(String description) {
-		// First, process wiki links [[W:Link|text]] or [[Link|text]] - replace with just the text part
-		description = description.replaceAll("\\[\\[([^|\\]]+)\\|([^\\]]+)\\]\\]", "$2");
-		// Then process simple wiki links [[Link]] - remove brackets
-		description = description.replaceAll("\\[\\[([^\\]]+)\\]\\]", "$1");
+		// Process wiki links [[W:Link|text]] or [[Link|text]] - replace with just the text part
+		// Match [[...|...]] where we capture the text part after |
+		// Use a more robust pattern that handles nested brackets
+		description = description.replaceAll("\\[\\[([^|\\]]+)\\|([^\\]]+?)\\]\\]", "$2");
+		// Then process simple wiki links [[Link]] - remove brackets, keep the link text
+		description = description.replaceAll("\\[\\[([^\\]]+?)\\]\\]", "$1");
 		
 		return description
 				.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
