@@ -22,12 +22,14 @@ import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
 
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
+	
 	private static final int DEFAULT_THREADS = 8;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
@@ -82,7 +84,7 @@ public class CommonsWikimediaPreparation {
 					printHelp();
 					throw new RuntimeException("Unknown mode: " + mode);
 			}
-		} catch (ParserConfigurationException | SAXException | IOException | SQLException | InterruptedException e) {
+		} catch (SQLException | InterruptedException e) {
 			throw new RuntimeException("Error during parsing: " + e.getMessage(), e);
 		}
 	}
@@ -117,8 +119,7 @@ public class CommonsWikimediaPreparation {
 	}
 
 	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate,boolean keepFiles,
-								   int threads)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {
+								   int threads) throws SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
 		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
 		initDatabase(commonsWikiDBPath, recreateDb);
@@ -126,13 +127,36 @@ public class CommonsWikimediaPreparation {
 		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
 		writerThread.start();
 		log.info("Updating wikidata...");
+		ExecutorCompletionService<Void> completionService = new ExecutorCompletionService<>(executor);
+		AtomicInteger taskCount = new AtomicInteger(0);
 		DownloadHandler dh = fileName -> {
 			log.info("Updating from " + fileName);
-			executor.submit(() -> parseCommonArticles(fileName));
+			completionService.submit(() -> {
+				parseCommonArticles(fileName);
+				return null;
+			});
+			taskCount.incrementAndGet();
 		};
 		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate, dh);
 		executor.shutdown();
-		while(!executor.awaitTermination(1, TimeUnit.DAYS));
+		
+		// Check tasks as they complete, stop immediately on critical error
+		int completed = 0;
+		while (completed < taskCount.get()) {
+			try {
+				Future<Void> future = completionService.take();
+				future.get();
+				completed++;
+			} catch (ExecutionException | InterruptedException e) {
+				executor.shutdownNow();
+				writerThread.interrupt();
+				Throwable cause = e instanceof ExecutionException ? e.getCause() : e;
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+				throw new RuntimeException("Error during parsing", cause);
+			}
+		}
 		
 		if (!keepFiles) {
 			wfd.removeDownloadedPages();
