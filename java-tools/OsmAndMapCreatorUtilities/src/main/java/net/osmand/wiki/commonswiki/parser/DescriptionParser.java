@@ -76,22 +76,19 @@ public final class DescriptionParser {
 
 		// Find the end of mld template
 		int openBraces = 1;
-		int currentIndex = mldStart + 6; // Skip "{{mld|" or "{{MLD|"
 		int mldEnd = -1;
 
-		while (openBraces > 0 && currentIndex < descriptionBlock.length() - 1) {
-			if (descriptionBlock.charAt(currentIndex) == '{' && descriptionBlock.charAt(currentIndex + 1) == '{') {
+		for (int i = mldStart + 6; i < descriptionBlock.length() - 1 && openBraces > 0; i++) {
+			if (descriptionBlock.charAt(i) == '{' && descriptionBlock.charAt(i + 1) == '{') {
 				openBraces++;
-				currentIndex += 2;
-			} else if (descriptionBlock.charAt(currentIndex) == '}' && descriptionBlock.charAt(currentIndex + 1) == '}') {
+				i++; // Skip next char as we already checked it
+			} else if (descriptionBlock.charAt(i) == '}' && descriptionBlock.charAt(i + 1) == '}') {
 				openBraces--;
 				if (openBraces == 0) {
-					mldEnd = currentIndex;
+					mldEnd = i;
 					break;
 				}
-				currentIndex += 2;
-			} else {
-				currentIndex++;
+				i++; // Skip next char as we already checked it
 			}
 		}
 

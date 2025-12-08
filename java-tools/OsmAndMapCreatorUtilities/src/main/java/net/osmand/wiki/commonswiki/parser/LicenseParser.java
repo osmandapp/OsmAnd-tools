@@ -125,7 +125,7 @@ public final class LicenseParser {
 		StringBuilder result = new StringBuilder();
 		for (String s : parts) {
 			String part = s.trim();
-			if (part.contains("=") && !part.matches("^[A-Z][A-Z0-9-]+$")) {
+			if (part.contains("=")) {
 				continue;
 			}
 			if (!result.isEmpty()) {
