@@ -185,6 +185,14 @@ public class WikiAuthorParsingTest {
 		assertNull("Author should be null when not found", webResults.get("author"));
 	}
 
+	@Test
+	public void test25() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Author = Test Author; Please attribute this image as the work of \"[[:en:User:TestUser|TestUserDisplayName]].\"\n"), webResults);
+		String result = webResults.get("author");
+		assertEquals("Test Author", result);
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

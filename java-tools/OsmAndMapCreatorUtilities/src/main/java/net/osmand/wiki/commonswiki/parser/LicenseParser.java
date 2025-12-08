@@ -35,7 +35,7 @@ public final class LicenseParser {
 
 		for (String block : licenseBlocks) {
 			String cleaned = cleanBlock(block);
-			List<String> parts = ParserUtils.splitByPipeOutsideBraces(cleaned, false);
+			List<String> parts = ParserUtils.splitByPipeOutsideBraces(cleaned, true);
 
 			for (String part : parts) {
 				String license = processLicensePart(part);
@@ -120,10 +120,21 @@ public final class LicenseParser {
 				.replace("-expired", " expired")
 				.toUpperCase();
 
-		// Remove any trailing parameters like " - param=value"
-		upper = upper.replaceAll("\\s+-\\s+[A-Z0-9_]+=.*$", "");
+		// Remove parameters like " - param=value" but keep license names
+		String[] parts = upper.split("\\s+-\\s+");
+		StringBuilder result = new StringBuilder();
+		for (String s : parts) {
+			String part = s.trim();
+			if (part.contains("=")) {
+				continue;
+			}
+			if (!result.isEmpty()) {
+				result.append(" - ");
+			}
+			result.append(part);
+		}
 
-		return upper;
+		return result.toString();
 	}
 
 	private static String cleanBlock(String block) {
@@ -141,6 +152,10 @@ public final class LicenseParser {
 			return null;
 		}
 
+		if (part.startsWith("{{") && part.endsWith("}}")) {
+			return extractLicenseFromTemplate(part);
+		}
+
 		// Handle parts with nested pipes
 		if (part.contains("|")) {
 			part = processNestedPipes(part);
@@ -149,11 +164,6 @@ public final class LicenseParser {
 		// Handle author parameter
 		if (part.toLowerCase().startsWith(AUTHOR_PARAM)) {
 			return extractAuthorLicense(part);
-		}
-
-		// Extract license from template if present
-		if (part.startsWith("{{") && part.endsWith("}}")) {
-			return extractLicenseFromTemplate(part);
 		}
 
 		return part;
