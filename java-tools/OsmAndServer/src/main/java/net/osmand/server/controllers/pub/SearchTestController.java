@@ -367,21 +367,21 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
 	}
 
-	@GetMapping(value = "/unit-test", produces = "application/zip")
+	@PutMapping(value = "/unit-test", produces = "application/zip")
 	@ResponseBody
 	public void downloadUnitTest(
 			@RequestParam String query,
-			@RequestParam(required = false) String unitTestName,
 			@RequestParam(required = false) Double radius,
 			@RequestParam Double lat,
 			@RequestParam Double lon,
+			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
 		// write a ZIP containing 2 entries
 		//  - unit-test_name.json (JSON request)
 		//  - unit-test_name.zip.gz (gzip-compressed data archive)
-		testSearchService.createUnitTest(query, unitTestName, radius, lat, lon, response.getOutputStream());
+		testSearchService.createUnitTest(query, unitTest, radius, lat, lon, response.getOutputStream());
 	}
 
 }

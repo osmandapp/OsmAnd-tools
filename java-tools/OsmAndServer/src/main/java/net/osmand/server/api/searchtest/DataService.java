@@ -1,10 +1,12 @@
 package net.osmand.server.api.searchtest;
 
+import com.amazonaws.util.StringInputStream;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -20,6 +22,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.json.JSONObject;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -689,29 +692,41 @@ public interface DataService extends BaseService {
         return new AddressResult(r.toString(), type, r.addressName, parent, metric);
     }
 
-	default void createUnitTest(String query, String name, Double radius, Double lat, Double lon, OutputStream out) throws IOException, SQLException {
-		SearchExportSettings settings = new SearchExportSettings(true, true, -1);
+	record UnitTestPayload(String name, String[] queries) {}
+
+	default void createUnitTest(String query, UnitTestPayload unitTest, Double radius, Double lat, Double lon, OutputStream out) throws IOException, SQLException {
+		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, "en", false, radius, null, null, true, null, settings);
+				.searchResults(lat, lon, query, "en", false, radius, null, null, true, null, exportSettings);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
 		try {
-			File jsonFile = dirPath.resolve(name + ".json").toFile();
+			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
 			String unitTestJson = result.unitTestJson();
+			if (unitTestJson == null)
+				return;
 			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
 
 			OBFDataCreator creator = new OBFDataCreator();
-			File outFile = creator.create(dirPath.resolve(name + ".obf").toAbsolutePath().toString(),
+			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
 					new String[] {jsonFile.getAbsolutePath()});
 
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
+			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(lat, lon));
+			JSONObject settingsJson = settings.toJSON();
+			Map<String, Object> rootJson = new LinkedHashMap<>();
+			rootJson.put("settings", settingsJson);
+			rootJson.put("phrases", unitTest.queries);
+			rootJson.put("results", Arrays.stream(unitTest.queries()).map(x -> "").toArray());
+
+			unitTestJson = new JSONObject(rootJson).toString(4);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
 				if (jsonFile.exists()) {
 					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
 					zipOut.putNextEntry(jsonEntry);
-					try (InputStream jsonIn = new FileInputStream(jsonFile)) {
+					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
 						Algorithms.streamCopy(jsonIn, zipOut);
 					}
 					zipOut.closeEntry();
@@ -719,7 +734,7 @@ public interface DataService extends BaseService {
 
 				// Gzipped data archive entry
 				if (outFile.exists()) {
-					ZipEntry gzEntry = new ZipEntry(outFile.getName());
+						ZipEntry gzEntry = new ZipEntry(outFile.getName());
 					zipOut.putNextEntry(gzEntry);
 					try (InputStream gzIn = new FileInputStream(outFile)) {
 						Algorithms.streamCopy(gzIn, zipOut);
@@ -738,13 +753,18 @@ public interface DataService extends BaseService {
 						.forEach(p -> {
 							try {
 								Files.deleteIfExists(p);
-							} catch (IOException e) {
-								getLogger().warn("Failed to delete temp unit-test path {}", p, e);
+							} catch (IOException first) {
+								try {
+									Thread.sleep(150L);
+									Files.deleteIfExists(p);
+								} catch (IOException | InterruptedException e) {
+									getLogger().warn("Failed to delete temp unit-test path {}", p);
+								}
 							}
 						});
 				}
 			} catch (IOException e) {
-				getLogger().warn("Failed to cleanup temp unit-tests directory {}", dirPath, e);
+				getLogger().warn("Failed to cleanup temp unit-tests directory {}", dirPath);
 			}
 		}
 	}
