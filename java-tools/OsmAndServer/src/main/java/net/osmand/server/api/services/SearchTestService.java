@@ -456,7 +456,7 @@ public class SearchTestService implements ReportService, DataService {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder);
+								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder, null);
 					}
 
 					args = collectRunResults(finder, gen_id, count, run, query, searchResult,

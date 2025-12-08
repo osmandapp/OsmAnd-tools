@@ -17,6 +17,7 @@ import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
@@ -142,7 +143,7 @@ public class SearchService {
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, SEARCH_RADIUS_DEGREE, northWest, southEast, false, null);
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, SEARCH_RADIUS_DEGREE, northWest, southEast, false, null, null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
@@ -157,13 +158,14 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
+	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat, String unitTestJson) {}
 
     public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
                                              double radius, String northWest, String southEast,
-                                             boolean unlimited, Consumer<List<SearchResult>> consumerInContext) throws IOException {
+                                             boolean unlimited, Consumer<List<SearchResult>> consumerInContext,
+                                             SearchExportSettings exportedSettings) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return new SearchResultWrapper(Collections.emptyList(), null);
+            return new SearchResultWrapper(Collections.emptyList(), null, null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         if (!unlimited) {
@@ -177,11 +179,11 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
             if (list.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null);
+                return new SearchResultWrapper(Collections.emptyList(), null, null);
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
             if (usedMapList.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null);
+                return new SearchResultWrapper(Collections.emptyList(), null, null);
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
 	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
@@ -189,6 +191,7 @@ public class SearchService {
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
+			settings.setExportSettings(exportedSettings);
             searchUICore.updateSettings(settings);
             
             searchUICore.init();
@@ -203,7 +206,15 @@ public class SearchService {
 			if (consumerInContext != null) {
 				consumerInContext.accept(res);
 			}
-			return new SearchResultWrapper(res, stat);
+
+	        String unitTestJson = null;
+			if (exportedSettings == null) {
+				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
+				settings.setExportedObjects(null);
+				settings.setExportedObjects(null);
+				unitTestJson = json == null ? null : json.toString();
+			}
+			return new SearchResultWrapper(res, stat, unitTestJson);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }

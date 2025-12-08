@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -370,16 +371,17 @@ public class SearchTestController {
 	@ResponseBody
 	public void downloadUnitTest(
 			@RequestParam String query,
-			@RequestParam(required = false) String name,
+			@RequestParam(required = false) String unitTestName,
 			@RequestParam(required = false) Double radius,
 			@RequestParam Double lat,
 			@RequestParam Double lon,
-			HttpServletResponse response) throws IOException {
+			HttpServletResponse response) throws IOException, SQLException {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
-		// Template only: write a ZIP containing 2 entries
-		//  - report.json (JSON metadata)
-		//  - data.zip.gz (gzip-compressed data archive)
+		// write a ZIP containing 2 entries
+		//  - unit-test_name.json (JSON request)
+		//  - unit-test_name.zip.gz (gzip-compressed data archive)
+		testSearchService.createUnitTest(query, unitTestName, radius, lat, lon, response.getOutputStream());
 	}
 
 }

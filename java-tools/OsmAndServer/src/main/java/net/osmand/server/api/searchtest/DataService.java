@@ -1,11 +1,9 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.*;
 import net.osmand.data.*;
+import net.osmand.obf.OBFDataCreator;
+import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
@@ -27,13 +25,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -41,6 +38,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public interface DataService extends BaseService {
 
@@ -665,7 +664,7 @@ public interface DataService extends BaseService {
 
 	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, lang, false, radius, null, null, true, null);
+				.searchResults(lat, lon, query, lang, false, radius, null, null, true, null, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
@@ -689,4 +688,64 @@ public interface DataService extends BaseService {
 	    AddressResult parent = toResult(r.parentSearchResult, seen);
         return new AddressResult(r.toString(), type, r.addressName, parent, metric);
     }
+
+	default void createUnitTest(String query, String name, Double radius, Double lat, Double lon, OutputStream out) throws IOException, SQLException {
+		SearchExportSettings settings = new SearchExportSettings(true, true, -1);
+		SearchService.SearchResultWrapper result = getSearchService()
+				.searchResults(lat, lon, query, "en", false, radius, null, null, true, null, settings);
+
+		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
+		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
+		try {
+			File jsonFile = dirPath.resolve(name + ".json").toFile();
+			String unitTestJson = result.unitTestJson();
+			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
+
+			OBFDataCreator creator = new OBFDataCreator();
+			File outFile = creator.create(dirPath.resolve(name + ".obf").toAbsolutePath().toString(),
+					new String[] {jsonFile.getAbsolutePath()});
+
+			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
+			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
+				// JSON metadata entry
+				if (jsonFile.exists()) {
+					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
+					zipOut.putNextEntry(jsonEntry);
+					try (InputStream jsonIn = new FileInputStream(jsonFile)) {
+						Algorithms.streamCopy(jsonIn, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+
+				// Gzipped data archive entry
+				if (outFile.exists()) {
+					ZipEntry gzEntry = new ZipEntry(outFile.getName());
+					zipOut.putNextEntry(gzEntry);
+					try (InputStream gzIn = new FileInputStream(outFile)) {
+						Algorithms.streamCopy(gzIn, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+
+				zipOut.finish();
+				out.flush();
+			}
+		} finally {
+			try {
+				if (dirPath != null && Files.exists(dirPath)) {
+					Files.walk(dirPath)
+						.sorted(Comparator.reverseOrder())
+						.forEach(p -> {
+							try {
+								Files.deleteIfExists(p);
+							} catch (IOException e) {
+								getLogger().warn("Failed to delete temp unit-test path {}", p, e);
+							}
+						});
+				}
+			} catch (IOException e) {
+				getLogger().warn("Failed to cleanup temp unit-tests directory {}", dirPath, e);
+			}
+		}
+	}
 }
