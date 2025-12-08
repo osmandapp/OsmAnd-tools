@@ -129,6 +129,17 @@ public class WikiLicenseParsingTest {
 		assertEquals("NUMBER-10-FLICKR - CC-NON-COMPLIANT", webResults.get("license"));
 	}
 
+	@Test
+	public void test15() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{uk|Парк Наталка}}\n" +
+				"|Author=[[User:TestUser|TestUser]]\n" +
+				"|Source={{own}}\n" +
+				"|Date=2009-09-29\n" +
+				"|Permission={{PD-self}}\n"), webResults);
+		assertEquals("PD SELF", webResults.get("license"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
