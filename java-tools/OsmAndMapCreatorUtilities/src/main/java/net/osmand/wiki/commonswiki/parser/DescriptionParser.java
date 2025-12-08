@@ -1,6 +1,5 @@
 package net.osmand.wiki.commonswiki.parser;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,8 +7,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+
 import info.bliki.wiki.filter.PlainTextConverter;
 import info.bliki.wiki.model.WikiModel;
+import net.osmand.PlatformUtil;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DESCRIPTION;
@@ -28,6 +30,7 @@ import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DESCRIPTION;
  */
 public final class DescriptionParser {
 
+	private static final Log log = PlatformUtil.getLog(DescriptionParser.class);
 	private static final int MAX_LANGUAGE_CODE_LENGTH = 5;
 	private static final Pattern LINK_PATTERN = Pattern.compile("\\[(https?://\\S+)\\s([^]]+)]");
 	private static final Pattern PROVIDED_DESC_PATTERN = Pattern.compile("\\w+\\s+provided\\s+description\\s*:", Pattern.CASE_INSENSITIVE);
@@ -40,10 +43,10 @@ public final class DescriptionParser {
 	 * Parses a description field from wiki markup.
 	 * 
 	 * @param line The line containing the description field
+	 * @param title The title of the image/article for logging purposes
 	 * @return Map of language codes to description texts, empty map if no description found
-	 * @throws IOException if wiki rendering fails
 	 */
-	public static Map<String, String> parse(String line) throws IOException {
+	public static Map<String, String> parse(String line, String title) {
 		Map<String, String> result = new HashMap<>();
 		String descriptionBlock = line;
 
@@ -52,7 +55,7 @@ public final class DescriptionParser {
 
 		// If no multilingual descriptions found, parse as plain text
 		if (result.isEmpty()) {
-			parsePlainTextDescription(descriptionBlock, result);
+			parsePlainTextDescription(descriptionBlock, result, title);
 		}
 
 		return result;
@@ -133,7 +136,7 @@ public final class DescriptionParser {
 				.trim();
 	}
 
-	private static void parsePlainTextDescription(String descriptionBlock, Map<String, String> result) throws IOException {
+	private static void parsePlainTextDescription(String descriptionBlock, Map<String, String> result, String title) {
 		String description = ParserUtils.extractFieldValue(descriptionBlock, FIELD_DESCRIPTION);
 		if (description == null) {
 			description = descriptionBlock.trim();
@@ -143,7 +146,10 @@ public final class DescriptionParser {
 		description = description.trim();
 
 		if (description.startsWith("{{")) {
-			String plainText = renderWikiText(description);
+			String plainText = renderWikiText(description, title);
+			if (plainText == null) {
+				return;
+			}
 			plainText = plainText.trim();
 			// If bliki returned empty string or "Template:..." (unknown template), extract template name
 			if (plainText.isEmpty() || plainText.startsWith("Template:")) {
@@ -164,7 +170,10 @@ public final class DescriptionParser {
 			description = description.substring(matcher.end()).trim();
 		}
 
-		String plainText = renderWikiText(description);
+		String plainText = renderWikiText(description, title);
+		if (plainText == null) {
+			return;
+		}
 		// Remove leading/trailing newlines from rendered text
 		plainText = plainText.trim();
 		
@@ -178,9 +187,14 @@ public final class DescriptionParser {
 		}
 	}
 
-	private static String renderWikiText(String description) throws IOException {
-		WikiModel wikiModel = new WikiModel("", "");
-		return wikiModel.render(new PlainTextConverter(true), description);
+	private static String renderWikiText(String description, String title) {
+		try {
+			WikiModel wikiModel = new WikiModel("", "");
+			return wikiModel.render(new PlainTextConverter(true), description);
+		} catch (Exception e) {
+			log.info(String.format("Rendering wiki text (title: %s)", title != null ? title : "unknown"));
+			return null;
+		}
 	}
 
 	/**

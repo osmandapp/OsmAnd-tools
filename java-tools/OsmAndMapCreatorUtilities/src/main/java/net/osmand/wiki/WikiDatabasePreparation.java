@@ -341,7 +341,7 @@ public class WikiDatabasePreparation {
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				} else if (ParserUtils.isInformationLikeTemplate(vallc)) {
-					parseInformationBlock(val, lang, webBlockResults, allLangs);
+					parseInformationBlock(val, lang, webBlockResults, allLangs, title);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
 				EnumSet<WikivoyageTemplates> key = pc != null ? of(WikivoyageTemplates.POI) : getKey(vallc, lang);
@@ -425,7 +425,7 @@ public class WikiDatabasePreparation {
 	}
 
 
-	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs) throws IOException {
+	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs, String title) {
 		
 		if (webBlockResults == null || val == null) {
 			return;
@@ -453,7 +453,7 @@ public class WikiDatabasePreparation {
 				date = DateParser.parse(line);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_DESCRIPTION)) {
-				description = DescriptionParser.parse(line);
+				description = DescriptionParser.parse(line, title);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_LICENSE) || lineLc.startsWith("permission")) {
 				String licenseValue = ParserUtils.extractFieldValue(line, ParserUtils.FIELD_LICENSE);
