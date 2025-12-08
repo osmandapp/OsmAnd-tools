@@ -82,6 +82,14 @@ public class WikiDescriptionParsingTest {
 		assertEquals("Paris from the Arc de Triomphe", result);
 	}
 
+	@Test
+	public void test10() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description = {{en|A [[W:Paris Métro Line 6|Paris Métro Line 6]] train as it crosses the [[W:Pont de Bir-Hakeim|Pont de Bir-Hakeim]] to reach the rive droite}}\n"), webResults, "en");
+		String result = webResults.get("description");
+		assertEquals("A Paris Métro Line 6 train as it crosses the Pont de Bir-Hakeim to reach the rive droite", result);
+	}
+
 	private void invoke(String text, Map<String, String> webResults, String lang)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

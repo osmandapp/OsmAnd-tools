@@ -126,11 +126,14 @@ public final class DescriptionParser {
 	}
 
 	private static String cleanDescriptionText(String description) {
+		// First, process wiki links [[W:Link|text]] or [[Link|text]] - replace with just the text part
+		description = description.replaceAll("\\[\\[([^|\\]]+)\\|([^\\]]+)\\]\\]", "$2");
+		// Then process simple wiki links [[Link]] - remove brackets
+		description = description.replaceAll("\\[\\[([^\\]]+)\\]\\]", "$1");
+		
 		return description
 				.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
 				.replaceAll("}}", "")               // Remove closing braces }}
-				.replaceAll("\\[\\[:[^|]+\\|", "")   // Remove links [[...|
-				.replaceAll("]]", "")               // Remove closing ]]
 				.replaceAll("\\{\\{", "")            // Remove remaining opening braces {{
 				.replaceAll("}$", "")                // Remove trailing brace
 				.trim();
