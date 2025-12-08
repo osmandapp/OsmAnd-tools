@@ -492,10 +492,7 @@ public class SearchTestService implements ReportService, DataService {
  				jdbcTemplate.batchUpdate(sql, batchArgs);
  			} catch (Exception ex) {
  				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
- 			} finally {
-				 run.finish = LocalDateTime.now();
-				 runRepo.save(run);
-		    }
+ 			}
  		}, EXECUTOR);
  		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
  	}
