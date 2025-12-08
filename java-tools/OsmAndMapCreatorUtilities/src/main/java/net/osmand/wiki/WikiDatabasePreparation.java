@@ -221,7 +221,7 @@ public class WikiDatabasePreparation {
 	                                       @Nullable WikiDBBrowser browser,
 	                                       @Nullable Boolean allLangs)
 			throws IOException, SQLException {
-		return removeMacroBlocks(text, webBlockResults, blockResults, pois, lang, title, browser, allLangs, null, true);
+		return removeMacroBlocks(text, webBlockResults, blockResults, pois, lang, title, browser, allLangs, false);
 	}
 
 	public static String removeMacroBlocks(StringBuilder text,
@@ -232,8 +232,7 @@ public class WikiDatabasePreparation {
 	                                       String title,
 	                                       @Nullable WikiDBBrowser browser,
 	                                       @Nullable Boolean allLangs,
-	                                       @Nullable AtomicLong errorContentBracesCounter,
-	                                       boolean logErrorContentBraces)
+	                                       boolean logContentErrors)
 			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
@@ -272,12 +271,9 @@ public class WikiDatabasePreparation {
 			cursor = i;
 			if (i >= text.length()) {
 				if (openCnt > 0) {
-					if (logErrorContentBraces) {
+					if (logContentErrors) {
 						String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
 						log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
-					}
-					if (errorContentBracesCounter != null) {
-						errorContentBracesCounter.incrementAndGet();
 					}
 					// start over again
 					errorBracesCnt.add(beginInd);
@@ -296,7 +292,7 @@ public class WikiDatabasePreparation {
 							&& text.substring(i + 1, i + 1 + tag.length()).toLowerCase().equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
-						i = parseTag(text, val, tag, i, lang, title);
+						i = parseTag(text, val, tag, i, lang, title, logContentErrors);
 						if (tag.equals(TAG_REF)) {
 							parseAndAppendCitation(val.toString(), bld);
 						} else if (tag.equals(TAG_GALLERY)) {
@@ -711,7 +707,7 @@ public class WikiDatabasePreparation {
 	}
 
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang,
-			String title) {
+			String title, boolean logContentErrors) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen + 1);
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
@@ -731,8 +727,10 @@ public class WikiDatabasePreparation {
 
 		int lastChar = text.indexOf(">", ind);
 		if (ind == -1 || lastChar == -1) {
-			String contentPreview = text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10));
-			log.error(String.format("Error content tag (not closed) %s %s: %s", lang, title, contentPreview));
+			if (logContentErrors) {
+				String contentPreview = text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10));
+				log.error(String.format("Error content tag (not closed) %s %s: %s", lang, title, contentPreview));
+			}
 			return indOpen + 1;
 		}
 		bld.append(text.substring(indOpen + 1, ind));

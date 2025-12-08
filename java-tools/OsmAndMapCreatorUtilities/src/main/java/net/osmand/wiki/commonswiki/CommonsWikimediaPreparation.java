@@ -35,7 +35,6 @@ public class CommonsWikimediaPreparation {
 	private static final AtomicLong articlesCount = new AtomicLong(0);
 	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
 	private static final AtomicLong totalPagesCount = new AtomicLong(0);
-	private static final AtomicLong errorContentBracesCount = new AtomicLong(0);
 	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
@@ -147,7 +146,6 @@ public class CommonsWikimediaPreparation {
 		log.info("Total pages with namespace=6: " + totalPagesCount.get());
 		log.info("Added to queue: " + articlesCount.get());
 		log.info("Written to database: " + writtenToDatabaseCount.get());
-		log.info("Errors 'Error content braces': " + errorContentBracesCount.get());
 		log.info("Other errors: " + otherErrorsCount.get());
 		log.info("========= End Statistics =========");
 	}
@@ -341,7 +339,7 @@ public class CommonsWikimediaPreparation {
 					}
 					totalPagesCount.incrementAndGet();
 					Map<String, String> meta = new HashMap<>();
-					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true, errorContentBracesCount, false);
+					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.get("author");
 					String license = meta.get("license");
