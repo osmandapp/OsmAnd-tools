@@ -201,6 +201,9 @@ public final class DescriptionParser {
 		// Then process simple wiki links [[Link]] - remove brackets, keep the link text
 		description = description.replaceAll("\\[\\[([^\\]]+?)\\]\\]", "$1");
 		
+		// Remove tag links like [#tag1, #tag2, #tag3]
+		description = description.replaceAll("\\[#[^\\]]+\\]", "");
+		
 		return description
 				.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
 				.replaceAll("}}", "")               // Remove closing braces }}
@@ -242,6 +245,9 @@ public final class DescriptionParser {
 			// Only apply if pattern is in the first third (likely a prefix)
 			description = description.substring(matcher.end()).trim();
 		}
+
+		// Remove tag links like [#tag1, #tag2, #tag3]
+		description = description.replaceAll("\\[#[^\\]]+\\]", "").trim();
 
 		String plainText = renderWikiText(description, title);
 		if (plainText == null) {

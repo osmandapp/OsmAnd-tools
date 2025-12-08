@@ -48,7 +48,7 @@ public class WikiDescriptionParsingTest {
 	public void test5() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(blockPhotograph("| Description    = 500px provided description: TestCity [#tag1 ,#tag2 ,#tag3]\n"), webResults, "en");
-		assertEquals("TestCity [#tag1 ,#tag2 ,#tag3]", webResults.get("description"));
+		assertEquals("TestCity", webResults.get("description"));
 	}
 
 	@Test
