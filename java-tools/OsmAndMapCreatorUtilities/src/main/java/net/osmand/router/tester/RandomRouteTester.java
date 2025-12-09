@@ -256,9 +256,9 @@ public class RandomRouteTester {
 		for (int i = 0; i < testList.size(); i++) {
 			report.entryOpen(i + 1);
 			RandomRouteEntry entry = testList.get(i);
-			for (int j = 0; j < entry.results.size(); j++) {
-				RandomRouteResult primary = entry.results.get(0);
-				RandomRouteResult result = entry.results.get(j);
+			for (int j = 0; j < entry.routeResults.size(); j++) {
+				RandomRouteResult primary = entry.routeResults.get(0);
+				RandomRouteResult result = entry.routeResults.get(j);
 				if (j == 0) {
 					report.resultPrimary(i + 1, primary);
 				} else {
@@ -350,19 +350,19 @@ public class RandomRouteTester {
 					switch (optPrimaryRouting) {
 						case BRP_JAVA:
 							opts.setOpt("--avoid-brp-java", "true");
-							entry.results.add(runBinaryRoutePlannerJava(entry));
+							entry.routeResults.add(runBinaryRoutePlannerJava(entry));
 							break;
 						case BRP_CPP:
 							opts.setOpt("--avoid-brp-cpp", "true");
-							entry.results.add(runBinaryRoutePlannerCpp(entry));
+							entry.routeResults.add(runBinaryRoutePlannerCpp(entry));
 							break;
 						case HH_JAVA:
 							opts.setOpt("--avoid-hh-java", "true");
-							entry.results.add(runHHRoutePlannerJava(entry));
+							entry.routeResults.add(runHHRoutePlannerJava(entry));
 							break;
 						case HH_CPP:
 							opts.setOpt("--avoid-hh-cpp", "true");
-							entry.results.add(runHHRoutePlannerCpp(entry));
+							entry.routeResults.add(runHHRoutePlannerCpp(entry));
 							break;
 						default:
 							throw new RuntimeException("Wrong primary routing defined");
@@ -371,28 +371,28 @@ public class RandomRouteTester {
 
 				// process --avoid-xxx options
 				if (!opts.getBoolean("--avoid-brp-java")) {
-					entry.results.add(runBinaryRoutePlannerJava(entry));
+					entry.routeResults.add(runBinaryRoutePlannerJava(entry));
 				}
 				if (!opts.getBoolean("--avoid-brp-cpp")) {
-					entry.results.add(runBinaryRoutePlannerCpp(entry));
+					entry.routeResults.add(runBinaryRoutePlannerCpp(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-java")) {
-					entry.results.add(runHHRoutePlannerJava(entry));
+					entry.routeResults.add(runHHRoutePlannerJava(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-cpp")) {
-					entry.results.add(runHHRoutePlannerCpp(entry));
+					entry.routeResults.add(runHHRoutePlannerCpp(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
 			} finally {
 				System.err.println("---------------------------------------------------------------------------------");
 				// verbose all route results after each cycle
-				for (int j = 0; j < entry.results.size(); j++) {
-					System.err.println(RandomRouteReport.resultPrimaryText(i + 1, entry.results.get(j)));
+				for (int j = 0; j < entry.routeResults.size(); j++) {
+					System.err.println(RandomRouteReport.resultPrimaryText(i + 1, entry.routeResults.get(j)));
 				}
 				System.err.println("---------------------------------------------------------------------------------");
 			}
-			if (optStopAtFirstRoute && !entry.results.isEmpty() && entry.results.get(0).distance > 0) {
+			if (optStopAtFirstRoute && !entry.routeResults.isEmpty() && entry.routeResults.get(0).distance > 0) {
 				testList = new ArrayList<>(List.of(entry));
 				break;
 			}

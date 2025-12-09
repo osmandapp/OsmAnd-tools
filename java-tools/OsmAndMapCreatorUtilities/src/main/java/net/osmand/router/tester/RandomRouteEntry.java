@@ -19,7 +19,7 @@ class RandomRouteEntry {
 	String profile = "car";
 	List<String> params = new ArrayList<>();
 
-	List<RandomRouteResult> results = new ArrayList<>();
+	List<RandomRouteResult> routeResults = new ArrayList<>();
 
 	Map<String, String> mapParams() {
 		Map<String, String> map = new HashMap<>();
