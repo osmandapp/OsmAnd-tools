@@ -364,24 +364,24 @@ public class RandomRouteTester {
 				}
 
 				// process --avoid-xxx options
-				if (opts.getOpt("--avoid-brp-java") == null) {
+				if (!opts.getBoolean("--avoid-brp-java")) {
 					if (entry.isPublicTransport()) {
 						entry.transportResults.add(runTransportRoutePlannerJava(entry));
 					} else {
 						entry.routeResults.add(runBinaryRoutePlannerJava(entry));
 					}
 				}
-				if (opts.getOpt("--avoid-brp-cpp") == null) {
+				if (!opts.getBoolean("--avoid-brp-cpp")) {
 					if (entry.isPublicTransport()) {
 						entry.transportResults.add(runTransportRoutePlannerCpp(entry));
 					} else {
 						entry.routeResults.add(runBinaryRoutePlannerCpp(entry));
 					}
 				}
-				if (opts.getOpt("--avoid-hh-java") == null) {
+				if (!opts.getBoolean("--avoid-hh-java")) {
 					entry.routeResults.add(runHHRoutePlannerJava(entry));
 				}
-				if (opts.getOpt("--avoid-hh-cpp") == null) {
+				if (!opts.getBoolean("--avoid-hh-cpp")) {
 					entry.routeResults.add(runHHRoutePlannerCpp(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
