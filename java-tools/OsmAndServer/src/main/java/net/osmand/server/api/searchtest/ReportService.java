@@ -37,6 +37,8 @@ public interface ReportService {
 			long processed,
 			long failed,
 			long duration,
+			long searchDuration,
+			int threadsCount,
 			long found,
 			long partial,
 			long totalBytes,
@@ -65,8 +67,9 @@ public interface ReportService {
 			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE 
-			    WHEN error IS NOT NULL THEN 'Error' WHEN query IS NULL THEN 'Filtered'
-				WHEN gen_count = 0 or trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
+			    WHEN error IS NOT NULL THEN 'Error' 
+			    WHEN gen_count <= 0 THEN 'Filtered'
+				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id, 
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
@@ -174,8 +177,8 @@ public interface ReportService {
 				SELECT (select status from test_case where id = case_id) AS status,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE (gen_count = -1 or query IS NULL) and error IS NULL) AS filtered,
-				    count(*) FILTER (WHERE gen_count = 0 or trim(query) = '') AS empty,
+				    count(*) FILTER (WHERE gen_count <= 0 and error IS NULL) AS filtered,
+				    count(*) FILTER (WHERE gen_count > 0 and error IS NULL and (query IS NULL or trim(query) = '')) AS empty,
 				    sum(duration) AS duration
 				FROM
 				    gen_result
@@ -213,19 +216,18 @@ public interface ReportService {
 
 	default Optional<RunStatus> getRunStatus(Long runId) {
 		String sql = """
-				SELECT (select status from run where id = run_id) AS status,
+				SELECT run.status, run.threads_count, COALESCE(finish - start, sum(duration)) AS time_duration,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
-				    count(*) FILTER (WHERE error IS NOT NULL) AS failed,
-				    sum(duration) AS duration,
-				    count(*) FILTER (WHERE COALESCE(found, res_distance <= 50)) AS found_count,
+				    count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed,
+				    sum(duration) AS search_duration,
+				    count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count,
 					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
 					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
 					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
 				FROM
-				    run_result
-				WHERE
-				    run_id = ?
+				    run_result, run 
+				WHERE run.id = run_id AND run_id = ?
 				""";
 		try {
 			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, runId);
@@ -242,8 +244,12 @@ public interface ReportService {
 			number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("duration"));
-			long duration = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("search_duration"));
+			long searchDuration = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("time_duration"));
+			long timeDuration = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("threads_count"));
+			int threadsCount = number == null ? 0 : number.intValue();
 
 			number = ((Number) result.get("found_count"));
 			long found = number == null ? 0 : number.longValue();
@@ -258,7 +264,7 @@ public interface ReportService {
 			long totalTime = number == null ? 0 : number.longValue();
 
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					duration, found, partial, totalBytes, totalTime, null, null);
+					timeDuration, searchDuration, threadsCount, found, partial, totalBytes, totalTime, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -298,10 +304,10 @@ public interface ReportService {
 		if (status == null) {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
-					caseStatus.failed(), caseStatus.duration(), 0, 0, 0, 0, distanceHistogram, caseStatus);
+					caseStatus.failed(), caseStatus.duration(), caseStatus.duration(), 0, 0, 0, 0, 0, distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.found(), status.partial(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
+					status.duration(), status.searchDuration, status.threadsCount, status.found(), status.partial(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}
@@ -365,7 +371,7 @@ public interface ReportService {
 			Map<Long, String> runNames = new HashMap<>();
 			for (long runId : runIds) {
 				runs.add(extendTo(getJdbcTemplate().queryForList(
-						REPORT_SQL + " ORDER BY gen_id", runId), allCols));
+						REPORT_SQL + " ORDER BY gen_id", caseId, runId), allCols));
 				runNames.put(runId, getJdbcTemplate().queryForObject("SELECT name FROM run WHERE id = ?",
 						String.class, runId));
 			}

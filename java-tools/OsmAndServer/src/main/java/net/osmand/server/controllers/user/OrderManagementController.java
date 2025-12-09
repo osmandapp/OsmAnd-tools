@@ -21,6 +21,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static net.osmand.purchases.PurchaseHelper.PLATFORM_FASTSPRING;
+
 
 @Controller
 @RequestMapping("/admin/order-mgmt")
@@ -166,5 +168,23 @@ public class OrderManagementController {
 			orderId = UUID.randomUUID().toString();
 		} while (!subscriptionsRepository.findByOrderId(orderId).isEmpty());
 		return orderId;
+	}
+
+	@PostMapping("/orders/revalidate")
+	@ResponseBody
+	public ResponseEntity<String> revalidateFastspring(@RequestParam String sku, @RequestParam String orderId) {
+		List<AdminService.Purchase> pList = orderManagementService.findPurchaseByOrderAndSku(orderId, sku);
+		if (pList.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+
+		pList.forEach(purchase -> {
+			if (!sku.toLowerCase().contains(PLATFORM_FASTSPRING)) {
+				return;
+			}
+			orderManagementService.revalidateFastspringPurchase(purchase);
+		});
+
+		return ResponseEntity.ok().build();
 	}
 }

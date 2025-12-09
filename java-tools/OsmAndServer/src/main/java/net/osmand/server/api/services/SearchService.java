@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -141,7 +142,7 @@ public class SearchService {
 
 	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false, false);
+		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, northWest, southEast, false, null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
@@ -159,8 +160,8 @@ public class SearchService {
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat) {}
 
     public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
-                                             String northWest, String southEast, boolean filterCombinedMap,
-                                             boolean unlimited) throws IOException {
+                                             String northWest, String southEast,
+                                             boolean unlimited, Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResultWrapper(Collections.emptyList(), null);
         }
@@ -199,6 +200,9 @@ public class SearchService {
 	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
 	        res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
 	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
+			if (consumerInContext != null) {
+				consumerInContext.accept(res);
+			}
 			return new SearchResultWrapper(res, stat);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
