@@ -46,8 +46,8 @@ public class ObfChecker {
 	private static final int MAX_ROUTE_RULES = 17500; // Chile_southamerica 2025-12-05 +20%
 	private static final int MAX_POI_TYPES = 6400; // Gb 2025-12-05 +20%
 
-	// TODO how to calculate and compare Island territories
-	// TODO fix Berlin vs https://www.openstreetmap.org/relation/13218198
+	// TO-THINK how to calculate and compare Island territories
+	// TO-THINK fix Berlin vs https://www.openstreetmap.org/relation/13218198
 	private static final double MAX_BBOX_AREAS_MIN_MAX_RATIO = 0; // disabled
 
 	private static final QuadRect bboxPoi = new QuadRect();
