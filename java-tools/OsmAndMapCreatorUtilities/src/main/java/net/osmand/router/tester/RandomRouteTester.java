@@ -20,7 +20,7 @@ import net.osmand.util.MapUtils;
 
 public class RandomRouteTester {
 	static final String PUBLIC_TRANSPORT_PROFILE = "public_transport";
-	static final String PUBLIC_TRANSPORT_PROFILE_UNLIMITED = PUBLIC_TRANSPORT_PROFILE + ",pt_limit=0,pt_exclude=0";
+	static final String PUBLIC_TRANSPORT_PROFILE_UNLIMITED = PUBLIC_TRANSPORT_PROFILE + ",pt_limit=0";
 
 	static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
