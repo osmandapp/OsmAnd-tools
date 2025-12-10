@@ -62,6 +62,8 @@ public class WebUserdataService {
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
+	private static final String AUTHOR = "author";
+	private static final String HAS_ADVANCED_ROUTE = "hasAdvancedRoute";
 
 	public static final String SRTM_ANALYSIS = "srtm-analysis";
 	private static final String DONE_SUFFIX = "-done";
@@ -73,7 +75,7 @@ public class WebUserdataService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1741949863504L; // 14-03-2025
+	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
 
 
 	Gson gson = new Gson();
@@ -184,6 +186,16 @@ public class WebUserdataService {
 			addMetadata(details, gpxFile);
 			if (isTrack) {
 				addTrackData(details, analysis);
+				String author = gpxFile.getAuthor();
+				if (author != null && !author.isBlank()) {
+					if (author.length() > 20) {
+						author = author.substring(0, 20);
+					}
+					details.addProperty(AUTHOR, author);
+				}
+				if (!gpxFile.getRoutes().isEmpty()) {
+					details.addProperty(HAS_ADVANCED_ROUTE, true);
+				}
 			}
 		}
 		details.add(SHARE, gson.toJsonTree(isShared));
