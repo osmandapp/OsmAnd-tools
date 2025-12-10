@@ -188,8 +188,8 @@ public class WebUserdataService {
 				addTrackData(details, analysis);
 				String author = gpxFile.getAuthor();
 				if (author != null && !author.isBlank()) {
-					if (author.length() > 20) {
-						author = author.substring(0, 20);
+					if (author.length() > 100) {
+						author = author.substring(0, 100) + "...";
 					}
 					details.addProperty(AUTHOR, author);
 				}
