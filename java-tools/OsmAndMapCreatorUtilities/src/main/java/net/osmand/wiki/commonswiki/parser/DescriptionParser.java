@@ -1,6 +1,5 @@
 package net.osmand.wiki.commonswiki.parser;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,8 +7,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+
 import info.bliki.wiki.filter.PlainTextConverter;
 import info.bliki.wiki.model.WikiModel;
+import net.osmand.PlatformUtil;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DESCRIPTION;
@@ -28,6 +30,7 @@ import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DESCRIPTION;
  */
 public final class DescriptionParser {
 
+	private static final Log log = PlatformUtil.getLog(DescriptionParser.class);
 	private static final int MAX_LANGUAGE_CODE_LENGTH = 5;
 	private static final Pattern LINK_PATTERN = Pattern.compile("\\[(https?://\\S+)\\s([^]]+)]");
 	private static final Pattern PROVIDED_DESC_PATTERN = Pattern.compile("\\w+\\s+provided\\s+description\\s*:", Pattern.CASE_INSENSITIVE);
@@ -40,22 +43,82 @@ public final class DescriptionParser {
 	 * Parses a description field from wiki markup.
 	 * 
 	 * @param line The line containing the description field
+	 * @param title The title of the image/article for logging purposes
 	 * @return Map of language codes to description texts, empty map if no description found
-	 * @throws IOException if wiki rendering fails
 	 */
-	public static Map<String, String> parse(String line) throws IOException {
+	public static Map<String, String> parse(String line, String title) {
 		Map<String, String> result = new HashMap<>();
 		String descriptionBlock = line;
 
-		// Parse multilingual descriptions in format {{lang|1=text}}
-		descriptionBlock = parseMultilingualDescriptions(descriptionBlock, result);
+		if (descriptionBlock.contains("{{mld|") || descriptionBlock.contains("{{MLD|")) {
+			parseMldDescription(descriptionBlock, result);
+		} else {
+			descriptionBlock = parseMultilingualDescriptions(descriptionBlock, result);
+		}
 
 		// If no multilingual descriptions found, parse as plain text
 		if (result.isEmpty()) {
-			parsePlainTextDescription(descriptionBlock, result);
+			parsePlainTextDescription(descriptionBlock, result, title);
 		}
 
 		return result;
+	}
+
+	private static void parseMldDescription(String descriptionBlock, Map<String, String> result) {
+		// Find mld template: {{mld|en=text|fr=text|...}}
+		int mldStart = descriptionBlock.indexOf("{{mld|");
+		if (mldStart == -1) {
+			mldStart = descriptionBlock.indexOf("{{MLD|");
+		}
+		if (mldStart == -1) {
+			return;
+		}
+
+		// Find the end of mld template
+		int openBraces = 1;
+		int mldEnd = -1;
+
+		for (int i = mldStart + 6; i < descriptionBlock.length() - 1 && openBraces > 0; i++) {
+			if (descriptionBlock.charAt(i) == '{' && descriptionBlock.charAt(i + 1) == '{') {
+				openBraces++;
+				i++; // Skip next char as we already checked it
+			} else if (descriptionBlock.charAt(i) == '}' && descriptionBlock.charAt(i + 1) == '}') {
+				openBraces--;
+				if (openBraces == 0) {
+					mldEnd = i;
+					break;
+				}
+				i++; // Skip next char as we already checked it
+			}
+		}
+
+		if (mldEnd == -1) {
+			return;
+		}
+
+		String mldContent = descriptionBlock.substring(mldStart + 6, mldEnd);
+		
+		// Split by | and parse lang=text pairs
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(mldContent, true);
+		for (String part : parts) {
+			part = part.trim();
+			int equalsIndex = part.indexOf('=');
+			if (equalsIndex > 0 && equalsIndex < part.length() - 1) {
+				String lang = part.substring(0, equalsIndex).trim();
+				String text = part.substring(equalsIndex + 1).trim();
+				if (lang.length() <= MAX_LANGUAGE_CODE_LENGTH && !text.isEmpty()) {
+					String cleanedText = renderWikiText(text, null);
+					if (cleanedText == null || cleanedText.isEmpty() || cleanedText.startsWith("Template:")) {
+						cleanedText = cleanDescriptionText(text);
+					} else {
+						cleanedText = cleanedText.trim();
+					}
+					if (!cleanedText.isEmpty()) {
+						result.put(lang, cleanedText);
+					}
+				}
+			}
+		}
 	}
 
 	private static String parseMultilingualDescriptions(String descriptionBlock, Map<String, String> result) {
@@ -64,8 +127,12 @@ public final class DescriptionParser {
 			if (block == null) {
 				break;
 			}
-
-			String cleanedDescription = cleanDescriptionText(block.content);
+			String cleanedDescription = renderWikiText(block.content, null);
+			if (cleanedDescription == null || cleanedDescription.isEmpty() || cleanedDescription.startsWith("Template:")) {
+				cleanedDescription = cleanDescriptionText(block.content);
+			} else {
+				cleanedDescription = cleanedDescription.trim();
+			}
 			result.put(block.language, cleanedDescription);
 			descriptionBlock = descriptionBlock.substring(block.endIndex).trim();
 		}
@@ -105,35 +172,44 @@ public final class DescriptionParser {
 
 	private static int findDescriptionEnd(String descriptionBlock, int startIndex) {
 		int openBraces = 1;
-		int currentIndex = startIndex;
-
-		while (openBraces > 0 && currentIndex < descriptionBlock.length()) {
-			if (descriptionBlock.startsWith("{{", currentIndex)) {
+		
+		for (int i = startIndex; i < descriptionBlock.length() - 1; i++) {
+			if (descriptionBlock.charAt(i) == '{' && descriptionBlock.charAt(i + 1) == '{') {
 				openBraces++;
-				currentIndex += 2;
-			} else if (descriptionBlock.startsWith("}}", currentIndex)) {
+				i++; // Skip next char as we already checked it
+			} else if (descriptionBlock.charAt(i) == '}' && descriptionBlock.charAt(i + 1) == '}') {
 				openBraces--;
-				currentIndex += 2;
-			} else {
-				currentIndex++;
+				if (openBraces == 0) {
+					// Return index before the closing }}, not including them
+					return i;
+				}
+				i++; // Skip next char as we already checked it
 			}
 		}
-
-		return openBraces == 0 ? currentIndex : -1;
+		
+		return -1; // Not found
 	}
 
 	private static String cleanDescriptionText(String description) {
+		// Process wiki links [[W:Link|text]] or [[Link|text]] - replace with just the text part
+		// Match [[...|...]] where we capture the text part after |
+		// Use a more robust pattern that handles nested brackets
+		description = description.replaceAll("\\[\\[([^|\\]]+)\\|([^\\]]+?)\\]\\]", "$2");
+		// Then process simple wiki links [[Link]] - remove brackets, keep the link text
+		description = description.replaceAll("\\[\\[([^\\]]+?)\\]\\]", "$1");
+		
+		// Remove tag links like [#tag1, #tag2, #tag3]
+		description = description.replaceAll("\\[#[^\\]]+\\]", "");
+		
 		return description
 				.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
 				.replaceAll("}}", "")               // Remove closing braces }}
-				.replaceAll("\\[\\[:[^|]+\\|", "")   // Remove links [[...|
-				.replaceAll("]]", "")               // Remove closing ]]
 				.replaceAll("\\{\\{", "")            // Remove remaining opening braces {{
 				.replaceAll("}$", "")                // Remove trailing brace
 				.trim();
 	}
 
-	private static void parsePlainTextDescription(String descriptionBlock, Map<String, String> result) throws IOException {
+	private static void parsePlainTextDescription(String descriptionBlock, Map<String, String> result, String title) {
 		String description = ParserUtils.extractFieldValue(descriptionBlock, FIELD_DESCRIPTION);
 		if (description == null) {
 			description = descriptionBlock.trim();
@@ -143,7 +219,10 @@ public final class DescriptionParser {
 		description = description.trim();
 
 		if (description.startsWith("{{")) {
-			String plainText = renderWikiText(description);
+			String plainText = renderWikiText(description, title);
+			if (plainText == null) {
+				return;
+			}
 			plainText = plainText.trim();
 			// If bliki returned empty string or "Template:..." (unknown template), extract template name
 			if (plainText.isEmpty() || plainText.startsWith("Template:")) {
@@ -164,7 +243,13 @@ public final class DescriptionParser {
 			description = description.substring(matcher.end()).trim();
 		}
 
-		String plainText = renderWikiText(description);
+		// Remove tag links like [#tag1, #tag2, #tag3]
+		description = description.replaceAll("\\[#[^\\]]+\\]", "").trim();
+
+		String plainText = renderWikiText(description, title);
+		if (plainText == null) {
+			return;
+		}
 		// Remove leading/trailing newlines from rendered text
 		plainText = plainText.trim();
 		
@@ -173,13 +258,19 @@ public final class DescriptionParser {
 		if (!links.isEmpty()) {
 			plainText = appendLinks(plainText, links);
 		}
-
-		result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
+		if (!plainText.isEmpty()) {
+			result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
+		}
 	}
 
-	private static String renderWikiText(String description) throws IOException {
-		WikiModel wikiModel = new WikiModel("", "");
-		return wikiModel.render(new PlainTextConverter(true), description);
+	private static String renderWikiText(String description, String title) {
+		try {
+			WikiModel wikiModel = new WikiModel("", "");
+			return wikiModel.render(new PlainTextConverter(true), description);
+		} catch (Exception e) {
+			log.info(String.format("Rendering wiki text (title: %s)", title != null ? title : "unknown"));
+			return null;
+		}
 	}
 
 	/**

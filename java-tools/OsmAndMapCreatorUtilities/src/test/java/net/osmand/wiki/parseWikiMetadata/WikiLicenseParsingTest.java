@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiLicenseParsingTest {
@@ -19,14 +20,14 @@ public class WikiLicenseParsingTest {
 	public void test1() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(licenseBlockWithTemplate("{{Self|author={{user at project|TestUser|testwiki|en}}|GFDL|CC-BY-SA-2.5|migration=relicense}}"), webResults);
-		assertEquals("SELF - GFDL - CC BY-SA-2.5", webResults.get("license"));
+		assertEquals("GFDL - CC BY-SA-2.5", webResults.get("license"));
 	}
 
 	@Test
 	public void test2() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(licenseBlockWithTemplate("{{self|cc-by-sa-3.0}}"), webResults);
-		assertEquals("SELF - CC-BY-SA-3.0", webResults.get("license"));
+		assertEquals("CC-BY-SA-3.0", webResults.get("license"));
 	}
 
 	@Test
@@ -98,7 +99,7 @@ public class WikiLicenseParsingTest {
 				"=={{int:license-header}}==\n" +
 				"{{FlickreviewR|status=passed|author=TestAuthor|sourceurl=https://example.com/photo|archive=|reviewdate=2023-07-01 18:54:15|reviewlicense=Public Domain Mark|reviewer=FlickreviewR 2}}{{PD-USGov-DOS}}\n" +
 				"\n", webResults);
-		assertEquals("PD USGOV-DOS", webResults.get("license"));
+		assertEquals("FLICKREVIEWR - PD USGOV-DOS", webResults.get("license"));
 	}
 
 	@Test
@@ -109,6 +110,34 @@ public class WikiLicenseParsingTest {
 				"{{PD-Art-two-auto|deathyear=1887}}\n" +
 				"\n", webResults);
 		assertEquals("PD ART-TWO-AUTO", webResults.get("license"));
+	}
+
+	@Test
+	public void test13() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description=Test description\n|author=Test Author\n|date=2023-01-01\n"), webResults);
+		assertNull("License should be null when not found", webResults.get("license"));
+	}
+
+	@Test
+	public void test14() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=Picture by Simon Dawson / No 10 Downing Street\n") +
+				"=={{int:license-header}}==\n" +
+				"{{Number-10-flickr|{{Cc-non-compliant|Attribution-NonCommercial-NoDerivs 2.0 Generic|by-nc-nd/2.0/|nowarn=yes}}}}\n" +
+				"\n", webResults);
+		assertEquals("NUMBER-10-FLICKR - CC-NON-COMPLIANT", webResults.get("license"));
+	}
+
+	@Test
+	public void test15() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{uk|Парк Наталка}}\n" +
+				"|Author=[[User:TestUser|TestUser]]\n" +
+				"|Source={{own}}\n" +
+				"|Date=2009-09-29\n" +
+				"|Permission={{PD-self}}\n"), webResults);
+		assertEquals("PD SELF", webResults.get("license"));
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

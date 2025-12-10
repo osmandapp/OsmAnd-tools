@@ -22,17 +22,22 @@ import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
 
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
+	
 	private static final int DEFAULT_THREADS = 8;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
 	private static final AtomicLong articlesCount = new AtomicLong(0);
+	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
+	private static final AtomicLong totalPagesCount = new AtomicLong(0);
+	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
@@ -79,7 +84,7 @@ public class CommonsWikimediaPreparation {
 					printHelp();
 					throw new RuntimeException("Unknown mode: " + mode);
 			}
-		} catch (ParserConfigurationException | SAXException | IOException | SQLException | InterruptedException e) {
+		} catch (SQLException | InterruptedException e) {
 			throw new RuntimeException("Error during parsing: " + e.getMessage(), e);
 		}
 	}
@@ -114,8 +119,7 @@ public class CommonsWikimediaPreparation {
 	}
 
 	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate,boolean keepFiles,
-								   int threads)
-			throws ParserConfigurationException, SAXException, IOException, SQLException, InterruptedException {
+								   int threads) throws SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
 		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
 		initDatabase(commonsWikiDBPath, recreateDb);
@@ -123,13 +127,36 @@ public class CommonsWikimediaPreparation {
 		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
 		writerThread.start();
 		log.info("Updating wikidata...");
+		ExecutorCompletionService<Void> completionService = new ExecutorCompletionService<>(executor);
+		AtomicInteger taskCount = new AtomicInteger(0);
 		DownloadHandler dh = fileName -> {
 			log.info("Updating from " + fileName);
-			executor.submit(() -> parseCommonArticles(fileName));
+			completionService.submit(() -> {
+				parseCommonArticles(fileName);
+				return null;
+			});
+			taskCount.incrementAndGet();
 		};
 		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate, dh);
 		executor.shutdown();
-		while(!executor.awaitTermination(1, TimeUnit.DAYS));
+		
+		// Check tasks as they complete, stop immediately on critical error
+		int completed = 0;
+		while (completed < taskCount.get()) {
+			try {
+				Future<Void> future = completionService.take();
+				future.get();
+				completed++;
+			} catch (ExecutionException | InterruptedException e) {
+				executor.shutdownNow();
+				writerThread.interrupt();
+				Throwable cause = e instanceof ExecutionException ? e.getCause() : e;
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
+				throw new RuntimeException("Error during parsing", cause);
+			}
+		}
 		
 		if (!keepFiles) {
 			wfd.removeDownloadedPages();
@@ -137,8 +164,14 @@ public class CommonsWikimediaPreparation {
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
 		createIndex(commonsWikiDBPath);
-		log.info("========= All tasks done in %.0fs total parsed %d articles ========="
-				.formatted((System.currentTimeMillis() - start) / 1000.0, articlesCount.get()));
+		log.info("========= All tasks done in %.0fs ========="
+				.formatted((System.currentTimeMillis() - start) / 1000.0));
+		log.info("========= Statistics =========");
+		log.info("Total pages with namespace=6: " + totalPagesCount.get());
+		log.info("Added to queue: " + articlesCount.get());
+		log.info("Written to database: " + writtenToDatabaseCount.get());
+		log.info("Other errors: " + otherErrorsCount.get());
+		log.info("========= End Statistics =========");
 	}
 
 	private static void initDatabase(String sqliteFileName, boolean recreateDb) throws SQLException {
@@ -195,12 +228,16 @@ public class CommonsWikimediaPreparation {
 					if (counter % BATCH_SIZE == 0) {
 						insertStatement.executeBatch();
 						conn.commit();
+						writtenToDatabaseCount.addAndGet(counter);
 						counter = 0;
 					}
 				}
 
-				insertStatement.executeBatch();
-				conn.commit();
+				if (counter > 0) {
+					insertStatement.executeBatch();
+					conn.commit();
+					writtenToDatabaseCount.addAndGet(counter);
+				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -324,13 +361,14 @@ public class CommonsWikimediaPreparation {
 					if (imageTitle == null) {
 						return;
 					}
+					totalPagesCount.incrementAndGet();
 					Map<String, String> meta = new HashMap<>();
 					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
-					String author = meta.getOrDefault("author", "");
-					String license = meta.getOrDefault("license", "");
-					String description = meta.getOrDefault("description", "");
-					String date = meta.getOrDefault("date", "");
+					String author = meta.get("author");
+					String license = meta.get("license");
+					String description = meta.get("description");
+					String date = meta.get("date");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
 								author, date, license, description));
@@ -342,6 +380,7 @@ public class CommonsWikimediaPreparation {
 					}
 				}
 			} catch (Exception exception) {
+				otherErrorsCount.incrementAndGet();
 				log.error(exception.getMessage() + " on page id : " + id + " title : " + title, exception);
 			}
 		}

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
 
 public class WikiAuthorParsingTest {
@@ -82,7 +83,7 @@ public class WikiAuthorParsingTest {
 	public void test10() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=[https://example.com]\n"), webResults);
-		assertEquals("Unknown", webResults.get("author"));
+		assertNull("Author should be null when link has no text", webResults.get("author"));
 	}
 
 	@Test
@@ -175,6 +176,21 @@ public class WikiAuthorParsingTest {
 		Map<String, String> webResults = new HashMap<>();
 		invoke(informationBlock("|author=[[:nl:Gebruiker:TestUser]]\n"), webResults);
 		assertEquals("TestUser", webResults.get("author"));
+	}
+
+	@Test
+	public void test24() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|description=Test description\n|date=2023-01-01\n"), webResults);
+		assertNull("Author should be null when not found", webResults.get("author"));
+	}
+
+	@Test
+	public void test25() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Author = Test Author; Please attribute this image as the work of \"[[:en:User:TestUser|TestUserDisplayName]].\"\n"), webResults);
+		String result = webResults.get("author");
+		assertEquals("Test Author", result);
 	}
 
 	private void invoke(String text, Map<String, String> webResults)

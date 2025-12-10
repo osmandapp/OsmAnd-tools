@@ -23,6 +23,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -83,8 +84,7 @@ public class WikiDatabasePreparation {
 	private static final int OPTIMAL_SHORT_DESCR = 250;
 	private static final int OPTIMAL_LONG_DESCR = 500;
 	private static final int SHORT_PARAGRAPH = 10;
-	
-	public static final String DEFAULT_STRING = "Unknown";
+
 	public static final String DEFAULT_LANG = "en";
 	
 
@@ -221,6 +221,19 @@ public class WikiDatabasePreparation {
 	                                       @Nullable WikiDBBrowser browser,
 	                                       @Nullable Boolean allLangs)
 			throws IOException, SQLException {
+		return removeMacroBlocks(text, webBlockResults, blockResults, pois, lang, title, browser, allLangs, false);
+	}
+
+	public static String removeMacroBlocks(StringBuilder text,
+	                                       @Nullable Map<String, String> webBlockResults,
+	                                       Map<WikivoyageTemplates, List<String>> blockResults,
+	                                       @Nullable List<Map<PoiFieldType, Object>> pois,
+	                                       String lang,
+	                                       String title,
+	                                       @Nullable WikiDBBrowser browser,
+	                                       @Nullable Boolean allLangs,
+	                                       boolean logContentErrors)
+			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
@@ -258,8 +271,10 @@ public class WikiDatabasePreparation {
 			cursor = i;
 			if (i >= text.length()) {
 				if (openCnt > 0) {
-					String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
-					log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
+					if (logContentErrors) {
+						String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
+						log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
+					}
 					// start over again
 					errorBracesCnt.add(beginInd);
 					beginInd = openCnt = i = 0;
@@ -277,7 +292,7 @@ public class WikiDatabasePreparation {
 							&& text.substring(i + 1, i + 1 + tag.length()).toLowerCase().equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
-						i = parseTag(text, val, tag, i, lang, title);
+						i = parseTag(text, val, tag, i, lang, title, logContentErrors);
 						if (tag.equals(TAG_REF)) {
 							parseAndAppendCitation(val.toString(), bld);
 						} else if (tag.equals(TAG_GALLERY)) {
@@ -322,7 +337,7 @@ public class WikiDatabasePreparation {
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
 				} else if (ParserUtils.isInformationLikeTemplate(vallc)) {
-					parseInformationBlock(val, lang, webBlockResults, allLangs);
+					parseInformationBlock(val, lang, webBlockResults, allLangs, title);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
 				EnumSet<WikivoyageTemplates> key = pc != null ? of(WikivoyageTemplates.POI) : getKey(vallc, lang);
@@ -406,14 +421,14 @@ public class WikiDatabasePreparation {
 	}
 
 
-	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs) throws IOException {
+	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs, String title) {
 		
 		if (webBlockResults == null || val == null) {
 			return;
 		}
 		
-		String author = DEFAULT_STRING;
-		String date = DEFAULT_STRING;
+		String author = null;
+		String date = null;
 		String license = null;
 		Map<String, String> description = new HashMap<>();
 		
@@ -434,7 +449,7 @@ public class WikiDatabasePreparation {
 				date = DateParser.parse(line);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_DESCRIPTION)) {
-				description = DescriptionParser.parse(line);
+				description = DescriptionParser.parse(line, title);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_LICENSE) || lineLc.startsWith("permission")) {
 				String licenseValue = ParserUtils.extractFieldValue(line, ParserUtils.FIELD_LICENSE);
@@ -446,30 +461,35 @@ public class WikiDatabasePreparation {
 				}
 			}
 		}
-        
-        webBlockResults.put(ParserUtils.FIELD_AUTHOR, author);
-        webBlockResults.put(ParserUtils.FIELD_DATE, date);
+
+		if (author != null) {
+			webBlockResults.put(ParserUtils.FIELD_AUTHOR, author);
+		}
+		if (date != null) {
+			webBlockResults.put(ParserUtils.FIELD_DATE, date);
+		}
 		if (license != null) {
 			webBlockResults.put(ParserUtils.FIELD_LICENSE, license);
 		}
-
-		if (Boolean.TRUE.equals(allLangs)) {
-			webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, new Gson().toJson(description));
-		} else {
-			for (Map.Entry<String, String> entry : description.entrySet()) {
-				if (entry.getKey().equals(lang)) {
-					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, entry.getValue());
+		if (!description.isEmpty()) {
+			if (Boolean.TRUE.equals(allLangs)) {
+				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, new Gson().toJson(description));
+			} else {
+				for (Map.Entry<String, String> entry : description.entrySet()) {
+					if (entry.getKey().equals(lang)) {
+						webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, entry.getValue());
+					}
 				}
-			}
 
-			// If no description was found in the target language, fallback to English description (default language)
-			if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
-			}
+				// If no description was found in the target language, fallback to English description (default language)
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
+				}
 
-			// If no description for English either, fallback to the first available description
-			if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && !description.isEmpty()) {
-				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.values().iterator().next());
+				// If no description for English either, fallback to the first available description
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && !description.isEmpty()) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.values().iterator().next());
+				}
 			}
 		}
     }
@@ -687,7 +707,7 @@ public class WikiDatabasePreparation {
 	}
 
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang,
-			String title) {
+			String title, boolean logContentErrors) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen + 1);
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
@@ -707,8 +727,10 @@ public class WikiDatabasePreparation {
 
 		int lastChar = text.indexOf(">", ind);
 		if (ind == -1 || lastChar == -1) {
-			String contentPreview = text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10));
-			log.error(String.format("Error content tag (not closed) %s %s: %s", lang, title, contentPreview));
+			if (logContentErrors) {
+				String contentPreview = text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10));
+				log.error(String.format("Error content tag (not closed) %s %s: %s", lang, title, contentPreview));
+			}
 			return indOpen + 1;
 		}
 		bld.append(text.substring(indOpen + 1, ind));

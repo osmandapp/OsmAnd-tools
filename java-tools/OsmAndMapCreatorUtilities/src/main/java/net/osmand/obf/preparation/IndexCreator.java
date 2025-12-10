@@ -854,11 +854,11 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-		settings.indexMap = true;
+//		settings.indexMap = true;
 //		settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
@@ -876,7 +876,7 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/ukraine_kyiv-city_europe.pbf";
+		String file = rootFolder + "../temp/map.osm";
 //		String file = rootFolder + "../temp/stuttgart.osm";
 //		String file = rootFolder + "../temp/andorra_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
