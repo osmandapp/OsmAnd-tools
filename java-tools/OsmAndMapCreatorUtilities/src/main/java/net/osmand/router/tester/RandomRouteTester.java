@@ -8,11 +8,28 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import net.osmand.MainUtilities.CommandLineOpts;
-import net.osmand.router.*;
+import net.osmand.PlatformUtil;
 import net.osmand.NativeLibrary;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.HHRouteDataStructure;
+import net.osmand.router.HHRoutePlanner;
+import net.osmand.router.NativeTransportRoutingResult;
+import net.osmand.router.RoutePlannerFrontEnd;
+import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.RoutingContext;
+import net.osmand.router.TransportRoutePlanner;
+import net.osmand.router.TransportRouteResult;
+import net.osmand.router.TransportRoutingConfiguration;
+import net.osmand.router.TransportRoutingContext;
 import net.osmand.util.Algorithms;
 
 import net.osmand.binary.BinaryMapIndexReader;
@@ -40,12 +57,12 @@ public class RandomRouteTester {
 		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
 
 		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
-				"car",
+//				"car",
 //				"bicycle",
 //				"car,short_way",
 //				"bicycle,short_way",
 //				"pedestrian,short_way",
-//				PUBLIC_TRANSPORT_PROFILE_UNLIMITED, // disable other profiles to test PT routes
+				PUBLIC_TRANSPORT_PROFILE_UNLIMITED, // disable other profiles to test PT routes
 		};
 
 		// cost/distance deviation limits
@@ -58,11 +75,19 @@ public class RandomRouteTester {
 //		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
 //		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
 
-		final static Map <String, String> ambiguousConditionalTags = null;
+		final static Map<String, String> ambiguousConditionalTags = null;
 //		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
+
+		RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
 	}
 
 	public static void main(String[] args) throws Exception {
+		System.exit(run(args));
+	}
+
+	public static int run(String[] args) throws Exception {
+		PlatformUtil.initOsmandRegionsAsTempFile();
+
 		RandomRouteTester test = new RandomRouteTester(args);
 
 		test.applyCommandLineOpts();
@@ -73,8 +98,7 @@ public class RandomRouteTester {
 		test.collectRoutes();
 		test.stopSlowDown();
 
-		int exitCode = test.reportResult();
-		System.exit(exitCode);
+		return test.reportResult();
 	}
 
 	private final CommandLineOpts opts;
@@ -83,6 +107,9 @@ public class RandomRouteTester {
 	private String optObfPrefix;
 	private String optHtmlReport;
 	private String optHtmlDomain;
+	private boolean optNoHtmlReport;
+	private boolean optNoNativeLibrary;
+	private boolean optStopAtFirstRoute;
 	private PrimaryRouting optPrimaryRouting;
 
 	private enum PrimaryRouting {
@@ -90,6 +117,11 @@ public class RandomRouteTester {
 		BRP_CPP,
 		HH_JAVA,
 		HH_CPP,
+	}
+
+	public enum RandomPointsSource {
+		ROUTE_SECTION_POINTS,
+		HH_SECTION_POINTS,
 	}
 
 	private final long started;
@@ -102,9 +134,9 @@ public class RandomRouteTester {
 
 //	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
-	private static final int EXIT_SUCCESS = 0;
-	private static final int EXIT_TEST_FAILED = 1;
-	private static final int EXIT_RED_LIMIT_REACHED = 2;
+	public static final int EXIT_SUCCESS = 0;
+	public static final int EXIT_TEST_FAILED = 1;
+	public static final int EXIT_RED_LIMIT_REACHED = 2;
 
 	private RandomRouteTester(String[] args) {
 		this.opts = new CommandLineOpts(args);
@@ -123,12 +155,19 @@ public class RandomRouteTester {
 
 	private void applyCommandLineOpts() {
 		// apply system options
-		optMapsDir = Objects.requireNonNullElse(opts.getOpt("--maps-dir"), "./");
-		optObfPrefix = Objects.requireNonNullElse(opts.getOpt("--obf-prefix"), "");
-		optHtmlReport = Objects.requireNonNullElse(opts.getOpt("--html-report"), "rr-report.html");
-		optHtmlDomain = Objects.requireNonNullElse(opts.getOpt("--html-domain"), "test.osmand.net");
-		optLibsDir = Objects.requireNonNullElse(
-				opts.getOpt("--libs-dir"), optMapsDir + "/../core-legacy/binaries");
+		optMapsDir = opts.getOrDefault("--maps-dir", "./");
+		optObfPrefix = opts.getOrDefault("--obf-prefix", "");
+		optHtmlReport = opts.getOrDefault("--html-report", "rr-report.html");
+		optHtmlDomain = opts.getOrDefault("--html-domain", "test.osmand.net");
+		optLibsDir = opts.getOrDefault("--libs-dir", optMapsDir + "/../core-legacy/binaries");
+
+		optNoHtmlReport = opts.getBoolean("--no-html-report");
+		optNoNativeLibrary = opts.getBoolean("--no-native-library");
+		optStopAtFirstRoute = opts.getBoolean("--stop-at-first-route");
+
+		if (opts.getBoolean("--use-hh-points")) {
+			config.optRandomPointsSource = RandomPointsSource.HH_SECTION_POINTS;
+		}
 
 		// validate
 		if (!isFileWriteable(optHtmlReport)) {
@@ -136,20 +175,15 @@ public class RandomRouteTester {
 		}
 
 		// apply generator options
-		config.ITERATIONS = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--iterations"), String.valueOf(config.ITERATIONS)));
-		config.MIN_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--min-dist"), String.valueOf(config.MIN_DISTANCE_KM)));
-		config.MAX_DISTANCE_KM = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-dist"), String.valueOf(config.MAX_DISTANCE_KM)));
-		config.MAX_INTER_POINTS = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-inter"), String.valueOf(config.MAX_INTER_POINTS)));
-		config.MAX_SHIFT_ALL_POINTS_M = Integer.parseInt(Objects.requireNonNullElse(
-				opts.getOpt("--max-shift"), String.valueOf(config.MAX_SHIFT_ALL_POINTS_M)));
-		config.DEVIATION_RED = Double.parseDouble(Objects.requireNonNullElse(
-				opts.getOpt("--red"), String.valueOf(config.DEVIATION_RED)));
-		config.DEVIATION_YELLOW = Double.parseDouble(Objects.requireNonNullElse(
-				opts.getOpt("--yellow"), String.valueOf(config.DEVIATION_YELLOW)));
+		config.ITERATIONS = opts.getIntOrDefault("--iterations", config.ITERATIONS);
+		config.MIN_DISTANCE_KM = opts.getIntOrDefault("--min-dist", config.MIN_DISTANCE_KM);
+		config.MAX_DISTANCE_KM = opts.getIntOrDefault("--max-dist", config.MAX_DISTANCE_KM);
+		config.MAX_INTER_POINTS = opts.getIntOrDefault("--max-inter", config.MAX_INTER_POINTS);
+		config.MAX_SHIFT_ALL_POINTS_M = opts.getIntOrDefault("--max-shift", config.MAX_SHIFT_ALL_POINTS_M);
+
+		config.DEVIATION_RED = Algorithms.parseDoubleSilently(opts.getOpt("--red"), config.DEVIATION_RED);
+		config.DEVIATION_YELLOW = Algorithms.parseDoubleSilently(opts.getOpt("--yellow"), config.DEVIATION_YELLOW);
+
 		if (opts.getOpt("--profile") != null) {
 			config.RANDOM_PROFILES = new String[]{
 					opts.getOpt("--profile")
@@ -174,15 +208,15 @@ public class RandomRouteTester {
 			}
 		}
 
-		if (opts.getOpt("--car-2phase") != null) {
+		if (opts.getBoolean("--car-2phase")) {
 			config.CAR_2PHASE_MODE = true;
 		}
 
-		if (opts.getOpt("--no-conditionals") != null) {
+		if (opts.getBoolean("--no-conditionals")) {
 			config.USE_TIME_CONDITIONAL_ROUTING = 0;
 		}
 
-		if (opts.getOpt("--help") != null) {
+		if (opts.getBoolean("--help")) {
 			System.err.printf("%s\n", String.join("\n",
 					"",
 					"Usage: random-route-tester [--options] [TEST_ROUTE(s)]",
@@ -191,8 +225,12 @@ public class RandomRouteTester {
 					"",
 					"--maps-dir=/path/to/directory/with/*.obf (default ./)",
 					"--obf-prefix=prefix to filter obf files (default all)",
+					"",
+					"--no-html-report do not create html report",
 					"--html-report=/path/to/report.html (rr-report.html)",
-					"--html-domain=test.osmand.net (used in html-report)",
+					"--html-domain=test.osmand.net (route-href in html-report)",
+					"",
+					"--no-native-library useful for Java-only tests",
 					"--libs-dir=/path/to/native/libs/dir (default auto)",
 					"",
 					"--iterations=N",
@@ -202,6 +240,7 @@ public class RandomRouteTester {
 					"--max-inter=N number",
 					"--profile=transport random public transport test",
 					"--profile=profile,settings,key:value force one profile",
+					"--stop-at-first-route stop iterations and return 1st calculated route",
 					"",
 					"--primary=(brp-java|brp-cpp|hh-java|hh-cpp) compare others against this",
 					"--avoid-brp-java avoid BinaryRoutePlanner (java)",
@@ -209,6 +248,7 @@ public class RandomRouteTester {
 					"--avoid-hh-java avoid HHRoutePlanner (java)",
 					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
 					"",
+					"--use-hh-points use random HH-points instead of highway-points",
 					"--car-2phase use COMPLEX mode for car (Android default)",
 					"--no-conditionals disable *:conditional restrictions",
 					"",
@@ -252,7 +292,9 @@ public class RandomRouteTester {
 			report.entryClose();
 		}
 
-		report.flush(optHtmlReport);
+		if (!optNoHtmlReport) {
+			report.flush(optHtmlReport);
+		}
 
 		if (report.isFailed()) {
 			return EXIT_TEST_FAILED;
@@ -279,8 +321,10 @@ public class RandomRouteTester {
 		}
 
 		for (File source : obfFiles) {
-			System.out.printf("Use OBF %s...\n", source.getName());
-			Objects.requireNonNull(nativeLibrary).initMapFile(source.getAbsolutePath(), true);
+			System.out.printf("Use OBF %s ...\n", source.getName());
+			if (nativeLibrary != null) {
+				nativeLibrary.initMapFile(source.getAbsolutePath(), true);
+			}
 			obfReaders.add(new BinaryMapIndexReader(new RandomAccessFile(source, "r"), source));
 		}
 
@@ -399,6 +443,10 @@ public class RandomRouteTester {
 					}
 					System.err.println(sep);
 				}
+			}
+			if (optStopAtFirstRoute && !entry.routeResults.isEmpty() && entry.routeResults.get(0).distance > 0) {
+				testList = new ArrayList<>(List.of(entry));
+				break;
 			}
 		}
 	}
@@ -574,6 +622,9 @@ public class RandomRouteTester {
 	}
 
 	private void loadNativeLibrary() {
+		if (optNoNativeLibrary) {
+			return;
+		}
 		String nativePath = getNativeLibPath();
 		if (NativeLibrary.loadOldLib(nativePath)) {
 			nativeLibrary = new NativeLibrary();
