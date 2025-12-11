@@ -1569,7 +1569,16 @@ public class AdminController {
 	
 	@GetMapping(path = {"/download-release"})
 	public ResponseEntity<FileSystemResource> releaseDownload(String file) {
-		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
+	    if (file == null)
+	        return ResponseEntity.notFound().build();
+
+	    if (file.contains("../"))
+	        return ResponseEntity.badRequest().build();
+
+		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file);
+		if (fl == null)
+	        return ResponseEntity.notFound().build();
+
 		HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fl.getName());
