@@ -58,7 +58,7 @@ public class DownloadIndexController {
 
 	private Resource getFileAsResource(String dir, String filename) throws FileNotFoundException {
 		File file = new File(new File(filesPath, dir), filename);
-		if (file.exists()) {
+		if (!filename.contains("/") && file.exists()) {
 			return new FileSystemResource(file);
 		}
 		String msg = "File: " + filename + " not found";

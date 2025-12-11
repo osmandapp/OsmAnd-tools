@@ -8,7 +8,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPOutputStream;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -1569,6 +1568,9 @@ public class AdminController {
 	
 	@GetMapping(path = {"/download-release"})
 	public ResponseEntity<FileSystemResource> releaseDownload(String file) {
+		if (file == null || file.contains("/")) {
+			return ResponseEntity.badRequest().build();
+		}
 		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
 		HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));

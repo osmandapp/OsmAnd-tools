@@ -247,7 +247,7 @@ public class MapApiController {
 		// probably it's better to support multiple file upload without these checks
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 
-		if (dev == null) {
+		if (dev == null || name.contains("/../")) {
 			return userdataService.tokenNotValidResponse();
 		}
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
