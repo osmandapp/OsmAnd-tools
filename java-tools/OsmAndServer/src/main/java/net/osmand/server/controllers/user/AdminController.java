@@ -67,7 +67,7 @@ public class AdminController {
 	private static final Log LOGGER = LogFactory.getLog(AdminController.class);
 
 	private static final String ACCESS_LOG_REPORTS_FOLDER = "reports";
-	
+
 	private static final String RELEASES_FOLDER = "osm-releases";
 
 	@Autowired
@@ -93,7 +93,7 @@ public class AdminController {
 
 	@Autowired
 	private EmailRegistryService emailService;
-	
+
 	@Autowired
 	protected UserSubscriptionService userSubService;
 
@@ -117,13 +117,13 @@ public class AdminController {
 
 	@Autowired
 	private LotterySeriesRepository seriesRepo;
-	
+
 	@Autowired
 	private PromoCampaignRepository promoCampaignRepository;
-	
+
 	@Autowired
 	private PluginsService pluginsService;
-	
+
 	@Autowired
 	PromoService promoService;
 
@@ -138,12 +138,12 @@ public class AdminController {
 
 	@Autowired
 	private WebAccessConfig webAccessConfig;
-	
+
 	private Gson gson = new Gson();
-	
+
 	private static final String GIT_LOG_CMD = "git log -1 --pretty=format:\"%h%x09%an%x09%ad%x09%s\"";
 	private static final SimpleDateFormat timeInputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
-	
+
 	public static final String PROMO_WEBSITE = "promo_website";
 	@Autowired
 	private PurchasesDataLoader purchasesDataLoader;
@@ -163,7 +163,7 @@ public class AdminController {
 
 		webAccessConfig.reload();
 		purchasesDataLoader.reload();
-		
+
         return "redirect:info";
 	}
 
@@ -182,10 +182,10 @@ public class AdminController {
 		model.addAttribute("status", status);
 		return "admin/error";
 	}
-	
+
 	@RequestMapping(path = { "/update-btc-report" }, method = RequestMethod.POST)
-	public String publish(Model model, 
-			@RequestParam(required = false) String defaultFee, 
+	public String publish(Model model,
+			@RequestParam(required = false) String defaultFee,
 			@RequestParam(required = false) String waitingBlocks, final RedirectAttributes redirectAttrs) throws JsonProcessingException {
 		reports.updateBitcoinReport(defaultFee, waitingBlocks);
 		redirectAttrs.addFlashAttribute("update_status", "OK");
@@ -193,11 +193,11 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_message", "Bitcoin report is regenerated");
         return "redirect:info#bitcoin";
 	}
-	
-	
-	
+
+
+
 	@PostMapping(path = { "/make-btc-payout" })
-	public String publish(Model model, 
+	public String publish(Model model,
 			@RequestParam(required = true) int batchSize, final RedirectAttributes redirectAttrs) throws IOException {
 		BtcTransactionReport rep = reports.getBitcoinTransactionReport();
 		PayoutResult res = reports.payOutBitcoin(rep, batchSize);
@@ -209,7 +209,7 @@ public class AdminController {
 		redirectAttrs.addFlashAttribute("update_message", "Payment successful! Bitcoin transaction id is: " + res.txId);
         return "redirect:info";
 	}
-	
+
 	@PostMapping(path = {"/register-promo"})
 	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
 		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null, false);
@@ -253,7 +253,7 @@ public class AdminController {
 		}
 		return ResponseEntity.ok("Downgrade successful");
 	}
-	
+
 	@GetMapping(path = {"/get-subscription-details"})
 	@ResponseBody
 	public ResponseEntity<SupporterDeviceSubscription> getSubscriptionDetails(@RequestParam String identifier) {
@@ -271,26 +271,26 @@ public class AdminController {
 		return ResponseEntity.badRequest().body("User is not found.");
 	}
 
-	
+
 	@PostMapping(path = { "/search-emails" })
-	public String searchEmail(Model model, 
+	public String searchEmail(Model model,
 			@RequestParam(required = true) String emailPart, final RedirectAttributes redirectAttrs) {
 		redirectAttrs.addFlashAttribute("emailSearch", emailService.searchEmails(emailPart));
         return "redirect:info#audience";
 	}
-	
+
 	@PostMapping(path = {"/delete-email"})
 	@Deprecated
 	public String deleteEmail(@RequestParam String email) {
 		throw new IllegalStateException("sendOsmRecipientsDeleteEmail() is obsolete"); // a895722f1
 	}
-	
+
 	@PostMapping(path = {"/ban-by-osmids"})
 	@Deprecated
 	public String banByOsmids(@RequestParam String osmidList) {
 		throw new IllegalStateException("band by osmids is obsolete"); // a895722f1
 	}
-	
+
 	private String err(RedirectAttributes redirectAttrs, String string) {
 		redirectAttrs.addFlashAttribute("update_status", "ERROR");
 		redirectAttrs.addFlashAttribute("update_errors", "");
@@ -301,11 +301,11 @@ public class AdminController {
 
 	@PostMapping(path = { "/register-giveaway" })
 	public String registerGiveaway(Model model,
-			@RequestParam(required = true) String name, 
-			@RequestParam(required = true) String type, 
+			@RequestParam(required = true) String name,
+			@RequestParam(required = true) String type,
 			@RequestParam(name="public", required = false) String asPublic,
 			@RequestParam(required = true) String emailTemplate,
-			@RequestParam(required = true) String promocodes, 
+			@RequestParam(required = true) String promocodes,
 			final RedirectAttributes redirectAttrs) {
 		// seriesRepo
 		LotterySeries lotterySeries = new LotterySeries();
@@ -321,36 +321,36 @@ public class AdminController {
 			throw new IllegalStateException("Giveaway already exists");
 		}
 		seriesRepo.save(lotterySeries);
-		
+
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Givewaway registered");
         return "redirect:info#giveaway";
 	}
-	
+
 
 	@RequestMapping(path = { "/update-giveaway-status" }, method = RequestMethod.POST)
 	public String updateStatusGiveaway(Model model,
-			@RequestParam(required = true) String name, 
-			@RequestParam(required = true) String status, 
+			@RequestParam(required = true) String name,
+			@RequestParam(required = true) String status,
 			final RedirectAttributes redirectAttrs) throws JsonProcessingException {
 		// seriesRepo
 		Optional<LotterySeries> obj = seriesRepo.findById(name);
 		obj.get().status =  LotteryStatus.valueOf(status.toUpperCase());
 		seriesRepo.save(obj.get());
-		
+
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Givewaway registered");
         return "redirect:info#giveaway";
 	}
-	
-	
+
+
 	@RequestMapping(path = { "/send-private-giveaway" }, method = RequestMethod.POST)
 	public String sendGiveaway(Model model,
-			@RequestParam(required = true) String name, 
-			@RequestParam(required = true) String email, 
-			@RequestParam(required = true) int promocodes, 
+			@RequestParam(required = true) String name,
+			@RequestParam(required = true) String email,
+			@RequestParam(required = true) int promocodes,
 			final RedirectAttributes redirectAttrs) {
 		// seriesRepo
 		Optional<LotterySeries> obj = seriesRepo.findById(name);
@@ -369,13 +369,13 @@ public class AdminController {
 		}
 		boolean sent = emailSender.sendPromocodesEmails(email, s.emailTemplate, String.join(",", promos));
 		seriesRepo.save(s);
-		
+
 		redirectAttrs.addFlashAttribute("update_status", sent ? "OK" : "Something went wrong!");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", sent ? "Givewaway sent" : "Something went wrong!");
         return "redirect:info";
 	}
-	
+
 
 	private List<String> publish() {
 		List<String> errors = new ArrayList<>();
@@ -386,12 +386,12 @@ public class AdminController {
 		reports.reloadConfigs(errors);
 		return errors;
 	}
-	
-	
-	
-		
+
+
+
+
 	@RequestMapping("/access-logs")
-	public void loadLogs(@RequestParam(required=false) String starttime, 
+	public void loadLogs(@RequestParam(required=false) String starttime,
 			@RequestParam(required = false) String endtime,
 			@RequestParam(required = false) String region,
 			@RequestParam(required = false) String uriFilter,
@@ -406,7 +406,7 @@ public class AdminController {
 		boolean parseRegion = "on".equals(region);
 		boolean behaviorAnalysis = "on".equals(behavior);
 		boolean statAnalysis = "on".equals(stats);
-		
+
 		boolean gzipFlag = "on".equals(gzip);
 		OutputStream out;
 		if(gzipFlag) {
@@ -429,11 +429,11 @@ public class AdminController {
 		logsAccessService.parseLogs(startTime, endTime, parseRegion, limit, uriFilter, logFilter, presentation, out);
 		response.flushBuffer();
 		response.getOutputStream().close();
-		
+
 	}
 
-	
-	
+
+
 	@RequestMapping("/info")
 	public String index(Model model) throws SQLException, IOException {
 		model.addAttribute("server_startup", String.format("%1$tF %1$tR", new Date(appContext.getStartupDate())));
@@ -453,7 +453,7 @@ public class AdminController {
 		if (settings != null) {
 			model.addAttribute("subSettings", settings);
 		}
-		
+
 		model.addAttribute("promos", promoCampaignRepository.findAllByOrderByStartTimeDesc());
 		model.addAttribute("giveaways", seriesRepo.findAllByOrderByUpdateTimeDesc());
 		model.addAttribute("downloadServers", getDownloadSettings());
@@ -463,43 +463,43 @@ public class AdminController {
 		model.addAttribute("subRevenueReportYear", getRevenueReport(allSubs, AdminGenericSubReport.YEAR));
 		model.addAttribute("subRevenueReportMonth", getRevenueReport(allSubs, AdminGenericSubReport.MONTH));
 		model.addAttribute("subRevenueReportDay", getRevenueReport(allSubs, AdminGenericSubReport.DAY));
-		
+
 		model.addAttribute("plugins", pluginsService.getPluginsAdminInfo());
 		model.addAttribute("yearSubscriptionsReport", getYearSubscriptionsRetentionReport());
 		model.addAttribute("emailsReport", emailService.getEmailsDBReport());
 		model.addAttribute("btc", getBitcoinReport());
 		model.addAttribute("polls", pollsService.getPollsConfig(false));
-		
+
 		model.addAttribute("promoSku", PROMO_WEBSITE);
-		
+
 		return "admin/info";
 	}
-	
+
 	@PostMapping(path = { "/upload-plugin-file" }, produces = "application/json")
 	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file)
 			throws IOException {
 		Map<String, ?> res = pluginsService.uploadFile(file);
 		return ResponseEntity.ok().body(gson.toJson(res));
 	}
-	
+
 	@PostMapping(path = {"/delete-plugin-version"})
 	public String deletePlugin(@RequestParam String plugin, @RequestParam String version) throws IOException {
 		pluginsService.deletePluginVersion(plugin, version);
 		return "redirect:info#plugins";
 	}
-	
+
 	@PostMapping(path = {"/publish-plugin-version"})
 	public String publish(@RequestParam String plugin, @RequestParam String version) throws IOException {
 		pluginsService.publish(plugin, version);
 		return "redirect:info#plugins";
 	}
-	
+
 	private BtcTransactionReport getBitcoinReport() {
 //		new File(websiteLocation, BTC_REPORT);
 		return reports.getBitcoinTransactionReport();
 	}
-	
-	
+
+
 	public static class YearSubRetentionGroup {
 		public int[] active;
 		public int[] gone;
@@ -519,7 +519,7 @@ public class AdminController {
 			if (total == 0) {
 				return "";
 			}
-			int totalLost = 0; 
+			int totalLost = 0;
 			int totalPossiblyGone = 0;
 			for (int kn = 0; possiblyGone != null && kn < possiblyGone.length; kn++) {
 				totalPossiblyGone += possiblyGone[kn];
@@ -528,7 +528,7 @@ public class AdminController {
 				totalLost += gone[kn];
 			}
 			StringBuilder r = new StringBuilder();
-			r.append(String.format("<b>%d</b><br> → <b>%d</b> %s" , total, 
+			r.append(String.format("<b>%d</b><br> → <b>%d</b> %s" , total,
 					total - totalLost - totalPossiblyGone, percent(total - totalLost - totalPossiblyGone, total)));
 			for (int kn = 0; gone != null && kn < gone.length; kn++) {
 				if (gone[kn] > 0) {
@@ -538,7 +538,7 @@ public class AdminController {
 			if (totalPossiblyGone > 0) {
 				r.append("<br>?. ").append(-totalPossiblyGone).append(percent(totalPossiblyGone, total));
 			}
-			
+
 			return r.toString();
 		}
 
@@ -558,7 +558,7 @@ public class AdminController {
 			this.possiblyGone = addArrayToArray(this.possiblyGone, r.possiblyGone);
 		}
 	}
-	
+
 	public static class YearSubscriptionRetentionReport {
 		public String month;
 		public YearSubRetentionGroup ios = new YearSubRetentionGroup();
@@ -571,11 +571,11 @@ public class AdminController {
 		public YearSubRetentionGroup androidPro = new YearSubRetentionGroup();
 		public YearSubRetentionGroup androidV2 = new YearSubRetentionGroup();
 		public YearSubRetentionGroup total = new YearSubRetentionGroup();
-		
+
 		public YearSubscriptionRetentionReport(String month) {
 			this.month = month;
 		}
-		
+
 		public void plus(YearSubscriptionRetentionReport r) {
 			this.ios.addReport(r.ios);
 			this.iosFull.addReport(r.iosFull);
@@ -590,7 +590,7 @@ public class AdminController {
 		}
 
 	}
-	
+
 	private static int[] addArrayToArray(int[] res, int[] add) {
 		if (add == null) {
 			return res;
@@ -600,7 +600,7 @@ public class AdminController {
 		}
 		return res;
 	}
-	
+
 	private static int[] addNumberToArr(int pos1Based, int[] arr, int cnt) {
 		int ind = pos1Based - 1;
 		if (arr == null) {
@@ -614,10 +614,10 @@ public class AdminController {
 		arr[ind] += cnt;
 		return arr;
 	}
- 	
-	
+
+
 	private Collection<YearSubscriptionRetentionReport> getYearSubscriptionsRetentionReport() {
-		final Map<String, YearSubscriptionRetentionReport> res = new LinkedHashMap<String, YearSubscriptionRetentionReport>(); 
+		final Map<String, YearSubscriptionRetentionReport> res = new LinkedHashMap<String, YearSubscriptionRetentionReport>();
 		jdbcTemplate.query("select  to_char(starttime, 'YYYY-MM') \"start\", \n"
 				+ "    round(extract(day from expiretime - starttime)/365) \"years\", \n"
 				+ "    sku, introcycles,\n"
@@ -635,7 +635,7 @@ public class AdminController {
 						String month = rs.getString(ind++);
 						int years = rs.getInt(ind++);
 						String sku = rs.getString(ind++);
-						boolean intro = rs.getInt(ind++) > 0; 
+						boolean intro = rs.getInt(ind++) > 0;
 						int active = rs.getInt(ind++);
 						int possibleGone = rs.getInt(ind++);
 						int gone = rs.getInt(ind++);
@@ -647,7 +647,7 @@ public class AdminController {
 							report = new YearSubscriptionRetentionReport(month);
 							res.put(month, report);
 						}
-						
+
 						if (sku.startsWith("net.osmand")) {
 							report.ios.addNumber(years, active, possibleGone, gone);
 							if(sku.contains("pro")) {
@@ -674,7 +674,7 @@ public class AdminController {
 						report.total.addNumber(years, active, possibleGone, gone);
 					}
 
-					
+
 		});
 		ArrayList<YearSubscriptionRetentionReport> list = new ArrayList<>(res.values());
 		YearSubscriptionRetentionReport totalAll = new YearSubscriptionRetentionReport("All");
@@ -695,8 +695,8 @@ public class AdminController {
 		list.add(0, totalAll);
 		return list;
 	}
-	
-	
+
+
 	public static class AdminGenericSubReportColumnValue {
 		public int active;
 		public int activeRenew;
@@ -709,16 +709,16 @@ public class AdminController {
 		public long valueNewLTV;
 		public long valuePaidLTV;
 		public boolean generic;
-		
+
 		public AdminGenericSubReportColumnValue(boolean generic) {
 			this.generic = generic;
 		}
-		
+
 		@Override
 		public String toString() {
 			return toString(0);
 		}
-		
+
 		public String toString(int formatVersion) {
 			if (formatVersion == 0) {
 				return String.format("%d, € %d<br>€ %d", totalNew, valueNewLTV / 1000, (valueNew + valueOld) / 1000);
@@ -754,9 +754,9 @@ public class AdminController {
 			}
 			return row.toString();
 		}
-		
+
 	}
-	
+
 	public static class AdminGenericSubReportColumn {
 		private Set<SubAppType> filterApp = null;
 		private int filterDuration = -1;
@@ -764,40 +764,40 @@ public class AdminController {
 		private Boolean pro;
 		private Boolean maps;
 		public final String name;
-		
+
 		public AdminGenericSubReportColumn(String name) {
 			this.name = name;
 		}
-		
+
 		public boolean isGenericColumn() {
 			return filterDuration == -1 && discount == null;
 		}
-		
+
 		public AdminGenericSubReportColumn app(SubAppType... vls) {
 			this.filterApp = EnumSet.of(vls[0], vls);
 			return this;
 		}
-		
+
 		public AdminGenericSubReportColumn duration(int duration) {
 			this.filterDuration = duration;
 			return this;
 		}
-		
+
 		public AdminGenericSubReportColumn discount(boolean discount) {
 			this.discount = discount;
 			return this;
 		}
-		
+
 		public AdminGenericSubReportColumn pro(boolean pro) {
 			this.pro = pro;
 			return this;
 		}
-		
+
 		public AdminGenericSubReportColumn maps(boolean maps) {
 			this.maps = maps;
 			return this;
 		}
-		
+
 		public void process(Subscription sub, AdminGenericSubReportColumnValue value) {
 			if (!filter(sub)) {
 				return;
@@ -848,15 +848,15 @@ public class AdminController {
 			return true;
 		}
 
-		
+
 	}
-	
+
 	public static class AdminGenericSubReport {
 		public static final int MONTH = 0;
 		public static final int YEAR = 1;
 		public static final int DAY = -1;
 		public int period; // month == 0 or day == -1 or year == 1
-		public int count; 
+		public int count;
 		public List<AdminGenericSubReportColumn> columns = new ArrayList<>();
 		public Map<String, List<AdminGenericSubReportColumnValue>> values = new TreeMap<>(new Comparator<String>() {
 
@@ -870,11 +870,11 @@ public class AdminController {
 			}
 		});
 		public List<Subscription> subs;
-		
+
 		public Map<String, List<AdminGenericSubReportColumnValue>> getValues(int limit) {
 			SimpleDateFormat dateFormat = period == MONTH ? Subscription.monthFormat
 					: (period == YEAR ? Subscription.yearFormat : Subscription.dayFormat);
-			
+
 			Calendar c = Calendar.getInstance();
 			c.setTimeInMillis(System.currentTimeMillis());
 			for (int i = 0; i < limit; i++) {
@@ -899,7 +899,7 @@ public class AdminController {
 
 		public void addResult(Subscription s, SimpleDateFormat dateFormat) {
 			String periodId = period == MONTH ? s.startPeriodMonth
-					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay); 
+					: (period == YEAR ? s.startPeriodYear : s.startPeriodDay);
 			processSub(s, periodId);
 			if (s.currentPeriod == 0 && (period == MONTH || period == YEAR)) {
 				Calendar c = Calendar.getInstance();
@@ -942,8 +942,8 @@ public class AdminController {
 			return vls;
 		}
 	}
-	
-	
+
+
 	private AdminGenericSubReport getRevenueReport(List<Subscription> subs, int period) {
 		AdminGenericSubReport report = new AdminGenericSubReport();
 		report.period = period;
@@ -952,24 +952,24 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>GPlay").app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>IOS").app(SubAppType.IOS));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING));
-		
+
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>Maps A").maps(true));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO A").pro(true).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO M").pro(true).duration(1));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>Other").pro(false).maps(false));
-		
+
 		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>Full").discount(false).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
 		report.columns.add(new AdminGenericSubReportColumn("Gplay<br>%%").discount(true).app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
 		report.columns.add(new AdminGenericSubReportColumn("iOS<br>Full").discount(false).app(SubAppType.IOS));
 		report.columns.add(new AdminGenericSubReportColumn("iOS<br>%%").discount(true).app(SubAppType.IOS));
 		return report;
 	}
-	
+
 	private static class ExchangeRate {
 		private long time;
 		private double eurRate;
 	}
-	
+
 	protected static class ExchangeRates {
 		Map<String, List<ExchangeRate>> currencies = new LinkedHashMap<>();
 
@@ -982,7 +982,7 @@ public class AdminController {
 			}
 			currencies.get(cur).add(r);
 		}
-		
+
 		public double getEurRate(String cur, long time) {
 			List<ExchangeRate> lst = currencies.get(cur);
 			if (lst != null) {
@@ -996,7 +996,7 @@ public class AdminController {
 			}
 			return 0;
 		}
-		
+
 	}
 
 
@@ -1005,7 +1005,7 @@ public class AdminController {
 		List<Subscription> subs = new ArrayList<AdminController.Subscription>();
 		ExchangeRates rates = parseExchangeRates();
 		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
-		
+
 		jdbcTemplate.query(
 				"select sku, price, pricecurrency, coalesce(introprice, -1), starttime, expiretime, autorenewing, valid, introcycles from supporters_device_sub",
 				new RowCallbackHandler() {
@@ -1051,7 +1051,7 @@ public class AdminController {
 						c.setTimeInMillis(s.startTime);
 						c.add(Calendar.DAY_OF_YEAR, 20); // sometimes end time shifts 3-5 days first month make 20 days
 						while (c.getTimeInMillis() < s.endTime) {
-							s.totalMonths++; 
+							s.totalMonths++;
 							c.add(Calendar.MONTH, 1);
 						}
 						s.totalPeriods = (int) Math.round((double) s.totalMonths / s.durationMonth);
@@ -1133,10 +1133,10 @@ public class AdminController {
 			// add up tail
 			last = Math.min(last, 0.95);
 			sum += prod  * last / (1 - last); // add tail
-			
-			
+
+
 			double ltv = sub.defPriceEurMillis / 1000 * sum;
-			String msg = String.format("%.0f$ %s - %.1f $ * %.2f: %d%% ~ %s", ltv, s, sub.defPriceEurMillis / 1000.0, sum, 
+			String msg = String.format("%.0f$ %s - %.1f $ * %.2f: %d%% ~ %s", ltv, s, sub.defPriceEurMillis / 1000.0, sum,
 					(int) (sub.retention * 100), bld.toString());
 			System.out.println(msg);
 			actualRetention.insert(0, sum);
@@ -1194,12 +1194,12 @@ public class AdminController {
 		s.durationMonth = subBaseData.duration();
 		s.defPriceEurMillis = subBaseData.defaultPriceEurMillis();
 	}
-	
-	
+
+
 	public static class SubscriptionMonthReport {
 		public String date;
 	}
-	
+
 	public enum SubAppType {
 		OSMAND_PLUS,
 		IOS,
@@ -1221,7 +1221,7 @@ public class AdminController {
 		}
 	}
 	public static class Subscription {
-		
+
 		public double retention;
 		static SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd");
 		static SimpleDateFormat monthFormat = new SimpleDateFormat("yyyy-MM");
@@ -1229,7 +1229,7 @@ public class AdminController {
 
 		public Subscription() {
 		}
-		
+
 		public String getSku() {
 			return sku + (introPeriod ? "-%" : "");
 		}
@@ -1253,7 +1253,7 @@ public class AdminController {
 			this.defPriceEurMillis = s.defPriceEurMillis;
 			this.totalPeriods = s.totalPeriods;
 		}
-		
+
 		protected int priceMillis;
 		protected int introCycles;
 		protected int introPriceMillis;
@@ -1269,12 +1269,12 @@ public class AdminController {
 		protected boolean maps;
 		protected SubAppType app;
 		protected int defPriceEurMillis;
-		
+
 		// period number
 		protected int totalMonths;
 		protected int totalPeriods;
-		
-		// current calculated 
+
+		// current calculated
 		protected int currentPeriod;
 		protected boolean introPeriod;
 		protected long startPeriodTime;
@@ -1284,15 +1284,15 @@ public class AdminController {
 		protected int fullPriceEurMillis;
 		protected int introPriceEurMillis;
 		protected int priceEurMillis;
-		
+
 		protected int priceLTVEurMillis;
 		protected int priceTotalPaidEurMillis;
-		
+
 		private boolean isEnded() {
 			boolean ended = (System.currentTimeMillis() - endTime) >= 1000l * 60 * 60 * 24 * 10;
-			return ended; 
+			return ended;
 		}
-		
+
 		public void calculateLTVValue(Map<String, TDoubleArrayList> retentionRates) {
 			priceTotalPaidEurMillis = introPriceEurMillis;
 			if (introCycles > 1) {
@@ -1326,21 +1326,21 @@ public class AdminController {
 				}
 			}
 		}
-		
+
 		public void buildUp(Date time, int period, ExchangeRates rts) {
 			this.startPeriodTime = time.getTime();
 			this.startPeriodDay = dayFormat.format(time.getTime());
 			this.startPeriodMonth = monthFormat.format(time.getTime());
 			this.startPeriodYear = yearFormat.format(time.getTime());
 			this.currentPeriod = period;
-			
+
 			this.fullPriceEurMillis = defPriceEurMillis;
 			this.introPriceEurMillis = defPriceEurMillis;
 			if (this.introCycles > 0) {
 				this.introPriceEurMillis = defPriceEurMillis / 2;
 			}
 			// TOO old
-			double rate = 0;//rts.getEurRate(pricecurrency, startPeriodTime); 
+			double rate = 0;//rts.getEurRate(pricecurrency, startPeriodTime);
 			if (introPriceMillis >= 0 && priceMillis > 0 && rate == 0) {
 				rate = priceMillis * 1.0 / defPriceEurMillis;
 			}
@@ -1354,12 +1354,12 @@ public class AdminController {
 			if (this.introPeriod) {
 				priceEurMillis = introPriceEurMillis;
 			} else {
-				priceEurMillis = fullPriceEurMillis;	
+				priceEurMillis = fullPriceEurMillis;
 			}
 		}
 	}
-	
-	
+
+
 	private static class SurveyReport {
 		public String date;
 		public int goodCount;
@@ -1376,7 +1376,7 @@ public class AdminController {
 			return false;
 		}
 	}
-	 
+
 	private List<SurveyReport> getSurveyReport() {
 		List<SurveyReport> result = jdbcTemplate.query(
 				"SELECT date_trunc('week', \"timestamp\"), response, count(distinct ip) from email_support_survey "
@@ -1411,7 +1411,7 @@ public class AdminController {
 		}
 		return result;
 	}
-	
+
 
 	private List<Map<String, Object>> getReports() {
 		List<Map<String, Object>> list = new ArrayList<>();
@@ -1431,7 +1431,7 @@ public class AdminController {
 					mo.put("name", f.getName().substring("report_".length()));
 					mo.put("date", String.format("%1$tF %1$tR", new Date(f.lastModified())));
 					mo.put("fullname", f.getName());
-					list.add(mo);		
+					list.add(mo);
 				}
 			}
 		}
@@ -1463,7 +1463,7 @@ public class AdminController {
 		}
 	}
 
-	
+
 	private Map<String, Object> getDownloadSettings() {
 		DownloadServerLoadBalancer dProps = downloadService.getSettings();
 		List<DownloadServerRegion> regions = new ArrayList<>(dProps.getRegions());
@@ -1487,7 +1487,7 @@ public class AdminController {
 		return Map.of("regions", regionResults, "types", types,
 				"freemaps", dProps.getFreemaps());
 	}
-	
+
 	@RequestMapping(path = "report")
 	@ResponseBody
     public ResponseEntity<Resource> downloadReport(@RequestParam(required=true) String file,
@@ -1506,7 +1506,7 @@ public class AdminController {
 	                            @RequestParam int numberLimit,
 	                            @RequestParam String endTime,
 	                            final RedirectAttributes redirectAttrs) throws ParseException {
-		
+
 		PromoCampaignRepository.Promo promo = new PromoCampaignRepository.Promo();
 		promo.name = name;
 		promo.subActiveMonths = subActiveMonths;
@@ -1514,18 +1514,18 @@ public class AdminController {
 		promo.startTime = new Date();
 		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
 		promo.endTime = formatter.parse(endTime);
-		
+
 		promoService.register(promo);
-		
+
 		redirectAttrs.addFlashAttribute("update_status", "OK");
 		redirectAttrs.addFlashAttribute("update_errors", "");
 		redirectAttrs.addFlashAttribute("update_message", "Promo registered");
-		
+
 		return "redirect:info#promo";
 	}
-	
+
 	public static class ReleaseInfo {
-		
+
 		public static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 		public String name;
 		public String size;
@@ -1566,10 +1566,23 @@ public class AdminController {
 		model.addAttribute("releases", releases);
 		return "admin/releases";
 	}
-	
+
 	@GetMapping(path = {"/download-release"})
 	public ResponseEntity<FileSystemResource> releaseDownload(String file) {
-		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file) ;
+        if (file == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (file.contains("../")){
+            return ResponseEntity.badRequest().build();
+        }
+
+		File fl = new File(new File(filesLocation, RELEASES_FOLDER), file);
+
+        if (fl == null) {
+            return ResponseEntity.notFound().build();
+        }
+
 		HttpHeaders headers = new HttpHeaders();
         // headers.add(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", fl.getName()));
 		headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fl.getName());
@@ -1577,5 +1590,5 @@ public class AdminController {
 		headers.add(HttpHeaders.CONTENT_LENGTH, fl.length() + "");
 		return  ResponseEntity.ok().headers(headers).body(new FileSystemResource(fl));
 	}
-	
+
 }
