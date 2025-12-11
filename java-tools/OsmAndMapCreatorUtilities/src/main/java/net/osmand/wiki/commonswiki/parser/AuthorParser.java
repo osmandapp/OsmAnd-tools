@@ -177,6 +177,9 @@ public final class AuthorParser {
 		}
 
 		String singlePart = parts.get(0).trim();
+		if (singlePart.contains(";")) {
+			singlePart = singlePart.substring(0, singlePart.indexOf(";")).trim();
+		}
 		if (isSimpleText(singlePart)) {
 			return cleanAuthor(singlePart);
 		}
@@ -336,6 +339,9 @@ public final class AuthorParser {
 	private static String cleanAuthor(String author) {
 		if (author == null) {
 			return null;
+		}
+		if (author.contains(";")) {
+			author = author.substring(0, author.indexOf(";")).trim();
 		}
 		String cleaned = ParserUtils.removeWikiMarkup(author);
 		author = cleaned.trim();

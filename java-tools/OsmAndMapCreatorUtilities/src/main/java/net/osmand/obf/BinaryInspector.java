@@ -93,24 +93,24 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups",// "-vcitynames",
+//					"-vaddress", "-vcities", "-vstreetgroups",// "-vcitynames",
 //					"-vstreets",  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-//					"-latlon=41.4,-75.7,0.05",
+					"-latlon=40.755934,-73.986425,0.005",
 //					"-latlon=48.804242,9.215574,0.005",
 					
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_3.obf"
+					System.getProperty("maps.dir") + "Map.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});

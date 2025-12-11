@@ -324,6 +324,7 @@ public class GpxService {
     public GpxFile createSimplifiedGpxFile(GpxFile gpxFile) {
         GpxFile simplified = new GpxFile(null);
 
+        simplified.setAuthor(gpxFile.getAuthor());
         simplified.setMetadata(gpxFile.getMetadata());
 
         List<WptPt> points = gpxFile.getPointsList();
