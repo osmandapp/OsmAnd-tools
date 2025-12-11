@@ -354,7 +354,7 @@ public class UserdataController {
 		// probably it's better to support multiple file upload without these checks
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 
-		if (dev == null) {
+		if (dev == null || name.contains("/../")) {
 			return userdataService.tokenNotValidError();
 		}
 		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);

@@ -200,7 +200,7 @@ public class IndexController {
     @ResponseBody
     public ResponseEntity<String> checkLive(@RequestParam("file") String file,
                                             @RequestParam("timestamp") Long timestamp) {
-        if (file.isEmpty() || timestamp == null) {
+        if (timestamp == null || file == null || file.isEmpty() || file.contains("/")) {
             return ResponseEntity.badRequest().body("BadRequest");
         }
         XMLOutputFactory output = XMLOutputFactory.newInstance();
