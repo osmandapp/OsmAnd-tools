@@ -78,7 +78,7 @@ public class UpdateSubscription {
 	private static final long HOUR = 1000L * 60 * 60;
 
 	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 14 * DAY;
-	private static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
+	public static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
 	private static final long MAX_WAITING_TIME_TO_EXPIRE = 15 * DAY;
 	private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = 3 * DAY;
 	int changes = 0;

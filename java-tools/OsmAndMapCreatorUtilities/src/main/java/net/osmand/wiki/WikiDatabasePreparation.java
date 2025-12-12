@@ -23,6 +23,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -31,8 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,7 +41,6 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
 import com.google.gson.Gson;
-import info.bliki.wiki.model.WikiModel;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -64,6 +62,11 @@ import net.osmand.travel.WikivoyageLangPreparation.WikivoyageTemplates;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
+import net.osmand.wiki.commonswiki.parser.AuthorParser;
+import net.osmand.wiki.commonswiki.parser.DateParser;
+import net.osmand.wiki.commonswiki.parser.DescriptionParser;
+import net.osmand.wiki.commonswiki.parser.LicenseParser;
+import net.osmand.wiki.commonswiki.parser.ParserUtils;
 import net.osmand.wiki.wikidata.WikiDataHandler;
 
 public class WikiDatabasePreparation {
@@ -81,9 +84,9 @@ public class WikiDatabasePreparation {
 	private static final int OPTIMAL_SHORT_DESCR = 250;
 	private static final int OPTIMAL_LONG_DESCR = 500;
 	private static final int SHORT_PARAGRAPH = 10;
-	
-	public static final String DEFAULT_STRING = "Unknown";
+
 	public static final String DEFAULT_LANG = "en";
+	
 
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT,
@@ -218,13 +221,24 @@ public class WikiDatabasePreparation {
 	                                       @Nullable WikiDBBrowser browser,
 	                                       @Nullable Boolean allLangs)
 			throws IOException, SQLException {
+		return removeMacroBlocks(text, webBlockResults, blockResults, pois, lang, title, browser, allLangs, false);
+	}
+
+	public static String removeMacroBlocks(StringBuilder text,
+	                                       @Nullable Map<String, String> webBlockResults,
+	                                       Map<WikivoyageTemplates, List<String>> blockResults,
+	                                       @Nullable List<Map<PoiFieldType, Object>> pois,
+	                                       String lang,
+	                                       String title,
+	                                       @Nullable WikiDBBrowser browser,
+	                                       @Nullable Boolean allLangs,
+	                                       boolean logContentErrors)
+			throws IOException, SQLException {
 		StringBuilder bld = new StringBuilder();
 		int openCnt = 0;
 		int beginInd = 0;
 		int headerCount = 0;
 		
-		final String TAG_INFORMATION = "information";
-		final String TAG_ARTWORK = "artwork";
 		final String TAG_GALLERY = "gallery";
 		final String TAG_WEATHER_BOX = "weather box";
 		final String TAG_WIDE_IMAGE = "wide image";
@@ -239,23 +253,28 @@ public class WikiDatabasePreparation {
 			if (isCommentOpen(text, leftChars, i)) {
 				int endI = skipComment(text, i + 3);
 				text.replace(i, endI + 1, "");
+			} else if (isNowikiOpen(text, i)) {
+				int endI = skipNowiki(text, i);
+				text.replace(i, endI + 1, "");
 			} else {
 				i++;
 			}
 		}
 		Set<Integer> errorBracesCnt = new TreeSet<>();
-		String[] tagsRetrieve = {TAG_INFORMATION, TAG_GALLERY, TAG_WEATHER_BOX, TAG_WIDE_IMAGE, TAG_REF};
+		String[] tagsRetrieve = {TAG_GALLERY, TAG_WEATHER_BOX, TAG_WIDE_IMAGE, TAG_REF};
 		int cursor = -1;
 		for (int i = 0; ; i++) {
 			if (cursor >= i) {
-				System.out.printf("BUG ! %d -> %d content parsing: %s %s \n ", cursor, i, lang, title);
+				log.error(String.format("BUG ! %d -> %d content parsing: %s %s", cursor, i, lang, title));
 				i = cursor + 1; // loop detected
 			}
 			cursor = i;
 			if (i >= text.length()) {
 				if (openCnt > 0) {
-					System.out.println("Error content braces {{ }}: " + lang + " " + title + " ..."
-							+ text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20)));
+					if (logContentErrors) {
+						String contentPreview = text.substring(beginInd, Math.min(text.length() - 1, beginInd + 20));
+						log.error(String.format("Error content braces {{ }}: %s %s ...%s", lang, title, contentPreview));
+					}
 					// start over again
 					errorBracesCnt.add(beginInd);
 					beginInd = openCnt = i = 0;
@@ -273,7 +292,7 @@ public class WikiDatabasePreparation {
 							&& text.substring(i + 1, i + 1 + tag.length()).toLowerCase().equals(tag)) {
 						found = true;
 						StringBuilder val = new StringBuilder();
-						i = parseTag(text, val, tag, i, lang, title);
+						i = parseTag(text, val, tag, i, lang, title, logContentErrors);
 						if (tag.equals(TAG_REF)) {
 							parseAndAppendCitation(val.toString(), bld);
 						} else if (tag.equals(TAG_GALLERY)) {
@@ -317,8 +336,8 @@ public class WikiDatabasePreparation {
 					parseAndAppendWeatherTable(val, bld);
 				} else if (vallc.startsWith(TAG_WIDE_IMAGE) || vallc.startsWith("תמונה רחבה")) {
 					bld.append(parseWideImageString(val));
-				} else if (vallc.startsWith(TAG_INFORMATION) || vallc.startsWith(TAG_ARTWORK)) {
-					parseInformationBlock(val, lang, webBlockResults, allLangs);
+				} else if (ParserUtils.isInformationLikeTemplate(vallc)) {
+					parseInformationBlock(val, lang, webBlockResults, allLangs, title);
 				}
 				PoiFieldCategory pc = isPOIKey(vallc, lang);
 				EnumSet<WikivoyageTemplates> key = pc != null ? of(WikivoyageTemplates.POI) : getKey(vallc, lang);
@@ -355,7 +374,11 @@ public class WikiDatabasePreparation {
 				int headerLvl = 0;
 				int indexCopy = i;
 				if (isLicenseBlock) {
-					parseLicenseBlock(licenseBlock, webBlockResults);
+					String license = LicenseParser.parse(licenseBlock);
+					if (license != null && webBlockResults != null) {
+							webBlockResults.put(ParserUtils.FIELD_LICENSE, license);
+						}
+
 					isLicenseBlock = false;
 				}
 				if (i > 0 && text.charAt(i - 1) != '=') {
@@ -373,12 +396,11 @@ public class WikiDatabasePreparation {
 						int nextHeader = calculateHeaderLevel(text, ch == '\n' ? indEnd + 2 : indEnd + 1);
 						if (nextHeader > 1 && headerLvl >= nextHeader) {
 							i = indEnd;
-							continue;
 						} else if (headerLvl == 2) {
 							if (headerCount != 0) {
 								bld.append("\n/div\n");
 							}
-							bld.append(text.substring(i, indEnd));
+							bld.append(text, i, indEnd);
 							bld.append("\ndiv class=\"content\"\n");
 							headerCount++;
 							i = indEnd;
@@ -395,432 +417,82 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void prepareMetaData(Map<String, String> metaData) {
-		String license = metaData.get("license");
-		if (license != null) {
-			metaData.put("license", processLicense(license));
-		}
+		metaData.computeIfPresent(ParserUtils.FIELD_LICENSE, (k, v) -> LicenseParser.process(v));
 	}
 
-	public static String processLicense(String license) {
-		license = license.replace("[[", "").replace("]]", "");
-		// Remove hyphens after "CC" and "PD"
-		license = license.replace("CC-", "CC ");
-		license = license.replace("PD-", "PD ");
 
-		// Remove hyphen before "expired"
-		license = license.replace("-expired", " expired");
-		license = license.toUpperCase();
-
-		return license;
-	}
-	
-	/**
-	 * Parses the {{Information}} block and extracts the author, date, and description.
-	 * This method checks the provided `val` string, splits it by '|' symbols outside braces,
-	 * and looks for the author, date, and description fields in the {{Information}} block.
-	 * If the description is missing for the specified language, it will fallback to the English description or the first description found.
-	 *
-	 * @param val             The raw input string containing the {{Information}} block
-	 * @param lang            The target language code to extract the description
-	 * @param webBlockResults A map to store the parsed author, date, and description fields
-	 */
-	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs) throws IOException {
+	private static void parseInformationBlock(String val, String lang, Map<String, String> webBlockResults, Boolean allLangs, String title) {
 		
-		if (webBlockResults == null) {
+		if (webBlockResults == null || val == null) {
 			return;
 		}
 		
-		String author = DEFAULT_STRING;
-		String date = DEFAULT_STRING;
+		String author = null;
+		String date = null;
+		String license = null;
 		Map<String, String> description = new HashMap<>();
 		
-		final String INFORMATION = "Information";
-		final String ARTWORK = "Artwork";
-		final String AUTHOR = "author";
-		final String DATE = "date";
-		final String DESCRIPTION = "description";
-		
 		// Clean up the input string by removing extra spaces and newlines
-		val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
+		val = ParserUtils.normalizeWhitespace(val);
 		
-		List<String> parts = splitByPipeOutsideBraces(val, true);
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(val, true);
 		
-		boolean inInformationBlock = false;
-		
+		// Process all parts looking for metadata fields (no need to check template name)
 		for (String line : parts) {
 			line = line.trim();
-			if (line.startsWith(INFORMATION) || line.startsWith(ARTWORK)) {
-				inInformationBlock = true;
-			}
+			String lineLc = line.toLowerCase();
 			
-			if (inInformationBlock) {
-				if (line.toLowerCase().startsWith(AUTHOR)) {
-					author = parseAuthor(line);
+			if (lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
+				author = AuthorParser.parse(line);
+			}
+			if (lineLc.startsWith(ParserUtils.FIELD_DATE)) {
+				date = DateParser.parse(line);
+			}
+			if (lineLc.startsWith(ParserUtils.FIELD_DESCRIPTION)) {
+				description = DescriptionParser.parse(line, title);
+			}
+			if (lineLc.startsWith(ParserUtils.FIELD_LICENSE) || lineLc.startsWith("permission")) {
+				String licenseValue = ParserUtils.extractFieldValue(line, ParserUtils.FIELD_LICENSE);
+				if (licenseValue == null) {
+					licenseValue = ParserUtils.extractFieldValue(line, "permission");
 				}
-				if (line.toLowerCase().startsWith(DATE)) {
-					date = parseDate(line);
-				}
-				if (line.toLowerCase().startsWith(DESCRIPTION)) {
-					description = parseDescription(line);
+				if (licenseValue != null) {
+					license = LicenseParser.parseFromInformationBlock(licenseValue);
 				}
 			}
 		}
-        
-        webBlockResults.put(AUTHOR, author);
-        webBlockResults.put(DATE, date);
 
-		if (Boolean.TRUE.equals(allLangs)) {
-			webBlockResults.put(DESCRIPTION, new Gson().toJson(description));
-		} else {
-			for (Map.Entry<String, String> entry : description.entrySet()) {
-				if (entry.getKey().equals(lang)) {
-					webBlockResults.put(DESCRIPTION, entry.getValue());
+		if (author != null) {
+			webBlockResults.put(ParserUtils.FIELD_AUTHOR, author);
+		}
+		if (date != null) {
+			webBlockResults.put(ParserUtils.FIELD_DATE, date);
+		}
+		if (license != null) {
+			webBlockResults.put(ParserUtils.FIELD_LICENSE, license);
+		}
+		if (!description.isEmpty()) {
+			if (Boolean.TRUE.equals(allLangs)) {
+				webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, new Gson().toJson(description));
+			} else {
+				for (Map.Entry<String, String> entry : description.entrySet()) {
+					if (entry.getKey().equals(lang)) {
+						webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, entry.getValue());
+					}
 				}
-			}
 
-			// If no description was found in the target language, fallback to English description (default language)
-			if (!webBlockResults.containsKey(DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
-				webBlockResults.put(DESCRIPTION, description.get(DEFAULT_LANG));
-			}
+				// If no description was found in the target language, fallback to English description (default language)
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && description.containsKey(DEFAULT_LANG)) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.get(DEFAULT_LANG));
+				}
 
-			// If no description for English either, fallback to the first available description
-			if (!webBlockResults.containsKey(DESCRIPTION) && !description.isEmpty()) {
-				webBlockResults.put(DESCRIPTION, description.values().iterator().next());
+				// If no description for English either, fallback to the first available description
+				if (!webBlockResults.containsKey(ParserUtils.FIELD_DESCRIPTION) && !description.isEmpty()) {
+					webBlockResults.put(ParserUtils.FIELD_DESCRIPTION, description.values().iterator().next());
+				}
 			}
 		}
     }
-	
-	/**
-	 * Parses the License block after =={{int:license-header}}== and extracts the license information.
-	 * This method checks the provided `val` string, splits it by '|' symbols outside braces,
-	 * and looks for the license field in the License block.
-	 *
-	 * @param vals 		  The raw input string containing the License block
-	 * @param webBlockResults A map to store the parsed license field
-	 */
-	private static void parseLicenseBlock(List<String> vals, Map<String, String> webBlockResults) {
-		
-		if (webBlockResults == null) {
-			return;
-		}
-		
-		final String LICENSE = "license";
-		List<String> licenses = new ArrayList<>();
-		for (String val : vals) {
-			val = val.replaceAll("\n", " ").replaceAll("\\s{2,}", " ").trim();
-			List<String> parts = splitByPipeOutsideBraces(val, false);
-			
-			for (String part : parts) {
-				part = part.trim();
-				
-				if (part.equalsIgnoreCase("self") || part.contains("status=")) {
-					continue;
-				}
-				if (part.contains("|")) {
-					List<String> subParts = splitByPipeOutsideBraces(part, true);
-					for (String subPart : subParts) {
-						if (subPart.toLowerCase().matches(".*country\\s*=\\s*.*")
-								|| subPart.toLowerCase().matches(".*author\\s*=\\s*.*")) {
-							part = part.replace("|" + subPart, "");
-						}
-					}
-					part = part.replaceAll("\\|", " - ");
-				}
-				
-				if (part.startsWith("author")) {
-					List<String> authorParts = splitByPipeOutsideBraces(part, true);
-					authorParts.removeIf(p -> p.trim().startsWith("author"));
-					if (!authorParts.isEmpty()) {
-						licenses.addAll(authorParts);
-					}
-					continue;
-				}
-				if (part.startsWith("{{") && part.endsWith("}}")) {
-					continue;
-				}
-				
-				licenses.add(part);
-			}
-		}
-		
-		if (!licenses.isEmpty()) {
-			webBlockResults.put(LICENSE, String.join(", ", licenses));
-		}
-	}
-	
-	private static List<String> splitByPipeOutsideBraces(String input, boolean splitByPipe) {
-		List<String> parts = new ArrayList<>();
-		StringBuilder currentPart = new StringBuilder();
-		int curlyBraceDepth = 0;  // To track the nesting level inside {{ }}
-		int squareBraceDepth = 0; // To track the nesting level inside [[ ]]
-		
-		for (int i = 0; i < input.length(); i++) {
-			char c = input.charAt(i);
-			
-			// Increase nesting level for {{ and [[
-			if (i < input.length() - 1 && input.charAt(i) == '{' && input.charAt(i + 1) == '{') {
-				curlyBraceDepth++;
-				currentPart.append(c);
-				currentPart.append(input.charAt(++i));
-			} else if (i < input.length() - 1 && input.charAt(i) == '[' && input.charAt(i + 1) == '[') {
-				squareBraceDepth++;
-				currentPart.append(c);
-				currentPart.append(input.charAt(++i));
-			}
-			
-			// Decrease nesting level for }} and ]]
-			else if (i < input.length() - 1 && input.charAt(i) == '}' && input.charAt(i + 1) == '}') {
-				curlyBraceDepth--;
-				currentPart.append(c);
-				currentPart.append(input.charAt(++i));
-			} else if (i < input.length() - 1 && input.charAt(i) == ']' && input.charAt(i + 1) == ']') {
-				squareBraceDepth--;
-				currentPart.append(c);
-				currentPart.append(input.charAt(++i));
-			}
-			
-			// Split by '|' if we are not inside {{ }} or [[ ]]
-			else if (c == '|' && curlyBraceDepth == 0 && squareBraceDepth == 0 && splitByPipe) {
-				parts.add(currentPart.toString().trim());
-				currentPart.setLength(0); // Clear the current string for the next part
-			} else {
-				currentPart.append(c); // Add character to the current part
-			}
-		}
-		
-		// Add the last part
-		if (!currentPart.isEmpty()) {
-			parts.add(currentPart.toString().trim());
-		}
-		
-		return parts;
-	}
-	
-	/**
-	 * Examples:
-	 * |author=[https://web.archive.org/web/20161031223609/http://www.panoramio.com/user/4678999?with_photo_id=118704129 Ben Bender] => Ben Bender
-	 * |author={{Creator:Johannes Petrus Albertus Antonietti}} => Johannes Petrus Albertus Antonietti
-	 * |author=[[User:PersianDutchNetwork|PersianDutchNetwork]] => PersianDutchNetwork
-	 * |author=[[User]] => User  // case when there's no pipe character
-	 * |author=[https://example.com SomeUser] => SomeUser
-	 * |author=[https://example.com] => Unknown  // when there is no name after the URL
-	 * |author={{User:Ralf Roletschek/Autor}} => Ralf Roletschek  // specific case for User template
-	 * |author={{self2|GFDL|cc-by-sa-3.0|author=[[User:Butko|Andrew Butko]]}} => Andrew Butko
-	 * |author={{FlickreviewR|author=Adam Jones, Ph.D. - Global Photo Archive|...}} => Adam Jones, Ph.D.  // Stop at first comma
-	 */
-	private static String parseAuthor(String line) {
-		String author = DEFAULT_STRING;
-		
-		if (line.toLowerCase().matches(".*author\\s*=\\s*.*")) {
-			line = line.replaceFirst("(?i).*author\\s*=\\s*", "").trim();
-		}
-		
-		List<String> templatesToHandle = Arrays.asList("User", "Creator");
-		List<String> parts = splitByPipeOutsideBraces(line, true);
-		
-		for (String part : parts) {
-			if (part.contains("edited by")) {
-				part = part.substring(0, part.indexOf("edited by")).trim();
-			}
-			if (part.startsWith("Publisher:")) {
-				part = part.substring("Publisher:".length()).trim();
-			}
-			if (part.startsWith("{{") && part.contains("|")) {
-				if (part.contains("author=")) {
-					String authorPart = part.substring(part.indexOf("author=") + 7).trim();
-					if (authorPart.contains("[[") && authorPart.contains("]]")) {
-						int start = authorPart.indexOf("[[") + 2;
-						int end = authorPart.indexOf("]]");
-						author = authorPart.substring(start, end).split("\\|").length > 1
-								? authorPart.split("\\|")[1].trim()
-								: authorPart.substring(start, end).trim();
-					} else if (authorPart.contains(",")) {
-						author = authorPart.split(",")[0].trim();
-					} else {
-						author = authorPart.trim();
-					}
-				} else {
-					int start = part.indexOf("|") + 1;
-					int end = part.lastIndexOf("}}");
-					if (end != -1 && start < end) {
-						author = part.substring(start, end).trim();
-					}
-				}
-				break;
-			} else if (part.startsWith("[http") && part.contains(" ")) {
-				author = part.substring(part.indexOf(" ") + 1, part.indexOf("]")).trim();
-				break;
-			} else if (part.startsWith("[http") && !part.contains(" ")) {
-				author = DEFAULT_STRING;
-				break;
-			}
-			
-			for (String template : templatesToHandle) {
-				if (part.startsWith("{{" + template + ":") || part.startsWith("[[" + template + ":")) {
-					int start = part.indexOf(":") + 1;
-					int end = part.indexOf("/", start);
-					
-					if (end == -1) {
-						end = part.indexOf(part.startsWith("{{") ? "}}" : "]]", start);
-					}
-					
-					String userSection = part.substring(start, end).trim();
-					
-					if (userSection.contains("|")) {
-						author = userSection.split("\\|")[1].trim();
-					} else {
-						author = userSection.trim();
-					}
-					break;
-				}
-			}
-		}
-		
-		if (parts.size() == 1 && author.equals(DEFAULT_STRING)) {
-			author = parts.get(0).trim();
-		}
-		author = author.replaceAll("\\[+|]+", "");
-		return author;
-	}
-	
-	
-	/**
-	 * Examples:
-	 * |date={{Original upload date|2015-04-15}} => 2015-04-15
-	 * |Date={{original upload date|2006-11-05}} => 2006-11-05
-	 * |date=2011-10-08 => 2011-10-08
-	 * |Date=2009-12-06 23:11 => 2009-12-06
-	 */
-	private static String parseDate(String line) {
-		String date = DEFAULT_STRING;
-		
-		if (line.toLowerCase().matches(".*date\\s*=\\s*.*")) {
-			String dateValue = line.replaceFirst("(?i).*date\\s*=\\s*", "").trim();
-			if (dateValue.startsWith("{{")) {
-				int start = dateValue.indexOf("{{") + 2;
-				int end = dateValue.indexOf("}}", start);
-				if (end != -1) {
-					String[] dateParts = dateValue.substring(start, end).split("\\|");
-					// If the template is "other date", it indicates an approximate date (e.g., "ca 1900")
-					if (dateParts.length > 1 && dateParts[0].equalsIgnoreCase("other date")) {
-						date = String.join(" ", Arrays.copyOfRange(dateParts, 1, dateParts.length)).trim();
-					} else {
-						// Find the part matching the format YYYY-MM-DD
-						for (String part : dateParts) {
-							if (part.matches("\\d{4}-\\d{2}-\\d{2}")) {
-								date = part.trim();
-								break;
-							}
-						}
-					}
-				}
-			} else {
-				date = dateValue.split(" ")[0].trim();
-			}
-		}
-		date = date.replaceAll("\\[+|]+", "");
-		return date;
-	}
-	
-	/**
-	 * Examples:
-	 * |description={{uk|1=Kyiv Pechersk Lavra}} => Kyiv Pechersk Lavra
-	 * |description=Some text description => Some text description
-	 */
-	private static Map<String, String> parseDescription(String line) throws IOException {
-		Map<String, String> result = new HashMap<>();
-		String descriptionBlock = line;
-		
-		while (descriptionBlock.contains("{{") && descriptionBlock.contains("}}")) {
-			// Find the start of the language
-			int langStart = descriptionBlock.indexOf("{{") + 2;
-			int langEnd = descriptionBlock.indexOf("|", langStart); // Look for the first "|"
-			if (langEnd == -1) {
-				break;  // If no "|", exit loop
-			}
-			
-			String lang = descriptionBlock.substring(langStart, langEnd).trim();
-			if (lang.length() > 5) {
-				break;  // If the language code is too long, exit loop
-			}
-			
-			// Look for the description part
-			int descStart = descriptionBlock.indexOf("|1=", langEnd) != -1
-					? descriptionBlock.indexOf("|1=", langEnd) + 3  // If "|1=" exists, use it
-					: langEnd + 1;  // Otherwise, start right after the first "|"
-			
-			// Count braces to correctly finish the language block
-			int openBraces = 1;  // We are already inside the first {{
-			int currentIndex = descStart;
-			
-			while (openBraces > 0 && currentIndex < descriptionBlock.length()) {
-				if (descriptionBlock.startsWith("{{", currentIndex)) {
-					openBraces++;
-				} else if (descriptionBlock.startsWith("}}", currentIndex)) {
-					openBraces--;
-				}
-				currentIndex++;
-			}
-			
-			if (openBraces == 0) {
-				String description = getDescString(descriptionBlock, descStart, currentIndex);
-				description = description.replaceAll("\\[+|]+", "");
-				result.put(lang, description);
-				// Move to the next block
-				descriptionBlock = descriptionBlock.substring(currentIndex).trim();
-			} else {
-				break;  // If closing brace is not found, exit
-			}
-		}
-		if (result.isEmpty()) {
-			// If no language block was found, use the whole description as the default language
-			String description = descriptionBlock.replaceFirst("(?i).*description\\s*=\\s*", "").trim();
-			if (description.startsWith("{{")) {
-				return result;  // skip it
-			}
-			final WikiModel wikiModel = new WikiModel("", "");
-			StringBuilder plainStr = new StringBuilder(wikiModel.render(new PlainTextConverter(true), description));
-			List<String> links = parseLinks(description);
-			if (!links.isEmpty()) {
-				plainStr.append("\n\nLinks:");
-				for (int i = 0; i < links.size(); i++) {
-					plainStr.append("\n[").append(i + 1).append("] ").append(links.get(i));
-				}
-			}
-			
-			result.put(DEFAULT_LANG, plainStr.toString());
-		}
-		
-		return result;
-	}
-	
-	private static List<String> parseLinks(String description) {
-		List<String> links = new ArrayList<>();
-		String regex = "\\[(https?://\\S+)\\s([^]]+)]";
-		Pattern pattern = Pattern.compile(regex);
-		Matcher matcher = pattern.matcher(description);
-		
-		while (matcher.find()) {
-			String link = matcher.group(1); //url
-			links.add(link);
-		}
-		return links;
-	}
-	
-	private static String getDescString(String descriptionBlock, int descStart, int currentIndex) {
-		String description = descriptionBlock.substring(descStart, currentIndex).trim();
-		
-		// Remove nested templates and links inside the description
-		description = description.replaceAll("\\{\\{[^|]+\\|", "")  // Remove nested templates {{...|
-				.replaceAll("}}", "")                               // Remove closing braces }}
-				.replaceAll("\\[\\[:[^|]+\\|", "")                  // Remove links [[...|
-				.replaceAll("]]", "")                               // Remove closing ]]
-				.replaceAll("\\{\\{", "")                           // Remove remaining opening braces {{
-				.replaceAll("}$", "")                               // Remove the last extra brace at the end of the string
-				.trim();
-		
-		return description;
-	}
 	
 	private static StringBuilder getWikivoyagePoiHtmlDescription(String lang, WikiDBBrowser browser,
 			Map<PoiFieldType, Object> poiFields, String val)
@@ -878,6 +550,31 @@ public class WikiDatabasePreparation {
 			i++;
 		}
 		return i;
+	}
+
+	private static boolean isNowikiOpen(StringBuilder text, int i) {
+		int len = text.length();
+		if (i + 7 >= len) {
+			return false;
+		}
+		String maybeTag = text.substring(i, i + 8);
+		return maybeTag.equalsIgnoreCase("<nowiki>");
+	}
+
+	private static int skipNowiki(StringBuilder text, int i) {
+		int len = text.length();
+		int pos = i + 8; // after "<nowiki>"
+		while (pos < len) {
+			if (pos + 8 < len) {
+				String maybeClose = text.substring(pos, pos + 9);
+				if (maybeClose.equalsIgnoreCase("</nowiki>")) {
+					return pos + 8;
+				}
+			}
+			pos++;
+		}
+		// If no closing tag found, skip to end
+		return len - 1;
 	}
 
 	private static boolean isCommentClosed(StringBuilder text, int i) {
@@ -1010,7 +707,7 @@ public class WikiDatabasePreparation {
 	}
 
 	private static int parseTag(StringBuilder text, StringBuilder bld, String tag, int indOpen, String lang,
-			String title) {
+			String title, boolean logContentErrors) {
 		int selfClosed = text.indexOf("/>", indOpen);
 		int nextTag = text.indexOf("<", indOpen + 1);
 		if (selfClosed > 0 && (selfClosed < nextTag || nextTag == -1)) {
@@ -1030,8 +727,10 @@ public class WikiDatabasePreparation {
 
 		int lastChar = text.indexOf(">", ind);
 		if (ind == -1 || lastChar == -1) {
-			System.out.printf("Error content tag (not closed) %s %s: %s\n", lang, title,
-					text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10)));
+			if (logContentErrors) {
+				String contentPreview = text.substring(indOpen + 1, Math.min(text.length() - 1, indOpen + 1 + 10));
+				log.error(String.format("Error content tag (not closed) %s %s: %s", lang, title, contentPreview));
+			}
 			return indOpen + 1;
 		}
 		bld.append(text.substring(indOpen + 1, ind));
@@ -2088,3 +1787,4 @@ public class WikiDatabasePreparation {
 	}
 
 }
+

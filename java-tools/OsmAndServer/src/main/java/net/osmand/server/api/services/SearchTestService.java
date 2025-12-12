@@ -110,6 +110,8 @@ public class SearchTestService implements ReportService, DataService {
 	private String overpassApiUrl;
 	@Autowired
 	private PolyglotEngine engine;
+	@Autowired
+	private OsmAndMapsService mapsService;
 
 	@PostConstruct
 	protected void init() {
@@ -150,6 +152,11 @@ public class SearchTestService implements ReportService, DataService {
 		LOGGER.info("Global search-test executor created with pool size = {}", maxCount);
 		return new ThreadPoolExecutor(maxCount, maxCount,60L, TimeUnit.SECONDS,
 					new LinkedBlockingQueue<>(), tf);
+	}
+
+	@Override
+	public OsmAndMapsService getMapsService() {
+		return mapsService;
 	}
 
 	public SearchService getSearchService() {
@@ -485,10 +492,7 @@ public class SearchTestService implements ReportService, DataService {
  				jdbcTemplate.batchUpdate(sql, batchArgs);
  			} catch (Exception ex) {
  				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
- 			} finally {
-				 run.finish = LocalDateTime.now();
-				 runRepo.save(run);
-		    }
+ 			}
  		}, EXECUTOR);
  		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
  	}

@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import net.osmand.gpx.clickable.ClickableWayTags;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -68,7 +67,6 @@ import net.osmand.util.MapUtils;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
-import static net.osmand.obf.preparation.IndexRouteRelationCreator.SHIELD_STUB_NAME;
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -903,6 +901,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType nameEnRuleType = getOrCreate("name:en", null, true);
 		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
+		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
+		Set<String> duplicateWikiWids = new HashSet<String>();
+		
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -919,6 +920,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String type = rs.getString(3);
 			String subtype = rs.getString(4);
 			decodeAdditionalInfo(rs.getString(6), additionalTags);
+			if (type.equals(MapPoiTypes.OSM_WIKI_CATEGORY) && additionalTags.containsKey(wikidataType)) {
+				String wikidata = additionalTags.get(wikidataType);
+				if (wikidata != null && wikidata.length() > 0) {
+					boolean added = duplicateWikiWids.add(wikidata);
+					if (!added) {
+						// skip generated duplicate
+						continue;
+					}
+				}
+			}
 			if (geocodingCtx != null && 
 					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
 					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {

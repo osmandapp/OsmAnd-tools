@@ -7,9 +7,9 @@
 # Load balancing depending on tiff size
 # For 128Gb RAM and 32 threads machine:
 threads_number_0=1 # >100M
-threads_number_1=17 # >19M  Max RAM per process without simplifying: ~30 Gb
-threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
-threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
+# threads_number_1=17 # >19M  Max RAM per process without simplifying: ~30 Gb
+# threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
+# threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
 export QT_LOGGING_RULES="qt5ct.debug=false"
 export QT_QPA_PLATFORM=offscreen
@@ -17,9 +17,10 @@ export TILES_PREFIX=${TILES_PREFIX:-""}
 TMP_DIR="/mnt/wd_2tb/tmp"
 isolines_step=10
 translation_script=contours.py
+neighbors_dir=""
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number]}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number] -n [neighbors-dir]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
@@ -27,10 +28,11 @@ function usage {
 	echo "-t: threads number"
 	echo "-f: make contours in feet"
 	echo "-c: path to cutline in shp format"
+	echo "-n: path to directory with neighbor tiles (default: same as input directory)"
 }
 
 date
-while getopts ":i:o:m:spdt:fc:" opt; do
+while getopts ":i:o:m:spdt:fc:n:" opt; do
   case $opt in
     i) indir="$OPTARG"
     ;;
@@ -55,6 +57,8 @@ while getopts ":i:o:m:spdt:fc:" opt; do
     ;;
     c) path_to_cutline="$OPTARG"
     ;;
+    n) neighbors_dir="$OPTARG"  # Добавлено
+    ;;
     \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
 	usage
     ;;
@@ -65,6 +69,10 @@ export XDG_RUNTIME_DIR=$TMP_DIR/runtime
 mkdir -p $TMP_DIR
 mkdir -p $XDG_RUNTIME_DIR
 chmod 0700 $XDG_RUNTIME_DIR
+
+if [[ -z $neighbors_dir ]] ; then
+    neighbors_dir=$indir
+fi
 
 if [[ $make_feet == "true" ]] ; then
 	isolines_step=40
@@ -99,6 +107,10 @@ if [ ! -d $outdir ]; then
 	echo "output dir is not found"
 	exit 3
 fi
+if [ ! -d $neighbors_dir ]; then
+	echo "neighbors dir is not found: $neighbors_dir"
+	exit 3
+fi
 if [ ! -f $path_to_cutline ]; then
 	echo "path to cutline is not found"
 	exit 3
@@ -106,6 +118,7 @@ fi
 
 echo -e "\e[104minput dir: $indir\e[49m"
 echo -e "\e[104moutput dir: $outdir\e[49m"
+echo -e "\e[104mneighbors dir: $neighbors_dir\e[49m"
 echo -e "\e[104msmooth: $smooth\e[49m"
 echo -e "\e[104msimplify: $simplify\e[49m"
 echo -e "\e[104msplit_lines: $split_lines\e[49m"
@@ -130,6 +143,7 @@ export make_feet
 export isolines_step
 export translation_script
 export path_to_cutline
+export neighbors_dir
 
 process_tiff ()
 {
@@ -214,9 +228,26 @@ process_tiff ()
                 formatted_lat=$(printf "%0${lat_digits}d" "$new_lat")
                 formatted_lon=$(printf "%0${lon_digits}d" "$new_lon")
 
-                neighbor_filename="${indir}/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                neighbor_filename=""
+                neighbor_highres_dir="${neighbors_dir%/*}/$(basename $neighbors_dir)_highres"
 
-                if [ -f "$neighbor_filename" ]; then
+                # Check highres in input dir
+                if [ -f "$highres_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif" ]; then
+                    neighbor_filename="$highres_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                    echo "Found highres neighbor in main dir: $neighbor_filename"
+                # If no tiles found then use lowres tile in input dir
+                elif [ -f "$indir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif" ]; then
+                    neighbor_filename="$indir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                # If no tiles found then checking highres neighbors dir
+                elif [ -f "$neighbor_highres_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif" ]; then
+                    neighbor_filename="$neighbor_highres_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                    echo "Found highres neighbor: $neighbor_filename"
+                # If there is no highres, checking lowres version in neighbors dir
+                elif [ -f "$neighbors_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif" ]; then
+                    neighbor_filename="$neighbors_dir/${lat_prefix}${formatted_lat}${lon_prefix}${formatted_lon}.tif"
+                fi
+
+                if [ -n "$neighbor_filename" ]; then
                     neighbors+=("$neighbor_filename")
 
                 if [ $dlat -eq 0 ] && [ $dlon -eq -1 ]; then
@@ -437,4 +468,4 @@ find "$indir" -maxdepth 1 -type f -name "$TILES_PREFIX*.tif" | sort -R | paralle
 rm -rf $outdir/processing || true
 rm -rf $outdir/symbology-style.db || true
 rm -rf $XDG_RUNTIME_DIR || true
-echo "Sucess $(date)"
+echo "Success $(date)"

@@ -47,7 +47,7 @@ public class CombineSRTMIntoFile {
 		File directoryWithTargetFiles = new File(args[1]);
 		boolean dryRun = false;
 		boolean feet = false;
-		String filter = null; // mauritius
+		Set<String> filters = new HashSet<>(); // mauritius
 		int limit = 1000;
 		for(int i = 2; i < args.length; i++ ){
 			if("--dry-run".equals(args[i])) {
@@ -55,9 +55,12 @@ public class CombineSRTMIntoFile {
 			} else if("--feet".equals(args[i])) {
 				feet = true;
 			} else if(args[i].startsWith("--filter=")) {
-				filter = args[i].substring("--filter=".length());
-				if(filter.length() == 0) {
-					filter = null;
+				String f = args[i].substring("--filter=".length());
+				if(f.length() > 0) {
+					String[] fs = f.split(",");
+					for (String ff : fs) {
+						filters.add(ff.trim());
+					}
 				}
 			} else if(args[i].startsWith("--limit=")) {
 				limit = Integer.parseInt(args[i].substring("--limit=".length())); 
@@ -75,8 +78,20 @@ public class CombineSRTMIntoFile {
 		Set<String> failedCountries = new HashSet<String>();
 		for (String fullName : allCountries.keySet()) {
 			LinkedList<BinaryMapDataObject> lst = allCountries.get(fullName);
-			if (fullName == null || (filter != null && !fullName.contains(filter))) {
+			if (fullName == null) {
 				continue;
+			}
+			if (!filters.isEmpty()) {
+				boolean matches = false;
+				for (String filt : filters) {
+					if (fullName.contains(filt)) {
+						matches = true;
+						break;
+					}
+				}
+				if (!matches) {
+					continue;
+				}
 			}
 			BinaryMapDataObject rc = null;
 			for (BinaryMapDataObject r : lst) {

@@ -773,6 +773,9 @@ public class UserdataService {
         if (dev == null) {
             return null;
         }
+		if (name.contains("/../")) {
+			return null; // just ../ or /.. is valid
+		}
         name = sanitizeDecode(name);
         if (updatetime != null) {
             return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
@@ -891,7 +894,7 @@ public class UserdataService {
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
-        File tmpGpx = File.createTempFile(newName, ".gpx");
+        File tmpGpx = File.createTempFile(newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
             zipFile = InternalZipFile.buildFromFile(tmpGpx);
         } else {

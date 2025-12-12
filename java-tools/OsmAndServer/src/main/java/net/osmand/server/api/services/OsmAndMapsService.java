@@ -150,7 +150,7 @@ public class OsmAndMapsService {
 	private static final String INTERACTIVE_STYLE_DELIMITER = "-";
 
 
-	Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
+	private final Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 
 	CachedOsmandIndexes cacheFiles = null;
 
@@ -350,6 +350,10 @@ public class OsmAndMapsService {
 			}
 			return cnt;
 		}
+
+		public File getFile() {
+			return file;
+		}
 	}
 
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
@@ -371,7 +375,9 @@ public class OsmAndMapsService {
 	}
 
 	public void unlockReaders(List<BinaryMapIndexReader> mapsReaders) {
-		obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+		synchronized (obfFiles) {
+			obfFiles.values().forEach(ref -> mapsReaders.forEach(ref::unlockReader));
+		}
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
