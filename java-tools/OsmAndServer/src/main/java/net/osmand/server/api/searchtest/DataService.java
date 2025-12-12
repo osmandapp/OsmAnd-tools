@@ -657,10 +657,10 @@ public interface DataService extends BaseService {
 		return new ResultMetric(r.file == null ? "" : r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
 				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), r.location == null ? null :
 				MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0,
-				r.completeMatchRes.allWordsEqual, r.completeMatchRes.allWordsInPhraseAreInResult);
+				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
 	}
 
-	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Map<String, Integer>>> wordsByApis) {}
+	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Integer>> wordByTypeCounts) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
@@ -674,7 +674,7 @@ public interface DataService extends BaseService {
 			AddressResult rec = toResult(r, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().wordsByApis);
+		return new ResultsWithStats(results, result.stat().wordByTypeCounts);
 	}
 
     private AddressResult toResult(SearchResult r, java.util.Set<SearchResult> seen) {
