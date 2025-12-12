@@ -21,7 +21,6 @@ import java.io.*;
 import java.util.*;
 
 import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.PINNED_EXTENSION;
 
 @Controller
 @RequestMapping("/mapapi/fav")
@@ -69,26 +68,17 @@ public class FavoriteController {
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
             boolean hidden = false;
-            boolean pinned = false;
             for (String d : data) {
                 WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(d, WebGpxParser.Wpt.class));
                 if (!hidden) {
                     hidden = Objects.requireNonNull(wptPt.getExtensions()).get(HIDDEN_EXTENSION) != null
                             && wptPt.getExtensions().get(HIDDEN_EXTENSION).equals("true");
                 }
-                if (!pinned) {
-                    pinned = Objects.requireNonNull(wptPt.getExtensions()).get(PINNED_EXTENSION) != null
-                            && wptPt.getExtensions().get(PINNED_EXTENSION).equals("true");
-                }
                 file.updateWptPt(Objects.requireNonNull(wptPt.getName()), data.indexOf(d), wptPt, updateTimestamp);
             }
             boolean groupHidden = file.getPointsGroups().get(groupName).getHidden();
             if (groupHidden != hidden) {
                 file.getPointsGroups().get(groupName).setHidden(hidden);
-            }
-            boolean groupPinned = file.getPointsGroups().get(groupName).getPinned();
-            if (groupPinned != pinned) {
-                file.getPointsGroups().get(groupName).setPinned(pinned);
             }
             file.updatePointsGroup(groupName, file.getPointsGroups().get(groupName));
 
@@ -183,6 +173,22 @@ public class FavoriteController {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
         return favoriteService.addNewGroup(trackData, groupName, dev);
+    }
+
+    @PostMapping(value = "/update-group")
+    @ResponseBody
+    public ResponseEntity<String> updateGroup(@RequestBody String data,
+                                              @RequestParam String fileName,
+                                              @RequestParam String groupName,
+                                              @RequestParam Long updatetime) throws IOException {
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
+        WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        if (file == null) {
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
+                    UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+        }
+        return favoriteService.updateGroup(file, trackData, groupName, dev);
     }
     
     @GetMapping(value = "/rename-fav-group")

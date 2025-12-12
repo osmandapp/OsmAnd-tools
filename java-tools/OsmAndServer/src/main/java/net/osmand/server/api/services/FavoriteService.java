@@ -151,6 +151,16 @@ public class FavoriteService {
         }
         return ResponseEntity.ok(gson.toJson(resp));
     }
+
+    public ResponseEntity<String> updateGroup(GpxFile gpxFile, WebGpxParser.TrackData trackData, String groupName, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+        GpxFile fromTrackData = webGpxParser.createGpxFileFromTrackData(trackData);
+        gpxFile.updatePointsGroup(groupName, fromTrackData.getPointsGroups().get(groupName));
+        String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
+        File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, name);
+        uploadFavoriteFile(tmpGpx, dev, name, null);
+        UserdataService.ResponseFileStatus resp = createResponse(dev, name, gpxFile, tmpGpx);
+        return ResponseEntity.ok(gson.toJson(resp));
+    }
     
     public CloudUserDevicesRepository.CloudUserDevice getUserId() {
         Object user = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
