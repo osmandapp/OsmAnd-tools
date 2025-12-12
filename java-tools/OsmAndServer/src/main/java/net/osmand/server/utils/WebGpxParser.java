@@ -594,6 +594,7 @@ public class WebGpxParser {
                 if (parsedColor != null) {
                     group.setColor(parsedColor);
                 }
+                group.setPinned(dataGroup.pinned);
                 res.put(key, group);
             }
             gpxFile.setPointsGroups(res);

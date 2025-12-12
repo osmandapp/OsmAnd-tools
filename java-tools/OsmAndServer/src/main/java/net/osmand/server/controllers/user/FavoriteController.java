@@ -188,7 +188,7 @@ public class FavoriteController {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
-        return favoriteService.updateGroup(file, trackData, groupName, dev);
+        return favoriteService.updateGroup(file, trackData, groupName, dev, updatetime);
     }
     
     @GetMapping(value = "/rename-fav-group")
