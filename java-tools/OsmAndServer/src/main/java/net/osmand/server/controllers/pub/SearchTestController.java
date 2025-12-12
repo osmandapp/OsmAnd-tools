@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -340,14 +341,47 @@ public class SearchTestController {
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
-	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
-	                 @RequestParam(required = false) String houseRegExp) {
+	                 @RequestParam(required = false) String houseRegExp,
+	                 @RequestParam(required = false) String poiRegExp) {
 		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
-				includesBoundary != null && includesBoundary,
-				cityRegExp, streetRegExp, houseRegExp));
+				includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
+				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
+
+	private static final double SEARCH_RADIUS_DEGREE = 1.0;
+
+	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<DataService.ResultsWithStats> getResults(
+			@RequestParam String query,
+			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon) throws IOException {
+		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
+		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
+	}
+
+	@PutMapping(value = "/unit-test", produces = "application/zip")
+	@ResponseBody
+	public void downloadUnitTest(
+			@RequestParam String query,
+			@RequestParam(required = false) Double radius,
+			@RequestParam Double lat,
+			@RequestParam Double lon,
+			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
+			HttpServletResponse response) throws IOException, SQLException {
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
+		// write a ZIP containing 2 entries
+		//  - unit-test_name.json (JSON request)
+		//  - unit-test_name.zip.gz (gzip-compressed data archive)
+		testSearchService.createUnitTest(query, unitTest, radius, lat, lon, response.getOutputStream());
+	}
+
 }
