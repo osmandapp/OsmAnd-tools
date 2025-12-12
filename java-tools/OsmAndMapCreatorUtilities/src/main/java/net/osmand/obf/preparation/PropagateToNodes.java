@@ -244,11 +244,7 @@ public class PropagateToNodes {
 	private List<PropagateRule> getRulesToApply(Way w) {
 		List<PropagateRule> rulesToApply = null;
 		Map<String, String> trTags = renderingTypes.transformTags(w.getTags(), EntityType.WAY, EntityConvertApplyType.MAP);
-//		System.out.println("WA " + (w.getId()));
 		for (String tag : trTags.keySet()) {
-            if (tag.equals("bicycle")) {
-                int r = 0;
-            }
 			List<PropagateRule> list = propagateRulesByTag.get(tag);
 			if (list == null) {
 				continue;
@@ -258,9 +254,6 @@ public class PropagateToNodes {
 				String entityTag = trTags.get(tag);
                 if (rule.value.isEmpty() && !renderingTypes.isMapRenderingType(tag, entityTag)) {
                     defaultRule = rule;
-                }
-                if (tag.equals("hazard")) {
-                    int y = 0;
                 }
 				if (entityTag != null && entityTag.equals(rule.value)) {
                     rulesToApply = applyRule(rulesToApply, rule, trTags);
@@ -476,6 +469,9 @@ public class PropagateToNodes {
 			int delete = 0;
 			for (PropagateFromWayToNode p : linkedPropagate) {
 				for (PropagateRuleFromWayToNode n : p.rls) {
+                    if (type.getValue() == null) {
+                        continue;
+                    }
 					boolean isEqual = type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue());
 					boolean isConverted = false;
 					if (!isEqual) {
