@@ -107,12 +107,7 @@ public final class DescriptionParser {
 				String lang = part.substring(0, equalsIndex).trim();
 				String text = part.substring(equalsIndex + 1).trim();
 				if (lang.length() <= MAX_LANGUAGE_CODE_LENGTH && !text.isEmpty()) {
-					String cleanedText = renderWikiText(text, null);
-					if (cleanedText == null || cleanedText.isEmpty() || cleanedText.startsWith("Template:")) {
-						cleanedText = cleanDescriptionText(text);
-					} else {
-						cleanedText = cleanedText.trim();
-					}
+					String cleanedText = cleanDescriptionText(text);
 					if (!cleanedText.isEmpty()) {
 						result.put(lang, cleanedText);
 					}
@@ -127,12 +122,7 @@ public final class DescriptionParser {
 			if (block == null) {
 				break;
 			}
-			String cleanedDescription = renderWikiText(block.content, null);
-			if (cleanedDescription == null || cleanedDescription.isEmpty() || cleanedDescription.startsWith("Template:")) {
-				cleanedDescription = cleanDescriptionText(block.content);
-			} else {
-				cleanedDescription = cleanedDescription.trim();
-			}
+			String cleanedDescription = cleanDescriptionText(block.content);
 			result.put(block.language, cleanedDescription);
 			descriptionBlock = descriptionBlock.substring(block.endIndex).trim();
 		}
@@ -246,13 +236,25 @@ public final class DescriptionParser {
 		// Remove tag links like [#tag1, #tag2, #tag3]
 		description = description.replaceAll("\\[#[^\\]]+\\]", "").trim();
 
-		String plainText = renderWikiText(description, title);
-		if (plainText == null) {
-			return;
+		String plainText;
+		boolean hasWikiMarkup =
+				description.contains("{{") ||
+				description.contains("}}") ||
+				description.contains("[[") ||
+				description.contains("]]") ||
+				LINK_PATTERN.matcher(description).find();
+
+		if (!hasWikiMarkup) {
+			plainText = description;
+		} else {
+			plainText = renderWikiText(description, title);
+			if (plainText == null) {
+				return;
+			}
+			// Remove leading/trailing newlines from rendered text
+			plainText = plainText.trim();
 		}
-		// Remove leading/trailing newlines from rendered text
-		plainText = plainText.trim();
-		
+
 		List<String> links = extractLinks(description);
 		
 		if (!links.isEmpty()) {
