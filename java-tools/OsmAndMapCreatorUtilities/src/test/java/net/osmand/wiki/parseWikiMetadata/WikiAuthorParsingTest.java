@@ -193,6 +193,13 @@ public class WikiAuthorParsingTest {
 		assertEquals("Test Author", result);
 	}
 
+	@Test
+	public void test26() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Author=[[:w:Photoglob Zürich|Photoglob Zürich]]\n"), webResults);
+		assertEquals("Photoglob Zürich", webResults.get("author"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
