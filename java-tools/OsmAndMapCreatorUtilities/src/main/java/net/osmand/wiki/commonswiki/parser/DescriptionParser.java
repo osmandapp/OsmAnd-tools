@@ -209,6 +209,10 @@ public final class DescriptionParser {
 		description = description.trim();
 
 		if (description.startsWith("{{")) {
+			// Special handling for {{Multilingual description|...}} template
+			if (parseMultilingualDescriptionTemplate(description, result)) {
+				return;
+			}
 			String plainText = renderWikiText(description, title);
 			if (plainText == null) {
 				return;
@@ -263,6 +267,49 @@ public final class DescriptionParser {
 		if (!plainText.isEmpty()) {
 			result.put(WikiDatabasePreparation.DEFAULT_LANG, plainText);
 		}
+	}
+
+	/**
+	 * Parses {{Multilingual description|en=...|xx=...}} template into language -> text map.
+	 *
+	 * @return true if template was successfully parsed and result map was updated.
+	 */
+	private static boolean parseMultilingualDescriptionTemplate(String description, Map<String, String> result) {
+		String lowered = description.toLowerCase();
+		if (!lowered.startsWith("{{multilingual description|")) {
+			return false;
+		}
+
+		// Strip outer {{ }}
+		if (!description.endsWith("}}")) {
+			return false;
+		}
+		String content = description.substring(2, description.length() - 2).trim();
+
+		// First part is template name, the rest are lang=value pairs
+		List<String> parts = ParserUtils.splitByPipeOutsideBraces(content, true);
+		if (parts.isEmpty()) {
+			return false;
+		}
+
+		for (int i = 1; i < parts.size(); i++) {
+			String part = parts.get(i).trim();
+			int equalsIndex = part.indexOf('=');
+			if (equalsIndex <= 0 || equalsIndex >= part.length() - 1) {
+				continue;
+			}
+			String lang = part.substring(0, equalsIndex).trim();
+			String text = part.substring(equalsIndex + 1).trim();
+			if (lang.isEmpty() || text.isEmpty() || lang.length() > MAX_LANGUAGE_CODE_LENGTH) {
+				continue;
+			}
+			String cleaned = cleanDescriptionText(text);
+			if (!cleaned.isEmpty()) {
+				result.put(lang, cleaned);
+			}
+		}
+
+		return !result.isEmpty();
 	}
 
 	private static String renderWikiText(String description, String title) {
