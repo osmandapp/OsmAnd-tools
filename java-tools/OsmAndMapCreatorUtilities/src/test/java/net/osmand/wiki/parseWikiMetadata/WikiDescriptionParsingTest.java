@@ -114,6 +114,14 @@ public class WikiDescriptionParsingTest {
 		assertEquals("Saint Sophia's Cathedral, Kiev", result);
 	}
 
+	@Test
+	public void test14() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|Description={{Multilingual description|en=Venedig|tr=[[:tr:San Marco Bazilikası|San Marco Bazilikası]]}}\n"),
+				webResults, "en");
+		assertEquals("Venedig", webResults.get("description"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults, String lang)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

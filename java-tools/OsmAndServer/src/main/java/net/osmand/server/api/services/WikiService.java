@@ -783,7 +783,7 @@ public class WikiService {
 	}
 
 	public String getLicense(String data) {
-		return licenseMap.getOrDefault("http://www.wikidata.org/entity/" + data, null);
+		return licenseMap.getOrDefault("http://www.wikidata.org/entity/" + data, data);
 	}
 	
 }
