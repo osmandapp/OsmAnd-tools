@@ -152,15 +152,15 @@ public class FavoriteService {
         return ResponseEntity.ok(gson.toJson(resp));
     }
 
-    public ResponseEntity<String> updateGroup(String fileName, WebGpxParser.TrackData trackData, String groupName,
+    public ResponseEntity<String> updateGroup(String fileName, WebGpxParser.TrackData updateGroupData, String groupName,
                                               CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
         GpxFile gpxFile = createGpxFile(fileName, dev, updatetime);
-        GpxFile updateGroupData = webGpxParser.createGpxFileFromTrackData(trackData);
+        GpxFile gpxUpdateGroupData = webGpxParser.createGpxFileFromTrackData(updateGroupData);
         if (gpxFile == null) {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         }
-        gpxFile.updatePointsGroup(groupName, updateGroupData.getPointsGroups().get(groupName));
+        gpxFile.updatePointsGroup(groupName, gpxUpdateGroupData.getPointsGroups().get(groupName));
         File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fileName);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, gpxFile, tmpGpx);
