@@ -249,18 +249,20 @@ public class IndexCreationContext {
 		return bld.toString();
 	}
 
+	public boolean isInsideRegionBBox(double lat, double lon) {
+		for (QuadRect quad : inflatedRegionQuads) {
+			if (quad.contains(lon, lat, lon, lat)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public boolean isInsideRegionBBox(Entity entity) {
 		if (inflatedRegionQuads == null) {
 			return true; // region might have no bbox
 		} else if (entity instanceof Node node) {
-			double lon = node.getLongitude();
-			double lat = node.getLatitude();
-			for (QuadRect quad : inflatedRegionQuads) {
-				if (quad.contains(lon, lat, lon, lat)) {
-					return true;
-				}
-			}
-			return false; // Node is outside
+			return isInsideRegionBBox(node.getLatitude(), node.getLongitude()); // Node
 		} else if (entity instanceof Way way && way.getFirstNode() != null) {
 			List<LatLon> latLons = new ArrayList<>();
 			latLons.add(way.getFirstNode().getLatLon());
@@ -269,12 +271,8 @@ public class IndexCreationContext {
 				latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
 			}
 			for (LatLon l : latLons) {
-				double lon = l.getLongitude();
-				double lat = l.getLatitude();
-				for (QuadRect quad : inflatedRegionQuads) {
-					if (quad.contains(lon, lat, lon, lat)) {
-						return true;
-					}
+				if (isInsideRegionBBox(l.getLatitude(), l.getLongitude())) {
+					return true;
 				}
 			}
 			return false; // Way is outside
