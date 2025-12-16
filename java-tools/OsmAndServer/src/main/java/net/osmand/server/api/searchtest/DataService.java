@@ -660,7 +660,7 @@ public interface DataService extends BaseService {
 				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
 	}
 
-	record ResultsWithStats(List<AddressResult> results, Map<String, Map<String, Integer>> wordByTypeCounts) {}
+	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
@@ -674,7 +674,7 @@ public interface DataService extends BaseService {
 			AddressResult rec = toResult(r, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().wordByTypeCounts);
+		return new ResultsWithStats(results, result.stat().getWordStats().values());
 	}
 
     private AddressResult toResult(SearchResult r, java.util.Set<SearchResult> seen) {
