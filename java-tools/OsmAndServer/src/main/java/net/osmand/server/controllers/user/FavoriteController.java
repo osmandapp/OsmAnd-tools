@@ -17,8 +17,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 
@@ -182,13 +186,8 @@ public class FavoriteController {
                                               @RequestParam String groupName,
                                               @RequestParam Long updatetime) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
-        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
-        if (file == null) {
-            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
-                    UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
-        }
-        return favoriteService.updateGroup(file, trackData, groupName, dev, updatetime);
+        WebGpxParser.TrackData groupData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime);
     }
     
     @GetMapping(value = "/rename-fav-group")
