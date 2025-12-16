@@ -245,6 +245,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (City c : cityDataStorage.getAllCities()) {
 			progress.progress(1);
 			Boundary cityB = cityDataStorage.getBoundaryByCity(c);
+			// wrong for Klaukkala - Town no boundary
 			if (cityB == null && (c.getType() == CityType.CITY || c.getType() == CityType.TOWN)) {
 				LatLon location = c.getLocation();
 				Boundary smallestBoundary = null;
