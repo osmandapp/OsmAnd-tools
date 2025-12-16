@@ -250,24 +250,25 @@ public class PropagateToNodes {
 				continue;
 			}
             PropagateRule defaultRule = null;
+            boolean isAnyApplied = false;
 			for (PropagateRule rule : list) {
 				String entityTag = trTags.get(tag);
                 if (rule.value.isEmpty() && !renderingTypes.isMapRenderingType(tag, entityTag)) {
                     defaultRule = rule;
                 }
 				if (entityTag != null && entityTag.equals(rule.value)) {
-                    rulesToApply = applyRule(rulesToApply, rule, trTags);
-                    defaultRule = null;
+                    rulesToApply = addToRules(rulesToApply, rule, trTags);
+                    isAnyApplied = true;
 				}
 			}
-            if (defaultRule != null) {
-                rulesToApply = applyRule(rulesToApply, defaultRule, trTags);
+            if (defaultRule != null && !isAnyApplied) {
+                rulesToApply = addToRules(rulesToApply, defaultRule, trTags);
             }
 		}
 		return rulesToApply;
 	}
 
-    private List<PropagateRule> applyRule(List<PropagateRule> rulesToApply, PropagateRule rule, Map<String, String> trTags) {
+    private List<PropagateRule> addToRules(List<PropagateRule> rulesToApply, PropagateRule rule, Map<String, String> trTags) {
         boolean propIf = rule.applicableBorder(trTags);
         if (propIf) {
             if (rulesToApply == null) {
