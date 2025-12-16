@@ -172,7 +172,7 @@ public class PropagateToNodes {
 						d.propagateNetworkIf, d.propagateIf, d.propagateAlsoTags, d.propagateAvoidPolygons);
 				String[] split = entry.getKey().split("/");
 				rule.tag = split[0];
-				rule.value = split.length > 1 ? split[1] : "";
+				rule.value = split[1];
 				if (!propagateRulesByTag.containsKey(rule.tag)) {
 					propagateRulesByTag.put(rule.tag, new ArrayList<PropagateToNodes.PropagateRule>());
 				}
@@ -244,41 +244,30 @@ public class PropagateToNodes {
 	private List<PropagateRule> getRulesToApply(Way w) {
 		List<PropagateRule> rulesToApply = null;
 		Map<String, String> trTags = renderingTypes.transformTags(w.getTags(), EntityType.WAY, EntityConvertApplyType.MAP);
+//		System.out.println("WA " + (w.getId()));
 		for (String tag : trTags.keySet()) {
 			List<PropagateRule> list = propagateRulesByTag.get(tag);
 			if (list == null) {
 				continue;
 			}
-            PropagateRule defaultRule = null;
 			for (PropagateRule rule : list) {
 				String entityTag = trTags.get(tag);
-                if (rule.value.isEmpty() && !renderingTypes.isMapRenderingType(tag, entityTag)) {
-                    defaultRule = rule;
-                }
 				if (entityTag != null && entityTag.equals(rule.value)) {
-                    rulesToApply = applyRule(rulesToApply, rule, trTags);
-                    defaultRule = null;
+					boolean propIf = rule.applicableBorder(trTags);
+					if (propIf) {
+						if (rulesToApply == null) {
+							rulesToApply = new ArrayList<>();
+						}
+						if (!rulesToApply.contains(rule)) {
+							rulesToApply.add(rule);
+						}
+					}
 				}
 			}
-            if (defaultRule != null) {
-                rulesToApply = applyRule(rulesToApply, defaultRule, trTags);
-            }
 		}
 		return rulesToApply;
 	}
 
-    private List<PropagateRule> applyRule(List<PropagateRule> rulesToApply, PropagateRule rule, Map<String, String> trTags) {
-        boolean propIf = rule.applicableBorder(trTags);
-        if (propIf) {
-            if (rulesToApply == null) {
-                rulesToApply = new ArrayList<>();
-            }
-            if (!rulesToApply.contains(rule)) {
-                rulesToApply.add(rule);
-            }
-        }
-        return rulesToApply;
-    }
 
 
 	public void propagateTagsToWayNodesNoBorderRule(Way w) {
@@ -325,7 +314,7 @@ public class PropagateToNodes {
 		public Set<String> propAlso;
 
 		public PropagateRule(PropagateToNodesType type, String tagPrefix,
-				Map<String, String> propNetworkIf, Map<String, String> propMapIf,
+				Map<String, String> propNetworkIf, Map<String, String> propMapIf, 
 				String[] propAlsoTags, boolean avoidPolygons) {
 			this.type = type;
 			this.tagPrefix = tagPrefix;
@@ -356,13 +345,13 @@ public class PropagateToNodes {
 			}
 			return propagateTag;
 		}
-
+		
 		public Set<String> getPropAlso() {
 			return propAlso;
 		}
 
 		public boolean applicableBorder(Map<String, String> tags) {
-			if (!value.equals(tags.get(tag)) && !value.isEmpty()) {
+			if (!value.equals(tags.get(tag))) {
 				return false;
 			}
 			if (propNetworkIf != null && !applicable(tags, propNetworkIf)) {
@@ -469,9 +458,6 @@ public class PropagateToNodes {
 			int delete = 0;
 			for (PropagateFromWayToNode p : linkedPropagate) {
 				for (PropagateRuleFromWayToNode n : p.rls) {
-                    if (type.getValue() == null) {
-                        continue;
-                    }
 					boolean isEqual = type.getTag().equals(n.rule.getPropagateTag()) && type.getValue().equals(n.rule.getPropagateValue());
 					boolean isConverted = false;
 					if (!isEqual) {
