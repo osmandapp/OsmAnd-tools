@@ -157,7 +157,7 @@ public class WebGpxParser {
         public String name;
         public String iconName;
         public String backgroundType;
-        public boolean pinned;
+        public Boolean pinned;
         public final List<Wpt> points = new ArrayList<>();
         public GpxUtilities.PointsGroup ext;
 
