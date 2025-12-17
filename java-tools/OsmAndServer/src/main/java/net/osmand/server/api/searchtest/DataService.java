@@ -622,7 +622,7 @@ public interface DataService extends BaseService {
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
 							final String poiName = amenity.getName(lang);
-							if (!poiPattern.matcher(poiName).find())
+							if (poiName == null || !poiPattern.matcher(poiName).find())
 								continue;
 							results.add(new Address(poiName, amenity.getLocation()));
 						}
@@ -673,13 +673,13 @@ public interface DataService extends BaseService {
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
-			AddressResult rec = toResult(r, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
 		return new ResultsWithStats(results, result.stat().getWordStats().values());
 	}
 
-    private AddressResult toResult(SearchResult r, java.util.Set<SearchResult> seen) {
+    private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
         if (r == null || r == r.parentSearchResult)
             return null;
 
@@ -736,7 +736,7 @@ public interface DataService extends BaseService {
 
 				// Gzipped data archive entry
 				if (outFile.exists()) {
-						ZipEntry gzEntry = new ZipEntry(outFile.getName());
+					ZipEntry gzEntry = new ZipEntry(outFile.getName());
 					zipOut.putNextEntry(gzEntry);
 					try (InputStream gzIn = new FileInputStream(outFile)) {
 						Algorithms.streamCopy(gzIn, zipOut);
