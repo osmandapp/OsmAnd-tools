@@ -241,11 +241,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// This is incorrect to do with suburbs because it assigns boundary that is much bigger!
 		// Than suburb and after that findCityPart works incorrectly
 		// So we do only for Cities & Towns without boundaries, try to find the right one
-		int smallestAdminLevel = 7; //start at level 8 for now...
 		for (City c : cityDataStorage.getAllCities()) {
 			progress.progress(1);
 			Boundary cityB = cityDataStorage.getBoundaryByCity(c);
+			// wrong for Klaukkala - Town no boundary
 			if (cityB == null && (c.getType() == CityType.CITY || c.getType() == CityType.TOWN)) {
+				int smallestAdminLevel = c.getType() == CityType.CITY? 7 : 8; //start at level 8 for now...
 				LatLon location = c.getLocation();
 				Boundary smallestBoundary = null;
 				// try to found boundary
