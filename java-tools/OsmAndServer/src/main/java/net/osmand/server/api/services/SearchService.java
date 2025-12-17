@@ -53,7 +53,7 @@ public class SearchService {
     private static final int SEARCH_RADIUS_LEVEL = 1;
     private static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 2000;
-    private static final int TOTAL_LIMIT_SEARCH_RESULTS = 10000;
+    private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
