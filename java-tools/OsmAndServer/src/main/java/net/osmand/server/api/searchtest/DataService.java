@@ -668,9 +668,9 @@ public interface DataService extends BaseService {
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
-	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang) throws IOException {
+	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang, boolean unlimited) throws IOException {
 		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, lang, false, radius, null, null, true, null, null);
+				.searchResults(lat, lon, query, lang, false, radius, null, null, unlimited, null, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {

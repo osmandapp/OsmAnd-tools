@@ -363,12 +363,13 @@ public class SearchTestController {
 			@RequestParam(required = false) String lang,
 			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
-			@RequestParam() Double lon) throws IOException {
+			@RequestParam() Double lon,
+			@RequestParam(required = false) Boolean unlimited) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
 		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
-		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
+		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang, unlimited == null || unlimited));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
