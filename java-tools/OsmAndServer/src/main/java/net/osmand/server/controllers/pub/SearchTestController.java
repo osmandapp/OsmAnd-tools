@@ -368,7 +368,7 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
 		return ResponseEntity.ok(testSearchService.getResults(
-				new SearchService.SearchContext(lat, lon, query, lang, false, null, null, null),
+				new SearchService.SearchContext(lat, lon, query, lang, false, radius, null, null),
 				new SearchService.SearchOption(unlimited == null || unlimited, null)));
 	}
 
@@ -387,7 +387,7 @@ public class SearchTestController {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
-				new SearchService.SearchContext(lat, lon, query, null, false, null, null, null),
+				new SearchService.SearchContext(lat, lon, query, null, false, radius, null, null),
 				response.getOutputStream());
 	}
 
