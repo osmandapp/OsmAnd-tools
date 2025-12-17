@@ -40,8 +40,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class SearchTestService implements ReportService, DataService {
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-
 	/**
 	 * Lightweight DTO for listing test-cases with parent dataset name.
 	 */
@@ -407,10 +405,10 @@ public class SearchTestService implements ReportService, DataService {
 			if (srcPoint != null) {
 				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
 						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + SEARCH_RADIUS_DEGREE,
-								srcPoint.getLongitude() - SEARCH_RADIUS_DEGREE),
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - SEARCH_RADIUS_DEGREE,
-								srcPoint.getLongitude() + SEARCH_RADIUS_DEGREE)};
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
 			}
 
 			for (Map<String, Object> row : rows) {
@@ -437,10 +435,10 @@ public class SearchTestService implements ReportService, DataService {
 				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + SEARCH_RADIUS_DEGREE,
-								searchPoint.getLongitude() - SEARCH_RADIUS_DEGREE),
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - SEARCH_RADIUS_DEGREE,
-								searchPoint.getLongitude() + SEARCH_RADIUS_DEGREE)};
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
 
 				Map<String, Object> newRow = new LinkedHashMap<>();
 				long datasetId;
@@ -456,7 +454,7 @@ public class SearchTestService implements ReportService, DataService {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
 						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder, null);
+								query, run.locale, false, SearchService.SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder, null);
 					}
 
 					args = collectRunResults(finder, genId, count, run, query, searchResult,

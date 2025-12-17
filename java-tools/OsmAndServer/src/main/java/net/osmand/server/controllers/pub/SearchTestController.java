@@ -6,6 +6,7 @@ import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
@@ -354,8 +355,6 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
-
 	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<DataService.ResultsWithStats> getResults(
@@ -368,7 +367,7 @@ public class SearchTestController {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
-		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
+		radius = radius == null ? SearchService.SEARCH_RADIUS_DEGREE : radius;
 		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang, unlimited == null || unlimited));
 	}
 
