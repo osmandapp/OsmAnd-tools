@@ -422,7 +422,7 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				long startTime = System.currentTimeMillis();
-				Integer gen_id = (Integer) row.get("id");
+				Integer genId = (Integer) row.get("id");
 				String query = (String) row.get("query");
 				int count = (Integer) row.get("gen_count");
 				String rowJson = (String) row.get("row");
@@ -459,15 +459,13 @@ public class SearchTestService implements ReportService, DataService {
 								query, run.locale, false, SEARCH_RADIUS_DEGREE, bbox[0], bbox[1], true, finder, null);
 					}
 
-					args = collectRunResults(finder, gen_id, count, run, query, searchResult,
+					args = collectRunResults(finder, genId, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					args = new Object[] {gen_id, count, run.datasetId, run.id, run.caseId, query, "",
-							e.getMessage() == null ? e.toString() : e.getMessage(), System.currentTimeMillis() - startTime,
-							0, null, null, null,
-							searchPoint.getLatitude(), searchPoint.getLongitude(), bbox[0] + "; " + bbox[1],
-							new Timestamp(System.currentTimeMillis()), false, null, null};
+					args = collectRunResults(finder, genId, count, run, query, null,
+							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
+							e.getMessage() == null ? e.toString() : e.getMessage());
 				} finally {
 					if (args != null)
 						enqueueRunResult(run, args);

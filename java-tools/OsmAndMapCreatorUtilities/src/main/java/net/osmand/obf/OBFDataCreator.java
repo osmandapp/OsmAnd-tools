@@ -54,7 +54,8 @@ public class OBFDataCreator extends BinaryMerger {
 
 		File outFile = new File(obfFilePath + ".gz");
 		try (FileInputStream inputStream = new FileInputStream(outputFile);
-		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(new FileOutputStream(outFile))) {
+		     FileOutputStream fileOutputStream = new FileOutputStream(outFile);
+		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
 			Algorithms.streamCopy(inputStream, gzipOutputStream);
 		}
 

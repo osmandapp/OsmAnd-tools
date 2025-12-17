@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -353,7 +354,7 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
-	private static final double SEARCH_RADIUS_DEGREE = 1.0;
+	private static final double SEARCH_RADIUS_DEGREE = 1.5;
 
 	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
@@ -361,21 +362,27 @@ public class SearchTestController {
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam(required = false) Double radius,
-			@RequestParam Double lat,
-			@RequestParam Double lon) throws IOException {
+			@RequestParam() Double lat,
+			@RequestParam() Double lon) throws IOException {
+		if (query == null || lat == null || lon == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
+		}
 		radius = radius == null ? SEARCH_RADIUS_DEGREE : radius;
 		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang));
 	}
 
-	@PutMapping(value = "/unit-test", produces = "application/zip")
+	@PostMapping(value = "/unit-test", produces = "application/zip")
 	@ResponseBody
 	public void downloadUnitTest(
 			@RequestParam String query,
 			@RequestParam(required = false) Double radius,
-			@RequestParam Double lat,
-			@RequestParam Double lon,
+			@RequestParam() Double lat,
+			@RequestParam() Double lon,
 			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
+		if (query == null || lat == null || lon == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
+		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
 		// write a ZIP containing 2 entries

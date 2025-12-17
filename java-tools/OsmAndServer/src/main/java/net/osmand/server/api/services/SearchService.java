@@ -166,7 +166,7 @@ public class SearchService {
                                              boolean unlimited, Consumer<List<SearchResult>> consumerInContext,
                                              SearchExportSettings exportedSettings) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return new SearchResultWrapper(Collections.emptyList(), null, null,null);
+            return new SearchResultWrapper(Collections.emptyList(), null, null, null);
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
         if (!unlimited) {
@@ -180,11 +180,11 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
             if (list.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null,null);
+                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
             if (usedMapList.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null,null);
+                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
 	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
@@ -211,8 +211,6 @@ public class SearchService {
 	        String unitTestJson = null;
 			if (exportedSettings != null) {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
-				settings.setExportedObjects(null);
-				settings.setExportedObjects(null);
 				unitTestJson = json == null ? null : json.toString();
 			}
 			return new SearchResultWrapper(res, stat, settings, unitTestJson);

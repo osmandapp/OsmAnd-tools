@@ -278,6 +278,12 @@ public interface DataService extends BaseService {
 	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
+		if (error != null) {
+			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, "", error, duration,
+					0, null, null, null, searchPoint.getLatitude(), searchPoint.getLongitude(), bbox,
+					new Timestamp(System.currentTimeMillis()), false, null, null};
+		}
+
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 
 		Map<String, Object> row = finder.getRow();
@@ -347,8 +353,7 @@ public interface DataService extends BaseService {
 		String rowJson = getObjectMapper().writeValueAsString(row);
 
 		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
-				resultsCount,
-				distance, resultPoint, resPlace,
+				resultsCount, distance, resultPoint, resPlace,
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
@@ -566,11 +571,9 @@ public interface DataService extends BaseService {
 
 							final List<City> cities = index.getCities(null, type, region, null);
 							for (City c : cities) {
-								boolean boundary = false;
-								if (c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE) {
-									if (!includesBoundaryPostcode)
-										continue;
-									boundary = c.getType() == City.CityType.BOUNDARY;
+								final boolean isBoundaryOrPostcode = c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE;
+								if (isBoundaryOrPostcode && !includesBoundaryPostcode) {
+									continue;
 								}
 
 								final String cityName = c.getName(lang);
@@ -579,7 +582,7 @@ public interface DataService extends BaseService {
 									continue;
 
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, streets, boundary));
+									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
 									continue;
 								}
 
@@ -610,7 +613,7 @@ public interface DataService extends BaseService {
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, streets, boundary));
+									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
