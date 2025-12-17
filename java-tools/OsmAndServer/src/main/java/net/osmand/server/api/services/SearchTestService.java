@@ -40,6 +40,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class SearchTestService implements ReportService, DataService {
+	private static final double SEARCH_RADIUS_DEGREE = 1.5;
+
 	/**
 	 * Lightweight DTO for listing test-cases with parent dataset name.
 	 */
@@ -375,8 +377,6 @@ public class SearchTestService implements ReportService, DataService {
 			runResultBatchTasks.remove(run.id);
 		}
 	}
-
-	private static final double SEARCH_RADIUS_DEGREE = 1.5;
 
 	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
