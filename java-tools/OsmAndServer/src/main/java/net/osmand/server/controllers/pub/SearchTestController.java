@@ -381,7 +381,7 @@ public class SearchTestController {
 			@RequestParam() Double lon,
 			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
-		if (unitTest.name() == null || query == null || lat == null || lon == null) {
+		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
 		response.setContentType("application/zip");
