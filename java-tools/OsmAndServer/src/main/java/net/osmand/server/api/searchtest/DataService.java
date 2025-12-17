@@ -668,9 +668,8 @@ public interface DataService extends BaseService {
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
-	default ResultsWithStats getResults(Double radius, Double lat, Double lon, String query, String lang, boolean unlimited) throws IOException {
-		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, lang, false, radius, null, null, unlimited, null, null);
+	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
+		SearchService.SearchResultWrapper result = getSearchService().searchResults(ctx, option, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
@@ -697,10 +696,10 @@ public interface DataService extends BaseService {
 
 	record UnitTestPayload(String name, String[] queries) {}
 
-	default void createUnitTest(String query, UnitTestPayload unitTest, Double radius, Double lat, Double lon, OutputStream out) throws IOException, SQLException {
+	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(lat, lon, query, "en", false, radius, null, null, true, null, exportSettings);
+				.searchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
@@ -716,7 +715,7 @@ public interface DataService extends BaseService {
 					new String[] {jsonFile.getAbsolutePath()});
 
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
-			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(lat, lon));
+			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lat()));
 			JSONObject settingsJson = settings.toJSON();
 			Map<String, Object> rootJson = new LinkedHashMap<>();
 			rootJson.put("settings", settingsJson);
@@ -749,25 +748,15 @@ public interface DataService extends BaseService {
 				out.flush();
 			}
 		} finally {
-			try {
-				if (dirPath != null && Files.exists(dirPath)) {
-					Files.walk(dirPath)
-						.sorted(Comparator.reverseOrder())
-						.forEach(p -> {
-							try {
-								Files.deleteIfExists(p);
-							} catch (IOException first) {
-								try {
-									Thread.sleep(150L);
-									Files.deleteIfExists(p);
-								} catch (IOException | InterruptedException e) {
-									getLogger().warn("Failed to delete temp unit-test path {}", p);
-								}
-							}
-						});
-				}
-			} catch (IOException e) {
-				getLogger().warn("Failed to cleanup temp unit-tests directory {}", dirPath);
+			if (dirPath != null && Files.exists(dirPath)) {
+				Files.walk(dirPath)
+					.sorted(Comparator.reverseOrder())
+					.forEach(p -> {
+						File f = p.toFile();
+						if (!f.delete()) {
+							f.deleteOnExit();
+						}
+					});
 			}
 		}
 	}

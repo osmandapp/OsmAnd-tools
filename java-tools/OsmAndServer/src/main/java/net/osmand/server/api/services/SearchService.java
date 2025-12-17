@@ -141,12 +141,12 @@ public class SearchService {
         return bbox;
     }
 
-	public List<Feature> search(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) throws IOException {
+	public List<Feature> search(SearchContext ctx) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(lat, lon, text, locale, baseSearch, SEARCH_RADIUS_DEGREE, northWest, southEast, false, null, null);
+		SearchResultWrapper searchResults = searchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
-			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", text,
+			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
 					(System.currentTimeMillis() - tm) / 1000.0, searchResults.stat));
 		}
@@ -158,27 +158,33 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
+	public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
+	                            Double radiusToLoadMaps, String northWest, String southEast) {
+		public double getRadius() {
+			return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
+		}
+	}
+	public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
 	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat,
 	                                  SearchSettings settings, String unitTestJson) {}
 
-    public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
-                                             double radiusToLoadMaps, String northWest, String southEast,
-                                             boolean unlimited, Consumer<List<SearchResult>> consumerInContext,
-                                             SearchExportSettings exportedSettings) throws IOException {
+    public SearchResultWrapper searchResults(SearchContext ctx, SearchOption option,
+                                             Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResultWrapper(Collections.emptyList(), null, null, null);
         }
-        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(locale), locale, false);
-        if (!unlimited) {
+        SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(ctx.locale), ctx.locale, false);
+        if (!option.unlimited) {
             searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         }
         searchUICore.getSearchSettings().setRegions(osmandRegions);
 
-        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + radiusToLoadMaps, lon - radiusToLoadMaps),
-                new LatLon(lat - radiusToLoadMaps, lon + radiusToLoadMaps));
+        QuadRect points = osmAndMapsService.points(null,
+		        new LatLon(ctx.lat + ctx.getRadius(), ctx.lon - ctx.getRadius()),
+                new LatLon(ctx.lat - ctx.getRadius(), ctx.lon + ctx.getRadius()));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
             if (list.isEmpty()) {
                 return new SearchResultWrapper(Collections.emptyList(), null, null, null);
             }
@@ -192,24 +198,25 @@ public class SearchService {
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
-			settings.setExportSettings(exportedSettings);
+			settings.setExportSettings(option.exportedSettings);
             searchUICore.updateSettings(settings);
             
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
             
-            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(text + DELIMITER, new LatLon(lat, lon));
-            resultCollection = addPoiCategoriesToSearchResult(resultCollection, text, locale, searchUICore);
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(ctx.text + DELIMITER,
+		            new LatLon(ctx.lat, ctx.lon));
+            resultCollection = addPoiCategoriesToSearchResult(resultCollection, ctx.text, ctx.locale, searchUICore);
 
 	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
-	        res = filterBrandsOutsideBBox(res, northWest, southEast, locale, lat, lon, baseSearch);
+	        res = filterBrandsOutsideBBox(res, ctx.northWest, ctx.southEast, ctx.locale, ctx.lat, ctx.lon, ctx.baseSearch);
 	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
 			if (consumerInContext != null) {
 				consumerInContext.accept(res);
 			}
 
 	        String unitTestJson = null;
-			if (exportedSettings != null) {
+			if (option.exportedSettings != null) {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
 				unitTestJson = json == null ? null : json.toString();
 			}
@@ -223,7 +230,8 @@ public class SearchService {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
-        QuadRect searchBbox = osmAndMapsService.points(null, new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+        QuadRect searchBbox = osmAndMapsService.points(null,
+		        new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
                 new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE));
         List<BinaryMapIndexReader> readers = new ArrayList<>();
         Feature feature = null;

@@ -367,8 +367,9 @@ public class SearchTestController {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
-		radius = radius == null ? SearchService.SEARCH_RADIUS_DEGREE : radius;
-		return ResponseEntity.ok(testSearchService.getResults(radius, lat, lon, query, lang, unlimited == null || unlimited));
+		return ResponseEntity.ok(testSearchService.getResults(
+				new SearchService.SearchContext(lat, lon, query, lang, false, null, null, null),
+				new SearchService.SearchOption(unlimited == null || unlimited, null)));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
@@ -380,15 +381,20 @@ public class SearchTestController {
 			@RequestParam() Double lon,
 			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
-		if (query == null || lat == null || lon == null) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
+		if (unitTest.name() == null || query == null || lat == null || lon == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
 		response.setContentType("application/zip");
-		response.setHeader("Content-Disposition", "attachment; filename=unit-test.zip");
-		// write a ZIP containing 2 entries
-		//  - unit-test_name.json (JSON request)
-		//  - unit-test_name.zip.gz (gzip-compressed data archive)
-		testSearchService.createUnitTest(query, unitTest, radius, lat, lon, response.getOutputStream());
+		String unitTestName = unitTest.name();
+		String safeBaseName = unitTestName.isBlank() ? "unit-test" : unitTestName;
+		safeBaseName = safeBaseName.replaceAll("[\\\\/\\r\\n\";]", "_").trim();
+		if (safeBaseName.replace("_", "").isEmpty()) {
+			safeBaseName = "unit-test";
+		}
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + safeBaseName + ".zip\"");
+		testSearchService.createUnitTest(unitTest,
+				new SearchService.SearchContext(lat, lon, query, null, false, null, null, null),
+				response.getOutputStream());
 	}
 
 }
