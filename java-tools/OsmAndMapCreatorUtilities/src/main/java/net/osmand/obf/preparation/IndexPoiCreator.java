@@ -1456,7 +1456,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String type = amenity.getType().getKeyName();
 			String subtype = amenity.getSubType();
 			String name = amenity.getName();
-			log.warn(String.format("Entity out-of-region-bbox: %s %.4f %.4f %s %s %s",
+			log.warn(String.format("POI out-of-bbox %s %.4f %.4f %s %s %s",
 					entity.getOsmUrl(), ll.getLatitude(), ll.getLongitude(), type, subtype, name));
 		}
 	}
