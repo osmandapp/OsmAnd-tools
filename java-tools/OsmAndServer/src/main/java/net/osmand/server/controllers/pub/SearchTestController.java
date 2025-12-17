@@ -385,13 +385,7 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
 		response.setContentType("application/zip");
-		String unitTestName = unitTest.name();
-		String safeBaseName = unitTestName.isBlank() ? "unit-test" : unitTestName;
-		safeBaseName = safeBaseName.replaceAll("[\\\\/\\r\\n\";]", "_").trim();
-		if (safeBaseName.replace("_", "").isEmpty()) {
-			safeBaseName = "unit-test";
-		}
-		response.setHeader("Content-Disposition", "attachment; filename=\"" + safeBaseName + ".zip\"");
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
 				new SearchService.SearchContext(lat, lon, query, null, false, null, null, null),
 				response.getOutputStream());
