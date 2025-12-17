@@ -30,7 +30,6 @@ public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
     private static final String JAPAN = "japan";
 	private static final String CHINA = "china";
-	private static final double INFLATE_REGION_BBOX_KM = 20;
 
     public OsmandRegions allRegions;
     public boolean basemap;
@@ -38,9 +37,9 @@ public class IndexCreationContext {
     private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
-	private IndexCreator indexCreator;
+	private final IndexCreator indexCreator;
 
-	private List<QuadRect> inflatedRegionQuads = null;
+	protected final IndexRegionBboxFilter bboxFilter = new IndexRegionBboxFilter();
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
@@ -52,11 +51,7 @@ public class IndexCreationContext {
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
-				inflatedRegionQuads = region.getAllPolygonsBounds();
-				double inflate = INFLATE_REGION_BBOX_KM * 1000 / MapUtils.METERS_IN_DEGREE;
-	            for (QuadRect rect : inflatedRegionQuads) {
-		            MapUtils.inflateBBoxLatLon(rect, inflate, inflate);
-	            }
+				bboxFilter.initRegionQuads(region);
             }
 		}
 	}
@@ -247,45 +242,6 @@ public class IndexCreationContext {
 			bld.append(next);
 		}
 		return bld.toString();
-	}
-
-	public boolean isInsideRegionBBox(double lat, double lon) {
-		for (QuadRect quad : inflatedRegionQuads) {
-			if (quad.contains(lon, lat, lon, lat)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	public boolean isInsideRegionBBox(Entity entity) {
-		if (inflatedRegionQuads == null) {
-			return true; // region might have no bbox
-		} else if (entity instanceof Node node) {
-			return isInsideRegionBBox(node.getLatitude(), node.getLongitude()); // Node
-		} else if (entity instanceof Way way && way.getFirstNode() != null) {
-			List<LatLon> latLons = new ArrayList<>();
-			latLons.add(way.getFirstNode().getLatLon());
-			latLons.add(way.getLastNode().getLatLon());
-			if (way.getNodes().size() > 2) {
-				latLons.add(way.getNodes().get(way.getNodes().size() / 2).getLatLon());
-			}
-			for (LatLon l : latLons) {
-				if (isInsideRegionBBox(l.getLatitude(), l.getLongitude())) {
-					return true;
-				}
-			}
-			return false; // Way is outside
-		} else if (entity instanceof Relation relation) {
-			for (Relation.RelationMember member : relation.getMembers()) {
-				if (isInsideRegionBBox(member.getEntity())) {
-					return true; // recursive
-				}
-			}
-			return false; // Relation is outside
-		} else {
-			return true; // default
-		}
 	}
 
 }

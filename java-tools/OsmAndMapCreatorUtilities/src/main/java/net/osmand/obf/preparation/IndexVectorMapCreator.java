@@ -755,14 +755,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             // split doesn't work correctly with OsmAnd Live so it was disabled
 //            List<Map<String, String>> splitTags = renderingTypes.splitTags(e.getTags(), EntityType.valueOf(e));
             for (int level = 0; level < mapZooms.size(); level++) {
-                processMainEntity(e, originalId, assignedId, level, tags);
+                processMainEntity(e, originalId, assignedId, level, tags, icc);
             }
-            createCenterNodeForSmallIsland(e, tags, originalId);
+            createCenterNodeForSmallIsland(e, tags, originalId, icc);
         }
     }
 
-	private void createCenterNodeForSmallIsland(Entity e, Map<String, String> tags, long originalId)
-			throws SQLException {
+    private void createCenterNodeForSmallIsland(Entity e, Map<String, String> tags, long originalId,
+                                                IndexCreationContext icc) throws SQLException {
 		long assignedId;
 		if (e instanceof Way && tags.size() > 2 && "coastline".equals(tags.get("natural"))
 		        && ("island".equals(tags.get("place")) || "islet".equals(tags.get("place")))) {
@@ -775,14 +775,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 		        EntityId eid = EntityId.valueOf(e);
 		        assignedId = assignIdBasedOnOriginalSplit(eid);
 		        for (int level = 0; level < mapZooms.size(); level++) {
-		            processMainEntity(node, originalId, assignedId, level, nodeTags);
+		            processMainEntity(node, originalId, assignedId, level, nodeTags, icc);
 		        }
 		    }
 		}
 	}
 
-    protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags)
-            throws SQLException {
+    protected void processMainEntity(Entity e, long originalId, long assignedId, int level, Map<String, String> tags,
+                                     IndexCreationContext icc) throws SQLException {
         if (settings.keepOnlySeaObjects) {
             // fix issue with duplicate coastlines from seamarks
             if ("coastline".equals(tags.get("natural"))) {
@@ -807,6 +807,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             typeUse.removeAll(set);
         }
         if (typeUse.isEmpty()) {
+            return;
+        }
+
+        if (icc.bboxFilter.shouldFilterMapEntity(e)) {
+            icc.bboxFilter.logEntity(e);
             return;
         }
 

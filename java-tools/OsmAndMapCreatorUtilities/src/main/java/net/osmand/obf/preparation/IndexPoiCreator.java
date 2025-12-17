@@ -206,7 +206,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		tags = icc.getIndexRouteRelationCreator().addClickableWayTags(icc, e, tags, true);
 		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
-			if ((e instanceof Node || e instanceof Way) && isEntityOutOfRegionBbox(e, tempAmenityList.get(0), icc)) {
+			if ((e instanceof Node || e instanceof Way) && icc.bboxFilter.shouldFilterPoiEntity(e)) {
+				icc.bboxFilter.logEntityWithAmenity(e, tempAmenityList.get(0));
                 return;
             }
 			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
@@ -255,7 +256,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (!memberIds.isEmpty()) {
 						a.setAdditionalInfo(Amenity.ROUTE_MEMBERS_IDS, memberIds.toString());
 					}
-					if (isAmenityOutOfRegionBbox(a, e, icc)) {
+					if (icc.bboxFilter.shouldFilterPoiAmenity(a)) {
+						icc.bboxFilter.logEntityWithAmenity(e, a);
 						continue;
 					}
    					try {
@@ -1443,41 +1445,5 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             amenity.setOrder(pt.getOrder());
         }
     }
-
-	private void logEntityWithAmenity(Entity entity, Amenity amenity) {
-		LatLon ll = entity.getLatLon();
-		if (entity instanceof Way way && !way.getNodes().isEmpty()) {
-			ll = way.getFirstNode().getLatLon();
-		}
-		if (entity instanceof Relation && amenity.getLocation() != null) {
-			ll = amenity.getLocation();
-		}
-		if (ll != null) {
-			String type = amenity.getType().getKeyName();
-			String subtype = amenity.getSubType();
-			String name = amenity.getName();
-			log.warn(String.format("POI out-of-bbox %s %.4f %.4f %s %s %s",
-					entity.getOsmUrl(), ll.getLatitude(), ll.getLongitude(), type, subtype, name));
-		}
-	}
-
-	private boolean isEntityOutOfRegionBbox(Entity entity, Amenity logAmenity, IndexCreationContext icc) {
-		if (icc.isInsideRegionBBox(entity)) {
-			return false;
-		}
-		logEntityWithAmenity(entity, logAmenity);
-		return true;
-	}
-
-	private boolean isAmenityOutOfRegionBbox(Amenity amenity, Entity logEntity, IndexCreationContext icc) {
-		if (amenity.getLocation() == null) {
-			return false;
-		}
-		if (icc.isInsideRegionBBox(amenity.getLocation().getLatitude(), amenity.getLocation().getLongitude())) {
-			return false;
-		}
-		logEntityWithAmenity(logEntity, amenity);
-		return true;
-	}
 
 }

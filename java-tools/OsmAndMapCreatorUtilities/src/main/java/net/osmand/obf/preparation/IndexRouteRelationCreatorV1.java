@@ -96,7 +96,7 @@ public class IndexRouteRelationCreatorV1 {
 				}
 				w.replaceTags(tags);
 				for (int level = 0; level < mapZooms.size(); level++) {
-					icc.getIndexMapCreator().processMainEntity(w, w.getId(), w.getId(), level, tags);
+					icc.getIndexMapCreator().processMainEntity(w, w.getId(), w.getId(), level, tags, icc);
 				}
 				if (settings.indexPOI) {
 					icc.getIndexPoiCreator().iterateEntityInternal(w, ctx, icc);
