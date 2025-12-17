@@ -162,7 +162,7 @@ public class SearchService {
 	                                  SearchSettings settings, String unitTestJson) {}
 
     public SearchResultWrapper searchResults(double lat, double lon, String text, String locale, boolean baseSearch,
-                                             double radius, String northWest, String southEast,
+                                             double radiusToLoadMaps, String northWest, String southEast,
                                              boolean unlimited, Consumer<List<SearchResult>> consumerInContext,
                                              SearchExportSettings exportedSettings) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
@@ -174,8 +174,8 @@ public class SearchService {
         }
         searchUICore.getSearchSettings().setRegions(osmandRegions);
 
-        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + radius, lon - radius),
-                new LatLon(lat - radius, lon + radius));
+        QuadRect points = osmAndMapsService.points(null, new LatLon(lat + radiusToLoadMaps, lon - radiusToLoadMaps),
+                new LatLon(lat - radiusToLoadMaps, lon + radiusToLoadMaps));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, baseSearch);
