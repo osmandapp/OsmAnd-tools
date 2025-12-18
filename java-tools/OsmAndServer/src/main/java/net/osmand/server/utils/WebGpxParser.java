@@ -157,6 +157,7 @@ public class WebGpxParser {
         public String name;
         public String iconName;
         public String backgroundType;
+        public Boolean pinned;
         public final List<Wpt> points = new ArrayList<>();
         public GpxUtilities.PointsGroup ext;
 
@@ -169,6 +170,7 @@ public class WebGpxParser {
                 if (group.getName() != null) {
                     name = group.getName();
                 }
+                pinned = group.getPinned();
                 if (group.getIconName() != null) {
                     iconName = group.getIconName();
                     group.setIconName(null);
@@ -592,6 +594,7 @@ public class WebGpxParser {
                 if (parsedColor != null) {
                     group.setColor(parsedColor);
                 }
+                group.setPinned(dataGroup.pinned);
                 res.put(key, group);
             }
             gpxFile.setPointsGroups(res);

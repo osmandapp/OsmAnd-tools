@@ -17,8 +17,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 
@@ -173,6 +177,17 @@ public class FavoriteController {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
         return favoriteService.addNewGroup(trackData, groupName, dev);
+    }
+
+    @PostMapping(value = "/update-group")
+    @ResponseBody
+    public ResponseEntity<String> updateGroup(@RequestBody String data,
+                                              @RequestParam String fileName,
+                                              @RequestParam String groupName,
+                                              @RequestParam Long updatetime) throws IOException {
+        CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
+        WebGpxParser.TrackData groupData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime);
     }
     
     @GetMapping(value = "/rename-fav-group")

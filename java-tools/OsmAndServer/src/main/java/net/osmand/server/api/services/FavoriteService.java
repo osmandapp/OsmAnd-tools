@@ -3,6 +3,8 @@ package net.osmand.server.api.services;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import jakarta.annotation.Nullable;
+import jakarta.transaction.Transactional;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
@@ -18,8 +20,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.Nullable;
-import jakarta.transaction.Transactional;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -149,6 +149,21 @@ public class FavoriteService {
             obj.add("pointGroups", gson.toJsonTree(gsonWithNans.toJson(webGpxParser.getPointsGroups(gpxFile))));
             resp.setJsonObject(obj);
         }
+        return ResponseEntity.ok(gson.toJson(resp));
+    }
+
+    public ResponseEntity<String> updateGroup(String fileName, WebGpxParser.TrackData updateGroupData, String groupName,
+                                              CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
+        GpxFile gpxFile = createGpxFile(fileName, dev, updatetime);
+        GpxFile gpxUpdateGroupData = webGpxParser.createGpxFileFromTrackData(updateGroupData);
+        if (gpxFile == null) {
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
+                    UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
+        }
+        gpxFile.updatePointsGroup(groupName, gpxUpdateGroupData.getPointsGroups().get(groupName));
+        File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fileName);
+        uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
+        UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, gpxFile, tmpGpx);
         return ResponseEntity.ok(gson.toJson(resp));
     }
     
