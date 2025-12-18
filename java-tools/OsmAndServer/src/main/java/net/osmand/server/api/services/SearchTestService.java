@@ -159,6 +159,7 @@ public class SearchTestService implements ReportService, DataService {
 		return mapsService;
 	}
 
+	@Override
 	public SearchService getSearchService() {
 		return searchService;
 	}
@@ -404,8 +405,10 @@ public class SearchTestService implements ReportService, DataService {
 			if (srcPoint != null) {
 				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
 						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() + 1.5, srcPoint.getLongitude() - 1.5),
-						String.format(Locale.US, "%f, %f", srcPoint.getLatitude() - 1.5, srcPoint.getLongitude() + 1.5)};
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
+								srcPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
 			}
 
 			for (Map<String, Object> row : rows) {
@@ -417,7 +420,7 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				long startTime = System.currentTimeMillis();
-				Integer gen_id = (Integer) row.get("id");
+				Integer genId = (Integer) row.get("id");
 				String query = (String) row.get("query");
 				int count = (Integer) row.get("gen_count");
 				String rowJson = (String) row.get("row");
@@ -432,8 +435,10 @@ public class SearchTestService implements ReportService, DataService {
 				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + 1.5, searchPoint.getLongitude() - 1.5),
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - 1.5, searchPoint.getLongitude() + 1.5)};
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
+								searchPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
 
 				Map<String, Object> newRow = new LinkedHashMap<>();
 				long datasetId;
@@ -444,22 +449,26 @@ public class SearchTestService implements ReportService, DataService {
 				}
 
 				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				Object[] args = null;
 				try {
 					SearchService.SearchResultWrapper searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
-						searchResult = searchService.searchResults(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1], true, finder);
+						searchResult = searchService.searchResults(
+								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
+								query, run.locale, false, SearchService.SEARCH_RADIUS_DEGREE, bbox[0], bbox[1]),
+								new SearchService.SearchOption(true, null), finder);
 					}
 
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, searchResult,
+					args = collectRunResults(finder, genId, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
-					enqueueRunResult(run, args);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					Object[] args = collectRunResults(finder, gen_id, count, run, query, null,
+					args = collectRunResults(finder, genId, count, run, query, null,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
-					enqueueRunResult(run, args);
+				} finally {
+					if (args != null)
+						enqueueRunResult(run, args);
 				}
 			}
 		} catch (Exception e) {
