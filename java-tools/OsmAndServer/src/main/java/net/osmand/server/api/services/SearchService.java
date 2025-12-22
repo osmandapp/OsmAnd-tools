@@ -492,7 +492,7 @@ public class SearchService {
                 brands.addAll(map.getTopIndexSubTypes());
             }
             for (PoiSearchCategory categoryObj : data.categories) {
-                if (categoryObj.key != null && categoryObj.mode.equals("all")) {
+                if (categoryObj.key != null && categoryObj.mode != null && categoryObj.mode.equals("all")) {
                     searchPoiByTypeCategory(categoryObj, mapPoiTypes, searchBbox, usedMapList, features);
                 } else {
                     searchPoiByNameCategory(categoryObj, data, mapPoiTypes, searchUICore, features, brands, poiSearchLimit);
