@@ -471,6 +471,9 @@ public class SearchService {
         searchUICore.registerAPI(searchAmenityByTypesAPI);
         
         List<Feature> features = new ArrayList<>();
+        if (data.categories.isEmpty()) {
+            return new PoiSearchResult(false, false, false, null);
+        }
         PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), 0, false);
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
