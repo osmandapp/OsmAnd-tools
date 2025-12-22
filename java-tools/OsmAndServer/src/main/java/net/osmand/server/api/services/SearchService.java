@@ -133,19 +133,7 @@ public class SearchService {
         }
     }
 
-    public static class PoiSearchCategory {
-        public String category;
-        public String key;
-        public String lang;
-        public String mode;
-
-        public PoiSearchCategory(String category, String lang, String key, String mode) {
-            this.category = category;
-            this.key = key;
-            this.lang = lang;
-            this.mode = mode;
-        }
-    }
+    public record PoiSearchCategory(String category, String key, String lang, String mode) {}
 
 	public SearchService() {
 		try {
@@ -495,7 +483,7 @@ public class SearchService {
                 brands.addAll(map.getTopIndexSubTypes());
             }
             for (PoiSearchCategory categoryObj : data.categories) {
-                if (categoryObj.key != null && categoryObj.mode != null && categoryObj.mode.equals("all")) {
+                if (categoryObj.key != null && "all".equals(categoryObj.mode)) {
                     searchPoiByTypeCategory(categoryObj, mapPoiTypes, searchBbox, usedMapList, features);
                 } else {
                     searchPoiByNameCategory(categoryObj, data, mapPoiTypes, searchUICore, features, brands, poiSearchLimit);
@@ -514,7 +502,7 @@ public class SearchService {
     private void searchPoiByNameCategory(PoiSearchCategory categoryObj, SearchService.PoiSearchData data, MapPoiTypes mapPoiTypes, SearchUICore searchUICore, List<Feature> features,
                                          List<BinaryMapPoiReaderAdapter.PoiSubType> brands, PoiSearchLimit poiSearchLimit) throws IOException {
         String lang = categoryObj.lang;
-        if (data.prevSearchRes != null && data.prevSearchCategory.equals(categoryObj.category)) {
+        if (data.prevSearchRes != null && data.prevSearchCategory != null && data.prevSearchCategory.equals(categoryObj.category)) {
             SearchResult prevResult = new SearchResult();
             prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
             if (prevResult.object == null) {
@@ -584,10 +572,13 @@ public class SearchService {
     }
     
     public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
-        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0055 : 0.0001; // 3-relation,0.0055-600m,0.0001-11m
+        final String RELATION_TYPE = "3";
+        final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
+        final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
+        final double SEARCH_POI_BY_OSMID_RADIUS_DEGREE = type.equals(RELATION_TYPE) ? RELATION_SEARCH_RADIUS : OTHER_POI_SEARCH_RADIUS;
         final int mapZoom = 15;
-        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
-        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
+        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_BY_OSMID_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_BY_OSMID_RADIUS_DEGREE);
+        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_BY_OSMID_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_BY_OSMID_RADIUS_DEGREE);
         BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
                 MapUtils.get31TileNumberX(p1.getLongitude()),
                 MapUtils.get31TileNumberX(p2.getLongitude()),
