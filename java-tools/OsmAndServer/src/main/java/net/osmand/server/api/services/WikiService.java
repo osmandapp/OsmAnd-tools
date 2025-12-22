@@ -657,7 +657,7 @@ public class WikiService {
 		}
 
 		Long photoId = getPhotoIdFromWikidata(wikidataId);
-		if (photoId == null) {
+		if (photoId == null || photoId == 0) {
 			return;
 		}
 
