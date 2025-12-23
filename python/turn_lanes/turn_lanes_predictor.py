@@ -18,6 +18,7 @@ TEST_JSON_DIR = os.getenv('TEST_JSON_DIR')
 TEST_IMAGES_DIR = os.getenv('TEST_IMAGES_DIR')
 WEB_SERVER_CONFIG_PATH = os.getenv('WEB_SERVER_CONFIG_PATH')
 OUTPUT_JSON_PATH = os.getenv('OUTPUT_JSON_PATH', 'turn_lanes_results_llm.json')
+ROLE = os.getenv('ROLE', 'predictor')
 
 if not TEST_IMAGES_DIR:
     raise ValueError("Missing required environment variable: TEST_IMAGES_DIR is required.")
@@ -384,19 +385,6 @@ if __name__ == '__main__':
             'turn_type_percentage': round(float(item.get('turn_type_percentage', 0.0)) / count, 2),
             'count': count,
         })
-
-    per_case_items.sort(key=lambda x: (x.get('lanes_percentage', 0.0), -x.get('count', 1)))
-    worst_items = per_case_items[:3]
-
-    print("WORST 3 TEST CASES (by lanes %)", flush=True)
-    print(f"{'id':>6}  {'lanes%':>7}  {'next%':>7}  {'n':>3} ", flush=True)
-    for item in worst_items:
-        test_case_id = item.get('id')
-        test_case_id_str = '' if test_case_id is None else str(test_case_id)
-        lanes_pct = float(item.get('lanes_percentage', 0.0) or 0.0)
-        next_pct = float(item.get('turn_type_percentage', 0.0) or 0.0)
-        count = int(item.get('count', 1) or 1)
-        print(f"{test_case_id_str:>6}  {lanes_pct:>7.2f}  {next_pct:>7.2f}  {count:>3} ", flush=True)
 
     output_path = Path(OUTPUT_JSON_PATH)
     with open(output_path, 'w', encoding='utf-8') as f:
