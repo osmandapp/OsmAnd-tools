@@ -100,6 +100,38 @@ class OpenAIClient:
 
         return response.choices[0].message.content, False
 
+    def request_with_image(self, system_prompt: str, images: List[Tuple[str, str]], image_prompts: List[str]) -> Tuple[str, bool]:
+        start_time = time.time()
+        self._init()
+
+        content = []
+        for i, im in enumerate(images):
+            format = file_name_image_format_lowercase(im[0])
+            content.append({"type": "text", "text": image_prompts[i]})
+            content.append(
+                {"type": "image_url", "image_url": {"url": f"data:image/{format};base64,{im[1]}"}})
+
+        response = self.client.chat.completions.create(model=self.model,
+                                                       messages=[{"role": "system", "content": system_prompt},
+                                                                 {"role": "user", "content": content}],
+                                                       max_tokens=2048 * len(images), n=1, temperature=MODEL_TEMPERATURE, top_p=top_p, stream=False)
+        if response.usage:
+            self.prompt_tokens = response.usage.prompt_tokens
+            self.completion_tokens = response.usage.completion_tokens
+        self.duration = time.time() - start_time
+
+        # print(response.model_dump_json(indent=2))
+
+        print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}.", flush=True)
+        if not response.choices or len(response.choices) == 0:
+            print(f"#{current_thread().name}. Warning: LLM response doesn't have 'choices'. Response: {response}", flush=True)
+            return "No 'choices' in LLM response.", True
+
+        if self.completion_tokens == 0 or not response.choices[0].message:
+            print(f"#{current_thread().name}. Warning: LLM response is empty. Reason: {response}", flush=True)
+            return response.choices[0].native_finish_reason, True
+
+        return response.choices[0].message.content, False
 
 def file_name_image_format_lowercase(file_name):
     file_ext = os.path.splitext(file_name)[1].lower().lstrip('.')
