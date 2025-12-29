@@ -223,7 +223,6 @@ public class WebSecurityConfiguration {
 					chain.doFilter(request, response);
 				}, org.springframework.security.web.context.SecurityContextPersistenceFilter.class)
 				.csrf(csrf -> csrf
-						.ignoringRequestMatchers("/gs-guide-websocket/**")
 						.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 						.requireCsrfProtectionMatcher(request -> {
 							String method = request.getMethod();
@@ -241,7 +240,6 @@ public class WebSecurityConfiguration {
 				)
 				.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/gs-guide-websocket/**").permitAll()
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
@@ -310,7 +308,7 @@ public class WebSecurityConfiguration {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
 				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net", 
-				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000", "http://localhost:8080"));
+				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
