@@ -1,6 +1,7 @@
 package net.osmand.server.ws;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
@@ -12,19 +13,17 @@ public class GreetingController {
     @Autowired
     private SimpMessagingTemplate template;
 
-    @MessageMapping("/hello")
-    public void greeting(HelloMessage message) {
-        // We expect 'message' to contain both the SENDER NAME and the CONTENT now.
-        // We will repurpose HelloMessage to hold both, or create a new ChatMessage class.
-        // For simplicity, let's assume HelloMessage now has a 'content' field too,
-        // or we just format the string here.
+    // We catch messages sent to /app/chat/{chatId}/sendMessage
+    @MessageMapping("/chat/{chatId}/sendMessage")
+    public void sendMessage(@DestinationVariable String chatId, ChatMessage message) {
         
-        String sender = HtmlUtils.htmlEscape(message.getName());
-        String text = HtmlUtils.htmlEscape(message.getContent()); // You need to add this field to HelloMessage!
+        String safeName = HtmlUtils.htmlEscape(message.getSender());
+        String safeContent = HtmlUtils.htmlEscape(message.getContent());
+        
+        // Construct the final message
+        String response = "<b>" + safeName + ":</b> " + safeContent;
 
-        String formattedMessage = "<b>" + sender + ":</b> " + text;
-
-        // Broadcast immediately to ALL subscribers
-        template.convertAndSend("/topic/greetings", new Greeting(formattedMessage));
+        // DYNAMIC BROADCAST: Send only to subscribers of this specific chat ID
+        template.convertAndSend("/topic/chat/" + chatId, response);
     }
 }

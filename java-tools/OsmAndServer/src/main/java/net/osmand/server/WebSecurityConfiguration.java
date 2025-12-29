@@ -310,7 +310,7 @@ public class WebSecurityConfiguration {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
 				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net", 
-				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
+				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000", "http://localhost:8080"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
