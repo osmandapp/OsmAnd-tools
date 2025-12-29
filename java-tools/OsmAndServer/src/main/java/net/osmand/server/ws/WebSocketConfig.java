@@ -17,8 +17,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
-	// FIXME origins
-    registry.addEndpoint("/osmand-websocket").setAllowedOriginPatterns("*"); 
+	// FIXME origins .setAllowedOriginPatterns("*")
+    registry.addEndpoint("/osmand-websocket"); 
   }
 
 }
