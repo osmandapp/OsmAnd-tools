@@ -8,46 +8,78 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.util.HtmlUtils;
 
+import java.security.Principal;
+
 @Controller
 public class GreetingController {
 
     @Autowired
     private SimpMessagingTemplate template;
 
-    // 1. Handle regular chat messages
+    /**
+     * Handles Sending Messages
+     */
     @MessageMapping("/chat/{chatId}/sendMessage")
-    public void sendMessage(@DestinationVariable String chatId, @Payload ChatMessage chatMessage) {
-        // Format: "<b>Name:</b> Message"
-        String safeName = HtmlUtils.htmlEscape(chatMessage.getSender());
-        String safeContent = HtmlUtils.htmlEscape(chatMessage.getContent());
+    public void sendMessage(@DestinationVariable String chatId, 
+                            @Payload ChatMessage message, 
+                            Principal principal) {
+        
+        // LOGIC: Determine the Display Name
+        String displayName;
+        
+        if (principal != null) {
+            // Case 1: Registered User (Ignore client-provided alias)
+            displayName = principal.getName();
+        } else {
+            // Case 2: Unregistered User (Use alias with prefix)
+            // Default to "Anonymous" if they sent empty string
+            String clientAlias = (message.getSender() != null && !message.getSender().isEmpty()) 
+                                 ? message.getSender() 
+                                 : "Anonymous";
+            displayName = "Unidentified " + clientAlias;
+        }
+
+        // Format and Broadcast
+        String safeContent = HtmlUtils.htmlEscape(message.getContent());
+        String safeName = HtmlUtils.htmlEscape(displayName);
+        
         String finalHtml = "<b>" + safeName + ":</b> " + safeContent;
 
-        // Broadcast to everyone in this room
         template.convertAndSend("/topic/chat/" + chatId, new ChatMessage(finalHtml));
     }
 
-    // 2. Handle "Join" events
+    /**
+     * Handles User Joining
+     */
     @MessageMapping("/chat/{chatId}/addUser")
-    public void addUser(@DestinationVariable String chatId, @Payload ChatMessage chatMessage) {
-        String safeName = HtmlUtils.htmlEscape(chatMessage.getSender());
+    public void addUser(@DestinationVariable String chatId, 
+                        @Payload ChatMessage message, 
+                        Principal principal) {
+        
+        String displayName;
+        
+        if (principal != null) {
+            displayName = principal.getName();
+        } else {
+            String clientAlias = (message.getSender() != null && !message.getSender().isEmpty()) 
+                                 ? message.getSender() 
+                                 : "Anonymous";
+            displayName = "Unidentified " + clientAlias;
+        }
+        
+        String safeName = HtmlUtils.htmlEscape(displayName);
         String msg = "<span style='color: #888; font-style: italic;'>User <b>" + safeName + "</b> joined the room.</span>";
         
-        // Broadcast system message
         template.convertAndSend("/topic/chat/" + chatId, new ChatMessage(msg));
     }
 
-
-    // --- INNER CLASS (No separate file needed) ---
+    // --- Inner Class for Message Structure ---
     public static class ChatMessage {
-        private String sender;
+        private String sender; // Client sends alias here
         private String content;
 
         public ChatMessage() {}
-        
-        // Constructor for sending simple text back to client
-        public ChatMessage(String content) {
-            this.content = content;
-        }
+        public ChatMessage(String content) { this.content = content; }
 
         public String getSender() { return sender; }
         public void setSender(String sender) { this.sender = sender; }
