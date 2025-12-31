@@ -30,7 +30,7 @@ public class UserTranslationsController {
     
  // One time call (subscription) returns map with TRANSLATION_ID
     @SubscribeMapping("/translation/create")
-	public ResponseEntity<String> createTranslation(SimpMessageHeaderAccessor headers) {
+	public Object createTranslation(SimpMessageHeaderAccessor headers) {
 		if (SecurityContextHolder.getContext().getAuthentication() == null) {
 			return userTranlsationService.sendError("No authenticated user", headers);
 		}

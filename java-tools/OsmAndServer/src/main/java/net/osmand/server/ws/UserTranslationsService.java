@@ -53,13 +53,13 @@ public class UserTranslationsService {
 		return (storedAlias != null) ? "Unidentified " + storedAlias : "Unidentified Anonymous";
 	}
 	
-	public ResponseEntity<String> createTranslation(CloudUserDevice dev, String pu) {
+	public Object createTranslation(CloudUserDevice dev, String pu) {
 		Random rnd = new Random();
 		String translationId = "room-"+rnd.nextInt(1000);
 		UserTranslation ust = new UserTranslation(pu, translationId);
 		ust.setCreationDate(System.currentTimeMillis());
 		translations.put(ust.getId(), ust);
-		return ResponseEntity.ok(gson.toJson(Map.of(TRANSLATION_ID, ust.getId())));
+		return gson.toJson(Map.of(TRANSLATION_ID, ust.getId()));
 	}
 
 	public ResponseEntity<String> sendMessage(String translationId, CloudUserDevice dev, CloudUser pu, HttpServletRequest request) {
@@ -75,13 +75,13 @@ public class UserTranslationsService {
 		return ust;
 	}
 
-	public ResponseEntity<String> sendError(String error, SimpMessageHeaderAccessor headers) {
+	public Object sendError(String error, SimpMessageHeaderAccessor headers) {
 		SimpMessageHeaderAccessor header = SimpMessageHeaderAccessor.create();
 		header.setSessionId(headers.getSessionId());
 		header.setLeaveMutable(true);
 		template.convertAndSendToUser(headers.getSessionId(), TOPIC_ERRORS, error,
 				headers.getMessageHeaders());
-		return ResponseEntity.ok(gson.toJson(Map.of("error", error)));
+		return Map.of("error", error);
 	}
 	
     public void sendMessage(@DestinationVariable String translationId, 
