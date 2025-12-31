@@ -854,8 +854,8 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-//		settings.indexMap = true;
-//		settings.indexAddress = true;
+		settings.indexMap = true;
+		settings.indexAddress = true;
 		settings.indexPOI = true;
 		// settings.indexTransport = true;
 //		settings.indexRouting = true;
