@@ -77,10 +77,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
 	private static final String PLACE_ATTR = "place";
+	private static final String ADMIN_LEVEL_ATTR = "admin_level";
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	{
 		langAttributes.add(PLACE_ATTR);
-		langAttributes.add("admin_level");
+		langAttributes.add(ADMIN_LEVEL_ATTR);
 	}
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
 	private static final int NO_BOUNDARY = 100;
@@ -430,6 +431,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setName(bname);
 			boundary.setAltName(e.getTag("short_name")); // Goteborg, Esslingen
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
+			boundary.setNames(getOtherNames(e));
 			boundary.setBoundaryId(ObfConstants.createMapObjectIdFromOsmAndEntity(e));
 			if (ct == null && census) {
 				boundary.setCityType(CityType.CENSUS);
@@ -1049,14 +1051,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private Map<String, String> getOtherNames(Entity e) {
 		Map<String, String> m = null;
-        List<String> languages = Arrays.asList(MapRenderingTypes.langs);
 		for (String t : e.getTagKeySet()) {
 			String prefix =  null;
-			if(t.startsWith("name:")) {
-                String lang = t.substring(5);
-                if (languages.contains(lang)) {
-                    prefix = "name:";
-                }
+			if (t.startsWith("name:")) {
+				String lang = t.substring(5);
+				if (MapRenderingTypes.langsSet.contains(lang)) {
+					prefix = "name:";
+				}
 			} else if(t.startsWith("old_name")){
 				prefix = "";
 			} else if(t.startsWith("alt_name")){
@@ -1251,16 +1252,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			city.setId(b.getBoundaryId());
 //			b.getAdminCenterId(); // could be improved by admin center ?
 			city.setLocation(b.getPolyCenterPoint());
+			city.setNames(b.getNameTags());
 			city.setName(b.getName());
 			if (b.hasAdminLevel()) {
-				city.setName("admin_level", b.getAdminLevel() + ""); // to retrieve later
+				city.setName(ADMIN_LEVEL_ATTR, b.getAdminLevel() + ""); // to retrieve later
 			}
 			if (b.getCityType() != null) {
 				city.setName(PLACE_ATTR, CityType.valueToString(b.getCityType())); // to retrieve later
 			}
 			if (!Algorithms.isEmpty(b.getAltName())) {
-				city.setEnName(b.getAltName());
+				city.setName("alt_name", b.getAltName());
 			}
+			
 			boundariesAsCities.add(city);
 		}
 		for (City c : this.cityDataStorage.getAllCities()) {
@@ -1682,7 +1685,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
-					if (!langAttributes.contains(lang)) {
+					if (!PLACE_ATTR.equals(lang) && !ADMIN_LEVEL_ATTR.equals(lang)) {
 						String cityLangPart = cityPart;
 						String cityLangName = city.getName(lang, true);
 						if (!Algorithms.isEmpty(cityLangName)) {

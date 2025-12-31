@@ -6,6 +6,7 @@ import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.DataService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
+import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.SearchTestService.TestCaseItem;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
@@ -22,10 +23,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -340,14 +343,52 @@ public class SearchTestController {
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<DataService.CityAddress>> getAddresses(@RequestParam String obf,
-	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundary,
+	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
+	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
-	                 @RequestParam(required = false) String houseRegExp) {
+	                 @RequestParam(required = false) String houseRegExp,
+	                 @RequestParam(required = false) String poiRegExp) {
 		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
-				includesBoundary != null && includesBoundary,
-				cityRegExp, streetRegExp, houseRegExp));
+				includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
+				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
+
+	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<DataService.ResultsWithStats> getResults(
+			@RequestParam String query,
+			@RequestParam(required = false) String lang,
+			@RequestParam(required = false) Double radius,
+			@RequestParam() Double lat,
+			@RequestParam() Double lon,
+			@RequestParam(required = false) Boolean unlimited) throws IOException {
+		if (query == null || lat == null || lon == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
+		}
+		return ResponseEntity.ok(testSearchService.getResults(
+				new SearchService.SearchContext(lat, lon, query, lang, false, radius, null, null),
+				new SearchService.SearchOption(unlimited == null || unlimited, null)));
+	}
+
+	@PostMapping(value = "/unit-test", produces = "application/zip")
+	@ResponseBody
+	public void downloadUnitTest(
+			@RequestParam String query,
+			@RequestParam(required = false) Double radius,
+			@RequestParam() Double lat,
+			@RequestParam() Double lon,
+			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
+			HttpServletResponse response) throws IOException, SQLException {
+		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
+		}
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
+		testSearchService.createUnitTest(unitTest,
+				new SearchService.SearchContext(lat, lon, query, null, false, radius, null, null),
+				response.getOutputStream());
+	}
+
 }

@@ -1,10 +1,12 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.binary.BinaryIndexPart;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapIndexReader;
+import com.amazonaws.util.StringInputStream;
+import net.osmand.binary.*;
 import net.osmand.data.*;
+import net.osmand.obf.OBFDataCreator;
+import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -14,27 +16,33 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.json.JSONObject;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public interface DataService extends BaseService {
 
@@ -110,11 +118,11 @@ public interface DataService extends BaseService {
 					// Parse the CSV line using Apache Commons CSV to handle quoted fields with delimiters
 					String[] record;
 					try (CSVParser parser = CSVParser.parse(line, format)) {
-						List<org.apache.commons.csv.CSVRecord> recs = parser.getRecords();
+						List<CSVRecord> recs = parser.getRecords();
 						if (recs.isEmpty()) {
 							record = new String[0];
 						} else {
-							org.apache.commons.csv.CSVRecord r = recs.get(0);
+							CSVRecord r = recs.get(0);
 							record = new String[r.size()];
 							for (int c = 0; c < r.size(); c++) {
 								record[c] = r.get(c);
@@ -260,7 +268,7 @@ public interface DataService extends BaseService {
 			getJdbcTemplate().update(sql, row.dsResultId(), row.count(), test.id, test.datasetId, rowJson, query, row.error(),
 					row.duration(),
 					row.point().getLatitude(), row.point().getLongitude(),
-					new java.sql.Timestamp(System.currentTimeMillis()));
+					new Timestamp(System.currentTimeMillis()));
 		}
 	}
 
@@ -270,6 +278,12 @@ public interface DataService extends BaseService {
 	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
+		if (error != null) {
+			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, "", error, duration,
+					0, null, null, null, searchPoint.getLatitude(), searchPoint.getLongitude(), bbox,
+					new Timestamp(System.currentTimeMillis()), false, null, null};
+		}
+
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 
 		Map<String, Object> row = finder.getRow();
@@ -281,63 +295,69 @@ public interface DataService extends BaseService {
 		String resultPoint = null;
 		boolean found = false;
 		if (firstResult != null) {
-			int dupCount = 0;
-			double closestDuplicate = MapUtils.getDistance(targetPoint, firstResult.searchResult().location);
-			int dupInd = firstResult.place() - 1;
-			String resName = firstResult.searchResult().toString(); // to do check to string is not too much
-			for (int i = firstResult.place(); i < searchResults.size(); i++) {
-				SearchResult sr = searchResults.get(i);
-				double dist = MapUtils.getDistance(firstResult.searchResult().location, sr.location);
-				if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
-					dupCount++;
-				} else {
-					break;
-				}
-				if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
-					closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
-					dupInd = i;
-				}
-			}
-			resPlace = firstResult.place();
 			LatLon resPoint = firstResult.searchResult().location;
-			resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
-			distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
+			if (resPoint != null) {
+				int dupCount = 0;
+				double closestDuplicate = MapUtils.getDistance(targetPoint, resPoint);
+				int dupInd = firstResult.place() - 1;
+				String resName = firstResult.searchResult().toString(); // to do check to string is not too much
+				for (int i = firstResult.place(); i < searchResults.size(); i++) {
+					SearchResult sr = searchResults.get(i);
+					double dist = MapUtils.getDistance(resPoint, sr.location);
+					if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
+						dupCount++;
+					} else {
+						break;
+					}
+					if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
+						closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
+						dupInd = i;
+					}
+				}
+				resPlace = firstResult.place();
 
-			if (dupCount > 0) {
-				row.put("dup_count", dupCount);
+				resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
+				distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
+
+				if (dupCount > 0) {
+					row.put("dup_count", dupCount);
+				}
+				if (searchResult != null && searchResult.stat() != null) {
+					row.put("stat_bytes", searchResult.stat().totalBytes);
+					row.put("stat_time", searchResult.stat().totalTime);
+				}
+				row.put("time", duration);
+				row.put("web_type", firstResult.searchResult().objectType);
+				row.put("res_id", firstResult.toIdString());
+				row.put("res_place", firstResult.toPlaceString());
+				row.put("res_name", firstResult.placeName());
+				if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
+					SearchResult sr = searchResults.get(dupInd);
+					actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
+				}
+				if (actualResult != null) {
+					row.put("actual_place", actualResult.toPlaceString());
+					row.put("actual_id", actualResult.toIdString());
+					row.put("actual_name", actualResult.placeName());
+					LatLon pnt = actualResult.searchResult().location;
+					row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
+					found = actualResult.place() <= dupCount + firstResult.place();
+				}
+				found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
+			} else {
+				error = "Result point location is null";
 			}
-			if (searchResult != null && searchResult.stat() != null) {
-				row.put("stat_bytes", searchResult.stat().totalBytes);
-				row.put("stat_time", searchResult.stat().totalTime);
-			}
-			row.put("time", duration);
-			row.put("web_type", firstResult.searchResult().objectType);
-			row.put("res_id", firstResult.toIdString());
-			row.put("res_place", firstResult.toPlaceString());
-			row.put("res_name", firstResult.placeName());
-			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
-				SearchResult sr = searchResults.get(dupInd);
-				actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
-			}
-			if (actualResult != null) {
-				row.put("actual_place", actualResult.toPlaceString());
-				row.put("actual_id", actualResult.toIdString());
-				row.put("actual_name", actualResult.placeName());
-				LatLon pnt = actualResult.searchResult().location;
-				row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
-				found = actualResult.place() <= dupCount + firstResult.place();
-			}
-			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
+		} else {
+			error = "Search result is missing";
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
 
 		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
-				resultsCount,
-				distance, resultPoint, resPlace,
+				resultsCount, distance, resultPoint, resPlace,
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
-				new java.sql.Timestamp(System.currentTimeMillis()), found,
+				new Timestamp(System.currentTimeMillis()), found,
 				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
 				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null
 		};
@@ -517,23 +537,26 @@ public interface DataService extends BaseService {
 	}
 
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record StreetAddress(String name, List<String> houses) {}
+	record Address(String name, LatLon point) {}
+	record StreetAddress(String name, List<Address> houses) {}
 
-	default List<CityAddress> getAddresses(String obf, String lang, boolean includesBoundary, String cityRegExp, String streetRegExp, String houseRegExp) {
-		List<CityAddress> results = new ArrayList<>();
+	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
+		List<Record> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
 		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
 		boolean isHouseEmpty = houseRegExp == null || houseRegExp.trim().isEmpty();
-		if (isCityEmpty && isStreetEmpty)
+		boolean isPoiEmpty = poiRegExp == null || poiRegExp.trim().isEmpty();
+		if (isCityEmpty && isStreetEmpty && isPoiEmpty)
 			return results;
 
 		File file = new File(obf);
-		try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(file.getAbsolutePath(), "r")) {
-			final Pattern cityPattern, streetPattern, housePattern;
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			final Pattern cityPattern, streetPattern, housePattern, poiPattern;
 			try {
 				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
 				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
 				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
+				poiPattern = !(isCityEmpty || isStreetEmpty) || !isHouseEmpty || isPoiEmpty ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
 			} catch (PatternSyntaxException e) {
 				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
 			}
@@ -541,33 +564,31 @@ public interface DataService extends BaseService {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
 			try {
 				for (BinaryIndexPart p : index.getIndexes()) {
-					if (p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+					if (poiPattern == null && p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
 						for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
 							if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
 								continue;
 
 							final List<City> cities = index.getCities(null, type, region, null);
 							for (City c : cities) {
+								final boolean isBoundaryOrPostcode = c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE;
+								if (isBoundaryOrPostcode && !includesBoundaryPostcode) {
+									continue;
+								}
+
 								final String cityName = c.getName(lang);
 								List<StreetAddress> streets = new ArrayList<>();
 								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
 									continue;
 
-								boolean boundary = false;
-								if (c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE) {
-									if (!includesBoundary)
-										continue;
-									boundary = true;
-								}
-
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, streets, boundary));
+									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
 									continue;
 								}
 
 								index.preloadStreets(c, null, null);
 								for (Street s : new ArrayList<>(c.getStreets())) {
-									List<String> buildings = new ArrayList<>();
+									List<Address> buildings = new ArrayList<>();
 									final String streetName = s.getName(lang);
 									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
 										continue;
@@ -583,7 +604,7 @@ public interface DataService extends BaseService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(houseName);
+												buildings.add(new Address(houseName, b.getLocation()));
 										}
 									}
 									if (!buildings.isEmpty()) {
@@ -592,20 +613,37 @@ public interface DataService extends BaseService {
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, streets, boundary));
+									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
 							}
+						}
+					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
+						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
+								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
+								null, null);
+						for (Amenity amenity : index.searchPoi(req, poi)) {
+							final String poiName = amenity.getName(lang);
+							if (poiName == null || !poiPattern.matcher(poiName).find())
+								continue;
+							results.add(new Address(poiName, amenity.getLocation()));
 						}
 					}
 				}
 			} finally {
 				index.close();
 			}
-			// Sort results by city name (case-insensitive)
-			results.sort(Comparator.comparing(CityAddress::name, String.CASE_INSENSITIVE_ORDER));
+			// Sort results by name (case-insensitive) for CityAddress and Address records
+			results.sort(Comparator.comparing(o -> {
+				if (o instanceof CityAddress ca) {
+					return ca.name();
+				} else if (o instanceof Address a) {
+					return a.name();
+				}
+				return "";
+			}, String.CASE_INSENSITIVE_ORDER));
 			return results;
 		} catch (Exception e) {
 			getLogger().error("Failed to read OBF {}", file, e);
-			throw new RuntimeException("Failed to read OBF: " + e.getMessage(), e);
+			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
 		}
 	}
 
@@ -614,5 +652,112 @@ public interface DataService extends BaseService {
 			return "";
 		}
 		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+	}
+
+	SearchService getSearchService();
+
+	default ResultMetric toMetric(SearchResult r) {
+		return new ResultMetric(r.file == null ? "" : r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
+				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), r.location == null ? null :
+				MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0,
+				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
+	}
+
+	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats) {}
+	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
+	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
+	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
+
+	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
+		SearchService.SearchResultWrapper result = getSearchService().searchResults(ctx, option, null);
+
+		List<AddressResult> results = new ArrayList<>();
+		for (SearchResult r : result.results()) {
+			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
+			results.add(rec);
+		}
+		return new ResultsWithStats(results, result.stat().getWordStats().values());
+	}
+
+    private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
+        if (r == null || r == r.parentSearchResult)
+            return null;
+
+	    ResultMetric metric = toMetric(r);
+	    String type = r.objectType.name().toLowerCase();
+
+	    // If we've already visited this node, break the cycle by not traversing further
+        if (!seen.add(r))
+            return new AddressResult(r.toString(), type, r.addressName, null, metric);
+
+	    AddressResult parent = toResult(r.parentSearchResult, seen);
+        return new AddressResult(r.toString(), type, r.addressName, parent, metric);
+    }
+
+	record UnitTestPayload(String name, String[] queries) {}
+
+	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
+		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
+		SearchService.SearchResultWrapper result = getSearchService()
+				.searchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+
+		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
+		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
+		try {
+			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			String unitTestJson = result.unitTestJson();
+			if (unitTestJson == null)
+				return;
+			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
+
+			OBFDataCreator creator = new OBFDataCreator();
+			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
+					new String[] {jsonFile.getAbsolutePath()});
+
+			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
+			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lat()));
+			JSONObject settingsJson = settings.toJSON();
+			Map<String, Object> rootJson = new LinkedHashMap<>();
+			rootJson.put("settings", settingsJson);
+			rootJson.put("phrases", unitTest.queries);
+			rootJson.put("results", Arrays.stream(unitTest.queries()).map(x -> "").toArray());
+
+			unitTestJson = new JSONObject(rootJson).toString(4);
+			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
+				// JSON metadata entry
+				if (jsonFile.exists()) {
+					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
+					zipOut.putNextEntry(jsonEntry);
+					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
+						Algorithms.streamCopy(jsonIn, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+
+				// Gzipped data archive entry
+				if (outFile.exists()) {
+					ZipEntry gzEntry = new ZipEntry(outFile.getName());
+					zipOut.putNextEntry(gzEntry);
+					try (InputStream gzIn = new FileInputStream(outFile)) {
+						Algorithms.streamCopy(gzIn, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+
+				zipOut.finish();
+				out.flush();
+			}
+		} finally {
+			if (dirPath != null && Files.exists(dirPath)) {
+				Files.walk(dirPath)
+					.sorted(Comparator.reverseOrder())
+					.forEach(p -> {
+						File f = p.toFile();
+						if (!f.delete()) {
+							f.deleteOnExit();
+						}
+					});
+			}
+		}
 	}
 }
