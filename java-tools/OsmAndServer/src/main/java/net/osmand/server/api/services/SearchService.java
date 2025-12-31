@@ -998,25 +998,20 @@ public class SearchService {
     }
 
     private void saveAmenityResults(List<Amenity> amenities, List<Feature> features) {
-        // Дедупликация по типу + ID (как в PoiUIFilter.wrapResultMatcher)
-        // Ключ: type.getKeyName() + getId() (например, "restaurant123456")
         Set<String> distinctAmenities = new TreeSet<>();
-        
-        // Собираем ключи из существующих features
+
         for (Feature feature : features) {
             Object poiType = feature.properties.get(PoiTypeField.POI_TYPE.getFieldName());
             Object poiId = feature.properties.get(PoiTypeField.POI_ID.getFieldName());
             if (poiType != null && poiId != null) {
-                String distinctId = poiType.toString() + poiId.toString();
+                String distinctId = poiType + poiId.toString();
                 distinctAmenities.add(distinctId);
             }
         }
-        
-        // Добавляем только те amenities, которых еще нет в features
+
         for (Amenity amenity : amenities) {
             String amenityDistinctId = amenity.getType().getKeyName() + amenity.getId();
             if (distinctAmenities.add(amenityDistinctId)) {
-                // Добавляем только если такого ключа еще нет
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
