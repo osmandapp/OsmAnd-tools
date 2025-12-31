@@ -469,7 +469,7 @@ public class SearchService {
             return new PoiSearchResult(false, false, true, null);
         }
 
-        List<Feature> features = new ArrayList<>();
+        Map<Long, Feature> foundFeatures = new HashMap<>();
         if (data.categories.isEmpty()) {
             return new PoiSearchResult(false, false, false, null);
         }
@@ -485,11 +485,12 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
 
             for (PoiSearchCategory categoryObj : data.categories) {
-                searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, features);
+                searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures);
             }
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
+        List<Feature> features = new ArrayList<>(foundFeatures.values());
         if (!features.isEmpty()) {
             return new PoiSearchResult(poiSearchLimit.useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
         } else {
@@ -498,7 +499,7 @@ public class SearchService {
     }
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
-                                         List<BinaryMapIndexReader> readers, List<Feature> features) throws IOException {
+                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures) throws IOException {
         if (searchBbox == null) {
             return;
         }
@@ -530,7 +531,7 @@ public class SearchService {
                 continue;
             }
             List<Amenity> amenities = reader.searchPoi(request);
-            saveAmenityResults(amenities, features);
+            saveAmenityResults(amenities, foundFeatures);
         }
     }
 
@@ -1019,26 +1020,15 @@ public class SearchService {
         }
     }
 
-    private void saveAmenityResults(List<Amenity> amenities, List<Feature> features) {
-        Set<String> distinctAmenities = new TreeSet<>();
-
-        for (Feature feature : features) {
-            Object poiType = feature.properties.get(PoiTypeField.POI_TYPE.getFieldName());
-            Object poiId = feature.properties.get(PoiTypeField.POI_ID.getFieldName());
-            if (poiType != null && poiId != null) {
-                String distinctId = poiType + poiId.toString();
-                distinctAmenities.add(distinctId);
-            }
-        }
-
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures) {
         for (Amenity amenity : amenities) {
-            String amenityDistinctId = amenity.getType().getKeyName() + amenity.getId();
-            if (distinctAmenities.add(amenityDistinctId)) {
+            long osmId = amenity.getId();
+            if (!foundFeatures.containsKey(osmId)) {
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                features.add(getPoiFeature(result));
+                foundFeatures.put(osmId, getPoiFeature(result));
             }
         }
     }
