@@ -134,7 +134,7 @@ public class SearchService {
         }
     }
 
-    public record PoiSearchCategory(String category, String key, String lang, String mode) {}
+    public record PoiSearchCategory(String category, String lang) {}
 
 	public SearchService() {
 		try {
@@ -499,15 +499,19 @@ public class SearchService {
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
                                          List<BinaryMapIndexReader> readers, List<Feature> features) throws IOException {
-        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        AbstractPoiType poiType = mapPoiTypes.getAnyPoiTypeByKey(categoryObj.category, false);
-        if (poiType == null || searchBbox == null) {
+        if (searchBbox == null) {
             return;
         }
 
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
+        AbstractPoiType poiType = mapPoiTypes.getAnyPoiTypeByKey(categoryObj.category, false);
         SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
         SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI);
-        SearchPoiTypeFilter filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, new LinkedHashSet<>());
+        SearchPoiTypeFilter filter = null;
+
+        if (poiType!= null) {
+            filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, new LinkedHashSet<>());
+        }
 
         int left31 = (int) searchBbox.left;
         int right31 = (int) searchBbox.right;
