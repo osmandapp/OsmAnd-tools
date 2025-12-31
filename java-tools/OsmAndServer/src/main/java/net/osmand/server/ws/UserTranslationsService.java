@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.ResponseEntity.BodyBuilder;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -21,7 +20,6 @@ import com.google.gson.Gson;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.data.LatLon;
-import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
