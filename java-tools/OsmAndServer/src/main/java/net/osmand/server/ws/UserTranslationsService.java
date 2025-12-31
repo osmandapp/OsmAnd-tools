@@ -8,8 +8,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ResponseEntity.BodyBuilder;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -21,6 +21,7 @@ import com.google.gson.Gson;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.data.LatLon;
+import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
@@ -52,8 +53,10 @@ public class UserTranslationsService {
 		return (storedAlias != null) ? "Unidentified " + storedAlias : "Unidentified Anonymous";
 	}
 	
-	public ResponseEntity<String> createTranslation(CloudUserDevice dev, CloudUser pu, HttpServletRequest request) {
-		UserTranslation ust = new UserTranslation(pu, TOPIC_TRANSLATION);
+	public ResponseEntity<String> createTranslation(CloudUserDevice dev, String pu) {
+		Random rnd = new Random();
+		String translationId = "room-"+rnd.nextInt(1000);
+		UserTranslation ust = new UserTranslation(pu, translationId);
 		ust.setCreationDate(System.currentTimeMillis());
 		translations.put(ust.getId(), ust);
 		return ResponseEntity.ok(gson.toJson(Map.of(TRANSLATION_ID, ust.getId())));
@@ -67,13 +70,18 @@ public class UserTranslationsService {
 	private UserTranslation getTranslation(String translationId, SimpMessageHeaderAccessor headers) {
 		UserTranslation ust = translations.get(translationId);
 		if (ust == null) {
-			SimpMessageHeaderAccessor header = SimpMessageHeaderAccessor.create();
-	        header.setSessionId(headers.getSessionId());
-	        header.setLeaveMutable(true);
-			template.convertAndSendToUser(headers.getSessionId(), TOPIC_ERRORS, "Translation doesn't exist",
-					headers.getMessageHeaders());
+			sendError("Translation doesn't exist", headers);
 		}
 		return ust;
+	}
+
+	public ResponseEntity<String> sendError(String error, SimpMessageHeaderAccessor headers) {
+		SimpMessageHeaderAccessor header = SimpMessageHeaderAccessor.create();
+		header.setSessionId(headers.getSessionId());
+		header.setLeaveMutable(true);
+		template.convertAndSendToUser(headers.getSessionId(), TOPIC_ERRORS, error,
+				headers.getMessageHeaders());
+		return ResponseEntity.ok(gson.toJson(Map.of("error", error)));
 	}
 	
     public void sendMessage(@DestinationVariable String translationId, 

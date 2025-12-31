@@ -11,14 +11,14 @@ import net.osmand.shared.gpx.primitives.WptPt;
 public class UserTranslation {
 
 	private final String id;
-	private final CloudUser owner;
+	private final String owner;
 	
 	private long creationDate;
 	private String password;
 	private Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
 	private Map<String, Deque<WptPt>> locations = new ConcurrentHashMap<>();
 	
-	public UserTranslation(CloudUser owner, String id) {
+	public UserTranslation(String owner, String id) {
 		this.owner = owner;
 		this.id = id;
 	}
@@ -43,7 +43,7 @@ public class UserTranslation {
 		this.creationDate = creationDate;
 	}
 	
-	public CloudUser getOwner() {
+	public String getOwner() {
 		return owner;
 	}
 	

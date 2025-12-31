@@ -1,28 +1,18 @@
 package net.osmand.server.controllers.pub;
 
-import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
-import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
-import static net.osmand.server.api.repo.SupportersRepository.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.*;
-
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-
-import net.osmand.server.api.repo.*;
-import net.osmand.server.api.services.*;
-import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
-
-import net.osmand.server.controllers.user.MapApiController;
-import net.osmand.server.utils.exception.OsmAndPublicApiException;
-import net.osmand.server.ws.UserTranslationsService;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -30,15 +20,45 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersRepository;
+import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
+import net.osmand.server.api.services.EmailSenderService;
+import net.osmand.server.api.services.StorageService;
+import net.osmand.server.api.services.UserSubscriptionService;
+import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.controllers.user.MapApiController;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
 @RestController
@@ -81,7 +101,7 @@ public class UserdataController {
 	protected UserSubscriptionService userSubService;
 	
 	@Autowired
-	protected UserTranslationsService websocketController;
+	protected UserTranslationsService userTranlsationService;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -181,7 +201,7 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		return websocketController.sendMessage(translationId, dev, pu, request); 
+		return userTranlsationService.sendMessage(translationId, dev, pu, request); 
 	}
 	
 	@GetMapping(value = "/translation/create")
@@ -197,8 +217,9 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		return websocketController.sendMessage(translationId, dev, pu, request); 
+		return userTranlsationService.sendMessage(translationId, dev, pu, request); 
 	}
+	
 
 	@PostMapping(value = "/user-update-orderid")
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam String email,
