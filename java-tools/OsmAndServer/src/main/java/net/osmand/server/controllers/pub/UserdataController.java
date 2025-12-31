@@ -22,6 +22,8 @@ import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.server.ws.UserTranslationsService;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +79,9 @@ public class UserdataController {
 
 	@Autowired
 	protected UserSubscriptionService userSubService;
+	
+	@Autowired
+	protected UserTranslationsService websocketController;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -161,6 +166,38 @@ public class UserdataController {
 			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
+	}
+	
+	@GetMapping(value = "/translation/msg")
+	public ResponseEntity<String> sendMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "translationId", required = true) String translationId,
+			HttpServletRequest request) throws IOException {
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		CloudUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		}
+		return websocketController.sendMessage(translationId, dev, pu, request); 
+	}
+	
+	@GetMapping(value = "/translation/create")
+	public ResponseEntity<String> createTranslation(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "translationId", required = true) String translationId,
+			HttpServletRequest request) throws IOException {
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		CloudUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		}
+		return websocketController.sendMessage(translationId, dev, pu, request); 
 	}
 
 	@PostMapping(value = "/user-update-orderid")
