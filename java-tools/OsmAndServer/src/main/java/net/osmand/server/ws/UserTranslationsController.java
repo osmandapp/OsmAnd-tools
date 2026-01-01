@@ -1,6 +1,9 @@
 package net.osmand.server.ws;
 
 import java.security.Principal;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -18,19 +21,31 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository;
 public class UserTranslationsController {
 
 	@Autowired
-	private UserTranslationsService userTranlsationService;
+	private UserTranslationsService userTranslationsService;
+
+	@MessageMapping("/translation/{translationId}/history")
+	public void loadHistory(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		if (ust != null) {
+			userTranslationsService.loadHistory(translationId, headers.getSessionId());
+		}
+	}
 
 	@MessageMapping("/translation/{translationId}/sendMessage")
 	public void sendMessage(@DestinationVariable String translationId, @Payload TranslationMessage message,
 			Principal principal, SimpMessageHeaderAccessor headers) {
-		userTranlsationService.sendMessage(translationId, message, principal, headers);
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		if (ust != null) {
+			userTranslationsService.sendMessage(translationId, message, principal, headers);
+		}
 	}
 
 	// One time call (subscription) returns map with TRANSLATION_ID
-	@SubscribeMapping("/translation/create")
+	@MessageMapping("/translation/create")
 	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
 		if (!(principal instanceof Authentication)) {
-			return userTranlsationService.sendError("No authenticated user", headers);
+//			return userTranslationsService.createTranslation(null, "test", headers.getSessionId());
+			return userTranslationsService.sendError("No authenticated user", headers.getSessionId());
 		}
 		Object user = ((Authentication) principal).getPrincipal();
 		CloudUserDevicesRepository.CloudUserDevice dev = null;
@@ -40,9 +55,9 @@ public class UserTranslationsController {
 			dev = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
 		}
 		if (dev == null) {
-			return userTranlsationService.sendError("No authenticated user", headers);
+			return userTranslationsService.sendError("No authenticated user", headers.getSessionId());
 		}
-		return userTranlsationService.createTranslation(dev, userObj.getUsername());
+		return userTranslationsService.createTranslation(dev, userObj.getUsername(), headers.getSessionId());
 	}
 
 }
