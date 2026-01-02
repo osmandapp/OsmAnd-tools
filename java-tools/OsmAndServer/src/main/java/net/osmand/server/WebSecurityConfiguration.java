@@ -95,16 +95,23 @@ public class WebSecurityConfiguration {
 	public static class OsmAndProUser extends User {
 
 		private static final long serialVersionUID = -881322456618342435L;
-		CloudUserDevice userDevice;
+		private final CloudUserDevice userDevice;
+		private final CloudUser pu;
 
-		public OsmAndProUser(String username, String password, CloudUserDevice pud,
+		public OsmAndProUser(String username, String password, CloudUser pu, CloudUserDevice pud,
 				List<GrantedAuthority> authorities) {
 			super(username, password, authorities);
+			this.pu = pu;
 			this.userDevice = pud;
 		}
 
+
 		public CloudUserDevice getUserDevice() {
 			return userDevice;
+		}
+		
+		public CloudUser getUser() {
+			return pu;
 		}
 	}
 
@@ -147,7 +154,7 @@ public class WebSecurityConfiguration {
 			if (pud != null) {
 				CloudUser pu = usersRepository.findById(pud.userid);
 				if (pu != null) {
-					return createOsmAndProUser(pu.email, pud);
+					return createOsmAndProUser(pu, pud);
 				}
 			}
 			throw new UsernameNotFoundException(username);
@@ -162,26 +169,22 @@ public class WebSecurityConfiguration {
 			CloudUserDevice pud = devicesRepository
 					.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(pu.id, UserdataService.TOKEN_DEVICE_WEB);
 			if (pud == null) throw new UsernameNotFoundException(username);
-			return createOsmAndProUser(username, pud);
+			return createOsmAndProUser(pu, pud);
 		};
 	}
 
-	private OsmAndProUser createOsmAndProUser(String username, CloudUserDevice pud) {
+	private OsmAndProUser createOsmAndProUser(CloudUser pu, CloudUserDevice pud) {
 		Set<GrantedAuthority> auths = new LinkedHashSet<>();
 		auths.add(new SimpleGrantedAuthority(ROLE_PRO_USER));
 
-		CloudUser pu = usersRepository.findById(pud.userid);
-		if (pu != null) {
-			String email = pu.email;
-			if (webAccessConfig.getAdmins().contains(email)) {
-				auths.add(new SimpleGrantedAuthority(ROLE_ADMIN));
-			}
-			if (webAccessConfig.getSupport().contains(email)) {
-				auths.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
-			}
+		String email = pu.email;
+		if (webAccessConfig.getAdmins().contains(email)) {
+			auths.add(new SimpleGrantedAuthority(ROLE_ADMIN));
 		}
-
-		return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
+		if (webAccessConfig.getSupport().contains(email)) {
+			auths.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
+		}
+		return new OsmAndProUser(email, pud.accesstoken, pu, pud, new ArrayList<>(auths));
 	}
 
 	@Bean

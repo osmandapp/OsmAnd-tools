@@ -5,22 +5,22 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.shared.gpx.primitives.WptPt;
 
 public class UserTranslation {
 
 	private final String id;
-	private final String owner;
-	
+	private final long owner;
 	private long creationDate;
 	private String password;
+	
+	
 	private Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
 	private Map<String, Deque<WptPt>> locations = new ConcurrentHashMap<>();
 	
-	public UserTranslation(String owner, String id) {
-		this.owner = owner;
+	public UserTranslation(String id, long ownerId) {
 		this.id = id;
+		this.owner = ownerId;
 	}
 	
 	public void setPassword(String password) {
@@ -43,7 +43,7 @@ public class UserTranslation {
 		this.creationDate = creationDate;
 	}
 	
-	public String getOwner() {
+	public long getOwner() {
 		return owner;
 	}
 	
