@@ -58,6 +58,7 @@ import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.server.ws.UserTranslation;
 import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
@@ -188,23 +189,7 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 	
-	@GetMapping(value = "/translation/msg")
-	public ResponseEntity<String> sendMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken,
-			@RequestParam(name = "translationId", required = true) String translationId,
-			HttpServletRequest request) throws IOException {
-		CloudUserDevice dev = checkToken(deviceId, accessToken);
-		if (dev == null) {
-			return userdataService.tokenNotValidError();
-		}
-		CloudUser pu = usersRepository.findById(dev.userid);
-		if (pu == null) {
-			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-		}
-		return userTranlsationService.sendMessage(translationId, dev, pu, request); 
-	}
-	
-	@GetMapping(value = "/translation/create")
+	@PostMapping(value = "/translation/create")
 	public ResponseEntity<String> createTranslation(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken,
 			@RequestParam(name = "translationId", required = true) String translationId,
@@ -217,7 +202,35 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		return userTranlsationService.sendMessage(translationId, dev, pu, request); 
+		UserTranslation ust = userTranlsationService.createTranslation(pu, translationId, null);
+		if (ust != null) {
+			return ResponseEntity.ok(gson.toJson(Map.of(UserTranslationsService.TRANSLATION_ID, ust.getId())));
+		}
+		return ResponseEntity.notFound().build();
+	}
+	
+	@RequestMapping(value = "/translation/msg")
+	public ResponseEntity<String> sendMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken,
+			@RequestParam(name = "translationId", required = true) String translationId,
+			HttpServletRequest request) throws IOException {
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		CloudUser pu = usersRepository.findById(dev.userid);
+		if (pu == null) {
+			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+		}
+		UserTranslation translation = userTranlsationService.getTranslation(translationId, null);
+		if(translation == null) {
+			translation = userTranlsationService.createTranslation(pu, translationId, null);
+		}
+		boolean ok = userTranlsationService.sendMessage(translation, dev, pu, request);
+		if (ok) {
+			return ResponseEntity.ok("OK");
+		}
+		return ResponseEntity.notFound().build();
 	}
 	
 

@@ -9,9 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -38,9 +35,10 @@ public class UserTranslationsService {
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
    
+    public static final String TRANSLATION_ID = "translationId";
+    
     static final String TOPIC_TRANSLATION = "/topic/translation/";
     static final String QUEUE_USER_UPDATES = "/queue/updates";
-    static final String TRANSLATION_ID = "translationId";
     static final String ALIAS = "alias";
     
     static final String USER_UPD_TYPE_HISTORY = "HISTORY";
@@ -67,14 +65,6 @@ public class UserTranslationsService {
         template.convertAndSendToUser(sessionId, QUEUE_USER_UPDATES, payload, header.getMessageHeaders());
     }
 
-	private String getStoredName(Principal principal, SimpMessageHeaderAccessor headers) {
-		if (principal != null) {
-			return principal.getName();
-		}
-		Map<String, Object> attributes = headers.getSessionAttributes();
-		String storedAlias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
-		return (storedAlias != null) ? "Unidentified " + storedAlias : "Unidentified Anonymous";
-	}
 	
 	public CloudUser getUserFromPrincipal(Principal principal) {
 		if (principal instanceof Authentication) {
@@ -102,10 +92,12 @@ public class UserTranslationsService {
 		return null;
 	}
 	
-	public Object createTranslation(CloudUser user, SimpMessageHeaderAccessor headers) {
+	public UserTranslation createTranslation(CloudUser user, String translationId, SimpMessageHeaderAccessor headers) {
 //		CloudUsersRepository.CloudUser user = userdataService.getUserById(dev.userid);
 		long time = System.currentTimeMillis();
-		String translationId = Long.toHexString(time * 100L + random.nextInt(100));
+		if (translationId == null) {
+			translationId = Long.toHexString(time * 100L + random.nextInt(100));
+		}
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		translations.put(ust.getId(), ust);
@@ -113,7 +105,7 @@ public class UserTranslationsService {
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		}
-		return obj;
+		return ust;
     }
 	
 
@@ -160,18 +152,15 @@ public class UserTranslationsService {
 		return true;
 	}
     
-    public ResponseEntity<String> sendMessage(String translationId, CloudUserDevice dev, CloudUser pu, HttpServletRequest request) {
-    	UserTranslation ust = getTranslation(translationId, null);
-		if (ust != null) {
-			// TODO parse from HttpServletRequest request vars location / device
-			String message = "Hello"; 
-			TranslationMessage msg = prepareMessageAuthor(dev, pu, null);
-			msg.content = message;
-			msg.type = TranslationMessage.TYPE_MSG_TEXT;
-			rawSendMessage(ust, msg);
-			return ResponseEntity.ok(gson.toJson(pu));
-		}
-		return ResponseEntity.notFound().build();
+	public boolean sendMessage(UserTranslation ust, CloudUserDevice dev, CloudUser pu,
+			HttpServletRequest request) {
+		// TODO parse from HttpServletRequest request vars location / device
+		String message = "Hello " + request.getParameterMap();
+		TranslationMessage msg = prepareMessageAuthor(dev, pu, null);
+		msg.content = message;
+		msg.type = TranslationMessage.TYPE_MSG_TEXT;
+		rawSendMessage(ust, msg);
+		return true;
 	}
     
 
