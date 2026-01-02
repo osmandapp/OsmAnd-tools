@@ -122,7 +122,9 @@ public class UserTranslationsService {
 	}
 
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
-		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
+		if (headers != null) {
+			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
+		}
 		return error;
 	}
 	
