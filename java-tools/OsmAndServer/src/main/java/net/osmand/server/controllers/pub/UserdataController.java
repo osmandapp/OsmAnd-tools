@@ -189,31 +189,11 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 	
-	@PostMapping(value = "/translation/create")
-	public ResponseEntity<String> createTranslation(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken,
-			@RequestParam(name = "translationId", required = true) String translationId,
-			HttpServletRequest request) throws IOException {
-		CloudUserDevice dev = checkToken(deviceId, accessToken);
-		if (dev == null) {
-			return userdataService.tokenNotValidError();
-		}
-		CloudUser pu = usersRepository.findById(dev.userid);
-		if (pu == null) {
-			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
-		}
-		UserTranslation ust = userTranlsationService.createTranslation(pu, translationId, null);
-		if (ust != null) {
-			return ResponseEntity.ok(gson.toJson(Map.of(UserTranslationsService.TRANSLATION_ID, ust.getId())));
-		}
-		return ResponseEntity.notFound().build();
-	}
-	
 	@RequestMapping(value = "/translation/msg")
 	public ResponseEntity<String> sendMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken,
-			@RequestParam(name = "translationId", required = true) String translationId,
 			HttpServletRequest request) throws IOException {
+		// TODO create cache to speed up token checks / userids
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -222,8 +202,9 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
+		String translationId = "test-system";
 		UserTranslation translation = userTranlsationService.getTranslation(translationId, null);
-		if(translation == null) {
+		if (translation == null) {
 			translation = userTranlsationService.createTranslation(pu, translationId, null);
 		}
 		boolean ok = userTranlsationService.sendMessage(translation, dev, pu, request);
