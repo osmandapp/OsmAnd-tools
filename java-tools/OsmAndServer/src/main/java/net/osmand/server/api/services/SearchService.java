@@ -464,7 +464,7 @@ public class SearchService {
         return searchUICore;
     }
 
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, boolean baseSearch) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -492,6 +492,7 @@ public class SearchService {
         }
         List<Feature> features = new ArrayList<>(foundFeatures.values());
         if (!features.isEmpty()) {
+            sortPoiResultsByDistance(features, center);
             return new PoiSearchResult(poiSearchLimit.useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
         } else {
             return null;
@@ -555,6 +556,14 @@ public class SearchService {
         SearchPoiTypeFilter filter = BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
         return BinaryMapIndexReader.buildSearchPoiRequest(
                 left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, brandFilter, null);
+    }
+
+    private void sortPoiResultsByDistance(List<Feature> features, LatLon center) {
+        features.sort(Comparator.comparingDouble(f -> {
+            float[] coords = (float[]) f.geometry.coordinates;
+            LatLon loc = new LatLon(coords[1], coords[0]);
+            return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
+        }));
     }
     
     public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {

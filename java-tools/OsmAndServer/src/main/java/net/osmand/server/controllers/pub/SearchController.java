@@ -76,8 +76,10 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
                                             @RequestParam String locale,
+                                            @RequestParam double lat,
+                                            @RequestParam double lon,
                                             @RequestParam(required = false) Boolean baseSearch) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, baseSearch);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
 
