@@ -93,6 +93,41 @@ public class SearchService {
             this.leftoverLimit = leftoverLimit;
             this.useLimit = useLimit;
         }
+
+        public int getRemainingForSave(int categoryStartSize, int currentSize) {
+            int remainingForCategory = getRemainingForCategory(categoryStartSize, currentSize);
+            int remainingTotal = getRemainingTotal();
+            return Math.min(remainingForCategory, remainingTotal);
+        }
+
+        public boolean shouldStopCategory(int categoryStartSize, int currentSize) {
+            return getRemainingForCategory(categoryStartSize, currentSize) == 0;
+        }
+
+        private int getMaxForCategory() {
+            return Math.min(limit, leftoverLimit);
+        }
+
+        private int getRemainingForCategory(int categoryStartSize, int currentSize) {
+            int used = currentSize - categoryStartSize;
+            return Math.max(0, getMaxForCategory() - used);
+        }
+
+        private int getRemainingTotal() {
+            return Math.max(0, leftoverLimit);
+        }
+
+        public void updateAfterCategory(int categoryStartSize, int categoryEndSize) {
+            int used = categoryEndSize - categoryStartSize;
+            leftoverLimit -= used;
+            if (leftoverLimit <= 0) {
+                useLimit = true;
+            }
+        }
+
+        public boolean isLimitReached() {
+            return leftoverLimit <= 0;
+        }
     }
     
     public static class PoiSearchData {
@@ -473,9 +508,9 @@ public class SearchService {
         if (data.categories.isEmpty()) {
             return new PoiSearchResult(false, false, false, null);
         }
-        PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), 0, false);
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        boolean useLimit = false;
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox, baseSearch);
             if (mapList.isEmpty()) {
@@ -484,8 +519,25 @@ public class SearchService {
 
             usedMapList = osmAndMapsService.getReaders(mapList, null);
 
-            for (PoiSearchCategory categoryObj : data.categories) {
-                searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures);
+            if (data.categories.size() == 1) {
+                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures);
+                useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
+            } else {
+                PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), TOTAL_LIMIT_POI, false);
+                for (PoiSearchCategory categoryObj : data.categories) {
+                    if (poiSearchLimit.isLimitReached()) {
+                        useLimit = true;
+                        break;
+                    }
+                    int categoryStartSize = foundFeatures.size();
+                    searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit);
+                    int categoryEndSize = foundFeatures.size();
+                    poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
+                    if (poiSearchLimit.useLimit) {
+                        useLimit = true;
+                        break;
+                    }
+                }
             }
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
@@ -493,14 +545,20 @@ public class SearchService {
         List<Feature> features = new ArrayList<>(foundFeatures.values());
         if (!features.isEmpty()) {
             sortPoiResultsByDistance(features, center);
-            return new PoiSearchResult(poiSearchLimit.useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
+            return new PoiSearchResult(useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
         } else {
-            return null;
+            return new PoiSearchResult(false, false, false, null);
         }
     }
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
                                          List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures) throws IOException {
+        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null);
+    }
+
+    private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
+                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
+                                         PoiSearchLimit poiSearchLimit) throws IOException {
         if (searchBbox == null) {
             return;
         }
@@ -511,7 +569,7 @@ public class SearchService {
         SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI);
         SearchPoiTypeFilter filter = null;
 
-        if (poiType!= null) {
+        if (poiType != null) {
             filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, new LinkedHashSet<>());
         }
 
@@ -520,7 +578,18 @@ public class SearchService {
         int top31 = (int) searchBbox.top;
         int bottom31 = (int) searchBbox.bottom;
 
+        int categoryStartSize = foundFeatures.size();
+
         for (BinaryMapIndexReader reader : readers) {
+            if (poiSearchLimit != null) {
+                if (poiSearchLimit.isLimitReached()) {
+                    break;
+                }
+            } else {
+                if (foundFeatures.size() >= TOTAL_LIMIT_POI) {
+                    break;
+                }
+            }
             BinaryMapIndexReader.SearchRequest<Amenity> request;
             if (filter == null || filter.isEmpty()) {
                 request = createSearchRequestByBrand(reader, categoryObj, mapPoiTypes, left31, right31, top31, bottom31);
@@ -532,7 +601,13 @@ public class SearchService {
                 continue;
             }
             List<Amenity> amenities = reader.searchPoi(request);
-            saveAmenityResults(amenities, foundFeatures);
+            int remaining = poiSearchLimit != null 
+                    ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
+                    : TOTAL_LIMIT_POI - foundFeatures.size();
+            saveAmenityResults(amenities, foundFeatures, remaining);
+            if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
+                break;
+            }
         }
     }
 
@@ -1029,8 +1104,11 @@ public class SearchService {
         }
     }
 
-    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures) {
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit) {
         for (Amenity amenity : amenities) {
+            if (remainingLimit <= 0) {
+                break;
+            }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
                 SearchResult result = new SearchResult();
@@ -1038,6 +1116,7 @@ public class SearchService {
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
                 foundFeatures.put(osmId, getPoiFeature(result));
+                remainingLimit--;
             }
         }
     }
