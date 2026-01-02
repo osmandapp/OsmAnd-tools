@@ -593,6 +593,14 @@ public class SearchService {
             BinaryMapIndexReader.SearchRequest<Amenity> request;
             if (filter == null || filter.isEmpty()) {
                 request = createSearchRequestByBrand(reader, categoryObj, mapPoiTypes, left31, right31, top31, bottom31);
+                if (request == null) {
+                    if (categoryObj.lang == null || categoryObj.lang.isEmpty()) {
+                        LOGGER.warn(String.format("Brand search skipped for category '%s': language is null or empty", categoryObj.category));
+                    } else {
+                        LOGGER.warn(String.format("Brand search skipped for category '%s' with language '%s': no matching brand found", categoryObj.category, categoryObj.lang));
+                    }
+                    continue;
+                }
             } else {
                 request = BinaryMapIndexReader.buildSearchPoiRequest(
                         left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, null);
