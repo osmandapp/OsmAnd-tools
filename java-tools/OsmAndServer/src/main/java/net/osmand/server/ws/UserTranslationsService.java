@@ -139,17 +139,20 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		translations.put(ust.getId(), ust);
-		int uid = user.id;
-		if (!translationsByUser.containsKey(uid)) {
-			translationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
-		}
-		translationsByUser.get(uid).add(ust);
+		userJoinTranslation(ust, user.id);
 		UserTranslationObject obj = new UserTranslationObject(ust.getId());
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		}
 		return ust;
     }
+
+	private void userJoinTranslation(UserTranslation ust, int uid) {
+		if (!translationsByUser.containsKey(uid)) {
+			translationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
+		}
+		translationsByUser.get(uid).add(ust);
+	}
 	
 
 	public UserTranslation getTranslation(String translationId, SimpMessageHeaderAccessor headers) {
@@ -302,14 +305,19 @@ public class UserTranslationsService {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		String destination = headers.getDestination();
 		if (destination != null && destination.startsWith(TOPIC_TRANSLATION)) {
-//			String translationId = destination.replace(TOPIC_TRANSLATION, "");
+			String translationId = destination.replace(TOPIC_TRANSLATION, "");
 			CloudUser user = getUser(headers.getUser(), headers, true);
+			UserTranslation ust = getTranslation(translationId, headers);
 			TranslationMessage msg = prepareMessageSystem();
 			msg.content = getNickname(user);
 			msg.type = TranslationMessage.TYPE_MSG_JOIN;
 			template.convertAndSend(destination, msg);
+			if (user.id > 0) {
+				userJoinTranslation(ust, user.id);
+			}
 		}
 	}
+	
 	@EventListener
 	public void onDisconnectEvent(SessionDisconnectEvent event) {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
