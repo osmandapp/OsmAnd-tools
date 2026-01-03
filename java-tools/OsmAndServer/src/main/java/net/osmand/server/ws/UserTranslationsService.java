@@ -74,9 +74,10 @@ public class UserTranslationsService {
 
 	
 	public CloudUser getUserFromPrincipal(Principal principal) {
+		System.out.println(principal + " --- " + principal.getName());
 		if (principal instanceof Authentication) {
 			Object user = ((Authentication) principal).getPrincipal();
-			System.out.println(user);
+			System.out.println(user + "..");
 			if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
 				CloudUser userObj = ((WebSecurityConfiguration.OsmAndProUser) user).getUser();
 				System.out.println(userObj);
