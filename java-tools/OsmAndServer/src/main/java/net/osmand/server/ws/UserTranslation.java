@@ -14,13 +14,22 @@ public class UserTranslation {
 	private long creationDate;
 	private String password;
 	
+	private Deque<TranslationSharingOptions> sharingOptions = new ConcurrentLinkedDeque<>();
 	
 	private Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
-	private Map<String, Deque<WptPt>> locations = new ConcurrentHashMap<>();
+	private Map<Integer, Deque<WptPt>> locations = new ConcurrentHashMap<>();
 	
 	public UserTranslation(String id, long ownerId) {
 		this.id = id;
 		this.owner = ownerId;
+	}
+	
+	public void sendLocation(int userid, WptPt wptPt) {
+		Deque<WptPt> deque = locations.get(userid);
+		if(deque == null) {
+			locations.put(userid, deque);
+		}
+		locations.get(userid).push(wptPt);
 	}
 	
 	public void setPassword(String password) {
@@ -39,6 +48,10 @@ public class UserTranslation {
 		return creationDate;
 	}
 	
+	public Deque<TranslationSharingOptions> getSharingOptions() {
+		return sharingOptions;
+	}
+	
 	public void setCreationDate(long creationDate) {
 		this.creationDate = creationDate;
 	}
@@ -51,8 +64,20 @@ public class UserTranslation {
 		return messages;
 	}
 	
-	public Map<String, Deque<WptPt>> getLocations() {
+	public Map<Integer, Deque<WptPt>> getLocations() {
 		return locations;
 	}
+	
+	public static class TranslationSharingOptions {
+		public int userId;
+//		public long deviceId; // possibly limit to device id
+		
+		public long startTime;
+		public long expireTime;
+
+		public String nickname;
+	}
+
+	
 	
 }

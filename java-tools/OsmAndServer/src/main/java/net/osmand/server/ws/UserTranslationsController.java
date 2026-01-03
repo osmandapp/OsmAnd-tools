@@ -18,13 +18,43 @@ public class UserTranslationsController {
 	@Autowired
 	private UserTranslationsService userTranslationsService;
 
-	@MessageMapping("/translation/{translationId}/history")
-	public void loadHistory(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
+	
+	@MessageMapping("/translation/{translationId}/load")
+	public void loadTranslation(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		if (ust != null) {
 			userTranslationsService.loadHistory(ust, headers);
 		}
 	}
+	
+	@MessageMapping("/translation/{translationId}/startSharing")
+	public String startSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
+			Principal principal) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
+		if (user == null) {
+			return userTranslationsService.sendError("No authenticated user", headers);
+		}
+		if (ust != null) {
+			userTranslationsService.startSharing(ust, user, headers);
+		}
+		return "OK";
+	}
+	
+	@MessageMapping("/translation/{translationId}/stopSharing")
+	public String stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
+			Principal principal) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
+		if (user == null) {
+			return userTranslationsService.sendError("No authenticated user", headers);
+		}
+		if (ust != null) {
+			userTranslationsService.stopSharing(ust, user, headers);
+		}
+		return "OK";
+	}
+
 
 	@MessageMapping("/translation/{translationId}/sendMessage")
 	public void sendMessage(@DestinationVariable String translationId, @Payload TranslationMessage message,
@@ -42,7 +72,7 @@ public class UserTranslationsController {
 	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
 		if (user == null) {
-			return userTranslationsService.sendError("No authenticated user", headers);
+//			return userTranslationsService.sendError("No authenticated user", headers);
 		}
 		return userTranslationsService.createTranslation(user, null, headers);
 	}
