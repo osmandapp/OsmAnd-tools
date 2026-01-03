@@ -81,7 +81,6 @@ public class UserTranslationsController {
 	}
 
 	private CloudUser validateUser(Principal principal, SimpMessageHeaderAccessor headers) {
-		principal = headers.getUser();
 		CloudUser us = userTranslationsService.getUserFromPrincipal(principal);
 		//if (isDevToolsActive) {
 		boolean isDevToolsActive = false;
