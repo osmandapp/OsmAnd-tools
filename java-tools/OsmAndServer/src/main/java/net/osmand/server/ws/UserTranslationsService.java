@@ -52,9 +52,13 @@ public class UserTranslationsService {
     
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
 
-    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
-    private Map<Integer, Deque<UserTranslation>> translationsByUser = new ConcurrentHashMap<>();
+    // implement 1-3 day storage for location
     private Map<Integer, Deque<WptPt>> locationByUser = new ConcurrentHashMap<>();
+    // store last 1-3 days locations are present (?)
+    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
+    
+    // no need to be persistent
+    private Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
     private Map<String, String> anonymousUsers = new ConcurrentHashMap<>(); 
     
     Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
@@ -67,9 +71,8 @@ public class UserTranslationsService {
 	protected CloudUserDevicesRepository devicesRepository;
     
     private final Environment environment;
-    
-	
-	public UserTranslationsService(Environment environment) {
+
+    public UserTranslationsService(Environment environment) {
         this.environment = environment;
     }
     
@@ -140,19 +143,19 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		translations.put(ust.getId(), ust);
-		userJoinTranslation(ust, user.id);
-		UserTranslationObject obj = new UserTranslationObject(ust.getId());
+		shareLocationByUser(ust, user.id);
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		}
 		return ust;
     }
 
-	private void userJoinTranslation(UserTranslation ust, int uid) {
-		if (!translationsByUser.containsKey(uid)) {
-			translationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
+	private void shareLocationByUser(UserTranslation ust, int uid) {
+		if (!shareLocTranslationsByUser.containsKey(uid)) {
+			shareLocTranslationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
 		}
-		translationsByUser.get(uid).add(ust);
+		shareLocTranslationsByUser.get(uid).add(ust);
 	}
 	
 
@@ -165,7 +168,7 @@ public class UserTranslationsService {
 	}
 
 	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
-		UserTranslationObject obj = new UserTranslationObject(ust.getId());
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setHistory(ust.getMessages());
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
@@ -186,8 +189,10 @@ public class UserTranslationsService {
 		if(!environment.acceptsProfiles(Profiles.of("production"))) {
 			startSimulation(user, ust);
 		}
-		UserTranslationObject obj = new UserTranslationObject(ust.getId());
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		ust.getSharingOptions().add(opts);
+		shareLocationByUser(ust, user.id);
+		
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
@@ -236,7 +241,7 @@ public class UserTranslationsService {
 				it.remove();
 			}
 		}
-		UserTranslationObject obj = new UserTranslationObject(ust.getId());
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 //		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
@@ -297,7 +302,7 @@ public class UserTranslationsService {
 		TranslationMessage msg = prepareMessageAuthor(dev, pu);
 		msg.content = Map.of("point", wptPt);
 		msg.type = TranslationMessageType.LOCATION;
-		Deque<UserTranslation> translations = translationsByUser.get(userId);
+		Deque<UserTranslation> translations = shareLocTranslationsByUser.get(userId);
 		long timeMillis = System.currentTimeMillis();
 		for (UserTranslation ust : translations) {
 			Deque<TranslationSharingOptions> sharingOptions = ust.getSharingOptions();
@@ -347,15 +352,16 @@ public class UserTranslationsService {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		String destination = headers.getDestination();
 		if (destination != null && destination.startsWith(TOPIC_TRANSLATION)) {
-			String translationId = destination.replace(TOPIC_TRANSLATION, "");
 			CloudUser user = getUser(headers.getUser(), headers, true);
-			UserTranslation ust = getTranslation(translationId, headers);
 			TranslationMessage msg = prepareMessageSystem().setType(TranslationMessageType.JOIN)
 					.setContent(getNickname(user));
 			template.convertAndSend(destination, msg);
-			if (user.id > 0) {
-				userJoinTranslation(ust, user.id);
-			}
+			
+//			String translationId = destination.replace(TOPIC_TRANSLATION, "");
+//			UserTranslation ust = getTranslation(translationId, headers);
+//			if (user.id > 0) {
+//				userJoinTranslation(ust, user.id);
+//			}
 		}
 	}
 	

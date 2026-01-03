@@ -8,7 +8,7 @@ import java.util.List;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
 import net.osmand.shared.gpx.primitives.WptPt;
 
-public class UserTranslationObject {
+public class UserTranslationPlainObject {
 
 	public final String id;
 	
@@ -16,7 +16,7 @@ public class UserTranslationObject {
 	
 	public List<SharingLocation> shareLocations = null;
 	
-	public UserTranslationObject(String id) {
+	public UserTranslationPlainObject(String id) {
 		this.id = id;
 	}
 	

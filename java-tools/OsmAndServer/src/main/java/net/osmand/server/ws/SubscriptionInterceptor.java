@@ -1,7 +1,6 @@
 package net.osmand.server.ws;
 
 import java.security.Principal;
-import java.util.Map;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
