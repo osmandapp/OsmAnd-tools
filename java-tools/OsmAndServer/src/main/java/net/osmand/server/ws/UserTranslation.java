@@ -26,10 +26,11 @@ public class UserTranslation {
 	
 	public void sendLocation(int userid, WptPt wptPt) {
 		Deque<WptPt> deque = locations.get(userid);
-		if(deque == null) {
-			locations.put(userid, deque);
+		if (deque == null) {
+			locations.putIfAbsent(userid, new ConcurrentLinkedDeque<WptPt>());
+			deque = locations.get(userid);
 		}
-		locations.get(userid).push(wptPt);
+		deque.push(wptPt);
 	}
 	
 	public void setPassword(String password) {
