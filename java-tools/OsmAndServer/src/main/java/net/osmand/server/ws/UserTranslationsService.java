@@ -12,14 +12,18 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import jakarta.servlet.http.HttpServletRequest;
 import net.osmand.server.WebSecurityConfiguration;
@@ -33,32 +37,40 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserTranslationsService {
 
+   
+    public static final String TRANSLATION_ID = "translationId";
+	public static final String ALIAS = "alias";
+
+    
+    static final String TOPIC_TRANSLATION = "/topic/translation/";
+    static final String QUEUE_USER_UPDATES = "/queue/updates";
+    
+    static final String USER_UPD_TYPE_ERROR = "ERROR";
+    static final String USER_UPD_TYPE_TRANSLATION = "TRANSLATION";
+    static final String USER_UPD_TYPE_USER_INFO = "USER_INFO";
+    
+    static final String TRANSLATION_MISSING = "Translation doesn't exist";
+
+    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
+    private Map<Integer, Deque<UserTranslation>> translationsByUser = new ConcurrentHashMap<>();
+    private Map<Integer, Deque<WptPt>> locationByUser = new ConcurrentHashMap<>();
+    private Map<String, String> anonymousUsers = new ConcurrentHashMap<>(); 
+    
+    Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+    Random random = new SecureRandom();
+    
     @Autowired
     private SimpMessagingTemplate template;
     
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
-   
-    public static final String TRANSLATION_ID = "translationId";
     
-    static final String TOPIC_TRANSLATION = "/topic/translation/";
-    static final String QUEUE_USER_UPDATES = "/queue/updates";
-    static final String ALIAS = "alias";
+    private final Environment environment;
     
-    static final String USER_UPD_TYPE_ERROR = "ERROR";
-    static final String USER_UPD_TYPE_TRANSLATION = "TRANSLATION";
-    
-    static final String TRANSLATION_MISSING = "Translation doesn't exist";
-    
-    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
-    
-    private Map<Integer, Deque<UserTranslation>> translationsByUser = new ConcurrentHashMap<>();
-    
-    private Map<Integer, Deque<WptPt>> locationByUser = new ConcurrentHashMap<>();
-    
-    Gson gson = new Gson();
-    
-    Random random = new SecureRandom();
+	
+	public UserTranslationsService(Environment environment) {
+        this.environment = environment;
+    }
     
     public void sendPrivateMessage(String sessionId, String type, Object data) {
         Map<String, Object> payload = new HashMap<>();
@@ -72,28 +84,44 @@ public class UserTranslationsService {
         template.convertAndSendToUser(sessionId, QUEUE_USER_UPDATES, payload, header.getMessageHeaders());
     }
 
-	
-	public CloudUser getUserFromPrincipal(Principal principal) {
-		System.out.println(principal + " --- " + principal.getName());
-		if (principal instanceof Authentication) {
-			Object user = ((Authentication) principal).getPrincipal();
-			System.out.println(user + "..");
-			if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-				CloudUser userObj = ((WebSecurityConfiguration.OsmAndProUser) user).getUser();
-				System.out.println(userObj);
-				if (userObj != null) {
-					return userObj;
-				}
-			}
-		}
-		return null;
+    
+    public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers) {
+		boolean production = environment.acceptsProfiles(Profiles.of("production"));		
+		return getUser(principal, headers, !production);
 	}
 	
-	public CloudUserDevice getUserDeviceFromPrincipal(Principal principal) {
+	public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers, boolean allowAnonymous) {
+		CloudUser us = getUserFromPrincipal(principal);
+		if (us == null && allowAnonymous) {
+			us = new CloudUser();
+			Map<String, Object> attributes = headers.getSessionAttributes();
+			String oalias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
+			String sessionId = headers.getSessionId();
+			if (Algorithms.isEmpty(oalias)) {
+				oalias = TranslationMessage.SENDER_ANONYMOUS;
+			}
+			String alias = oalias;
+			anonymousUsers.putIfAbsent(alias, sessionId);
+			while (!sessionId.equals(anonymousUsers.get(alias))) {
+				alias = oalias + " " + random.nextInt(1000);
+				anonymousUsers.putIfAbsent(alias, sessionId);
+			}
+			attributes.put(ALIAS, alias);
+			us.id = TranslationMessage.SENDER_ANONYMOUS_ID;
+			us.nickname = alias;
+			us.email = us.nickname + "@example.com";
+		}
+		if (us == null) {
+			sendError("No authenticated user", headers);
+		}
+		return us;
+	}
+	
+	private  CloudUser getUserFromPrincipal(Principal principal) {
 		if (principal instanceof Authentication) {
 			Object user = ((Authentication) principal).getPrincipal();
 			if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-				CloudUserDevice userObj = ((WebSecurityConfiguration.OsmAndProUser) user).getUserDevice();
+				CloudUser userObj = ((WebSecurityConfiguration.OsmAndProUser) user).getUser();
 				if (userObj != null) {
 					return userObj;
 				}
@@ -111,7 +139,7 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		translations.put(ust.getId(), ust);
-		int uid = user != null ? user.id : TranslationMessage.SENDER_ANONYMOUS_ID;
+		int uid = user.id;
 		if (!translationsByUser.containsKey(uid)) {
 			translationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
 		}
@@ -132,9 +160,10 @@ public class UserTranslationsService {
 		return ust;
 	}
 
-	public void loadHistory(UserTranslation ust, SimpMessageHeaderAccessor headers) {
+	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
 		UserTranslationObject obj = new UserTranslationObject(ust.getId());
 		obj.setHistory(ust.getMessages());
+		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 	
@@ -143,7 +172,7 @@ public class UserTranslationsService {
 		opts.startTime = System.currentTimeMillis();
 		opts.expireTime = System.currentTimeMillis() + 60 * 60 * 1000;
 		opts.userId = user.id;
-		opts.nickname = Algorithms.isEmpty(user.nickname) ? obfuscateEmail(user) : user.nickname;
+		opts.nickname = getNickname(user);
 
 		Deque<WptPt> locations = locationByUser.get(user.id);
 		if (locations != null && !locations.isEmpty()) {
@@ -170,6 +199,15 @@ public class UserTranslationsService {
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
+	
+	public boolean whoami(CloudUser user, SimpMessageHeaderAccessor headers) {
+		Map<String, Object> u = new HashMap<>();
+		u.put("nickname", user.nickname);
+		u.put("email", user.email);
+		u.put("id", user.id);
+		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_USER_INFO, u);
+		return true;
+	}
 
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
 		if (headers != null) {
@@ -178,12 +216,9 @@ public class UserTranslationsService {
 		return error;
 	}
 	
-    public boolean sendMessage(UserTranslation ust, TranslationMessage message, 
-			Principal principal, String storedAlias) {
-		CloudUser user = getUserFromPrincipal(principal);
-		CloudUserDevice userDevice = getUserDeviceFromPrincipal(principal);
-		TranslationMessage msg = prepareMessageAuthor(userDevice, user, storedAlias);
-		msg.content = message.content;
+    public boolean sendMessage(UserTranslation ust, CloudUser user, Object message) {
+		TranslationMessage msg = prepareMessageAuthor(null, user);
+		msg.content = message;
 		msg.type = TranslationMessage.TYPE_MSG_TEXT;
 		rawSendMessage(ust, msg);
 		return true;
@@ -211,7 +246,7 @@ public class UserTranslationsService {
 			locationByUser.put(dev.userid, deque);
 		}
 		deque.push(wptPt);
-		TranslationMessage msg = prepareMessageAuthor(dev, pu, null);
+		TranslationMessage msg = prepareMessageAuthor(dev, pu);
 //		msg.content = wptPt.toString();
 		msg.content = gson.toJson(Map.of("point", wptPt));
 		msg.type = TranslationMessage.TYPE_MSG_TEXT; // TODO location
@@ -239,34 +274,27 @@ public class UserTranslationsService {
 		return tm;
 	}
     
-	private TranslationMessage prepareMessageAuthor(CloudUserDevice dev, CloudUser pu, String alias) {
+	private TranslationMessage prepareMessageAuthor(CloudUserDevice dev, CloudUser pu) {
 		TranslationMessage tm = new TranslationMessage();
-		tm.sendUserId = TranslationMessage.SENDER_ANONYMOUS_ID;
 		if (dev != null) {
 			tm.sendDeviceId = dev.id;
-			tm.sendUserId = dev.userid;
 		}
-		if (pu != null) {
-			tm.sendUserId = pu.id;
-			tm.sender = pu.nickname;
-		}
-		if (Algorithms.isEmpty(tm.sender)) {
-			tm.sender = alias;
-		}
-		if (Algorithms.isEmpty(tm.sender) && pu != null) {
-			tm.sender = obfuscateEmail(pu);
-		}
+		tm.sendUserId = pu.id;
+		tm.sender = getNickname(pu);
 		return tm;
 	}
 
-
-	private String obfuscateEmail(CloudUser pu) {
-		return pu.email.substring(0, pu.email.length() / 2) + "...";
-	}
-    
     private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
     	template.convertAndSend(TOPIC_TRANSLATION + ust.getId(), msg);
     	ust.getMessages().add(msg);
+	}
+    
+
+	private String getNickname(CloudUser user) {
+		if (!Algorithms.isEmpty(user.nickname)) {
+			return user.nickname;
+		}
+		return user.email.substring(0, user.email.length() / 2) + "...";
 	}
 
 	@EventListener
@@ -275,26 +303,22 @@ public class UserTranslationsService {
 		String destination = headers.getDestination();
 		if (destination != null && destination.startsWith(TOPIC_TRANSLATION)) {
 //			String translationId = destination.replace(TOPIC_TRANSLATION, "");
-			Principal principal = headers.getUser();
-			String alias = headers.getFirstNativeHeader(ALIAS);
-			if (alias == null && principal != null) {
-				alias = principal.getName();
-			}
-			if (alias == null || alias.isEmpty()) {
-				alias = new Random().nextInt(100000) + "";
-			}
-			// This map persists for the life of the connection
-			Map<String, Object> attributes = headers.getSessionAttributes();
-			if (attributes != null) {
-				attributes.put(ALIAS, alias);
-			}
+			CloudUser user = getUser(headers.getUser(), headers, true);
 			TranslationMessage msg = prepareMessageSystem();
-			msg.content = alias;
+			msg.content = getNickname(user);
 			msg.type = TranslationMessage.TYPE_MSG_JOIN;
 			template.convertAndSend(destination, msg);
 		}
 	}
-    
+	@EventListener
+	public void onDisconnectEvent(SessionDisconnectEvent event) {
+		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
+		Map<String, Object> attributes = headers.getSessionAttributes();
+		String oalias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
+		if (oalias != null && event.getSessionId().equals(anonymousUsers.get(oalias))) {
+			anonymousUsers.remove(oalias);
+		}
+	}
 
     
 }

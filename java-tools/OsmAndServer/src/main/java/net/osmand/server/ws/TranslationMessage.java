@@ -7,13 +7,14 @@ public class TranslationMessage {
 	public static final String TYPE_MSG_JOIN = "join";
 	
 	public static final String SENDER_SYSTEM = "System";
+	public static final String SENDER_ANONYMOUS = "Anonymous";
 	public static final int SENDER_SYSTEM_ID = 0;
 	public static final int SENDER_ANONYMOUS_ID = -1;
 
 	public String sender;
 	public long sendDeviceId;
 	public long sendUserId;
-	public String content;
+	public Object content;
 	public String type;
 	
 	public TranslationMessage() {}
