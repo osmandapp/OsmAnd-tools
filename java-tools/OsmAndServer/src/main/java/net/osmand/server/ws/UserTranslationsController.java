@@ -81,6 +81,7 @@ public class UserTranslationsController {
 	}
 
 	private CloudUser validateUser(Principal principal, SimpMessageHeaderAccessor headers) {
+		principal = headers.getUser();
 		CloudUser us = userTranslationsService.getUserFromPrincipal(principal);
 		//if (isDevToolsActive) {
 		boolean isDevToolsActive = false;
@@ -90,7 +91,7 @@ public class UserTranslationsController {
 			us.nickname = TranslationMessage.SENDER_SYSTEM;
 			us.email = TranslationMessage.SENDER_SYSTEM;
 		}
-		if(us == null) {
+		if (us == null) {
 			userTranslationsService.sendError("No authenticated user", headers);
 		}
 		return us;
