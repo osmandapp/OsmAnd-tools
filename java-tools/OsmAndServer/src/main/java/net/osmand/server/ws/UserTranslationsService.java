@@ -278,7 +278,7 @@ public class UserTranslationsService {
 		try {
 			wptPt.setHdop(Double.parseDouble(request.getParameter("hdop")));
 			wptPt.setEle(Double.parseDouble(request.getParameter("altitude")));
-			wptPt.setSpeed(Long.parseLong(request.getParameter("speed")));
+			wptPt.setSpeed(Double.parseDouble(request.getParameter("speed")));
 		} catch (RuntimeException e) {
 			// ignore exception as they could flood
 		}
