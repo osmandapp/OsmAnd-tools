@@ -12,9 +12,9 @@ public class UserTranslationObject {
 
 	public final String id;
 	
-	List<TranslationMessage> history = null;
+	public List<TranslationMessage> history = null;
 	
-	List<SharingLocation> shareLocations = null;
+	public List<SharingLocation> shareLocations = null;
 	
 	public UserTranslationObject(String id) {
 		this.id = id;
@@ -35,14 +35,15 @@ public class UserTranslationObject {
 			if (deque != null) {
 				sh.lastLocation = deque.getLast();
 			}
+			this.shareLocations.add(sh);
 		}
 	}
 	
-	static class SharingLocation {
-		String nickname;
-		long expireTime;
-		long startTime;
-		WptPt lastLocation;
+	public static class SharingLocation {
+		public String nickname;
+		public long expireTime;
+		public long startTime;
+		public WptPt lastLocation;
 	}
 	
 }

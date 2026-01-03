@@ -141,12 +141,12 @@ public class UserTranslationsService {
 		opts.expireTime = System.currentTimeMillis() + 60 * 60 * 1000;
 		opts.userId = user.id;
 		opts.nickname = Algorithms.isEmpty(user.nickname) ? obfuscateEmail(user) : user.nickname;
-		
+
 		Deque<WptPt> locations = locationByUser.get(user.id);
-		if(locations != null && !locations.isEmpty()) {
+		if (locations != null && !locations.isEmpty()) {
 			ust.sendLocation(user.id, locations.getLast());
 		}
-		
+
 		UserTranslationObject obj = new UserTranslationObject(ust.getId());
 		ust.getSharingOptions().add(opts);
 		obj.setShareLocations(ust);
@@ -156,9 +156,10 @@ public class UserTranslationsService {
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		Deque<TranslationSharingOptions> opts = ust.getSharingOptions();
 		Iterator<TranslationSharingOptions> it = opts.iterator();
+		int userId = user.id;
 		while (it.hasNext()) {
 			TranslationSharingOptions opt = it.next();
-			if (opt.userId == user.id) {
+			if (opt.userId == userId) {
 				it.remove();
 			}
 		}
@@ -219,6 +220,8 @@ public class UserTranslationsService {
 				if (o.userId == dev.userid && timeMillis < o.expireTime) {
 					ust.sendLocation(dev.userid, wptPt);
 					rawSendMessage(ust, msg);
+					ust.sendLocation(dev.userid, wptPt);
+					break;
 				}
 			}
 		}

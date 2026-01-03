@@ -18,6 +18,9 @@ public class UserTranslationsController {
 	@Autowired
 	private UserTranslationsService userTranslationsService;
 
+//	@Value("${spring.devtools.restart.enabled:false}")
+	// FIXME
+//	private boolean isDevToolsActive = true;
 	
 	@MessageMapping("/translation/{translationId}/load")
 	public void loadTranslation(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
@@ -31,9 +34,9 @@ public class UserTranslationsController {
 	public String startSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
 			Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
-		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
+		CloudUser user = validateUser(principal, headers);
 		if (user == null) {
-			return userTranslationsService.sendError("No authenticated user", headers);
+			return null;
 		}
 		if (ust != null) {
 			userTranslationsService.startSharing(ust, user, headers);
@@ -45,9 +48,9 @@ public class UserTranslationsController {
 	public String stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
 			Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
-		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
+		CloudUser user = validateUser(principal, headers);
 		if (user == null) {
-			return userTranslationsService.sendError("No authenticated user", headers);
+			return null;
 		}
 		if (ust != null) {
 			userTranslationsService.stopSharing(ust, user, headers);
@@ -70,11 +73,27 @@ public class UserTranslationsController {
 	// One time call (subscription) returns map with TRANSLATION_ID
 	@MessageMapping("/translation/create")
 	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
-		CloudUser user = userTranslationsService.getUserFromPrincipal(principal);
+		CloudUser user = validateUser(principal, headers);
 		if (user == null) {
-//			return userTranslationsService.sendError("No authenticated user", headers);
+			return null;
 		}
 		return userTranslationsService.createTranslation(user, null, headers);
+	}
+
+	private CloudUser validateUser(Principal principal, SimpMessageHeaderAccessor headers) {
+		CloudUser us = userTranslationsService.getUserFromPrincipal(principal);
+		//if (isDevToolsActive) {
+		boolean isDevToolsActive = false;
+		if (us == null && isDevToolsActive) {
+			us = new CloudUser();
+			us.id = TranslationMessage.SENDER_SYSTEM_ID;
+			us.nickname = TranslationMessage.SENDER_SYSTEM;
+			us.email = TranslationMessage.SENDER_SYSTEM;
+		}
+		if(us == null) {
+			userTranslationsService.sendError("No authenticated user", headers);
+		}
+		return us;
 	}
 
 }
