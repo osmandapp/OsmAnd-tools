@@ -73,6 +73,7 @@ public class UserTranslationsController {
 	// One time call (subscription) returns map with TRANSLATION_ID
 	@MessageMapping("/translation/create")
 	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
+		System.out.println(principal);
 		CloudUser user = validateUser(principal, headers);
 		if (user == null) {
 			return null;
