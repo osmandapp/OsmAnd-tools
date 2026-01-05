@@ -300,7 +300,12 @@ public class SearchController {
         String wikiTitle = wikiTagData.getWikiTitle();
         List<WikiImage> wikiImages = wikiTagData.getWikiImages();
 
-        Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
+        return getPhotos(wikidataId, wikiCategory, wikiTitle, wikiImages);
+    }
+
+	private ResponseEntity<String> getPhotos(String wikidataId, String wikiCategory, String wikiTitle,
+			List<WikiImage> wikiImages) {
+		Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
 
         images.forEach(img -> {
             WikiImage wikiImage = new WikiImage("", (String) img.get("image"), "", "", "");
@@ -315,5 +320,12 @@ public class SearchController {
         });
         FeatureCollection featureCollection = wikiService.convertToFeatureCollection(wikiImages);
         return ResponseEntity.ok(gson.toJson(featureCollection));
+	}
+    
+    @GetMapping(path = {"/get-photos"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> gePhotos(@RequestParam(required = false) String wikidataId, 
+    		@RequestParam(required = false) String wikiCategory, @RequestParam(required = false) String wikiTitle) {
+        return getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>());
     }
 }
