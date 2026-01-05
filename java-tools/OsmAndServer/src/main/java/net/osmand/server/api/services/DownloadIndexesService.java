@@ -320,9 +320,6 @@ public class DownloadIndexesService  {
                                 di.setType(type);
                                 String name = source.name;
                                 long actualContentSize = source.size;
-                                if (name.toLowerCase().endsWith(".gz")) {
-                                    actualContentSize = getGzipUncompressedSize(new File(source.getPath()));
-                                }
                                 int extInd = name.indexOf('.');
                                 String ext = name.substring(extInd + 1);
                                 formatName(name, extInd);
@@ -389,10 +386,14 @@ public class DownloadIndexesService  {
 						e.printStackTrace();
 					}
 				} else {
+					long actualContentSize = lf.length();
+					if (name.toLowerCase().endsWith(".gz")) {
+                        actualContentSize = getGzipUncompressedSize(lf);
+                    }
 					di.setTimestamp(lf.lastModified());
 					di.setDate(lf.lastModified());
-					di.setContentSize(lf.length());
-					di.setTargetsize(lf.length());
+					di.setContentSize(actualContentSize);
+					di.setTargetsize(actualContentSize);
 					di.setDescription(type.getDefaultTitle(name, ext));
 					list.add(di);
 				}
