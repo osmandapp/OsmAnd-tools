@@ -9,6 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DateFormat;
@@ -280,6 +281,21 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(list, rootFolder, type.getPath(), type, null);
 	}
 	
+	public long getGzipUncompressedSize(File file) {
+	    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+	        raf.seek(raf.length() - 4);
+	        byte[] b = new byte[4];
+	        raf.readFully(b);
+	        // Gzip stores size in Little Endian
+	        return ((long) (b[3] & 0xFF) << 24) |
+	               ((long) (b[2] & 0xFF) << 16) |
+	               ((long) (b[1] & 0xFF) << 8) |
+	               ((long) (b[0] & 0xFF));
+	    } catch (IOException e) {
+	        return file.length(); // Fallback to compressed size on error
+	    }
+	}
+	
 	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type, String filterFiles) {
 		File subFolder = new File(rootFolder, subPath);
 		File[] files = subFolder.listFiles();
@@ -299,9 +315,14 @@ public class DownloadIndexesService  {
                         for (ExternalSource source : externalSources) {
                             // do not read external zip files, otherwise it will be too long by remote connection
                             if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
+                            	
                                 DownloadIndex di = new DownloadIndex();
                                 di.setType(type);
                                 String name = source.name;
+                                long actualContentSize = source.size;
+                                if (name.toLowerCase().endsWith(".gz")) {
+                                    actualContentSize = getGzipUncompressedSize(new File(source.getPath()));
+                                }
                                 int extInd = name.indexOf('.');
                                 String ext = name.substring(extInd + 1);
                                 formatName(name, extInd);
@@ -310,8 +331,8 @@ public class DownloadIndexesService  {
                                 di.setContainerSize(source.size);
                                 di.setTimestamp(source.getTimestamp());
                                 di.setDate(source.getTimestamp());
-                                di.setContentSize(source.size);
-                                di.setTargetsize(source.size);
+                                di.setContentSize(actualContentSize);
+                                di.setTargetsize(actualContentSize);
                                 di.setDescription(type.getDefaultTitle(name, ext));
                                 list.add(di);
                                 areFilesAdded = true;
