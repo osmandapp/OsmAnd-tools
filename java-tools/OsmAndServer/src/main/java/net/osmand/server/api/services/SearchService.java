@@ -581,14 +581,8 @@ public class SearchService {
         int categoryStartSize = foundFeatures.size();
 
         for (BinaryMapIndexReader reader : readers) {
-            if (poiSearchLimit != null) {
-                if (poiSearchLimit.isLimitReached()) {
-                    break;
-                }
-            } else {
-                if (foundFeatures.size() >= TOTAL_LIMIT_POI) {
-                    break;
-                }
+            if (poiSearchLimit != null ? poiSearchLimit.isLimitReached() : foundFeatures.size() >= TOTAL_LIMIT_POI) {
+                break;
             }
             BinaryMapIndexReader.SearchRequest<Amenity> request;
             if (filter == null || filter.isEmpty()) {
@@ -619,8 +613,11 @@ public class SearchService {
         }
     }
 
-    private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader, PoiSearchCategory categoryObj, MapPoiTypes mapPoiTypes,
-                                                                                   int left31, int right31, int top31, int bottom31) throws IOException {
+    private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader,
+                                                                                   PoiSearchCategory categoryObj,
+                                                                                   MapPoiTypes mapPoiTypes,
+                                                                                   int left31, int right31,
+                                                                                   int top31, int bottom31) throws IOException {
         List<BinaryMapPoiReaderAdapter.PoiSubType> brands = reader.getTopIndexSubTypes();
         String lang = categoryObj.lang;
         BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = brands.stream()
