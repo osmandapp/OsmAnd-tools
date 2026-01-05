@@ -159,6 +159,7 @@ public class IndexController {
 		model.addAttribute("travel", doc.getTravelGuides());
 		model.addAttribute("hillshade", doc.getHillshade());
 		model.addAttribute("depth", doc.getDepths());
+		model.addAttribute("starmap", doc.getStarmap());
 		model.addAttribute("slope", doc.getSlope());
 		model.addAttribute("heightmap", doc.getHeightmap());
 		model.addAttribute("weather", doc.getWeather());

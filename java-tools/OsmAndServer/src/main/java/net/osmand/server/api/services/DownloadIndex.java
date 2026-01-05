@@ -210,6 +210,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.DEPTH;
 			} else if (v.equals("depthmap")) {
 				dt = DownloadIndexesService.DownloadType.DEPTHMAP;
+			} else if (v.equals("starmap")) {
+				dt = DownloadIndexesService.DownloadType.STARMAP;
 			} else if (v.equals("travel")) {
 				dt = DownloadIndexesService.DownloadType.TRAVEL;
 			} else if (v.equals("wikimap")) {

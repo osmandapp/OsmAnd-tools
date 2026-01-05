@@ -118,6 +118,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getFonts(), rootFolder, DownloadType.FONTS);
 		loadIndexesFromDir(doc.getInapps(), rootFolder, DownloadType.DEPTH);
 		loadIndexesFromDir(doc.getDepths(), rootFolder, DownloadType.DEPTHMAP);
+		loadIndexesFromDir(doc.getStarmap(), rootFolder, DownloadType.STARMAP);
 		loadIndexesFromDir(doc.getWikimaps(), rootFolder, DownloadType.WIKIMAP);
 		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, DownloadType.TRAVEL);
 		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, DownloadType.ROAD_MAP);
@@ -422,6 +423,7 @@ public class DownloadIndexesService  {
 	    VOICE("indexes") ,
 	    DEPTH("indexes/inapp/depth", "depth"), // Deprecated
 	    DEPTHMAP("depth", "depth") ,
+	    STARMAP("indexes") ,
 	    FONTS("indexes/fonts", "fonts") ,
 	    WIKIMAP("wiki", "wiki") ,
 	    TRAVEL("travel", "wikivoyage", "travel") ,
@@ -468,6 +470,8 @@ public class DownloadIndexesService  {
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
                 case OSMLIVE:
                 	return fileName.endsWith(".obf.gz");
+                case STARMAP:
+                	return fileName.endsWith(".stardb.gz");
                 case MAP:
                 case ROAD_MAP:
                 case WIKIMAP:
@@ -495,6 +499,8 @@ public class DownloadIndexesService  {
 				return String.format("Roads, POI, Address data for %s", regionName);
 			case WIKIMAP:
 				return String.format("Wikipedia POI data for %s", regionName);
+			case STARMAP:
+				return String.format("Starmap for %s", regionName);
 			case DEPTH:
 			case DEPTHMAP:
 				return String.format("Depth maps for %s", regionName);
@@ -570,7 +576,7 @@ public class DownloadIndexesService  {
 	}
 		
 	public enum PredefinedServerSpecialty {
-		MAIN(DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
+		MAIN(DownloadType.VOICE, DownloadType.STARMAP, DownloadType.FONTS, DownloadType.MAP),
 		SRTM(DownloadType.SRTM_MAP),
 		HILLSHADE(DownloadType.HILLSHADE),
 		SLOPE(DownloadType.SLOPE),
