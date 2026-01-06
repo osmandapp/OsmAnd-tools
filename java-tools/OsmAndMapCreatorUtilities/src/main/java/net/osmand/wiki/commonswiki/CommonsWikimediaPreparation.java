@@ -30,7 +30,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 	
-	private static final int DEFAULT_THREADS = 8;
+	private static final int DEFAULT_THREADS = 2;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
