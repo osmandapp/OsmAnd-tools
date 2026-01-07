@@ -1292,6 +1292,11 @@ public class SearchService {
         } finally {
             osmAndMapsService.unlockReaders(readers);
         }
+        if (features.isEmpty()) {
+            LOGGER.error(String.format(
+                    "No transport stops found for bbox northWest=%s southEast=%s (31bit l=%d r=%d t=%d b=%d)",
+                    northWest, southEast, left31, right31, top31, bottom31));
+        }
         return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
     }
     
