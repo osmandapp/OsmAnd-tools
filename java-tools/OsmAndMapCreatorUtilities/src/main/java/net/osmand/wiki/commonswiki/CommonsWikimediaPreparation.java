@@ -270,7 +270,7 @@ public class CommonsWikimediaPreparation {
 			InputSource is = getInputSource(streamFile);
 			final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress);
 			sx.parse(is, handler);
-		} catch (ParserConfigurationException | SQLException | IOException | SAXException e) {
+		} catch (ParserConfigurationException | IOException | SAXException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -280,6 +280,7 @@ public class CommonsWikimediaPreparation {
 		private boolean pageTag = false;
 		private boolean pageIdParsed = false;
 		private boolean pageTextParsed = false;
+		private boolean revisionTag = false;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
@@ -288,7 +289,7 @@ public class CommonsWikimediaPreparation {
 
 		private final StringBuilder textContent = new StringBuilder();
 
-		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) throws SQLException {
+		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) {
 			this.saxParser = saxParser;
 			this.progress = progress;
 		}
@@ -309,14 +310,18 @@ public class CommonsWikimediaPreparation {
 						ctext = ns;
 					}
 					case "id" -> {
-						if (!pageIdParsed) {
+						if (!revisionTag && !pageIdParsed) {
 							id.setLength(0);
 							ctext = id;
 							pageIdParsed = true;
 						}
 					}
+					case "revision" -> {
+						revisionTag = true;
+						pageTextParsed = false;
+					}
 					case "text" -> {
-						if (!pageTextParsed) {
+						if (revisionTag && !pageTextParsed) {
 							textContent.setLength(0);
 							ctext = textContent;
 						}
@@ -337,18 +342,24 @@ public class CommonsWikimediaPreparation {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
 			if (pageTag) {
 				switch (name) {
+					case "revision" -> {
+						revisionTag = false;
+					}
 					case "page" -> {
 						pageTag = false;
 						pageIdParsed = false;
 						pageTextParsed = false;
+						revisionTag = false;
+						ctext = null;
 						progress.update();
 					}
 					case "title", "ns", "id" -> ctext = null;
 					case "text" -> {
-						if (!pageTextParsed) {
-							parseMeta();
+						if (revisionTag && !pageTextParsed) {
 							pageTextParsed = true;
+							parseMeta();
 						}
+						ctext = null;
 					}
 				}
 			}
