@@ -79,7 +79,7 @@ public class SearchController {
                                             @RequestParam double lat,
                                             @RequestParam double lon,
                                             @RequestParam(required = false) Boolean baseSearch) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
 
@@ -288,6 +288,14 @@ public class SearchController {
     public ResponseEntity<String> getWikivoyageContent(@RequestParam String title, @RequestParam String lang) {
         String content = wikiService.getWikivoyageContent(title, lang);
         return ResponseEntity.ok(gson.toJson(content));
+    }
+
+    @GetMapping(path = {"/search-transport-stops"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> searchTransportStops(@RequestParam String northWest,
+                                                       @RequestParam String southEast) throws IOException {
+        SearchService.TransportStopsSearchResult result = searchService.searchTransportStops(northWest, southEast);
+        return ResponseEntity.ok(gson.toJson(result));
     }
 
     @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
