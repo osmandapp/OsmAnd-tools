@@ -1315,7 +1315,7 @@ public class SearchService {
         if (routes != null && !routes.isEmpty()) {
             List<TransportStopFeature> stopFeatures = new ArrayList<>();
             routes.forEach(route -> {
-                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef()));
+                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor()));
             });
             feature.prop("routes", stopFeatures);
         }
@@ -1325,6 +1325,6 @@ public class SearchService {
 
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {}
 
-    public record TransportStopFeature(long id, String name, String type, String ref) {}
+    public record TransportStopFeature(long id, String name, String type, String ref, String color) {}
 
 }
