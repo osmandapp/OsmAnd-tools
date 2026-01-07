@@ -1274,9 +1274,8 @@ public class SearchService {
             }
 
             TransportStopsRouteReader transportReaders = new TransportStopsRouteReader(readers);
-            List<TransportStop> stops = new ArrayList<>();
             SearchRequest<TransportStop> request = BinaryMapIndexReader.buildSearchTransportRequest(
-                    left31, right31, top31, bottom31, -1, stops);
+                    left31, right31, top31, bottom31, -1, new ArrayList<>());
 
             for (TransportStop s : transportReaders.readMergedTransportStops(request)) {
                 if (features.size() >= TOTAL_LIMIT_TRANSPORT_STOPS) {
@@ -1284,7 +1283,6 @@ public class SearchService {
                     break;
                 }
                 if (!s.isDeleted() && !s.isMissingStop()) {
-                    stops.add(s);
                     Feature feature = convertTransportStopToFeature(s);
                     if (feature != null) {
                         features.add(feature);
