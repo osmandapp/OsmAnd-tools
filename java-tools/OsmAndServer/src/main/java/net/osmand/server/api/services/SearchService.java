@@ -10,6 +10,7 @@ import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
+import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
@@ -57,6 +58,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
+    private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String DEFAULT_SEARCH_LANG = "en";
@@ -1235,5 +1237,94 @@ public class SearchService {
         Long id = object.getId();
         return id != null && id > 0;
     }
+    
+    public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+        if (bbox.size() != 2) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        QuadRect searchBbox = getSearchBbox(bbox);
+        if (searchBbox == null) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        int left31 = (int) searchBbox.left;
+        int right31 = (int) searchBbox.right;
+        int top31 = (int) searchBbox.top;
+        int bottom31 = (int) searchBbox.bottom;
+        
+        List<BinaryMapIndexReader> readers = new ArrayList<>();
+        List<Feature> features = new ArrayList<>();
+        boolean useLimit = false;
+        
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, false);
+            if (mapList.isEmpty()) {
+                return new TransportStopsSearchResult(false, new FeatureCollection());
+            }
+            
+            readers = osmAndMapsService.getReaders(mapList, null);
+            if (readers.isEmpty()) {
+                return new TransportStopsSearchResult(false, new FeatureCollection());
+            }
+
+            TransportStopsRouteReader transportReaders = new TransportStopsRouteReader(readers);
+            SearchRequest<TransportStop> request = BinaryMapIndexReader.buildSearchTransportRequest(
+                    left31, right31, top31, bottom31, -1, new ArrayList<>());
+
+            for (TransportStop s : transportReaders.readMergedTransportStops(request)) {
+                if (features.size() >= TOTAL_LIMIT_TRANSPORT_STOPS) {
+                    useLimit = true;
+                    break;
+                }
+                if (!s.isDeleted() && !s.isMissingStop()) {
+                    Feature feature = convertTransportStopToFeature(s);
+                    if (feature != null) {
+                        features.add(feature);
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readers);
+        }
+        if (features.isEmpty()) {
+            LOGGER.error(String.format(
+                    "No transport stops found for bbox northWest=%s southEast=%s (31bit l=%d r=%d t=%d b=%d)",
+                    northWest, southEast, left31, right31, top31, bottom31));
+        }
+        return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
+    }
+    
+    private Feature convertTransportStopToFeature(TransportStop stop) {
+        if (stop == null || stop.getLocation() == null) {
+            return null;
+        }
+        
+        LatLon location = stop.getLocation();
+        Feature feature = new Feature(Geometry.point(location));
+        
+        feature.prop("id", stop.getId());
+        feature.prop("name", stop.getName());
+        
+        List<TransportRoute> routes = stop.getRoutes();
+        if (routes != null && !routes.isEmpty()) {
+            List<TransportStopFeature> stopFeatures = new ArrayList<>();
+            routes.forEach(route -> {
+                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef()));
+            });
+            feature.prop("routes", stopFeatures);
+        }
+        
+        return feature;
+    }
+
+    public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {}
+
+    public record TransportStopFeature(long id, String name, String type, String ref) {}
 
 }
