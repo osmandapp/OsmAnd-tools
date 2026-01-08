@@ -36,8 +36,8 @@ public class StyleDataExtractor {
     private static final String STYLE_RULES_RESULT_JSON = "styleRulesResult.json";
     
     public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
-        //parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
-        parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
+        parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
+       // parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
     }
     
     /**
@@ -126,17 +126,59 @@ public class StyleDataExtractor {
         RenderingRule rule = storage.getRenderingAttributeRule(attribute);
         if (rule != null) {
             List<RenderingRule> allRules = getRules(rule, new ArrayList<>());
-            return allRules.stream()
+            // Define preferred order for keys: attrStringValue first, then attrColorValue, then tag, value, etc.
+            List<String> preferredOrder = Arrays.asList("attrStringValue", "attrColorValue", "tag", "value", "additional");
+            
+            List<Map<String, String>> rulesList = allRules.stream()
                     .map(renderingRule -> {
                         RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
                         searchRequest.loadOutputProperties(renderingRule, true);
-                        return Arrays.stream(renderingRule.getProperties())
+                        Map<String, String> ruleMap = Arrays.stream(renderingRule.getProperties())
                                 .map(prop -> new AbstractMap.SimpleEntry<>(prop.getAttrName(), getProperty(prop, prop.getAttrName(), searchRequest, renderingRule)))
                                 .filter(entry -> entry.getValue() != null)
-                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, LinkedHashMap::new));
+                        
+                        // Reorder keys: put preferred keys first, then others in alphabetical order
+                        LinkedHashMap<String, String> orderedMap = new LinkedHashMap<>();
+                        // Add preferred keys in order
+                        for (String key : preferredOrder) {
+                            if (ruleMap.containsKey(key)) {
+                                orderedMap.put(key, ruleMap.get(key));
+                            }
+                        }
+                        // Add remaining keys in alphabetical order
+                        ruleMap.entrySet().stream()
+                                .filter(e -> !preferredOrder.contains(e.getKey()))
+                                .sorted(Map.Entry.comparingByKey())
+                                .forEach(e -> orderedMap.put(e.getKey(), e.getValue()));
+                        
+                        return orderedMap;
                     })
                     .filter(map -> !map.isEmpty())
                     .collect(Collectors.toList());
+            
+            // Remove duplicates: keep first occurrence, remove rest
+            // Compare all fields except attrColorValue to identify duplicates
+            // (same rule with different colors should be considered duplicate)
+            Set<String> seen = new HashSet<>();
+            List<Map<String, String>> uniqueRules = new ArrayList<>();
+            
+            for (Map<String, String> ruleMap : rulesList) {
+                // Create comparison key from all fields except attrColorValue
+                Map<String, String> comparisonMap = new TreeMap<>(ruleMap);
+                comparisonMap.remove("attrColorValue"); // Exclude color from comparison
+                
+                String normalizedKey = comparisonMap.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining("|"));
+                
+                if (!seen.contains(normalizedKey)) {
+                    seen.add(normalizedKey);
+                    uniqueRules.add(new LinkedHashMap<>(ruleMap)); // Keep original order
+                }
+            }
+            
+            return uniqueRules;
         }
         return Collections.emptyList();
     }
