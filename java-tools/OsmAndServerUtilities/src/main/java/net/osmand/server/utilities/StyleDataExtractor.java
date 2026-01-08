@@ -84,14 +84,15 @@ public class StyleDataExtractor {
         }
         
         Map<String, Object> result = new HashMap<>();
+        // Combine all attributes for parsing colors in all styles
+        List<String> allAttributes = new ArrayList<>(regularAttributes);
+        allAttributes.addAll(publicTransportAttributes);
+        
         for (String style : styles) {
             try {
                 RenderingRulesStorage storage = parseStorage(style);
-                List<String> attributesToParse = style.endsWith("publictransportroutes.addon.render.xml") 
-                    ? publicTransportAttributes 
-                    : regularAttributes;
-                
-                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, attributesToParse);
+                // Parse all attributes (both regular and publictransport) for all styles
+                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, allAttributes);
                 
                 if (!attributesRes.isEmpty()) {
                     result.put(style, attributesRes);
