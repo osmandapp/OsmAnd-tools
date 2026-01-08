@@ -14,6 +14,7 @@ import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -1326,5 +1327,12 @@ public class SearchService {
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {}
 
     public record TransportStopFeature(long id, String name, String type, String ref, String color) {}
+
+    public LatLon parseLocation(String locationString) {
+        if (locationString == null || locationString.trim().isEmpty()) {
+            return null;
+        }
+        return LocationParser.parseLocation(locationString);
+    }
 
 }

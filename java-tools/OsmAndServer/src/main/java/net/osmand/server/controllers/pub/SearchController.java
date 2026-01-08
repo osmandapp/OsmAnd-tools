@@ -336,4 +336,17 @@ public class SearchController {
     		@RequestParam(required = false) String wikiCategory, @RequestParam(required = false) String wikiTitle) {
         return getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>());
     }
+
+    @GetMapping(path = {"/parse-location"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseLocation(@RequestParam String location) {
+        LatLon coordinates = searchService.parseLocation(location);
+        if (coordinates == null) {
+            return ResponseEntity.ok(gson.toJson(null));
+        }
+        Map<String, Double> result = new HashMap<>();
+        result.put("lat", coordinates.getLatitude());
+        result.put("lon", coordinates.getLongitude());
+        return ResponseEntity.ok(gson.toJson(result));
+    }
 }
