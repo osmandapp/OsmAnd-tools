@@ -2,6 +2,7 @@ package net.osmand.server.utilities;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.render.RenderingRule;
 import net.osmand.render.RenderingRuleProperty;
@@ -54,8 +55,31 @@ public class StyleDataExtractor {
             return;
         }
         List<String> styles = parseFile(stylesPath);
-        List<String> attributes = parseFile(attributesPath);
-        if (styles.isEmpty() || attributes.isEmpty()) {
+
+        Gson gson = new Gson();
+        List<String> regularAttributes = new ArrayList<>();
+        List<String> publicTransportAttributes = new ArrayList<>();
+        
+        try (FileReader reader = new FileReader(attributesPath)) {
+            JsonElement jsonElement = gson.fromJson(reader, JsonElement.class);
+            if (jsonElement != null) {
+                if (jsonElement.isJsonObject()) {
+                    com.google.gson.JsonObject jsonObj = jsonElement.getAsJsonObject();
+                    if (jsonObj.has("regular")) {
+                        Type listType = new TypeToken<List<String>>() {}.getType();
+                        regularAttributes = gson.fromJson(jsonObj.get("regular"), listType);
+                    }
+                    if (jsonObj.has("publictransport")) {
+                        Type listType = new TypeToken<List<String>>() {}.getType();
+                        publicTransportAttributes = gson.fromJson(jsonObj.get("publictransport"), listType);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new IOException("Failed to parse attributes JSON file at " + attributesPath, e);
+        }
+        
+        if (styles.isEmpty() || (regularAttributes.isEmpty() && publicTransportAttributes.isEmpty())) {
             return;
         }
         
@@ -63,7 +87,12 @@ public class StyleDataExtractor {
         for (String style : styles) {
             try {
                 RenderingRulesStorage storage = parseStorage(style);
-                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, attributes);
+                List<String> attributesToParse = style.endsWith("publictransportroutes.addon.render.xml") 
+                    ? publicTransportAttributes 
+                    : regularAttributes;
+                
+                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, attributesToParse);
+                
                 if (!attributesRes.isEmpty()) {
                     result.put(style, attributesRes);
                 }
@@ -72,8 +101,8 @@ public class StyleDataExtractor {
             }
         }
         
-        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-        String jsonResult = gson.toJson(result);
+        Gson gsonPretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        String jsonResult = gsonPretty.toJson(result);
         String outputFilePath = Paths.get(new File(stylesPath).getParent(), STYLE_RULES_RESULT_JSON).toString();
         Files.write(Paths.get(outputFilePath), jsonResult.getBytes());
     }
