@@ -609,7 +609,7 @@ public class SearchService {
             int remaining = poiSearchLimit != null 
                     ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
                     : TOTAL_LIMIT_POI - foundFeatures.size();
-            saveAmenityResults(amenities, foundFeatures, remaining);
+            saveAmenityResults(amenities, foundFeatures, remaining, locale);
             if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
                 break;
             }
@@ -1112,7 +1112,7 @@ public class SearchService {
         }
     }
 
-    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit) {
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
         for (Amenity amenity : amenities) {
             if (remainingLimit <= 0) {
                 break;
@@ -1123,6 +1123,7 @@ public class SearchService {
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
+                result.addressName = amenity.getCityFromTagGroups(locale);
                 foundFeatures.put(osmId, getPoiFeature(result));
                 remainingLimit--;
             }
