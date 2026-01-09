@@ -240,7 +240,7 @@ public class GpxController {
 					"process-track-data loadGpxFile (%s) error (%s)", filename, gpxFile.getError().getMessage()));
 			return ResponseEntity.badRequest().body("Error reading gpx: " + gpxFile.getError().getMessage());
 		} else {
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, true, null);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, null);
 			return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 		}
 	}

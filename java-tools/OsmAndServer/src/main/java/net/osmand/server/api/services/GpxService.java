@@ -55,13 +55,9 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
 
-    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, boolean createAnalysis,
-                                                            GpxTrackAnalysis existingAnalysis) throws IOException {
+    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, GpxTrackAnalysis existingAnalysis) throws IOException {
+        GpxTrackAnalysis analysis = existingAnalysis != null ? existingAnalysis : getAnalysis(gpxFile, false);
 
-        GpxFile gpxFileForAnalyse = null;
-        if (createAnalysis) {
-            gpxFileForAnalyse = gpxFile.clone();
-        }
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = (new WebGpxParser.WebMetaData(gpxFile.getMetadata()));
@@ -78,16 +74,14 @@ public class GpxService {
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        addAnalysis(gpxData, gpxFileForAnalyse, existingAnalysis);
         gpxData.pointsGroups = (webGpxParser.getPointsGroups(gpxFile));
+
+        addAnalysisToTrackData(gpxData, analysis);
 
         return gpxData;
     }
 
-    private void addAnalysis(WebGpxParser.TrackData gpxData, GpxFile gpxFileForAnalysis, GpxTrackAnalysis gpxAnalysis) throws IOException {
-        if (gpxAnalysis == null && gpxFileForAnalysis != null) {
-            gpxAnalysis = getAnalysis(gpxFileForAnalysis, false);
-        }
+    private void addAnalysisToTrackData(WebGpxParser.TrackData gpxData, GpxTrackAnalysis gpxAnalysis) {
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
             if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
@@ -133,11 +127,11 @@ public class GpxService {
     private GpxTrackAnalysis getAnalysis(GpxFile gpxFile, boolean isSrtm) throws IOException {
        GpxTrackAnalysis analysis = null;
         if (!isSrtm) {
-            analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+            analysis = gpxFile.getAnalysis(0);
         } else {
             GpxFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
             if (srtmGpx != null && srtmGpx.getError() == null) {
-                analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+                analysis = srtmGpx.getAnalysis(0);
             }
         }
         if (analysis != null) {
