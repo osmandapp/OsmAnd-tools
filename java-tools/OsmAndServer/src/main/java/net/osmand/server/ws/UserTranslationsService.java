@@ -51,15 +51,17 @@ public class UserTranslationsService {
     static final String USER_UPD_TYPE_USER_INFO = "USER_INFO";
     
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
+    
+    private static final long DEFAULT_SHARING_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
     // implement 1-3 day storage for location
-    private Map<Integer, Deque<WptPt>> locationByUser = new ConcurrentHashMap<>();
+    private final Map<Integer, Deque<WptPt>> userLocationHistory = new ConcurrentHashMap<>();
     // store last 1-3 days locations are present (?)
-    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
+    private final Map<String, UserTranslation> activeTranslations = new ConcurrentHashMap<>();
     
     // no need to be persistent
-    private Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
-    private Map<String, String> anonymousUsers = new ConcurrentHashMap<>(); 
+    private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
+    private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
     
     Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
     Random random = new SecureRandom();
@@ -88,7 +90,7 @@ public class UserTranslationsService {
         template.convertAndSendToUser(sessionId, QUEUE_USER_UPDATES, payload, header.getMessageHeaders());
     }
 
-    
+    // User management
     public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers) {
 		boolean production = environment.acceptsProfiles(Profiles.of("production"));		
 		return getUser(principal, headers, !production);
@@ -134,6 +136,8 @@ public class UserTranslationsService {
 		return null;
 	}
 
+	// Session management
+
 	// deleteTranslation
 	public UserTranslation createTranslation(CloudUser user, String translationId, SimpMessageHeaderAccessor headers) {
 		long time = System.currentTimeMillis();
@@ -142,9 +146,11 @@ public class UserTranslationsService {
 		}
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
-		translations.put(ust.getId(), ust);
-		shareLocationByUser(ust, user.id);
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		activeTranslations.put(ust.getSessionId(), ust);
+		if (user != null) {
+			shareLocationByUser(ust, user.id);
+		}
+		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		}
@@ -152,15 +158,12 @@ public class UserTranslationsService {
     }
 
 	private void shareLocationByUser(UserTranslation ust, int uid) {
-		if (!shareLocTranslationsByUser.containsKey(uid)) {
-			shareLocTranslationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
-		}
-		shareLocTranslationsByUser.get(uid).add(ust);
+		shareLocTranslationsByUser.computeIfAbsent(uid, k -> new ConcurrentLinkedDeque<>()).add(ust);
 	}
 	
 
 	public UserTranslation getTranslation(String translationId, SimpMessageHeaderAccessor headers) {
-		UserTranslation ust = translations.get(translationId);
+		UserTranslation ust = activeTranslations.get(translationId);
 		if (ust == null) {
 			sendError(TRANSLATION_MISSING, headers);
 		}
@@ -168,32 +171,34 @@ public class UserTranslationsService {
 	}
 
 	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
 		obj.setHistory(ust.getMessages());
-		obj.setShareLocations(ust);
+		obj.setSharingUsers(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
+
+	// Sharing management
 	
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		TranslationSharingOptions opts = new TranslationSharingOptions();
 		opts.startTime = System.currentTimeMillis();
-		opts.expireTime = System.currentTimeMillis() + 60 * 60 * 1000;
+		opts.expireTime = System.currentTimeMillis() + DEFAULT_SHARING_DURATION_MS;
 		opts.userId = user.id;
 		opts.nickname = getNickname(user);
 
-		Deque<WptPt> locations = locationByUser.get(user.id);
-		if (locations != null && !locations.isEmpty()) {
-			ust.sendLocation(user.id, locations.getLast());
+		Deque<WptPt> locationHistory = userLocationHistory.get(user.id);
+		if (locationHistory != null && !locationHistory.isEmpty()) {
+			ust.sendLocation(user.id, locationHistory.getLast());
 		}
 		
 		if(!environment.acceptsProfiles(Profiles.of("production"))) {
 			startSimulation(user, ust);
 		}
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
-		ust.getSharingOptions().add(opts);
+		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
+		ust.getActiveSharers().add(opts);
 		shareLocationByUser(ust, user.id);
 		
-		obj.setShareLocations(ust);
+		obj.setSharingUsers(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 	
@@ -204,8 +209,8 @@ public class UserTranslationsService {
 			boolean gone = false;
 			while (!gone) {
 				gone = true;
-				for (TranslationSharingOptions u : ust.getSharingOptions()) {
-					if (u.userId == user.id) {
+				for (TranslationSharingOptions sharing : ust.getActiveSharers()) {
+					if (sharing.userId == user.id) {
 						gone = false;
 						break;
 					}
@@ -232,36 +237,22 @@ public class UserTranslationsService {
 	}
 
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
-		Deque<TranslationSharingOptions> opts = ust.getSharingOptions();
-		Iterator<TranslationSharingOptions> it = opts.iterator();
+		Deque<TranslationSharingOptions> activeSharers = ust.getActiveSharers();
+		Iterator<TranslationSharingOptions> it = activeSharers.iterator();
 		int userId = user.id;
 		while (it.hasNext()) {
-			TranslationSharingOptions opt = it.next();
-			if (opt.userId == userId) {
+			TranslationSharingOptions sharing = it.next();
+			if (sharing.userId == userId) {
 				it.remove();
 			}
 		}
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
-		obj.setShareLocations(ust);
+		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
+		obj.setSharingUsers(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 //		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
-	
-	public boolean whoami(CloudUser user, SimpMessageHeaderAccessor headers) {
-		Map<String, Object> u = new HashMap<>();
-		u.put("nickname", user.nickname);
-		u.put("email", user.email);
-		u.put("id", user.id);
-		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_USER_INFO, u);
-		return true;
-	}
 
-	public String sendError(String error, SimpMessageHeaderAccessor headers) {
-		if (headers != null) {
-			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
-		}
-		return error;
-	}
+	// Message sending
 	
     public boolean sendMessage(UserTranslation ust, CloudUser user, Object message) {
 		TranslationMessage msg = prepareMessageAuthor(null, user);
@@ -292,28 +283,31 @@ public class UserTranslationsService {
 	}
 
 	public void sendLocation(CloudUserDevice dev, CloudUser pu, WptPt wptPt) {
-		int userId = dev == null ? pu.id : dev.userid; 
-		Deque<WptPt> deque = locationByUser.get(userId);
-		if (deque == null) {
-			deque = new ConcurrentLinkedDeque<WptPt>();
-			locationByUser.put(userId, deque);
-		}
-		deque.push(wptPt);
+		int userId = dev == null ? pu.id : dev.userid;
+		userLocationHistory.computeIfAbsent(userId, k -> new ConcurrentLinkedDeque<>()).push(wptPt);
 		TranslationMessage msg = prepareMessageAuthor(dev, pu);
 		msg.content = Map.of("point", wptPt);
 		msg.type = TranslationMessageType.LOCATION;
 		Deque<UserTranslation> translations = shareLocTranslationsByUser.get(userId);
+		if (translations == null) {
+			return;
+		}
 		long timeMillis = System.currentTimeMillis();
 		for (UserTranslation ust : translations) {
-			Deque<TranslationSharingOptions> sharingOptions = ust.getSharingOptions();
-			for (TranslationSharingOptions o : sharingOptions) {
-				if (o.userId == userId && timeMillis < o.expireTime) {
+			Deque<TranslationSharingOptions> activeSharers = ust.getActiveSharers();
+			for (TranslationSharingOptions sharing : activeSharers) {
+				if (sharing.userId == userId && timeMillis < sharing.expireTime) {
 					ust.sendLocation(userId, wptPt);
 					rawSendMessage(ust, msg);
 					break;
 				}
 			}
 		}
+	}
+
+	private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getSessionId(), msg);
+		ust.getMessages().add(msg);
 	}
     
 
@@ -334,11 +328,21 @@ public class UserTranslationsService {
 		return tm;
 	}
 
-    private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
-    	template.convertAndSend(TOPIC_TRANSLATION + ust.getId(), msg);
-    	ust.getMessages().add(msg);
+	public boolean whoami(CloudUser user, SimpMessageHeaderAccessor headers) {
+		Map<String, Object> u = new HashMap<>();
+		u.put("nickname", user.nickname);
+		u.put("email", user.email);
+		u.put("id", user.id);
+		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_USER_INFO, u);
+		return true;
 	}
-    
+
+	public String sendError(String error, SimpMessageHeaderAccessor headers) {
+		if (headers != null) {
+			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
+		}
+		return error;
+	}
 
 	private String getNickname(CloudUser user) {
 		if (!Algorithms.isEmpty(user.nickname)) {
