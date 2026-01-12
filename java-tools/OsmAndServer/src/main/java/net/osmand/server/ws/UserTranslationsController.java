@@ -17,8 +17,21 @@ public class UserTranslationsController {
 	@Autowired
 	private UserTranslationsService userTranslationsService;
 
+	// One time call (subscription) returns map with TRANSLATION_ID
+	@MessageMapping("/translation/create")
+	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
+		CloudUser user = userTranslationsService.getUser(principal, headers);
+		if (user == null) {
+			return null;
+		}
+		return userTranslationsService.createTranslation(user, null, headers);
+	}
+
 	@MessageMapping("/translation/{translationId}/load")
-	public void loadTranslation(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
+	public void loadTranslationHistory(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
+		if (headers == null) {
+			return;
+		}
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		if (ust != null) {
 			userTranslationsService.load(ust, headers);
@@ -68,18 +81,10 @@ public class UserTranslationsController {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		if (ust != null) {
 			CloudUser user = userTranslationsService.getUser(principal, headers, true);
-			userTranslationsService.sendMessage(ust, user, message);
+			if (user != null) {
+				userTranslationsService.sendMessage(ust, user, message);
+			}
 		}
-	}
-
-	// One time call (subscription) returns map with TRANSLATION_ID
-	@MessageMapping("/translation/create")
-	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
-		CloudUser user = userTranslationsService.getUser(principal, headers);
-		if (user == null) {
-			return null;
-		}
-		return userTranslationsService.createTranslation(user, null, headers);
 	}
 
 	

@@ -9,66 +9,66 @@ import net.osmand.shared.gpx.primitives.WptPt;
 
 public class UserTranslation {
 
-	private final String id;
-	private final long owner;
+	private final String sessionId;
+	private final long ownerId;
 	private long creationDate;
 	private String password;
 	
-	private Deque<TranslationSharingOptions> sharingOptions = new ConcurrentLinkedDeque<>();
-	
-	private Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
-	private Map<Integer, Deque<WptPt>> locations = new ConcurrentHashMap<>();
-	
-	public UserTranslation(String id, long ownerId) {
-		this.id = id;
-		this.owner = ownerId;
+	private final Deque<TranslationSharingOptions> activeSharers = new ConcurrentLinkedDeque<>();
+
+	private final Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
+	private final Map<Integer, Deque<WptPt>> locationsByUser = new ConcurrentHashMap<>();
+
+	public UserTranslation(String sessionId, long ownerId) {
+		this.sessionId = sessionId;
+		this.ownerId = ownerId;
 	}
-	
+
 	public void sendLocation(int userid, WptPt wptPt) {
-		Deque<WptPt> deque = locations.get(userid);
-		if (deque == null) {
-			locations.putIfAbsent(userid, new ConcurrentLinkedDeque<WptPt>());
-			deque = locations.get(userid);
+		Deque<WptPt> locations = locationsByUser.get(userid);
+		if (locations == null) {
+			locationsByUser.putIfAbsent(userid, new ConcurrentLinkedDeque<>());
+			locations = locationsByUser.get(userid);
 		}
-		deque.push(wptPt);
+		locations.push(wptPt);
 	}
-	
+
 	public void setPassword(String password) {
 		this.password = password;
 	}
-	
+
 	public String getPassword() {
 		return password;
 	}
-	
-	public String getId() {
-		return id;
+
+	public String getSessionId() {
+		return sessionId;
 	}
-	
+
 	public long getCreationDate() {
 		return creationDate;
 	}
-	
-	public Deque<TranslationSharingOptions> getSharingOptions() {
-		return sharingOptions;
+
+	public Deque<TranslationSharingOptions> getActiveSharers() {
+		return activeSharers;
 	}
-	
+
 	public void setCreationDate(long creationDate) {
 		this.creationDate = creationDate;
 	}
-	
-	public long getOwner() {
-		return owner;
+
+	public long getOwnerId() {
+		return ownerId;
 	}
-	
+
 	public Deque<TranslationMessage> getMessages() {
 		return messages;
 	}
-	
-	public Map<Integer, Deque<WptPt>> getLocations() {
-		return locations;
+
+	public Map<Integer, Deque<WptPt>> getLocationsByUser() {
+		return locationsByUser;
 	}
-	
+
 	public static class TranslationSharingOptions {
 		public int userId;
 //		public long deviceId; // possibly limit to device id
