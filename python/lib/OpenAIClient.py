@@ -114,7 +114,7 @@ class OpenAIClient:
         response = self.client.chat.completions.create(model=self.model,
                                                        messages=[{"role": "system", "content": system_prompt},
                                                                  {"role": "user", "content": content}],
-                                                       max_tokens=2048 * len(images), n=1, temperature=MODEL_TEMPERATURE, top_p=top_p, stream=False, reasoning_effort="low")
+                                                       max_tokens=16512 * len(images), n=1, temperature=MODEL_TEMPERATURE, top_p=top_p, stream=False, reasoning_effort="high")
         if response.usage:
             self.prompt_tokens = response.usage.prompt_tokens
             self.completion_tokens = response.usage.completion_tokens
