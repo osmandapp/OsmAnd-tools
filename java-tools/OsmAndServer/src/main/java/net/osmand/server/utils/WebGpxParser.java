@@ -666,7 +666,7 @@ public class WebGpxParser {
     private Map<String, String> parseTrackExt(WebGpxParser.TrackData trackData) {
         Map<String, String> trackExt = trackData.ext;
         WebTrackAppearance trackAppearance = trackData.trackAppearance;
-        if (trackAppearance != null && !trackData.tracks.isEmpty()) {
+        if (trackAppearance != null) {
             if (trackExt == null) {
                 trackExt = new LinkedHashMap<>();
             }
