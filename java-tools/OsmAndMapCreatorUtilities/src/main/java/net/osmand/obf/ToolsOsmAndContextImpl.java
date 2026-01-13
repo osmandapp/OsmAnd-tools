@@ -45,6 +45,11 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
     }
 
     @Override
+    public KFile getCacheDir() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+
+    @Override
     public KFile getGpxDir() {
         throw new UnsupportedOperationException("Not yet implemented");
     }
