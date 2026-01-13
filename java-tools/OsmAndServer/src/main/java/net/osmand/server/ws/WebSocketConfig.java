@@ -23,6 +23,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {
 		// Add the interceptor to the "Inbound" channel (messages coming FROM client)
+		// SubscriptionInterceptor handles both SecurityContext propagation and access control
 		registration.interceptors(subscriptionInterceptor);
 	}
 

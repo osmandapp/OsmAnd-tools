@@ -2,11 +2,13 @@ package net.osmand.server.ws;
 
 import java.security.Principal;
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -14,10 +16,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
@@ -38,7 +43,8 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserTranslationsService {
 
-   
+	private static final Log LOG = LogFactory.getLog(UserTranslationsService.class);
+	
     public static final String TRANSLATION_ID = "translationId";
 	public static final String ALIAS = "alias";
 
@@ -53,6 +59,12 @@ public class UserTranslationsService {
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
     
     private static final long DEFAULT_SHARING_DURATION_MS = 60 * 60 * 1000; // 1 hour
+	
+	// Maximum number of active translations per user
+	private static final int MAX_TRANSLATIONS_PER_USER = 50;
+	
+	// Maximum number of devices per user that can share in a single translation
+	private static final int MAX_DEVICES_PER_USER_PER_TRANSLATION = 5;
 
     // implement 1-3 day storage for location
     private final Map<Integer, Deque<WptPt>> userLocationHistory = new ConcurrentHashMap<>();
@@ -62,8 +74,7 @@ public class UserTranslationsService {
     // no need to be persistent
     private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
     private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
-    
-    Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+
     Random random = new SecureRandom();
     
     @Autowired
@@ -73,9 +84,23 @@ public class UserTranslationsService {
 	protected CloudUserDevicesRepository devicesRepository;
     
     private final Environment environment;
+    
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public UserTranslationsService(Environment environment) {
         this.environment = environment;
+    }
+
+    public void setTranslationPassword(UserTranslation translation, String plainPassword) {
+        if (translation == null) {
+            throw new IllegalArgumentException("Translation cannot be null");
+        }
+        if (plainPassword == null || plainPassword.isEmpty()) {
+            translation.setPassword(null);
+            return;
+        }
+        String passwordHash = passwordEncoder.encode(plainPassword);
+        translation.setPassword(passwordHash);
     }
     
     public void sendPrivateMessage(String sessionId, String type, Object data) {
@@ -138,8 +163,26 @@ public class UserTranslationsService {
 
 	// Session management
 
-	// deleteTranslation
+	/**
+	 * Creates a new translation (sharing session).
+	 * Enforces limits on the number of translations per user.
+	 * 
+	 * @param user user creating the translation (null for anonymous)
+	 * @param translationId optional translation ID (generated if null)
+	 * @param headers WebSocket headers
+	 * @return created UserTranslation
+	 * @throws IllegalStateException if user has reached the maximum number of translations
+	 */
 	public UserTranslation createTranslation(CloudUser user, String translationId, SimpMessageHeaderAccessor headers) {
+		if (user != null && user.id > 0) {
+			long userTranslationCount = countUserTranslations(user.id);
+			if (userTranslationCount >= MAX_TRANSLATIONS_PER_USER) {
+				String error = String.format("Maximum number of translations (%d) reached", MAX_TRANSLATIONS_PER_USER);
+				sendError(error, headers);
+				throw new IllegalStateException(error);
+			}
+		}
+		
 		long time = System.currentTimeMillis();
 		if (translationId == null) {
 			translationId = Long.toHexString(time * 100L + random.nextInt(100));
@@ -160,7 +203,71 @@ public class UserTranslationsService {
 	private void shareLocationByUser(UserTranslation ust, int uid) {
 		shareLocTranslationsByUser.computeIfAbsent(uid, k -> new ConcurrentLinkedDeque<>()).add(ust);
 	}
+
+	private long extractDeviceIdFromHeaders(SimpMessageHeaderAccessor headers) {
+		if (headers == null) {
+			return 0;
+		}
+		String deviceIdHeader = headers.getFirstNativeHeader("deviceId");
+		if (deviceIdHeader == null || deviceIdHeader.isEmpty()) {
+			return 0;
+		}
+		try {
+			return Long.parseLong(deviceIdHeader);
+		} catch (NumberFormatException e) {
+			LOG.warn("Invalid deviceId format: " + deviceIdHeader);
+			return 0;
+		}
+	}
+
+	private long calculateExpireTime() {
+		return System.currentTimeMillis() + DEFAULT_SHARING_DURATION_MS;
+	}
+
+	private long countUserTranslations(int userId) {
+		long count = 0;
+		for (UserTranslation t : activeTranslations.values()) {
+			if (t.getOwnerId() == userId) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private long countUserDevicesInTranslation(UserTranslation translation, int userId) {
+		Map<Long, Boolean> uniqueDevices = new HashMap<>();
+		for (TranslationSharingOptions sharer : translation.getActiveSharers()) {
+			if (sharer.userId == userId && sharer.deviceId > 0) {
+				uniqueDevices.put(sharer.deviceId, true);
+			}
+		}
+		return uniqueDevices.size();
+	}
 	
+	/**
+	 * Finds an active sharer for a user and device in a translation.
+	 * 
+	 * @param translation translation to search in
+	 * @param userId user ID
+	 * @param deviceId device ID (0 means any device)
+	 * @return TranslationSharingOptions if found, null otherwise
+	 */
+	private TranslationSharingOptions findSharer(UserTranslation translation, int userId, long deviceId) {
+		long currentTime = System.currentTimeMillis();
+		for (TranslationSharingOptions sharer : translation.getActiveSharers()) {
+			if (sharer.userId == userId && currentTime < sharer.expireTime) {
+				// If deviceId is 0, match any device; otherwise match specific device or deviceId == 0 in sharer
+				if (deviceId == 0 || sharer.deviceId == 0 || sharer.deviceId == deviceId) {
+					return sharer;
+				}
+			}
+		}
+		return null;
+	}
+
+	private void updateSharerExpireTime(TranslationSharingOptions sharer) {
+		sharer.expireTime = calculateExpireTime();
+	}
 
 	public UserTranslation getTranslation(String translationId, SimpMessageHeaderAccessor headers) {
 		UserTranslation ust = activeTranslations.get(translationId);
@@ -168,6 +275,16 @@ public class UserTranslationsService {
 			sendError(TRANSLATION_MISSING, headers);
 		}
 		return ust;
+	}
+
+	/**
+	 * Returns a translation without sending an error to the client (for use in interceptors).
+	 *
+	 * @param translationId translation (session) ID
+	 * @return UserTranslation instance or null if not found
+	 */
+	public UserTranslation getTranslationSilent(String translationId) {
+		return activeTranslations.get(translationId);
 	}
 
 	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
@@ -178,26 +295,136 @@ public class UserTranslationsService {
 	}
 
 	// Sharing management
+
+	public void recordVerifiedAccess(String translationId, long userId) {
+		if (translationId != null) {
+			UserTranslation translation = activeTranslations.get(translationId);
+			if (translation != null) {
+				translation.getVerifiedUsers().add((int)userId);
+			}
+		}
+	}
 	
+	/**
+	 * Checks if a user has permission to perform operations on a translation.
+	 * Users can operate on translations if they are:
+	 * 1. The owner of the translation
+	 * 2. An active sharer (sharing location in the translation)
+	 * 3. Have verified access via password (cached after successful subscription)
+	 * 4. Public translation (no password)
+	 * 
+	 * @param translation translation to check
+	 * @param user user to check permissions for
+	 * @param deviceId optional device ID to check (0 means any device)
+	 * @param headers WebSocket headers (may contain password header and sessionId)
+	 * @return true if user has permission, false otherwise
+	 */
+	public boolean hasOperationPermission(UserTranslation translation, CloudUser user, long deviceId, SimpMessageHeaderAccessor headers) {
+		if (translation == null || user == null) {
+			return false;
+		}
+
+		if (translation.getOwnerId() == user.id) {
+			return true;
+		}
+
+		if (findSharer(translation, user.id, deviceId) != null) {
+			return true;
+		}
+
+		String password = translation.getPassword();
+		if (password != null && !password.isEmpty()) {
+			// Check if user already verified password for this translation
+			if (translation.getVerifiedUsers().contains(user.id)) {
+				return true;
+			}
+			
+			// If not verified, check password from headers
+			String providedPassword = headers != null ? headers.getFirstNativeHeader("password") : null;
+			if (providedPassword == null || providedPassword.isEmpty()) {
+				return false;
+			}
+
+			try {
+				boolean matches = passwordEncoder.matches(providedPassword, password);
+				if (matches) {
+					// Remember verified user for this translation only
+					translation.getVerifiedUsers().add(user.id);
+				}
+				return matches;
+			} catch (Exception e) {
+				LOG.warn("Error verifying password for translation " + translation.getSessionId() + ": " + e.getMessage());
+				return false;
+			}
+		}
+		
+		// Public translation - allow everyone
+		return true;
+	}
+
+	public boolean hasOperationPermission(UserTranslation translation, CloudUser user, SimpMessageHeaderAccessor headers) {
+		return hasOperationPermission(translation, user, 0, headers);
+	}
+	
+	/**
+	 * Starts sharing location in a translation.
+	 * Requires that the user has permission (owner or active sharer).
+	 * Enforces limit on number of devices per user per translation.
+	 * 
+	 * @param ust translation to share in
+	 * @param user user starting to share
+	 * @param headers WebSocket headers (may contain deviceId header)
+	 * @throws SecurityException if user doesn't have permission or device limit exceeded
+	 */
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
+		if (!hasOperationPermission(ust, user, headers)) {
+			String error = "Permission denied: user is not owner or active sharer";
+			sendError(error, headers);
+			throw new SecurityException(error);
+		}
+
+		long deviceId = extractDeviceIdFromHeaders(headers);
+		TranslationSharingOptions existingSharer = findSharer(ust, user.id, deviceId);
+		if (existingSharer != null) {
+			// Already sharing, just update expire time
+			updateSharerExpireTime(existingSharer);
+			return;
+		}
+
+		if (deviceId > 0) {
+			long totalDevicesForUser = countUserDevicesInTranslation(ust, user.id);
+			if (totalDevicesForUser >= MAX_DEVICES_PER_USER_PER_TRANSLATION) {
+				String error = "Maximum number of devices (" + MAX_DEVICES_PER_USER_PER_TRANSLATION + 
+					") per user per translation reached";
+				sendError(error, headers);
+				throw new SecurityException(error);
+			}
+		}
+		
+		// Create new sharing options
 		TranslationSharingOptions opts = new TranslationSharingOptions();
 		opts.startTime = System.currentTimeMillis();
-		opts.expireTime = System.currentTimeMillis() + DEFAULT_SHARING_DURATION_MS;
+		opts.expireTime = calculateExpireTime();
 		opts.userId = user.id;
+		opts.deviceId = deviceId;
 		opts.nickname = getNickname(user);
 
+		// Send last known location if available
 		Deque<WptPt> locationHistory = userLocationHistory.get(user.id);
 		if (locationHistory != null && !locationHistory.isEmpty()) {
 			ust.sendLocation(user.id, locationHistory.getLast());
 		}
 		
+		// Start simulation in non-production environments
 		if(!environment.acceptsProfiles(Profiles.of("production"))) {
 			startSimulation(user, ust);
 		}
-		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
+		
+		// Add sharer and notify clients
 		ust.getActiveSharers().add(opts);
 		shareLocationByUser(ust, user.id);
 		
+		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
 		obj.setSharingUsers(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
@@ -236,25 +463,79 @@ public class UserTranslationsService {
 		simThread.start();
 	}
 
+	/**
+	 * Stops sharing location in a translation.
+	 * Users can stop their own sharing (optionally for specific device), owners can stop anyone's sharing.
+	 * 
+	 * @param ust translation to stop sharing in
+	 * @param user user stopping sharing
+	 * @param headers WebSocket headers (may contain deviceId header)
+	 * @throws SecurityException if user doesn't have permission
+	 */
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
+		if (ust == null || user == null) {
+			sendError("Invalid translation or user", headers);
+			return;
+		}
+
+		long deviceId = extractDeviceIdFromHeaders(headers);
+		boolean isOwner = ust.getOwnerId() == user.id;
 		Deque<TranslationSharingOptions> activeSharers = ust.getActiveSharers();
 		Iterator<TranslationSharingOptions> it = activeSharers.iterator();
 		int userId = user.id;
+		boolean removed = false;
+		
 		while (it.hasNext()) {
 			TranslationSharingOptions sharing = it.next();
-			if (sharing.userId == userId) {
+			// Owner can remove anyone, users can only remove themselves
+			boolean matchesUser = sharing.userId == userId || isOwner;
+			boolean matchesDevice = deviceId == 0 || sharing.deviceId == 0 || sharing.deviceId == deviceId;
+			
+			if (matchesUser && matchesDevice) {
 				it.remove();
+				removed = true;
+				if (isOwner && sharing.userId != userId) {
+					break;
+				}
+				if (deviceId > 0 && sharing.deviceId == deviceId) {
+					break;
+				}
 			}
 		}
+		
+		if (!removed && !isOwner) {
+			String error = "Permission denied: cannot stop sharing for other users or devices";
+			sendError(error, headers);
+			throw new SecurityException(error);
+		}
+		
 		UserTranslationDTO obj = new UserTranslationDTO(ust.getSessionId());
 		obj.setSharingUsers(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
-//		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 
 	// Message sending
 	
-    public boolean sendMessage(UserTranslation ust, CloudUser user, Object message) {
+    /**
+     * Sends a message to a translation.
+     * Requires that the user has permission (owner or active sharer).
+     * 
+     * @param ust translation to send message to
+     * @param user user sending the message
+     * @param message message content
+     * @return true if message was sent, false otherwise
+     * @throws SecurityException if user doesn't have permission
+     */
+    public boolean sendMessage(UserTranslation ust, CloudUser user, Object message, SimpMessageHeaderAccessor headers) {
+		if (ust == null || user == null) {
+			return false;
+		}
+
+		if (!hasOperationPermission(ust, user, headers)) {
+			LOG.warn("User " + user.id + " attempted to send message to translation " + ust.getSessionId() + " without permission");
+			throw new SecurityException("Access denied to translation: " + ust.getSessionId());
+		}
+		
 		TranslationMessage msg = prepareMessageAuthor(null, user);
 		msg.content = message;
 		msg.type = TranslationMessageType.TEXT;
@@ -284,23 +565,24 @@ public class UserTranslationsService {
 
 	public void sendLocation(CloudUserDevice dev, CloudUser pu, WptPt wptPt) {
 		int userId = dev == null ? pu.id : dev.userid;
+		long deviceId = dev != null ? dev.id : 0;
+		
 		userLocationHistory.computeIfAbsent(userId, k -> new ConcurrentLinkedDeque<>()).push(wptPt);
 		TranslationMessage msg = prepareMessageAuthor(dev, pu);
 		msg.content = Map.of("point", wptPt);
 		msg.type = TranslationMessageType.LOCATION;
+		
 		Deque<UserTranslation> translations = shareLocTranslationsByUser.get(userId);
 		if (translations == null) {
 			return;
 		}
-		long timeMillis = System.currentTimeMillis();
+		
+		// Send location to all translations where user is actively sharing
 		for (UserTranslation ust : translations) {
-			Deque<TranslationSharingOptions> activeSharers = ust.getActiveSharers();
-			for (TranslationSharingOptions sharing : activeSharers) {
-				if (sharing.userId == userId && timeMillis < sharing.expireTime) {
-					ust.sendLocation(userId, wptPt);
-					rawSendMessage(ust, msg);
-					break;
-				}
+			TranslationSharingOptions sharer = findSharer(ust, userId, deviceId);
+			if (sharer != null) {
+				ust.sendLocation(userId, wptPt);
+				rawSendMessage(ust, msg);
 			}
 		}
 	}

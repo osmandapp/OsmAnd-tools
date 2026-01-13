@@ -236,7 +236,8 @@ public class WebSecurityConfiguration {
 								if (request.getPathInfo() != null) {
 									url += request.getPathInfo();
 								}
-								return !(url.startsWith("/api/") || url.startsWith("/subscription/"));
+								return !(url.startsWith("/api/") || url.startsWith("/subscription/") 
+										|| url.startsWith("/osmand-websocket"));
 							}
 							return false;
 						})
@@ -256,6 +257,8 @@ public class WebSecurityConfiguration {
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/mapapi/auth/**").permitAll()
 						.requestMatchers("/mapapi/**").hasAuthority(ROLE_PRO_USER)
+						// WebSocket endpoint - allow authenticated and anonymous (handled by SubscriptionInterceptor)
+						.requestMatchers("/osmand-websocket", "/osmand-websocket/**").permitAll()
 						.anyRequest().permitAll()
 				)
 				.exceptionHandling(ex -> ex
@@ -314,7 +317,7 @@ public class WebSecurityConfiguration {
 				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
-		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
+		configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "alias", "password", "deviceId"));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**",  configuration);
 		return source;
