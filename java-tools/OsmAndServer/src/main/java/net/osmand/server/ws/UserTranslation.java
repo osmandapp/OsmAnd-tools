@@ -2,6 +2,7 @@ package net.osmand.server.ws;
 
 import java.util.Deque;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -15,6 +16,9 @@ public class UserTranslation {
 	private String password;
 	
 	private final Deque<TranslationSharingOptions> activeSharers = new ConcurrentLinkedDeque<>();
+	
+	// Users who have successfully verified password access to this translation
+	private final Set<Integer> verifiedUsers = ConcurrentHashMap.newKeySet();
 
 	private final Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
 	private final Map<Integer, Deque<WptPt>> locationsByUser = new ConcurrentHashMap<>();
@@ -33,10 +37,20 @@ public class UserTranslation {
 		locations.push(wptPt);
 	}
 
+	/**
+	 * Sets the password (should be BCrypt hash, not plain text).
+	 * Use UserTranslationsService.setTranslationPassword() to set password from plain text.
+	 * 
+	 * @param password BCrypt hash of the password
+	 */
 	public void setPassword(String password) {
 		this.password = password;
 	}
 
+	/**
+	 * Returns the password (BCrypt hash).
+	 * @return password hash or null if no password is set
+	 */
 	public String getPassword() {
 		return password;
 	}
@@ -68,17 +82,19 @@ public class UserTranslation {
 	public Map<Integer, Deque<WptPt>> getLocationsByUser() {
 		return locationsByUser;
 	}
+	
+	public Set<Integer> getVerifiedUsers() {
+		return verifiedUsers;
+	}
 
 	public static class TranslationSharingOptions {
 		public int userId;
-//		public long deviceId; // possibly limit to device id
+		// Device ID to limit sharing to specific device (0 means any device for this user)
+		public long deviceId;
 		
 		public long startTime;
 		public long expireTime;
 
 		public String nickname;
 	}
-
-	
-	
 }
