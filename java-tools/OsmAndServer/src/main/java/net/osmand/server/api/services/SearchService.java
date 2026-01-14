@@ -1132,7 +1132,6 @@ public class SearchService {
     }
 
     private String getFullAddressFromAmenity(Amenity amenity, String locale) {
-        // Use calculateAddressString format logic
         String cityName = amenity.getCityFromTagGroups(locale);
         if (cityName == null) {
             cityName = "";
@@ -1147,7 +1146,7 @@ public class SearchService {
         if (cityName.isEmpty()) {
             return addr;
         } else {
-            return cityName + ", " + addr;
+            return addr + ", " + cityName;
         }
     }
 
