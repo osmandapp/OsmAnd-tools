@@ -14,6 +14,7 @@ import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
@@ -1123,10 +1124,30 @@ public class SearchService {
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = amenity.getCityFromTagGroups(locale);
+                result.addressName = getFullAddressFromAmenity(amenity, locale);
                 foundFeatures.put(osmId, getPoiFeature(result));
                 remainingLimit--;
             }
+        }
+    }
+
+    private String getFullAddressFromAmenity(Amenity amenity, String locale) {
+        // Use calculateAddressString format logic
+        String cityName = amenity.getCityFromTagGroups(locale);
+        if (cityName == null) {
+            cityName = "";
+        }
+        String streetName = amenity.getStreetName();
+        if (Algorithms.isEmpty(streetName)) {
+            return cityName.isEmpty() ? null : cityName;
+        }
+        String houseNumber = amenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
+        String addr = streetName + (Algorithms.isEmpty(houseNumber) ? "" : " " + houseNumber);
+        
+        if (cityName.isEmpty()) {
+            return addr;
+        } else {
+            return cityName + ", " + addr;
         }
     }
 
