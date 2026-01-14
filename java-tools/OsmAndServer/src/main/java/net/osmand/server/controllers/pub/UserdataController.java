@@ -81,7 +81,7 @@ public class UserdataController {
 	// identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
-	private final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
+	public static final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
 
 	private static final long CACHE_TTL = 15 * 60 * 1000; // Minutes Validity
 
@@ -138,14 +138,19 @@ public class UserdataController {
 		public String lang;
 	}
 
-	private static class CachedInfoDevice {
+	public static class CachedInfoDevice {
 		final CloudUserDevice device;
 		final long timestamp;
 		public CloudUser user;
 
 		CachedInfoDevice(CloudUserDevice device, CloudUser user) {
 			this.device = device;
+			this.user = user;
 			this.timestamp = System.currentTimeMillis();
+		}
+
+		public CloudUserDevice getDevice() {
+			return device;
 		}
 	}
 	
