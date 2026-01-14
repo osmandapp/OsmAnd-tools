@@ -1116,12 +1116,12 @@ public class SearchService {
 
     private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
         String dominatedCity = "";
-        Map<String, Integer> citiesCounterMap = new TreeMap<>();
+        Map<String, Integer> cityCounter = new TreeMap<>();
         for (Amenity amenity : amenities) {
             String cityName = amenity.getCityFromTagGroups(locale);
             if (!Algorithms.isEmpty(cityName)) {
                 String mainCity = getMainCityName(cityName);
-                String domCity = getDominatedCity(citiesCounterMap, mainCity);
+                String domCity = getDominatedCity(cityCounter, mainCity);
                 if (domCity != null) {
                     dominatedCity = domCity;
                     break;
