@@ -1114,24 +1114,40 @@ public class SearchService {
     }
 
     private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
+        SearchUICore.SearchResultCollection collection = new SearchUICore.SearchResultCollection(null);
+        String dominatedCity = "";
+        Map<String, Integer> cities = new TreeMap<>();
+        for (Amenity amenity : amenities) {
+            String cityName = amenity.getCityFromTagGroups(locale);
+            if (!Algorithms.isEmpty(cityName)) {
+                String mainCity = collection.getMainCityName(cityName);
+                String domCity = collection.getDominatedCity(cities, mainCity);
+                if (domCity != null) {
+                    dominatedCity = domCity;
+                    break;
+                }
+            }
+        }
         for (Amenity amenity : amenities) {
             if (remainingLimit <= 0) {
                 break;
             }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
+                String cityName = amenity.getCityFromTagGroups(locale);
+                String mainCity = collection.getMainCityName(cityName);
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = getFullAddressFromAmenity(amenity, locale);
+                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity, collection);
                 foundFeatures.put(osmId, getPoiFeature(result));
                 remainingLimit--;
             }
         }
     }
 
-    private String getFullAddressFromAmenity(Amenity amenity, String locale) {
+    private String calculateAddressString(Amenity amenity, String locale, String mainCity, String dominatedCity, SearchUICore.SearchResultCollection collection) {
         String cityName = amenity.getCityFromTagGroups(locale);
         if (cityName == null) {
             cityName = "";
@@ -1142,12 +1158,8 @@ public class SearchService {
         }
         String houseNumber = amenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
         String addr = streetName + (Algorithms.isEmpty(houseNumber) ? "" : " " + houseNumber);
-        
-        if (cityName.isEmpty()) {
-            return addr;
-        } else {
-            return addr + ", " + cityName;
-        }
+
+        return collection.createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
 	public Feature getFeature(SearchResult result) {
