@@ -1252,16 +1252,25 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
 		RouteSegmentResult prevSegm = null;
+		int indVisual = 0;
 		for (RouteSegmentResult segm : searchRoute) {
 			// double dist = MapUtils.getDistance(s.startPoint, s.endPoint);
 			Way way = new Way(-1);
 //					String name = String.format("time %.2f ", s.getSegmentTime());
-			String name = segm.getDescription(false);
-			if(segm.getTurnType() != null) {
-				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
+			TurnType tt = segm.getTurnType();
+			String name = "";
+			if (tt != null) {
+				name = (++indVisual) + ". " + tt.toXmlString() + (tt.isSkipToSpeak() ? "*" : "");
+				if (tt.getLanes() != null) {
+					name += " [" + TurnType.lanesToString(tt.getLanes()) + "]";
+				}
 			}
+//			String name = segm.getDescription(false);
+//			if(segm.getTurnType() != null) {
+//				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
+//			}
 //					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
-			way.putTag(OSMTagKey.NAME.getValue(),name);
+			way.putTag(OSMTagKey.NAME.getValue(), name);
 			if (prevSegm != null
 					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
 				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);

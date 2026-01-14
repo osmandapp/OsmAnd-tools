@@ -10,9 +10,11 @@ import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
+import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -32,6 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
@@ -56,6 +59,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
+    private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String DEFAULT_SEARCH_LANG = "en";
@@ -81,11 +85,57 @@ public class SearchService {
         public boolean alreadyFound;
         public FeatureCollection features;
     }
+
+    private static class PoiSearchLimit {
+        int limit;
+        int leftoverLimit;
+        boolean useLimit;
+
+        public PoiSearchLimit(int limit, int leftoverLimit, boolean useLimit) {
+            this.limit = limit;
+            this.leftoverLimit = leftoverLimit;
+            this.useLimit = useLimit;
+        }
+
+        public int getRemainingForSave(int categoryStartSize, int currentSize) {
+            int remainingForCategory = getRemainingForCategory(categoryStartSize, currentSize);
+            int remainingTotal = getRemainingTotal();
+            return Math.min(remainingForCategory, remainingTotal);
+        }
+
+        public boolean shouldStopCategory(int categoryStartSize, int currentSize) {
+            return getRemainingForCategory(categoryStartSize, currentSize) == 0;
+        }
+
+        private int getMaxForCategory() {
+            return Math.min(limit, leftoverLimit);
+        }
+
+        private int getRemainingForCategory(int categoryStartSize, int currentSize) {
+            int used = currentSize - categoryStartSize;
+            return Math.max(0, getMaxForCategory() - used);
+        }
+
+        private int getRemainingTotal() {
+            return Math.max(0, leftoverLimit);
+        }
+
+        public void updateAfterCategory(int categoryStartSize, int categoryEndSize) {
+            int used = categoryEndSize - categoryStartSize;
+            leftoverLimit -= used;
+            if (leftoverLimit <= 0) {
+                useLimit = true;
+            }
+        }
+
+        public boolean isLimitReached() {
+            return leftoverLimit <= 0;
+        }
+    }
     
     public static class PoiSearchData {
         
-        public PoiSearchData(List<String> categories,
-                             Map<String, String> categoriesLang,
+        public PoiSearchData(List<PoiSearchCategory> categories,
                              String northWest,
                              String southEast,
                              String savedNorthWest,
@@ -94,7 +144,6 @@ public class SearchService {
                              String prevSearchRes,
                              String prevSearchCategory) {
             this.categories = categories;
-            this.categoriesLang = categoriesLang;
             this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
             if (savedNorthWest != null && savedSouthEast != null) {
                 this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
@@ -106,8 +155,7 @@ public class SearchService {
             }
         }
         
-        public List<String> categories;
-        public Map<String, String> categoriesLang;
+        public List<PoiSearchCategory> categories;
         public List<LatLon> bbox;
         public List<LatLon> savedBbox;
         public int prevCategoriesCount;
@@ -123,6 +171,8 @@ public class SearchService {
             return bbox;
         }
     }
+
+    public record PoiSearchCategory(String category, String lang) {}
 
 	public SearchService() {
 		try {
@@ -451,100 +501,162 @@ public class SearchService {
 
         return searchUICore;
     }
-    
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon loc, boolean baseSearch) throws IOException {
+
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
-        
-        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
-        
-        SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
-        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(searchUICore.getPoiTypes());
-        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(searchUICore.getPoiTypes(), searchAmenityTypesAPI);
-        searchUICore.registerAPI(searchAmenityByTypesAPI);
-        
-        List<Feature> features = new ArrayList<>();
-        int leftoverLimit = 0;
-        int limit = TOTAL_LIMIT_POI / data.categories.size();
-        boolean useLimit = false;
+
+        Map<Long, Feature> foundFeatures = new HashMap<>();
+        if (data.categories.isEmpty()) {
+            return new PoiSearchResult(false, false, false, null);
+        }
         QuadRect searchBbox = getSearchBbox(data.bbox);
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+        boolean useLimit = false;
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox,baseSearch);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox, baseSearch);
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
-            
-            usedMapList = osmAndMapsService.getReaders(mapList, null);
-            
-            SearchSettings settings = searchUICore.getSearchSettings().setSearchTypes(ObjectType.POI);
-            settings = settings.setOriginalLocation(loc);
-            settings.setRegions(osmandRegions);
-            settings.setOfflineIndexes(usedMapList);
-            searchUICore.updateSettings(settings.setSearchBBox31(searchBbox));
-            List<BinaryMapPoiReaderAdapter.PoiSubType> brands = new ArrayList<>();
-            for (BinaryMapIndexReader map : usedMapList) {
-                brands.addAll(map.getTopIndexSubTypes());
-            }
-            for (String category : data.categories) {
-                String lang = data.categoriesLang != null ? data.categoriesLang.get(category) : null;
-	            if (data.prevSearchRes != null && data.prevSearchCategory.equals(category)) {
-                    SearchResult prevResult = new SearchResult();
-                    prevResult.object = mapPoiTypes.getAnyPoiTypeByKey(data.prevSearchRes, false);
-                    if (prevResult.object == null) {
-                        // try to find in brands
-                        BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = brands.stream()
-                                .filter(brand -> brand.name.contains(":") && brand.name.split(":")[1].equalsIgnoreCase(lang))
-                                .findFirst()
-                                .orElseGet(() -> brands.stream()
-                                        .filter(brand -> !brand.name.contains(":"))
-                                        .findFirst()
-                                        .orElse(null)
-                                );
 
-                        if (selectedBrand != null) {
-                            prevResult.object = new TopIndexFilter(selectedBrand, mapPoiTypes, category);
-                        }
+            usedMapList = osmAndMapsService.getReaders(mapList, null);
+
+            if (data.categories.size() == 1) {
+                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures);
+                useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
+            } else {
+                PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), TOTAL_LIMIT_POI, false);
+                for (PoiSearchCategory categoryObj : data.categories) {
+                    if (poiSearchLimit.isLimitReached()) {
+                        useLimit = true;
+                        break;
                     }
-                    if (prevResult.object == null) {
-                        searchUICore.resetPhrase();
-                    }
-                    prevResult.localeName = category;
-                    prevResult.objectType = ObjectType.POI_TYPE;
-                    searchUICore.resetPhrase(prevResult);
-                } else {
-                    searchUICore.resetPhrase();
-                }
-                int sumLimit = limit + leftoverLimit;
-                SearchUICore.SearchResultCollection resultCollection = searchPoiByCategory(searchUICore, category, sumLimit);
-                List<SearchResult> res = new ArrayList<>();
-                if (resultCollection != null) {
-                    res = resultCollection.getCurrentSearchResults();
-                    if (!res.isEmpty()) {
-                        if (resultCollection.getUseLimit()) {
-                            useLimit = true;
-                        }
-                        saveSearchResult(res, features);
+                    int categoryStartSize = foundFeatures.size();
+                    searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit);
+                    int categoryEndSize = foundFeatures.size();
+                    poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
+                    if (poiSearchLimit.useLimit) {
+                        useLimit = true;
+                        break;
                     }
                 }
-                leftoverLimit = limit - res.size();
             }
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
+        List<Feature> features = new ArrayList<>(foundFeatures.values());
         if (!features.isEmpty()) {
+            sortPoiResultsByDistance(features, center);
             return new PoiSearchResult(useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
         } else {
+            return new PoiSearchResult(false, false, false, null);
+        }
+    }
+
+    private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
+                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures) throws IOException {
+        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null);
+    }
+
+    private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
+                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
+                                         PoiSearchLimit poiSearchLimit) throws IOException {
+        if (searchBbox == null) {
+            return;
+        }
+
+        MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
+        AbstractPoiType poiType = mapPoiTypes.getAnyPoiTypeByKey(categoryObj.category, false);
+        SearchCoreFactory.SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchCoreFactory.SearchAmenityTypesAPI(mapPoiTypes);
+        SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI);
+        SearchPoiTypeFilter filter = null;
+
+        if (poiType != null) {
+            filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, new LinkedHashSet<>());
+        }
+
+        int left31 = (int) searchBbox.left;
+        int right31 = (int) searchBbox.right;
+        int top31 = (int) searchBbox.top;
+        int bottom31 = (int) searchBbox.bottom;
+
+        int categoryStartSize = foundFeatures.size();
+
+        for (BinaryMapIndexReader reader : readers) {
+            if (poiSearchLimit != null ? poiSearchLimit.isLimitReached() : foundFeatures.size() >= TOTAL_LIMIT_POI) {
+                break;
+            }
+            BinaryMapIndexReader.SearchRequest<Amenity> request;
+            if (filter == null || filter.isEmpty()) {
+                request = createSearchRequestByBrand(reader, categoryObj, mapPoiTypes, left31, right31, top31, bottom31);
+                if (request == null) {
+                    if (categoryObj.lang == null || categoryObj.lang.isEmpty()) {
+                        LOGGER.warn(String.format("Brand search skipped for category '%s': language is null or empty", categoryObj.category));
+                    } else {
+                        LOGGER.warn(String.format("Brand search skipped for category '%s' with language '%s': no matching brand found", categoryObj.category, categoryObj.lang));
+                    }
+                    continue;
+                }
+            } else {
+                request = BinaryMapIndexReader.buildSearchPoiRequest(
+                        left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, null);
+            }
+            if (request == null) {
+                continue;
+            }
+            List<Amenity> amenities = reader.searchPoi(request);
+            int remaining = poiSearchLimit != null 
+                    ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
+                    : TOTAL_LIMIT_POI - foundFeatures.size();
+            saveAmenityResults(amenities, foundFeatures, remaining, locale);
+            if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
+                break;
+            }
+        }
+    }
+
+    private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader,
+                                                                                   PoiSearchCategory categoryObj,
+                                                                                   MapPoiTypes mapPoiTypes,
+                                                                                   int left31, int right31,
+                                                                                   int top31, int bottom31) throws IOException {
+        List<BinaryMapPoiReaderAdapter.PoiSubType> brands = reader.getTopIndexSubTypes();
+        String lang = categoryObj.lang;
+        BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = brands.stream()
+                .filter(brand -> brand.name.contains(":") && brand.name.split(":")[1].equalsIgnoreCase(lang))
+                .findFirst()
+                .orElseGet(() -> brands.stream()
+                        .filter(brand -> !brand.name.contains(":"))
+                        .findFirst()
+                        .orElse(null)
+                );
+        if (selectedBrand == null) {
             return null;
         }
+        String brandValueToSearch = categoryObj.category;
+        TopIndexFilter brandFilter = new TopIndexFilter(selectedBrand, mapPoiTypes, brandValueToSearch);
+        SearchPoiTypeFilter filter = BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
+        return BinaryMapIndexReader.buildSearchPoiRequest(
+                left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, brandFilter, null);
+    }
+
+    private void sortPoiResultsByDistance(List<Feature> features, LatLon center) {
+        features.sort(Comparator.comparingDouble(f -> {
+            float[] coords = (float[]) f.geometry.coordinates;
+            LatLon loc = new LatLon(coords[1], coords[0]);
+            return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
+        }));
     }
     
     public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
-        final double SEARCH_POI_RADIUS_DEGREE = type.equals("3") ? 0.0055 : 0.0001; // 3-relation,0.0055-600m,0.0001-11m
+        final String RELATION_TYPE = "3";
+        final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
+        final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
+        final double SEARCH_POI_BY_OSMID_RADIUS_DEGREE = type.equals(RELATION_TYPE) ? RELATION_SEARCH_RADIUS : OTHER_POI_SEARCH_RADIUS;
         final int mapZoom = 15;
-        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_RADIUS_DEGREE);
-        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_RADIUS_DEGREE);
+        LatLon p1 = new LatLon(loc.getLatitude() + SEARCH_POI_BY_OSMID_RADIUS_DEGREE, loc.getLongitude() - SEARCH_POI_BY_OSMID_RADIUS_DEGREE);
+        LatLon p2 = new LatLon(loc.getLatitude() - SEARCH_POI_BY_OSMID_RADIUS_DEGREE, loc.getLongitude() + SEARCH_POI_BY_OSMID_RADIUS_DEGREE);
         BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
                 MapUtils.get31TileNumberX(p1.getLongitude()),
                 MapUtils.get31TileNumberX(p2.getLongitude()),
@@ -1000,6 +1112,24 @@ public class SearchService {
         }
     }
 
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
+        for (Amenity amenity : amenities) {
+            if (remainingLimit <= 0) {
+                break;
+            }
+            long osmId = amenity.getId();
+            if (!foundFeatures.containsKey(osmId)) {
+                SearchResult result = new SearchResult();
+                result.object = amenity;
+                result.objectType = ObjectType.POI;
+                result.location = amenity.getLocation();
+                result.addressName = amenity.getCityFromTagGroups(locale);
+                foundFeatures.put(osmId, getPoiFeature(result));
+                remainingLimit--;
+            }
+        }
+    }
+
 	public Feature getFeature(SearchResult result) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
@@ -1110,4 +1240,100 @@ public class SearchService {
         return id != null && id > 0;
     }
     
+    public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+        if (bbox.size() != 2) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        QuadRect searchBbox = getSearchBbox(bbox);
+        if (searchBbox == null) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        int left31 = (int) searchBbox.left;
+        int right31 = (int) searchBbox.right;
+        int top31 = (int) searchBbox.top;
+        int bottom31 = (int) searchBbox.bottom;
+        
+        List<BinaryMapIndexReader> readers = new ArrayList<>();
+        List<Feature> features = new ArrayList<>();
+        boolean useLimit = false;
+        
+        try {
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, false);
+            if (mapList.isEmpty()) {
+                return new TransportStopsSearchResult(false, new FeatureCollection());
+            }
+            
+            readers = osmAndMapsService.getReaders(mapList, null);
+            if (readers.isEmpty()) {
+                return new TransportStopsSearchResult(false, new FeatureCollection());
+            }
+
+            TransportStopsRouteReader transportReaders = new TransportStopsRouteReader(readers);
+            SearchRequest<TransportStop> request = BinaryMapIndexReader.buildSearchTransportRequest(
+                    left31, right31, top31, bottom31, -1, new ArrayList<>());
+
+            for (TransportStop s : transportReaders.readMergedTransportStops(request)) {
+                if (features.size() >= TOTAL_LIMIT_TRANSPORT_STOPS) {
+                    useLimit = true;
+                    break;
+                }
+                if (!s.isDeleted() && !s.isMissingStop()) {
+                    Feature feature = convertTransportStopToFeature(s);
+                    if (feature != null) {
+                        features.add(feature);
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readers);
+        }
+        if (features.isEmpty()) {
+            LOGGER.error(String.format(
+                    "No transport stops found for bbox northWest=%s southEast=%s (31bit l=%d r=%d t=%d b=%d)",
+                    northWest, southEast, left31, right31, top31, bottom31));
+        }
+        return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
+    }
+    
+    private Feature convertTransportStopToFeature(TransportStop stop) {
+        if (stop == null || stop.getLocation() == null) {
+            return null;
+        }
+        
+        LatLon location = stop.getLocation();
+        Feature feature = new Feature(Geometry.point(location));
+        
+        feature.prop("id", stop.getId());
+        feature.prop("name", stop.getName());
+        
+        List<TransportRoute> routes = stop.getRoutes();
+        if (routes != null && !routes.isEmpty()) {
+            List<TransportStopFeature> stopFeatures = new ArrayList<>();
+            routes.forEach(route -> {
+                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor()));
+            });
+            feature.prop("routes", stopFeatures);
+        }
+        
+        return feature;
+    }
+
+    public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {}
+
+    public record TransportStopFeature(long id, String name, String type, String ref, String color) {}
+
+    public LatLon parseLocation(String locationString) {
+        if (locationString == null || locationString.trim().isEmpty()) {
+            return null;
+        }
+        return LocationParser.parseLocation(locationString);
+    }
+
 }

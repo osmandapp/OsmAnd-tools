@@ -9,6 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DateFormat;
@@ -118,6 +119,7 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(doc.getFonts(), rootFolder, DownloadType.FONTS);
 		loadIndexesFromDir(doc.getInapps(), rootFolder, DownloadType.DEPTH);
 		loadIndexesFromDir(doc.getDepths(), rootFolder, DownloadType.DEPTHMAP);
+		loadIndexesFromDir(doc.getStarmap(), rootFolder, DownloadType.STARMAP);
 		loadIndexesFromDir(doc.getWikimaps(), rootFolder, DownloadType.WIKIMAP);
 		loadIndexesFromDir(doc.getTravelGuides(), rootFolder, DownloadType.TRAVEL);
 		loadIndexesFromDir(doc.getRoadMaps(), rootFolder, DownloadType.ROAD_MAP);
@@ -279,6 +281,21 @@ public class DownloadIndexesService  {
 		loadIndexesFromDir(list, rootFolder, type.getPath(), type, null);
 	}
 	
+	public long getGzipUncompressedSize(File file) {
+	    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+	        raf.seek(raf.length() - 4);
+	        byte[] b = new byte[4];
+	        raf.readFully(b);
+	        // Gzip stores size in Little Endian
+	        return ((long) (b[3] & 0xFF) << 24) |
+	               ((long) (b[2] & 0xFF) << 16) |
+	               ((long) (b[1] & 0xFF) << 8) |
+	               ((long) (b[0] & 0xFF));
+	    } catch (IOException e) {
+	        return file.length(); // Fallback to compressed size on error
+	    }
+	}
+	
 	private void loadIndexesFromDir(List<DownloadIndex> list, File rootFolder, String subPath, DownloadType type, String filterFiles) {
 		File subFolder = new File(rootFolder, subPath);
 		File[] files = subFolder.listFiles();
@@ -298,9 +315,11 @@ public class DownloadIndexesService  {
                         for (ExternalSource source : externalSources) {
                             // do not read external zip files, otherwise it will be too long by remote connection
                             if (source.type.equals("file") && type.acceptFileName(source.name) && !isZip(source.name)) {
+                            	
                                 DownloadIndex di = new DownloadIndex();
                                 di.setType(type);
                                 String name = source.name;
+                                long actualContentSize = source.size;
                                 int extInd = name.indexOf('.');
                                 String ext = name.substring(extInd + 1);
                                 formatName(name, extInd);
@@ -309,8 +328,8 @@ public class DownloadIndexesService  {
                                 di.setContainerSize(source.size);
                                 di.setTimestamp(source.getTimestamp());
                                 di.setDate(source.getTimestamp());
-                                di.setContentSize(source.size);
-                                di.setTargetsize(source.size);
+                                di.setContentSize(actualContentSize);
+                                di.setTargetsize(actualContentSize);
                                 di.setDescription(type.getDefaultTitle(name, ext));
                                 list.add(di);
                                 areFilesAdded = true;
@@ -367,10 +386,14 @@ public class DownloadIndexesService  {
 						e.printStackTrace();
 					}
 				} else {
+					long actualContentSize = lf.length();
+					if (name.toLowerCase().endsWith(".gz")) {
+                        actualContentSize = getGzipUncompressedSize(lf);
+                    }
 					di.setTimestamp(lf.lastModified());
 					di.setDate(lf.lastModified());
-					di.setContentSize(lf.length());
-					di.setTargetsize(lf.length());
+					di.setContentSize(actualContentSize);
+					di.setTargetsize(actualContentSize);
 					di.setDescription(type.getDefaultTitle(name, ext));
 					list.add(di);
 				}
@@ -422,6 +445,7 @@ public class DownloadIndexesService  {
 	    VOICE("indexes") ,
 	    DEPTH("indexes/inapp/depth", "depth"), // Deprecated
 	    DEPTHMAP("depth", "depth") ,
+	    STARMAP("indexes") ,
 	    FONTS("indexes/fonts", "fonts") ,
 	    WIKIMAP("wiki", "wiki") ,
 	    TRAVEL("travel", "wikivoyage", "travel") ,
@@ -468,6 +492,8 @@ public class DownloadIndexesService  {
                     return fileName.endsWith(".travel.obf.zip") || fileName.endsWith(".travel.obf");
                 case OSMLIVE:
                 	return fileName.endsWith(".obf.gz");
+                case STARMAP:
+                	return fileName.endsWith(".stardb.gz");
                 case MAP:
                 case ROAD_MAP:
                 case WIKIMAP:
@@ -495,6 +521,8 @@ public class DownloadIndexesService  {
 				return String.format("Roads, POI, Address data for %s", regionName);
 			case WIKIMAP:
 				return String.format("Wikipedia POI data for %s", regionName);
+			case STARMAP:
+				return String.format("Starmap for %s", regionName);
 			case DEPTH:
 			case DEPTHMAP:
 				return String.format("Depth maps for %s", regionName);
@@ -570,7 +598,7 @@ public class DownloadIndexesService  {
 	}
 		
 	public enum PredefinedServerSpecialty {
-		MAIN(DownloadType.VOICE, DownloadType.FONTS, DownloadType.MAP),
+		MAIN(DownloadType.VOICE, DownloadType.STARMAP, DownloadType.FONTS, DownloadType.MAP),
 		SRTM(DownloadType.SRTM_MAP),
 		HILLSHADE(DownloadType.HILLSHADE),
 		SLOPE(DownloadType.SLOPE),

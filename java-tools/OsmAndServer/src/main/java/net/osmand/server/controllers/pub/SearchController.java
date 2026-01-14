@@ -79,7 +79,7 @@ public class SearchController {
                                             @RequestParam double lat,
                                             @RequestParam double lon,
                                             @RequestParam(required = false) Boolean baseSearch) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
 
@@ -290,6 +290,14 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(content));
     }
 
+    @GetMapping(path = {"/search-transport-stops"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> searchTransportStops(@RequestParam String northWest,
+                                                       @RequestParam String southEast) throws IOException {
+        SearchService.TransportStopsSearchResult result = searchService.searchTransportStops(northWest, southEast);
+        return ResponseEntity.ok(gson.toJson(result));
+    }
+
     @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {
@@ -300,7 +308,12 @@ public class SearchController {
         String wikiTitle = wikiTagData.getWikiTitle();
         List<WikiImage> wikiImages = wikiTagData.getWikiImages();
 
-        Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
+        return getPhotos(wikidataId, wikiCategory, wikiTitle, wikiImages);
+    }
+
+	private ResponseEntity<String> getPhotos(String wikidataId, String wikiCategory, String wikiTitle,
+			List<WikiImage> wikiImages) {
+		Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
 
         images.forEach(img -> {
             WikiImage wikiImage = new WikiImage("", (String) img.get("image"), "", "", "");
@@ -315,5 +328,25 @@ public class SearchController {
         });
         FeatureCollection featureCollection = wikiService.convertToFeatureCollection(wikiImages);
         return ResponseEntity.ok(gson.toJson(featureCollection));
+	}
+    
+    @GetMapping(path = {"/get-photos"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> gePhotos(@RequestParam(required = false) String wikidataId, 
+    		@RequestParam(required = false) String wikiCategory, @RequestParam(required = false) String wikiTitle) {
+        return getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>());
+    }
+
+    @GetMapping(path = {"/parse-location"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> parseLocation(@RequestParam String location) {
+        LatLon coordinates = searchService.parseLocation(location);
+        if (coordinates == null) {
+            return ResponseEntity.ok(gson.toJson(null));
+        }
+        Map<String, Double> result = new HashMap<>();
+        result.put("lat", coordinates.getLatitude());
+        result.put("lon", coordinates.getLongitude());
+        return ResponseEntity.ok(gson.toJson(result));
     }
 }
