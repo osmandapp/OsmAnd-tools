@@ -7,6 +7,9 @@ import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
+import java.awt.Shape;
+import java.awt.Stroke;
+import java.awt.font.GlyphVector;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
@@ -94,6 +97,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		// draw user points
 		int[] xPoints = new int[4];
 		int[] yPoints = new int[4];
+		boolean upDown = true;
 		for (LineObject e : linesToDraw) {
 			Line2D p = e.line;
 			Way w = e.w;
@@ -132,8 +136,10 @@ public class MapPointsLayer implements MapPanelLayer {
 			}
 			g.drawPolygon(xPoints, yPoints, 4);
 			g.fillPolygon(xPoints, yPoints, 4);
-			if(name != null && name.length() > 0 && map.getZoom() >= 16) {
-				g.drawOval((int) p.getX2(), (int) p.getY2(), 6, 6);
+			if (name != null && name.length() > 0 && map.getZoom() >= 16) {
+				Stroke prevStroke = g.getStroke();
+				g.setStroke(new BasicStroke(3.0f));
+				g.drawOval((int) p.getX2() - 6, (int) p.getY2() -6, 10, 10);
 
 				Font prevFont = g.getFont();
 				Color prevColor = g.getColor();
@@ -142,28 +148,33 @@ public class MapPointsLayer implements MapPanelLayer {
 				double flt = Math.atan2(p.getX2() - p.getX1(), p.getY2() - p.getY1());
 
 				AffineTransform ps = new AffineTransform(prev);
-				ps.translate((p.getX2() + p.getX1()) / 2, (int)(p.getY2() + p.getY1()) / 2);
+//				ps.translate((p.getX2() + p.getX1()) / 2, (int)(p.getY2() + p.getY1()) / 2);
+				ps.translate(p.getX2(), p.getY2());
 				if(flt < Math.PI && flt > 0) {
 					ps.rotate(p.getX2() - p.getX1(), p.getY2() - p.getY1());
 				} else {
 					ps.rotate(-(p.getX2() - p.getX1()), -(p.getY2() - p.getY1()));
 				}
 				g.setTransform(ps);
-
-				g.setFont(whiteFont);
+				GlyphVector gv = whiteFont.createGlyphVector(g.getFontRenderContext(), name);
+				int shiftX = (int) (gv.getVisualBounds().getWidth() / 2);
+				int shiftY = upDown ? 15 : -15;
+				upDown = !upDown;
+				Shape textShape = gv.getOutline(-shiftX, -shiftY);
+				
 				g.setColor(Color.white);
-				float c = 1.3f;
-				g.scale(c, c);
-				g.drawString(name, -15, (int) (-10/c));
-				g.scale(1/c, 1/c);
+				g.setFont(whiteFont);
+//				g.drawString(name, -15, -10);
+				g.draw(textShape);
 
 				if(white) {
 					g.setColor(Color.lightGray);
 				} else {
 					g.setColor(Color.DARK_GRAY);
 				}
-				g.drawString(name, -15, -10);
-
+				g.drawString(name, -shiftX, -shiftY);
+				
+				g.setStroke(prevStroke);
 				g.setColor(prevColor);
 				g.setTransform(prev);
 				g.setFont(prevFont);
@@ -175,7 +186,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		Map<Point, Node> pointsToDraw = this.pointsToDraw;
 		g.setColor(color);
 		if (whiteFont == null) {
-			whiteFont = g.getFont().deriveFont(15).deriveFont(Font.BOLD);
+			whiteFont = g.getFont().deriveFont(21).deriveFont(Font.BOLD);
 		}
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);

@@ -69,7 +69,9 @@ public class GpxService {
 
         Map<String, String> extensions = gpxFile.getExtensions();
         gpxData.ext = (extensions);
-        gpxData.trackAppearance = (new WebGpxParser.WebTrackAppearance(extensions));
+        if (!gpxFile.getTracks().isEmpty()) {
+            gpxData.trackAppearance = (new WebGpxParser.WebTrackAppearance(extensions));
+        }
 
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
