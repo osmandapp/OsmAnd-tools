@@ -14,6 +14,7 @@ import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
 
 import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
 import static net.osmand.data.MapObject.unzipContent;
+import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 
@@ -1113,21 +1115,51 @@ public class SearchService {
     }
 
     private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
+        String dominatedCity = "";
+        Map<String, Integer> cityCounter = new TreeMap<>();
+        for (Amenity amenity : amenities) {
+            String cityName = amenity.getCityFromTagGroups(locale);
+            if (!Algorithms.isEmpty(cityName)) {
+                String mainCity = getMainCityName(cityName);
+                String domCity = getDominatedCity(cityCounter, mainCity);
+                if (domCity != null) {
+                    dominatedCity = domCity;
+                    break;
+                }
+            }
+        }
         for (Amenity amenity : amenities) {
             if (remainingLimit <= 0) {
                 break;
             }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
+                String cityName = amenity.getCityFromTagGroups(locale);
+                String mainCity = getMainCityName(cityName);
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = amenity.getCityFromTagGroups(locale);
+                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity);
                 foundFeatures.put(osmId, getPoiFeature(result));
                 remainingLimit--;
             }
         }
+    }
+
+    private String calculateAddressString(Amenity amenity, String locale, String mainCity, String dominatedCity) {
+        String cityName = amenity.getCityFromTagGroups(locale);
+        if (cityName == null) {
+            cityName = "";
+        }
+        String streetName = amenity.getStreetName();
+        if (Algorithms.isEmpty(streetName)) {
+            return cityName.isEmpty() ? null : cityName;
+        }
+        String houseNumber = amenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
+        String addr = streetName + (Algorithms.isEmpty(houseNumber) ? "" : " " + houseNumber);
+
+        return createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
 	public Feature getFeature(SearchResult result) {
