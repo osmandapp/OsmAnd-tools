@@ -1135,7 +1135,8 @@ public class SearchService {
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
                 String cityName = amenity.getCityFromTagGroups(locale);
-                String mainCity = getMainCityName(cityName);
+                String city = cityName == null ? "" : cityName;
+                String mainCity = getMainCityName(city);
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
