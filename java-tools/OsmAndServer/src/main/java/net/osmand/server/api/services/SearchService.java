@@ -10,6 +10,7 @@ import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
 import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
@@ -1342,11 +1343,12 @@ public class SearchService {
                                 .stream()
                                 .map(TransportStop::getId)
                                 .toList();
-                        List<LatLon> nodes = route.getForwardWays()
+                        List<List<LatLon>> nodes = route.getForwardWays()
                                 .stream()
-                                .flatMap(way -> way.getNodes()
+                                .map(way -> way.getNodes()
                                         .stream()
-                                        .map(node -> new LatLon(node.getLatitude(), node.getLongitude())))
+                                        .map(Node::getLatLon)
+                                        .toList())
                                 .toList();
                         return new TransportRouteFeature(route.getId(), stops, nodes);
                     }
@@ -1424,7 +1426,7 @@ public class SearchService {
     public record TransportStopFeature(long id, String name, String type, String ref, String color) {
     }
 
-    public record TransportRouteFeature(long id, List<Long> stops, List<LatLon> nodes) {
+    public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
     public LatLon parseLocation(String locationString) {
