@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,7 +31,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 	
-	private static final int DEFAULT_THREADS = 2; // Wikimedia limits the number of per-IP connections to 2 https://dumps.wikimedia.org/
+	private static final int DEFAULT_THREADS = 8;
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
@@ -38,10 +39,12 @@ public class CommonsWikimediaPreparation {
 	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
 	private static final AtomicLong totalPagesCount = new AtomicLong(0);
 	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
+	private static final AtomicLong changedLicenseCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
+	private static boolean showLog = false;
 
 	public static void main(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
@@ -58,6 +61,7 @@ public class CommonsWikimediaPreparation {
 		boolean recreateDb = opts.getBoolean("--recreate_db");
 		boolean keepFiles = opts.getBoolean("--keep_files");
 		int threads = opts.getIntOrDefault("--threads", DEFAULT_THREADS);
+		showLog = opts.getBoolean("--show_log");
 
 		if (mode.isEmpty() || folder.isEmpty()) {
 			printHelp();
@@ -99,7 +103,8 @@ public class CommonsWikimediaPreparation {
 		--result_db=/path/to/result_db/meta_commonswiki.sqlite
 		--recreate_db recreate meta_commonswiki.sqlite
 		--keep_files keep downloaded files instead of deleting them
-		--threads=8 number of parsing threads
+		--threads=8 number of parsing threads (downloads always run in a single thread)
+		--show_log show license update log
 		
 		--mode=parse-img-meta
 		  Recreates the RESULT_SQLITE database and downloads, then parses commonswiki-latest-pages-articles.xml.gz
@@ -170,6 +175,9 @@ public class CommonsWikimediaPreparation {
 		log.info("Added to queue: " + articlesCount.get());
 		log.info("Written to database: " + writtenToDatabaseCount.get());
 		log.info("Other errors: " + otherErrorsCount.get());
+		if (showLog) {
+			log.info("Changed licenses: " + changedLicenseCount.get());
+		}
 		log.info("========= End Statistics =========");
 	}
 
@@ -208,13 +216,31 @@ public class CommonsWikimediaPreparation {
 					date = excluded.date, \
 					license = excluded.license, \
 					description = excluded.description;""")) {
+				PreparedStatement selectStatement = conn.prepareStatement("""
+					SELECT id, name, license FROM common_meta WHERE id = ?;""");
 
 				int counter = 0;
-
+				try (Statement st = conn.createStatement();
+					 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM common_meta")) {
+					rs.next();
+					log.info("Rows in common_meta at start: %d".formatted( rs.getInt(1)));
+				}
 				while (true) {
 					Article a = QUEUE.take();
 					if (a == END_SIGNAL) break;
-
+					if (showLog) {
+						selectStatement.setLong(1, a.id);
+						try (ResultSet rs = selectStatement.executeQuery()) {
+							if (rs.next()) {
+								String oldLicense = rs.getString("license");
+								if (!Objects.equals(oldLicense, a.license)) {
+									changedLicenseCount.incrementAndGet();
+									log.info("==== Article %s (%s) license changed from %s to %s"
+											.formatted(rs.getString("name"), rs.getString("id"), oldLicense, a.license));
+								}
+							}
+						}
+					}
 					insertStatement.setLong(1, a.id);
 					insertStatement.setString(2, a.title);
 					insertStatement.setString(3, a.author);
