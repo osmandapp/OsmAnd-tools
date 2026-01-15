@@ -75,8 +75,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     private static final String YES = "yes";
     private static final String ROLE = "role";
+    private static final String OUTLINE = "outline";
     private static final String BUILDING = "building";
     private static final String BUILDING_PART = "building:part";
+    private static final String BUILDING_OUTLINE_TYPE = "building_outline_type";
 
     private static final String MULTIPOLYGON = "multipolygon";
     Map<Long, TIntArrayList> multiPolygonsWays = new LinkedHashMap<Long, TIntArrayList>();
@@ -183,10 +185,21 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
                 && (e.getTag(BUILDING) != null || e.getTag(BUILDING_PART) != null);
         if (hasTypeBuilding || hasMultipolygonBuilding) {
             ctx.loadEntityRelation(e);
+            String buildingOutlineType = null;
+            for (RelationMember entry : e.getMembers()) {
+                if (OUTLINE.equals(entry.getRole())) {
+                    buildingOutlineType = entry.getEntity().getTag(BUILDING);
+                    break;
+                }
+            }
             for (RelationMember entry : e.getMembers()) {
                 String role = entry.getRole();
                 if (!Algorithms.isEmpty(role)) {
                     PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
+                    if (buildingOutlineType != null && YES.equals(entry.getEntity().getTag(BUILDING_PART))) {
+                        // converted to building:part by entity_convert (putThroughTags does not overwrite)
+                        p.putThroughTags.put(BUILDING_OUTLINE_TYPE, buildingOutlineType);
+                    }
                     p.putThroughTags.put(ROLE + "_" + role, YES);
                 }
             }
