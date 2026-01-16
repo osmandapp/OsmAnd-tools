@@ -298,6 +298,20 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(result));
     }
 
+    @GetMapping(path = {"/get-transport-route"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getTransportRoute(@RequestParam double lat,
+                                                    @RequestParam double lon,
+                                                    @RequestParam long stopId,
+                                                    @RequestParam long routeId) throws IOException {
+        LatLon transportStopCoords = new LatLon(lat, lon);
+        SearchService.TransportRouteFeature result = searchService.getTransportRoute(transportStopCoords, stopId, routeId);
+        if (result == null) {
+            return ResponseEntity.badRequest().body("Error get transport route!");
+        }
+        return ResponseEntity.ok(gson.toJson(result));
+    }
+
     @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {
