@@ -216,14 +216,14 @@ public class CommonsWikimediaPreparation {
 					date = excluded.date, \
 					license = excluded.license, \
 					description = excluded.description;""")) {
-				PreparedStatement selectStatement = conn.prepareStatement("""
-					SELECT id, name, license FROM common_meta WHERE id = ?;""");
+				PreparedStatement selectStatement = conn
+						.prepareStatement("SELECT id, name, license FROM common_meta WHERE id = ?");
 
 				int counter = 0;
 				try (Statement st = conn.createStatement();
 					 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM common_meta")) {
 					rs.next();
-					log.info("Rows in common_meta at start: %d".formatted( rs.getInt(1)));
+					log.info("Rows in common_meta at start: %d".formatted(rs.getInt(1)));
 				}
 				while (true) {
 					Article a = QUEUE.take();
