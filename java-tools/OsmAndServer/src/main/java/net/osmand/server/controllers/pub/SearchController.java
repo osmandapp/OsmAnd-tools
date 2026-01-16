@@ -306,6 +306,9 @@ public class SearchController {
                                                     @RequestParam long routeId) throws IOException {
         LatLon transportStopCoords = new LatLon(lat, lon);
         SearchService.TransportRouteFeature result = searchService.getTransportRoute(transportStopCoords, stopId, routeId);
+        if (result == null) {
+            return ResponseEntity.badRequest().body("Error get transport route!");
+        }
         return ResponseEntity.ok(gson.toJson(result));
     }
 

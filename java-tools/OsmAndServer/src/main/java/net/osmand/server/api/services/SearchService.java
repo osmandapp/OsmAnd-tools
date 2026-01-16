@@ -1306,13 +1306,7 @@ public class SearchService {
         }
 
         if (features.isEmpty()) {
-            int left31 = (int) getSearchBbox(bbox).left;
-            int right31 = (int) getSearchBbox(bbox).right;
-            int top31 = (int) getSearchBbox(bbox).top;
-            int bottom31 = (int) getSearchBbox(bbox).bottom;
-            LOGGER.error(String.format(
-                    "No transport stops found for bbox northWest=%s southEast=%s (31bit l=%d r=%d t=%d b=%d)",
-                    northWest, southEast, left31, right31, top31, bottom31));
+            return new TransportStopsSearchResult(false, new FeatureCollection());
         }
         return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
     }
@@ -1337,7 +1331,11 @@ public class SearchService {
                 }
             }
             if (foundStop != null) {
-                for (TransportRoute route : foundStop.getRoutes()) {
+                List<TransportRoute> routes = foundStop.getRoutes();
+                if (routes == null || routes.isEmpty()) {
+                    return null;
+                }
+                for (TransportRoute route : routes) {
                     if (route.getId() == routeId) {
                         List<Long> stops = route.getForwardStops()
                                 .stream()
@@ -1354,8 +1352,6 @@ public class SearchService {
                     }
                 }
             }
-        } catch (IOException e) {
-            LOGGER.error("Error reading transport routes", e);
         } finally {
             osmAndMapsService.unlockReaders(readerResult.readers);
         }
