@@ -31,7 +31,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 	
-	private static final int DEFAULT_THREADS = 8;
+	private static final int DEFAULT_THREADS = 8; // it's parsing threads (downloads always run in a single thread https://dumps.wikimedia.org/)
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
@@ -313,6 +313,7 @@ public class CommonsWikimediaPreparation {
 		private final FileProgressImplementation progress;
 
 		private final StringBuilder textContent = new StringBuilder();
+		private final StringBuilder lastRevisionText = new StringBuilder();
 
 		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) {
 			this.saxParser = saxParser;
@@ -371,6 +372,8 @@ public class CommonsWikimediaPreparation {
 						revisionTag = false;
 					}
 					case "page" -> {
+						parseMeta();
+						lastRevisionText.setLength(0);
 						pageTag = false;
 						pageIdParsed = false;
 						pageTextParsed = false;
@@ -382,7 +385,8 @@ public class CommonsWikimediaPreparation {
 					case "text" -> {
 						if (revisionTag && !pageTextParsed) {
 							pageTextParsed = true;
-							parseMeta();
+							lastRevisionText.setLength(0);
+							lastRevisionText.append(textContent);
 						}
 						ctext = null;
 					}
@@ -392,14 +396,14 @@ public class CommonsWikimediaPreparation {
 
 		private void parseMeta() {
 			try {
-				if (FILE_NAMESPACE.contentEquals(ns)) {
+				if (!lastRevisionText.isEmpty() && FILE_NAMESPACE.contentEquals(ns)) {
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
 					if (imageTitle == null) {
 						return;
 					}
 					totalPagesCount.incrementAndGet();
 					Map<String, String> meta = new HashMap<>();
-					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
+					WikiDatabasePreparation.removeMacroBlocks(lastRevisionText, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.get("author");
 					String license = meta.get("license");
