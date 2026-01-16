@@ -307,7 +307,7 @@ public class SearchController {
         LatLon transportStopCoords = new LatLon(lat, lon);
         SearchService.TransportRouteFeature result = searchService.getTransportRoute(transportStopCoords, stopId, routeId);
         if (result == null) {
-            return ResponseEntity.badRequest().body("Error get transport route!");
+            return ResponseEntity.badRequest().body("Error getting transport route!");
         }
         return ResponseEntity.ok(gson.toJson(result));
     }
@@ -320,7 +320,7 @@ public class SearchController {
         LatLon transportStopCoords = new LatLon(lat, lon);
         Feature result = searchService.getTransportStop(transportStopCoords, stopId);
         if (result == null) {
-            return ResponseEntity.badRequest().body("Error get transport stop!");
+            return ResponseEntity.badRequest().body("Error getting transport stop!");
         }
         return ResponseEntity.ok(gson.toJson(result));
     }
