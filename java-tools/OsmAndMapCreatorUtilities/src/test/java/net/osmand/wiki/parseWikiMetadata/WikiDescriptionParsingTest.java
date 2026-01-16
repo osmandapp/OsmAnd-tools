@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static net.osmand.wiki.parseWikiMetadata.WikiTestUtils.blockPhotograph;
+import static net.osmand.wiki.parseWikiMetadata.WikiTestUtils.informationBlock;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
@@ -128,22 +130,6 @@ public class WikiDescriptionParsingTest {
 		WikiDatabasePreparation.removeMacroBlocks(new StringBuilder(text), webResults, blockResults,
 				null, lang, null, null, null);
 		WikiDatabasePreparation.prepareMetaData(webResults);
-	}
-
-	private static String informationBlock(String content) {
-		return "=={{int:filedesc}}==\n" +
-				"{{Information\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String blockPhotograph(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{Photograph\n" +
-				content +
-				"}}\n" +
-				"\n";
 	}
 }
 
