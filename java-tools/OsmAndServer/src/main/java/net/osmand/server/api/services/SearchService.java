@@ -1358,6 +1358,27 @@ public class SearchService {
         return null;
     }
 
+    public Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
+        List<LatLon> bbox = Arrays.asList(
+                new LatLon(transportStopCoords.getLatitude() + SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(transportStopCoords.getLatitude() - SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SEARCH_POI_RADIUS_DEGREE)
+        );
+        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
+        if (readerResult == null) {
+            return null;
+        }
+        try {
+            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
+                if (s.getId() == stopId) {
+                    return convertTransportStopToFeature(s);
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+        return null;
+    }
+
     private TransportStopsReaderResult getTransportStopsReader(List<LatLon> bbox) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;

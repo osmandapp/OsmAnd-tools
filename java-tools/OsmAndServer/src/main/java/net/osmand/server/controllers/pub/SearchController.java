@@ -312,6 +312,19 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(result));
     }
 
+    @GetMapping(path = {"/get-transport-stop"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getTransportStop(@RequestParam double lat,
+                                                    @RequestParam double lon,
+                                                    @RequestParam long stopId) throws IOException {
+        LatLon transportStopCoords = new LatLon(lat, lon);
+        Feature result = searchService.getTransportStop(transportStopCoords, stopId);
+        if (result == null) {
+            return ResponseEntity.badRequest().body("Error get transport stop!");
+        }
+        return ResponseEntity.ok(gson.toJson(result));
+    }
+
     @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {
