@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static net.osmand.wiki.parseWikiMetadata.WikiTestUtils.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
@@ -54,8 +55,8 @@ public class WikiDateParsingTest {
 	@Test
 	public void test6() throws IOException, SQLException {
 		Map<String, String> webResults = new HashMap<>();
-		invoke(informationBlock("|date={{Taken on|2014-03-09|location=Test Location}}\n"), webResults);
-		assertEquals("2014-03-09", webResults.get("date"));
+		invoke(informationBlock("|date={{Taken on|2016-02-23 15:45:15 (UTC)|location=Test Location}}\n"), webResults);
+		assertEquals("2016-02-23", webResults.get("date"));
 	}
 
 	@Test
@@ -72,28 +73,19 @@ public class WikiDateParsingTest {
 		assertNull("Date should be null when not found", webResults.get("date"));
 	}
 
+	@Test
+	public void test9() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(blockMilim("| date = 2009-07-24\n| dateposted = 2009-07-24 04:37"), webResults);
+		assertEquals("2009-07-24", webResults.get("date"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
 		WikiDatabasePreparation.removeMacroBlocks(new StringBuilder(text), webResults, blockResults,
 				null, null, null, null, true);
 		WikiDatabasePreparation.prepareMetaData(webResults);
-	}
-
-	private static String informationBlock(String content) {
-		return "=={{int:filedesc}}==\n" +
-				"{{Information\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String blockPhotograph(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{Photograph\n" +
-				content +
-				"}}\n" +
-				"\n";
 	}
 }
 

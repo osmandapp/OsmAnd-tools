@@ -1,6 +1,8 @@
 package net.osmand.wiki.commonswiki.parser;
 
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FIELD_DATE;
 
@@ -56,9 +58,11 @@ public final class DateParser {
 		}
 
 		// Find the part matching YYYY-MM-DD format
+		Pattern DATE_PATTERN_C = Pattern.compile(DATE_PATTERN);
 		for (String part : parts) {
-			if (part.matches(DATE_PATTERN)) {
-				return part.trim();
+			Matcher m = DATE_PATTERN_C.matcher(part);
+			if (m.find()) {
+				return m.group(0); // extracted YYYY-MM-DD
 			}
 		}
 

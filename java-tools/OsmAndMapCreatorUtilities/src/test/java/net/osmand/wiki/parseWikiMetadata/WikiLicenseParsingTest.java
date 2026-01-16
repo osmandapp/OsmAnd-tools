@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static net.osmand.wiki.parseWikiMetadata.WikiTestUtils.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
@@ -155,28 +156,6 @@ public class WikiLicenseParsingTest {
 				"\n";
 	}
 
-	private static String informationBlock(String content) {
-		return "=={{int:filedesc}}==\n" +
-				"{{Information\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
 
-	private static String blockPhotograph(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{Photograph\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String blockMilim(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{milim\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
 }
 
