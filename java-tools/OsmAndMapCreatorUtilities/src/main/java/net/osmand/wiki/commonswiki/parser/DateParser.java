@@ -72,7 +72,8 @@ public final class DateParser {
 	private static String parseDateFromPlainText(String dateValue) {
 		// Extract the date part (before first space, if any)
 		String[] parts = dateValue.split(" ");
-		return parts[0].trim();
+		String res = parts[0].trim();
+		return res.matches(DATE_PATTERN) ? res : dateValue;
 	}
 
 	private static String cleanDate(String date) {
