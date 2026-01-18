@@ -35,18 +35,6 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			Object oClaims = obj.get(CLAIMS_KEY);
 			if (oClaims instanceof JsonObject) {
 				JsonObject claims = obj.getAsJsonObject(CLAIMS_KEY);
-				claims.keySet().forEach(key -> {
-					JsonArray array = claims.getAsJsonArray(key);
-					List<Map<String, JsonElement>> list = new ArrayList<>();
-					for (int i = 0; i < array.size(); i++) {
-						Map<String, JsonElement> item = new HashMap<>();
-						array.get(i).getAsJsonObject().entrySet().forEach(entry -> {
-							item.put(entry.getKey(), entry.getValue());
-						});
-						list.add(item);
-					}
-					article.claims.put(key, list);
-				});
 				JsonArray propCoords = claims.getAsJsonArray(PROP_COMMON_COORDS);
 				if (propCoords != null) {
 					JsonObject coordinatesDataValue = propCoords.get(0).getAsJsonObject().getAsJsonObject(MAINSNAK_KEY)
@@ -138,7 +126,6 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private String imageProp;
 		private String commonCat;
 		private Map<String, String> labels;
-		private final Map<String, List<Map<String, JsonElement>>> claims = new HashMap<>();
 
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
@@ -194,10 +181,6 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 
 		public void setLabels(Map<String, String> labels) {
 			this.labels = labels;
-		}
-
-		public Map<String, List<Map<String, JsonElement>>> getClaims() {
-			return claims;
 		}
 	}
 

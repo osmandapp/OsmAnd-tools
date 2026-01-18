@@ -61,7 +61,7 @@ public class WikiDataHandler extends DefaultHandler {
 
 	OsmCoordinatesByTag osmWikiCoordinates;
 	private long lastProcessedId;
-	private AstroDataHandler astroHandler = new AstroDataHandler();
+	private final AstroDataHandler astroHandler = new AstroDataHandler();
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
 	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)

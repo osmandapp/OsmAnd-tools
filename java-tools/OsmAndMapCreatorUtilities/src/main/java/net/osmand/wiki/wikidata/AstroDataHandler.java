@@ -35,9 +35,11 @@ public class AstroDataHandler {
 			ArticleMapper.Article article,
 			PhysicalProperties physics,
 			List<CatalogEntry> catalogs,
+			Map<String, List<Map<String, JsonElement>>> claims,
+			Map<String, String> descriptions,
 			String json
 	) {
-		public Map<String, String> getWiki() {
+		public Map<String, String> getSiteLinks() {
 			Map<String, String> wiki = new HashMap<>();
 			for (ArticleMapper.SiteLink link : article.getSiteLinks()) {
 				wiki.put(link.lang(), link.title());
@@ -56,6 +58,7 @@ public class AstroDataHandler {
 	}
 
 	private static final Log log = PlatformUtil.getLog(AstroDataHandler.class);
+	private static final String ASTRO_JSON_DIR_ENV = "ASTRO_JSON_DIR";
 	private static final List<String> INPUT_FILES = List.of(
 			"solar_system.json",
 			"galaxies.json",
@@ -107,12 +110,31 @@ public class AstroDataHandler {
 			"Q828224", KM_TO_SOLAR_R,
 			"Q1811", (AU_TO_PC / M_TO_PC) * M_TO_SOLAR_R
 	);
+	private static final String ASTRO_MAPPING_TYPE_LABEL = "label";
+	private static final String ASTRO_MAPPING_TYPE_SITELINK = "sitelink";
+	private static final String ASTRO_MAPPING_TYPE_DESCRIPTION = "description";
+
 	private final ObjectMapper objectMapper = new ObjectMapper();
 	private final Map<Long, Map<String, Object>> items;
 	private final List<EntityData> entities = new ArrayList<>();
 
 	public AstroDataHandler() throws IOException {
-		this.items = getAstroMap(Path.of("../../resources/astro"));
+		this.items = getAstroMap(resolveAstroInputDir());
+	}
+
+	private static Path resolveAstroInputDir() throws IOException {
+		String astroJsonDir = System.getenv(ASTRO_JSON_DIR_ENV);
+		Path dir;
+		if (astroJsonDir != null && !astroJsonDir.isBlank()) {
+			dir = Path.of(astroJsonDir).toAbsolutePath().normalize();
+		} else {
+			throw new IOException("Environment variable " + ASTRO_JSON_DIR_ENV + " is not set!");
+		}
+		if (!Files.isDirectory(dir)) {
+			throw new IOException("Astro JSON directory not found or not a directory: " + dir
+					+ " (set " + ASTRO_JSON_DIR_ENV + " env var to override)");
+		}
+		return dir;
 	}
 
 	private static String normalizeNameKey(String s) {
@@ -203,9 +225,14 @@ public class AstroDataHandler {
 	}
 
 	public void addItem(long qid, ArticleMapper.Article article, String json) {
+		if (json == null || json.isBlank()) {
+			return;
+		}
+
 		Map<String, Object> map = items.get(qid);
 		if (map != null) {
-			EntityData entityData = processEntityData(qid, map, article, json);
+			JsonObject obj = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+			EntityData entityData = processEntityData(qid, map, article, json, parseClaims(obj), parseDescriptions(obj));
 			entities.add(entityData);
 		}
 	}
@@ -216,7 +243,7 @@ public class AstroDataHandler {
 
 		int inserted = 0;
 		try (PreparedStatement insertObject = conn.prepareStatement(
-				"INSERT INTO Objects (id, name, type, ra, dec, lines, mag, centerwid, radius, distance, mass, hip, json, image) "
+				"INSERT OR REPLACE INTO Objects (id, name, type, ra, dec, lines, mag, centerwid, radius, distance, mass, hip, json, image) "
 						+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 			try (PreparedStatement insertCatalog = conn.prepareStatement(
 					"INSERT OR IGNORE INTO Catalogs (catalogWid, catalogName) VALUES (?, ?)")) {
@@ -224,26 +251,37 @@ public class AstroDataHandler {
 						"INSERT OR REPLACE INTO CatalogIds (id, catalogWid, catalogId) VALUES (?, ?, ?)")) {
 					try (PreparedStatement insertName = conn.prepareStatement(
 							"INSERT OR IGNORE INTO Names (id, name, type) VALUES (?, ?, ?)")) {
+						try (PreparedStatement deleteAstroMappings = conn.prepareStatement(
+								"DELETE FROM AstroMappings WHERE id = ?")) {
+							try (PreparedStatement upsertAstroMapping = conn.prepareStatement(
+									"INSERT OR REPLACE INTO AstroMappings (id, type, lang, value) VALUES (?, ?, ?, ?)")) {
 
-						for (EntityData entityData : entities) {
-							if (entityData.article == null) {
-								continue;
+								for (EntityData entityData : entities) {
+									if (entityData.article == null) {
+										continue;
+									}
+
+									insertObject(insertObject, entityData);
+
+									deleteAstroMappings.setLong(1, entityData.qid);
+									deleteAstroMappings.execute();
+									upsertAstroMappings(upsertAstroMapping, entityData);
+
+									inserted++;
+									for (CatalogEntry c : entityData.catalogs) {
+										insertCatalog.setString(1, c.catalogQid);
+										insertCatalog.setString(2, c.catalogName);
+										insertCatalog.execute();
+
+										upsertCatalogId.setLong(1, entityData.qid);
+										upsertCatalogId.setString(2, c.catalogQid);
+										upsertCatalogId.setString(3, c.code);
+										upsertCatalogId.execute();
+									}
+
+									insertNames(insertName, entityData);
+								}
 							}
-
-							insertObject(insertObject, entityData);
-							inserted++;
-							for (CatalogEntry c : entityData.catalogs) {
-								insertCatalog.setString(1, c.catalogQid);
-								insertCatalog.setString(2, c.catalogName);
-								insertCatalog.execute();
-
-								upsertCatalogId.setLong(1, entityData.qid);
-								upsertCatalogId.setString(2, c.catalogQid);
-								upsertCatalogId.setString(3, c.code);
-								upsertCatalogId.execute();
-							}
-
-							insertNames(insertName, entityData);
 						}
 					}
 				}
@@ -262,56 +300,70 @@ public class AstroDataHandler {
 		}
 		conn.commit();
 
+		boolean previousAutoCommit = conn.getAutoCommit();
+		conn.setAutoCommit(true);
 		try (Statement st = conn.createStatement()) {
 			st.execute("PRAGMA journal_mode = DELETE");
 			st.execute("PRAGMA page_size = 4096");
 			st.execute("VACUUM");
-			conn.commit();
+		} finally {
+			conn.setAutoCommit(previousAutoCommit);
 		}
 	}
 
 	private void initDb(Connection conn) throws SQLException {
 		try (Statement st = conn.createStatement()) {
-			st.execute("CREATE TABLE IF NOT EXISTS Objects (" +
-					"id INTEGER, " +
-					"name TEXT, " +
-					"type TEXT, " +
-					"ra REAL, " +
-					"dec REAL, " +
-					"lines TEXT, " +
-					"centerwid TEXT, " +
-					"mag REAL, " +
-					"radius REAL, " +
-					"distance REAL, " +
-					"mass REAL, " +
-					"hip INTEGER, " +
-					"json TEXT, " +
-					"image TEXT, " +
-					"PRIMARY KEY (id, name, type)" +
-					")");
-
-			st.execute("CREATE TABLE IF NOT EXISTS Names (" +
-					"id INTEGER, " +
-					"name TEXT, " +
-					"type TEXT, " +
-					"PRIMARY KEY (id, type)" +
-					") WITHOUT ROWID");
-
-			st.execute("CREATE TABLE IF NOT EXISTS Catalogs (" +
-					"catalogWid TEXT PRIMARY KEY, " +
-					"catalogName TEXT" +
-					") WITHOUT ROWID");
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS Objects (
+						id BIGINT, 
+						name TEXT, 
+						type TEXT, 
+						ra REAL, 
+						dec REAL,
+						lines TEXT,
+						centerwid TEXT,
+						mag REAL,
+						radius REAL,
+						distance REAL,
+						mass REAL, 
+						hip INTEGER, 
+						json TEXT, 
+						image TEXT, 
+					PRIMARY KEY (id, name, type))""");
 
 			st.execute("""
-							CREATE TABLE IF NOT EXISTS CatalogIds (
-								id INTEGER,
-								catalogWid TEXT,
-								catalogId TEXT,
-								PRIMARY KEY (id, catalogWid)
-							) WITHOUT ROWID
+					CREATE TABLE IF NOT EXISTS Names (
+						id BIGINT, 
+						name TEXT, 
+						type TEXT, 
+						PRIMARY KEY (id, type)
+					) WITHOUT ROWID""");
+
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS Catalogs (
+						catalogWid TEXT PRIMARY KEY,
+						catalogName TEXT
+					) WITHOUT ROWID""");
+
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS CatalogIds (
+						id BIGINT,
+						catalogWid TEXT,
+						catalogId TEXT,
+						PRIMARY KEY (id, catalogWid)
+					) WITHOUT ROWID
 					""");
 
-			st.execute("CREATE INDEX IF NOT EXISTS idx_objects_wikidata ON Objects (name)");
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS AstroMappings (
+						id BIGINT,
+						type TEXT,
+						lang TEXT,
+						value TEXT,
+						PRIMARY KEY (id, type, lang)
+					) WITHOUT ROWID""");
+
+			st.execute("CREATE INDEX IF NOT EXISTS idx_astro_mappings_type_lang ON AstroMappings (type, lang)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_objects_name_nocase ON Objects (name COLLATE NOCASE)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_names_name_nocase ON Names (name COLLATE NOCASE)");
 			st.execute("CREATE INDEX IF NOT EXISTS idx_ids_catalog_nocase ON CatalogIds (catalogId COLLATE NOCASE)");
@@ -347,7 +399,7 @@ public class AstroDataHandler {
 		String groupKey = asString(data.map.get("astro_group"));
 		Map<String, Object> item = data.map;
 		Map<String, String> labels = data.article.getLabels();
-		Map<String, String> wiki = data.getWiki();
+		Map<String, String> siteLinks = data.getSiteLinks();
 
 		Double mag = asDouble(item.get("mag"));
 		boolean allLangs = !Objects.equals(groupKey, "stars") || (mag == null ? 99.0 : mag) <= MAGNITUDE_ONLY_EN;
@@ -370,7 +422,7 @@ public class AstroDataHandler {
 			nameData.computeIfAbsent(key, k -> new NameAgg(val.trim())).sources.add(lang);
 		}
 
-		for (Map.Entry<String, String> e : wiki.entrySet()) {
+		for (Map.Entry<String, String> e : siteLinks.entrySet()) {
 			String site = e.getKey();
 			String title = e.getValue();
 			if (title == null) {
@@ -379,7 +431,7 @@ public class AstroDataHandler {
 			if (!(site.length() == 6 && site.endsWith("wiki"))) {
 				continue;
 			}
-			if (!site.equals("enwiki") && !allLangs) {
+			if (!site.equals("en") && !allLangs) {
 				continue;
 			}
 			String key = normalizeNameKey(title);
@@ -398,6 +450,105 @@ public class AstroDataHandler {
 		}
 	}
 
+	private void upsertAstroMappings(PreparedStatement upsertAstroMapping, EntityData entityData) throws SQLException {
+		Map<String, String> labels = entityData.article.getLabels();
+		if (labels != null) {
+			for (Map.Entry<String, String> e : labels.entrySet()) {
+				String lang = e.getKey();
+				String value = e.getValue();
+				if (lang == null || lang.isBlank() || value == null || value.isBlank()) {
+					continue;
+				}
+				upsertAstroMapping.setLong(1, entityData.qid);
+				upsertAstroMapping.setString(2, ASTRO_MAPPING_TYPE_LABEL);
+				upsertAstroMapping.setString(3, lang);
+				upsertAstroMapping.setString(4, value);
+				upsertAstroMapping.execute();
+			}
+		}
+		for (ArticleMapper.SiteLink siteLink : entityData.article.getSiteLinks()) {
+			String lang = siteLink.lang();
+			String title = siteLink.title();
+			if (lang == null || lang.isBlank() || title == null || title.isBlank()) {
+				continue;
+			}
+			upsertAstroMapping.setLong(1, entityData.qid);
+			upsertAstroMapping.setString(2, ASTRO_MAPPING_TYPE_SITELINK);
+			upsertAstroMapping.setString(3, lang);
+			upsertAstroMapping.setString(4, title);
+			upsertAstroMapping.execute();
+		}
+
+		Map<String, String> descriptions =  entityData.descriptions;
+		if (descriptions != null) {
+			for (Map.Entry<String, String> e : descriptions.entrySet()) {
+				String lang = e.getKey();
+				String value = e.getValue();
+				if (lang == null || lang.isBlank() || value == null || value.isBlank()) {
+					continue;
+				}
+				upsertAstroMapping.setLong(1, entityData.qid);
+				upsertAstroMapping.setString(2, ASTRO_MAPPING_TYPE_DESCRIPTION);
+				upsertAstroMapping.setString(3, lang);
+				upsertAstroMapping.setString(4, value);
+				upsertAstroMapping.execute();
+			}
+		}
+	}
+
+	private Map<String, List<Map<String, JsonElement>>> parseClaims(JsonObject obj) {
+		Map<String, List<Map<String, JsonElement>>> claimsMap = new HashMap<>();
+		try {
+			JsonObject claims = (JsonObject) obj.get("claims");
+			claims.keySet().forEach(key -> {
+				JsonArray array = claims.getAsJsonArray(key);
+				List<Map<String, JsonElement>> list = new ArrayList<>();
+				for (int i = 0; i < array.size(); i++) {
+					Map<String, JsonElement> item = new HashMap<>();
+					array.get(i).getAsJsonObject().entrySet().forEach(entry -> {
+						item.put(entry.getKey(), entry.getValue());
+					});
+					list.add(item);
+				}
+				claimsMap.put(key, list);
+			});
+		} catch (Exception e) {
+			return null;
+		}
+		return claimsMap;
+	}
+
+	private Map<String, String> parseDescriptions(JsonObject obj) {
+		try {
+			JsonElement el = obj.get("descriptions");
+			if (el == null || !el.isJsonObject()) {
+				return null;
+			}
+			JsonObject descriptions = el.getAsJsonObject();
+			Map<String, String> result = new LinkedHashMap<>();
+			for (Map.Entry<String, JsonElement> entry : descriptions.entrySet()) {
+				JsonObject v = entry.getValue().isJsonObject() ? entry.getValue().getAsJsonObject() : null;
+				if (v == null) {
+					continue;
+				}
+				JsonElement langEl = v.get(ArticleMapper.LANGUAGE_KEY);
+				JsonElement valueEl = v.get(ArticleMapper.VALUE_KEY);
+				if (langEl == null || valueEl == null) {
+					continue;
+				}
+				String lang = langEl.getAsString();
+				String value = valueEl.getAsString();
+				if (lang == null || lang.isBlank() || value == null || value.isBlank()) {
+					continue;
+				}
+				result.put(lang, value);
+			}
+			return result;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	private List<Map<String, Object>> readJsonList(Path filePath) throws IOException {
 		try (InputStream is = Files.newInputStream(filePath)) {
 			return objectMapper.readValue(is, new TypeReference<>() {
@@ -405,19 +556,20 @@ public class AstroDataHandler {
 		}
 	}
 
-	private EntityData processEntityData(long qid, Map<String, Object> map, ArticleMapper.Article article, String json) {
+	private EntityData processEntityData(long qid, Map<String, Object> map, ArticleMapper.Article article, String json,
+	                                     Map<String, List<Map<String, JsonElement>>> claims, Map<String, String> descriptions) {
 		if (article == null) {
-			return new EntityData(qid, map, null, new PhysicalProperties(null, null, null), List.of(), json);
+			return new EntityData(qid, map, null, new PhysicalProperties(null, null, null), List.of(), claims, descriptions, json);
 		}
 
 		PhysicalProperties physics = new PhysicalProperties(
-				getPhysicalProperty(article.getClaims(), PROP_RADIUS, CONVERSIONS_RADIUS),
-				getPhysicalProperty(article.getClaims(), PROP_DISTANCE, CONVERSIONS_DISTANCE),
-				getPhysicalProperty(article.getClaims(), PROP_MASS, CONVERSIONS_MASS)
+				getPhysicalProperty(claims, PROP_RADIUS, CONVERSIONS_RADIUS),
+				getPhysicalProperty(claims, PROP_DISTANCE, CONVERSIONS_DISTANCE),
+				getPhysicalProperty(claims, PROP_MASS, CONVERSIONS_MASS)
 		);
 
-		List<CatalogEntry> catalogs = extractCatalogs(article.getClaims(), article.getLabels());
-		return new EntityData(qid, map, article, physics, catalogs, json);
+		List<CatalogEntry> catalogs = extractCatalogs(claims, article.getLabels());
+		return new EntityData(qid, map, article, physics, catalogs, claims, descriptions, json);
 	}
 
 	private Double getPhysicalProperty(Map<String, List<Map<String, JsonElement>>> claims, String propId, Map<String, Double> conversionMap) {
