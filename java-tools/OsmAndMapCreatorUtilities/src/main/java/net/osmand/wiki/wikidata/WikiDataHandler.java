@@ -61,11 +61,11 @@ public class WikiDataHandler extends DefaultHandler {
 
 	OsmCoordinatesByTag osmWikiCoordinates;
 	private long lastProcessedId;
-
+	private AstroDataHandler astroHandler = new AstroDataHandler();
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
 	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)
-			throws SQLException {
+			throws SQLException, IOException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
@@ -117,7 +117,9 @@ public class WikiDataHandler extends DefaultHandler {
         }
         mappingPrep.close();
         coordsPrep.close();
-        conn.close();
+
+	    astroHandler.run(conn);
+	    conn.close();
     }
 
     public void setLastProcessedId(Long lastProcessedId) {
@@ -207,7 +209,9 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLon(osmCoordinates.lon);
 		}
 
-		if (article.getLat() != 0 || article.getLon() != 0) {
+		if (article.getLat() == 0 && article.getLon() == 0) {
+			astroHandler.addItem(id, article, json);
+		} else  {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
