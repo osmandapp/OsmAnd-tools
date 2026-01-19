@@ -1486,7 +1486,7 @@ public class WikiDatabasePreparation {
 			sx.parse(is, handler);
 		} catch (IllegalStateException e) {
 			// stopped by limit
-			e.printStackTrace();
+			System.out.println("Stopped by limit " + e.getMessage());
 		}
 		handler.finish();
 		osmCoordinates.closeConnection();
