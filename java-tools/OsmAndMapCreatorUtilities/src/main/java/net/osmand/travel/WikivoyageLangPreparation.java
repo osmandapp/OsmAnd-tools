@@ -37,7 +37,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import net.osmand.wiki.WikivoyageOSMTags;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
@@ -57,11 +56,12 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.SqlInsertValuesReader;
 import net.osmand.util.SqlInsertValuesReader.InsertValueProcessor;
 import net.osmand.wiki.CustomWikiModel;
+import net.osmand.wiki.PoiFieldCategory;
 import net.osmand.wiki.WikiDatabasePreparation;
-import net.osmand.wiki.WikiDatabasePreparation.PoiFieldCategory;
 import net.osmand.wiki.WikiDatabasePreparation.PoiFieldType;
 import net.osmand.wiki.WikiDatabasePreparation.WikiDBBrowser;
 import net.osmand.wiki.WikiImageUrlStorage;
+import net.osmand.wiki.WikivoyageOSMTags;
 
 public class WikivoyageLangPreparation {
 	private static final Log log = PlatformUtil.getLog(WikivoyageLangPreparation.class);	

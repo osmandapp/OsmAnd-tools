@@ -10,9 +10,13 @@ import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.Node;
+import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
+import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
@@ -34,6 +38,7 @@ import java.util.stream.Collectors;
 
 import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
 import static net.osmand.data.MapObject.unzipContent;
+import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 
@@ -57,6 +62,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
+    private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String DEFAULT_SEARCH_LANG = "en";
@@ -606,7 +612,7 @@ public class SearchService {
             int remaining = poiSearchLimit != null 
                     ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
                     : TOTAL_LIMIT_POI - foundFeatures.size();
-            saveAmenityResults(amenities, foundFeatures, remaining);
+            saveAmenityResults(amenities, foundFeatures, remaining, locale);
             if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
                 break;
             }
@@ -1109,21 +1115,53 @@ public class SearchService {
         }
     }
 
-    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit) {
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
+        String dominatedCity = "";
+        Map<String, Integer> cityCounter = new TreeMap<>();
+        for (Amenity amenity : amenities) {
+            String cityName = amenity.getCityFromTagGroups(locale);
+            if (!Algorithms.isEmpty(cityName)) {
+                String mainCity = getMainCityName(cityName);
+                String domCity = getDominatedCity(cityCounter, mainCity);
+                if (domCity != null) {
+                    dominatedCity = domCity;
+                    break;
+                }
+            }
+        }
         for (Amenity amenity : amenities) {
             if (remainingLimit <= 0) {
                 break;
             }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
+                String cityName = amenity.getCityFromTagGroups(locale);
+                String city = cityName == null ? "" : cityName;
+                String mainCity = getMainCityName(city);
                 SearchResult result = new SearchResult();
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
+                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity);
                 foundFeatures.put(osmId, getPoiFeature(result));
                 remainingLimit--;
             }
         }
+    }
+
+    private String calculateAddressString(Amenity amenity, String locale, String mainCity, String dominatedCity) {
+        String cityName = amenity.getCityFromTagGroups(locale);
+        if (cityName == null) {
+            cityName = "";
+        }
+        String streetName = amenity.getStreetName();
+        if (Algorithms.isEmpty(streetName)) {
+            return cityName.isEmpty() ? null : cityName;
+        }
+        String houseNumber = amenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
+        String addr = streetName + (Algorithms.isEmpty(houseNumber) ? "" : " " + houseNumber);
+
+        return createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
 	public Feature getFeature(SearchResult result) {
@@ -1234,6 +1272,185 @@ public class SearchService {
     public static boolean isOsmUrlAvailable(MapObject object) {
         Long id = object.getId();
         return id != null && id > 0;
+    }
+
+    public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
+        List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
+        if (bbox.size() != 2) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
+        if (readerResult == null) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+
+        List<Feature> features = new ArrayList<>();
+        boolean useLimit = false;
+        
+        try {
+            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
+                if (features.size() >= TOTAL_LIMIT_TRANSPORT_STOPS) {
+                    useLimit = true;
+                    break;
+                }
+                if (!s.isDeleted() && !s.isMissingStop()) {
+                    Feature feature = convertTransportStopToFeature(s);
+                    if (feature != null) {
+                        features.add(feature);
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+
+        if (features.isEmpty()) {
+            return new TransportStopsSearchResult(false, new FeatureCollection());
+        }
+        return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
+    }
+
+    public TransportRouteFeature getTransportRoute(LatLon transportStopCoords, long stopId, long routeId) throws IOException {
+        List<LatLon> bbox = Arrays.asList(
+                new LatLon(transportStopCoords.getLatitude() + SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(transportStopCoords.getLatitude() - SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SEARCH_POI_RADIUS_DEGREE)
+        );
+
+        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
+        if (readerResult == null) {
+            return null;
+        }
+
+        try {
+            TransportStop foundStop = null;
+            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
+                if (s.getId() == stopId) {
+                    foundStop = s;
+                    break;
+                }
+            }
+            if (foundStop != null) {
+                List<TransportRoute> routes = foundStop.getRoutes();
+                if (routes == null || routes.isEmpty()) {
+                    return null;
+                }
+                for (TransportRoute route : routes) {
+                    if (route.getId() == routeId) {
+                        List<Long> stops = route.getForwardStops()
+                                .stream()
+                                .map(TransportStop::getId)
+                                .toList();
+                        List<List<LatLon>> nodes = route.getForwardWays()
+                                .stream()
+                                .map(way -> way.getNodes()
+                                        .stream()
+                                        .map(Node::getLatLon)
+                                        .toList())
+                                .toList();
+                        return new TransportRouteFeature(route.getId(), stops, nodes);
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+        return null;
+    }
+
+    public Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
+        List<LatLon> bbox = Arrays.asList(
+                new LatLon(transportStopCoords.getLatitude() + SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
+                new LatLon(transportStopCoords.getLatitude() - SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SEARCH_POI_RADIUS_DEGREE)
+        );
+        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
+        if (readerResult == null) {
+            return null;
+        }
+        try {
+            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
+                if (s.getId() == stopId) {
+                    return convertTransportStopToFeature(s);
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+        return null;
+    }
+
+    private TransportStopsReaderResult getTransportStopsReader(List<LatLon> bbox) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+
+        QuadRect searchBbox = getSearchBbox(bbox);
+        if (searchBbox == null) {
+            return null;
+        }
+
+        int left31 = (int) searchBbox.left;
+        int right31 = (int) searchBbox.right;
+        int top31 = (int) searchBbox.top;
+        int bottom31 = (int) searchBbox.bottom;
+
+        List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, false);
+        if (mapList.isEmpty()) {
+            return null;
+        }
+        List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
+        if (readers.isEmpty()) {
+            return null;
+        }
+        TransportStopsRouteReader transportReaders = new TransportStopsRouteReader(readers);
+        SearchRequest<TransportStop> request = BinaryMapIndexReader.buildSearchTransportRequest(
+                left31, right31, top31, bottom31, -1, new ArrayList<>());
+
+        return new TransportStopsReaderResult(transportReaders, readers, request);
+    }
+
+    private Feature convertTransportStopToFeature(TransportStop stop) {
+        if (stop == null || stop.getLocation() == null) {
+            return null;
+        }
+
+        LatLon location = stop.getLocation();
+        Feature feature = new Feature(Geometry.point(location));
+
+        feature.prop("id", stop.getId());
+        feature.prop("name", stop.getName());
+
+        List<TransportRoute> routes = stop.getRoutes();
+        if (routes != null && !routes.isEmpty()) {
+            List<TransportStopFeature> stopFeatures = new ArrayList<>();
+            routes.forEach(route -> {
+                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor()));
+            });
+            feature.prop("routes", stopFeatures);
+        }
+
+        return feature;
+    }
+
+    private record TransportStopsReaderResult(TransportStopsRouteReader transportReaders,
+                                              List<BinaryMapIndexReader> readers,
+                                              SearchRequest<TransportStop> request) {
+    }
+
+    public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
+    }
+
+    public record TransportStopFeature(long id, String name, String type, String ref, String color) {
+    }
+
+    public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
+    }
+
+    public LatLon parseLocation(String locationString) {
+        if (locationString == null || locationString.trim().isEmpty()) {
+            return null;
+        }
+        return LocationParser.parseLocation(locationString);
     }
 
 }
