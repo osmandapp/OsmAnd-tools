@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,7 +85,7 @@ public class WikiDataHandler extends DefaultHandler {
 	
 	private long limit = -1;
 
-	private Set<Long> allAstroWids;
+	private Map<Long, String> allAstroWids;
 
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
@@ -132,8 +133,8 @@ public class WikiDataHandler extends DefaultHandler {
 	}
 	
 	
-	public static Set<Long> getAllAstroWids() {
-        Set<Long> wids = new HashSet<>();
+	public static Map<Long, String> getAllAstroWids() {
+		Map<Long, String> wids = new HashMap<>();
         Gson gson = new Gson();
         @SuppressWarnings("unused")
 		Type listType = new TypeToken<List<AstroObject>>() {}.getType();
@@ -167,9 +168,10 @@ public class WikiDataHandler extends DefaultHandler {
 					List<AstroObject> objects = gson.fromJson(reader, new TypeToken<List<AstroObject>>() {
 					}.getType());
 					if (objects != null) {
+						String type = resourcePath.substring(resourcePath.lastIndexOf('/') + 1, resourcePath.lastIndexOf('.'));
 						for (AstroObject obj : objects) {
 							if (obj.wid != null && obj.wid.startsWith("Q")) {
-								wids.add(Long.parseLong(obj.wid.substring(1)));
+								wids.put(Long.parseLong(obj.wid.substring(1)), type);
 							}
 						}
 					}
@@ -180,7 +182,7 @@ public class WikiDataHandler extends DefaultHandler {
         }
         return wids;
     }
-
+	
 	public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
         prep.addBatch();
         bt[0] = bt[0] + 1;
@@ -298,8 +300,8 @@ public class WikiDataHandler extends DefaultHandler {
 
 
 	public void processJsonPage(long id, String json) throws SQLException, IOException {
-		boolean star = allAstroWids.contains(id);
-		boolean storeJson = star;
+		String starType = allAstroWids.get(id);
+		boolean storeJson = starType != null;
 		ArticleMapper.Article article = gson.fromJson(json, ArticleMapper.Article.class);
 		
 		OsmLatLonId osmCoordinates = null;
@@ -311,7 +313,7 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLon(osmCoordinates.lon);
 		}
 		
-		if (article.getLat() != 0 || article.getLon() != 0 || star) {
+		if (article.getLat() != 0 || article.getLon() != 0 || starType != null) {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
@@ -338,8 +340,9 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
 			String type = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null;
-			coordsPrep.setString(++ind, star ? "starmap" : type);
-			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
+			coordsPrep.setString(++ind, starType != null ? "starmap" : type);
+			String subtype = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null;
+			coordsPrep.setString(++ind,  starType != null ? starType : subtype);
 			coordsPrep.setString(++ind, labelsJson);
 
 			addBatch(coordsPrep, coordsBatch);
