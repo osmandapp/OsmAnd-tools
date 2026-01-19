@@ -1,10 +1,13 @@
 package net.osmand.wiki.wikidata;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -14,6 +17,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.xml.parsers.SAXParser;
 
@@ -125,31 +131,53 @@ public class WikiDataHandler extends DefaultHandler {
 	    }
 	}
 	
-	public Set<Long> getAllAstroWids() {
+	public static void main(String[] args) {
+		System.out.println(getAllAstroWids());
+	}
+	
+	public static Set<Long> getAllAstroWids() {
         Set<Long> wids = new HashSet<>();
         Gson gson = new Gson();
         Type listType = new TypeToken<List<AstroObject>>() {}.getType();
-
+        String path = "/astro";
         try {
-            URL url = getClass().getResource("/astro");
+        	URL url = WikiDataHandler.class.getResource(path);
             if (url == null) return wids;
-            File folder = new File(url.toURI());
-            File[] files = folder.listFiles((dir, name) -> name.endsWith(".json"));
-            if (files != null) {
-                for (File file : files) {
-                    try (FileReader reader = new FileReader(file)) {
-                        List<AstroObject> objects = gson.fromJson(reader, listType);
-                        if (objects != null) {
-                            for (AstroObject obj : objects) {
-                                if (obj.wid != null && obj.wid.startsWith("Q")) {
-                                    wids.add(Long.parseLong(obj.wid.substring(1)));
-                                }
-                            }
+            List<String> jsonPaths = new ArrayList<>();
+
+            if (url.getProtocol().equals("jar")) {
+                String jarPath = url.getPath().substring(5, url.getPath().indexOf("!"));
+                try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(Paths.get(jarPath)))) {
+                    ZipEntry entry;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        // Check if entry is in the 'astro' folder and is a JSON
+                        if (!entry.isDirectory() && entry.getName().startsWith("astro/") && entry.getName().endsWith(".json")) {
+                            jsonPaths.add("/" + entry.getName());
                         }
-                        System.out.println(file.getName() + " " + objects);
                     }
                 }
+            } else {
+                // SCENARIO B: Running from IDE / File System
+                try (Stream<Path> walk = Files.walk(Paths.get(url.toURI()), 1)) {
+                    walk.filter(p -> p.toString().endsWith(".json"))
+                        .forEach(p -> jsonPaths.add(path + "/" + p.getFileName().toString()));
+                }
             }
+			for (String resourcePath : jsonPaths) {
+				try (InputStreamReader reader = new InputStreamReader(
+						WikiDataHandler.class.getResourceAsStream(resourcePath))) {
+					List<AstroObject> objects = gson.fromJson(reader, new TypeToken<List<AstroObject>>() {
+					}.getType());
+					if (objects != null) {
+						for (AstroObject obj : objects) {
+							if (obj.wid != null && obj.wid.startsWith("Q")) {
+								wids.add(Long.parseLong(obj.wid.substring(1)));
+							}
+						}
+					}
+					System.out.println(resourcePath + " " + objects);
+				}
+			}
         } catch (Exception e) {
             e.printStackTrace();
         }
