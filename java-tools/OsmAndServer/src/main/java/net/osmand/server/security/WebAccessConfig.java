@@ -1,4 +1,4 @@
-package net.osmand.server;
+package net.osmand.server.security;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,8 +12,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import static net.osmand.server.WebSecurityConfiguration.ROLE_ADMIN;
-import static net.osmand.server.WebSecurityConfiguration.ROLE_SUPPORT;
+import static net.osmand.server.security.WebSecurityConfiguration.ROLE_ADMIN;
+import static net.osmand.server.security.WebSecurityConfiguration.ROLE_SUPPORT;
 
 @Component
 public class WebAccessConfig {

@@ -2,7 +2,7 @@ package net.osmand.server.api.services;
 
 import kotlin.Pair;
 import net.osmand.obf.preparation.IndexHeightData;
-import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.security.WebSecurityConfiguration;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;

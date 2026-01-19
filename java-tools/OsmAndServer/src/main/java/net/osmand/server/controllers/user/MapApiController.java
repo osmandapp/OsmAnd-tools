@@ -47,7 +47,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
-import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.security.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;

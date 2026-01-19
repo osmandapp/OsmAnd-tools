@@ -2,16 +2,15 @@ package net.osmand.server.ws;
 
 import java.security.Principal;
 import java.security.SecureRandom;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import net.osmand.server.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
@@ -27,11 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import jakarta.servlet.http.HttpServletRequest;
-import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.security.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
@@ -46,7 +42,9 @@ public class UserTranslationsService {
 	private static final Log LOG = LogFactory.getLog(UserTranslationsService.class);
 	
     public static final String TRANSLATION_ID = "translationId";
-	public static final String ALIAS = "alias";
+
+	public static final String X_ALIAS = "X-Alias"; // User alias header
+	public static final String X_DEVICE_ID = "X-Device-Id"; // Device ID header
 
     
     static final String TOPIC_TRANSLATION = "/topic/translation/";
@@ -77,14 +75,19 @@ public class UserTranslationsService {
     // no need to be persistent
     private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
     private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
+    
+    private static final long ROOM_TOKEN_VALIDITY_MS = 30 * 60 * 1000; // 30 minutes
 
-    Random random = new SecureRandom();
+    private final Random random = new SecureRandom();
     
     @Autowired
     private SimpMessagingTemplate template;
     
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
+    
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
     
     private final Environment environment;
     
@@ -129,7 +132,7 @@ public class UserTranslationsService {
 		if (us == null && allowAnonymous) {
 			us = new CloudUser();
 			Map<String, Object> attributes = headers.getSessionAttributes();
-			String oalias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
+			String oalias = (attributes != null) ? (String) attributes.get(X_ALIAS) : null;
 			String sessionId = headers.getSessionId();
 			if (Algorithms.isEmpty(oalias)) {
 				oalias = TranslationMessage.SENDER_ANONYMOUS;
@@ -140,7 +143,7 @@ public class UserTranslationsService {
 				alias = oalias + " " + random.nextInt(1000);
 				anonymousUsers.putIfAbsent(alias, sessionId);
 			}
-			attributes.put(ALIAS, alias);
+			attributes.put(X_ALIAS, alias);
 			us.id = TranslationMessage.SENDER_ANONYMOUS_ID;
 			us.nickname = alias;
 			us.email = us.nickname + "@example.com";
@@ -211,11 +214,15 @@ public class UserTranslationsService {
 		if (headers == null) {
 			return 0;
 		}
-		String deviceIdHeader = headers.getFirstNativeHeader("deviceId");
+		String deviceIdHeader = headers.getFirstNativeHeader(X_DEVICE_ID);
 		if (deviceIdHeader == null || deviceIdHeader.isEmpty()) {
 			return 0;
 		}
-		return Algorithms.parseLongSilently(deviceIdHeader, 0);
+		long deviceId = Algorithms.parseLongSilently(deviceIdHeader, 0);
+		if (deviceId == 0) {
+			LOG.warn("Invalid deviceId format in header: " + deviceIdHeader);
+		}
+		return deviceId;
 	}
 
 	private long calculateExpireTime() {
@@ -304,6 +311,76 @@ public class UserTranslationsService {
 	}
 	
 	/**
+	 * Generates a JWT Bearer token for room access after password verification.
+	 * Token is valid for 30 minutes.
+	 * 
+	 * @param translationId room ID
+	 * @param userId user ID
+	 * @param alias user alias
+	 * @return Bearer token string
+	 */
+	public String generateRoomToken(String translationId, int userId, String alias) {
+		if (translationId == null || translationId.isEmpty()) {
+			return null;
+		}
+		
+		String token = jwtTokenProvider.createRoomToken(translationId, alias, ROOM_TOKEN_VALIDITY_MS);
+		LOG.debug("Generated JWT room token for translation " + translationId + ", user " + userId);
+		return token;
+	}
+	
+	/**
+	 * Authenticates user for room access using password and returns Bearer token.
+	 * 
+	 * @param translationId room ID
+	 * @param password room password (plain text)
+	 * @param userId user ID (optional, 0 if anonymous)
+	 * @param alias user alias
+	 * @return Bearer token if authentication successful, null otherwise
+	 */
+	public String authenticateRoom(String translationId, String password, int userId, String alias) {
+		UserTranslation translation = activeTranslations.get(translationId);
+		if (translation == null) {
+			LOG.warn("Room authentication failed: translation not found " + translationId);
+			return null;
+		}
+		
+		String passwordHash = translation.getPassword();
+		// If room has no password, allow access
+		if (passwordHash == null || passwordHash.isEmpty()) {
+			return generateRoomToken(translationId, userId, alias);
+		}
+		
+		// If user already verified, allow access
+		if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
+			return generateRoomToken(translationId, userId, alias);
+		}
+		
+		// Check password
+		if (password == null || password.isEmpty()) {
+			LOG.warn("Room authentication failed: password required for " + translationId);
+			return null;
+		}
+		
+		try {
+			boolean matches = passwordEncoder.matches(password, passwordHash);
+			if (matches) {
+				if (userId > 0) {
+					translation.getVerifiedUsers().add(userId);
+				}
+				LOG.debug("Room authentication successful for " + translationId + ", user " + userId);
+				return generateRoomToken(translationId, userId, alias);
+			} else {
+				LOG.warn("Room authentication failed: invalid password for " + translationId);
+				return null;
+			}
+		} catch (Exception e) {
+			LOG.warn("Room authentication error for " + translationId + ": " + e.getMessage(), e);
+			return null;
+		}
+	}
+	
+	/**
 	 * Checks if a user has permission to perform operations on a translation.
 	 * Users can operate on translations if they are:
 	 * 1. The owner of the translation
@@ -332,28 +409,12 @@ public class UserTranslationsService {
 
 		String password = translation.getPassword();
 		if (password != null && !password.isEmpty()) {
-			// Check if user already verified password for this translation
+			// Password-protected rooms require JWT token authentication
 			if (translation.getVerifiedUsers().contains(user.id)) {
 				return true;
 			}
-			
-			// If not verified, check password from headers
-			String providedPassword = headers != null ? headers.getFirstNativeHeader("password") : null;
-			if (providedPassword == null || providedPassword.isEmpty()) {
-				return false;
-			}
-
-			try {
-				boolean matches = passwordEncoder.matches(providedPassword, password);
-				if (matches) {
-					// Remember verified user for this translation only
-					translation.getVerifiedUsers().add(user.id);
-				}
-				return matches;
-			} catch (Exception e) {
-				LOG.warn("Error verifying password for translation " + translation.getSessionId() + ": " + e.getMessage());
-				return false;
-			}
+			LOG.debug("Password-protected translation " + translation.getSessionId() + " requires JWT Bearer token");
+			return false;
 		}
 		
 		// Public translation - allow everyone
@@ -426,6 +487,16 @@ public class UserTranslationsService {
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 	
+	/**
+	 * Starts location simulation for testing purposes (non-production only).
+	 * 
+	 * NOTE: Creates unmanaged threads which could lead to resource leaks.
+	 * This is acceptable for testing/simulation purposes only.
+	 * For production code, consider using ExecutorService or @Async with proper thread pool configuration.
+	 * 
+	 * @param user user to simulate location for
+	 * @param ust translation session
+	 */
 	private void startSimulation(CloudUser user, UserTranslation ust) {
 		Thread simThread = new Thread(() -> {
 			double simLat = 50.4501;
@@ -652,7 +723,7 @@ public class UserTranslationsService {
 	public void onDisconnectEvent(SessionDisconnectEvent event) {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		Map<String, Object> attributes = headers.getSessionAttributes();
-		String oalias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
+		String oalias = (attributes != null) ? (String) attributes.get(X_ALIAS) : null;
 		if (oalias != null && event.getSessionId().equals(anonymousUsers.get(oalias))) {
 			anonymousUsers.remove(oalias);
 		}

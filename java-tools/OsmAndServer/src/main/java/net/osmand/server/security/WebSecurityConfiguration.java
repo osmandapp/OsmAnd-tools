@@ -1,4 +1,4 @@
-package net.osmand.server;
+package net.osmand.server.security;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -188,12 +188,12 @@ public class WebSecurityConfiguration {
 	}
 
 	@Bean
-	public BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter() {
-		return new BearerTokenAuthenticationFilter(userDetailsServiceByAccessToken());
+	public BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+		return new BearerTokenAuthenticationFilter(userDetailsServiceByAccessToken(), jwtTokenProvider);
 	}
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenProvider jwtTokenProvider) throws Exception {
 		LoginUrlAuthenticationEntryPoint adminEntryPoint =
 				new LoginUrlAuthenticationEntryPoint("/map/account/") {
 					@Override
@@ -211,7 +211,7 @@ public class WebSecurityConfiguration {
 					}
 				};
 		http
-				.addFilterBefore(bearerTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+				.addFilterBefore(bearerTokenAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
 				.sessionManagement(session -> session
 						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
 						.maximumSessions(1)
@@ -317,7 +317,12 @@ public class WebSecurityConfiguration {
 				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
-		configuration.setAllowedHeaders(Arrays.asList("Content-Type", "Authorization", "alias", "password", "deviceId"));
+		configuration.setAllowedHeaders(Arrays.asList(
+			"Content-Type", 
+			"Authorization",
+			"X-Alias",        // User alias for WebSocket authentication
+			"X-Device-Id"     // Device identifier for location sharing
+		));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**",  configuration);
 		return source;
