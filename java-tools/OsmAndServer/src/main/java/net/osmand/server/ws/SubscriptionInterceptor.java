@@ -5,6 +5,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.NotNull;
@@ -21,12 +24,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
 import net.osmand.util.Algorithms;
+import net.osmand.server.security.JwtTokenProvider;
 
 @Component
 public class SubscriptionInterceptor implements ChannelInterceptor {
@@ -39,20 +42,21 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
 	private static final long RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
 	private final Map<String, FailedAttemptTracker> failedAttempts = new ConcurrentHashMap<>();
-	
+
 	@Autowired
 	@Lazy
 	private UserTranslationsService translationsService;
-	
-	private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-	
+
+	@Autowired
+	private JwtTokenProvider jwtTokenProvider;
+
 	/**
 	 * Tracks failed access attempts for rate limiting.
 	 */
 	private static class FailedAttemptTracker {
 		private final AtomicInteger count = new AtomicInteger(0);
 		private volatile long resetTime = System.currentTimeMillis() + RATE_LIMIT_WINDOW_MS;
-		
+
 		public int incrementAndGet() {
 			long now = System.currentTimeMillis();
 			if (now > resetTime) {
@@ -61,7 +65,7 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
 			}
 			return count.incrementAndGet();
 		}
-		
+
 		public boolean isBlocked() {
 			return count.get() >= MAX_FAILED_ATTEMPTS && System.currentTimeMillis() < resetTime;
 		}
@@ -70,7 +74,7 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(@NotNull Message<?> message, @NotNull MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
-        
+
         // Propagate SecurityContext from HTTP session to WebSocket message
         // This ensures Principal (Authentication) is available for access control
         SecurityContext securityContext = SecurityContextHolder.getContext();
@@ -78,16 +82,17 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
         if (authentication != null && accessor.getUser() == null) {
             accessor.setUser(authentication);
         }
-        
+
         Principal user = accessor.getUser();
 		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
 			// Access authentication header(s) and invoke accessor.setUser(user)
-			String alias = accessor.getFirstNativeHeader(UserTranslationsService.ALIAS);
-			if (alias != null) {
+			String alias = accessor.getFirstNativeHeader(UserTranslationsService.X_ALIAS);
+			if (alias != null && !alias.isEmpty()) {
 				Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
 				if (sessionAttributes != null) {
-					sessionAttributes.put(UserTranslationsService.ALIAS, alias);
+					sessionAttributes.put(UserTranslationsService.X_ALIAS, alias);
 				}
+				LOG.debug("WebSocket CONNECT: alias=" + alias);
 			}
 		} else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             String destination = accessor.getDestination();
@@ -109,7 +114,48 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
                     throw new MessageDeliveryException(message, errorMessage, 
                         new AccessDeniedException(errorMessage));
                 }
-                
+                String authHeader = simpHeaders.getFirstNativeHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String token = authHeader.substring("Bearer ".length());
+                    
+                    // JWT token-based authentication
+                    if (jwtTokenProvider.isRoomToken(token)) {
+                        try {
+                            Claims claims = jwtTokenProvider.validateToken(token);
+                            String tokenTranslationId = claims.get("translationId", String.class);
+                            
+                            if (tokenTranslationId != null && tokenTranslationId.equals(translationId)) {
+                                // JWT token is valid and matches the room
+                                resetFailedAttempts(sessionId);
+                                // Record verified access for the user (including anonymous)
+                                CloudUser cloudUser = translationsService.getUser(user, simpHeaders, true);
+                                if (cloudUser != null) {
+                                    translationsService.recordVerifiedAccess(translationId, cloudUser.id);
+                                }
+                                logAccessAttempt(translationId, user, true, "Access granted via JWT Bearer token");
+                                return message;
+                            } else {
+                                // Token is valid but for different room
+                                trackFailedAttempt(sessionId);
+                                String errorMessage = "Token does not match translation ID";
+                                logAccessAttempt(translationId, user, false, errorMessage);
+                                throw new MessageDeliveryException(message, errorMessage, 
+                                    new AccessDeniedException(errorMessage));
+                            }
+                        } catch (ExpiredJwtException e) {
+                            trackFailedAttempt(sessionId);
+                            String errorMessage = "Token expired";
+                            logAccessAttempt(translationId, user, false, errorMessage);
+                            throw new MessageDeliveryException(message, errorMessage, 
+                                new AccessDeniedException(errorMessage));
+                        } catch (JwtException e) {
+                            // Invalid JWT token - check if session is public or user is owner
+                            // Fall through to check permissions
+                        }
+                    }
+                }
+
+                // Check access permissions for the user
                 boolean allowed = isUserAllowed(translationId, user, simpHeaders);
                 
                 if (!allowed) {
@@ -191,12 +237,12 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
      * 1. Translation does not exist -> access denied
      * 2. Owner of the translation -> always allowed
      * 3. Active sharer -> allowed while sharing is not expired
-     * 4. Translation with password -> allowed only with correct password header (BCrypt)
+     * 4. Translation with password -> requires JWT Bearer token (checked above)
      * 5. Public translation (no password) -> allowed for everyone
      *
      * @param translationId translation (session) ID
      * @param principal     user principal (may be null for anonymous users)
-     * @param headers       message headers (used to read password and session info)
+     * @param headers       message headers (used to read session info)
      * @return true if access is allowed, false otherwise
      */
     private boolean isUserAllowed(String translationId, Principal principal, SimpMessageHeaderAccessor headers) {
@@ -217,9 +263,12 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
         // Check if user is an active sharer
         // Get deviceId from header if specified
         long deviceId = 0;
-        String deviceIdHeader = headers.getFirstNativeHeader("deviceId");
+        String deviceIdHeader = headers.getFirstNativeHeader(UserTranslationsService.X_DEVICE_ID);
         if (deviceIdHeader != null && !deviceIdHeader.isEmpty()) {
             deviceId = Algorithms.parseLongSilently(deviceIdHeader, 0);
+            if (deviceId == 0) {
+                LOG.warn("Invalid deviceId format in header: " + deviceIdHeader);
+            }
         }
         
         for (TranslationSharingOptions sharer : translation.getActiveSharers()) {
@@ -235,34 +284,12 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
             }
         }
 
-        // Check password if translation is password-protected
+        // Password-protected rooms require JWT token (checked above)
+        // If we reach here without JWT, access is denied for password-protected rooms
         String password = translation.getPassword();
         if (password != null && !password.isEmpty()) {
-            CloudUser cloudUser = translationsService.getUser(principal, headers, true);
-            if (cloudUser != null) {
-                // Check if user already verified password for this translation
-                if (translation.getVerifiedUsers().contains(cloudUser.id)) {
-                    return true; // Already verified for this translation
-                }
-            }
-            
-            String providedPassword = headers.getFirstNativeHeader("password");
-            if (providedPassword == null || providedPassword.isEmpty()) {
-                return false;
-            }
-
-            // This prevents timing attacks
-            try {
-                boolean matches = passwordEncoder.matches(providedPassword, password);
-                if (matches && cloudUser != null) {
-                    // Remember verified user for this translation only
-                    translation.getVerifiedUsers().add(cloudUser.id);
-                }
-                return matches;
-            } catch (Exception e) {
-                LOG.warn("Error verifying password for translation " + translationId + ": " + e.getMessage());
-                return false;
-            }
+            LOG.debug("Password-protected translation " + translationId + " requires JWT Bearer token");
+            return false;
         }
 
         // Public translation - allow everyone
