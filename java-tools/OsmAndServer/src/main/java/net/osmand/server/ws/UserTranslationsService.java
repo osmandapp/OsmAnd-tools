@@ -453,6 +453,12 @@ public class UserTranslationsService {
 		}
 
 		long deviceId = extractDeviceIdFromHeaders(headers);
+		if (deviceId > 0) {
+			CloudUserDevice device = devicesRepository.findById(deviceId).orElse(null);
+			if (device == null || device.userid != user.id) {
+				throw new SecurityException("Device does not belong to user");
+			}
+		}
 		TranslationSharingOptions existingSharer = findSharer(ust, user.id, deviceId);
 		if (existingSharer != null) {
 			// Already sharing, just update expire time
