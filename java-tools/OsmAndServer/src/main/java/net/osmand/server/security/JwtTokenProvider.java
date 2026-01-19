@@ -19,7 +19,7 @@ public class JwtTokenProvider {
     
     private final SecretKey key;
     
-    public JwtTokenProvider(@Value("${jwt.secret}") String secret) {
+    public JwtTokenProvider(@Value("${JWT_SECRET}") String secret) {
         // Minimum 256 bits for HS256
         if (secret.length() < 32) {
             throw new IllegalArgumentException("JWT secret must be at least 32 characters (256 bits)");

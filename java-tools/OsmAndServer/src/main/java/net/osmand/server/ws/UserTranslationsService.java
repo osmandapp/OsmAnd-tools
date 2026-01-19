@@ -97,15 +97,15 @@ public class UserTranslationsService {
         this.environment = environment;
     }
 
-    public void setTranslationPassword(UserTranslation translation, String plainPassword) {
+    public void setTranslationPassword(UserTranslation translation, String password) {
         if (translation == null) {
             throw new IllegalArgumentException("Translation cannot be null");
         }
-        if (plainPassword == null || plainPassword.isEmpty()) {
+        if (password == null || password.isEmpty()) {
             translation.setPassword(null);
             return;
         }
-        String passwordHash = passwordEncoder.encode(plainPassword);
+        String passwordHash = passwordEncoder.encode(password);
         translation.setPassword(passwordHash);
     }
     
