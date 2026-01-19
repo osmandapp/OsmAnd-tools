@@ -151,7 +151,7 @@ public class AstroDataHandler {
 	}
 
 	public void addItem(long qid, ArticleMapper.Article article, String json) {
-		if (json == null || json.isBlank()) {
+		if (article == null) {
 			return;
 		}
 
@@ -176,7 +176,7 @@ public class AstroDataHandler {
 				try (PreparedStatement upsertCatalogId = conn.prepareStatement(
 						"INSERT OR REPLACE INTO astro_catalog_id (id, catalogWid, catalogId) VALUES (?, ?, ?)")) {
 					try (PreparedStatement insertName = conn.prepareStatement(
-							"INSERT OR IGNORE INTO astr_name (id, name, type) VALUES (?, ?, ?)")) {
+							"INSERT OR IGNORE INTO astro_name (id, name, type) VALUES (?, ?, ?)")) {
 						try (PreparedStatement deleteAstroMappings = conn.prepareStatement(
 								"DELETE FROM astro_mapping WHERE id = ?")) {
 							try (PreparedStatement upsertAstroMapping = conn.prepareStatement(
@@ -325,11 +325,11 @@ public class AstroDataHandler {
 
 	private void insertNames(PreparedStatement insertName, EntityData data) throws SQLException {
 		String groupKey = asString(data.astroParams.get("astro_group"));
-		Map<String, Object> item = data.astroParams;
+		Map<String, Object> params = data.astroParams;
 		Map<String, String> labels = data.article.getLabels();
 		Map<String, String> siteLinks = data.getSiteLinks();
 
-		double mag = Algorithms.parseDoubleSilently(asString(item.get("mag")), 0.0);
+		double mag = Algorithms.parseDoubleSilently(asString(params.get("mag")), 0.0);
 		boolean allLangs = !Objects.equals(groupKey, "stars") || (mag == 0.0 ? 99.0 : mag) <= MAGNITUDE_BRIGHT_THRESHOLD_EN_ONLY;
 
 		Map<String, NameAggregation> nameData = new LinkedHashMap<>();
