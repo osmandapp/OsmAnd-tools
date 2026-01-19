@@ -7,12 +7,11 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.PlatformUtil;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -31,7 +30,7 @@ public class AstroDataHandler {
 
 	private record EntityData(
 			long qid,
-			Map<String, Object> map,
+			Map<String, Object> astroParams,
 			ArticleMapper.Article article,
 			PhysicalProperties physics,
 			List<CatalogEntry> catalogs,
@@ -40,25 +39,25 @@ public class AstroDataHandler {
 			String json
 	) {
 		public Map<String, String> getSiteLinks() {
-			Map<String, String> wiki = new HashMap<>();
+			Map<String, String> siteLinks = new HashMap<>();
 			for (ArticleMapper.SiteLink link : article.getSiteLinks()) {
-				wiki.put(link.lang(), link.title());
+				siteLinks.put(link.lang(), link.title());
 			}
-			return wiki;
+			return siteLinks;
 		}
 	}
 
-	private static class NameAgg {
-		final String display;
+	private static class NameAggregation {
+		final String displayLabel;
 		final Set<String> sources = new LinkedHashSet<>();
 
-		private NameAgg(String display) {
-			this.display = display;
+		private NameAggregation(String displayLabel) {
+			this.displayLabel = displayLabel;
 		}
 	}
 
 	private static final Log log = PlatformUtil.getLog(AstroDataHandler.class);
-	private static final String ASTRO_JSON_DIR_ENV = "ASTRO_JSON_DIR";
+	private static final int WIKI_WITH_LANG_LENGTH = 6;
 	private static final List<String> INPUT_FILES = List.of(
 			"solar_system.json",
 			"galaxies.json",
@@ -70,7 +69,7 @@ public class AstroDataHandler {
 			"nebulae.json",
 			"galaxy_clusters.json"
 	);
-	private static final double MAGNITUDE_ONLY_EN = 3.0;
+	private static final double MAGNITUDE_BRIGHT_THRESHOLD_EN_ONLY = 3.0;
 	private static final String PROP_RADIUS = "P2120";
 	private static final String PROP_DISTANCE = "P2583";
 	private static final String PROP_MASS = "P2067";
@@ -85,10 +84,15 @@ public class AstroDataHandler {
 			"Q91442269", "Trumpler catalogue",
 			"Q4999741", "Burnham"
 	);
+	// https://en.wikipedia.org/wiki/Light-year to https://en.wikipedia.org/wiki/Parsec
 	private static final double LY_TO_PC = 0.306601;
+	// https://en.wikipedia.org/wiki/Metre to https://en.wikipedia.org/wiki/Parsec
 	private static final double M_TO_PC = 3.24078e-17;
+	// https://en.wikipedia.org/wiki/Astronomical_unit to https://en.wikipedia.org/wiki/Parsec
 	private static final double AU_TO_PC = 4.84814e-6;
+	// https://en.wikipedia.org/wiki/Kilogram to https://en.wikipedia.org/wiki/Solar_mass
 	private static final double KG_TO_SOLAR = 5.029e-31;
+	// https://en.wikipedia.org/wiki/Yottagram to https://en.wikipedia.org/wiki/Solar_mass
 	private static final double YOTTAGRAM_TO_SOLAR = 1e21 * KG_TO_SOLAR;
 	private static final Map<String, Double> CONVERSIONS_MASS = Map.of(
 			"Q180892", 1.0,
@@ -119,109 +123,31 @@ public class AstroDataHandler {
 	private final List<EntityData> entities = new ArrayList<>();
 
 	public AstroDataHandler() throws IOException {
-		this.items = getAstroMap(resolveAstroInputDir());
+		this.items = getAstroMap();
 	}
 
-	private static Path resolveAstroInputDir() throws IOException {
-		String astroJsonDir = System.getenv(ASTRO_JSON_DIR_ENV);
-		Path dir;
-		if (astroJsonDir != null && !astroJsonDir.isBlank()) {
-			dir = Path.of(astroJsonDir).toAbsolutePath().normalize();
-		} else {
-			throw new IOException("Environment variable " + ASTRO_JSON_DIR_ENV + " is not set!");
-		}
-		if (!Files.isDirectory(dir)) {
-			throw new IOException("Astro JSON directory not found or not a directory: " + dir
-					+ " (set " + ASTRO_JSON_DIR_ENV + " env var to override)");
-		}
-		return dir;
-	}
-
-	private static String normalizeNameKey(String s) {
-		if (s == null) {
-			return null;
-		}
-		String t = s.trim();
-		if (t.isEmpty()) {
-			return null;
-		}
-		return t.toLowerCase(Locale.ROOT);
-	}
-
-	private static String stripExtension(String fileName) {
-		int ind = fileName.lastIndexOf('.');
-		return ind >= 0 ? fileName.substring(0, ind) : fileName;
-	}
-
-	private static String asString(Object o) {
-		return o == null ? null : String.valueOf(o);
-	}
-
-	private static Double asDouble(Object o) {
-		if (o == null) {
-			return null;
-		}
-		if (o instanceof Number n) {
-			return n.doubleValue();
-		}
-		try {
-			return Double.parseDouble(String.valueOf(o));
-		} catch (NumberFormatException e) {
-			return null;
-		}
-	}
-
-	private static Integer asInt(Object o) {
-		if (o == null) {
-			return null;
-		}
-		if (o instanceof Number n) {
-			return n.intValue();
-		}
-		try {
-			return Integer.parseInt(String.valueOf(o));
-		} catch (NumberFormatException e) {
-			return null;
-		}
-	}
-
-	private static Long asLong(Object o) {
-		if (o == null) {
-			return null;
-		}
-		if (o instanceof Number n) {
-			return n.longValue();
-		}
-		try {
-			return Long.parseLong(String.valueOf(o));
-		} catch (NumberFormatException e) {
-			return null;
-		}
-	}
-
-	private Map<Long, Map<String, Object>> getAstroMap(Path inputDir) throws IOException {
-		Map<Long, Map<String, Object>> astroMap = new LinkedHashMap<>();
+	private Map<Long, Map<String, Object>> getAstroMap() throws IOException {
+		Map<Long, Map<String, Object>> astroItems = new LinkedHashMap<>();
 		for (String fileName : INPUT_FILES) {
 			String groupKey = stripExtension(fileName);
-			Path filePath = inputDir.resolve(fileName);
-			if (!Files.exists(filePath)) {
-				throw new IOException("File not found: " + filePath);
-			}
+			String resourcePath = "astro/" + fileName;
 
 			log.info("Processing " + groupKey + "...");
-			List<Map<String, Object>> items = readJsonList(filePath);
+			List<Map<String, Object>> items = readJsonList(resourcePath);
 			for (Map<String, Object> item : items) {
 				String wid = asString(item.get("wid"));
 				if (wid == null || wid.isBlank()) {
 					continue;
 				}
-				Long qid = asLong(wid.substring(1));
-
+				long qid = Algorithms.parseLongSilently(wid.substring(1), 0L);
+				if (qid == 0L) {
+					continue;
+				}
 				item.put("astro_group", groupKey);
-				astroMap.put(qid, item);
+				astroItems.put(qid, item);
 			}
 		}
-		return astroMap;
+		return astroItems;
 	}
 
 	public void addItem(long qid, ArticleMapper.Article article, String json) {
@@ -229,10 +155,10 @@ public class AstroDataHandler {
 			return;
 		}
 
-		Map<String, Object> map = items.get(qid);
-		if (map != null) {
+		Map<String, Object> astroParams = items.get(qid);
+		if (astroParams != null) {
 			JsonObject obj = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
-			EntityData entityData = processEntityData(qid, map, article, json, parseClaims(obj), parseDescriptions(obj));
+			EntityData entityData = processEntityData(qid, astroParams, article, json, parseClaims(obj), parseDescriptions(obj));
 			entities.add(entityData);
 		}
 	}
@@ -243,18 +169,18 @@ public class AstroDataHandler {
 
 		int inserted = 0;
 		try (PreparedStatement insertObject = conn.prepareStatement(
-				"INSERT OR REPLACE INTO Objects (id, name, type, ra, dec, lines, mag, centerwid, radius, distance, mass, hip, json, image) "
+				"INSERT OR REPLACE INTO astro_object (id, name, type, ra, dec, lines, mag, centerwid, radius, distance, mass, hip, json, image) "
 						+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 			try (PreparedStatement insertCatalog = conn.prepareStatement(
-					"INSERT OR IGNORE INTO Catalogs (catalogWid, catalogName) VALUES (?, ?)")) {
+					"INSERT OR IGNORE INTO astro_catalog (catalogWid, catalogName) VALUES (?, ?)")) {
 				try (PreparedStatement upsertCatalogId = conn.prepareStatement(
-						"INSERT OR REPLACE INTO CatalogIds (id, catalogWid, catalogId) VALUES (?, ?, ?)")) {
+						"INSERT OR REPLACE INTO astro_catalog_id (id, catalogWid, catalogId) VALUES (?, ?, ?)")) {
 					try (PreparedStatement insertName = conn.prepareStatement(
-							"INSERT OR IGNORE INTO Names (id, name, type) VALUES (?, ?, ?)")) {
+							"INSERT OR IGNORE INTO astr_name (id, name, type) VALUES (?, ?, ?)")) {
 						try (PreparedStatement deleteAstroMappings = conn.prepareStatement(
-								"DELETE FROM AstroMappings WHERE id = ?")) {
+								"DELETE FROM astro_mapping WHERE id = ?")) {
 							try (PreparedStatement upsertAstroMapping = conn.prepareStatement(
-									"INSERT OR REPLACE INTO AstroMappings (id, type, lang, value) VALUES (?, ?, ?, ?)")) {
+									"INSERT OR REPLACE INTO astro_mapping (id, type, lang, value) VALUES (?, ?, ?, ?)")) {
 
 								for (EntityData entityData : entities) {
 									if (entityData.article == null) {
@@ -295,16 +221,14 @@ public class AstroDataHandler {
 				.reduce((a, b) -> a + "," + b)
 				.orElse("");
 		try (Statement st = conn.createStatement()) {
-			st.execute("DELETE FROM CatalogIds WHERE catalogWid NOT IN (" + placeholders + ")");
-			st.execute("CREATE INDEX IF NOT EXISTS idx_ids_catalog_nocase ON CatalogIds (catalogId COLLATE NOCASE)");
+			st.execute("DELETE FROM astro_catalog_id WHERE catalogWid NOT IN (" + placeholders + ")");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_ids_catalog_nocase ON astro_catalog_id (catalogId COLLATE NOCASE)");
 		}
 		conn.commit();
 
 		boolean previousAutoCommit = conn.getAutoCommit();
 		conn.setAutoCommit(true);
 		try (Statement st = conn.createStatement()) {
-			st.execute("PRAGMA journal_mode = DELETE");
-			st.execute("PRAGMA page_size = 4096");
 			st.execute("VACUUM");
 		} finally {
 			conn.setAutoCommit(previousAutoCommit);
@@ -314,7 +238,7 @@ public class AstroDataHandler {
 	private void initDb(Connection conn) throws SQLException {
 		try (Statement st = conn.createStatement()) {
 			st.execute("""
-					CREATE TABLE IF NOT EXISTS Objects (
+					CREATE TABLE IF NOT EXISTS astro_object (
 						id BIGINT, 
 						name TEXT, 
 						type TEXT, 
@@ -329,24 +253,27 @@ public class AstroDataHandler {
 						hip INTEGER, 
 						json TEXT, 
 						image TEXT, 
-					PRIMARY KEY (id, name, type))""");
+					PRIMARY KEY (id, name, type))
+					""");
 
 			st.execute("""
-					CREATE TABLE IF NOT EXISTS Names (
+					CREATE TABLE IF NOT EXISTS astro_name (
 						id BIGINT, 
 						name TEXT, 
 						type TEXT, 
 						PRIMARY KEY (id, type)
-					) WITHOUT ROWID""");
+					) WITHOUT ROWID
+					""");
 
 			st.execute("""
-					CREATE TABLE IF NOT EXISTS Catalogs (
+					CREATE TABLE IF NOT EXISTS astro_catalog (
 						catalogWid TEXT PRIMARY KEY,
 						catalogName TEXT
-					) WITHOUT ROWID""");
+					) WITHOUT ROWID
+					""");
 
 			st.execute("""
-					CREATE TABLE IF NOT EXISTS CatalogIds (
+					CREATE TABLE IF NOT EXISTS astro_catalog_id (
 						id BIGINT,
 						catalogWid TEXT,
 						catalogId TEXT,
@@ -355,71 +282,72 @@ public class AstroDataHandler {
 					""");
 
 			st.execute("""
-					CREATE TABLE IF NOT EXISTS AstroMappings (
+					CREATE TABLE IF NOT EXISTS astro_mapping (
 						id BIGINT,
 						type TEXT,
 						lang TEXT,
 						value TEXT,
 						PRIMARY KEY (id, type, lang)
-					) WITHOUT ROWID""");
+					) WITHOUT ROWID
+					""");
 
-			st.execute("CREATE INDEX IF NOT EXISTS idx_astro_mappings_type_lang ON AstroMappings (type, lang)");
-			st.execute("CREATE INDEX IF NOT EXISTS idx_objects_name_nocase ON Objects (name COLLATE NOCASE)");
-			st.execute("CREATE INDEX IF NOT EXISTS idx_names_name_nocase ON Names (name COLLATE NOCASE)");
-			st.execute("CREATE INDEX IF NOT EXISTS idx_ids_catalog_nocase ON CatalogIds (catalogId COLLATE NOCASE)");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_astro_mappings_type_lang ON astro_mapping (type, lang)");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_objects_name_nocase ON astro_object (name COLLATE NOCASE)");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_names_name_nocase ON astro_name (name COLLATE NOCASE)");
+			st.execute("CREATE INDEX IF NOT EXISTS idx_ids_catalog_nocase ON astro_catalog_id (catalogId COLLATE NOCASE)");
 		}
 		conn.setAutoCommit(false);
 	}
 
 	private void insertObject(PreparedStatement insertObject, EntityData data) throws SQLException {
 		PhysicalProperties physics = data.physics;
-		Map<String, Object> item = data.map;
+		Map<String, Object> item = data.astroParams;
 		int ind = 0;
 		insertObject.setLong(++ind, data.qid);
 		insertObject.setString(++ind, asString(item.get("name")));
 		insertObject.setString(++ind, asString(item.get("astro_group")));
-		insertObject.setObject(++ind, asDouble(item.get("ra")));
-		insertObject.setObject(++ind, asDouble(item.get("dec")));
+		insertObject.setObject(++ind, Algorithms.parseDoubleSilently(asString(item.get("ra")), 0.0));
+		insertObject.setObject(++ind, Algorithms.parseDoubleSilently(asString(item.get("dec")), 0.0));
 
 		Object lines = item.get("lines");
 		insertObject.setString(++ind, lines != null ? writeJsonSilently(lines) : null);
 
-		insertObject.setObject(++ind, asDouble(item.get("mag")));
+		insertObject.setObject(++ind, Algorithms.parseDoubleSilently(asString(item.get("mag")), 0.0));
 		insertObject.setString(++ind, asString(item.get("centerwid")));
 		insertObject.setObject(++ind, physics.radius);
 		insertObject.setObject(++ind, physics.distance);
 		insertObject.setObject(++ind, physics.mass);
-		insertObject.setObject(++ind, asInt(item.get("hip")));
+		insertObject.setObject(++ind, Algorithms.parseLongSilently(asString(item.get("hip")), 0L));
 		insertObject.setString(++ind, data.json);
 		insertObject.setString(++ind, asString(data.article.getImage()));
 		insertObject.execute();
 	}
 
 	private void insertNames(PreparedStatement insertName, EntityData data) throws SQLException {
-		String groupKey = asString(data.map.get("astro_group"));
-		Map<String, Object> item = data.map;
+		String groupKey = asString(data.astroParams.get("astro_group"));
+		Map<String, Object> item = data.astroParams;
 		Map<String, String> labels = data.article.getLabels();
 		Map<String, String> siteLinks = data.getSiteLinks();
 
-		Double mag = asDouble(item.get("mag"));
-		boolean allLangs = !Objects.equals(groupKey, "stars") || (mag == null ? 99.0 : mag) <= MAGNITUDE_ONLY_EN;
+		double mag = Algorithms.parseDoubleSilently(asString(item.get("mag")), 0.0);
+		boolean allLangs = !Objects.equals(groupKey, "stars") || (mag == 0.0 ? 99.0 : mag) <= MAGNITUDE_BRIGHT_THRESHOLD_EN_ONLY;
 
-		Map<String, NameAgg> nameData = new HashMap<>();
+		Map<String, NameAggregation> nameData = new LinkedHashMap<>();
 
 		for (Map.Entry<String, String> e : labels.entrySet()) {
 			String lang = e.getKey();
-			String val = e.getValue();
-			if (val == null) {
+			String label = e.getValue();
+			if (label == null) {
 				continue;
 			}
-			if (!lang.equals("en") && !allLangs) {
+			if (!allLangs && !lang.equals("en")) {
 				continue;
 			}
-			String key = normalizeNameKey(val);
+			String key = normalizeNameKey(label);
 			if (key == null) {
 				continue;
 			}
-			nameData.computeIfAbsent(key, k -> new NameAgg(val.trim())).sources.add(lang);
+			nameData.computeIfAbsent(key, k -> new NameAggregation(label.trim())).sources.add(lang);
 		}
 
 		for (Map.Entry<String, String> e : siteLinks.entrySet()) {
@@ -428,23 +356,23 @@ public class AstroDataHandler {
 			if (title == null) {
 				continue;
 			}
-			if (!(site.length() == 6 && site.endsWith("wiki"))) {
+			if (!(site.length() == WIKI_WITH_LANG_LENGTH && site.endsWith("wiki"))) {
 				continue;
 			}
-			if (!site.equals("en") && !allLangs) {
+			if (!allLangs && !site.equals("en")) {
 				continue;
 			}
 			String key = normalizeNameKey(title);
 			if (key == null) {
 				continue;
 			}
-			nameData.computeIfAbsent(key, k -> new NameAgg(title.trim())).sources.add(site);
+			nameData.computeIfAbsent(key, k -> new NameAggregation(title.trim())).sources.add(site);
 		}
 
-		for (NameAgg agg : nameData.values()) {
+		for (NameAggregation agg : nameData.values()) {
 			String typesStr = String.join(",", agg.sources.stream().sorted().toList());
 			insertName.setLong(1, data.qid);
-			insertName.setString(2, agg.display);
+			insertName.setString(2, agg.displayLabel);
 			insertName.setString(3, typesStr);
 			insertName.execute();
 		}
@@ -479,7 +407,7 @@ public class AstroDataHandler {
 			upsertAstroMapping.execute();
 		}
 
-		Map<String, String> descriptions =  entityData.descriptions;
+		Map<String, String> descriptions = entityData.descriptions;
 		if (descriptions != null) {
 			for (Map.Entry<String, String> e : descriptions.entrySet()) {
 				String lang = e.getKey();
@@ -497,14 +425,14 @@ public class AstroDataHandler {
 	}
 
 	private Map<String, List<Map<String, JsonElement>>> parseClaims(JsonObject obj) {
-		Map<String, List<Map<String, JsonElement>>> claimsMap = new HashMap<>();
+		Map<String, List<Map<String, JsonElement>>> claimsMap = new LinkedHashMap<>();
 		try {
 			JsonObject claims = (JsonObject) obj.get("claims");
 			claims.keySet().forEach(key -> {
 				JsonArray array = claims.getAsJsonArray(key);
 				List<Map<String, JsonElement>> list = new ArrayList<>();
 				for (int i = 0; i < array.size(); i++) {
-					Map<String, JsonElement> item = new HashMap<>();
+					Map<String, JsonElement> item = new LinkedHashMap<>();
 					array.get(i).getAsJsonObject().entrySet().forEach(entry -> {
 						item.put(entry.getKey(), entry.getValue());
 					});
@@ -513,6 +441,7 @@ public class AstroDataHandler {
 				claimsMap.put(key, list);
 			});
 		} catch (Exception e) {
+			log.error("Failed to parse claims", e);
 			return null;
 		}
 		return claimsMap;
@@ -545,21 +474,26 @@ public class AstroDataHandler {
 			}
 			return result;
 		} catch (Exception e) {
+			log.error("Failed to parse descriptions", e);
 			return null;
 		}
 	}
 
-	private List<Map<String, Object>> readJsonList(Path filePath) throws IOException {
-		try (InputStream is = Files.newInputStream(filePath)) {
+	private List<Map<String, Object>> readJsonList(String resourcePath) throws IOException {
+		InputStream inputStream = AstroDataHandler.class.getClassLoader().getResourceAsStream(resourcePath);
+		if (inputStream == null) {
+			throw new IOException("Resource not found: " + resourcePath);
+		}
+		try (InputStream is = inputStream) {
 			return objectMapper.readValue(is, new TypeReference<>() {
 			});
 		}
 	}
 
-	private EntityData processEntityData(long qid, Map<String, Object> map, ArticleMapper.Article article, String json,
+	private EntityData processEntityData(long qid, Map<String, Object> astroParams, ArticleMapper.Article article, String json,
 	                                     Map<String, List<Map<String, JsonElement>>> claims, Map<String, String> descriptions) {
 		if (article == null) {
-			return new EntityData(qid, map, null, new PhysicalProperties(null, null, null), List.of(), claims, descriptions, json);
+			return new EntityData(qid, astroParams, null, new PhysicalProperties(null, null, null), List.of(), claims, descriptions, json);
 		}
 
 		PhysicalProperties physics = new PhysicalProperties(
@@ -569,7 +503,7 @@ public class AstroDataHandler {
 		);
 
 		List<CatalogEntry> catalogs = extractCatalogs(claims, article.getLabels());
-		return new EntityData(qid, map, article, physics, catalogs, claims, descriptions, json);
+		return new EntityData(qid, astroParams, article, physics, catalogs, claims, descriptions, json);
 	}
 
 	private Double getPhysicalProperty(Map<String, List<Map<String, JsonElement>>> claims, String propId, Map<String, Double> conversionMap) {
@@ -605,23 +539,20 @@ public class AstroDataHandler {
 	}
 
 	private Quantity parseQuantity(JsonObject valueNode) {
-		try {
-			String amountStr = valueNode.get("amount").getAsString();
-			if (amountStr == null) {
-				return null;
-			}
-			double amount = Double.parseDouble(amountStr);
-
-			String unitUrl = valueNode.get("unit").getAsString();
-			String unitQid = null;
-			int ind = unitUrl.lastIndexOf("entity/");
-			if (ind >= 0) {
-				unitQid = unitUrl.substring(ind + "entity/".length());
-			}
-			return new Quantity(amount, unitQid);
-		} catch (Exception e) {
+		String amountStr = valueNode.get("amount").getAsString();
+		if (amountStr == null) {
 			return null;
 		}
+		double amount = Algorithms.parseDoubleSilently(amountStr, 0.0);
+
+		String unitUrl = valueNode.get("unit").getAsString();
+		String unitQid = null;
+		final String suffix = "entity/";
+		int ind = unitUrl.lastIndexOf(suffix);
+		if (ind >= 0) {
+			unitQid = unitUrl.substring(ind + suffix.length());
+		}
+		return new Quantity(amount, unitQid);
 	}
 
 	private List<CatalogEntry> extractCatalogs(Map<String, List<Map<String, JsonElement>>> claims, Map<String, String> labels) {
@@ -675,7 +606,24 @@ public class AstroDataHandler {
 		try {
 			return objectMapper.writeValueAsString(v);
 		} catch (JsonProcessingException e) {
+			log.error("Failed to write JSON", e);
 			return null;
 		}
+	}
+
+	private static String normalizeNameKey(String s) {
+		if (Algorithms.isBlank(s)) {
+			return null;
+		}
+		return s.trim().toLowerCase(Locale.ROOT);
+	}
+
+	private static String stripExtension(String fileName) {
+		int ind = fileName.lastIndexOf('.');
+		return ind >= 0 ? fileName.substring(0, ind) : fileName;
+	}
+
+	private static String asString(Object o) {
+		return o == null ? null : String.valueOf(o);
 	}
 }
