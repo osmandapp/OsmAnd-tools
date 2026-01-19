@@ -445,7 +445,7 @@ public class WikiDatabasePreparation {
 			if (lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
 				author = AuthorParser.parse(line);
 			}
-			if (lineLc.startsWith(ParserUtils.FIELD_DATE)) {
+			if (date == null && lineLc.startsWith(ParserUtils.FIELD_DATE)) {
 				date = DateParser.parse(line);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_DESCRIPTION)) {
