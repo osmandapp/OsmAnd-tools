@@ -1253,7 +1253,7 @@ public class WikiDatabasePreparation {
 			log.info("Create wikidata...");
 			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
-			
+			break;
 		case "create-wikidata-mapping":
 			wikidataDB = new File(wikidataSqliteName);
 			log.info("Create wikidata mapping DB.");
