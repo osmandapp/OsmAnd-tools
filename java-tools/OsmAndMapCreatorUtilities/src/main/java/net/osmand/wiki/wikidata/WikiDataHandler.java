@@ -209,9 +209,8 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLon(osmCoordinates.lon);
 		}
 
-		if (article.getLat() == 0 && article.getLon() == 0) {
-			astroHandler.addItem(id, article, json);
-		} else  {
+		astroHandler.addItem(id, article, json);
+		if (article.getLat() != 0 || article.getLon() != 0) {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
