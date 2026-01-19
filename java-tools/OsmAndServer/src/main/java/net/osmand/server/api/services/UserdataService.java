@@ -1,6 +1,8 @@
 package net.osmand.server.api.services;
 
 import static net.osmand.server.controllers.pub.UserdataController.cacheByDeviceId;
+import static net.osmand.server.controllers.pub.UserdataController.invalidateCacheByUserId;
+import static net.osmand.server.controllers.pub.UserdataController.removeFromCache;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -557,7 +559,7 @@ public class UserdataService {
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
 						email, sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
-			    cacheByDeviceId.remove(sameDevice.id);
+			    removeFromCache(sameDevice.id);
 		    }
 	    }
         device.lang = lang;
@@ -572,7 +574,7 @@ public class UserdataService {
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
         devicesRepository.saveAndFlush(device);
-        cacheByDeviceId.entrySet().removeIf(entry -> entry.getValue().getDevice().userid == pu.id);
+        invalidateCacheByUserId(pu.id);
         LOG.info("device-register: success (" + email + ")");
         return ResponseEntity.ok(gson.toJson(device));
     }
@@ -1176,7 +1178,7 @@ public class UserdataService {
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
-                            cacheByDeviceId.entrySet().removeIf(entry -> entry.getValue().getDevice().userid == dev.userid);
+                            invalidateCacheByUserId(dev.userid);
                             request.logout();
                             return ResponseEntity.ok(String.format("Account has been successfully deleted (email %s)", pu.email));
                         }
@@ -1281,7 +1283,7 @@ public class UserdataService {
         pu.tokenTime = cal.getTime();
 
         usersRepository.saveAndFlush(pu);
-        cacheByDeviceId.entrySet().removeIf(entry -> entry.getValue().getDevice().userid == pu.id);
+        invalidateCacheByUserId(pu.id);
     }
 
 

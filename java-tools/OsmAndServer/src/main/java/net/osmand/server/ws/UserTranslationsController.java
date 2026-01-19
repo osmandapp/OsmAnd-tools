@@ -168,6 +168,7 @@ public class UserTranslationsController {
 			return null;
 		}
 		userTranslationsService.setTranslationPassword(ust, password);
+		ust.getVerifiedUsers().clear();
 		return "OK";
 	}
 
