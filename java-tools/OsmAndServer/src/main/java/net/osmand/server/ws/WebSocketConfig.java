@@ -60,10 +60,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 				.setAllowedOriginPatterns("https://*.osmand.net")
 				.withSockJS();
 		} else {
-			// In development, allow all origins for testing
-			registry.addEndpoint("/osmand-websocket")
-				.setAllowedOriginPatterns("*")
-				.withSockJS();
+			registry.addEndpoint("/osmand-websocket");
 		}
 	}
 
