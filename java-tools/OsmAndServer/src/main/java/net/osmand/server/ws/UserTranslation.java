@@ -1,6 +1,7 @@
 package net.osmand.server.ws;
 
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,7 +65,7 @@ public class UserTranslation {
 	}
 
 	public Deque<TranslationSharingOptions> getActiveSharers() {
-		return activeSharers;
+		return new ConcurrentLinkedDeque<>(activeSharers);
 	}
 
 	public void setCreationDate(long creationDate) {
@@ -76,7 +77,7 @@ public class UserTranslation {
 	}
 
 	public Deque<TranslationMessage> getMessages() {
-		return messages;
+		return new ConcurrentLinkedDeque<>(messages);
 	}
 
 	public Map<Integer, Deque<WptPt>> getLocationsByUser() {

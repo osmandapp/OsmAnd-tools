@@ -215,7 +215,6 @@ public class UserTranslationsController {
 			);
 			
 			if (token == null) {
-				LOG.warn("Room authentication failed for " + request.translationId());
 				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Authentication failed");
 			}
 			
