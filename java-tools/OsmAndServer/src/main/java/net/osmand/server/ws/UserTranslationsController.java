@@ -150,7 +150,7 @@ public class UserTranslationsController {
 			return false;
 		}
 		// Allow only alphanumeric characters and safe characters
-		return translationId.matches("^[a-zA-Z0-9_-]+$");
+		return translationId.matches(UserTranslationsService.VALID_TRANSLATION_ID_PATTERN);
 	}
 
 	private boolean isValidPassword(String password) {
