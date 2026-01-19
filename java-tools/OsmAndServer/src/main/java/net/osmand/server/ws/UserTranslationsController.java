@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 
 @RestController
@@ -26,14 +28,17 @@ import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 public class UserTranslationsController {
 
 	private static final Log LOG = LogFactory.getLog(UserTranslationsController.class);
-	
+
 	@Autowired
 	private UserTranslationsService userTranslationsService;
-	
+
+	@Autowired
+	private RateLimitService rateLimitService;
+
 	private final Gson gson = new Gson();
-	
+
 	public record AuthenticateRequest(String translationId, String password, String alias) {}
-	
+
 	public record CreateTranslationRequest(String password) {}
 
 
@@ -41,7 +46,7 @@ public class UserTranslationsController {
 	 * Creates a new translation session.
 	 * Request body: {"password": "secret"} (optional password)
 	 * Response: {"sessionId": "translation123"}
-	 * 
+	 *
 	 * @param request JSON request with optional password
 	 * @param headers WebSocket headers
 	 * @param principal user principal
@@ -60,7 +65,7 @@ public class UserTranslationsController {
 		if (request != null && hasPassword(request.password())) {
 			userTranslationsService.setTranslationPassword(translation, request.password());
 		}
-		
+
 		return new UserTranslationDTO(translation.getSessionId());
 	}
 
@@ -81,10 +86,10 @@ public class UserTranslationsController {
 			userTranslationsService.sendError("Access denied to translation", headers);
 			return;
 		}
-		
+
 		userTranslationsService.load(ust, headers);
 	}
-	
+
 	@MessageMapping("/whoami")
 	public void whoami(SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUser(principal, headers, true);
@@ -92,7 +97,7 @@ public class UserTranslationsController {
 			userTranslationsService.whoami(user, headers);
 		}
 	}
-	
+
 	@MessageMapping("/translation/{translationId}/startSharing")
 	public String startSharing(@DestinationVariable String translationId,
 	                           SimpMessageHeaderAccessor headers,
@@ -112,7 +117,7 @@ public class UserTranslationsController {
 			return null;
 		}
 	}
-	
+
 	@MessageMapping("/translation/{translationId}/stopSharing")
 	public String stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
 	                          Principal principal) {
@@ -186,7 +191,7 @@ public class UserTranslationsController {
 	private boolean hasPassword(String password) {
 		return password != null && !password.isEmpty() && !password.equals("{}");
 	}
-	
+
 	/**
 	 * Authenticates user for room access and returns Bearer token.
 	 * POST /api/translation/authenticate
@@ -194,8 +199,17 @@ public class UserTranslationsController {
 	 * Response: {"token": "bearer_token_string"}
 	 */
 	@PostMapping("/authenticate")
-	public ResponseEntity<String> authenticate(@RequestBody AuthenticateRequest request) {
+	public ResponseEntity<String> authenticate(@RequestBody AuthenticateRequest request, HttpServletRequest httpRequest) {
 		try {
+			// Get client IP for rate limiting (forward-headers-strategy: native handles X-Forwarded-For)
+			String clientIp = httpRequest != null ? httpRequest.getRemoteAddr() : RateLimitService.UNKNOWN_IP;
+
+			if (rateLimitService.isRateLimited(clientIp)) {
+				LOG.warn("Rate limited authentication attempt from IP: " + clientIp);
+				return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+					.body("Too many failed authentication attempts. Please try again later.");
+			}
+
 			if (request.translationId() == null || request.translationId().isEmpty()) {
 				return ResponseEntity.badRequest().body("translationId is required");
 			}
@@ -208,15 +222,19 @@ public class UserTranslationsController {
 			// This is fine - tokens work for anonymous users too
 
 			String token = userTranslationsService.authenticateRoom(
-				request.translationId(), 
-				request.password(), 
-				userId, 
+				request.translationId(),
+				request.password(),
+				userId,
 				request.alias()
 			);
-			
+
 			if (token == null) {
+				rateLimitService.trackFailedAttempt(clientIp);
+				LOG.warn("Authentication failed for translationId: " + request.translationId() + " from IP: " + clientIp);
 				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Authentication failed");
 			}
+
+			rateLimitService.resetRateLimit(clientIp);
 			
 			JsonObject response = new JsonObject();
 			response.addProperty("token", token);
