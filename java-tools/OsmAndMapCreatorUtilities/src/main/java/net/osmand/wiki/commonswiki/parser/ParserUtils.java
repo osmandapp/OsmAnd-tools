@@ -100,9 +100,33 @@ public final class ParserUtils {
 		if (text == null) {
 			return null;
 		}
-		String withoutLinks = removeWikiLinkBrackets(text);
+		String withoutLinks = removeWikiLinks(text);
+		withoutLinks = removeWikiLinkBrackets(withoutLinks);
 		// removeWikiLinkBrackets returns null only if input is null, which we already checked
 		return removeTemplateBrackets(withoutLinks);
+	}
+
+	/**
+	 * Removes wiki links from a string.
+	 * Eleanor Stackhouse Atkinson (:wikisource:Author:Eleanor Stackhouse Atkinson|Wikisource, :en:Eleanor Stackhouse Atkinson|Wikipedia)
+	 * -> Eleanor Stackhouse Atkinson (Wikisource, Wikipedia)
+	 *
+	 * @param text The text to clean
+	 * @return Cleaned text
+	 */
+
+	private static String removeWikiLinks(String text) {
+		StringBuilder sb = new StringBuilder(text);
+		int startIdx;
+		while ((startIdx = sb.indexOf(":")) != -1) {
+			int secondIdx = sb.indexOf(":", startIdx + 1);
+			int endIdx = sb.indexOf("|", secondIdx + 1);
+			if (secondIdx == -1 || endIdx == -1) {
+				break;
+			}
+			sb.delete(startIdx, endIdx + 1);
+		}
+		return sb.toString();
 	}
 
 	/**

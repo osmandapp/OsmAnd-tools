@@ -401,8 +401,8 @@ public class WikiDatabasePreparation {
 		for (String line : parts) {
 			line = line.trim();
 			String lineLc = line.toLowerCase();
-			
-			if (lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
+
+			if (author == null && lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
 				author = AuthorParser.parse(line);
 			}
 			if (date == null && lineLc.startsWith(ParserUtils.FIELD_DATE)) {
