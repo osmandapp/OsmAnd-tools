@@ -203,11 +203,17 @@ public class WikiDataHandler extends DefaultHandler {
 
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
+        wikiRegionPrep.executeBatch();
+    	wikidataPropPrep.executeBatch();
+    	wikidataBlobPrep.executeBatch();
         if (!conn.getAutoCommit()) {
             conn.commit();
         }
         mappingPrep.close();
         coordsPrep.close();
+        wikiRegionPrep.close();
+    	wikidataPropPrep.close();
+    	wikidataBlobPrep.close();
         conn.close();
     }
 
@@ -361,7 +367,7 @@ public class WikiDataHandler extends DefaultHandler {
 				wikidataPropPrep.setString(3, commonCat);
 				addBatch(wikidataPropPrep, wikidataPropBatch);
 			}
-			if(storeJson) {
+			if (storeJson) {
 				wikidataBlobPrep.setLong(1, id);
 				wikidataBlobPrep.setBytes(2, Algorithms.stringToGzip(json));
 				addBatch(wikidataBlobPrep, wikidataBlobBatch);
