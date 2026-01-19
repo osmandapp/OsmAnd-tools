@@ -135,7 +135,8 @@ public class WikiDataHandler extends DefaultHandler {
 	public static Set<Long> getAllAstroWids() {
         Set<Long> wids = new HashSet<>();
         Gson gson = new Gson();
-        Type listType = new TypeToken<List<AstroObject>>() {}.getType();
+        @SuppressWarnings("unused")
+		Type listType = new TypeToken<List<AstroObject>>() {}.getType();
         String path = "/astro";
         try {
         	URL url = WikiDataHandler.class.getResource(path);
@@ -336,7 +337,8 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setDouble(++ind, wlon);
 			coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
-			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
+			String type = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null;
+			coordsPrep.setString(++ind, star ? "starmap" : type);
 			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
 			coordsPrep.setString(++ind, labelsJson);
 
