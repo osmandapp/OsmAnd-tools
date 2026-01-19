@@ -2,10 +2,25 @@ package net.osmand.wiki.wikidata;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Type;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.xml.parsers.SAXParser;
 
@@ -16,11 +31,14 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
+import com.google.gson.reflect.TypeToken;
 
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
 import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.DBDialect;
+import net.osmand.util.Algorithms;
 import net.osmand.wiki.OsmCoordinatesByTag;
 import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 
@@ -42,10 +60,12 @@ public class WikiDataHandler extends DefaultHandler {
 	private PreparedStatement mappingPrep;
 	private PreparedStatement wikiRegionPrep;
 	private PreparedStatement wikidataPropPrep;
+	private PreparedStatement wikidataBlobPrep;
 	private int[] mappingBatch = new int[]{0};
 	private int[] coordsBatch = new int[]{0};
 	private int[] regionBatch = new int[]{0};
 	private int[] wikidataPropBatch = new int[]{0};
+	private int[] wikidataBlobBatch = new int[]{0};
 
 	public final static int BATCH_SIZE = 5000;
 	private final static int ARTICLE_BATCH_SIZE = 10000;
@@ -60,7 +80,12 @@ public class WikiDataHandler extends DefaultHandler {
 	private List<String> keyNames = new ArrayList<>();
 
 	OsmCoordinatesByTag osmWikiCoordinates;
+	
 	private long lastProcessedId;
+	
+	private long limit = -1;
+
+	private Map<Long, String> allAstroWids;
 
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
@@ -78,17 +103,86 @@ public class WikiDataHandler extends DefaultHandler {
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_blobs(id bigint PRIMARY KEY, page blob)");
 		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson) "
 				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
+		wikidataBlobPrep = conn.prepareStatement("INSERT INTO wikidata_blobs(id, page) VALUES(?, ?)");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
+		
+		allAstroWids = getAllAstroWids();
+	}
+	
+	
+	public void setLimit(long limit) {
+		this.limit = limit;
 		
 	}
 	
 	
+	public class AstroObject {
+	    @SerializedName("wid")
+	    public String wid;
+	    
+	    @Override
+	    public String toString() {
+	    	return wid;
+	    }
+	}
+	
+	
+	public static Map<Long, String> getAllAstroWids() {
+		Map<Long, String> wids = new HashMap<>();
+        Gson gson = new Gson();
+        @SuppressWarnings("unused")
+		Type listType = new TypeToken<List<AstroObject>>() {}.getType();
+        String path = "/astro";
+        try {
+        	URL url = WikiDataHandler.class.getResource(path);
+            if (url == null) return wids;
+            List<String> jsonPaths = new ArrayList<>();
 
+            if (url.getProtocol().equals("jar")) {
+                String jarPath = url.getPath().substring(5, url.getPath().indexOf("!"));
+                try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(Paths.get(jarPath)))) {
+                    ZipEntry entry;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        // Check if entry is in the 'astro' folder and is a JSON
+                        if (!entry.isDirectory() && entry.getName().startsWith("astro/") && entry.getName().endsWith(".json")) {
+                            jsonPaths.add("/" + entry.getName());
+                        }
+                    }
+                }
+            } else {
+                // SCENARIO B: Running from IDE / File System
+                try (Stream<Path> walk = Files.walk(Paths.get(url.toURI()), 1)) {
+                    walk.filter(p -> p.toString().endsWith(".json"))
+                        .forEach(p -> jsonPaths.add(path + "/" + p.getFileName().toString()));
+                }
+            }
+			for (String resourcePath : jsonPaths) {
+				try (InputStreamReader reader = new InputStreamReader(
+						WikiDataHandler.class.getResourceAsStream(resourcePath))) {
+					List<AstroObject> objects = gson.fromJson(reader, new TypeToken<List<AstroObject>>() {
+					}.getType());
+					if (objects != null) {
+						String type = resourcePath.substring(resourcePath.lastIndexOf('/') + 1, resourcePath.lastIndexOf('.'));
+						for (AstroObject obj : objects) {
+							if (obj.wid != null && obj.wid.startsWith("Q")) {
+								wids.put(Long.parseLong(obj.wid.substring(1)), type);
+							}
+						}
+					}
+				}
+			}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return wids;
+    }
+	
 	public void addBatch(PreparedStatement prep, int[] bt) throws SQLException {
         prep.addBatch();
         bt[0] = bt[0] + 1;
@@ -112,11 +206,17 @@ public class WikiDataHandler extends DefaultHandler {
 
         coordsPrep.executeBatch();
         mappingPrep.executeBatch();
+        wikiRegionPrep.executeBatch();
+    	wikidataPropPrep.executeBatch();
+    	wikidataBlobPrep.executeBatch();
         if (!conn.getAutoCommit()) {
             conn.commit();
         }
         mappingPrep.close();
         coordsPrep.close();
+        wikiRegionPrep.close();
+    	wikidataPropPrep.close();
+    	wikidataBlobPrep.close();
         conn.close();
     }
 
@@ -160,6 +260,9 @@ public class WikiDataHandler extends DefaultHandler {
 				case "page":
 					page = false;
 					progress.update();
+					if (limit > 0 && count >= limit) {
+						throw new IllegalStateException();
+					}
 					break;
 				case "title":
 				case "format":
@@ -197,7 +300,10 @@ public class WikiDataHandler extends DefaultHandler {
 
 
 	public void processJsonPage(long id, String json) throws SQLException, IOException {
+		String starType = allAstroWids.get(id);
+		boolean storeJson = starType != null;
 		ArticleMapper.Article article = gson.fromJson(json, ArticleMapper.Article.class);
+		
 		OsmLatLonId osmCoordinates = null;
 		double wlat = article.getLat();
 		double wlon = article.getLon();
@@ -206,8 +312,8 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLat(osmCoordinates.lat);
 			article.setLon(osmCoordinates.lon);
 		}
-
-		if (article.getLat() != 0 || article.getLon() != 0) {
+		
+		if (article.getLat() != 0 || article.getLon() != 0 || starType != null) {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
 			}
@@ -233,8 +339,10 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setDouble(++ind, wlon);
 			coordsPrep.setInt(++ind, osmCoordinates != null ? (osmCoordinates.type + 1) : 0);
 			coordsPrep.setLong(++ind, osmCoordinates != null ? osmCoordinates.id : 0);
-			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null);
-			coordsPrep.setString(++ind, osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null );
+			String type = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getType().getKeyName(): null;
+			coordsPrep.setString(++ind, starType != null ? "starmap" : type);
+			String subtype = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null;
+			coordsPrep.setString(++ind,  starType != null ? starType : subtype);
 			coordsPrep.setString(++ind, labelsJson);
 
 			addBatch(coordsPrep, coordsBatch);
@@ -264,6 +372,11 @@ public class WikiDataHandler extends DefaultHandler {
 				wikidataPropPrep.setString(3, commonCat);
 				addBatch(wikidataPropPrep, wikidataPropBatch);
 			}
+			if (storeJson) {
+				wikidataBlobPrep.setLong(1, id);
+				wikidataBlobPrep.setBytes(2, Algorithms.stringToGzip(json));
+				addBatch(wikidataBlobPrep, wikidataBlobBatch);
+			}
 		}
 	}
 
@@ -286,5 +399,8 @@ public class WikiDataHandler extends DefaultHandler {
 		}
 		return osmWikiCoordinates.getCoordinates("wikidata", "Q"+wid);
 	}
+
+
+
 }
 
