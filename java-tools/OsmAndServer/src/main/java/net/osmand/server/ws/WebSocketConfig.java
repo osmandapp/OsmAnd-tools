@@ -1,8 +1,11 @@
 package net.osmand.server.ws;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.TaskScheduler;
@@ -19,6 +22,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	
 	@Autowired
 	private SubscriptionInterceptor subscriptionInterceptor;
+	
+	@Autowired
+	private Environment environment;
 
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {
@@ -45,8 +51,20 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 	
 	@Override
-	public void registerStompEndpoints(StompEndpointRegistry registry) {
-		registry.addEndpoint("/osmand-websocket");
+	public void registerStompEndpoints(@NotNull StompEndpointRegistry registry) {
+		boolean isProduction = environment.acceptsProfiles(Profiles.of("production"));
+		
+		if (isProduction) {
+			// In production, only allow connections from osmand.net domains over HTTPS/WSS
+			registry.addEndpoint("/osmand-websocket")
+				.setAllowedOriginPatterns("https://*.osmand.net")
+				.withSockJS();
+		} else {
+			// In development, allow all origins for testing
+			registry.addEndpoint("/osmand-websocket")
+				.setAllowedOriginPatterns("*")
+				.withSockJS();
+		}
 	}
 
 }
