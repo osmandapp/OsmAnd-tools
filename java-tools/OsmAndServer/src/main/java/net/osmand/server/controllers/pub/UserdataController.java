@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +82,9 @@ public class UserdataController {
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
 	public static final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
+	
+	// Reverse index: userId -> Set of device IDs for efficient user-level cache invalidation
+	private static final Map<Integer, Set<Integer>> cacheByUserId = new ConcurrentHashMap<>();
 
 	private static final long CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
@@ -152,6 +156,49 @@ public class UserdataController {
 			return device;
 		}
 	}
+
+	/**
+	 * Adds a device to the cache and updates the reverse index accordingly.
+	 * @param deviceId device ID to add
+	 * @param cachedInfo cached device info
+	 */
+	private static void addToCache(int deviceId, CachedInfoDevice cachedInfo) {
+		cacheByDeviceId.put(deviceId, cachedInfo);
+		int userId = cachedInfo.device.userid;
+		cacheByUserId.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet()).add(deviceId);
+	}
+
+	/**
+	 * Removes a device from the cache and updates the reverse index accordingly.
+	 * @param deviceId device ID to remove
+	 */
+	public static void removeFromCache(int deviceId) {
+		CachedInfoDevice removed = cacheByDeviceId.remove(deviceId);
+		if (removed != null) {
+			int userId = removed.device.userid;
+			Set<Integer> deviceIds = cacheByUserId.get(userId);
+			if (deviceIds != null) {
+				deviceIds.remove(deviceId);
+				// Clean up empty sets to prevent memory leaks
+				if (deviceIds.isEmpty()) {
+					cacheByUserId.remove(userId);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Invalidates all cached devices for a given user ID.
+	 * @param userId user ID whose devices should be invalidated
+	 */
+	public static void invalidateCacheByUserId(int userId) {
+		Set<Integer> deviceIds = cacheByUserId.remove(userId);
+		if (deviceIds != null) {
+			for (Integer deviceId : deviceIds) {
+				cacheByDeviceId.remove(deviceId);
+			}
+		}
+	}
 	
 	private CachedInfoDevice checkTokenCache(int deviceId, String accessToken) {
 		CachedInfoDevice cached = cacheByDeviceId.get(deviceId);
@@ -163,7 +210,7 @@ public class UserdataController {
 		CloudUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
 			CachedInfoDevice cache = new CachedInfoDevice(d, null);
-			cacheByDeviceId.put(deviceId, new CachedInfoDevice(d, null));
+			addToCache(deviceId, cache);
 			return cache;
 		}
 		return null;
@@ -601,6 +648,14 @@ public class UserdataController {
 	@Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS) // Run every hour
 	public void clearExpiredTokens() {
 		long now = System.currentTimeMillis();
-		cacheByDeviceId.values().removeIf(c -> (now - c.timestamp) > CACHE_TTL);
+		Set<Integer> expiredDeviceIds = new HashSet<>();
+		for (Map.Entry<Integer, CachedInfoDevice> entry : cacheByDeviceId.entrySet()) {
+			if ((now - entry.getValue().timestamp) > CACHE_TTL) {
+				expiredDeviceIds.add(entry.getKey());
+			}
+		}
+		for (Integer deviceId : expiredDeviceIds) {
+			removeFromCache(deviceId);
+		}
 	}
 }

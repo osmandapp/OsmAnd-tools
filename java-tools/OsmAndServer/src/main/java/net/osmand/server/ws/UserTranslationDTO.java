@@ -32,7 +32,7 @@ public class UserTranslationDTO {
 			sh.startTime = o.startTime;
 			sh.nickname = o.nickname;
 			Deque<WptPt> deque = us.getLocationsByUser().get(o.userId);
-			if (deque != null) {
+			if (deque != null && !deque.isEmpty()) {
 				sh.lastLocation = deque.getLast();
 			}
 			this.sharingUsers.add(sh);
