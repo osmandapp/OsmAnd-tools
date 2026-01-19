@@ -319,6 +319,9 @@ public class IndexRouteRelationCreator {
 
 		if (icc.getIndexHeightData() != null) {
 			for (Way way : ways) {
+                if (way.getNodes().isEmpty()) {
+                    continue;
+                }
 				IndexHeightData.WayGeneralStats wg = icc.getIndexHeightData()
 						.calculateWayGeneralStats(way, IndexRouteRelationCreatorV1.DIST_STEP);
 				if (wg.eleCount > 0) {
