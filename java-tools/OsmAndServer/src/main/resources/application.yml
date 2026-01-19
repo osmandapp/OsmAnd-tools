@@ -3,8 +3,6 @@ admin.api-oauth2-url: https://api.github.com/orgs/osmandapp/teams/serveradmins
 
 google.androidPublisher.clientSecret: ${ANDROID_PUBLISHER_CLIENT_SECRET_JSON:}
 
-jwt.secret: ${JWT_SECRET}
-
 # local storage to store files in db
 storage:
   default: ${STORAGE_DEFAULT:local}
