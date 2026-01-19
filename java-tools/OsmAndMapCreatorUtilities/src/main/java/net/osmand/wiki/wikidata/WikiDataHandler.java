@@ -131,9 +131,6 @@ public class WikiDataHandler extends DefaultHandler {
 	    }
 	}
 	
-	public static void main(String[] args) {
-		System.out.println(getAllAstroWids());
-	}
 	
 	public static Set<Long> getAllAstroWids() {
         Set<Long> wids = new HashSet<>();
@@ -175,7 +172,6 @@ public class WikiDataHandler extends DefaultHandler {
 							}
 						}
 					}
-					System.out.println(resourcePath + " " + objects);
 				}
 			}
         } catch (Exception e) {

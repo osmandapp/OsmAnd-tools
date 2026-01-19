@@ -1179,7 +1179,7 @@ public class WikiDatabasePreparation {
 			}
 			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
-		if (mode.equals("create-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
+		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
@@ -1247,7 +1247,7 @@ public class WikiDatabasePreparation {
 			processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, testArticleID);
 			break;
 		case "test-wikidata":
-			wikidataDB = new File(wikidataSqliteName+".test");
+			wikidataDB = new File(wikidataSqliteName + ".test");
 //			log.info("Process OSM coordinates...");
 //			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
