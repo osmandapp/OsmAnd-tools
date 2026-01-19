@@ -1,7 +1,6 @@
 package net.osmand.server.utilities;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.render.RenderingRule;
 import net.osmand.render.RenderingRuleProperty;
@@ -35,9 +34,11 @@ public class StyleDataExtractor {
     
     private static final String STYLE_RULES_RESULT_JSON = "styleRulesResult.json";
     
+    private static final List<String> PREFERRED_KEY_ORDER = Arrays.asList("attrStringValue", "attrColorValue", "tag", "value", "additional");
+    
     public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
-        //parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
-        parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
+        parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
+       // parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
     }
     
     /**
@@ -54,16 +55,46 @@ public class StyleDataExtractor {
             return;
         }
         List<String> styles = parseFile(stylesPath);
-        List<String> attributes = parseFile(attributesPath);
-        if (styles.isEmpty() || attributes.isEmpty()) {
+
+        Gson gson = new Gson();
+        List<String> regularAttributes = new ArrayList<>();
+        List<String> publicTransportAttributes = new ArrayList<>();
+        
+        try (FileReader reader = new FileReader(attributesPath)) {
+            JsonElement jsonElement = gson.fromJson(reader, JsonElement.class);
+            if (jsonElement != null) {
+                if (jsonElement.isJsonObject()) {
+                    Type listType = new TypeToken<List<String>>() {}.getType();
+                    JsonObject jsonObj = jsonElement.getAsJsonObject();
+                    if (jsonObj.has("regular")) {
+                        regularAttributes = gson.fromJson(jsonObj.get("regular"), listType);
+                    }
+                    if (jsonObj.has("publictransport")) {
+                        publicTransportAttributes = gson.fromJson(jsonObj.get("publictransport"), listType);
+                    }
+                }
+            }
+        } catch (JsonSyntaxException | JsonIOException e) {
+            throw new IOException("Failed to parse attributes JSON file at " + attributesPath + ": " + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new IOException("Failed to read attributes JSON file at " + attributesPath, e);
+        }
+        
+        if (styles.isEmpty() || (regularAttributes.isEmpty() && publicTransportAttributes.isEmpty())) {
             return;
         }
         
         Map<String, Object> result = new HashMap<>();
+        // Combine all attributes for parsing colors in all styles
+        List<String> allAttributes = new ArrayList<>(regularAttributes);
+        allAttributes.addAll(publicTransportAttributes);
+        
         for (String style : styles) {
             try {
                 RenderingRulesStorage storage = parseStorage(style);
-                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, attributes);
+                // Parse all attributes (both regular and publictransport) for all styles
+                Map<String, List<Map<String, String>>> attributesRes = parseAttributes(storage, allAttributes);
+                
                 if (!attributesRes.isEmpty()) {
                     result.put(style, attributesRes);
                 }
@@ -72,8 +103,8 @@ public class StyleDataExtractor {
             }
         }
         
-        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-        String jsonResult = gson.toJson(result);
+        Gson gsonPretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        String jsonResult = gsonPretty.toJson(result);
         String outputFilePath = Paths.get(new File(stylesPath).getParent(), STYLE_RULES_RESULT_JSON).toString();
         Files.write(Paths.get(outputFilePath), jsonResult.getBytes());
     }
@@ -126,17 +157,56 @@ public class StyleDataExtractor {
         RenderingRule rule = storage.getRenderingAttributeRule(attribute);
         if (rule != null) {
             List<RenderingRule> allRules = getRules(rule, new ArrayList<>());
-            return allRules.stream()
+            
+            List<Map<String, String>> rulesList = allRules.stream()
                     .map(renderingRule -> {
                         RenderingRuleSearchRequest searchRequest = new RenderingRuleSearchRequest(storage);
                         searchRequest.loadOutputProperties(renderingRule, true);
-                        return Arrays.stream(renderingRule.getProperties())
+                        Map<String, String> ruleMap = Arrays.stream(renderingRule.getProperties())
                                 .map(prop -> new AbstractMap.SimpleEntry<>(prop.getAttrName(), getProperty(prop, prop.getAttrName(), searchRequest, renderingRule)))
                                 .filter(entry -> entry.getValue() != null)
-                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1, LinkedHashMap::new));
+                        
+                        // Reorder keys: put preferred keys first, then others in alphabetical order
+                        LinkedHashMap<String, String> orderedMap = new LinkedHashMap<>();
+                        // Add preferred keys in order
+                        for (String key : PREFERRED_KEY_ORDER) {
+                            if (ruleMap.containsKey(key)) {
+                                orderedMap.put(key, ruleMap.get(key));
+                            }
+                        }
+                        // Add remaining keys in alphabetical order
+                        ruleMap.entrySet().stream()
+                                .filter(e -> !PREFERRED_KEY_ORDER.contains(e.getKey()))
+                                .sorted(Map.Entry.comparingByKey())
+                                .forEach(e -> orderedMap.put(e.getKey(), e.getValue()));
+                        
+                        return orderedMap;
                     })
                     .filter(map -> !map.isEmpty())
                     .collect(Collectors.toList());
+            
+            // Remove duplicates: keep first occurrence, remove rest
+            // Compare all fields except attrColorValue to identify duplicates
+            // (same rule with different colors should be considered duplicate)
+            Set<String> seen = new HashSet<>();
+            List<Map<String, String>> uniqueRules = new ArrayList<>();
+            
+            for (Map<String, String> ruleMap : rulesList) {
+                // Create comparison key directly from map entries (excluding attrColorValue) without creating TreeMap
+                String normalizedKey = ruleMap.entrySet().stream()
+                        .filter(e -> !"attrColorValue".equals(e.getKey())) // Exclude color from comparison
+                        .sorted(Map.Entry.comparingByKey()) // Sort keys for consistent comparison
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining("|"));
+                
+                if (!seen.contains(normalizedKey)) {
+                    seen.add(normalizedKey);
+                    uniqueRules.add(ruleMap);
+                }
+            }
+            
+            return uniqueRules;
         }
         return Collections.emptyList();
     }

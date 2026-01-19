@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,7 +31,7 @@ import java.util.zip.GZIPInputStream;
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 	
-	private static final int DEFAULT_THREADS = 8;
+	private static final int DEFAULT_THREADS = 8; // it's parsing threads (downloads always run in a single thread https://dumps.wikimedia.org/)
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
 	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
@@ -38,11 +39,12 @@ public class CommonsWikimediaPreparation {
 	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
 	private static final AtomicLong totalPagesCount = new AtomicLong(0);
 	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
+	private static final AtomicLong changedLicenseCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
 	public static final String FILE = "File:";
-
+	private static boolean showLog = false;
 
 	public static void main(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
@@ -59,6 +61,7 @@ public class CommonsWikimediaPreparation {
 		boolean recreateDb = opts.getBoolean("--recreate_db");
 		boolean keepFiles = opts.getBoolean("--keep_files");
 		int threads = opts.getIntOrDefault("--threads", DEFAULT_THREADS);
+		showLog = opts.getBoolean("--show_log");
 
 		if (mode.isEmpty() || folder.isEmpty()) {
 			printHelp();
@@ -100,7 +103,8 @@ public class CommonsWikimediaPreparation {
 		--result_db=/path/to/result_db/meta_commonswiki.sqlite
 		--recreate_db recreate meta_commonswiki.sqlite
 		--keep_files keep downloaded files instead of deleting them
-		--threads=8 number of parsing threads
+		--threads=8 number of parsing threads (downloads always run in a single thread)
+		--show_log show license update log
 		
 		--mode=parse-img-meta
 		  Recreates the RESULT_SQLITE database and downloads, then parses commonswiki-latest-pages-articles.xml.gz
@@ -171,6 +175,9 @@ public class CommonsWikimediaPreparation {
 		log.info("Added to queue: " + articlesCount.get());
 		log.info("Written to database: " + writtenToDatabaseCount.get());
 		log.info("Other errors: " + otherErrorsCount.get());
+		if (showLog) {
+			log.info("Changed licenses: " + changedLicenseCount.get());
+		}
 		log.info("========= End Statistics =========");
 	}
 
@@ -209,13 +216,31 @@ public class CommonsWikimediaPreparation {
 					date = excluded.date, \
 					license = excluded.license, \
 					description = excluded.description;""")) {
+				PreparedStatement selectStatement = conn
+						.prepareStatement("SELECT id, name, license FROM common_meta WHERE id = ?");
 
 				int counter = 0;
-
+				try (Statement st = conn.createStatement();
+					 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM common_meta")) {
+					rs.next();
+					log.info("Rows in common_meta at start: %d".formatted(rs.getInt(1)));
+				}
 				while (true) {
 					Article a = QUEUE.take();
 					if (a == END_SIGNAL) break;
-
+					if (showLog) {
+						selectStatement.setLong(1, a.id);
+						try (ResultSet rs = selectStatement.executeQuery()) {
+							if (rs.next()) {
+								String oldLicense = rs.getString("license");
+								if (!Objects.equals(oldLicense, a.license)) {
+									changedLicenseCount.incrementAndGet();
+									log.info("==== Article %s (%s) license changed from %s to %s"
+											.formatted(rs.getString("name"), rs.getString("id"), oldLicense, a.license));
+								}
+							}
+						}
+					}
 					insertStatement.setLong(1, a.id);
 					insertStatement.setString(2, a.title);
 					insertStatement.setString(3, a.author);
@@ -270,7 +295,7 @@ public class CommonsWikimediaPreparation {
 			InputSource is = getInputSource(streamFile);
 			final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress);
 			sx.parse(is, handler);
-		} catch (ParserConfigurationException | SQLException | IOException | SAXException e) {
+		} catch (ParserConfigurationException | IOException | SAXException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -280,6 +305,7 @@ public class CommonsWikimediaPreparation {
 		private boolean pageTag = false;
 		private boolean pageIdParsed = false;
 		private boolean pageTextParsed = false;
+		private boolean revisionTag = false;
 		private StringBuilder ctext = null;
 		private final StringBuilder title = new StringBuilder();
 		private final StringBuilder ns = new StringBuilder();
@@ -287,8 +313,9 @@ public class CommonsWikimediaPreparation {
 		private final FileProgressImplementation progress;
 
 		private final StringBuilder textContent = new StringBuilder();
+		private final StringBuilder lastRevisionText = new StringBuilder();
 
-		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) throws SQLException {
+		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) {
 			this.saxParser = saxParser;
 			this.progress = progress;
 		}
@@ -309,14 +336,18 @@ public class CommonsWikimediaPreparation {
 						ctext = ns;
 					}
 					case "id" -> {
-						if (!pageIdParsed) {
+						if (!revisionTag && !pageIdParsed) {
 							id.setLength(0);
 							ctext = id;
 							pageIdParsed = true;
 						}
 					}
+					case "revision" -> {
+						revisionTag = true;
+						pageTextParsed = false;
+					}
 					case "text" -> {
-						if (!pageTextParsed) {
+						if (revisionTag && !pageTextParsed) {
 							textContent.setLength(0);
 							ctext = textContent;
 						}
@@ -337,18 +368,27 @@ public class CommonsWikimediaPreparation {
 			String name = saxParser.isNamespaceAware() ? localName : qName;
 			if (pageTag) {
 				switch (name) {
+					case "revision" -> {
+						revisionTag = false;
+					}
 					case "page" -> {
+						parseMeta();
+						lastRevisionText.setLength(0);
 						pageTag = false;
 						pageIdParsed = false;
 						pageTextParsed = false;
+						revisionTag = false;
+						ctext = null;
 						progress.update();
 					}
 					case "title", "ns", "id" -> ctext = null;
 					case "text" -> {
-						if (!pageTextParsed) {
-							parseMeta();
+						if (revisionTag && !pageTextParsed) {
 							pageTextParsed = true;
+							lastRevisionText.setLength(0);
+							lastRevisionText.append(textContent);
 						}
+						ctext = null;
 					}
 				}
 			}
@@ -356,14 +396,14 @@ public class CommonsWikimediaPreparation {
 
 		private void parseMeta() {
 			try {
-				if (FILE_NAMESPACE.contentEquals(ns)) {
+				if (!lastRevisionText.isEmpty() && FILE_NAMESPACE.contentEquals(ns)) {
 					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
 					if (imageTitle == null) {
 						return;
 					}
 					totalPagesCount.incrementAndGet();
 					Map<String, String> meta = new HashMap<>();
-					WikiDatabasePreparation.removeMacroBlocks(textContent, meta, new HashMap<>(), null, "en", imageTitle, null, true);
+					WikiDatabasePreparation.removeMacroBlocks(lastRevisionText, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.get("author");
 					String license = meta.get("license");
