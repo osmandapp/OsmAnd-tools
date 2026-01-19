@@ -340,42 +340,52 @@ public class UserTranslationsService {
 	 */
 	public String authenticateRoom(String translationId, String password, int userId, String alias) {
 		UserTranslation translation = activeTranslations.get(translationId);
-		if (translation == null) {
-			LOG.warn("Room authentication failed: translation not found " + translationId);
-			return null;
-		}
 		
-		String passwordHash = translation.getPassword();
-		// If room has no password, allow access
-		if (passwordHash == null || passwordHash.isEmpty()) {
-			return generateRoomToken(translationId, userId, alias);
-		}
+		// Dummy BCrypt hash for timing attack prevention when translation doesn't exist
+		// This ensures password verification always takes similar time
+		// Using a valid BCrypt hash format that will never match any password
+		final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 		
-		// If user already verified, allow access
-		if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
-			return generateRoomToken(translationId, userId, alias);
+		String passwordHash;
+		boolean translationExists = translation != null;
+		
+		if (!translationExists) {
+			// Use dummy hash to normalize timing - prevents enumeration attacks
+			passwordHash = DUMMY_HASH;
+		} else {
+			passwordHash = translation.getPassword();
+			// If room has no password, allow access
+			if (passwordHash == null || passwordHash.isEmpty()) {
+				return generateRoomToken(translationId, userId, alias);
+			}
+			
+			// If user already verified, allow access
+			if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
+				return generateRoomToken(translationId, userId, alias);
+			}
 		}
 		
 		// Check password
 		if (password == null || password.isEmpty()) {
-			LOG.warn("Room authentication failed: password required for " + translationId);
 			return null;
 		}
 		
 		try {
 			boolean matches = passwordEncoder.matches(password, passwordHash);
-			if (matches) {
-				if (userId > 0) {
-					translation.getVerifiedUsers().add(userId);
-				}
-				LOG.debug("Room authentication successful for " + translationId + ", user " + userId);
-				return generateRoomToken(translationId, userId, alias);
-			} else {
-				LOG.warn("Room authentication failed: invalid password for " + translationId);
+			
+			if (!translationExists || !matches) {
+				// Generic failure - don't reveal whether translation exists or password is wrong
 				return null;
 			}
+			
+			// Authentication successful
+			if (userId > 0) {
+				translation.getVerifiedUsers().add(userId);
+			}
+			LOG.debug("Room authentication successful for " + translationId + ", user " + userId);
+			return generateRoomToken(translationId, userId, alias);
 		} catch (Exception e) {
-			LOG.warn("Room authentication error for " + translationId + ": " + e.getMessage(), e);
+			LOG.warn("Room authentication error for " + translationId, e);
 			return null;
 		}
 	}
@@ -469,8 +479,11 @@ public class UserTranslationsService {
 
 		// Send last known location if available
 		Deque<WptPt> locationHistory = userLocationHistory.get(user.id);
-		if (locationHistory != null && !locationHistory.isEmpty()) {
-			ust.sendLocation(user.id, locationHistory.getLast());
+		if (locationHistory != null) {
+			WptPt lastLocation = locationHistory.peekLast();
+			if (lastLocation != null) {
+				ust.sendLocation(user.id, lastLocation);
+			}
 		}
 		
 		// Start simulation in non-production environments
