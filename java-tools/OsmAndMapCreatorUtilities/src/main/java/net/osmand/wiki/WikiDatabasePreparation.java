@@ -1251,7 +1251,7 @@ public class WikiDatabasePreparation {
 //			log.info("Process OSM coordinates...");
 //			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 100000);
+			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			
 		case "create-wikidata-mapping":
@@ -1484,7 +1484,8 @@ public class WikiDatabasePreparation {
 		handler.setLimit(limit);
 		try {
 			sx.parse(is, handler);
-		} catch (SAXException e) {
+		} catch (IllegalStateException e) {
+			// stopped by limit
 			e.printStackTrace();
 		}
 		handler.finish();
