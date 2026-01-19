@@ -66,6 +66,9 @@ public class UserTranslationsService {
 	// Maximum number of devices per user that can share in a single translation
 	private static final int MAX_DEVICES_PER_USER_PER_TRANSLATION = 5;
 
+	// Regex pattern for valid translation IDs: alphanumeric characters, underscores, and hyphens
+	public static final String VALID_TRANSLATION_ID_PATTERN = "^[a-zA-Z0-9_-]+$";
+
     // implement 1-3 day storage for location
     private final Map<Integer, Deque<WptPt>> userLocationHistory = new ConcurrentHashMap<>();
     // store last 1-3 days locations are present (?)
@@ -175,7 +178,7 @@ public class UserTranslationsService {
 	 */
 	public UserTranslation createTranslation(CloudUser user, String translationId, SimpMessageHeaderAccessor headers) {
 		if (user != null && user.id > 0) {
-			long userTranslationCount = countUserTranslations(user.id);
+			int userTranslationCount = countUserTranslations(user.id);
 			if (userTranslationCount >= MAX_TRANSLATIONS_PER_USER) {
 				String error = String.format("Maximum number of translations (%d) reached", MAX_TRANSLATIONS_PER_USER);
 				sendError(error, headers);
@@ -212,20 +215,15 @@ public class UserTranslationsService {
 		if (deviceIdHeader == null || deviceIdHeader.isEmpty()) {
 			return 0;
 		}
-		try {
-			return Long.parseLong(deviceIdHeader);
-		} catch (NumberFormatException e) {
-			LOG.warn("Invalid deviceId format: " + deviceIdHeader);
-			return 0;
-		}
+		return Algorithms.parseLongSilently(deviceIdHeader, 0);
 	}
 
 	private long calculateExpireTime() {
 		return System.currentTimeMillis() + DEFAULT_SHARING_DURATION_MS;
 	}
 
-	private long countUserTranslations(int userId) {
-		long count = 0;
+	private int countUserTranslations(int userId) {
+		int count = 0;
 		for (UserTranslation t : activeTranslations.values()) {
 			if (t.getOwnerId() == userId) {
 				count++;
@@ -296,11 +294,11 @@ public class UserTranslationsService {
 
 	// Sharing management
 
-	public void recordVerifiedAccess(String translationId, long userId) {
+	public void recordVerifiedAccess(String translationId, int userId) {
 		if (translationId != null) {
 			UserTranslation translation = activeTranslations.get(translationId);
 			if (translation != null) {
-				translation.getVerifiedUsers().add((int)userId);
+				translation.getVerifiedUsers().add(userId);
 			}
 		}
 	}
@@ -394,8 +392,7 @@ public class UserTranslationsService {
 		if (deviceId > 0) {
 			long totalDevicesForUser = countUserDevicesInTranslation(ust, user.id);
 			if (totalDevicesForUser >= MAX_DEVICES_PER_USER_PER_TRANSLATION) {
-				String error = "Maximum number of devices (" + MAX_DEVICES_PER_USER_PER_TRANSLATION + 
-					") per user per translation reached";
+				String error = String.format("Maximum number of devices (%d) per user per translation reached", MAX_DEVICES_PER_USER_PER_TRANSLATION);
 				sendError(error, headers);
 				throw new SecurityException(error);
 			}
@@ -454,7 +451,7 @@ public class UserTranslationsService {
 					Thread.currentThread().interrupt();
 					break;
 				} catch (Exception e) {
-					System.err.println("Simulation error: " + e.getMessage());
+					LOG.error("Simulation error", e);
 				}
 			}
 		});

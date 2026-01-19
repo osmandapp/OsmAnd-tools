@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
+import net.osmand.util.Algorithms;
 
 @Component
 public class SubscriptionInterceptor implements ChannelInterceptor {
@@ -139,7 +140,7 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
         }
         
         // Allow only alphanumeric characters and common safe characters
-        return translationId.matches("^[a-zA-Z0-9_-]+$");
+        return translationId.matches(UserTranslationsService.VALID_TRANSLATION_ID_PATTERN);
     }
     
     /**
@@ -218,11 +219,7 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
         long deviceId = 0;
         String deviceIdHeader = headers.getFirstNativeHeader("deviceId");
         if (deviceIdHeader != null && !deviceIdHeader.isEmpty()) {
-            try {
-                deviceId = Long.parseLong(deviceIdHeader);
-            } catch (NumberFormatException e) {
-                // Invalid deviceId format - ignore
-            }
+            deviceId = Algorithms.parseLongSilently(deviceIdHeader, 0);
         }
         
         for (TranslationSharingOptions sharer : translation.getActiveSharers()) {

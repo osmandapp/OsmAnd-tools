@@ -61,7 +61,6 @@ import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
-import net.osmand.server.ws.UserTranslation;
 import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
@@ -83,7 +82,7 @@ public class UserdataController {
 
 	public static final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
 
-	private static final long CACHE_TTL = 15 * 60 * 1000; // Minutes Validity
+	private static final long CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 	Gson gson = new Gson();
 
@@ -109,7 +108,7 @@ public class UserdataController {
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
-	protected UserTranslationsService userTranlsationService;
+	protected UserTranslationsService userTranslationsService;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -154,7 +153,7 @@ public class UserdataController {
 		}
 	}
 	
-	private CachedInfoDevice checkTokenСache(int deviceId, String accessToken) {
+	private CachedInfoDevice checkTokenCache(int deviceId, String accessToken) {
 		CachedInfoDevice cached = cacheByDeviceId.get(deviceId);
 		if (cached != null && (System.currentTimeMillis() - cached.timestamp) < CACHE_TTL) {
 			if (Algorithms.stringsEqual(cached.device.accesstoken, accessToken)) {
@@ -171,11 +170,11 @@ public class UserdataController {
 	}
 
 	private CloudUserDevice checkToken(int deviceId, String accessToken) {
-		CachedInfoDevice checkTokenСache = checkTokenСache(deviceId, accessToken);
-		if (checkTokenСache == null) {
+		CachedInfoDevice checkTokenCache = checkTokenCache(deviceId, accessToken);
+		if (checkTokenCache == null) {
 			return null;
 		}
-		return checkTokenСache.device;
+		return checkTokenCache.device;
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
@@ -232,7 +231,7 @@ public class UserdataController {
 	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken, HttpServletRequest request)
 			throws IOException {
-		CachedInfoDevice dev = checkTokenСache(deviceId, accessToken);
+		CachedInfoDevice dev = checkTokenCache(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -246,7 +245,7 @@ public class UserdataController {
 //				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 //			}
 		}
-		boolean ok = userTranlsationService.sendDeviceMessage(dev.device, dev.user, request);
+		boolean ok = userTranslationsService.sendDeviceMessage(dev.device, dev.user, request);
 		if (ok) {
 			return ResponseEntity.ok("OK");
 		}
