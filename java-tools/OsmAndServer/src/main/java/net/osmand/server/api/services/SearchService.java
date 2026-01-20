@@ -1149,11 +1149,7 @@ public class SearchService {
         }
     }
 
-    private String calculateAddressString(Amenity amenity, String locale, String mainCity, String dominatedCity) {
-        String cityName = amenity.getCityFromTagGroups(locale);
-        if (cityName == null) {
-            cityName = "";
-        }
+    private String calculateAddressString(Amenity amenity, String cityName, String mainCity, String dominatedCity) {
         String streetName = amenity.getStreetName();
         if (Algorithms.isEmpty(streetName)) {
             return cityName.isEmpty() ? null : cityName;
