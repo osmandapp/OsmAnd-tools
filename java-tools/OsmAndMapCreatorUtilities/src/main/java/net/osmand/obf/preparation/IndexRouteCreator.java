@@ -587,83 +587,97 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	private void indexHighwayRestrictions(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-		if (e instanceof Relation && "restriction".equals(e.getTag(OSMTagKey.TYPE))) { //$NON-NLS-1$
-			String val = e.getTag("restriction"); //$NON-NLS-1$
-			if (val != null) {
-				Relation r = (Relation) e;
-				if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					List<RelationMember> lfrom = r.getMembers("from"); //$NON-NLS-1$
-					List<RelationMember> lto = r.getMembers("to"); //$NON-NLS-1$
-					if (lfrom.size() == 1 && lto.size() == 1 &&
-							lfrom.get(0).getEntityId().equals(lto.get(0).getEntityId())) {
-						// don't index such roads - can't go through issue https://www.openstreetmap.org/way/338099991#map=17/46.86699/-0.20473
-						return;
-					}
+		if (!(e instanceof Relation && "restriction".equals(e.getTag(OSMTagKey.TYPE)))) { //$NON-NLS-1$
+			return;
+		}
+		String val = e.getTag("restriction"); //$NON-NLS-1$
+		if (val == null) {
+			return;
+		}
+		Relation r = (Relation) e;
+		if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			List<RelationMember> lfrom = r.getMembers("from"); //$NON-NLS-1$
+			List<RelationMember> lto = r.getMembers("to"); //$NON-NLS-1$
+			if (lfrom.size() == 1 && lto.size() == 1 &&
+					lfrom.get(0).getEntityId().equals(lto.get(0).getEntityId())) {
+				// don't index such roads - can't go through issue https://www.openstreetmap.org/way/338099991#map=17/46.86699/-0.20473
+				return;
+			}
+		}
+
+		boolean allowMultipleFrom = false;
+		boolean allowMultipleTo = false;
+		byte type = -1;
+		if ("no_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_NO_RIGHT_TURN;
+		} else if ("no_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_NO_LEFT_TURN;
+		} else if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_NO_U_TURN;
+		} else if ("no_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+		} else if ("no_entry".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			// reuse no straight on
+			type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+			allowMultipleFrom = true;
+		} else if ("no_exit".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			// reuse no straight on
+			type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
+			allowMultipleTo = true;
+		} else if ("only_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN;
+		} else if ("only_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_ONLY_LEFT_TURN;
+		} else if ("only_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
+			type = MapRenderingTypes.RESTRICTION_ONLY_STRAIGHT_ON;
+		} else {
+			// unknown restriction type
+			return;
+		}
+
+		ctx.loadEntityRelation(r);
+		Collection<RelationMember> fromL = r.getMembers("from"); //$NON-NLS-1$
+		Collection<RelationMember> toL = r.getMembers("to"); //$NON-NLS-1$
+		Collection<RelationMember> viaL = r.getMembers("via"); //$NON-NLS-1$
+		if (fromL.isEmpty() || toL.isEmpty() || viaL.isEmpty()) {
+			return;
+		}
+
+		for (RelationMember from : fromL) {
+			if (from.getEntityId().getType() != EntityType.WAY) {
+				// only ways are valid with role "from"
+				continue;
+			}
+
+			Long fromId = from.getEntityId().getId();
+			if (!highwayRestrictions.containsKey(fromId)) {
+				highwayRestrictions.put(fromId, new ArrayList<>());
+			}
+
+			List<RestrictionInfo> rdList = highwayRestrictions.get(fromId);
+			for (RelationMember to : toL) {
+				if (to.getEntityId().getType() != EntityType.WAY) {
+					// only ways are valid with role "to"
+					continue;
 				}
 
-				boolean allowMultipleFrom = false;
-				boolean allowMultipleTo = false;
-				byte type = -1;
-				if ("no_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_NO_RIGHT_TURN;
-				} else if ("no_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_NO_LEFT_TURN;
-				} else if ("no_u_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_NO_U_TURN;
-				} else if ("no_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
-				} else if ("no_entry".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					// reuse no straight on
-					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
-					allowMultipleFrom = true;
-				} else if ("no_exit".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					// reuse no straight on
-					type = MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON;
-					allowMultipleTo = true;
-				} else if ("only_right_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN;
-				} else if ("only_left_turn".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_ONLY_LEFT_TURN;
-				} else if ("only_straight_on".equalsIgnoreCase(val)) { //$NON-NLS-1$
-					type = MapRenderingTypes.RESTRICTION_ONLY_STRAIGHT_ON;
+				RestrictionInfo rd = new RestrictionInfo();
+				rd.toWay = to.getEntityId().getId();
+				rd.type = type;
+
+				RelationMember via = viaL.iterator().next();
+				if (via.getEntityId().getType() == EntityType.WAY) {
+					rd.viaWay = via.getEntityId().getId();
 				}
-				if (type != -1) {
-					ctx.loadEntityRelation(r);
-					Collection<RelationMember> fromL = r.getMembers("from"); //$NON-NLS-1$
-					Collection<RelationMember> toL = r.getMembers("to"); //$NON-NLS-1$
-					Collection<RelationMember> viaL = r.getMembers("via"); //$NON-NLS-1$
-					if (!toL.isEmpty()) {
-						for (RelationMember from : fromL) {
-							if (from.getEntityId().getType() == EntityType.WAY) {
-								if (!highwayRestrictions.containsKey(from.getEntityId().getId())) {
-									highwayRestrictions.put(from.getEntityId().getId(), new ArrayList<>());
-								}
+				rdList.add(rd);
 
-								List<RestrictionInfo> rdList = highwayRestrictions.get(from.getEntityId().getId());
-								for (RelationMember to : toL) {
-									RestrictionInfo rd = new RestrictionInfo();
-									rd.toWay = to.getEntityId().getId();
-									rd.type = type;
-									if (!viaL.isEmpty()) {
-										RelationMember via = viaL.iterator().next();
-										if (via.getEntityId().getType() == EntityType.WAY) {
-											rd.viaWay = via.getEntityId().getId();
-										}
-									}
-									rdList.add(rd);
-
-									if (!allowMultipleTo) {
-										break;
-									}
-								}
-
-								if (!allowMultipleFrom) {
-									break;
-								}
-							}
-						}
-					}
+				if (!allowMultipleTo) {
+					break;
 				}
+			}
+
+			if (!allowMultipleFrom) {
+				break;
 			}
 		}
 	}
