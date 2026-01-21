@@ -454,7 +454,7 @@ public class ApiController {
 			List<SupporterDeviceSubscription> subscriptions = subscriptionsRepository.findAllByUserId(pu.id);
 			List<SupporterDeviceSubscription> activeSubscriptions = new ArrayList<>();
 			subscriptions.stream()
-					.filter(s -> s.valid && s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis())
+					.filter(s -> Boolean.TRUE.equals(s.valid) && s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis())
 					.forEach(activeSubscriptions::add);
 
 			List<Object> res = new ArrayList<>();
