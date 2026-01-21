@@ -57,7 +57,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 		if (isProduction) {
 			// In production, only allow connections from osmand.net domains over HTTPS/WSS
 			registry.addEndpoint("/osmand-websocket")
-				.setAllowedOriginPatterns("https://*.osmand.net")
+				.setAllowedOriginPatterns("https://*.osmand.net", "https://osmand.net")
 				.withSockJS();
 		} else {
 			registry.addEndpoint("/osmand-websocket");
