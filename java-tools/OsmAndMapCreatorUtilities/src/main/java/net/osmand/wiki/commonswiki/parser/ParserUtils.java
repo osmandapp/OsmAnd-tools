@@ -16,6 +16,7 @@ public final class ParserUtils {
 	public static final String FIELD_DATE = "date";
 	public static final String FIELD_DESCRIPTION = "description";
 	public static final String FIELD_LICENSE = "license";
+	public static final String FIELD_SOURCE = "source";
 
 	private ParserUtils() {
 		// Utility class - no instantiation
@@ -229,6 +230,22 @@ public final class ParserUtils {
 		return patternAuthor.matcher(vallc).find() || patternPhotographer.matcher(vallc).find() || 
 			   patternDate.matcher(vallc).find() || patternDescription.matcher(vallc).find() ||
 			   patternLicense.matcher(vallc).find() || patternPermission.matcher(vallc).find();
+	}
+
+	public static String stripImageName(String sourceFile) {
+		if (sourceFile == null) {
+			return null;
+		}
+		if (sourceFile.contains("]")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
+		}
+		if (sourceFile.contains("}")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf('}'));
+		}
+		if (sourceFile.contains("[[") || sourceFile.contains("|")) {
+			return null;
+		}
+		return sourceFile;
 	}
 }
 

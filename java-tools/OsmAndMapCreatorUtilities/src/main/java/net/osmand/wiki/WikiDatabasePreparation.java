@@ -390,6 +390,7 @@ public class WikiDatabasePreparation {
 		String author = null;
 		String date = null;
 		String license = null;
+		String source = null;
 		Map<String, String> description = new HashMap<>();
 		
 		// Clean up the input string by removing extra spaces and newlines
@@ -420,6 +421,13 @@ public class WikiDatabasePreparation {
 					license = LicenseParser.parseFromInformationBlock(licenseValue);
 				}
 			}
+			if (lineLc.startsWith(ParserUtils.FIELD_SOURCE)) {
+				String sourceValue = ParserUtils.extractFieldValue(line, ParserUtils.FIELD_SOURCE);
+				if (sourceValue != null && sourceValue.contains("File:")) {
+					source = sourceValue.substring(sourceValue.indexOf("File:") + "File:".length());
+					source = ParserUtils.stripImageName(source);
+				}
+			}
 		}
 
 		if (author != null) {
@@ -430,6 +438,9 @@ public class WikiDatabasePreparation {
 		}
 		if (license != null) {
 			webBlockResults.put(ParserUtils.FIELD_LICENSE, license);
+		}
+		if (source != null) {
+			webBlockResults.put(ParserUtils.FIELD_SOURCE, source);
 		}
 		if (!description.isEmpty()) {
 			if (Boolean.TRUE.equals(allLangs)) {

@@ -34,7 +34,7 @@ public class CommonsWikimediaPreparation {
 	private static final int DEFAULT_THREADS = 8; // it's parsing threads (downloads always run in a single thread https://dumps.wikimedia.org/)
 	public static final int BATCH_SIZE = 5000;
 	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
-	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "");
+	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "", "");
 	private static final AtomicLong articlesCount = new AtomicLong(0);
 	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
 	private static final AtomicLong totalPagesCount = new AtomicLong(0);
@@ -194,13 +194,14 @@ public class CommonsWikimediaPreparation {
 			}
 			log.info("========= CREATE TABLE common_meta =========");
 			stmt.execute("""
-					CREATE TABLE IF NOT EXISTS common_meta(\
-					id long PRIMARY KEY, \
-					name text, \
-					author text, \
-					date text, \
-					license text, \
-					description text)""");
+					CREATE TABLE IF NOT EXISTS common_meta(
+					id long PRIMARY KEY,
+					name text,
+					author text,
+					date text,
+					license text,
+					description text,
+					source text)""");
 		}
 	}
 
@@ -209,13 +210,14 @@ public class CommonsWikimediaPreparation {
 		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log)) {
 			conn.setAutoCommit(false);
 			try (PreparedStatement insertStatement = conn.prepareStatement("""
-					INSERT INTO common_meta(id, name, author, date, license, description) VALUES (?, ?, ?, ?, ?, ?) \
-					ON CONFLICT(id) DO UPDATE SET \
-					name = excluded.name, \
-					author = excluded.author, \
-					date = excluded.date, \
-					license = excluded.license, \
-					description = excluded.description;""")) {
+					INSERT INTO common_meta(id, name, author, date, license, description, source) VALUES (?, ?, ?, ?, ?, ?, ?)
+					ON CONFLICT(id) DO UPDATE SET
+					name = excluded.name,
+					author = excluded.author,
+					date = excluded.date,
+					license = excluded.license,
+					description = excluded.description,
+					source = excluded.source;""")) {
 				PreparedStatement selectStatement = conn
 						.prepareStatement("SELECT id, name, license FROM common_meta WHERE id = ?");
 
@@ -247,6 +249,7 @@ public class CommonsWikimediaPreparation {
 					insertStatement.setString(4, a.date);
 					insertStatement.setString(5, a.license);
 					insertStatement.setString(6, a.description);
+					insertStatement.setString(7, a.source);
 					insertStatement.addBatch();
 					counter++;
 
@@ -284,7 +287,8 @@ public class CommonsWikimediaPreparation {
 		}
 	}
 
-	private record Article(Long id, String title, String author, String date, String license, String description) {
+	private record Article(Long id, String title, String author, String date, String license, String description,
+						   String source) {
 	}
 
 	private void parseCommonArticles(String articles) {
@@ -406,12 +410,13 @@ public class CommonsWikimediaPreparation {
 					WikiDatabasePreparation.removeMacroBlocks(lastRevisionText, meta, new HashMap<>(), null, "en", imageTitle, null, true);
 					WikiDatabasePreparation.prepareMetaData(meta);
 					String author = meta.get("author");
+					String date = meta.get("date");
 					String license = meta.get("license");
 					String description = meta.get("description");
-					String date = meta.get("date");
+					String source = meta.get("source");
 					try {
 						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
-								author, date, license, description));
+								author, date, license, description, source));
 						if (articlesCount.incrementAndGet() % 100000 == 0) {
 							System.out.println(articlesCount.get() + " Articles processed");
 						}
