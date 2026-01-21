@@ -307,31 +307,22 @@ public class UserTranslationsService {
 	public boolean verifyTranslationPassword(String translationId, String passwordHash, int userId) {
 		UserTranslation translation = activeTranslations.get(translationId);
 		
-		// Dummy BCrypt hash for timing attack prevention when translation doesn't exist
-		// This ensures password verification always takes similar time
-		// Using a valid BCrypt hash format that will never match any password
-		final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+		if (translation == null) {
+			return false;
+		}
 		
-		String storedPasswordHash;
-		boolean translationExists = translation != null;
+		String storedPasswordHash = translation.getPassword();
+		// If translation has no password, allow access
+		if (storedPasswordHash == null || storedPasswordHash.isEmpty()) {
+			if (userId > 0) {
+				translation.getVerifiedUsers().add(userId);
+			}
+			return true;
+		}
 		
-		if (!translationExists) {
-			// Use dummy hash to normalize timing - prevents enumeration attacks
-			storedPasswordHash = DUMMY_HASH;
-		} else {
-			storedPasswordHash = translation.getPassword();
-			// If translation has no password, allow access
-			if (storedPasswordHash == null || storedPasswordHash.isEmpty()) {
-				if (userId > 0) {
-					translation.getVerifiedUsers().add(userId);
-				}
-				return true;
-			}
-			
-			// If user already verified, allow access
-			if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
-				return true;
-			}
+		// If user already verified, allow access
+		if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
+			return true;
 		}
 
 		// Check password hash
@@ -343,8 +334,7 @@ public class UserTranslationsService {
 			// Compare password hashes directly
 			boolean matches = storedPasswordHash.equals(passwordHash);
 			
-			if (!translationExists || !matches) {
-				// Generic failure - don't reveal whether translation exists or password is wrong
+			if (!matches) {
 				return false;
 			}
 			
