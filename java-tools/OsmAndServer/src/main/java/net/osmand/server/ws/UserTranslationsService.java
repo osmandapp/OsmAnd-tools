@@ -10,7 +10,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-import net.osmand.server.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
@@ -76,8 +75,6 @@ public class UserTranslationsService {
     private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
     private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
     
-    private static final long ROOM_TOKEN_VALIDITY_MS = 30 * 60 * 1000; // 30 minutes
-
     private final Random random = new SecureRandom();
     
     @Autowired
@@ -85,9 +82,6 @@ public class UserTranslationsService {
     
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
-    
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
     
     private final Environment environment;
     
@@ -309,36 +303,8 @@ public class UserTranslationsService {
 			}
 		}
 	}
-	
-	/**
-	 * Generates a JWT Bearer token for room access after password verification.
-	 * Token is valid for 30 minutes.
-	 * 
-	 * @param translationId room ID
-	 * @param userId user ID
-	 * @param alias user alias
-	 * @return Bearer token string
-	 */
-	public String generateRoomToken(String translationId, int userId, String alias) {
-		if (translationId == null || translationId.isEmpty()) {
-			return null;
-		}
-		
-		String token = jwtTokenProvider.createRoomToken(translationId, alias, ROOM_TOKEN_VALIDITY_MS);
-		LOG.debug("Generated JWT room token for translation " + translationId + ", user " + userId);
-		return token;
-	}
-	
-	/**
-	 * Authenticates user for room access using password and returns Bearer token.
-	 * 
-	 * @param translationId room ID
-	 * @param password room password (plain text)
-	 * @param userId user ID (optional, 0 if anonymous)
-	 * @param alias user alias
-	 * @return Bearer token if authentication successful, null otherwise
-	 */
-	public String authenticateRoom(String translationId, String password, int userId, String alias) {
+
+	public boolean verifyTranslationPassword(String translationId, String passwordHash, int userId) {
 		UserTranslation translation = activeTranslations.get(translationId);
 		
 		// Dummy BCrypt hash for timing attack prevention when translation doesn't exist
@@ -346,47 +312,51 @@ public class UserTranslationsService {
 		// Using a valid BCrypt hash format that will never match any password
 		final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 		
-		String passwordHash;
+		String storedPasswordHash;
 		boolean translationExists = translation != null;
 		
 		if (!translationExists) {
 			// Use dummy hash to normalize timing - prevents enumeration attacks
-			passwordHash = DUMMY_HASH;
+			storedPasswordHash = DUMMY_HASH;
 		} else {
-			passwordHash = translation.getPassword();
-			// If room has no password, allow access
-			if (passwordHash == null || passwordHash.isEmpty()) {
-				return generateRoomToken(translationId, userId, alias);
+			storedPasswordHash = translation.getPassword();
+			// If translation has no password, allow access
+			if (storedPasswordHash == null || storedPasswordHash.isEmpty()) {
+				if (userId > 0) {
+					translation.getVerifiedUsers().add(userId);
+				}
+				return true;
 			}
 			
 			// If user already verified, allow access
 			if (userId > 0 && translation.getVerifiedUsers().contains(userId)) {
-				return generateRoomToken(translationId, userId, alias);
+				return true;
 			}
 		}
-		
-		// Check password
-		if (password == null || password.isEmpty()) {
-			return null;
+
+		// Check password hash
+		if (passwordHash == null || passwordHash.isEmpty()) {
+			return false;
 		}
 		
 		try {
-			boolean matches = passwordEncoder.matches(password, passwordHash);
+			// Compare password hashes directly
+			boolean matches = storedPasswordHash.equals(passwordHash);
 			
 			if (!translationExists || !matches) {
 				// Generic failure - don't reveal whether translation exists or password is wrong
-				return null;
+				return false;
 			}
 			
 			// Authentication successful
 			if (userId > 0) {
 				translation.getVerifiedUsers().add(userId);
 			}
-			LOG.debug("Room authentication successful for " + translationId + ", user " + userId);
-			return generateRoomToken(translationId, userId, alias);
+			LOG.debug("Translation password verification successful for " + translationId + ", user " + userId);
+			return true;
 		} catch (Exception e) {
-			LOG.warn("Room authentication error for " + translationId, e);
-			return null;
+			LOG.warn("Translation password verification error for " + translationId, e);
+			return false;
 		}
 	}
 	
@@ -419,11 +389,11 @@ public class UserTranslationsService {
 
 		String password = translation.getPassword();
 		if (password != null && !password.isEmpty()) {
-			// Password-protected rooms require JWT token authentication
+			// Password-protected translations require X-Password header authentication
 			if (translation.getVerifiedUsers().contains(user.id)) {
 				return true;
 			}
-			LOG.debug("Password-protected translation " + translation.getSessionId() + " requires JWT Bearer token");
+			LOG.debug("Password-protected translation " + translation.getSessionId() + " requires X-Password header");
 			return false;
 		}
 		

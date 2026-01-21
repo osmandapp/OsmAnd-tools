@@ -176,9 +176,5 @@ dependencies {
     implementation 'org.graalvm.sdk:graal-sdk:24.1.1'
     implementation 'org.graalvm.js:js:24.1.1'
 
-    // JWT support
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
-    implementation 'io.jsonwebtoken:jjwt-impl:0.12.3'
-    implementation 'io.jsonwebtoken:jjwt-jackson:0.12.3'
 
 }

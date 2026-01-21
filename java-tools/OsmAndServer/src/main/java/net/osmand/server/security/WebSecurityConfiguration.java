@@ -188,12 +188,12 @@ public class WebSecurityConfiguration {
 	}
 
 	@Bean
-	public BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
-		return new BearerTokenAuthenticationFilter(userDetailsServiceByAccessToken(), jwtTokenProvider);
+	public BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter() {
+		return new BearerTokenAuthenticationFilter(userDetailsServiceByAccessToken());
 	}
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenProvider jwtTokenProvider) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		LoginUrlAuthenticationEntryPoint adminEntryPoint =
 				new LoginUrlAuthenticationEntryPoint("/map/account/") {
 					@Override
@@ -211,7 +211,7 @@ public class WebSecurityConfiguration {
 					}
 				};
 		http
-				.addFilterBefore(bearerTokenAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
+				.addFilterBefore(bearerTokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
 				.sessionManagement(session -> session
 						.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
 						.maximumSessions(1)
@@ -321,7 +321,8 @@ public class WebSecurityConfiguration {
 			"Content-Type", 
 			"Authorization",
 			"X-Alias",        // User alias for WebSocket authentication
-			"X-Device-Id"     // Device identifier for location sharing
+			"X-Device-Id",    // Device identifier for location sharing
+			"X-Password"      // Password hash for translation authentication
 		));
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**",  configuration);

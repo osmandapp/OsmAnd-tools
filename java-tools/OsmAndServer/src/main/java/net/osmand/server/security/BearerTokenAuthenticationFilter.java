@@ -19,11 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final UserDetailsService userDetailsService;
-    private final JwtTokenProvider jwtTokenProvider;
 
-    public BearerTokenAuthenticationFilter(UserDetailsService userDetailsService, JwtTokenProvider jwtTokenProvider) {
+    public BearerTokenAuthenticationFilter(UserDetailsService userDetailsService) {
         this.userDetailsService = userDetailsService;
-        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     @Override
@@ -35,17 +33,9 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
         final String authorizationHeader = request.getHeader("Authorization");
 
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-            String jwt = authorizationHeader.substring(7);
-
-            if (jwtTokenProvider.isRoomToken(jwt)) {
-                // Room access token - skip, will be handled by WebSocket interceptor
-                filterChain.doFilter(request, response);
-                return;
-            }
-
-            // For now, we'll just use the token as the username.
-            // In a real application, you would decode the JWT and get the username from it.
-            authenticateUser(jwt, request);
+            String token = authorizationHeader.substring(7);
+            // Use the token as the username (access token)
+            authenticateUser(token, request);
         }
 
         filterChain.doFilter(request, response);

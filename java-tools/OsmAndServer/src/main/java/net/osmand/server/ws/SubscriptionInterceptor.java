@@ -5,9 +5,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.NotNull;
@@ -29,7 +26,6 @@ import org.springframework.stereotype.Component;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
 import net.osmand.util.Algorithms;
-import net.osmand.server.security.JwtTokenProvider;
 
 @Component
 public class SubscriptionInterceptor implements ChannelInterceptor {
@@ -47,8 +43,6 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
 	@Lazy
 	private UserTranslationsService translationsService;
 
-	@Autowired
-	private JwtTokenProvider jwtTokenProvider;
 
 	/**
 	 * Tracks failed access attempts for rate limiting.
@@ -114,44 +108,21 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
                     throw new MessageDeliveryException(message, errorMessage, 
                         new AccessDeniedException(errorMessage));
                 }
-                String authHeader = simpHeaders.getFirstNativeHeader("Authorization");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    String token = authHeader.substring("Bearer ".length());
-                    
-                    // JWT token-based authentication
-                    if (jwtTokenProvider.isRoomToken(token)) {
-                        try {
-                            Claims claims = jwtTokenProvider.validateToken(token);
-                            String tokenTranslationId = claims.get("translationId", String.class);
-                            
-                            if (tokenTranslationId != null && tokenTranslationId.equals(translationId)) {
-                                // JWT token is valid and matches the room
-                                resetFailedAttempts(sessionId);
-                                // Record verified access for the user (including anonymous)
-                                CloudUser cloudUser = translationsService.getUser(user, simpHeaders, true);
-                                if (cloudUser != null) {
-                                    translationsService.recordVerifiedAccess(translationId, cloudUser.id);
-                                }
-                                logAccessAttempt(translationId, user, true, "Access granted via JWT Bearer token");
-                                return message;
-                            } else {
-                                // Token is valid but for different room
-                                trackFailedAttempt(sessionId);
-                                String errorMessage = "Token does not match translation ID";
-                                logAccessAttempt(translationId, user, false, errorMessage);
-                                throw new MessageDeliveryException(message, errorMessage, 
-                                    new AccessDeniedException(errorMessage));
-                            }
-                        } catch (ExpiredJwtException e) {
-                            trackFailedAttempt(sessionId);
-                            String errorMessage = "Token expired";
-                            logAccessAttempt(translationId, user, false, errorMessage);
-                            throw new MessageDeliveryException(message, errorMessage, 
-                                new AccessDeniedException(errorMessage));
-                        } catch (JwtException e) {
-                            // Invalid JWT token - check if session is public or user is owner
-                            // Fall through to check permissions
-                        }
+                // Check for X-Password header for password-protected translations
+                String passwordHash = simpHeaders.getFirstNativeHeader("X-Password");
+                if (passwordHash != null && !passwordHash.isEmpty()) {
+                    CloudUser cloudUser = translationsService.getUser(user, simpHeaders, true);
+                    int userId = cloudUser != null ? cloudUser.id : 0;
+                    if (translationsService.verifyTranslationPassword(translationId, passwordHash, userId)) {
+                        resetFailedAttempts(sessionId);
+                        logAccessAttempt(translationId, user, true, "Access granted via X-Password header");
+                        return message;
+                    } else {
+                        trackFailedAttempt(sessionId);
+                        String errorMessage = "Invalid password";
+                        logAccessAttempt(translationId, user, false, errorMessage);
+                        throw new MessageDeliveryException(message, errorMessage, 
+                            new AccessDeniedException(errorMessage));
                     }
                 }
 
@@ -237,7 +208,7 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
      * 1. Translation does not exist -> access denied
      * 2. Owner of the translation -> always allowed
      * 3. Active sharer -> allowed while sharing is not expired
-     * 4. Translation with password -> requires JWT Bearer token (checked above)
+     * 4. Translation with password -> requires X-Password header (checked above)
      * 5. Public translation (no password) -> allowed for everyone
      *
      * @param translationId translation (session) ID
@@ -284,11 +255,11 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
             }
         }
 
-        // Password-protected rooms require JWT token (checked above)
-        // If we reach here without JWT, access is denied for password-protected rooms
+        // Password-protected translations require X-Password header (checked above)
+        // If we reach here without X-Password, access is denied for password-protected translations
         String password = translation.getPassword();
         if (password != null && !password.isEmpty()) {
-            LOG.debug("Password-protected translation " + translationId + " requires JWT Bearer token");
+            LOG.debug("Password-protected translation " + translationId + " requires X-Password header");
             return false;
         }
 

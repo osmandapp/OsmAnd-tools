@@ -192,20 +192,14 @@ public class UserTranslationsController {
 		return password != null && !password.isEmpty() && !password.equals("{}");
 	}
 
-	/**
-	 * Authenticates user for room access and returns Bearer token.
-	 * POST /api/translation/authenticate
-	 * Body: {"translationId": "room123", "password": "secret", "alias": "user1"}
-	 * Response: {"token": "bearer_token_string"}
-	 */
-	@PostMapping("/authenticate")
-	public ResponseEntity<String> authenticate(@RequestBody AuthenticateRequest request, HttpServletRequest httpRequest) {
+
+	@PostMapping("/verify-password")
+	public ResponseEntity<String> verifyPassword(@RequestBody AuthenticateRequest request, HttpServletRequest httpRequest) {
 		try {
 			// Get client IP for rate limiting (forward-headers-strategy: native handles X-Forwarded-For)
 			String clientIp = httpRequest != null ? httpRequest.getRemoteAddr() : RateLimitService.UNKNOWN_IP;
 
 			if (rateLimitService.isRateLimited(clientIp)) {
-				LOG.warn("Rate limited authentication attempt from IP: " + clientIp);
 				return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
 					.body("Too many failed authentication attempts. Please try again later.");
 			}
@@ -219,29 +213,27 @@ public class UserTranslationsController {
 
 			int userId = 0;
 			// Note: In REST context, we don't have WebSocket session, so userId is 0 for anonymous users
-			// This is fine - tokens work for anonymous users too
 
-			String token = userTranslationsService.authenticateRoom(
+			boolean verified = userTranslationsService.verifyTranslationPassword(
 				request.translationId(),
 				request.password(),
-				userId,
-				request.alias()
+				userId
 			);
 
-			if (token == null) {
+			if (!verified) {
 				rateLimitService.trackFailedAttempt(clientIp);
-				LOG.warn("Authentication failed for translationId: " + request.translationId() + " from IP: " + clientIp);
-				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Authentication failed");
+				LOG.warn("Password verification failed for translationId: " + request.translationId() + " from IP: " + clientIp);
+				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Password verification failed");
 			}
 
 			rateLimitService.resetRateLimit(clientIp);
 			
 			JsonObject response = new JsonObject();
-			response.addProperty("token", token);
+			response.addProperty("success", true);
 			return ResponseEntity.ok(gson.toJson(response));
 			
 		} catch (Exception e) {
-			LOG.error("Error in room authentication", e);
+			LOG.error("Error in password verification", e);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
 		}
 	}
