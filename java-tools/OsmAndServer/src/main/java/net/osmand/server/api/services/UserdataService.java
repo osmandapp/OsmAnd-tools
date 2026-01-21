@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.server.controllers.pub.UserdataController.removeFromCache;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -556,6 +557,7 @@ public class UserdataService {
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
 						email, sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
+			    removeFromCache(sameDevice.id);
 		    }
 	    }
         device.lang = lang;

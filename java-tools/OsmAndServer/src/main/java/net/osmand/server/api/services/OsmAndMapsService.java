@@ -94,7 +94,7 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
-import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.security.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;

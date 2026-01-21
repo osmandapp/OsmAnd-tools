@@ -15,7 +15,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import net.osmand.server.PurchasesDataLoader;
-import net.osmand.server.WebAccessConfig;
+import net.osmand.server.security.WebAccessConfig;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;

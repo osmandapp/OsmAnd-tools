@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,6 @@ import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
-import net.osmand.server.ws.UserTranslation;
 import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
@@ -81,9 +81,9 @@ public class UserdataController {
 	// identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
-	private final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
+	public static final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
 
-	private static final long CACHE_TTL = 15 * 60 * 1000; // Minutes Validity
+	private static final long CACHE_TTL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 	Gson gson = new Gson();
 
@@ -109,7 +109,7 @@ public class UserdataController {
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
-	protected UserTranslationsService userTranlsationService;
+	protected UserTranslationsService userTranslationsService;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -138,18 +138,31 @@ public class UserdataController {
 		public String lang;
 	}
 
-	private static class CachedInfoDevice {
+	public static class CachedInfoDevice {
 		final CloudUserDevice device;
 		final long timestamp;
 		public CloudUser user;
 
 		CachedInfoDevice(CloudUserDevice device, CloudUser user) {
 			this.device = device;
+			this.user = user;
 			this.timestamp = System.currentTimeMillis();
 		}
+
+		public CloudUserDevice getDevice() {
+			return device;
+		}
+	}
+
+	private static void addToCache(int deviceId, CachedInfoDevice cachedInfo) {
+		cacheByDeviceId.put(deviceId, cachedInfo);
+	}
+
+	public static void removeFromCache(int deviceId) {
+		cacheByDeviceId.remove(deviceId);
 	}
 	
-	private CachedInfoDevice checkTokenСache(int deviceId, String accessToken) {
+	private CachedInfoDevice checkTokenCache(int deviceId, String accessToken) {
 		CachedInfoDevice cached = cacheByDeviceId.get(deviceId);
 		if (cached != null && (System.currentTimeMillis() - cached.timestamp) < CACHE_TTL) {
 			if (Algorithms.stringsEqual(cached.device.accesstoken, accessToken)) {
@@ -159,18 +172,18 @@ public class UserdataController {
 		CloudUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
 			CachedInfoDevice cache = new CachedInfoDevice(d, null);
-			cacheByDeviceId.put(deviceId, new CachedInfoDevice(d, null));
+			addToCache(deviceId, cache);
 			return cache;
 		}
 		return null;
 	}
 
 	private CloudUserDevice checkToken(int deviceId, String accessToken) {
-		CachedInfoDevice checkTokenСache = checkTokenСache(deviceId, accessToken);
-		if (checkTokenСache == null) {
+		CachedInfoDevice checkTokenCache = checkTokenCache(deviceId, accessToken);
+		if (checkTokenCache == null) {
 			return null;
 		}
-		return checkTokenСache.device;
+		return checkTokenCache.device;
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
@@ -227,7 +240,7 @@ public class UserdataController {
 	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = true) String accessToken, HttpServletRequest request)
 			throws IOException {
-		CachedInfoDevice dev = checkTokenСache(deviceId, accessToken);
+		CachedInfoDevice dev = checkTokenCache(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -241,7 +254,7 @@ public class UserdataController {
 //				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 //			}
 		}
-		boolean ok = userTranlsationService.sendDeviceMessage(dev.device, dev.user, request);
+		boolean ok = userTranslationsService.sendDeviceMessage(dev.device, dev.user, request);
 		if (ok) {
 			return ResponseEntity.ok("OK");
 		}
@@ -594,9 +607,17 @@ public class UserdataController {
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
-	@Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS) // Run every hour
+	@Scheduled(fixedRate = 15, timeUnit = TimeUnit.MINUTES)
 	public void clearExpiredTokens() {
 		long now = System.currentTimeMillis();
-		cacheByDeviceId.values().removeIf(c -> (now - c.timestamp) > CACHE_TTL);
+		Set<Integer> expiredDeviceIds = new HashSet<>();
+		for (Map.Entry<Integer, CachedInfoDevice> entry : cacheByDeviceId.entrySet()) {
+			if ((now - entry.getValue().timestamp) > CACHE_TTL) {
+				expiredDeviceIds.add(entry.getKey());
+			}
+		}
+		for (Integer deviceId : expiredDeviceIds) {
+			removeFromCache(deviceId);
+		}
 	}
 }

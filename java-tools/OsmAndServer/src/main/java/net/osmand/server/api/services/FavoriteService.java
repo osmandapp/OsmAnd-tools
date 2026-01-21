@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Nullable;
 import jakarta.transaction.Transactional;
-import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.security.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.utils.WebGpxParser;

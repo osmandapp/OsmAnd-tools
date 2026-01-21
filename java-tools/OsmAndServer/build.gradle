@@ -174,4 +174,5 @@ dependencies {
     implementation 'org.graalvm.sdk:graal-sdk:24.1.1'
     implementation 'org.graalvm.js:js:24.1.1'
 
+
 }
