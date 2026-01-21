@@ -79,8 +79,6 @@ dependencies {
     implementation 'org.springframework.session:spring-session-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-    implementation 'com.bucket4j:bucket4j-core:8.10.1'
-
     implementation group: 'com.vladmihalcea', name: 'hibernate-types-60', version: '2.21.1'
     implementation 'org.hibernate.orm:hibernate-community-dialects'
 

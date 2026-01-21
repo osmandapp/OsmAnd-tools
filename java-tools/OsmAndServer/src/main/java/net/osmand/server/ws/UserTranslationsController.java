@@ -32,9 +32,6 @@ public class UserTranslationsController {
 	@Autowired
 	private UserTranslationsService userTranslationsService;
 
-	@Autowired
-	private RateLimitService rateLimitService;
-
 	private final Gson gson = new Gson();
 
 	public record AuthenticateRequest(String translationId, String password, String alias) {}
@@ -196,14 +193,6 @@ public class UserTranslationsController {
 	@PostMapping("/verify-password")
 	public ResponseEntity<String> verifyPassword(@RequestBody AuthenticateRequest request, HttpServletRequest httpRequest) {
 		try {
-			// Get client IP for rate limiting (forward-headers-strategy: native handles X-Forwarded-For)
-			String clientIp = httpRequest != null ? httpRequest.getRemoteAddr() : RateLimitService.UNKNOWN_IP;
-
-			if (rateLimitService.isRateLimited(clientIp)) {
-				return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-					.body("Too many failed authentication attempts. Please try again later.");
-			}
-
 			if (request.translationId() == null || request.translationId().isEmpty()) {
 				return ResponseEntity.badRequest().body("translationId is required");
 			}
@@ -221,12 +210,9 @@ public class UserTranslationsController {
 			);
 
 			if (!verified) {
-				rateLimitService.trackFailedAttempt(clientIp);
-				LOG.warn("Password verification failed for translationId: " + request.translationId() + " from IP: " + clientIp);
+				LOG.warn("Password verification failed for translationId: " + request.translationId());
 				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Password verification failed");
 			}
-
-			rateLimitService.resetRateLimit(clientIp);
 			
 			JsonObject response = new JsonObject();
 			response.addProperty("success", true);
