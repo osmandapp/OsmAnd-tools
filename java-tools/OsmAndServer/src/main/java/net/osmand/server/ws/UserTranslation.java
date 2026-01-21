@@ -65,7 +65,7 @@ public class UserTranslation {
 	}
 
 	public Deque<TranslationSharingOptions> getActiveSharers() {
-		return new ConcurrentLinkedDeque<>(activeSharers);
+		return activeSharers;
 	}
 
 	public void setCreationDate(long creationDate) {
@@ -77,7 +77,7 @@ public class UserTranslation {
 	}
 
 	public Deque<TranslationMessage> getMessages() {
-		return new ConcurrentLinkedDeque<>(messages);
+		return messages;
 	}
 
 	public Map<Integer, Deque<WptPt>> getLocationsByUser() {
