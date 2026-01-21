@@ -3,7 +3,6 @@ package net.osmand.server.ws;
 import java.security.Principal;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,44 +32,17 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
 	private static final Log LOG = LogFactory.getLog(SubscriptionInterceptor.class);
 
 	private static final int MAX_TRANSLATION_ID_LENGTH = 128;
-	// Rate limiting: max failed attempts per IP/session before blocking
 	private static final int MAX_FAILED_ATTEMPTS = 5;
-	private static final long RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 
-	private final Map<String, FailedAttemptTracker> failedAttempts = new ConcurrentHashMap<>();
+	private final Map<String, Integer> failedAttempts = new ConcurrentHashMap<>();
 
 	@Autowired
 	@Lazy
 	private UserTranslationsService translationsService;
 
-
-	/**
-	 * Tracks failed access attempts for rate limiting.
-	 */
-	private static class FailedAttemptTracker {
-		private final AtomicInteger count = new AtomicInteger(0);
-		private volatile long resetTime = System.currentTimeMillis() + RATE_LIMIT_WINDOW_MS;
-
-		public int incrementAndGet() {
-			long now = System.currentTimeMillis();
-			if (now > resetTime) {
-				count.set(0);
-				resetTime = now + RATE_LIMIT_WINDOW_MS;
-			}
-			return count.incrementAndGet();
-		}
-
-		public boolean isBlocked() {
-			return count.get() >= MAX_FAILED_ATTEMPTS && System.currentTimeMillis() < resetTime;
-		}
-	}
-
     @Override
     public Message<?> preSend(@NotNull Message<?> message, @NotNull MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
-
-        // Propagate SecurityContext from HTTP session to WebSocket message
-        // This ensures Principal (Authentication) is available for access control
         SecurityContext securityContext = SecurityContextHolder.getContext();
         Authentication authentication = securityContext.getAuthentication();
         if (authentication != null && accessor.getUser() == null) {
@@ -79,7 +51,6 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
 
         Principal user = accessor.getUser();
 		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-			// Access authentication header(s) and invoke accessor.setUser(user)
 			String alias = accessor.getFirstNativeHeader(UserTranslationsService.X_ALIAS);
 			if (alias != null && !alias.isEmpty()) {
 				Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
@@ -151,48 +122,33 @@ public class SubscriptionInterceptor implements ChannelInterceptor {
         if (translationId == null || translationId.isEmpty()) {
             return false;
         }
-
         if (translationId.length() > MAX_TRANSLATION_ID_LENGTH) {
             return false;
         }
-        
-        // Allow only alphanumeric characters and common safe characters
         return translationId.matches(UserTranslationsService.VALID_TRANSLATION_ID_PATTERN);
     }
-    
-    /**
-     * Checks if the session is rate limited due to too many failed attempts.
-     * 
-     * @param sessionId WebSocket session ID
-     * @return true if rate limited, false otherwise
-     */
+
     private boolean isRateLimited(String sessionId) {
         if (sessionId == null) {
             return false;
         }
-        FailedAttemptTracker tracker = failedAttempts.get(sessionId);
-        return tracker != null && tracker.isBlocked();
+        Integer count = failedAttempts.get(sessionId);
+        return count != null && count >= MAX_FAILED_ATTEMPTS;
     }
 
     private void trackFailedAttempt(String sessionId) {
         if (sessionId == null) {
             return;
         }
-        failedAttempts.computeIfAbsent(sessionId, k -> new FailedAttemptTracker())
-            .incrementAndGet();
+        failedAttempts.merge(sessionId, 1, Integer::sum);
     }
-    
-    /**
-     * Resets failed attempts counter for successful access.
-     * 
-     * @param sessionId WebSocket session ID
-     */
+
     private void resetFailedAttempts(String sessionId) {
         if (sessionId != null) {
             failedAttempts.remove(sessionId);
         }
     }
-
+    
     private void logAccessAttempt(String translationId, Principal principal, boolean allowed, String reason) {
         String userId = principal != null ? principal.getName() : "anonymous";
         if (allowed) {

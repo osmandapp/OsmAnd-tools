@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.server.controllers.pub.UserdataController.cacheByDeviceId;
 import static net.osmand.server.controllers.pub.UserdataController.removeFromCache;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
