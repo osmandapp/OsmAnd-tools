@@ -19,7 +19,7 @@ from .database_api import get_images_per_page, populate_cache_from_db, scan_and_
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
 MAX_IMG_DIMENSION = int(os.getenv('MAX_IMG_DIMENSION', 720))
 IMAGE_SIZE = 1280
-USER_AGENT_DOWNLOAD_WIKIMEDIA = "Chrome/132.0.0.0 Safari/537.36"
+USER_AGENT_DOWNLOAD_WIKIMEDIA = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
 SLEEP = int(os.getenv('SLEEP', '1'))
 CACHE_DIR = os.getenv('CACHE_DIR', './wiki')
 cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
