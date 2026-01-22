@@ -26,6 +26,7 @@ VALID_EXTENSIONS_LOWERCASE = set(ext.lower() for ext in os.getenv('VALID_EXTENSI
 QUAD_ALPHABET = os.getenv('QUAD_ALPHABET', "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~")
 MAX_EXECUTION_TIME = int(os.getenv('DB_TIMEOUT', '900'))
 POI_SUBTYPE = ",".join([f"'{w.strip()}'" if w else '' for w in os.getenv('POI_SUBTYPE', '').split(",")])
+ASTRO_IMAGES_ONLY = os.getenv("ASTRO_IMAGES_ONLY", "false") == "true"
 
 if not all([CLICKHOUSE_HOST, CLICKHOUSE_PWD]):
     raise ValueError("Missing required environment variables (CLICKHOUSE_HOST, CLICKHOUSE_PWD)")
@@ -390,15 +391,30 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
     file_ext_conditions = " OR ".join(
         f"endsWith(lower(imageTitle), '.{ext}')" for ext in VALID_EXTENSIONS_LOWERCASE
     )
+
+    if ASTRO_IMAGES_ONLY:
+        id_select = f"""
+            SELECT w.id FROM wikidata w
+                LEFT JOIN elo_rating e ON e.id = w.id
+                WHERE w.lat = 0 and w.lon = 0
+                ORDER BY e.elo DESC, w.id
+                LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE}
+        """
+    else:
+        id_select = f"""
+            SELECT w.id FROM wikidata w
+                LEFT JOIN elo_rating e ON e.id = w.id
+                ORDER BY e.elo DESC, w.id
+                LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE}
+        """
+
     query = f"""
     SELECT id, groupArray({PHOTOS_PER_PLACE})((imageTitle, mediaId, namespace, score))
     FROM (
         SELECT DISTINCT id, imageTitle, mediaId, namespace, if(type = 'P18', 1000000, views) as score
         FROM wikiimages
-        WHERE id in (SELECT w.id FROM wikidata w
-                LEFT JOIN elo_rating e ON e.id = w.id
-                ORDER BY e.elo DESC, w.id
-                LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE})
+        WHERE
+            id in ({id_select})
             AND namespace = 6
             AND ({file_ext_conditions})
             AND imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
