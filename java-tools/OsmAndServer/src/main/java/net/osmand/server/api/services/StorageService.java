@@ -339,7 +339,8 @@ public class StorageService {
 		public static InternalZipFile buildFromFile(File file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
-			zipfile.tempzipfile = new File(file.getPath().substring(0, file.getPath().indexOf(GPX)) + GPX_GZ);
+			String path = file.getPath();
+			zipfile.tempzipfile = new File(path.substring(0, path.lastIndexOf(".gpx")) + GPX_GZ);
 			zipfile.contentSize = file.length();
 			try (FileInputStream fis = new FileInputStream(file);
 			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
