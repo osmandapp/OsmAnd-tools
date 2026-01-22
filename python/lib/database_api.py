@@ -394,10 +394,7 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
 
     if ASTRO_IMAGES_ONLY:
         id_select = f"""
-            SELECT w.id FROM wikidata w
-                LEFT JOIN elo_rating e ON e.id = w.id
-                WHERE w.lat = 0 and w.lon = 0
-                ORDER BY e.elo DESC, w.id
+            SELECT id FROM wiki_coords WHERE poitype = 'starmap'
                 LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE}
         """
     else:
