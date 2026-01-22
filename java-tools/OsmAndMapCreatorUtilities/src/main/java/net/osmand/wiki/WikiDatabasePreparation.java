@@ -1179,7 +1179,7 @@ public class WikiDatabasePreparation {
 			}
 			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
-		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
+		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("update-wikidata-daily") || mode.equals("create-osm-wikidata")) {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
@@ -1221,7 +1221,7 @@ public class WikiDatabasePreparation {
 			log.info("Process OSM coordinates...");
 			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1);
+			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			break;
 		case "create-osm-wikidata":
@@ -1251,7 +1251,7 @@ public class WikiDatabasePreparation {
 //			log.info("Process OSM coordinates...");
 //			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000);
+			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			break;
 		case "create-wikidata-mapping":
@@ -1272,7 +1272,7 @@ public class WikiDatabasePreparation {
 		log.info("Updating wikidata...");
 		for (String fileName : downloadedPageFiles) {
 			log.info("Updating from " + fileName);
-			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId, -1);
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId, -1, true);
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
@@ -1469,7 +1469,7 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void processWikidata(File wikidataSqlite, final String wikidataFile,
-			OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit)
+			OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit, boolean update)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file",
@@ -1480,7 +1480,7 @@ public class WikiDatabasePreparation {
 		regions.prepareFile();
 		regions.cacheAllCountries();
 		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions,
-				lastProcessedId);
+				lastProcessedId, update);
 		handler.setLimit(limit);
 		try {
 			sx.parse(is, handler);

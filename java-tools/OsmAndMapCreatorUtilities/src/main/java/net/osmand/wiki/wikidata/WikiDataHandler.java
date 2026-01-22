@@ -13,11 +13,9 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -61,6 +59,10 @@ public class WikiDataHandler extends DefaultHandler {
 	private PreparedStatement wikiRegionPrep;
 	private PreparedStatement wikidataPropPrep;
 	private PreparedStatement wikidataBlobPrep;
+	private final PreparedStatement deleteWikidataPropPrep;
+	private final PreparedStatement deleteMappingPrep;
+	private final PreparedStatement deleteWikiRegionPrep;
+	private final PreparedStatement deleteWikidataBlobPrep;
 	private int[] mappingBatch = new int[]{0};
 	private int[] coordsBatch = new int[]{0};
 	private int[] regionBatch = new int[]{0};
@@ -82,6 +84,7 @@ public class WikiDataHandler extends DefaultHandler {
 	OsmCoordinatesByTag osmWikiCoordinates;
 	
 	private long lastProcessedId;
+	private final boolean update;
 	
 	private long limit = -1;
 
@@ -89,27 +92,45 @@ public class WikiDataHandler extends DefaultHandler {
 
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
-	                       OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)
+						   OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId, boolean update)
 			throws SQLException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
 		this.lastProcessedId = lastProcessedId;
+		this.update = update;
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint, originalId text, lat double, lon double, wlat double, wlon double,  "
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint PRIMARY KEY, originalId text, lat double, lon double, wlat double, wlon double,  "
 				+ " osmtype int, osmid bigint, poitype text, poisubtype text, labelsJson text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_blobs(id bigint PRIMARY KEY, page blob)");
-		coordsPrep = conn.prepareStatement("INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson) "
-				+ " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+		coordsPrep = conn.prepareStatement("""
+				INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(id) DO UPDATE SET
+				originalId = excluded.originalId,
+				lat = excluded.lat,
+				lon = excluded.lon,
+				wlat = excluded.wlat,
+				wlon = excluded.wlon,
+				osmtype = excluded.osmtype,
+				osmid = excluded.osmid,
+				poitype = excluded.poitype,
+				poisubtype = excluded.poisubtype,
+				labelsJson = excluded.labelsJson;
+				""");
 		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
 		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
 		wikidataBlobPrep = conn.prepareStatement("INSERT INTO wikidata_blobs(id, page) VALUES(?, ?)");
+		deleteWikiRegionPrep = conn.prepareStatement("DELETE FROM wiki_region WHERE id = ?");
+		deleteMappingPrep = conn.prepareStatement("DELETE FROM wiki_mapping WHERE id = ?");
+		deleteWikidataPropPrep = conn.prepareStatement("DELETE FROM wikidata_properties WHERE id = ?");
+		deleteWikidataBlobPrep = conn.prepareStatement("DELETE FROM wikidata_blobs WHERE id = ?");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		
 		allAstroWids = getAllAstroWids();
@@ -274,7 +295,7 @@ public class WikiDataHandler extends DefaultHandler {
 					}
 					try {
 						String t = title.toString();
-						if (t.startsWith("Lexeme:")) {
+						if (t.startsWith("Lexeme:") || t.startsWith("Property:")) {
 							return;
 						}
 						long id = Long.parseLong(title.substring(1));
@@ -312,7 +333,7 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLat(osmCoordinates.lat);
 			article.setLon(osmCoordinates.lon);
 		}
-		
+
 		if (article.getLat() != 0 || article.getLon() != 0 || starType != null) {
 			if (++count % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, count));
@@ -344,8 +365,17 @@ public class WikiDataHandler extends DefaultHandler {
 			String subtype = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null;
 			coordsPrep.setString(++ind,  starType != null ? starType : subtype);
 			coordsPrep.setString(++ind, labelsJson);
-
-			addBatch(coordsPrep, coordsBatch);
+			addBatch(coordsPrep, coordsBatch);1
+			if (update) {
+				deleteWikiRegionPrep.setLong(1, id);
+				deleteWikiRegionPrep.execute();
+				deleteMappingPrep.setLong(1, id);
+				deleteMappingPrep.execute();
+				deleteWikidataPropPrep.setLong(1, id);
+				deleteWikidataPropPrep.execute();
+				deleteWikidataBlobPrep.setLong(1, id);
+				deleteWikidataBlobPrep.execute();
+			}
 			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 			for (String reg : rgs) {
 				wikiRegionPrep.setLong(1, id);
@@ -399,8 +429,5 @@ public class WikiDataHandler extends DefaultHandler {
 		}
 		return osmWikiCoordinates.getCoordinates("wikidata", "Q"+wid);
 	}
-
-
-
 }
 
