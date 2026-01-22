@@ -360,6 +360,10 @@ public class WebUserdataService {
 
 	@Transactional
 	public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+		String preparedName = prepareFileName(newName);
+		if (preparedName == null || preparedName.length() < 3) {
+			return ResponseEntity.badRequest().body("File name must be at least 3 characters long!");
+		}
 		CloudUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
 		if (file != null && file.filesize != -1) {
 			File updatedFile = renameGpxTrack(file, newName);
@@ -396,9 +400,27 @@ public class WebUserdataService {
 		return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
 	}
 
+	private String prepareFileName(String fileName) {
+		if (fileName == null || fileName.isEmpty()) {
+			return null;
+		}
+		String preparedName = fileName;
+		int lastDotIndex = fileName.lastIndexOf('.');
+		if (lastDotIndex > 0) {
+			preparedName = fileName.substring(0, lastDotIndex);
+		}
+		int lastSlashIndex = preparedName.lastIndexOf('/');
+		if (lastSlashIndex >= 0) {
+			preparedName = preparedName.substring(lastSlashIndex + 1);
+		}
+		return preparedName;
+	}
+
 	private File renameGpxTrack(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
-		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
-		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
+		String preparedName = prepareFileName(newName);
+		if (preparedName == null || preparedName.length() < 3) {
+			return null;
+		}
 		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 		if (isTrack) {
 			GpxFile gpxFile = null;
