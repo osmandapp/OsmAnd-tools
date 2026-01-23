@@ -51,6 +51,7 @@ public class WikiDataHandler extends DefaultHandler {
 	private final StringBuilder title = new StringBuilder();
 	private final StringBuilder text = new StringBuilder();
 	private final StringBuilder format = new StringBuilder();
+	private String lastRevisionText = null;
 
 	private FileProgressImplementation progress;
 	private Connection conn;
@@ -241,28 +242,28 @@ public class WikiDataHandler extends DefaultHandler {
         conn.close();
     }
 
-    public void setLastProcessedId(Long lastProcessedId) {
-		this.lastProcessedId = lastProcessedId;
+	@Override
+	public void startElement(String uri, String localName, String qName, Attributes attributes) {
+		String name = saxParser.isNamespaceAware() ? localName : qName;
+		if (!page) {
+			 page = name.equals("page");
+		} else {
+			switch (name) {
+				case "title" -> {
+					title.setLength(0);
+					ctext = title;
+				}
+				case "text" -> {
+					text.setLength(0);
+					ctext = text;
+				}
+				case "format" -> {
+					format.setLength(0);
+					ctext = format;
+				}
+			}
+		}
 	}
-
-    @Override
-    public void startElement(String uri, String localName, String qName, Attributes attributes) {
-        String name = saxParser.isNamespaceAware() ? localName : qName;
-        if (!page) {
-             page = name.equals("page");
-        } else {
-            if (name.equals("title")) {
-                title.setLength(0);
-                ctext = title;
-            } else if (name.equals("text")) {
-                text.setLength(0);
-                ctext = text;
-            } else if (name.equals("format")) {
-                format.setLength(0);
-                ctext = format;
-            }
-        }
-    }
 
 	@Override
 	public void characters(char[] ch, int start, int length) {
@@ -278,47 +279,41 @@ public class WikiDataHandler extends DefaultHandler {
 		String name = saxParser.isNamespaceAware() ? localName : qName;
 		if (page) {
 			switch (name) {
-				case "page":
+				case "revision" -> {
+					lastRevisionText = text.toString();
+				}
+				case "page" -> {
 					page = false;
 					progress.update();
 					if (limit > 0 && count >= limit) {
 						throw new IllegalStateException();
 					}
-					break;
-				case "title":
-				case "format":
-					ctext = null;
-					break;
-				case "text":
-					if (!format.toString().equals("application/json")) {
-						return;
-					}
-					try {
-						String t = title.toString();
-						if (t.startsWith("Lexeme:") || t.startsWith("Property:")) {
-							return;
-						}
-						long id = Long.parseLong(title.substring(1));
-						if (id < lastProcessedId) {
-							return;
-						}
-						processJsonPage(id, ctext.toString());
-					} catch (Exception e) {
-						// Generally means that the field is missing in the json or the incorrect data is supplied
-						errorCount++;
-						if (errorCount == ERROR_BATCH_SIZE) {
-							log.error(e.getMessage(), e);
-						}
-						if (errorCount % ERROR_BATCH_SIZE == 0) {
-							log.error(String.format("Error pages %s (total %d)", title, errorCount));
+					if (lastRevisionText != null && "application/json".contentEquals(format)) {
+						try {
+							String t = title.toString();
+							if (!t.startsWith("Lexeme:") && !t.startsWith("Property:")) {
+								long id = Long.parseLong(title.substring(1));
+								if (id >= lastProcessedId) {
+									processJsonPage(id, lastRevisionText);
+								}
+							}
+						} catch (Exception e) {
+							// Generally means that the field is missing in the json or the incorrect data is supplied
+							errorCount++;
+							if (errorCount == ERROR_BATCH_SIZE) {
+								log.error(e.getMessage(), e);
+							}
+							if (errorCount % ERROR_BATCH_SIZE == 0) {
+								log.error(String.format("Error pages %s (total %d)", title, errorCount));
+							}
 						}
 					}
-					break;
+					lastRevisionText = null;
+				}
+				case "title", "format", "text" -> ctext = null;
 			}
 		}
 	}
-
-
 
 	public void processJsonPage(long id, String json) throws SQLException, IOException {
 		String starType = allAstroWids.get(id);
