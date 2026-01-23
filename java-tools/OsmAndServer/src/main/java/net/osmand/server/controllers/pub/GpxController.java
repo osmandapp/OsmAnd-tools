@@ -46,6 +46,8 @@ import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
 import net.osmand.server.utils.WebGpxParser;
 
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
+
 
 @RestController
 @RequestMapping("/gpx/")
@@ -256,7 +258,7 @@ public class GpxController {
 		if (simplified != null && simplified) {
 			gpxFile = gpxService.createSimplifiedGpxFile(gpxFile);
 		}
-		File tmpGpx = File.createTempFile("gpx_" + httpSession.getId(), ".gpx");
+		File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + httpSession.getId(), ".gpx");
 
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {

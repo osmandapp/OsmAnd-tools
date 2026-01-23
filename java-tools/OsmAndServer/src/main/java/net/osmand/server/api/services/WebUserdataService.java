@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
 public class WebUserdataService {
@@ -396,9 +397,21 @@ public class WebUserdataService {
 		return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
 	}
 
+	private String prepareFileName(String fileName) {
+		if (fileName == null || fileName.isEmpty()) {
+			return null;
+		}
+		int lastDot = fileName.lastIndexOf('.');
+		String name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+
+		return name.substring(name.lastIndexOf('/') + 1);
+	}
+
 	private File renameGpxTrack(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
-		String preparedName = newName.substring(0, newName.lastIndexOf('.'));
-		preparedName = preparedName.substring(preparedName.lastIndexOf('/') + 1);
+		String preparedName = prepareFileName(newName);
+		if (preparedName == null) {
+			return null;
+		}
 		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
 		if (isTrack) {
 			GpxFile gpxFile = null;
@@ -434,7 +447,7 @@ public class WebUserdataService {
 			}
 			if (gpxFile != null) {
 				gpxFile.updateTrackName(preparedName);
-				File tmpGpx = File.createTempFile(preparedName.replace("/../", "/"), ".gpx");
+				File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + preparedName.replace("/../", "/"), ".gpx");
 				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 				if (exception != null) {
 					String isError = String.format(
@@ -490,7 +503,7 @@ public class WebUserdataService {
 					.replace("/", "\\/");
 			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
 			// create new file
-			File tmpInfo = File.createTempFile(newName.replace("/../", "/") + INFO_FILE_EXT, INFO_FILE_EXT);
+			File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/") + INFO_FILE_EXT, INFO_FILE_EXT);
 			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
 				fos.write(updated);
 			}
