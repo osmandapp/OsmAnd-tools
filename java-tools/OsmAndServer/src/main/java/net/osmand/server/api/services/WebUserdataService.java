@@ -397,12 +397,13 @@ public class WebUserdataService {
 	}
 
 	private String prepareFileName(String fileName) {
-		if (fileName == null || fileName.isEmpty()) return null;
+		if (fileName == null || fileName.isEmpty()) {
+			return null;
+		}
 		int lastDot = fileName.lastIndexOf('.');
 		String name = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
-		int lastSlash = name.lastIndexOf('/');
 
-		return lastSlash >= 0 ? name.substring(lastSlash + 1) : name;
+		return name.substring(name.lastIndexOf('/') + 1);
 	}
 
 	private File renameGpxTrack(CloudUserFilesRepository.UserFile file, String newName) throws IOException {

@@ -32,6 +32,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+
 @Service
 public class StorageService {
 
@@ -340,7 +342,7 @@ public class StorageService {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
 			String path = file.getPath();
-			zipfile.tempzipfile = new File(path.substring(0, path.lastIndexOf(".gpx")) + GPX_GZ);
+			zipfile.tempzipfile = new File(path.substring(0, path.lastIndexOf("." + FILE_TYPE_GPX)) + GPX_GZ);
 			zipfile.contentSize = file.length();
 			try (FileInputStream fis = new FileInputStream(file);
 			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
