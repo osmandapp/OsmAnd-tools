@@ -415,6 +415,7 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
             AND namespace = 6
             AND ({file_ext_conditions})
             AND imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
+            AND mediaId NOT IN (SELECT mediaId FROM wiki_images_downloaded)
         ORDER BY score DESC, imageTitle)
     GROUP BY id
     """
