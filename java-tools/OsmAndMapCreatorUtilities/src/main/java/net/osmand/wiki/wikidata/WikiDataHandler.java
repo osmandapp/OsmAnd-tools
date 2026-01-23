@@ -365,7 +365,7 @@ public class WikiDataHandler extends DefaultHandler {
 			String subtype = osmCoordinates != null &&  osmCoordinates.amenity != null ? osmCoordinates.amenity.getSubType() : null;
 			coordsPrep.setString(++ind,  starType != null ? starType : subtype);
 			coordsPrep.setString(++ind, labelsJson);
-			addBatch(coordsPrep, coordsBatch);1
+			addBatch(coordsPrep, coordsBatch);
 			if (update) {
 				deleteWikiRegionPrep.setLong(1, id);
 				deleteWikiRegionPrep.execute();
