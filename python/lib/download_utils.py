@@ -6,9 +6,11 @@ import sys
 import tempfile
 import threading
 import time
+import random
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from typing import Optional
 
 import requests
 from PIL import Image
@@ -17,11 +19,16 @@ downloaded_files_cache: set = set()
 
 from .database_api import get_images_per_page, populate_cache_from_db, scan_and_populate_db, insert_downloaded_image, is_valid_image_file_name
 
+USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndPython/1.0"
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
+MAX_TRIES = int(os.getenv('MAX_TRIES', '10'))
+MAX_SLEEP = int(os.getenv('MAX_SLEEP', '60'))
+CONNECT_TIMEOUT = 10
+READ_TIMEOUT = 60
+
 MAX_IMG_DIMENSION = int(os.getenv('MAX_IMG_DIMENSION', 720))
 IMAGE_SIZE = 1280
-USER_AGENT_DOWNLOAD_WIKIMEDIA = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
-SLEEP = int(os.getenv('SLEEP', '1'))
+
 CACHE_DIR = os.getenv('CACHE_DIR', './wiki')
 cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
 
@@ -52,7 +59,7 @@ class ProxyManager:
             print(f"Proxy file {file_path} not found. Proceeding without proxies.")
             self.proxies = []
 
-    def get_proxy(self):
+    def get_rotated_proxy(self):
         with self.lock:
             if not self.proxies:
                 return None
@@ -60,6 +67,10 @@ class ProxyManager:
             proxy = self.proxies.pop(0)
             self.proxies.append(proxy)
             return proxy
+
+    def get_random_proxy(self) -> Optional[str]:
+        with self.lock:
+            return random.choice(self.proxies) if self.proxies else None
 
 
 def _cached_path(file_name):
@@ -74,6 +85,7 @@ def _cached_path(file_name):
 
 def _generate_image_url(file_name, base="https://upload.wikimedia.org/wikipedia/commons/", width=IMAGE_SIZE):
     filename_encoded = file_name.replace(' ', '_')
+    base = base.rstrip("/")
 
     hash_md5 = hashlib.md5(filename_encoded.encode()).hexdigest()
     hash_prefix = f"{hash_md5[0]}/{hash_md5[0:2]}"
@@ -157,41 +169,60 @@ def download_pil_image(file_name):
         return None
 
 
-def download_image(file_name, override: bool = False, proxy=None):
-    # start_time = time.time()
+def download_image(file_name, override: bool = False, proxy_manager=None):
+    start_time = time.time()
+
     file_path = _cached_path(file_name)
     if not override and os.path.exists(file_path):
         return True
 
-    time.sleep(SLEEP)
-
+    status_code = 0
+    reuse_same_proxy = False
     url = _generate_image_url(file_name)
-    headers = {"User-Agent": USER_AGENT_DOWNLOAD_WIKIMEDIA}
-    proxies = None
-    if proxy:
-        proxies = {
-            'http': f'http://{proxy}',
-            'https': f'http://{proxy}'
-        }
-    try:
-        response = requests.get(url, headers=headers, proxies=proxies, timeout=(30, 30))
-    except Exception as e:
-        print(f"Failed to download image from {url} proxy {proxy}: {e}")
-        return False
+    headers = {"User-Agent": USER_AGENT}
 
-    if response.status_code == 200:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "wb") as image_file:
-            image_file.write(response.content)
-    else:
-        print(f"Failed to download image from {url} proxy {proxy}. Status code: {response.status_code}", flush=True)
-        return False
+    for attempt in range(0, MAX_TRIES):
+        proxy = None
+        proxies = None
+        if proxy_manager and not reuse_same_proxy:
+            proxy = proxy_manager.get_random_proxy()
+            if proxy:
+                proxies = {
+                    'http': f'http://{proxy}',
+                    'https': f'http://{proxy}'
+                }
 
-    # print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s", flush=True)
-    return True
+        reuse_same_proxy = False
+
+        try:
+            response = requests.get(url, headers=headers, proxies=proxies, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT))
+        except Exception as e:
+            print(f"Retry exception {url} proxy {proxy}: {e} [{attempt}]")
+            status_code = 666
+            continue
+
+        status_code = response.status_code
+
+        if status_code == 200:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, "wb") as image_file:
+                image_file.write(response.content)
+            print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
+            return True
+        elif status_code == 429:
+            reuse_same_proxy = True
+            time.sleep(attempt * (MAX_SLEEP / MAX_TRIES))
+        elif status_code == 404 or (500 <= status_code <= 599):
+            break
+
+        print(f"Retry HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
+        continue
+
+    print(f"Failed to get {url}. Last status code: {status_code}")
+    return False
 
 
-def download_images_per_page(page_no: int, override: bool = False, proxy=None):
+def download_images_per_page(page_no: int, override: bool = False, proxy_manager=None):
     start_time = time.time()
     image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
@@ -207,7 +238,7 @@ def download_images_per_page(page_no: int, override: bool = False, proxy=None):
             if not override and img_path in downloaded_files_cache:
                 continue  # Skip if found in the pre-scanned set
 
-            success = download_image(img_path, override, proxy=proxy)
+            success = download_image(img_path, override, proxy_manager)
             if not success:
                 error_count += 1
                 place_img_error += 1
@@ -251,11 +282,8 @@ def process_chunk(proxy_manager=None):
             current_chunk = chunk_i
             chunk_i += 1  # Now chunk_i is recognized as global
 
-        proxy = None
-        if proxy_manager:
-            proxy = proxy_manager.get_proxy()
+        error_count, place_count, image_count = download_images_per_page(current_chunk, DOWNLOAD_IF_EXISTS, proxy_manager)
 
-        error_count, place_count, image_count = download_images_per_page(current_chunk, DOWNLOAD_IF_EXISTS, proxy)
         with total_lock:
             total_place_count += PLACES_PER_THREAD
             total_image_count += image_count
@@ -303,7 +331,6 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(line_buffering=True)
 
     count_images_to_download()
-    sys.exit(1)
 
     proxy_manager = None
     initialize_download_cache()
@@ -321,11 +348,10 @@ if __name__ == "__main__":
     total_lock = threading.Lock()
     stop_event = threading.Event()
 
-    num_workers = len(proxy_manager.proxies) if proxy_manager and proxy_manager.proxies else PARALLEL
-    print(f"Number of workers: {num_workers}", flush=True)
+    print(f"Number of workers: {PARALLEL}", flush=True)
 
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = [executor.submit(process_chunk, proxy_manager) for _ in range(num_workers)]
+    with ThreadPoolExecutor(max_workers=PARALLEL) as executor:
+        futures = [executor.submit(process_chunk, proxy_manager) for _ in range(PARALLEL)]
         for future in futures:
             future.result()
 
