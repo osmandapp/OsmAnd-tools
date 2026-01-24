@@ -203,9 +203,10 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
     url = _generate_image_url(file_name)
     headers = {"User-Agent": USER_AGENT}
 
+    proxy = None
+    proxies = None
+
     for attempt in range(1, MAX_TRIES + 1):
-        proxy = None
-        proxies = None
         if proxy_manager and not reuse_same_proxy:
             proxy = proxy_manager.get_random_proxy()
             if proxy:
@@ -213,6 +214,8 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
                     'http': f'http://{proxy}',
                     'https': f'http://{proxy}'
                 }
+            else:
+                proxies = None
 
         reuse_same_proxy = False
 
