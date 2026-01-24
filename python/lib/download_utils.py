@@ -16,9 +16,9 @@ from typing import Optional
 
 import requests
 from PIL import Image
-from openai.types.beta.threads import ImageFile
 
 downloaded_files_cache: set = set()
+downloaded_files_cache_lock = threading.Lock()
 
 from .database_api import VALID_EXTENSIONS_LOWERCASE, is_valid_image_file_name, ch_client, ch_query
 from .database_api import populate_cache_from_db, scan_and_populate_db, insert_downloaded_image
@@ -163,7 +163,7 @@ def download_image_as_base64(file_name):
     return base64_encoded
 
 
-def resize_image(image: ImageFile):
+def resize_image(image: Image):
     width, height = image.size
     if width > MAX_IMG_DIMENSION or height > MAX_IMG_DIMENSION:
         if width > height:
@@ -267,10 +267,10 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
     global monitoring_error_count, monitoring_success_count
     start_time = time.time()
 
-    t0 = time.perf_counter()
+    # t0 = time.perf_counter()
     with clickhouse_slow_query_lock:
         image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
-    print(f"get_images_per_page({page_no}, {PLACES_PER_THREAD}) ~ {(time.perf_counter() - t0) * 1000:.2f} ms")
+    # print(f"get_images_per_page({page_no}, {PLACES_PER_THREAD}) ~ {(time.perf_counter() - t0) * 1000:.2f} ms") # debug
 
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
     for place_id, place_paths in image_records:
@@ -280,7 +280,6 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
         # print(f"Places: {place_paths}", flush=True)
         for img_path, mediaId, namespace, _ in place_paths:
             image_all_count += 1
-            cached_file_path = _cached_path(img_path, False) # TODO might be removed
             # Directly check the set (no os.path.exists here)
             if not override and img_path in downloaded_files_cache:
                 continue  # Skip if found in the pre-scanned set
@@ -292,7 +291,9 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
                 with monitoring_counter_lock:
                     monitoring_error_count += 1
             else:
-                # downloaded_files_cache.append(img_path) # check multithread
+                with downloaded_files_cache_lock:
+                    downloaded_files_cache.add(img_path)
+                cached_file_path = _cached_path(img_path, False)
                 file_stat = os.stat(cached_file_path)
                 timestamp = datetime.datetime.fromtimestamp(file_stat.st_mtime)
                 filesize = file_stat.st_size
@@ -402,12 +403,17 @@ def get_images_per_page(page_no: int, places_per_thread: int) -> list[tuple[int,
         GROUP BY id
         ORDER BY rand()
     """
+
     with ch_client() as client:
-        result = ch_query(query, client)
         images = []
-        for p in result:
-            images.append((p[0], p[1]))
+        for p in ch_query(query, client):
+            place_id, place_paths = p[0], p[1]
+            with downloaded_files_cache_lock:
+                cleaned_place_paths = [t for t in place_paths if t[0] not in downloaded_files_cache]
+            if cleaned_place_paths:
+                images.append((place_id, cleaned_place_paths))
         return images
+
 
 def count_images_to_download() -> tuple[int, int]:
     all_places = get_images_per_page(0, sys.maxsize)
@@ -464,6 +470,8 @@ if __name__ == "__main__":
         PARALLEL = min(2, PARALLEL)
         print(f"Warning. No proxies loaded. PARALLEL is limited to {PARALLEL}.")
 
+    initialize_download_cache()
+
     places_to_download, images_to_download = count_images_to_download()
     print(f"Total {places_to_download} places with {images_to_download} images to download")
 
@@ -477,8 +485,6 @@ if __name__ == "__main__":
     if places_to_download < PROCESS_PLACES:
         PROCESS_PLACES = places_to_download
         print(f"Warning. PROCESS_PLACES was cut down to {PROCESS_PLACES}")
-
-    initialize_download_cache()
 
     chunk_i = OFFSET_BATCH
     total_time = time.time()

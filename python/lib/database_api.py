@@ -116,7 +116,7 @@ def delete_erroneous_from(table: str):
 
 def populate_cache_from_db() -> Set[str]:
     """Queries the database and returns a set of already downloaded image names."""
-    query = "SELECT DISTINCT name FROM wiki_images_downloaded"
+    query = "SELECT name FROM wiki_images_downloaded"
     downloaded_names = set()
     try:
         with ch_client() as client:
