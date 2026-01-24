@@ -41,7 +41,7 @@ OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
 PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
-ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '5'))
+ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '50'))
 MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '600'))
 PARALLEL = int(os.getenv('PARALLEL', '2'))
 
@@ -435,14 +435,6 @@ def monitoring_thread() -> None:
         errors = monitoring_error_count - errors_before
         success = monitoring_success_count - success_before
 
-        if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
-            current_errors_percent = int(errors / (errors + success) * 100)
-            if current_errors_percent > ERROR_LIMIT_PERCENT:
-                print(f"Monitoring thread terminates downloading")
-                print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
-                print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
-                os.kill(os.getpid(), signal.SIGTERM)
-
         now = datetime.datetime.now().replace(microsecond=0)
         if success > 0 or errors > 0:
             images_left = images_to_download - (monitoring_error_count + monitoring_success_count)
@@ -456,6 +448,14 @@ def monitoring_thread() -> None:
                   "\n")
         else:
             print(f"{now} nothing happened")
+
+        if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
+            current_errors_percent = int(errors / (errors + success) * 100)
+            if current_errors_percent > ERROR_LIMIT_PERCENT:
+                print(f"Monitoring thread terminates downloading")
+                print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
+                print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
+                os.kill(os.getpid(), signal.SIGTERM)
 
 
 if __name__ == "__main__":
@@ -472,6 +472,7 @@ if __name__ == "__main__":
 
     initialize_download_cache()
 
+    print("Counting number of places and images to download...")
     places_to_download, images_to_download = count_images_to_download()
     print(f"Total {places_to_download} places with {images_to_download} images to download")
 
