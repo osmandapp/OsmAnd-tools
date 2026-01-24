@@ -208,7 +208,10 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "wb") as image_file:
                 image_file.write(response.content)
-            print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
+            if attempt > 1:
+                print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
+            else:
+                print("+")
             return True
         elif status_code == 429:
             reuse_same_proxy = True
@@ -326,16 +329,21 @@ def file_name_image_format_lowercase(file_name):
     return file_ext
 
 
-def count_images_to_download() -> None:
+def count_images_to_download() -> tuple[int, int]:
     all_places = get_images_per_page(0, sys.maxsize)
     total_images = sum(len(paths) for _, paths in all_places)
     print(f"Total {len(all_places)} places with {total_images} images to download")
+    return len(all_places), total_images
 
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(line_buffering=True)
 
-    count_images_to_download()
+    places_to_download, _ = count_images_to_download()
+
+    if places_to_download < PLACES_PER_THREAD / PARALLEL:
+        PLACES_PER_THREAD = max(1, places_to_download // PARALLEL)
+        print(f"Warning! PLACES_PER_THREAD cut down to {PLACES_PER_THREAD}")
 
     proxy_manager = None
     initialize_download_cache()
