@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import random
+import signal
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 from io import BytesIO
@@ -35,12 +36,16 @@ CACHE_DIR = os.getenv('CACHE_DIR', './wiki')
 cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
 
 OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
-ERROR_LIMIT = int(os.getenv('ERROR_LIMIT', '20'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
 PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
+ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '5'))
+MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '600'))
 PARALLEL = int(os.getenv('PARALLEL', '2'))
 
+monitoring_error_count = 0
+monitoring_success_count = 0
+monitoring_counter_lock = threading.Lock()
 
 class ProxyManager:
     def __init__(self, proxy_file_path):
@@ -53,6 +58,7 @@ class ProxyManager:
 
         try:
             if proxy_file_url.startswith(("http://", "https://")):
+                # TO-THINK proxy_file_url should be refreshed regularly
                 req = Request(proxy_file_url, headers={"User-Agent": "ProxyManager/1.0"})
                 with urlopen(req, timeout=30) as resp:
                     text = resp.read().decode("utf-8", errors="replace")
@@ -226,13 +232,13 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
                 image_file.write(response.content)
             if attempt > 1:
                 print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
-            else:
-                print("+")
+            # else:
+            #     print("+") # debug
             return True
         elif status_code == 429:
             reuse_same_proxy = True
-            seconds = attempt * (MAX_SLEEP / MAX_TRIES)
-            print(f"Sleep {seconds} HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
+            seconds = int(attempt * (MAX_SLEEP / MAX_TRIES))
+            print(f"Sleep {seconds}s HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
             time.sleep(seconds)
             continue
         elif status_code == 404 or (500 <= status_code <= 599):
@@ -247,6 +253,7 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
 
 
 def download_images_per_page(page_no: int, override: bool = False, proxy_manager=None):
+    global monitoring_error_count, monitoring_success_count
     start_time = time.time()
     image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
@@ -266,9 +273,8 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
             if not success:
                 error_count += 1
                 place_img_error += 1
-                if error_count > ERROR_LIMIT:
-                    print(f"STOPPED! There are {error_count} errors exceeds limit {ERROR_LIMIT}!", flush=True)
-                    return error_count, place_count, image_count
+                with monitoring_counter_lock:
+                    monitoring_error_count += 1
             else:
                 # downloaded_files_cache.append(img_path) # check multithread
                 file_stat = os.stat(cached_file_path)
@@ -278,6 +284,8 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
                 insert_downloaded_image(img_path, relative_folder, timestamp, filesize, mediaId, namespace)
                 place_img_loaded += 1
                 image_count += 1
+                with monitoring_counter_lock:
+                    monitoring_success_count += 1
 
         place_count += 1
         duration = time.time() - sub_start_time
@@ -313,10 +321,9 @@ def process_chunk(proxy_manager=None):
             total_image_count += image_count
             total_error_count += error_count
 
-            if error_count > ERROR_LIMIT or place_count < 0 or image_count < 0 or total_place_count >= PROCESS_PLACES:
-                print(
-                    f"Thread stopped! Last chunk: {error_count} errors, {place_count} places, {image_count} images. Total: {total_place_count} places, {total_image_count} images.",
-                    flush=True)
+            if place_count < 0 or image_count < 0 or total_place_count >= PROCESS_PLACES:
+                print(f"Thread stopped! Last chunk: {error_count} errors, {place_count} places, {image_count} images. "
+                      f"Total: {total_place_count} places, {total_image_count} images.")
                 stopped = True
                 # stop_event.set()
     return error_count, place_count, image_count
@@ -352,6 +359,43 @@ def count_images_to_download() -> tuple[int, int]:
     return len(all_places), total_images
 
 
+def monitoring_thread() -> None:
+    while True:
+        errors_before = monitoring_error_count
+        success_before = monitoring_success_count
+
+        for i in range(MONITORING_INTERVAL):
+            if monitoring_error_count + monitoring_success_count >= images_to_download:
+                print("Monitoring finished")
+                return
+            time.sleep(1)
+
+        errors = monitoring_error_count - errors_before
+        success = monitoring_success_count - success_before
+
+        if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
+            current_errors_percent = int(errors / (errors + success) * 100)
+            if current_errors_percent > ERROR_LIMIT_PERCENT:
+                print(f"Monitoring thread terminates downloading")
+                print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
+                print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
+                os.kill(os.getpid(), signal.SIGTERM)
+
+        now = datetime.datetime.now().replace(microsecond=0)
+        if success > 0 or errors > 0:
+            images_left = images_to_download - (monitoring_error_count + monitoring_success_count)
+            eta_seconds = int(images_left / ((success + errors) / MONITORING_INTERVAL))
+            success_per_day = int(success * 86400 / MONITORING_INTERVAL)
+            print("\n"
+                  f"{now} "
+                  f"todo {images_left:,} "
+                  f"performance {success_per_day // 1000}k/day "
+                  f"ETA {datetime.timedelta(seconds=eta_seconds)}"
+                  "\n")
+        else:
+            print(f"{now} nothing happened")
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(line_buffering=True)
 
@@ -362,9 +406,9 @@ if __name__ == "__main__":
     if not proxy_manager or not proxy_manager.get_random_proxy():
         proxy_manager = None
         PARALLEL = max(2, PARALLEL)
-        print(f"Warning. No proxies loaded. PARALLEL is set to {PARALLEL}.")
+        print(f"Warning. No proxies loaded. PARALLEL is limited to {PARALLEL}.")
 
-    places_to_download, _ = count_images_to_download()
+    places_to_download, images_to_download = count_images_to_download()
 
     if places_to_download < PLACES_PER_THREAD / PARALLEL:
         PLACES_PER_THREAD = max(1, places_to_download // PARALLEL)
@@ -382,13 +426,12 @@ if __name__ == "__main__":
     stop_event = threading.Event()
 
     print(f"Number of workers: {PARALLEL}", flush=True)
+    threading.Thread(target=monitoring_thread, daemon=True).start()
 
     with ThreadPoolExecutor(max_workers=PARALLEL) as executor:
         futures = [executor.submit(process_chunk, proxy_manager) for _ in range(PARALLEL)]
         for future in futures:
             future.result()
 
-    print(f"Processed {total_place_count} places with {total_image_count} images, {total_error_count} errors.",
-          flush=True)
-    # if total_error_count > ERROR_LIMIT:
-    #     sys.exit(1)
+    print(f"Processed {total_place_count} places with {total_image_count} images, {total_error_count} errors.")
+    sys.exit(0)
