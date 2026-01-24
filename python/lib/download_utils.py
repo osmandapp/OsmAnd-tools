@@ -181,7 +181,7 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
     url = _generate_image_url(file_name)
     headers = {"User-Agent": USER_AGENT}
 
-    for attempt in range(0, MAX_TRIES):
+    for attempt in range(1, MAX_TRIES + 1):
         proxy = None
         proxies = None
         if proxy_manager and not reuse_same_proxy:
@@ -198,6 +198,7 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
             response = requests.get(url, headers=headers, proxies=proxies, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT))
         except Exception as e:
             print(f"Retry exception {url} proxy {proxy}: {e} [{attempt}]")
+            time.sleep(attempt)
             status_code = 666
             continue
 
@@ -211,11 +212,15 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
             return True
         elif status_code == 429:
             reuse_same_proxy = True
-            time.sleep(attempt * (MAX_SLEEP / MAX_TRIES))
+            seconds = attempt * (MAX_SLEEP / MAX_TRIES)
+            print(f"Sleep {seconds} HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
+            time.sleep(seconds)
+            continue
         elif status_code == 404 or (500 <= status_code <= 599):
             break
 
         print(f"Retry HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
+        time.sleep(attempt)
         continue
 
     print(f"Failed to get {url}. Last status code: {status_code}")
