@@ -264,7 +264,7 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
         place_img_loaded = 0
         place_img_error = 0
         sub_start_time = time.time()
-        print(f"Places: {place_paths}", flush=True)
+        # print(f"Places: {place_paths}", flush=True)
         for img_path, mediaId, namespace, _ in place_paths:
             image_all_count += 1
             cached_file_path = _cached_path(img_path)
@@ -320,11 +320,12 @@ def process_chunk(proxy_manager=None):
         error_count, place_count, image_count = download_images_per_page(current_chunk, DOWNLOAD_IF_EXISTS, proxy_manager)
 
         with total_lock:
-            total_place_count += PLACES_PER_THREAD
+            total_place_count += place_count # PLACES_PER_THREAD is a wrong way
             total_image_count += image_count
             total_error_count += error_count
 
-            if (place_count <= 0 and image_count <= 0) or total_place_count >= PROCESS_PLACES:
+            # if (place_count <= 0 and image_count <= 0) or total_place_count >= PROCESS_PLACES: # wrong way
+            if total_place_count >= PROCESS_PLACES:
                 print(f"Thread stopped! Last chunk: {error_count} errors, {place_count} places, {image_count} images. "
                       f"Total: {total_place_count} places, {total_image_count} images.")
                 stopped = True
@@ -416,6 +417,10 @@ if __name__ == "__main__":
     if places_to_download < PLACES_PER_THREAD / PARALLEL:
         PLACES_PER_THREAD = max(1, places_to_download // PARALLEL)
         print(f"Warning. PLACES_PER_THREAD was cut down to {PLACES_PER_THREAD}")
+
+    if places_to_download < PROCESS_PLACES:
+        PROCESS_PLACES = places_to_download
+        print(f"Warning. PROCESS_PLACES was cut down to {PROCESS_PLACES}")
 
     initialize_download_cache()
 
