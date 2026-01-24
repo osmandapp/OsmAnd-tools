@@ -264,7 +264,7 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
         place_img_loaded = 0
         place_img_error = 0
         sub_start_time = time.time()
-        # print(f"Places: {place_paths}", flush=True)
+        print(f"Places: {place_paths}", flush=True)
         for img_path, mediaId, namespace, _ in place_paths:
             image_all_count += 1
             cached_file_path = _cached_path(img_path)
