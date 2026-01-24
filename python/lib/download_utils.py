@@ -235,8 +235,8 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
                 image_file.write(response.content)
             if attempt > 1:
                 print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
-            # else:
-            #     print("+") # debug
+            else:
+                print("+") # debug
             return True
         elif status_code == 429:
             reuse_same_proxy = True
@@ -324,7 +324,7 @@ def process_chunk(proxy_manager=None):
             total_image_count += image_count
             total_error_count += error_count
 
-            if place_count < 0 or image_count < 0 or total_place_count >= PROCESS_PLACES:
+            if (place_count <= 0 and image_count <= 0) or total_place_count >= PROCESS_PLACES:
                 print(f"Thread stopped! Last chunk: {error_count} errors, {place_count} places, {image_count} images. "
                       f"Total: {total_place_count} places, {total_image_count} images.")
                 stopped = True
