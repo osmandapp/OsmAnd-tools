@@ -46,6 +46,7 @@ PARALLEL = int(os.getenv('PARALLEL', '2'))
 monitoring_error_count = 0
 monitoring_success_count = 0
 monitoring_counter_lock = threading.Lock()
+clickhouse_slow_query_lock = threading.Lock()
 
 class ProxyManager:
     def __init__(self, proxy_file_path):
@@ -235,8 +236,8 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
                 image_file.write(response.content)
             if attempt > 1:
                 print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
-            else:
-                print("+") # debug
+            # else:
+            #     print("+") # debug
             return True
         elif status_code == 429:
             reuse_same_proxy = True
@@ -258,7 +259,11 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
 def download_images_per_page(page_no: int, override: bool = False, proxy_manager=None):
     global monitoring_error_count, monitoring_success_count
     start_time = time.time()
-    image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
+    with clickhouse_slow_query_lock:
+        t0 = time.perf_counter()
+        image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
+        print(f"get_images_per_page({page_no}, {PLACES_PER_THREAD}) ~ {(time.perf_counter() - t0) * 1000:.2f} ms")
+
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
     for place_id, place_paths in image_records:
         place_img_loaded = 0
