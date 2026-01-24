@@ -359,7 +359,6 @@ def file_name_image_format_lowercase(file_name):
 def count_images_to_download() -> tuple[int, int]:
     all_places = get_images_per_page(0, sys.maxsize)
     total_images = sum(len(paths) for _, paths in all_places)
-    print(f"Total {len(all_places)} places with {total_images} images to download")
     return len(all_places), total_images
 
 
@@ -413,6 +412,10 @@ if __name__ == "__main__":
         print(f"Warning. No proxies loaded. PARALLEL is limited to {PARALLEL}.")
 
     places_to_download, images_to_download = count_images_to_download()
+    print(f"Total {places_to_download} places with {images_to_download} images to download")
+
+    if images_to_download == 0:
+        sys.exit(0)
 
     if places_to_download < PLACES_PER_THREAD / PARALLEL:
         PLACES_PER_THREAD = max(1, places_to_download // PARALLEL)
