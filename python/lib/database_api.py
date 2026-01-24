@@ -9,7 +9,6 @@ logging.basicConfig(level=logging.INFO)
 from clickhouse_pool import ChPool
 
 # Maximum 4500 token - looks like 15 photos by 360px or by 720px
-PHOTOS_PER_PLACE = int(os.getenv('PHOTOS_PER_PLACE', '40'))
 CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'data.osmand.net')
 CLICKHOUSE_PORT = int(os.getenv('CLICKHOUSE_PORT', '9000'))
 CLICKHOUSE_PWD = os.getenv('CLICKHOUSE_PWD')
@@ -25,7 +24,6 @@ VALID_EXTENSIONS_LOWERCASE = set(ext.lower() for ext in os.getenv('VALID_EXTENSI
 QUAD_ALPHABET = os.getenv('QUAD_ALPHABET', "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~")
 MAX_EXECUTION_TIME = int(os.getenv('DB_TIMEOUT', '900'))
 POI_SUBTYPE = ",".join([f"'{w.strip()}'" if w else '' for w in os.getenv('POI_SUBTYPE', '').split(",")])
-ASTRO_IMAGES_ONLY = os.getenv("ASTRO_IMAGES_ONLY", "false") == "true"
 
 if not all([CLICKHOUSE_HOST, CLICKHOUSE_PWD]):
     raise ValueError("Missing required environment variables (CLICKHOUSE_HOST, CLICKHOUSE_PWD)")
@@ -383,49 +381,6 @@ def get_places_per_quad(quad: str, skip_table: str = None) -> List:
             LIMIT {min(PROCESS_PLACES, MAX_PLACES_PER_QUAD)}
     """
     return ch_query(query)
-
-
-# Used for Downloading
-def get_images_per_page(page_no: int, places_per_thread: int) -> List[Tuple[int, List[Tuple[str, int, int]]]]:
-    file_ext_conditions = " OR ".join(
-        f"endsWith(lower(imageTitle), '.{ext}')" for ext in VALID_EXTENSIONS_LOWERCASE
-    )
-
-    if ASTRO_IMAGES_ONLY:
-        id_select = f"""
-            SELECT id FROM wiki_coords WHERE poitype = 'starmap'
-                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
-        """
-    else:
-        id_select = f"""
-            SELECT w.id FROM wikidata w
-                LEFT JOIN elo_rating e ON e.id = w.id
-                ORDER BY e.elo DESC, w.id
-                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
-        """
-
-    query = f"""
-    SELECT id, groupArray({PHOTOS_PER_PLACE})((imageTitle, mediaId, namespace, score))
-    FROM (
-        SELECT DISTINCT id, imageTitle, mediaId, namespace, if(type = 'P18', 1000000, views) as score
-        FROM wikiimages
-        WHERE
-            id IN ({id_select})
-            AND namespace = 6
-            AND ({file_ext_conditions})
-            AND imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
-            AND mediaId NOT IN (SELECT mediaId FROM wiki_images_downloaded)
-        ORDER BY score DESC, imageTitle
-    )
-    GROUP BY id
-    ORDER BY rand()
-    """
-    with ch_client() as client:
-        result = ch_query(query, client)
-        images = []
-        for p in result:
-            images.append((p[0], p[1]))
-        return images
 
 
 def calculate_score(scores: list[float], coeffs: list[float], log_power: float) -> float:

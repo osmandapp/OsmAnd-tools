@@ -16,10 +16,12 @@ from typing import Optional
 
 import requests
 from PIL import Image
+from openai.types.beta.threads import ImageFile
 
 downloaded_files_cache: set = set()
 
-from .database_api import get_images_per_page, populate_cache_from_db, scan_and_populate_db, insert_downloaded_image, is_valid_image_file_name
+from .database_api import VALID_EXTENSIONS_LOWERCASE, is_valid_image_file_name, ch_client, ch_query
+from .database_api import populate_cache_from_db, scan_and_populate_db, insert_downloaded_image
 
 USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndPython/1.0"
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
@@ -42,6 +44,9 @@ PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
 ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '5'))
 MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '600'))
 PARALLEL = int(os.getenv('PARALLEL', '2'))
+
+PHOTOS_PER_PLACE = int(os.getenv('PHOTOS_PER_PLACE', '40'))
+ASTRO_IMAGES_ONLY = os.getenv("ASTRO_IMAGES_ONLY", "false") == "true"
 
 monitoring_error_count = 0
 monitoring_success_count = 0
@@ -96,13 +101,15 @@ class ProxyManager:
             return random.choice(self.proxies) if self.proxies else None
 
 
-def _cached_path(file_name):
+def _cached_path(file_name: str, create_directory: bool = False):
     filename_encoded = file_name.replace(' ', '_')
     hash_md5 = hashlib.md5(filename_encoded.encode()).hexdigest()
     hash_prefix = f"{hash_md5[0]}/{hash_md5[0:2]}"
     file_path = os.path.join(cache_folder, hash_prefix, file_name)
 
-    Path(cache_folder, hash_prefix).mkdir(parents=True, exist_ok=True)
+    if create_directory:
+        Path(cache_folder, hash_prefix).mkdir(parents=True, exist_ok=True)
+
     return file_path
 
 
@@ -156,7 +163,7 @@ def download_image_as_base64(file_name):
     return base64_encoded
 
 
-def resize_image(image: Image):
+def resize_image(image: ImageFile):
     width, height = image.size
     if width > MAX_IMG_DIMENSION or height > MAX_IMG_DIMENSION:
         if width > height:
@@ -195,7 +202,7 @@ def download_pil_image(file_name):
 def download_image(file_name, override: bool = False, proxy_manager=None):
     start_time = time.time()
 
-    file_path = _cached_path(file_name)
+    file_path = _cached_path(file_name, True)
     if not override and os.path.exists(file_path):
         return True
 
@@ -259,10 +266,11 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
 def download_images_per_page(page_no: int, override: bool = False, proxy_manager=None):
     global monitoring_error_count, monitoring_success_count
     start_time = time.time()
+
+    t0 = time.perf_counter()
     with clickhouse_slow_query_lock:
-        t0 = time.perf_counter()
         image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
-        print(f"get_images_per_page({page_no}, {PLACES_PER_THREAD}) ~ {(time.perf_counter() - t0) * 1000:.2f} ms")
+    print(f"get_images_per_page({page_no}, {PLACES_PER_THREAD}) ~ {(time.perf_counter() - t0) * 1000:.2f} ms")
 
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
     for place_id, place_paths in image_records:
@@ -272,7 +280,7 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
         # print(f"Places: {place_paths}", flush=True)
         for img_path, mediaId, namespace, _ in place_paths:
             image_all_count += 1
-            cached_file_path = _cached_path(img_path)
+            cached_file_path = _cached_path(img_path, False) # TODO might be removed
             # Directly check the set (no os.path.exists here)
             if not override and img_path in downloaded_files_cache:
                 continue  # Skip if found in the pre-scanned set
@@ -360,6 +368,46 @@ def file_name_image_format_lowercase(file_name):
         return 'jpeg'
     return file_ext
 
+
+def get_images_per_page(page_no: int, places_per_thread: int) -> list[tuple[int, list[tuple[str, int, int]]]]:
+    file_ext_conditions = " OR ".join(
+        f"endsWith(lower(imageTitle), '.{ext}')" for ext in VALID_EXTENSIONS_LOWERCASE
+    )
+
+    if ASTRO_IMAGES_ONLY:
+        id_select = f"""
+            SELECT id FROM wiki_coords WHERE poitype = 'starmap'
+                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
+        """
+    else:
+        id_select = f"""
+            SELECT w.id FROM wikidata w
+                LEFT JOIN elo_rating e ON e.id = w.id
+                ORDER BY e.elo DESC, w.id
+                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
+        """
+
+    query = f"""
+        SELECT id, groupArray({PHOTOS_PER_PLACE})((imageTitle, mediaId, namespace, score))
+        FROM (
+            SELECT DISTINCT id, imageTitle, mediaId, namespace, if(type = 'P18', 1000000, views) as score
+            FROM wikiimages
+            WHERE
+                id IN ({id_select})
+                AND namespace = 6
+                AND ({file_ext_conditions})
+                AND imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
+            ORDER BY score DESC, imageTitle
+        )
+        GROUP BY id
+        ORDER BY rand()
+    """
+    with ch_client() as client:
+        result = ch_query(query, client)
+        images = []
+        for p in result:
+            images.append((p[0], p[1]))
+        return images
 
 def count_images_to_download() -> tuple[int, int]:
     all_places = get_images_per_page(0, sys.maxsize)
