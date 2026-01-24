@@ -26,12 +26,11 @@ cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
 
 OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
 ERROR_LIMIT = int(os.getenv('ERROR_LIMIT', '20'))
-ERROR_LIMIT_PROXY = int(os.getenv('ERROR_LIMIT_PROXY', '1000'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
 USE_PROXY_FILE = os.getenv('USE_PROXY_FILE', '../top-photos/proxy-test.list')
 PARALLEL = int(os.getenv('PARALLEL', '10'))
-CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '100'))
+PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '100'))
 
 
 class ProxyManager:
@@ -193,7 +192,7 @@ def download_image(file_name, override: bool = False, proxy=None):
 
 def download_images_per_page(page_no: int, override: bool = False, proxy=None):
     start_time = time.time()
-    image_records = get_images_per_page(page_no)
+    image_records = get_images_per_page(page_no, PLACES_PER_THREAD)
     error_count, place_count, image_count, image_all_count = 0, 0, 0, 0
     for place_id, place_paths in image_records:
         place_img_loaded = 0
@@ -257,7 +256,7 @@ def process_chunk(proxy_manager=None):
 
         error_count, place_count, image_count = download_images_per_page(current_chunk, DOWNLOAD_IF_EXISTS, proxy)
         with total_lock:
-            total_place_count += CHUNK_SIZE
+            total_place_count += PLACES_PER_THREAD
             total_image_count += image_count
             total_error_count += error_count
 
@@ -294,6 +293,8 @@ def file_name_image_format_lowercase(file_name):
 
 
 if __name__ == "__main__":
+
+
     proxy_manager = None
     initialize_download_cache()
     if USE_PROXY_FILE and os.path.exists(USE_PROXY_FILE):

@@ -14,7 +14,6 @@ CLICKHOUSE_HOST = os.getenv('CLICKHOUSE_HOST', 'data.osmand.net')
 CLICKHOUSE_PORT = int(os.getenv('CLICKHOUSE_PORT', '9000'))
 CLICKHOUSE_PWD = os.getenv('CLICKHOUSE_PWD')
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '999999'))  # Default 1000
-CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '100'))
 MAX_PLACES_PER_QUAD = int(os.getenv('MAX_PLACES_PER_QUAD', '999999'))
 # Weights for scores
 SCORING_WEIGHTS = [float(w) for w in os.getenv('SCORING_WEIGHTS', '0.20, 0.20, 0.30, 0.30').split(",")]
@@ -387,7 +386,7 @@ def get_places_per_quad(quad: str, skip_table: str = None) -> List:
 
 
 # Used for Downloading
-def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, int]]]]:
+def get_images_per_page(page_no: int, places_per_thread: int) -> List[Tuple[int, List[Tuple[str, int, int]]]]:
     file_ext_conditions = " OR ".join(
         f"endsWith(lower(imageTitle), '.{ext}')" for ext in VALID_EXTENSIONS_LOWERCASE
     )
@@ -395,14 +394,14 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
     if ASTRO_IMAGES_ONLY:
         id_select = f"""
             SELECT id FROM wiki_coords WHERE poitype = 'starmap'
-                LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE}
+                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
         """
     else:
         id_select = f"""
             SELECT w.id FROM wikidata w
                 LEFT JOIN elo_rating e ON e.id = w.id
                 ORDER BY e.elo DESC, w.id
-                LIMIT {CHUNK_SIZE} OFFSET {page_no * CHUNK_SIZE}
+                LIMIT {places_per_thread} OFFSET {page_no * places_per_thread}
         """
 
     query = f"""
@@ -411,13 +410,15 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
         SELECT DISTINCT id, imageTitle, mediaId, namespace, if(type = 'P18', 1000000, views) as score
         FROM wikiimages
         WHERE
-            id in ({id_select})
+            id IN ({id_select})
             AND namespace = 6
             AND ({file_ext_conditions})
             AND imageTitle NOT IN (SELECT imageTitle FROM blocked_images)
             AND mediaId NOT IN (SELECT mediaId FROM wiki_images_downloaded)
-        ORDER BY score DESC, imageTitle)
+        ORDER BY score DESC, imageTitle
+    )
     GROUP BY id
+    ORDER BY rand()
     """
     with ch_client() as client:
         result = ch_query(query, client)
@@ -425,9 +426,6 @@ def get_images_per_page(page_no: int) -> List[Tuple[int, List[Tuple[str, int, in
         for p in result:
             images.append((p[0], p[1]))
         return images
-
-
-backslash_quote = "\\" + "'"
 
 
 def calculate_score(scores: list[float], coeffs: list[float], log_power: float) -> float:
