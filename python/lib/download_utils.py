@@ -8,6 +8,7 @@ import threading
 import time
 import random
 from concurrent.futures import ThreadPoolExecutor
+from urllib.request import Request, urlopen
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,7 @@ from .database_api import get_images_per_page, populate_cache_from_db, scan_and_
 
 USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndPython/1.0"
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
+PROXY_FILE_URL = os.getenv('PROXY_FILE_URL', None)
 MAX_TRIES = int(os.getenv('MAX_TRIES', '10'))
 MAX_SLEEP = int(os.getenv('MAX_SLEEP', '60'))
 CONNECT_TIMEOUT = 10
@@ -36,28 +38,42 @@ OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
 ERROR_LIMIT = int(os.getenv('ERROR_LIMIT', '20'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
-USE_PROXY_FILE = os.getenv('USE_PROXY_FILE', '../top-photos/proxy-test.list')
-PARALLEL = int(os.getenv('PARALLEL', '10'))
-PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '100'))
+PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
+PARALLEL = int(os.getenv('PARALLEL', '2'))
 
 
 class ProxyManager:
     def __init__(self, proxy_file_path):
         self.proxies = []
-        self.error_counts = {}
         self.lock = threading.Lock()
         self.load_proxies(proxy_file_path)
 
-    def load_proxies(self, file_path):
+    def load_proxies(self, proxy_file_url: str):
+        proxies: list[str] = []
+
         try:
-            with open(file_path, 'r') as f:
-                proxies = [line.strip() for line in f if line.strip()]
+            if proxy_file_url.startswith(("http://", "https://")):
+                req = Request(proxy_file_url, headers={"User-Agent": "ProxyManager/1.0"})
+                with urlopen(req, timeout=30) as resp:
+                    text = resp.read().decode("utf-8", errors="replace")
+                proxies = [l.strip() for l in text.splitlines() if l.strip()]
+            else:
+                with open(proxy_file_url, "r", encoding="utf-8", errors="replace") as f:
+                    proxies = [l.strip() for l in f if l.strip()]
+
             with self.lock:
-                self.proxies = proxies.copy()
-                self.error_counts = {proxy: 0 for proxy in proxies}
+                self.proxies = proxies
+
+            print(f"Loaded {len(proxies)} proxies from {proxy_file_url}")
+
         except FileNotFoundError:
-            print(f"Proxy file {file_path} not found. Proceeding without proxies.")
-            self.proxies = []
+            print(f"Proxy file {proxy_file_url} not found.")
+            with self.lock:
+                self.proxies = []
+        except Exception as e:
+            print(f"Failed to load proxies from {proxy_file_url}: {e}.")
+            with self.lock:
+                self.proxies = []
 
     def get_rotated_proxy(self):
         with self.lock:
@@ -339,18 +355,22 @@ def count_images_to_download() -> tuple[int, int]:
 if __name__ == "__main__":
     sys.stdout.reconfigure(line_buffering=True)
 
+    proxy_manager = None
+    if PROXY_FILE_URL:
+        proxy_manager = ProxyManager(PROXY_FILE_URL)
+
+    if not proxy_manager or not proxy_manager.get_random_proxy():
+        proxy_manager = None
+        PARALLEL = max(2, PARALLEL)
+        print(f"Warning. No proxies loaded. PARALLEL is set to {PARALLEL}.")
+
     places_to_download, _ = count_images_to_download()
 
     if places_to_download < PLACES_PER_THREAD / PARALLEL:
         PLACES_PER_THREAD = max(1, places_to_download // PARALLEL)
-        print(f"Warning! PLACES_PER_THREAD cut down to {PLACES_PER_THREAD}")
+        print(f"Warning. PLACES_PER_THREAD was cut down to {PLACES_PER_THREAD}")
 
-    proxy_manager = None
     initialize_download_cache()
-    if USE_PROXY_FILE and os.path.exists(USE_PROXY_FILE):
-        proxy_manager = ProxyManager(USE_PROXY_FILE)
-    else:
-        print("No proxy file used. Proceeding without proxies.", flush=True)
 
     chunk_i = OFFSET_BATCH
     total_time = time.time()
