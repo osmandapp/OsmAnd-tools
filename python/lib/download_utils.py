@@ -408,7 +408,7 @@ if __name__ == "__main__":
 
     if not proxy_manager or not proxy_manager.get_random_proxy():
         proxy_manager = None
-        PARALLEL = max(2, PARALLEL)
+        PARALLEL = min(2, PARALLEL)
         print(f"Warning. No proxies loaded. PARALLEL is limited to {PARALLEL}.")
 
     places_to_download, images_to_download = count_images_to_download()
