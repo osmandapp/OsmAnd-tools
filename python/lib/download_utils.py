@@ -2,6 +2,7 @@ import base64
 import datetime
 import hashlib
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -292,8 +293,17 @@ def file_name_image_format_lowercase(file_name):
     return file_ext
 
 
-if __name__ == "__main__":
+def count_images_to_download() -> None:
+    all_places = get_images_per_page(0, sys.maxsize)
+    total_images = sum(len(paths) for _, paths in all_places)
+    print(f"Total {len(all_places)} places with {total_images} images to download")
 
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(line_buffering=True)
+
+    count_images_to_download()
+    sys.exit(1)
 
     proxy_manager = None
     initialize_download_cache()
