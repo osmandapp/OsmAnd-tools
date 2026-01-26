@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
 public class GpxService {
@@ -55,13 +56,9 @@ public class GpxService {
     @Value("${osmand.srtm.location}")
     String srtmLocation;
 
-    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, boolean createAnalysis,
-                                                            GpxTrackAnalysis existingAnalysis) throws IOException {
+    public WebGpxParser.TrackData buildTrackDataFromGpxFile(GpxFile gpxFile, GpxTrackAnalysis existingAnalysis) throws IOException {
+        GpxTrackAnalysis analysis = existingAnalysis != null ? existingAnalysis : getAnalysis(gpxFile, false);
 
-        GpxFile gpxFileForAnalyse = null;
-        if (createAnalysis) {
-            gpxFileForAnalyse = gpxFile.clone();
-        }
         WebGpxParser.TrackData gpxData = new WebGpxParser.TrackData();
         
         gpxData.metaData = (new WebGpxParser.WebMetaData(gpxFile.getMetadata()));
@@ -73,21 +70,21 @@ public class GpxService {
 
         Map<String, String> extensions = gpxFile.getExtensions();
         gpxData.ext = (extensions);
-        gpxData.trackAppearance = (new WebGpxParser.WebTrackAppearance(extensions));
+        if (!gpxFile.getTracks().isEmpty()) {
+            gpxData.trackAppearance = (new WebGpxParser.WebTrackAppearance(extensions));
+        }
 
         if (!gpxFile.getRoutes().isEmpty()) {
             webGpxParser.addRoutePoints(gpxFile, gpxData);
         }
-        addAnalysis(gpxData, gpxFileForAnalyse, existingAnalysis);
         gpxData.pointsGroups = (webGpxParser.getPointsGroups(gpxFile));
+
+        addAnalysisToTrackData(gpxData, analysis);
 
         return gpxData;
     }
 
-    private void addAnalysis(WebGpxParser.TrackData gpxData, GpxFile gpxFileForAnalysis, GpxTrackAnalysis gpxAnalysis) throws IOException {
-        if (gpxAnalysis == null && gpxFileForAnalysis != null) {
-            gpxAnalysis = getAnalysis(gpxFileForAnalysis, false);
-        }
+    private void addAnalysisToTrackData(WebGpxParser.TrackData gpxData, GpxTrackAnalysis gpxAnalysis) {
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
             if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
@@ -133,11 +130,11 @@ public class GpxService {
     private GpxTrackAnalysis getAnalysis(GpxFile gpxFile, boolean isSrtm) throws IOException {
        GpxTrackAnalysis analysis = null;
         if (!isSrtm) {
-            analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+            analysis = gpxFile.getAnalysis(0);
         } else {
             GpxFile srtmGpx = calculateSrtmAltitude(gpxFile, null);
             if (srtmGpx != null && srtmGpx.getError() == null) {
-                analysis = srtmGpx.getAnalysis(System.currentTimeMillis());
+                analysis = srtmGpx.getAnalysis(0);
             }
         }
         if (analysis != null) {
@@ -303,7 +300,7 @@ public class GpxService {
     }
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
-        File tmpFile = File.createTempFile("gpx_" + httpSessionId, GPX_FILE_EXT);
+        File tmpFile = File.createTempFile(GPX_FILE_PREFIX + httpSessionId, GPX_FILE_EXT);
         InputStream is = file.getInputStream();
         FileOutputStream fous = new FileOutputStream(tmpFile);
         Algorithms.streamCopy(is, fous);
@@ -314,7 +311,7 @@ public class GpxService {
     
     public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
         String sanitizedPrefix = fileName.replace("/../", "/");
-        File tmpGpx = File.createTempFile(sanitizedPrefix, GPX_FILE_EXT);
+        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + sanitizedPrefix, GPX_FILE_EXT);
         Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);

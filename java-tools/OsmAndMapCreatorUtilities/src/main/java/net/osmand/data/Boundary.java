@@ -1,5 +1,7 @@
 package net.osmand.data;
 
+import java.util.Map;
+
 import net.osmand.data.City.CityType;
 
 public class Boundary {
@@ -14,9 +16,19 @@ public class Boundary {
 	private long adminCenterId;
 	private CityType cityType;
 	private Multipolygon multipolygon;
+	private Map<String, String> nameTags;
+	
 
 	public Boundary(MultipolygonBuilder m) {
 		multipolygon = m.build();
+	}
+	
+	public void setNames(Map<String, String> nameTags) {
+		this.nameTags = nameTags;
+	}
+	
+	public Map<String, String> getNameTags() {
+		return nameTags;
 	}
 
 	public boolean containsPoint(double latitude, double longitude) {
@@ -117,5 +129,6 @@ public class Boundary {
 	public Multipolygon getMultipolygon() {
 		return multipolygon;
 	}
+
 
 }

@@ -1,6 +1,7 @@
 package net.osmand.wiki;
 
 import net.osmand.PlatformUtil;
+import net.osmand.util.Algorithms;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.logging.Log;
 
@@ -53,7 +54,7 @@ public abstract class AbstractWikiFilesDownloader {
 				updateFileList = readFilesUrl(getWikiLatestDirURL());
 			}
 			downloadPageFiles(destFolder, updateFileList, dh);
-			if (daily) {
+			if (!Algorithms.isEmpty(updateFileList)) {
 				writeTimestampFile(destFolder);
 			}
 			log.info("Finish %s download".formatted(getFilePrefix()));
