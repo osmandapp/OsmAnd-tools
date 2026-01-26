@@ -357,6 +357,10 @@ public class OsmAndMapsService {
 	}
 
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
+		return getReaders(refs, incompleteFlag, false);
+	}
+
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag, boolean useGeocoding) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
 			BinaryMapIndexReader reader = null;
@@ -366,7 +370,9 @@ public class OsmAndMapsService {
 				LOGGER.error(e.getMessage(), e);
 			}
 			if (reader != null) {
-				res.add(reader);
+				if (!useGeocoding || (reader.containsAddressData() && reader.containsRouteData())) {
+					res.add(reader);
+				}
 			} else if (incompleteFlag != null) {
 				incompleteFlag[0] = true;
 			}
@@ -647,7 +653,7 @@ public class OsmAndMapsService {
 			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
 			list = list.stream().filter(ref -> !ref.file.getName().contains("seamarks")).toList();
 			boolean[] incomplete = new boolean[1];
-			usedMapList = getReaders(list, incomplete);
+			usedMapList = getReaders(list, incomplete, true);
 			if (incomplete[0]) {
 				return Collections.emptyList();
 			}
