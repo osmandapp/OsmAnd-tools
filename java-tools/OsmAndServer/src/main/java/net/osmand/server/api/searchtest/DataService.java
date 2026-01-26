@@ -715,7 +715,7 @@ public interface DataService extends BaseService {
 					new String[] {jsonFile.getAbsolutePath()});
 
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
-			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lat()));
+			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
 			JSONObject settingsJson = settings.toJSON();
 			Map<String, Object> rootJson = new LinkedHashMap<>();
 			rootJson.put("settings", settingsJson);
