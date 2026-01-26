@@ -645,6 +645,7 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
 			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
+			list = list.stream().filter(ref -> !ref.file.getName().contains("seamarks")).toList();
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
