@@ -281,8 +281,9 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
         for img_path, mediaId, namespace, _ in place_paths:
             image_all_count += 1
             # Directly check the set (no os.path.exists here)
-            if not override and img_path in downloaded_files_cache:
-                continue  # Skip if found in the pre-scanned set
+            with downloaded_files_cache_lock:
+                if not override and img_path in downloaded_files_cache:
+                    continue  # Skip if found in the pre-scanned set
 
             success = download_image(img_path, override, proxy_manager)
             if not success:
@@ -325,7 +326,6 @@ def process_chunk(proxy_manager=None):
     global chunk_i, total_place_count, total_image_count, total_error_count, total_time  # Declare globals
     error_count, place_count, image_count = 0, 0, 0
     stopped = False
-    # while not stop_event.is_set():
     while not stopped:
         with chunk_lock:
             current_chunk = chunk_i
@@ -334,16 +334,14 @@ def process_chunk(proxy_manager=None):
         error_count, place_count, image_count = download_images_per_page(current_chunk, DOWNLOAD_IF_EXISTS, proxy_manager)
 
         with total_lock:
-            total_place_count += place_count # PLACES_PER_THREAD is a wrong way
+            total_place_count += place_count
             total_image_count += image_count
             total_error_count += error_count
 
-            # if (place_count <= 0 and image_count <= 0) or total_place_count >= PROCESS_PLACES: # wrong way
             if total_place_count >= PROCESS_PLACES:
                 print(f"Thread stopped! Last chunk: {error_count} errors, {place_count} places, {image_count} images. "
                       f"Total: {total_place_count} places, {total_image_count} images.")
                 stopped = True
-                # stop_event.set()
     return error_count, place_count, image_count
 
 
@@ -423,21 +421,25 @@ def count_images_to_download() -> tuple[int, int]:
 
 def monitoring_thread() -> None:
     while True:
-        errors_before = monitoring_error_count
-        success_before = monitoring_success_count
+        with monitoring_counter_lock:
+            errors_before = monitoring_error_count
+            success_before = monitoring_success_count
 
         for i in range(MONITORING_INTERVAL):
-            if monitoring_error_count + monitoring_success_count >= images_to_download:
-                print("Monitoring finished")
-                return
+            with monitoring_counter_lock:
+                if monitoring_error_count + monitoring_success_count >= images_to_download:
+                    print("Monitoring finished")
+                    return
             time.sleep(1)
 
-        errors = monitoring_error_count - errors_before
-        success = monitoring_success_count - success_before
+        with monitoring_counter_lock:
+            errors = monitoring_error_count - errors_before
+            success = monitoring_success_count - success_before
+            monitoring_total_count = monitoring_error_count + monitoring_success_count
 
         now = datetime.datetime.now().replace(microsecond=0)
         if success > 0 or errors > 0:
-            images_left = images_to_download - (monitoring_error_count + monitoring_success_count)
+            images_left = max(0, images_to_download - monitoring_total_count)
             eta_seconds = int(images_left / ((success + errors) / MONITORING_INTERVAL))
             success_per_day = int(success * 86400 / MONITORING_INTERVAL)
             print("\n"
@@ -449,13 +451,14 @@ def monitoring_thread() -> None:
         else:
             print(f"{now} nothing happened")
 
-        if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
-            current_errors_percent = int(errors / (errors + success) * 100)
-            if current_errors_percent > ERROR_LIMIT_PERCENT:
-                print(f"Monitoring thread terminates downloading")
-                print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
-                print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
-                os.kill(os.getpid(), signal.SIGTERM)
+        with monitoring_counter_lock:
+            if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
+                current_errors_percent = int(errors / (errors + success) * 100)
+                if current_errors_percent > ERROR_LIMIT_PERCENT:
+                    print(f"Monitoring thread terminates downloading")
+                    print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
+                    print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
+                    os.kill(os.getpid(), signal.SIGTERM)
 
 
 if __name__ == "__main__":
@@ -476,7 +479,7 @@ if __name__ == "__main__":
     places_to_download, images_to_download = count_images_to_download()
     print(f"Total {places_to_download} places with {images_to_download} images to download")
 
-    if images_to_download == 0:
+    if places_to_download == 0 or images_to_download == 0:
         sys.exit(0)
 
     if places_to_download < PLACES_PER_THREAD / PARALLEL:
@@ -494,7 +497,6 @@ if __name__ == "__main__":
     total_image_count = 0
     total_error_count = 0
     total_lock = threading.Lock()
-    stop_event = threading.Event()
 
     print(f"Number of workers: {PARALLEL}", flush=True)
     threading.Thread(target=monitoring_thread, daemon=True).start()
