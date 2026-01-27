@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.Writer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -34,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -67,6 +70,7 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -790,8 +794,15 @@ public class MapRouterLayer implements MapPanelLayer {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
-					map.setPoints(points);
-					map.fillPopupActions();
+					final List<RouteSegmentResult> routeSegmentsToExport = previousRoute;
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							map.setPoints(points);
+							map.fillPopupActions();
+							exportScreenshotAndRouteJson(routeSegmentsToExport);
+						}
+					});
 				}
 
 				if (selectedGPXFile != null) {
@@ -833,14 +844,147 @@ public class MapRouterLayer implements MapPanelLayer {
 						LatLon n = w.getLatLon();
 						points.registerObject(n.getLatitude(), n.getLongitude(), w);
 					}
-					map.setPoints(points);
-					map.fillPopupActions();
+					final List<RouteSegmentResult> routeSegmentsToExport = previousRoute;
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							map.setPoints(points);
+							map.fillPopupActions();
+							exportScreenshotAndRouteJson(routeSegmentsToExport);
+						}
+					});
 				}
 			}
 
 		}.start();
 	}
 
+	private void exportScreenshotAndRouteJson(List<RouteSegmentResult> routeSegments) {
+		if (routeSegments == null || routeSegments.isEmpty()) {
+			return;
+		}
+		File[] savedPng = new File[1];
+		Runnable captureScreenshotRunnable = new Runnable() {
+			@Override
+			public void run() {
+				try {
+					map.prepareImage();
+					map.paintImmediately(0, 0, map.getWidth(), map.getHeight());
+					savedPng[0] = map.saveScreenshotToEnvDir();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+		try {
+			if (SwingUtilities.isEventDispatchThread()) {
+				captureScreenshotRunnable.run();
+			} else {
+				SwingUtilities.invokeAndWait(captureScreenshotRunnable);
+			}
+		} catch (InvocationTargetException e) {
+			Throwable cause = e.getCause();
+			ExceptionHandler.handle(cause == null ? e : cause);
+			return;
+		} catch (InterruptedException e) {
+			ExceptionHandler.handle(e);
+			return;
+		} catch (RuntimeException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof IOException) {
+				ExceptionHandler.handle("Failed to save screenshot", cause);
+			} else {
+				ExceptionHandler.handle("Failed to save screenshot", e);
+			}
+			return;
+		}
+		if (savedPng[0] == null) {
+			return;
+		}
+
+		String pngName = savedPng[0].getName();
+		String jsonName = pngName.endsWith(".png") ? pngName.substring(0, pngName.length() - 4) + ".json" : pngName + ".json";
+		File jsonFile = new File(savedPng[0].getParentFile(), jsonName);
+
+		try (Writer writer = Files.newBufferedWriter(jsonFile.toPath(), StandardCharsets.UTF_8)) {
+			Gson gson = new GsonBuilder().setPrettyPrinting().create();
+			JsonObject root = new JsonObject();
+			if (startRoute != null) {
+				JsonObject startPoint = new JsonObject();
+				startPoint.addProperty("lat", startRoute.getLatitude());
+				startPoint.addProperty("lon", startRoute.getLongitude());
+				root.add("start_point", startPoint);
+			}
+			if (endRoute != null) {
+				JsonObject endPoint = new JsonObject();
+				endPoint.addProperty("lat", endRoute.getLatitude());
+				endPoint.addProperty("lon", endRoute.getLongitude());
+				root.add("end_point", endPoint);
+			}
+
+			JsonArray segments = new JsonArray();
+			int indVisual = 0;
+			int prevSegment = -1;
+			double dist = 0;
+			for (int i = 0; i <= routeSegments.size(); i++) {
+				if (i == routeSegments.size() || routeSegments.get(i).getTurnType() != null) {
+					if (prevSegment >= 0) {
+						RouteSegmentResult segment = routeSegments.get(prevSegment);
+						TurnType tt = segment.getTurnType();
+						if (tt != null) {
+							JsonObject seg = new JsonObject();
+							seg.addProperty("point", ++indVisual);
+							seg.addProperty("turn_type", tt.toXmlString());
+							if (tt.getLanes() != null) {
+								seg.addProperty("lanes_encoded", TurnType.lanesToString(tt.getLanes()));
+								seg.add("lanes", gson.toJsonTree(buildLaneGuidanceJson(tt)));
+								String approachTurnLanesTag = RouteResultPreparation.getTurnLanesString(segment);
+								if (approachTurnLanesTag != null) {
+									seg.addProperty("turn_lanes_tag", approachTurnLanesTag);
+								}
+							}
+							seg.addProperty("distance_to_next_point_m", Math.round(dist * 100.0) / 100.0);
+
+							segments.add(seg);
+						}
+					}
+					prevSegment = i;
+					dist = 0;
+				}
+				if (i < routeSegments.size()) {
+					dist += routeSegments.get(i).getDistance();
+				}
+			}
+			root.add("segments", segments);
+
+			gson.toJson(root, writer);
+		} catch (IOException e) {
+			ExceptionHandler.handle("Failed to write route json: " + jsonFile.getAbsolutePath(), e);
+		}
+	}
+
+	private static List<Map<String, Object>> buildLaneGuidanceJson(TurnType turnType) {
+		int[] lanes = turnType == null ? null : turnType.getLanes();
+		int activeCommonLaneTurn = turnType == null ? -1 : turnType.getActiveCommonLaneTurn();
+		List<Map<String, Object>> lanesJson = new ArrayList<>();
+		if (lanes != null) {
+			for (int laneValue : lanes) {
+				Map<String, Object> laneJson = new LinkedHashMap<>();
+				int primary = TurnType.getPrimaryTurn(laneValue);
+				if (primary == 0) {
+					primary = TurnType.C;
+				}
+				laneJson.put("active", activeCommonLaneTurn != -1 && primary == activeCommonLaneTurn);
+				laneJson.put("primary", TurnType.valueOf(primary, false).toXmlString());
+				int secondary = TurnType.getSecondaryTurn(laneValue);
+				laneJson.put("secondary", secondary == 0 ? "" : TurnType.valueOf(secondary, false).toXmlString());
+				int tertiary = TurnType.getTertiaryTurn(laneValue);
+				laneJson.put("tertiary", tertiary == 0 ? "" : TurnType.valueOf(tertiary, false).toXmlString());
+				lanesJson.add(laneJson);
+			}
+		}
+		return lanesJson;
+	}
 
 	private static Reader getUTF8Reader(InputStream f) throws IOException {
 		BufferedInputStream bis = new BufferedInputStream(f);
@@ -1260,17 +1404,12 @@ public class MapRouterLayer implements MapPanelLayer {
 			TurnType tt = segm.getTurnType();
 			String name = "";
 			if (tt != null) {
-				name = (++indVisual) + ". " + tt.toXmlString() + (tt.isSkipToSpeak() ? "*" : "");
-				if (tt.getLanes() != null) {
-					name += " [" + TurnType.lanesToString(tt.getLanes()) + "]";
-				}
+				name = (++indVisual) + ". ";
 			}
-//			String name = segm.getDescription(false);
-//			if(segm.getTurnType() != null) {
-//				name += " (TA " + segm.getTurnType().getTurnAngle() + ") ";
-//			}
-//					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
+
 			way.putTag(OSMTagKey.NAME.getValue(), name);
+			way.putTag("colour", "blue");
+
 			if (prevSegm != null
 					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
 				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);
