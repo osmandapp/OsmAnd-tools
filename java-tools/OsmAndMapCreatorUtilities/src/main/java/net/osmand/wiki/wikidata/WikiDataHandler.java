@@ -43,6 +43,8 @@ import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 public class WikiDataHandler extends DefaultHandler {
 
 	private static final Log log = PlatformUtil.getLog(WikiDataHandler.class);
+	public static final String LEXEME_PREFIX = "Lexeme:";
+	public static final String PROPERTY_PREFIX = "Property:";
 
 	private final SAXParser saxParser;
 	private boolean page = false;
@@ -60,10 +62,6 @@ public class WikiDataHandler extends DefaultHandler {
 	private PreparedStatement wikiRegionPrep;
 	private PreparedStatement wikidataPropPrep;
 	private PreparedStatement wikidataBlobPrep;
-	private final PreparedStatement deleteWikidataPropPrep;
-	private final PreparedStatement deleteMappingPrep;
-	private final PreparedStatement deleteWikiRegionPrep;
-	private final PreparedStatement deleteWikidataBlobPrep;
 	private int[] mappingBatch = new int[]{0};
 	private int[] coordsBatch = new int[]{0};
 	private int[] regionBatch = new int[]{0};
@@ -85,7 +83,6 @@ public class WikiDataHandler extends DefaultHandler {
 	OsmCoordinatesByTag osmWikiCoordinates;
 	
 	private long lastProcessedId;
-	private final boolean update;
 	
 	private long limit = -1;
 
@@ -93,21 +90,23 @@ public class WikiDataHandler extends DefaultHandler {
 
 
 	public WikiDataHandler(SAXParser saxParser, FileProgressImplementation progress, File wikidataSqlite,
-						   OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId, boolean update)
+						   OsmCoordinatesByTag osmWikiCoordinates, OsmandRegions regions, long lastProcessedId)
 			throws SQLException {
 		this.saxParser = saxParser;
 		this.osmWikiCoordinates = osmWikiCoordinates;
 		this.regions = regions;
 		this.progress = progress;
 		this.lastProcessedId = lastProcessedId;
-		this.update = update;
 		DBDialect dialect = DBDialect.SQLITE;
 		conn = dialect.getDatabaseConnection(wikidataSqlite.getAbsolutePath(), log);
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint PRIMARY KEY, originalId text, lat double, lon double, wlat double, wlon double,  "
-				+ " osmtype int, osmid bigint, poitype text, poisubtype text, labelsJson text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_coords(id bigint PRIMARY KEY, originalId text," +
+				" lat double, lon double, wlat double, wlon double, osmtype int, osmid bigint, poitype text," +
+				" poisubtype text, labelsJson text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text," +
+				" UNIQUE(id, lang))");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text, value text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text," +
+				" value text, UNIQUE(id, type))");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_blobs(id bigint PRIMARY KEY, page blob)");
 		coordsPrep = conn.prepareStatement("""
 				INSERT INTO wiki_coords(id, originalId, lat, lon, wlat, wlon, osmtype, osmid, poitype, poisubtype, labelsJson)
@@ -124,14 +123,22 @@ public class WikiDataHandler extends DefaultHandler {
 				poisubtype = excluded.poisubtype,
 				labelsJson = excluded.labelsJson;
 				""");
-		mappingPrep = conn.prepareStatement("INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)");
+		mappingPrep = conn.prepareStatement("""
+				INSERT INTO wiki_mapping(id, lang, title) VALUES (?, ?, ?)
+				ON CONFLICT(id, lang) DO UPDATE SET
+				title = excluded.title;
+				""");
 		wikiRegionPrep = conn.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
-		wikidataPropPrep = conn.prepareStatement("INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)");
-		wikidataBlobPrep = conn.prepareStatement("INSERT INTO wikidata_blobs(id, page) VALUES(?, ?)");
-		deleteWikiRegionPrep = conn.prepareStatement("DELETE FROM wiki_region WHERE id = ?");
-		deleteMappingPrep = conn.prepareStatement("DELETE FROM wiki_mapping WHERE id = ?");
-		deleteWikidataPropPrep = conn.prepareStatement("DELETE FROM wikidata_properties WHERE id = ?");
-		deleteWikidataBlobPrep = conn.prepareStatement("DELETE FROM wikidata_blobs WHERE id = ?");
+		wikidataPropPrep = conn.prepareStatement("""
+				INSERT INTO wikidata_properties(id, type, value) VALUES(?, ?, ?)
+				ON CONFLICT(id, type) DO UPDATE SET
+				value = excluded.value;
+				""");
+		wikidataBlobPrep = conn.prepareStatement("""
+				INSERT INTO wikidata_blobs(id, page) VALUES(?, ?)
+				ON CONFLICT(id) DO UPDATE SET
+				page = excluded.page;
+				""");
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		
 		allAstroWids = getAllAstroWids();
@@ -291,7 +298,7 @@ public class WikiDataHandler extends DefaultHandler {
 					if (lastRevisionText != null && "application/json".contentEquals(format)) {
 						try {
 							String t = title.toString();
-							if (!t.startsWith("Lexeme:") && !t.startsWith("Property:")) {
+							if (!t.startsWith(LEXEME_PREFIX) && !t.startsWith(PROPERTY_PREFIX)) {
 								long id = Long.parseLong(title.substring(1));
 								if (id >= lastProcessedId) {
 									processJsonPage(id, lastRevisionText);
@@ -361,16 +368,6 @@ public class WikiDataHandler extends DefaultHandler {
 			coordsPrep.setString(++ind,  starType != null ? starType : subtype);
 			coordsPrep.setString(++ind, labelsJson);
 			addBatch(coordsPrep, coordsBatch);
-			if (update) {
-				deleteWikiRegionPrep.setLong(1, id);
-				deleteWikiRegionPrep.execute();
-				deleteMappingPrep.setLong(1, id);
-				deleteMappingPrep.execute();
-				deleteWikidataPropPrep.setLong(1, id);
-				deleteWikidataPropPrep.execute();
-				deleteWikidataBlobPrep.setLong(1, id);
-				deleteWikidataBlobPrep.execute();
-			}
 			List<String> rgs = regions.getRegionsToDownload(article.getLat(), article.getLon(), keyNames);
 			for (String reg : rgs) {
 				wikiRegionPrep.setLong(1, id);

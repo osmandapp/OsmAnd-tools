@@ -133,7 +133,7 @@ public class OsmCoordinatesByTag {
 		File wikidataDb = new File(osmGz, "wikidata_osm.sqlitedb");
 		OsmandRegions or = new OsmandRegions();
 		or.prepareFile();
-		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, otag, or, 0, false);
+		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, otag, or, 0);
 		long testwid = 2051638;
 		StringBuilder sb;
 		if (testwid > 0) {
