@@ -2,6 +2,7 @@ package net.osmand.wiki;
 
 import static java.util.EnumSet.of;
 import static net.osmand.util.Algorithms.stringsEqual;
+import static net.osmand.wiki.commonswiki.parser.ParserUtils.FILE_PREFIX;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -85,7 +86,7 @@ public class WikiDatabasePreparation {
 	private static final int SHORT_PARAGRAPH = 10;
 
 	public static final String DEFAULT_LANG = "en";
-	
+
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT,
 		ADDRESS, AREA_CODE,
@@ -423,9 +424,8 @@ public class WikiDatabasePreparation {
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_SOURCE)) {
 				String sourceValue = ParserUtils.extractFieldValue(line, ParserUtils.FIELD_SOURCE);
-				if (sourceValue != null && sourceValue.contains("File:")) {
-					source = sourceValue.substring(sourceValue.indexOf("File:") + "File:".length());
-					source = ParserUtils.stripImageName(source);
+				if (sourceValue != null) {
+					source = ParserUtils.extractImageName(sourceValue);
 				}
 			}
 		}
@@ -792,7 +792,7 @@ public class WikiDatabasePreparation {
 			if (toCompare.contains(".jpg") || toCompare.contains(".jpeg") || toCompare.contains(".png")
 					|| toCompare.contains(".gif")) {
 				if (!toCompare.contains(":")) {
-					bld.append("File:");
+					bld.append(FILE_PREFIX);
 				}
 			}
 			bld.append(part);

@@ -17,6 +17,7 @@ public final class ParserUtils {
 	public static final String FIELD_DESCRIPTION = "description";
 	public static final String FIELD_LICENSE = "license";
 	public static final String FIELD_SOURCE = "source";
+	public static final String FILE_PREFIX = "File:";
 
 	private ParserUtils() {
 		// Utility class - no instantiation
@@ -232,10 +233,22 @@ public final class ParserUtils {
 			   patternLicense.matcher(vallc).find() || patternPermission.matcher(vallc).find();
 	}
 
-	public static String stripImageName(String sourceFile) {
-		if (sourceFile == null) {
+	/**
+	 * Extract the image file name from the source string. The file name starts with the "File:" prefix.
+	 * {{own}} (Reference: [[:File:Bahla.jpg]])
+	 * {{Extracted from|File:Dr. Goodluck Ebele Jonathan GCFR.jpg}}
+	 * Wikimedia [[File:Digitized Sky Survey Image of the Eagle Nebula.jpg]]
+	 *
+	 * @param sourceFile - source string
+	 * @return extracted file name
+	 */
+	public static String extractImageName(String sourceFile) {
+
+		int idx;
+		if (sourceFile == null || (idx = sourceFile.indexOf(FILE_PREFIX)) < 0) {
 			return null;
 		}
+		sourceFile = sourceFile.substring(idx + FILE_PREFIX.length());
 		if (sourceFile.contains("]")) {
 			sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
 		}

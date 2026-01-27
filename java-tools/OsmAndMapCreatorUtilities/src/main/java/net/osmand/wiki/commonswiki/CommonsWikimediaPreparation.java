@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
+import static net.osmand.wiki.commonswiki.parser.ParserUtils.FILE_PREFIX;
+
 
 public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
@@ -43,7 +45,6 @@ public class CommonsWikimediaPreparation {
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
-	public static final String FILE = "File:";
 	private static boolean showLog = false;
 
 	public static void main(String[] args) {
@@ -401,7 +402,7 @@ public class CommonsWikimediaPreparation {
 		private void parseMeta() {
 			try {
 				if (!lastRevisionText.isEmpty() && FILE_NAMESPACE.contentEquals(ns)) {
-					String imageTitle = title.toString().startsWith(FILE) ? title.substring(FILE.length()) : null;
+					String imageTitle = title.toString().startsWith(FILE_PREFIX) ? title.substring(FILE_PREFIX.length()) : null;
 					if (imageTitle == null) {
 						return;
 					}
