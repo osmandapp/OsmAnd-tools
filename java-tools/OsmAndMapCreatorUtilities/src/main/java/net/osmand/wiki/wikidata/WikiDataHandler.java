@@ -51,6 +51,7 @@ public class WikiDataHandler extends DefaultHandler {
 	private StringBuilder ctext = null;
 
 	private final StringBuilder title = new StringBuilder();
+	private final StringBuilder ns = new StringBuilder();
 	private final StringBuilder text = new StringBuilder();
 	private final StringBuilder format = new StringBuilder();
 	private String lastRevisionText = null;
@@ -260,6 +261,10 @@ public class WikiDataHandler extends DefaultHandler {
 					title.setLength(0);
 					ctext = title;
 				}
+				case "ns" -> {
+					ns.setLength(0);
+					ctext = ns;
+				}
 				case "text" -> {
 					text.setLength(0);
 					ctext = text;
@@ -295,10 +300,9 @@ public class WikiDataHandler extends DefaultHandler {
 					if (limit > 0 && count >= limit) {
 						throw new IllegalStateException();
 					}
-					if (lastRevisionText != null && "application/json".contentEquals(format)) {
+					if (ns.charAt(0) == '0' && lastRevisionText != null && "application/json".contentEquals(format)) {
 						try {
-							String t = title.toString();
-							if (!t.startsWith(LEXEME_PREFIX) && !t.startsWith(PROPERTY_PREFIX)) {
+							if (title.charAt(0) == 'Q') {
 								long id = Long.parseLong(title.substring(1));
 								if (id >= lastProcessedId) {
 									processJsonPage(id, lastRevisionText);
@@ -317,7 +321,7 @@ public class WikiDataHandler extends DefaultHandler {
 					}
 					lastRevisionText = null;
 				}
-				case "title", "format", "text" -> ctext = null;
+				case "title", "ns", "format", "text" -> ctext = null;
 			}
 		}
 	}
