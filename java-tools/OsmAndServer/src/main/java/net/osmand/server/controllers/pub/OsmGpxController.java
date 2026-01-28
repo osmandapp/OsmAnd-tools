@@ -206,9 +206,11 @@ public class OsmGpxController {
 		List<Long> ids = new ArrayList<>();
 		for (Feature f : summaryFeatures) {
 			Long id = f.getProperty("id");
-			if (!featureById.computeIfAbsent(id, k -> f).equals(f)) {
-				featureById.put(id, f);
-				ids.add(id);
+			if (id != null) {
+				featureById.computeIfAbsent(id, k -> {
+					ids.add(k);
+					return f;
+				});
 			}
 		}
 		if (ids.isEmpty()) {
