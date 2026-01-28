@@ -231,13 +231,17 @@ public class IssuesController {
 		Map<Long, IssueDto> issuesDetailData = readIssuesDetailParquet();
 		Map<String, ProjectBacklogDto> backlogData = readProjectBacklogParquet();
 
-		issuesDetailData.forEach((id, detail) -> categoriesData.merge(id, detail, (cat, det) -> {
-			cat.body = det.body;
-			cat.comments = det.comments;
-			cat.milestone = det.milestone;
-			cat.assignees = det.assignees;
-			return cat;
-		}));
+		issuesDetailData.forEach((id, detail) -> {
+			IssueDto existing = categoriesData.get(id);
+			if (existing != null) {
+				existing.body = detail.body;
+				existing.comments = detail.comments;
+				existing.milestone = detail.milestone;
+				existing.assignees = detail.assignees;
+				return;
+			}
+			categoriesData.put(id, detail);
+		});
 
 		List<IssueDto> mergedIssues = new ArrayList<>(categoriesData.values());
 
@@ -557,7 +561,15 @@ public class IssuesController {
 				return;
 
 			issue.id = id;
+			issue.repo = getString(group, "repo");
+			issue.number = getLong(group, "number");
+			issue.title = getString(group, "title");
 			issue.body = getString(group, "body");
+			issue.state = getString(group, "state");
+			issue.user = getString(group, "user");
+			issue.labels = getStringList(group, "labels");
+			issue.createdAt = getDate(group, "created_at");
+			issue.closedAt = getDate(group, "closed_at");
 			issue.milestone = getString(group, "milestone");
 			issue.assignees = getStringList(group, "assignees");
 			issue.updatedAt = getDate(group, "updated_at");
@@ -574,6 +586,7 @@ public class IssuesController {
 						comment.id = getLong(commentGroup, "id");
 						comment.user = getString(commentGroup, "user");
 						comment.body = getString(commentGroup, "body");
+						comment.createdAt = getString(commentGroup, "created_at");
 						issue.comments.add(comment);
 					}
 				}
