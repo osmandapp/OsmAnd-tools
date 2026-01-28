@@ -43,8 +43,6 @@ import net.osmand.wiki.OsmCoordinatesByTag.OsmLatLonId;
 public class WikiDataHandler extends DefaultHandler {
 
 	private static final Log log = PlatformUtil.getLog(WikiDataHandler.class);
-	public static final String LEXEME_PREFIX = "Lexeme:";
-	public static final String PROPERTY_PREFIX = "Property:";
 
 	private final SAXParser saxParser;
 	private boolean page = false;
@@ -73,7 +71,7 @@ public class WikiDataHandler extends DefaultHandler {
 	private final static int ARTICLE_BATCH_SIZE = 10000;
 	private static final int ERROR_BATCH_SIZE = 200;
 
-	private int count = 0;
+	private int articleCount = 0;
 	private int errorCount = 0;
 
 	private Gson gson;
@@ -105,7 +103,8 @@ public class WikiDataHandler extends DefaultHandler {
 				" poisubtype text, labelsJson text)");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_mapping(id bigint, lang text, title text," +
 				" UNIQUE(id, lang))");
-		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text)");
+		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wiki_region(id bigint, regionName text," +
+				" UNIQUE(id, regionName))");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_properties(id bigint, type text," +
 				" value text, UNIQUE(id, type))");
 		conn.createStatement().execute("CREATE TABLE IF NOT EXISTS wikidata_blobs(id bigint PRIMARY KEY, page blob)");
@@ -224,14 +223,13 @@ public class WikiDataHandler extends DefaultHandler {
     }
 
     public void finish() throws SQLException {
-        log.info("Total accepted: " + count);
+        log.info("Total accepted: " + articleCount);
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS map_lang_title_idx ON wiki_mapping(lang, title)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_mapping_index on wiki_mapping(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_idx on wiki_coords(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_coords_originalId on wiki_coords(originalId)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS id_region_idx on wiki_region(id)");
         conn.createStatement().execute("CREATE INDEX IF NOT EXISTS reg_region_idx on wiki_region(regionName)");
-	    conn.createStatement().execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_region_idx on wiki_region(id, regionName)");
 		conn.createStatement().execute("CREATE INDEX IF NOT EXISTS wikidata_properties_idx on wikidata_properties(id)");
 
         coordsPrep.executeBatch();
@@ -297,7 +295,7 @@ public class WikiDataHandler extends DefaultHandler {
 				case "page" -> {
 					page = false;
 					progress.update();
-					if (limit > 0 && count >= limit) {
+					if (limit > 0 && articleCount >= limit) {
 						throw new IllegalStateException();
 					}
 					if (ns.charAt(0) == '0' && lastRevisionText != null && "application/json".contentEquals(format)) {
@@ -341,8 +339,8 @@ public class WikiDataHandler extends DefaultHandler {
 		}
 
 		if (article.getLat() != 0 || article.getLon() != 0 || starType != null) {
-			if (++count % ARTICLE_BATCH_SIZE == 0) {
-				log.info(String.format("Article accepted %s (%d)", title, count));
+			if (++articleCount % ARTICLE_BATCH_SIZE == 0) {
+				log.info(String.format("Article accepted %s (%d)", title, articleCount));
 			}
 			Map<String, String> labels = article.getLabels();
 			Map<String, String> merged = null;
