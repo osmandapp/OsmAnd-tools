@@ -28,6 +28,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -61,8 +63,8 @@ public class OsmGpxController {
 	private final ReentrantLock lock = new ReentrantLock();
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
-	private static final int MAX_ROUTES = 100;
 	private static final int MAX_ROUTES_SUMMARY = 200000;
+	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 50;
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
@@ -70,85 +72,8 @@ public class OsmGpxController {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 
-	@GetMapping(path = {"/get-routes-list"}, produces = "application/json")
-	public ResponseEntity<String> getRoutes(@RequestParam String activity,
-	                                        @RequestParam(required = false) String year,
-	                                        @RequestParam String minlat,
-	                                        @RequestParam String maxlat,
-	                                        @RequestParam String minlon,
-	                                        @RequestParam String maxlon) {
-		if (!config.osmgpxInitialized()) {
-			return ResponseEntity.ok("OsmGpx datasource is not initialized");
-		}
-		cleanupCache();
-
-		StringBuilder conditions = new StringBuilder();
-		List<Object> params = new ArrayList<>();
-
-		ResponseEntity<String> error = addCoords(params, conditions, minlat, maxlat, minlon, maxlon);
-		if (error != null) {
-			return error;
-		}
-
-		error = filterByYear(year, params, conditions);
-		if (error != null) {
-			return error;
-		}
-
-		error = filterByActivity(activity, params, conditions);
-		if (error != null) {
-			return error;
-		}
-
-		String query = "SELECT m.id, f.data AS bytes, m.name, m.description, m.\"user\", m.date, m.activity " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id " +
-				"WHERE 1 = 1 " + conditions +
-				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES;
-
-		List<Feature> features = new ArrayList<>();
-		jdbcTemplate.query(query, ps -> {
-			for (int i = 0; i < params.size(); i++) {
-				ps.setObject(i + 1, params.get(i));
-			}
-		}, rs -> {
-			Feature feature = new Feature();
-			Long id = rs.getLong("id");
-			feature.getProperties().put("id", id);
-			feature.getProperties().put("name", rs.getString("name"));
-			feature.getProperties().put("description", rs.getString("description"));
-			feature.getProperties().put("user", rs.getString("user"));
-			feature.getProperties().put("date", rs.getString("date"));
-			String idKey = feature.getProperty("id").toString();
-			byte[] bytes = rs.getBytes("bytes");
-			RouteFile file = routesCache.computeIfAbsent(idKey, key -> {
-				GpxFile gpxFile = null;
-				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
-					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-				} catch (IOException e) {
-					LOGGER.error("Error loading GPX file", e);
-				}
-				if (gpxFile != null && gpxFile.getError() == null) {
-					GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-					return new RouteFile(bytes, gpxFile, analysis);
-				}
-				return null;
-			});
-			if (file != null) {
-				addGeoDataToFeature(file, feature);
-				if (feature.getProperty("geo") != null) {
-					features.add(feature);
-				}
-			}
-		});
-		FeatureCollection featureCollection = new FeatureCollection();
-		featureCollection.setFeatures(features);
-
-		return ResponseEntity.ok(gson.toJson(featureCollection));
-	}
-
-	@PostMapping(path = {"/get-routes-summary"}, consumes = "application/json", produces = "application/json")
-	public ResponseEntity<String> getRoutesSummary(@RequestParam(required = false) String activity,
+	@PostMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> getRoutesPost(@RequestParam(required = false) String activity,
 	                                            @RequestParam(required = false) Integer year,
 	                                            @RequestParam String minlat,
 	                                            @RequestParam String maxlat,
@@ -159,6 +84,8 @@ public class OsmGpxController {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
+
+		cleanupCache();
 
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
@@ -182,54 +109,17 @@ public class OsmGpxController {
 			}
 		}
 
-		if (tags != null && !tags.isEmpty()) {
-			List<String> normalized = new ArrayList<>();
-			for (String tag : tags) {
-				if (!Algorithms.isEmpty(tag)) {
-					normalized.add(tag.trim().toLowerCase());
-				}
-			}
-			if (!normalized.isEmpty()) {
-				String op = "AND".equalsIgnoreCase(tagMatchMode) ? "@>" : "&&";
-				conditions.append(" AND m.tags ").append(op).append(" ARRAY[");
-				conditions.append(String.join(",", Collections.nCopies(normalized.size(), "?")));
-				conditions.append("]::text[]");
-				params.addAll(normalized);
-			}
+		applyTagsFilter(tags, tagMatchMode, conditions, params);
+
+		List<Feature> summaryFeatures = querySummaryFeatures(conditions, params);
+
+		if (summaryFeatures.size() > MAX_ROUTES_FULL_MODE_THRESHOLD) {
+			FeatureCollection featureCollection = new FeatureCollection();
+			featureCollection.setFeatures(summaryFeatures);
+			return ResponseEntity.ok(gson.toJson(featureCollection));
+		} else {
+			return buildFullRoutesResponse(summaryFeatures);
 		}
-
-		String query = "SELECT m.id, m.name, m.description, m.\"user\", m.date, m.activity, m.lat, m.lon " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions +
-				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
-
-		List<Feature> features = new ArrayList<>();
-		jdbcTemplate.query(query, ps -> {
-			for (int i = 0; i < params.size(); i++) {
-				ps.setObject(i + 1, params.get(i));
-			}
-		}, rs -> {
-			Feature feature = new Feature();
-			Long id = rs.getLong("id");
-			feature.getProperties().put("id", id);
-			feature.getProperties().put("name", rs.getString("name"));
-			feature.getProperties().put("description", rs.getString("description"));
-			feature.getProperties().put("user", rs.getString("user"));
-			feature.getProperties().put("date", rs.getString("date"));
-			feature.getProperties().put("activity", rs.getString("activity"));
-			Double lat = rs.getDouble("lat");
-			Double lon = rs.getDouble("lon");
-			Map<String, Object> geo = new LinkedHashMap<>();
-			geo.put("lat", lat);
-			geo.put("lon", lon);
-			feature.getProperties().put("geo", geo);
-			features.add(feature);
-		});
-
-		FeatureCollection featureCollection = new FeatureCollection();
-		featureCollection.setFeatures(features);
-
-		return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
 
 	@GetMapping(path = {"/tags"}, produces = "application/json")
@@ -263,6 +153,127 @@ public class OsmGpxController {
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
 		return ResponseEntity.ok(gson.toJson(rows));
+	}
+
+	private void applyTagsFilter(List<String> tags,
+	                             String tagMatchMode,
+	                             StringBuilder conditions,
+	                             List<Object> params) {
+		if (tags == null || tags.isEmpty()) {
+			return;
+		}
+		List<String> normalized = new ArrayList<>();
+		for (String tag : tags) {
+			if (!Algorithms.isEmpty(tag)) {
+				normalized.add(tag.trim().toLowerCase());
+			}
+		}
+		if (normalized.isEmpty()) {
+			return;
+		}
+		String op = "AND".equalsIgnoreCase(tagMatchMode) ? "@>" : "&&";
+		conditions.append(" AND m.tags ").append(op).append(" ARRAY[");
+		conditions.append(String.join(",", Collections.nCopies(normalized.size(), "?")));
+		conditions.append("]::text[]");
+		params.addAll(normalized);
+	}
+
+	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
+		String query = "SELECT m.id, m.name, m.description, m.\"user\", m.date, m.activity, m.lat, m.lon " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions +
+				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
+
+		List<Feature> features = new ArrayList<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			features.add(createBaseFeature(rs));
+		});
+		return features;
+	}
+
+	private ResponseEntity<String> buildFullRoutesResponse(List<Feature> summaryFeatures) {
+		if (summaryFeatures.isEmpty()) {
+			FeatureCollection empty = new FeatureCollection();
+			empty.setFeatures(Collections.emptyList());
+			return ResponseEntity.ok(gson.toJson(empty));
+		}
+
+		Map<Long, Feature> featureById = new LinkedHashMap<>();
+		List<Long> ids = new ArrayList<>();
+		for (Feature f : summaryFeatures) {
+			Long id = f.getProperty("id");
+			if (!featureById.computeIfAbsent(id, k -> f).equals(f)) {
+				featureById.put(id, f);
+				ids.add(id);
+			}
+		}
+		if (ids.isEmpty()) {
+			FeatureCollection empty = new FeatureCollection();
+			empty.setFeatures(Collections.emptyList());
+			return ResponseEntity.ok(gson.toJson(empty));
+		}
+
+		String query = "SELECT id, data FROM " + GPX_FILES_TABLE_NAME + " WHERE id IN (" + String.join(",", Collections.nCopies(ids.size(), "?")) +
+				") ORDER BY id DESC";
+
+		List<Feature> features = new ArrayList<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < ids.size(); i++) {
+				ps.setLong(i + 1, ids.get(i));
+			}
+		}, rs -> {
+			Long id = rs.getLong("id");
+			Feature feature = featureById.get(id);
+			if (feature == null) {
+				return;
+			}
+			String idKey = String.valueOf(id);
+			byte[] bytes = rs.getBytes("data");
+			RouteFile file = routesCache.computeIfAbsent(idKey, key -> {
+				GpxFile gpxFile = null;
+				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+				} catch (IOException e) {
+					LOGGER.error("Error loading GPX file", e);
+				}
+				if (gpxFile != null && gpxFile.getError() == null) {
+					GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+					return new RouteFile(bytes, gpxFile, analysis);
+				}
+				return null;
+			});
+			if (file != null) {
+				addGeoDataToFeature(file, feature);
+				if (feature.getProperty("geo") != null) {
+					features.add(feature);
+				}
+			}
+		});
+
+		FeatureCollection featureCollection = new FeatureCollection();
+		featureCollection.setFeatures(features);
+		return ResponseEntity.ok(gson.toJson(featureCollection));
+	}
+
+	private Feature createBaseFeature(ResultSet rs) throws SQLException {
+		Feature feature = new Feature();
+
+		feature.getProperties().put("id", rs.getLong("id"));
+		feature.getProperties().put("name", rs.getString("name"));
+		feature.getProperties().put("description", rs.getString("description"));
+		feature.getProperties().put("user", rs.getString("user"));
+		feature.getProperties().put("date", rs.getString("date"));
+		feature.getProperties().put("activity", rs.getString("activity"));
+		Map<String, Object> point = new LinkedHashMap<>();
+		point.put("lat", rs.getDouble("lat"));
+		point.put("lon", rs.getDouble("lon"));
+		feature.getProperties().put("point", point);
+
+		return feature;
 	}
 
 	@GetMapping(path = {"/get-osm-route"}, produces = "application/json")
