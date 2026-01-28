@@ -146,6 +146,39 @@ public class OsmGpxController {
 		return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
 
+	@GetMapping(path = {"/tags"}, produces = "application/json")
+	public ResponseEntity<String> getTags(@RequestParam String minlat,
+	                                      @RequestParam String maxlat,
+	                                      @RequestParam String minlon,
+	                                      @RequestParam String maxlon) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minlat, maxlat, minlon, maxlon);
+		if (error != null) {
+			return error;
+		}
+
+		String query =
+				"SELECT tag, count(*) AS cnt " +
+				"FROM (" +
+				"  SELECT unnest(m.tags) AS tag " +
+				"  FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"  WHERE 1 = 1 " + conditions +
+				") t " +
+				"WHERE tag IS NOT NULL AND tag <> '' " +
+				"GROUP BY tag " +
+				"ORDER BY cnt DESC " +
+				"LIMIT 1000";
+
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
+		return ResponseEntity.ok(gson.toJson(rows));
+	}
+
 	@GetMapping(path = {"/get-osm-route"}, produces = "application/json")
 	public ResponseEntity<String> getRoute(@RequestParam Long id) throws IOException {
 		RouteFile routeFile = routesCache.get(id.toString());
