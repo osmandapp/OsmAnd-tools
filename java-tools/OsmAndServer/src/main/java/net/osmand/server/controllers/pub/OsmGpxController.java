@@ -72,7 +72,7 @@ public class OsmGpxController {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 
-	@PostMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
+	@GetMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> getRoutesPost(@RequestParam(required = false) String activity,
 	                                            @RequestParam(required = false) Integer year,
 	                                            @RequestParam String minlat,
