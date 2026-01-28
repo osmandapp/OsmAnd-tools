@@ -302,7 +302,7 @@ public class OsmGpxController {
 			if (resultData != null && resultData.byteArray != null) {
 				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(resultData.byteArray)).getBytes())) {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-					if (gpxFile.getError() != null) {
+					if (gpxFile.getError() == null) {
 						GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, analysis);
 						if (gpxData != null) {
