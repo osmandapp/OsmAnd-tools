@@ -62,6 +62,7 @@ public class OsmGpxController {
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES = 100;
+	private static final int MAX_ROUTES_SUMMARY = 200000;
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
@@ -140,6 +141,91 @@ public class OsmGpxController {
 				}
 			}
 		});
+		FeatureCollection featureCollection = new FeatureCollection();
+		featureCollection.setFeatures(features);
+
+		return ResponseEntity.ok(gson.toJson(featureCollection));
+	}
+
+	@PostMapping(path = {"/get-routes-summary"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> getRoutesSummary(@RequestParam(required = false) String activity,
+	                                            @RequestParam(required = false) Integer year,
+	                                            @RequestParam String minlat,
+	                                            @RequestParam String maxlat,
+	                                            @RequestParam String minlon,
+	                                            @RequestParam String maxlon,
+	                                            @RequestParam(required = false) List<String> tags,
+	                                            @RequestParam(required = false, defaultValue = "OR") String tagMatchMode) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minlat, maxlat, minlon, maxlon);
+		if (error != null) {
+			return error;
+		}
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (!Algorithms.isEmpty(activity)) {
+			error = filterByActivity(activity, params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (tags != null && !tags.isEmpty()) {
+			List<String> normalized = new ArrayList<>();
+			for (String tag : tags) {
+				if (!Algorithms.isEmpty(tag)) {
+					normalized.add(tag.trim().toLowerCase());
+				}
+			}
+			if (!normalized.isEmpty()) {
+				String op = "AND".equalsIgnoreCase(tagMatchMode) ? "@>" : "&&";
+				conditions.append(" AND m.tags ").append(op).append(" ARRAY[");
+				conditions.append(String.join(",", Collections.nCopies(normalized.size(), "?")));
+				conditions.append("]::text[]");
+				params.addAll(normalized);
+			}
+		}
+
+		String query = "SELECT m.id, m.name, m.description, m.\"user\", m.date, m.activity, m.lat, m.lon " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions +
+				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
+
+		List<Feature> features = new ArrayList<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			Feature feature = new Feature();
+			Long id = rs.getLong("id");
+			feature.getProperties().put("id", id);
+			feature.getProperties().put("name", rs.getString("name"));
+			feature.getProperties().put("description", rs.getString("description"));
+			feature.getProperties().put("user", rs.getString("user"));
+			feature.getProperties().put("date", rs.getString("date"));
+			feature.getProperties().put("activity", rs.getString("activity"));
+			Double lat = rs.getDouble("lat");
+			Double lon = rs.getDouble("lon");
+			Map<String, Object> geo = new LinkedHashMap<>();
+			geo.put("lat", lat);
+			geo.put("lon", lon);
+			feature.getProperties().put("geo", geo);
+			features.add(feature);
+		});
+
 		FeatureCollection featureCollection = new FeatureCollection();
 		featureCollection.setFeatures(features);
 
