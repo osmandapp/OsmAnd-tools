@@ -252,7 +252,6 @@ public class DownloadOsmGPX {
 
 	private void ensureActivitySchema() throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_data_id ON " + GPX_METADATA_TABLE_NAME + " (id)");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
