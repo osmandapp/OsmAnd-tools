@@ -257,10 +257,10 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
-			// add indexes for analysis columns (keep small: only non-null rows)
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed) WHERE speed IS NOT NULL");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance) WHERE distance IS NOT NULL");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points) WHERE points IS NOT NULL");
+			// add indexes for analysis columns
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed) WHERE speed > 0");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance) WHERE distance > 0");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points) WHERE points > 0");
 			// add index for activity column
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
 			// add index for tags (GIN)
@@ -317,9 +317,9 @@ public class DownloadOsmGPX {
 						long id = rs.getLong("id");
 						GpxFile gpxFile = null;
 						GpxTrackAnalysis analysis = null;
-						Integer pointsCount = null;
-						Float distanceMeters = null;
-						Float avgSpeedKmh = null;
+						int pointsCount = 0;
+						float distanceMeters = 0f;
+						float avgSpeedKmh = 0f;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
@@ -391,11 +391,7 @@ public class DownloadOsmGPX {
 						boolean fillMetrics = !GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity);
 						if (fillMetrics) {
 							updateStmtMetrics.setString(1, activity);
-							if (avgSpeedKmh != null) {
-								updateStmtMetrics.setFloat(2, avgSpeedKmh);
-							} else {
-								updateStmtMetrics.setNull(2, java.sql.Types.FLOAT);
-							}
+							updateStmtMetrics.setFloat(2, avgSpeedKmh);
 							updateStmtMetrics.setFloat(3, distanceMeters);
 							updateStmtMetrics.setInt(4, pointsCount);
 							updateStmtMetrics.setLong(5, id);
