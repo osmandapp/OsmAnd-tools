@@ -116,6 +116,10 @@ public class DownloadOsmGPX {
 
 	private static final String GPX_FILE_PREIX = "OG";
 
+	private static float round2(float value) {
+		return Math.round(value * 100) / 100.0f;
+	}
+
 	private boolean sslInit;
 	private Connection dbConn;
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
@@ -399,8 +403,8 @@ public class DownloadOsmGPX {
 						boolean fillMetrics = !GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity);
 						if (fillMetrics) {
 							updateStmtMetrics.setString(1, activity);
-							updateStmtMetrics.setFloat(2, avgSpeedKmh);
-							updateStmtMetrics.setFloat(3, distanceMeters);
+							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
+							updateStmtMetrics.setFloat(3, round2(distanceMeters));
 							updateStmtMetrics.setInt(4, pointsCount);
 							updateStmtMetrics.setLong(5, id);
 							updateStmtMetrics.addBatch();
