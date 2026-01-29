@@ -936,12 +936,13 @@ public class MapRouterLayer implements MapPanelLayer {
 							seg.addProperty("point", ++indVisual);
 							seg.addProperty("turn_type", tt.toXmlString());
 							if (tt.getLanes() != null) {
-								seg.addProperty("lanes_encoded", TurnType.lanesToString(tt.getLanes()));
-								seg.add("lanes", gson.toJsonTree(buildLaneGuidanceJson(tt)));
-								String approachTurnLanesTag = RouteResultPreparation.getTurnLanesString(segment);
-								if (approachTurnLanesTag != null) {
-									seg.addProperty("turn_lanes_tag", approachTurnLanesTag);
-								}
+								String turnLanesValue = getTurnLanesString(routeSegments.get(prevSegment - 1));
+								String encoded = TurnType.lanesToString(tt.getLanes());
+								//seg.addProperty("lanes_encoded", encoded);
+								seg.add("lanes", gson.toJsonTree(buildLaneGuidanceJson(tt, turnLanesValue)));
+//								if (turnLanesValue != null) {
+//									seg.addProperty("turn_lanes_tag", turnLanesValue);
+//								}
 							}
 							seg.addProperty("distance_to_next_point_m", Math.round(dist * 100.0) / 100.0);
 
@@ -963,23 +964,54 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	}
 
-	private static List<Map<String, Object>> buildLaneGuidanceJson(TurnType turnType) {
+	private static String getTurnLanesString(RouteSegmentResult segment) {
+		if (segment.getObject().getOneway() == 0) {
+			if (segment.isForwardDirection()) {
+				return segment.getObject().getValue("turn:lanes:forward");
+			} else {
+				return segment.getObject().getValue("turn:lanes:backward");
+			}
+		} else {
+			return segment.getObject().getValue("turn:lanes");
+		}
+	}
+
+	private static List<Map<String, Object>> buildLaneGuidanceJson(TurnType turnType, String turnLanesValue) {
 		int[] lanes = turnType == null ? null : turnType.getLanes();
 		int activeCommonLaneTurn = turnType == null ? -1 : turnType.getActiveCommonLaneTurn();
+		String[] turnLanesValueParsed = null;
+		if (turnLanesValue != null && !turnLanesValue.isEmpty()) {
+			turnLanesValueParsed = turnLanesValue.split("\\|", -1);
+			if (lanes == null || turnLanesValueParsed.length != lanes.length) {
+				turnLanesValueParsed = null;
+			}
+		}
 		List<Map<String, Object>> lanesJson = new ArrayList<>();
 		if (lanes != null) {
-			for (int laneValue : lanes) {
+			for (int laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
+				int laneValue = lanes[laneIndex];
 				Map<String, Object> laneJson = new LinkedHashMap<>();
 				int primary = TurnType.getPrimaryTurn(laneValue);
 				if (primary == 0) {
 					primary = TurnType.C;
 				}
+				boolean[] isNone = new boolean[] {false, false, false};
+				if (turnLanesValueParsed != null) {
+					String laneTag = turnLanesValueParsed[laneIndex] == null ? "" : turnLanesValueParsed[laneIndex].trim();
+					if (!laneTag.isEmpty()) {
+						String[] laneTagParts = laneTag.split(";", -1);
+						int i = 0;
+						for (String laneTagPart : laneTagParts) {
+							isNone[i++] =  laneTagPart != null && "none".equals(laneTagPart.trim());
+						}
+					}
+				}
 				laneJson.put("active", activeCommonLaneTurn != -1 && primary == activeCommonLaneTurn);
-				laneJson.put("primary", TurnType.valueOf(primary, false).toXmlString());
+				laneJson.put("primary", isNone[0] ? "NONE" : TurnType.valueOf(primary, false).toXmlString());
 				int secondary = TurnType.getSecondaryTurn(laneValue);
-				laneJson.put("secondary", secondary == 0 ? "" : TurnType.valueOf(secondary, false).toXmlString());
+				laneJson.put("secondary", isNone[1] ? "NONE" : (secondary == 0 ? "" : TurnType.valueOf(secondary, false).toXmlString()));
 				int tertiary = TurnType.getTertiaryTurn(laneValue);
-				laneJson.put("tertiary", tertiary == 0 ? "" : TurnType.valueOf(tertiary, false).toXmlString());
+				laneJson.put("tertiary", isNone[2] ? "NONE" : (tertiary == 0 ? "" : TurnType.valueOf(tertiary, false).toXmlString()));
 				lanesJson.add(laneJson);
 			}
 		}
