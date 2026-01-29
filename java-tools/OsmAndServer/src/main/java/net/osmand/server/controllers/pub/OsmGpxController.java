@@ -72,15 +72,20 @@ public class OsmGpxController {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 
-	@GetMapping(path = {"/get-routes-list"}, produces = "application/json")
-	public ResponseEntity<String> getRoutesPost(@RequestParam(required = false) String activity,
-	                                            @RequestParam(required = false) Integer year,
-	                                            @RequestParam String minlat,
-	                                            @RequestParam String maxlat,
-	                                            @RequestParam String minlon,
-	                                            @RequestParam String maxlon,
-	                                            @RequestParam(required = false) List<String> tags,
-	                                            @RequestParam(required = false, defaultValue = "OR") String tagMatchMode) {
+	public record RoutesListRequest(
+			String activity,
+			Integer year,
+			String minlat,
+			String maxlat,
+			String minlon,
+			String maxlon,
+			List<String> tags,
+			String tagMatchMode
+	) {
+	}
+
+	@PostMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> getRoutesPost(@RequestBody RoutesListRequest req) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -90,26 +95,27 @@ public class OsmGpxController {
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, minlat, maxlat, minlon, maxlon);
+		ResponseEntity<String> error = addCoords(params, conditions, req.minlat(), req.maxlat(), req.minlon(), req.maxlon());
 		if (error != null) {
 			return error;
 		}
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
+		if (req.year() != null) {
+			error = filterByYear(String.valueOf(req.year()), params, conditions);
 			if (error != null) {
 				return error;
 			}
 		}
 
-		if (!Algorithms.isEmpty(activity)) {
-			error = filterByActivity(activity, params, conditions);
+		if (!Algorithms.isEmpty(req.activity())) {
+			error = filterByActivity(req.activity(), params, conditions);
 			if (error != null) {
 				return error;
 			}
 		}
 
-		applyTagsFilter(tags, tagMatchMode, conditions, params);
+		String tagMatchMode = Algorithms.isEmpty(req.tagMatchMode()) ? "OR" : req.tagMatchMode();
+		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
 		List<Feature> summaryFeatures = querySummaryFeatures(conditions, params);
 
