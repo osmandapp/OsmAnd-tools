@@ -191,7 +191,7 @@ public class OsmGpxController {
 	}
 
 	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
-		String query = "SELECT m.id, m.name, m.description, m.\"user\", m.date, m.activity, m.lat, m.lon " +
+		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
 				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
