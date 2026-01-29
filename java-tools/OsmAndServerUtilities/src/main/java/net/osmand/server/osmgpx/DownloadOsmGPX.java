@@ -253,8 +253,18 @@ public class DownloadOsmGPX {
 		try (Statement statement = dbConn.createStatement()) {
 			// add activity column if not exists
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
+			// add analysis columns if not exists
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
+			// add indexes for analysis columns
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed) WHERE speed > 0");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance) WHERE distance > 0");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points) WHERE points > 0");
 			// add index for activity column
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
+			// add index for tags (GIN)
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
 			// add indexes for coordinates
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
 			statement.executeUpdate(
@@ -278,7 +288,10 @@ public class DownloadOsmGPX {
 	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
 		LOG.info("Starting to populate the 'activity' column...");
 		dbConn.setAutoCommit(false);
-		PreparedStatement updateStmt = dbConn.prepareStatement(
+		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ? WHERE id = ?"
+		);
+		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
 		);
 
@@ -304,6 +317,9 @@ public class DownloadOsmGPX {
 						long id = rs.getLong("id");
 						GpxFile gpxFile = null;
 						GpxTrackAnalysis analysis = null;
+						int pointsCount = 0;
+						float distanceMeters = 0f;
+						float avgSpeedKmh = 0f;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
@@ -325,10 +341,31 @@ public class DownloadOsmGPX {
 							if (gpxFile != null && gpxFile.getError() == null) {
 								analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 								List<WptPt> points = gpxFile.getAllSegmentsPoints();
-								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
-										|| analysis.getTotalDistance() < MIN_DISTANCE
+								int pointsSize = points.size();
+								float totalDistance = analysis.getTotalDistance();
+								if (pointsSize < MIN_POINTS_SIZE
+										|| totalDistance < MIN_DISTANCE
 										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
 									activity = GARBAGE_ACTIVITY_TYPE;
+								} else {
+									// only for non-garbage & non-error tracks
+									pointsCount = pointsSize;
+									distanceMeters = totalDistance;
+									if (analysis.getHasSpeedInTrack()) {
+										double avgSpeedMs = analysis.getAvgSpeed();
+										if (avgSpeedMs > 0) {
+											avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
+										}
+									} else if (distanceMeters > 0) {
+										double timeMs = analysis.getTimeMoving();
+										if (timeMs <= 0) {
+											timeMs = analysis.getTimeSpan();
+										}
+										if (timeMs > 0) {
+											double speedMs = distanceMeters / (timeMs / 1000d);
+											avgSpeedKmh = (float) (speedMs * 3.6d);
+										}
+									}
 								}
 							} else {
 								activity = ERROR_ACTIVITY_TYPE;
@@ -351,15 +388,26 @@ public class DownloadOsmGPX {
 							identifiedActivityCount++;
 						}
 
-						updateStmt.setString(1, activity);
-						updateStmt.setLong(2, id);
-						updateStmt.addBatch();
+						boolean fillMetrics = !GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity);
+						if (fillMetrics) {
+							updateStmtMetrics.setString(1, activity);
+							updateStmtMetrics.setFloat(2, avgSpeedKmh);
+							updateStmtMetrics.setFloat(3, distanceMeters);
+							updateStmtMetrics.setInt(4, pointsCount);
+							updateStmtMetrics.setLong(5, id);
+							updateStmtMetrics.addBatch();
+						} else {
+							updateStmtActivityOnly.setString(1, activity);
+							updateStmtActivityOnly.setLong(2, id);
+							updateStmtActivityOnly.addBatch();
+						}
 
 						batchSize++;
 						processedCount++;
 
 						if (batchSize >= BATCH_LIMIT) {
-							updateStmt.executeBatch();
+							updateStmtMetrics.executeBatch();
+							updateStmtActivityOnly.executeBatch();
 							dbConn.commit();
 							batchSize = 0;
 							LOG.info("Processed " + processedCount + " records so far. Identified " + identifiedActivityCount + " activities.");
@@ -369,7 +417,8 @@ public class DownloadOsmGPX {
 			}
 
 			if (batchSize > 0) {
-				updateStmt.executeBatch();
+				updateStmtMetrics.executeBatch();
+				updateStmtActivityOnly.executeBatch();
 				dbConn.commit();
 			}
 		} catch (SQLException e) {
@@ -377,7 +426,8 @@ public class DownloadOsmGPX {
 			throw e;
 		} finally {
 			dbConn.setAutoCommit(true);
-			updateStmt.close();
+			updateStmtMetrics.close();
+			updateStmtActivityOnly.close();
 		}
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
