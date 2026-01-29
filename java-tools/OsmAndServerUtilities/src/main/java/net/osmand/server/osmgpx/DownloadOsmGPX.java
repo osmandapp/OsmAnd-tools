@@ -116,7 +116,7 @@ public class DownloadOsmGPX {
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 
 	private static final String GPX_FILE_PREIX = "OG";
-	private static final String GPX_EXTENSION_ACTIVITY_OSMAND = "osmand:activity";
+	RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 
 	private static float round2(float value) {
 		return Math.round(value * 100) / 100.0f;
@@ -456,7 +456,7 @@ public class DownloadOsmGPX {
 			return null;
 		}
 		RouteActivity routeActivity = gpxFile.getMetadata()
-				.getRouteActivity(RouteActivityHelper.INSTANCE.getActivities());
+				.getRouteActivity(routeActivityHelper.getActivities());
 		if (routeActivity == null) {
 			return null;
 		}
@@ -489,7 +489,7 @@ public class DownloadOsmGPX {
 			}
 		}
 
-		RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
+		// check tags first
 		for (String tag : tags) {
 			RouteActivity activity = routeActivityHelper.findActivityByTag(tag);
 			if (activity != null && activitiesMap.containsKey(activity.getId())) {
