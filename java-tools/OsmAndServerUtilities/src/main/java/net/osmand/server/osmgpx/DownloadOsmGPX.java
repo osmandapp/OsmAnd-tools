@@ -22,8 +22,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
@@ -118,12 +116,6 @@ public class DownloadOsmGPX {
 
 	private static final String GPX_FILE_PREIX = "OG";
 
-	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-	static {
-		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-		FORMAT2.setTimeZone(TimeZone.getTimeZone("UTC"));
-	}
 	private boolean sslInit;
 	private Connection dbConn;
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
@@ -1072,7 +1064,7 @@ public class DownloadOsmGPX {
 	}
 
 	private static OsmGpxFile parseGPXFiles(StringReader inputReader, List<OsmGpxFile> gpxFiles)
-			throws XmlPullParserException, IOException, ParseException {
+			throws XmlPullParserException, IOException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(inputReader);
 		int tok;
@@ -1088,7 +1080,8 @@ public class DownloadOsmGPX {
 					p.visibility = parser.getAttributeValue("", "visibility");
 					p.pending = "true".equals(parser.getAttributeValue("", "visibility"));
 					p.id = Long.parseLong(parser.getAttributeValue("", "id"));
-					p.timestamp = FORMAT.parse(parser.getAttributeValue("", "timestamp"));
+					String tsStr = parser.getAttributeValue("", "timestamp");
+					p.timestamp = tsStr != null ? new Date(GpxUtilities.INSTANCE.parseTime(tsStr)) : new Date(0);
 					p.lat = Double.parseDouble(getAttributeDoubleValue(parser, "lat"));
 					p.lon = Double.parseDouble(getAttributeDoubleValue(parser, "lon"));
 				} else if(parser.getName().equals("description") && p != null) {
