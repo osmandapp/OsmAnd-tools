@@ -39,6 +39,8 @@ import javax.xml.stream.XMLStreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Source;
 import okio.Buffer;
@@ -75,7 +77,6 @@ import net.osmand.util.Algorithms;
 import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
-import rtree.RTree;
 
 public class DownloadOsmGPX {
 
@@ -115,6 +116,11 @@ public class DownloadOsmGPX {
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 
 	private static final String GPX_FILE_PREIX = "OG";
+	RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
+
+	private static float round2(float value) {
+		return Math.round(value * 100) / 100.0f;
+	}
 
 	private boolean sslInit;
 	private Connection dbConn;
@@ -381,9 +387,11 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
+							activity = getActivityByRouteActivity(gpxFile, activitiesMap);
+						}
+						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
-
 						if (activity == null) {
 							activity = analyzeActivityFromGpx(analysis);
 						}
@@ -399,8 +407,8 @@ public class DownloadOsmGPX {
 						boolean fillMetrics = !GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity);
 						if (fillMetrics) {
 							updateStmtMetrics.setString(1, activity);
-							updateStmtMetrics.setFloat(2, avgSpeedKmh);
-							updateStmtMetrics.setFloat(3, distanceMeters);
+							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
+							updateStmtMetrics.setFloat(3, round2(distanceMeters));
 							updateStmtMetrics.setInt(4, pointsCount);
 							updateStmtMetrics.setLong(5, id);
 							updateStmtMetrics.addBatch();
@@ -443,6 +451,24 @@ public class DownloadOsmGPX {
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
 
+	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
+		if (gpxFile == null || activitiesMap.isEmpty()) {
+			return null;
+		}
+		RouteActivity routeActivity = gpxFile.getMetadata()
+				.getRouteActivity(routeActivityHelper.getActivities());
+		if (routeActivity == null) {
+			return null;
+		}
+
+		String activityId = routeActivity.getId();
+		if (activitiesMap.containsKey(activityId)) {
+			return activityId;
+		}
+
+		return null;
+	}
+
 	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
 		if (activitiesMap.isEmpty()) {
 			return null;
@@ -463,8 +489,16 @@ public class DownloadOsmGPX {
 			}
 		}
 
-		Map<String, String> tagMap = new LinkedHashMap<>();
+		// check tags first
+		for (String tag : tags) {
+			RouteActivity activity = routeActivityHelper.findActivityByTag(tag);
+			if (activity != null && activitiesMap.containsKey(activity.getId())) {
+				return activity.getId();
+			}
+		}
 
+		// check name/desc
+		Map<String, String> tagMap = new LinkedHashMap<>();
 		activitiesMap.forEach((activityId, tagList) ->
 				tagList.stream()
 						.sorted((tag1, tag2) -> Integer.compare(tag2.length(), tag1.length()))
@@ -474,9 +508,6 @@ public class DownloadOsmGPX {
 		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
-			if (tags.contains(tag)) {
-				return activityId;
-			}
 			if (name != null && name.toLowerCase().contains(tag)) {
 				return activityId;
 			}
