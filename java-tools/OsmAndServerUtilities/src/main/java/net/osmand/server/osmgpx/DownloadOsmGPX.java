@@ -38,6 +38,7 @@ import javax.xml.stream.XMLStreamException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
@@ -116,7 +117,7 @@ public class DownloadOsmGPX {
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 
 	private static final String GPX_FILE_PREIX = "OG";
-	RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
+	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 
 	private static float round2(float value) {
 		return Math.round(value * 100) / 100.0f;
@@ -127,6 +128,7 @@ public class DownloadOsmGPX {
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
 	
 	public DownloadOsmGPX() throws SQLException {
+		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 		initDBConnection();
 	}
 	
