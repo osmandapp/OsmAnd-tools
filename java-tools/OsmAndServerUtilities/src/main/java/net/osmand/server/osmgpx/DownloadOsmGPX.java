@@ -252,6 +252,7 @@ public class DownloadOsmGPX {
 
 	private void ensureActivitySchema() throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_data_id ON " + GPX_METADATA_TABLE_NAME + " (id)");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
@@ -313,14 +314,14 @@ public class DownloadOsmGPX {
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
 		int identifiedActivityCount = 0;
-		long lastId = 0;
+		long lastUpdatedId = -1; // so id=0 is included when present
 		boolean hasMoreRecords = true;
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
 				String selectSql = update
-						? "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > " + lastId + " ORDER BY id LIMIT " + BATCH_LIMIT
+						? "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > " + lastUpdatedId + " ORDER BY id LIMIT " + BATCH_LIMIT
 						: "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE activity IS NULL LIMIT " + BATCH_LIMIT;
 				try (Statement selectStmt = dbConn.createStatement();
 				     ResultSet rs = selectStmt.executeQuery(selectSql)) {
@@ -421,7 +422,7 @@ public class DownloadOsmGPX {
 						batchSize++;
 						processedCount++;
 						if (update) {
-							lastId = id;
+							lastUpdatedId = id;
 						}
 
 						if (batchSize >= BATCH_LIMIT) {
