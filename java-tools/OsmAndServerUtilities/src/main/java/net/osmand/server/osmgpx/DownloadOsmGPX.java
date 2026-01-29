@@ -115,6 +115,7 @@ public class DownloadOsmGPX {
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 
 	private static final String GPX_FILE_PREIX = "OG";
+	private static final String GPX_EXTENSION_ACTIVITY_OSMAND = "osmand:activity";
 
 	private static float round2(float value) {
 		return Math.round(value * 100) / 100.0f;
@@ -385,9 +386,11 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
+							activity = getActivityFromGpxExtensions(gpxFile, activitiesMap);
+						}
+						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
-
 						if (activity == null) {
 							activity = analyzeActivityFromGpx(analysis);
 						}
@@ -445,6 +448,38 @@ public class DownloadOsmGPX {
 			updateStmtActivityOnly.close();
 		}
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
+	}
+
+	private String getActivityFromGpxExtensions(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
+		if (gpxFile == null || activitiesMap.isEmpty()) {
+			return null;
+		}
+		String value = null;
+		Map<String, String> extensions = gpxFile.getExtensions();
+		if (extensions != null && !extensions.isEmpty()) {
+			value = extensions.get(GPX_EXTENSION_ACTIVITY_OSMAND);
+		}
+		if (value == null || value.isEmpty()) {
+			Map<String, String> metaExt = gpxFile.getMetadata().getExtensionsToRead();
+			if (!metaExt.isEmpty()) {
+				value = metaExt.get(GPX_EXTENSION_ACTIVITY_OSMAND);
+			}
+		}
+		if (value == null || value.isEmpty()) {
+			return null;
+		}
+		String v = value.trim();
+		if (activitiesMap.containsKey(v)) {
+			return v;
+		}
+		for (Map.Entry<String, List<String>> e : activitiesMap.entrySet()) {
+			for (String tag : e.getValue()) {
+				if (tag != null && tag.equalsIgnoreCase(v)) {
+					return e.getKey();
+				}
+			}
+		}
+		return null;
 	}
 
 	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
