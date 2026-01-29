@@ -75,10 +75,10 @@ public class OsmGpxController {
 	public record RoutesListRequest(
 			String activity,
 			Integer year,
-			String minlat,
-			String maxlat,
-			String minlon,
-			String maxlon,
+			String minLat,
+			String maxLat,
+			String minLon,
+			String maxLon,
 			List<String> tags,
 			String tagMatchMode
 	) {
@@ -95,7 +95,7 @@ public class OsmGpxController {
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, req.minlat(), req.maxlat(), req.minlon(), req.maxlon());
+		ResponseEntity<String> error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
 		if (error != null) {
 			return error;
 		}
@@ -134,10 +134,10 @@ public class OsmGpxController {
 	}
 
 	@GetMapping(path = {"/tags"}, produces = "application/json")
-	public ResponseEntity<String> getTags(@RequestParam String minlat,
-	                                      @RequestParam String maxlat,
-	                                      @RequestParam String minlon,
-	                                      @RequestParam String maxlon) {
+	public ResponseEntity<String> getTags(@RequestParam String minLat,
+	                                      @RequestParam String maxLat,
+	                                      @RequestParam String minLon,
+	                                      @RequestParam String maxLon) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -145,7 +145,7 @@ public class OsmGpxController {
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, minlat, maxlat, minlon, maxlon);
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
 			return error;
 		}
@@ -432,11 +432,11 @@ public class OsmGpxController {
 		}
 	}
 
-	private ResponseEntity<String> addCoords(List<Object> params, StringBuilder conditions, String minlat, String maxlat, String minlon, String maxlon) {
-		Float validatedMinLat = validateCoordinate(minlat, "minlat");
-		Float validatedMaxLat = validateCoordinate(maxlat, "maxlat");
-		Float validatedMinLon = validateCoordinate(minlon, "minlon");
-		Float validatedMaxLon = validateCoordinate(maxlon, "maxlon");
+	private ResponseEntity<String> addCoords(List<Object> params, StringBuilder conditions, String minLat, String maxLat, String minLon, String maxLon) {
+		Float validatedMinLat = validateCoordinate(minLat, "minLat");
+		Float validatedMaxLat = validateCoordinate(maxLat, "maxLat");
+		Float validatedMinLon = validateCoordinate(minLon, "minLon");
+		Float validatedMaxLon = validateCoordinate(maxLon, "maxLon");
 
 		if (validatedMinLat == null || validatedMaxLat == null || validatedMinLon == null || validatedMaxLon == null) {
 			return ResponseEntity.badRequest().body("Invalid latitude or longitude values.");
