@@ -39,6 +39,8 @@ import javax.xml.stream.XMLStreamException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Source;
 import okio.Buffer;
@@ -75,7 +77,6 @@ import net.osmand.util.Algorithms;
 import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
-import rtree.RTree;
 
 public class DownloadOsmGPX {
 
@@ -386,7 +387,7 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
-							activity = getActivityFromGpxExtensions(gpxFile, activitiesMap);
+							activity = getActivityByRouteActivity(gpxFile, activitiesMap);
 						}
 						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
@@ -450,31 +451,35 @@ public class DownloadOsmGPX {
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
 	}
 
-	private String getActivityFromGpxExtensions(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
+	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
 		if (gpxFile == null || activitiesMap.isEmpty()) {
 			return null;
 		}
-		String value = null;
-		Map<String, String> extensions = gpxFile.getExtensions();
-		if (extensions != null && !extensions.isEmpty()) {
-			value = extensions.get(GPX_EXTENSION_ACTIVITY_OSMAND);
-		}
-		if (value == null || value.isEmpty()) {
-			Map<String, String> metaExt = gpxFile.getMetadata().getExtensionsToRead();
-			if (!metaExt.isEmpty()) {
-				value = metaExt.get(GPX_EXTENSION_ACTIVITY_OSMAND);
-			}
-		}
-		if (value == null || value.isEmpty()) {
+		RouteActivity routeActivity = gpxFile.getMetadata()
+				.getRouteActivity(RouteActivityHelper.INSTANCE.getActivities());
+		if (routeActivity == null) {
 			return null;
 		}
-		String v = value.trim();
-		if (activitiesMap.containsKey(v)) {
-			return v;
+
+		String activityId = routeActivity.getId();
+		String key = activitiesMap.keySet()
+				.stream()
+				.filter(k -> k != null && k.equalsIgnoreCase(activityId))
+				.findFirst()
+				.orElse(null);
+		if (key != null) {
+			return key;
 		}
-		for (Map.Entry<String, List<String>> e : activitiesMap.entrySet()) {
-			for (String tag : e.getValue()) {
-				if (tag != null && tag.equalsIgnoreCase(v)) {
+
+		Set<String> tags = routeActivity.getTags();
+		if (tags != null && !tags.isEmpty()) {
+			for (Map.Entry<String, List<String>> e : activitiesMap.entrySet()) {
+				boolean tagMatches = e.getValue()
+						.stream()
+						.anyMatch(t -> tags
+								.stream()
+								.anyMatch(tag -> tag.equalsIgnoreCase(t)));
+				if (tagMatches) {
 					return e.getKey();
 				}
 			}
