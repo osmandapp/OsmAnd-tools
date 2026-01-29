@@ -100,6 +100,11 @@ public class OsmGpxController {
 			return error;
 		}
 
+		// skip garbage and error activities
+		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
+		params.add("garbage");
+		params.add("error");
+
 		if (req.year() != null) {
 			error = filterByYear(String.valueOf(req.year()), params, conditions);
 			if (error != null) {
