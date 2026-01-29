@@ -1171,10 +1171,11 @@ public class DownloadOsmGPX {
 	
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {
 		String vl = parser.getAttributeValue("", key);
-		if(isEmpty(vl)) {
+		if (isEmpty(vl)) {
 			return "0";
 		}
-		return vl;
+		// Normalize decimal separator: API/XML may use comma (e.g. "0,000000")
+		return vl.replace(',', '.');
 	}
 
 	private static boolean isEmpty(String vl) {
