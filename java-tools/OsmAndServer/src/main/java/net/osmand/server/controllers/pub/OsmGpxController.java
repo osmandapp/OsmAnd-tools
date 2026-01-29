@@ -64,6 +64,7 @@ public class OsmGpxController {
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
+	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 100;
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
@@ -160,7 +161,7 @@ public class OsmGpxController {
 				"WHERE tag IS NOT NULL AND tag <> '' " +
 				"GROUP BY tag " +
 				"ORDER BY cnt DESC " +
-				"LIMIT 1000";
+				"LIMIT " + MAX_TAGS_PER_BBOX;
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
 		return ResponseEntity.ok(gson.toJson(rows));
