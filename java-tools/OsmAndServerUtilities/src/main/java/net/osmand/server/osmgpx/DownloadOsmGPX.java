@@ -225,6 +225,8 @@ public class DownloadOsmGPX {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
 			utility.addActivityColumnAndPopulate(args[1]);
+		} else if ("update_activity".equals(main)) {
+			utility.updateActivity(args[1]);
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
 			for (int i = 0; i < args.length; i++) {
@@ -248,45 +250,57 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
-		LOG.info("Starting the process to add activity column and indexes...");
+	private void ensureActivitySchema() throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
-			// add activity column if not exists
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
-			// add analysis columns if not exists
+
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
-			// add indexes for analysis columns
+
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed) WHERE speed > 0");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance) WHERE distance > 0");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points) WHERE points > 0");
-			// add index for activity column
+
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
-			// add index for tags (GIN)
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
-			// add indexes for coordinates
+
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
 			statement.executeUpdate(
 					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
 							"ON " + GPX_METADATA_TABLE_NAME +
 							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
 			);
-			// add indexes for date
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
 		}
-		LOG.info("All indexes created successfully.");
-		LOG.info("Creating activities map...");
+		LOG.info("Activity schema (columns and indexes) ensured.");
+	}
+
+	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
+		LOG.info("Starting add_activity (column/indexes + populate only activity IS NULL)...");
+		ensureActivitySchema();
 		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
 		} else {
-			fillActivityColumn(activitiesMap);
+			fillActivityColumn(activitiesMap, false);
 		}
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
-		LOG.info("Starting to populate the 'activity' column...");
+	protected void updateActivity(String rootPath) throws SQLException {
+		LOG.info("Starting update_activity (all records)...");
+		ensureActivitySchema();
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping.");
+			return;
+		}
+		fillActivityColumn(activitiesMap, true);
+		LOG.info("Update activity finished.");
+	}
+
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap, boolean update) throws SQLException {
+		LOG.info("Starting to populate the 'activity' column" + (update ? " (all records)" : " (only activity IS NULL)") + "...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ? WHERE id = ?"
@@ -299,15 +313,17 @@ public class DownloadOsmGPX {
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
 		int identifiedActivityCount = 0;
+		long lastUpdatedId = -1; // so id=0 is included when present
 		boolean hasMoreRecords = true;
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
+				String selectSql = update
+						? "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > " + lastUpdatedId + " ORDER BY id LIMIT " + BATCH_LIMIT
+						: "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE activity IS NULL LIMIT " + BATCH_LIMIT;
 				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery(
-						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT)) {
+				     ResultSet rs = selectStmt.executeQuery(selectSql)) {
 					if (!rs.isBeforeFirst()) {
 						break; // no more records to process
 					}
@@ -404,6 +420,9 @@ public class DownloadOsmGPX {
 
 						batchSize++;
 						processedCount++;
+						if (update) {
+							lastUpdatedId = id;
+						}
 
 						if (batchSize >= BATCH_LIMIT) {
 							updateStmtMetrics.executeBatch();
