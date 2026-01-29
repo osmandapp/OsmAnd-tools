@@ -489,8 +489,16 @@ public class DownloadOsmGPX {
 			}
 		}
 
-		Map<String, String> tagMap = new LinkedHashMap<>();
+		RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
+		for (String tag : tags) {
+			RouteActivity activity = routeActivityHelper.findActivityByTag(tag);
+			if (activity != null && activitiesMap.containsKey(activity.getId())) {
+				return activity.getId();
+			}
+		}
 
+		// check name/desc
+		Map<String, String> tagMap = new LinkedHashMap<>();
 		activitiesMap.forEach((activityId, tagList) ->
 				tagList.stream()
 						.sorted((tag1, tag2) -> Integer.compare(tag2.length(), tag1.length()))
@@ -500,9 +508,6 @@ public class DownloadOsmGPX {
 		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
-			if (tags.contains(tag)) {
-				return activityId;
-			}
 			if (name != null && name.toLowerCase().contains(tag)) {
 				return activityId;
 			}
