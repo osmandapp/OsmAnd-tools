@@ -462,28 +462,10 @@ public class DownloadOsmGPX {
 		}
 
 		String activityId = routeActivity.getId();
-		String key = activitiesMap.keySet()
-				.stream()
-				.filter(k -> k != null && k.equalsIgnoreCase(activityId))
-				.findFirst()
-				.orElse(null);
-		if (key != null) {
-			return key;
+		if (activitiesMap.containsKey(activityId)) {
+			return activityId;
 		}
 
-		Set<String> tags = routeActivity.getTags();
-		if (tags != null && !tags.isEmpty()) {
-			for (Map.Entry<String, List<String>> e : activitiesMap.entrySet()) {
-				boolean tagMatches = e.getValue()
-						.stream()
-						.anyMatch(t -> tags
-								.stream()
-								.anyMatch(tag -> tag.equalsIgnoreCase(t)));
-				if (tagMatches) {
-					return e.getKey();
-				}
-			}
-		}
 		return null;
 	}
 
