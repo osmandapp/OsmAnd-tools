@@ -200,7 +200,7 @@ public class SearchService {
         return bbox;
     }
 
-	public List<Feature> search(SearchContext ctx) throws IOException {
+	public List<Feature> search(SearchContext ctx, Calendar clientTime) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResultWrapper searchResults = searchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
@@ -211,7 +211,7 @@ public class SearchService {
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
-			saveSearchResult(res, features);
+			saveSearchResult(res, features, clientTime);
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();
@@ -1116,10 +1116,10 @@ public class SearchService {
             return fieldName;
         }
     }
-    
-    private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
+
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features, Calendar clientTime) {
         for (SearchResult result : res) {
-            features.add(getFeature(result));
+            features.add(getFeature(result, clientTime));
         }
     }
 
@@ -1169,10 +1169,10 @@ public class SearchService {
         return createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
-	public Feature getFeature(SearchResult result) {
+	public Feature getFeature(SearchResult result, Calendar clientTime) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
-            feature = getPoiFeature(result, null);
+			feature = getPoiFeature(result, clientTime);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
 			feature = new Feature(geometry)
@@ -1187,8 +1187,8 @@ public class SearchService {
 					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
 				}
 			} else if (result.objectType == ObjectType.STREET_INTERSECTION) {
-                feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
-            }
+				feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
+			}
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
@@ -1197,7 +1197,7 @@ public class SearchService {
 		return feature;
 	}
 
-    private Feature getPoiFeature(SearchResult result, Calendar clientTime) {
+	private Feature getPoiFeature(SearchResult result, Calendar clientTime) {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
@@ -1223,13 +1223,13 @@ public class SearchService {
 			String value = unzipContent(entry.getValue());
 			feature.prop(entry.getKey(), value);
 		}
-        String oh = tags.get(AMENITY_PREFIX + OPENING_HOURS);
-        if (clientTime != null && oh != null) {
-            String openingHoursInfo = getOpeningHoursInfo(oh, clientTime);
-            if (openingHoursInfo != null) {
-                feature.prop(AMENITY_PREFIX + OPENING_HOURS + INFO, openingHoursInfo);
-            }
-        }
+		String oh = tags.get(AMENITY_PREFIX + OPENING_HOURS);
+		if (clientTime != null && oh != null) {
+			String openingHoursInfo = getOpeningHoursInfo(oh, clientTime);
+			if (openingHoursInfo != null) {
+				feature.prop(AMENITY_PREFIX + OPENING_HOURS + INFO, openingHoursInfo);
+			}
+		}
 		Map<String, String> names = amenity.getNamesMap(true);
 		for (Map.Entry<String, String> entry : names.entrySet()) {
 			feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
@@ -1251,17 +1251,17 @@ public class SearchService {
 		return feature;
 	}
 
-    private String getOpeningHoursInfo(String oh, Calendar calendar) {
-        OpeningHoursParser.OpeningHours openingHours = parseOpenedHours(oh);
-        List<OpeningHoursParser.OpeningHours.Info> ohInfo;
-        if (openingHours != null) {
-            ohInfo = openingHours.getInfo(calendar);
-            if (ohInfo != null) {
-                return (ohInfo.get(0).isOpened() ? IS_OPENED_PREFIX : "") + ohInfo.get(0).getInfo();
-            }
-        }
-        return null;
-    }
+	private String getOpeningHoursInfo(String oh, Calendar calendar) {
+		OpeningHoursParser.OpeningHours openingHours = parseOpenedHours(oh);
+		List<OpeningHoursParser.OpeningHours.Info> ohInfo;
+		if (openingHours != null) {
+			ohInfo = openingHours.getInfo(calendar);
+			if (ohInfo != null) {
+				return (ohInfo.get(0).isOpened() ? IS_OPENED_PREFIX : "") + ohInfo.get(0).getInfo();
+			}
+		}
+		return null;
+	}
 
     private void filterWikiTags(Map<String, String> tags) {
         tags.entrySet().removeIf(entry -> entry.getKey().startsWith("osm_tag_travel_elo")
