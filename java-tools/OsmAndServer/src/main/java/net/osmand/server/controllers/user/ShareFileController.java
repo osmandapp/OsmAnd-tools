@@ -131,7 +131,7 @@ public class ShareFileController {
 		GpxFile gpxFile = shareFileService.getFile(userFile);
 		if (gpxFile != null && gpxFile.getError() == null) {
 			GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
-			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, false, analysis);
+			WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, analysis);
 			if (gpxData != null) {
 				return ResponseEntity.ok(gsonWithNans.toJson(Map.of(
 						"gpx_data", gpxData,

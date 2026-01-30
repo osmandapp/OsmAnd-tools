@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -894,7 +895,7 @@ public class UserdataService {
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
         InternalZipFile zipFile = null;
-        File tmpGpx = File.createTempFile(newName.replace("/../", "/"), ".gpx");
+        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
             zipFile = InternalZipFile.buildFromFile(tmpGpx);
         } else {

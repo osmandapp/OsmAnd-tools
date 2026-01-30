@@ -263,6 +263,23 @@ public class CombineSRTMIntoFile {
 						}
 					}
 				}
+				if (isOut) {
+					boolean anyPointInTile = false;
+					for (Ring r : polygon.getOuterRings()) {
+						for (Node n : r.getBorder()) {
+							double nLat = n.getLatitude();
+							double nLon = n.getLongitude();
+							if (nLat >= lat && nLat < lat + 1 && nLon >= lon && nLon < lon + 1) {
+								anyPointInTile = true;
+								break;
+							}
+						}
+						if (anyPointInTile) break;
+					}
+					if (anyPointInTile) {
+						isOut = false;
+					}
+				}
 				if(!isOut) {
 					final String filename = getFileName(lon, lat);
 					srtmFileNames.add(filename);

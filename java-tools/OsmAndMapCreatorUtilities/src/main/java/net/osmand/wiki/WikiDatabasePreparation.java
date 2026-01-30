@@ -23,7 +23,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -87,50 +86,11 @@ public class WikiDatabasePreparation {
 
 	public static final String DEFAULT_LANG = "en";
 	
-
 	public enum PoiFieldType {
 		NAME, PHONE, WEBSITE, WORK_HOURS, PRICE, DIRECTIONS, WIKIPEDIA, WIKIDATA, FAX, EMAIL, DESCRIPTION, LON, LAT,
 		ADDRESS, AREA_CODE,
 		// Object categories
 		CATEGORY, LATLON
-	}
-
-	public enum PoiFieldCategory {
-		SEE("special_photo_camera", 0xCC10A37E, new String[] { "see", "voir", "veja", "מוקדי", "دیدن" }, "church",
-				"mosque", "square", "town_hall", "building", "veja", "voir", "temple", "mosque", "synagogue",
-				"monastery", "palace", "château", "memorial", "archaeological", "fort", "monument", "castle", "دیدن",
-				"tower", "cathedral", "arts centre", "mill", "house", "ruins"),
-		DO("special_photo_camera", 0xCC10A37E, new String[] { "do", "event", "פעילויות", "انجام‌دادن" }, "museum",
-				"zoo", "theater", "fair", "faire", "cinema", "disco", "sauna", "aquarium", "swimming", "amusement",
-				"golf", "club", "sports", "music", "spa", "انجام‌دادن", "festival"),
-		EAT("restaurants", 0xCCCA2D1D, new String[] { "eat", "manger", "coma", "אוכל", "خوردن" }, "restaurant", "cafe",
-				"bistro"),
-		DRINK("restaurants", 0xCCCA2D1D, new String[] { "drink", "boire", "beba", "שתייה", "نوشیدن" }, "bar", "pub"),
-		SLEEP("tourism_hotel", 0xCC0E53C9, new String[] { "sleep", "se loger", "durma", "לינה", "خوابیدن" }, "hotel",
-				"hostel", "habitat", "campsite"),
-		BUY("shop_department_store", 0xCC8F2BAB, new String[] { "buy", "קניות", "فهرست‌بندی" }, "shop", "market",
-				"mall"),
-		GO("public_transport_stop_position", 0xCC0F5FFF,
-				new String[] { "go", "destination", "aller", "circuler", "sortir", "רשימה" }, "airport", "train",
-				"station", "bus"),
-		NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island" }, "park",
-				"cemetery", "garden", "lake", "beach", "landmark", "cemetery", "cave", "garden", "waterfall",
-				"viewpoint", "mountain"),
-		OTHER("", 0xCC0F5FFF, new String[] { "other", "marker", "ville", "item", "רשימה", "دیدن", "יעד מרכזי",
-				"יישוב מרכזי", "représentation diplomatique" });
-
-		public final String[] names;
-		public final String[] types;
-		public final String icon;
-		public final int color;
-
-		private PoiFieldCategory(String icon, int color, String[] names, String... types) {
-			this.icon = icon;
-			this.color = color;
-			this.names = names;
-			this.types = types;
-		}
-
 	}
 
 	public interface WikiDBBrowser {
@@ -441,11 +401,11 @@ public class WikiDatabasePreparation {
 		for (String line : parts) {
 			line = line.trim();
 			String lineLc = line.toLowerCase();
-			
-			if (lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
+
+			if (author == null && lineLc.startsWith(ParserUtils.FIELD_AUTHOR) || lineLc.startsWith(ParserUtils.FIELD_PHOTOGRAPHER)) {
 				author = AuthorParser.parse(line);
 			}
-			if (lineLc.startsWith(ParserUtils.FIELD_DATE)) {
+			if (date == null && lineLc.startsWith(ParserUtils.FIELD_DATE)) {
 				date = DateParser.parse(line);
 			}
 			if (lineLc.startsWith(ParserUtils.FIELD_DESCRIPTION)) {
@@ -1219,7 +1179,7 @@ public class WikiDatabasePreparation {
 			}
 			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
-		if (mode.equals("create-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
+		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
@@ -1261,7 +1221,7 @@ public class WikiDatabasePreparation {
 			log.info("Process OSM coordinates...");
 			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0);
+			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			break;
 		case "create-osm-wikidata":
@@ -1286,6 +1246,14 @@ public class WikiDatabasePreparation {
 		case "test-wikipedia":
 			processWikipedia(wikipediaFolder, wikipediaSqliteName, lang, testArticleID);
 			break;
+		case "test-wikidata":
+			wikidataDB = new File(wikidataSqliteName + ".test");
+//			log.info("Process OSM coordinates...");
+//			osmCoordinates.parse(wikidataDB.getParentFile());
+			log.info("Create wikidata...");
+			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000);
+			createOSMWikidataTable(wikidataDB, osmCoordinates);
+			break;
 		case "create-wikidata-mapping":
 			wikidataDB = new File(wikidataSqliteName);
 			log.info("Create wikidata mapping DB.");
@@ -1304,7 +1272,7 @@ public class WikiDatabasePreparation {
 		log.info("Updating wikidata...");
 		for (String fileName : downloadedPageFiles) {
 			log.info("Updating from " + fileName);
-			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId);
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId, -1);
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
@@ -1501,7 +1469,7 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void processWikidata(File wikidataSqlite, final String wikidataFile,
-			OsmCoordinatesByTag osmCoordinates, long lastProcessedId)
+			OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file",
@@ -1513,7 +1481,13 @@ public class WikiDatabasePreparation {
 		regions.cacheAllCountries();
 		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions,
 				lastProcessedId);
-		sx.parse(is, handler);
+		handler.setLimit(limit);
+		try {
+			sx.parse(is, handler);
+		} catch (IllegalStateException e) {
+			// stopped by limit
+			System.out.println("Stopped by limit " + e.getMessage());
+		}
 		handler.finish();
 		osmCoordinates.closeConnection();
 	}

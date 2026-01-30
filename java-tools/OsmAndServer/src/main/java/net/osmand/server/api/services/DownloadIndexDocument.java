@@ -62,6 +62,9 @@ public class DownloadIndexDocument {
 	@XmlElement(name = "heightmap")
 	private List<DownloadIndex> heightmap = new ArrayList<>();
 	
+	@XmlElement(name = "starmap")
+	private List<DownloadIndex> starmap = new ArrayList<>();
+	
 	@XmlElement(name = "slope")
 	private List<DownloadIndex> slope = new ArrayList<>();
 	
@@ -110,6 +113,7 @@ public class DownloadIndexDocument {
 		sortMaps(wikimaps);
 		sortMaps(travel);
 		sortMaps(weather);
+		sortMaps(starmap);
 	}
 	
 	public List<DownloadIndex> getAllMaps() {
@@ -126,6 +130,7 @@ public class DownloadIndexDocument {
 		indx.addAll(wikimaps);
 		indx.addAll(travel);
 		indx.addAll(weather);
+		indx.addAll(starmap);
 		return indx;
 	}
 
@@ -159,11 +164,14 @@ public class DownloadIndexDocument {
 	public List<DownloadIndex> getDepths() {
 		return depths;
 	}
+	
+	public List<DownloadIndex> getStarmap() {
+		return starmap;
+	}
 
 	public List<DownloadIndex> getWikimaps() {
 		return wikimaps;
 	}
-
 	
 	public List<DownloadIndex> getTravelGuides() {
 		return travel;

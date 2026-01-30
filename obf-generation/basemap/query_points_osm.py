@@ -29,7 +29,7 @@ def process_points(cond, filename, array):
 	shift = 2
 	queryFields = ""
 	names = ['name:af', 'name:ar', 'name:az', 'name:be', 'name:bg', 'name:bn', 'name:bpy', 'name:br', 'name:bs', 'name:ca', 'name:ceb', 'name:crh', 'name:cs', 'name:cy', 'name:da', 'name:de', 'name:el', 'name:eo', 'name:es', 'name:et', 'name:eu', 'name:id', 'name:fa', 'name:fi', 'name:fr', 'name:fy', 'name:ga', 'name:gl', 'name:he', 'name:hi', 'name:hr', 'name:ht', 'name:hu', 'name:hy', 'name:is', 'name:it', 'name:ja', 'name:ka', 'name:kn', 'name:ko', 'name:ku', 'name:la', 'name:lb', 'name:lt', 'name:lv', 'name:mi', 'name:mk', 'name:ml', 'name:mr', 'name:ms', 'name:nds', 'name:new', 'name:nl', 'name:nn', 'name:no', 'name:nv', 'name:os', 'name:pl', 'name:pms', 'name:pt', 'name:ro', 'name:ru', 'name:sc', 'name:sh', 'name:sk', 'name:sl', 'name:sq', 'name:sr', 'name:sv', 'name:sw', 'name:ta', 'name:te', 'name:th', 'name:tl', 'name:tr', 'name:uk', 'name:vi', 'name:vo', 'name:zh']
-	largeStatesList = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'ᓄᓇᕗᑦ Nunavut', 'Ontario', 'Québec', 'Saskatchewan', 'Yukon', 'Western Australia', 'Northern Territory', 'Queensland', 'South Australia', 'New South Wales', 'Victoria', 'Tasmania']
+	largeStatesList = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'ᓄᓇᕗᑦ Nunavut', 'Ontario', 'Québec', 'Saskatchewan', 'Yukon', 'Western Australia', 'Northern Territory', 'Queensland', 'South Australia', 'New South Wales', 'Victoria', 'Tasmania','Alabama', 'Alaska', 'Amazonas', 'Pará', 'Bahia', 'Minas Gerais', 'Mato Grosso', 'Goiás', 'Maranhão', 'Mato Grosso do Sul', 'Rio Grande do Sul', 'Loreto', 'Bolívar', 'Región de Magallanes y de la Antártica Chilena', 'Región Aysén del General Carlos Ibáñez del Campo', 'Santa Cruz', 'Chubut', 'Río Negro', 'Buenos Aires', 'Beni', 'Northern Cape', 'Cuando Cubango', 'ሶማሌ ክልል / Somali Region', 'تمنراست', 'Tiris Zemmour تيرس زمور', 'مرزق', 'الكفرة', 'الواحات', 'مطروح', 'الوادي الجديد', 'الشمالية Northern State', 'Red Sea State البحر الأحمر', 'المنطقة الشرقية', 'منطقة الرياض', 'استان کرمان', 'استان خراسان جنوبی', 'استان خراسان رضوی', 'استان سیستان و بلوچستان', 'Balkan welaýaty', 'بلوچستان', 'Rajasthan', 'Uttar Pradesh', 'Gujarat', 'Maharashtra', 'Madhya Pradesh', 'Karnataka', 'Odisha', 'Kalimantan Barat', 'Kalimantan Tengah', 'Sarawak', '新疆维吾尔自治区 شىنجاڭ ئۇيغۇر ئاپتونوم رايونی', '西藏自治区 བོད་རང་སྐྱོང་ལྗོངས།', '青海省', '甘肃省', '内蒙古自治区 ᠦᠪᠦᠷ ᠮᠣᠩᠭᠤᠯ ᠤᠨ ᠥᠪᠡᠷᠲᠡᠭᠡᠨ ᠵᠠᠰᠠᠬᠣ ᠣᠷᠣᠨ', '四川省', '云南省', '贵州省', '广西壮族自治区', '广东省', '湖南省', '江西省', '福建省', '浙江省', '安徽省', '河南省', '山东省', '山西省', '辽宁省', '吉林省', '黑龙江省', 'Өмнөговь ᠡᠮᠦᠨᠡ ᠭᠣᠪᠢ', 'Говь-Алтай ᠭᠣᠪᠢ ᠠᠯᠲᠠᠢ', 'Хөвсгөл ᠬᠥᠪᠰᠦᠭᠦᠯ', 'Дорнод ᠳᠣᠷᠤᠨᠠᠳᠤ', 'Дорноговь ᠳᠣᠷᠤᠨᠠ ᠭᠣᠪᠢ', 'Батыс Қазақстан облысы', 'Атырау облысы', 'Маңғыстау облысы', 'Ақтөбе облысы', 'Қызылорда облысы', 'Қостанай облысы', 'Солтүстік Қазақстан облысы', 'Ақмола облысы', 'Павлодар облысы', 'Қарағанды облысы', 'Ұлытау облысы', 'Қарағанды облысы', 'Абай облысы', 'Жамбыл облысы', 'Qaraqalpaqstan Respublikası', 'Castilla y León', 'England', 'Alba / Scotland', 'Мурманская область', 'Карелия', 'Ленинградская область', 'Новгородская область', 'Тверская область', 'Ростовская область', 'Воронежская область', 'Волгоградская область', 'Ставропольский край', 'Саратовская область', 'Нижегородская область', 'Костромская область', 'Вологодская область', 'Архангельская область', 'Ненецкий автономный округ', 'Республика Коми', 'Пермский край', 'Башкортостан', 'Свердловская область', 'Тюменская область', 'Ханты-Мансийский автономный округ — Югра', 'Ямало-Ненецкий автономный округ', 'Томская область', 'Омская область', 'Новосибирская область', 'Алтайский край', 'Кемеровская область', 'Республика Алтай', 'Республика Тыва', 'Красноярский край', 'Иркутская область', 'Бурятия', 'Забайкальский край', 'Амурская область', 'Республика Саха (Якутия)', 'Хабаровский край', 'Приморский край', 'Магаданская область', 'Камчатский край']
 	for tag in array:
 		if tag == 'name:en':
 			tag = 'tags->\'name:en\' as "name:en"'
@@ -58,13 +58,13 @@ def process_points(cond, filename, array):
 	for nm in names:
 		array.append(nm)
 		queryFields += ", tags->\'" + nm + "\' as \"" + nm + "\""
-		
+
 	sql = "select ST_AsText(ST_Transform(way,4326)), osm_id  " + queryFields + \
 	      " from planet_osm_point where " + cond + ";"
 	      # "LIMIT 2"
 	print(sql)
 	cursor.execute(sql)
- 	
+
 	node_id =-1000
 	parse = re.compile(r'(-?[\d.]+)\s(-?[\d.]+)')
 	for row in cursor:
@@ -89,7 +89,7 @@ def process_points(cond, filename, array):
 					# value = '' # write name:en instead of name
 				# if tagName == 'name:en' and len(value) > 0 :
 					# tagName = 'name'
-				
+
 				if len(value) > 0 :
 					if not (tagName == "ref" and len(value) > 6) :
 						xml += '\t<tag k="%s" v="%s" />\n' % (tagName, value)
@@ -112,6 +112,6 @@ if __name__ == "__main__":
 #				   " or tags->'abandoned' in ('yes') "
 #				   " or (tags->'population' <> '')"
 #				   " or aeroway in ('aerodrome', 'airport')"
-#		       		   , 'points_less.osm', 
+#		       		   , 'points_less.osm',
 #				   ['name', 'name:en',
 #				    'ref', 'ele', 'place','natural', 'seamark:type', 'abandoned', 'aeroway', 'tourism', 'iata', 'icao', 'faa', 'population'])

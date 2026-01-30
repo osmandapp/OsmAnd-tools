@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static net.osmand.wiki.parseWikiMetadata.WikiTestUtils.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import net.osmand.wiki.WikiDatabasePreparation;
@@ -200,44 +201,19 @@ public class WikiAuthorParsingTest {
 		assertEquals("Photoglob Zürich", webResults.get("author"));
 	}
 
+	@Test
+	public void test27() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=Сергій Нужненко / [[:en:Kyiv City State Administration|Kyiv City State Administration]]\n"), webResults);
+		assertEquals("Сергій Нужненко / Kyiv City State Administration", webResults.get("author"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);
 		WikiDatabasePreparation.removeMacroBlocks(new StringBuilder(text), webResults, blockResults,
 				null, null, null, null, true);
 		WikiDatabasePreparation.prepareMetaData(webResults);
-	}
-
-	private static String informationBlock(String content) {
-		return "=={{int:filedesc}}==\n" +
-				"{{Information\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String artworkBlock(String content) {
-		return "=={{int:filedesc}}==\n" +
-				"{{Artwork\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String blockPhotograph(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{Photograph\n" +
-				content +
-				"}}\n" +
-				"\n";
-	}
-
-	private static String blockMilim(String content) {
-		return "== {{int:filedesc}} ==\n" +
-				"{{milim\n" +
-				content +
-				"}}\n" +
-				"\n";
 	}
 }
 

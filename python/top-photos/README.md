@@ -18,7 +18,7 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 |                        |      |                   |                                                                              |
 | PHOTOS_PER_PLACE       | int  | 40                | Number of images to request/download per place.                              |
 | PROCESS_PLACES         | int  | 500               | Maximum number of places to process per run.                                 |
-| CHUNK_SIZE             | int  | 100               | Batch size for paginated queries/inserts.                                    |
+| PLACES_PER_THREAD      | int  | 10000             | Batch size for paginated queries/inserts (ex CHUNK_SIZE image-downloader).   |
 | MAX_PLACES_PER_QUAD    | int  | 500               | Upper bound on places fetched per quad (should be less then PROCESS_PLACES). |
 | MAX_PHOTOS_PER_REQUEST | int  | 15                | Maximum number of images to include in a single LLM call.                    |
 | QUAD                   | str  | '**'              | Template string for quad search patterns.                                    |
@@ -30,13 +30,18 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 | MAX_IMG_DIMENSION      | int  | 720               | Upper bound for width/height when resizing images before LLM upload.         |
 | DOWNLOAD_IF_EXISTS     | bool | false             | If `true`, force re-download even when a cached file already exists.         |
 | CACHE_DIR              | str  | './wiki'          | Root directory for on-disk image cache.                                      |
-| USE_PROXY_FILE         | str  | 'proxy-test.list' | Path to a proxy list file (one proxy per line) utilised by the downloader.   |
+| PROXY_FILE_URL         | str  | ''                | Path to a proxy URL of file (one proxy per line) used by image-downloader.   |
 | OFFSET_BATCH           | int  | 0                 | Starting page offset when downloading images in chunks.                      |
-| ERROR_LIMIT            | int  | 20                | Abort the current batch after this many consecutive download errors.         |
+| ERROR_LIMIT_PERCENT    | int  | 50                | Abort the whole image-downloader if error/success ratio reached.             |
 | QUAD_ALPHABET          | str  | see code          | Character set expanded when `*` wildcards are present in `QUAD`.             |
 | STATUS_TIME_OUT        | int  | 60                | Number of seconds as interval to check status of undone tasks.               |
 | MIN_ELO_SUBTYPE        | int  | 800               | Minimum ELO rating to include a place which are in POI sub types.            |
 | POI_SUBTYPE            | str  |                   | Comma separated list of POI sub types (e.g. "city, town").                   |
+| MONITORING_INTERVAL    | int  | 600               | Interval for monitoring image-downloader stats (seconds)                     |
+| ASTRO_IMAGES_ONLY      | bool | false             | Download images for lat==lon==0 objects only (image-downloader)              |
+| MAX_TRIES              | int  | 10                | Number of attempts of image-downloader (useful with proxies)                 |
+| MAX_SLEEP              | int  | 60                | Maximum sleep between HTTP-429 errors (image-downloader)                     |
+
 
 ### Threading Model
 

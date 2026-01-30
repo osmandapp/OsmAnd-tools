@@ -422,7 +422,7 @@ public class OsmExtractionUI implements IMapLocationListener {
 						mapPanel.setStatusField(null);
 						if(sr.location != null) {
 							mapPanel.setLatLon(sr.location.getLatitude(), sr.location.getLongitude());
-							mapPanel.setZoom(sr.preferredZoom);
+							//mapPanel.setZoom(sr.preferredZoom);
 						}
 						SearchStat searchStat = new SearchStat();
 						searchUICore.getPhrase().getSettings().setStat(searchStat);
@@ -555,6 +555,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 		menu.add(loadSpecifiedAreaFile);
 		JMenuItem specifyWorkingDir = new JMenuItem(Messages.getString("OsmExtractionUI.SPECIFY_WORKING_DIR")); //$NON-NLS-1$
 		menu.add(specifyWorkingDir);
+		JMenuItem saveMapScreenshot = new JMenuItem("Save map screenshot");
+		menu.add(saveMapScreenshot);
 		menu.addSeparator();
 		JMenuItem exitMenu= new JMenuItem(Messages.getString("OsmExtractionUI.MENU_EXIT")); //$NON-NLS-1$
 		menu.add(exitMenu);
@@ -730,6 +732,19 @@ public class OsmExtractionUI implements IMapLocationListener {
 		        }
 			}
 
+		});
+		saveMapScreenshot.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				try {
+					File targetFile = mapPanel.saveScreenshotToEnvDir();
+					statusBarLabel.setText("Saved screenshot: " + targetFile.getAbsolutePath());
+				} catch (IOException ex) {
+					ExceptionHandler.handle("Failed to save screenshot", ex);
+				} catch (RuntimeException ex) {
+					ExceptionHandler.handle("Failed to capture screenshot", ex);
+				}
+			}
 		});
 		loadFile.addActionListener(new ActionListener(){
 

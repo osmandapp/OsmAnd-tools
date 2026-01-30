@@ -48,7 +48,7 @@ import static net.osmand.wiki.WikiDatabasePreparation.*;
 
 @Service
 public class WikiService {
-	
+
 	protected static final Log log = LogFactory.getLog(WikiService.class);
 
 	public static final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
@@ -56,6 +56,7 @@ public class WikiService {
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
 	private static final String THUMB_PREFIX = "320px-";
+	public static final String LANG_CODE_REGEX = "^[a-z]{2,3}(-[A-Za-z]{2,4})?$"; // "uk" "hsb" "zh-TW" "sr-Latn"
 	protected static int FILE_URL_TO_USE = 1;
 
 	private static final int LIMIT_OBJS_QUERY = 1000;
@@ -267,7 +268,7 @@ public class WikiService {
 	public String getLangListQuery(List<String> langPriority) {
 		return langPriority.stream()
 				.map(String::trim)
-				.filter(l -> l.matches("^[a-z]{1,3}$"))
+				.filter(l -> l.matches(LANG_CODE_REGEX))
 				.map(l -> "'" + l + "'")
 				.collect(Collectors.joining(", ", "[", "]"));
 	}

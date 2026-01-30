@@ -37,6 +37,7 @@ import java.awt.Image;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
+import java.awt.RenderingHints;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -271,6 +272,95 @@ public class MapPanel extends JPanel implements IMapDownloaderCallback {
 
 	public void setStatusField(JTextField statusField) {
 		this.statusField = statusField;
+	}
+
+	private static final double DEFAULT_SCREENSHOT_SCALE = 2.0;
+	private static final double MIN_SCREENSHOT_SCALE = 0.1;
+	private static final double MAX_SCREENSHOT_SCALE = 8.0;
+
+	private static double getScreenshotScaleFromEnv() {
+		String raw = System.getenv("SCREEN_SHOT_SCALE");
+		raw = raw == null ? "" : raw.trim();
+		if (Algorithms.isEmpty(raw)) {
+			return DEFAULT_SCREENSHOT_SCALE;
+		}
+		double parsed = Algorithms.parseDoubleSilently(raw, -1.0);
+		if (!Double.isFinite(parsed) || parsed < MIN_SCREENSHOT_SCALE || parsed > MAX_SCREENSHOT_SCALE) {
+			return 1.0;
+		}
+		return parsed;
+	}
+
+	public BufferedImage captureScreenshot() {
+		return captureScreenshot(1.0);
+	}
+
+	public BufferedImage captureScreenshot(double scale) {
+		int width = getWidth();
+		int height = getHeight();
+		if (width <= 0 || height <= 0) {
+			throw new IllegalStateException("MapPanel has invalid size: " + width + "x" + height);
+		}
+		if (!Double.isFinite(scale) || scale <= 0) {
+			throw new IllegalArgumentException("Invalid scale: " + scale);
+		}
+		int scaledWidth = (int) Math.max(1, Math.round(width * scale));
+		int scaledHeight = (int) Math.max(1, Math.round(height * scale));
+		BufferedImage bufferedImage = new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D graphics2D = bufferedImage.createGraphics();
+		try {
+			graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			graphics2D.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+			graphics2D.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+			graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+			graphics2D.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+			graphics2D.scale(scale, scale);
+			printAll(graphics2D);
+		} finally {
+			graphics2D.dispose();
+		}
+		return bufferedImage;
+	}
+
+	public File saveScreenshotToEnvDir() throws IOException {
+		String screenshotDirPath = System.getenv("SCREEN_SHOT_DIR");
+		screenshotDirPath = screenshotDirPath == null ? "" : screenshotDirPath.trim();
+		if (Algorithms.isEmpty(screenshotDirPath)) {
+			throw new IOException("Environment variable SCREEN_SHOT_DIR is not set");
+		}
+		File screenshotDir = new File(screenshotDirPath);
+		if (!screenshotDir.exists() && !screenshotDir.mkdirs()) {
+			throw new IOException("Failed to create screenshot directory: " + screenshotDir.getAbsolutePath());
+		}
+		if (!screenshotDir.isDirectory()) {
+			throw new IOException("SCREEN_SHOT_DIR is not a directory: " + screenshotDir.getAbsolutePath());
+		}
+
+		int nextNumber = 1;
+		File[] existingFiles = screenshotDir.listFiles();
+		if (existingFiles != null) {
+			for (File file : existingFiles) {
+				String name = file.getName();
+				if (!name.endsWith(".png")) {
+					continue;
+				}
+				String numberPart = name.substring(0, name.length() - 4);
+				try {
+					int value = Integer.parseInt(numberPart);
+					if (value >= nextNumber) {
+						nextNumber = value + 1;
+					}
+				} catch (NumberFormatException ex) {
+					// ignore non-numeric names
+				}
+			}
+		}
+
+		File targetFile = new File(screenshotDir, nextNumber + ".png");
+		double scale = getScreenshotScaleFromEnv();
+		BufferedImage image = captureScreenshot(scale);
+		ImageIO.write(image, "png", targetFile);
+		return targetFile;
 	}
 
 	private static Map<String, TileSourceTemplate> getCommonTemplates(File dir){
