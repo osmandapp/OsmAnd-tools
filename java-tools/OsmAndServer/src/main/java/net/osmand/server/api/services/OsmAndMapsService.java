@@ -363,6 +363,11 @@ public class OsmAndMapsService {
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag, boolean useGeocoding) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
+			if (useGeocoding && ref.file.getName().startsWith("World_")) {
+				// World_basemap does not contain address or routing data
+				// World_seamarks contains routing data only
+				continue;
+			}
 			BinaryMapIndexReader reader = null;
 			try {
 				reader = ref.getReader(cacheFiles, 1000);
