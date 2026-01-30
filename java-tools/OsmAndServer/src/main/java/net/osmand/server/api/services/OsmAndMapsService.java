@@ -364,7 +364,8 @@ public class OsmAndMapsService {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
 			if (useGeocoding && ref.file.getName().startsWith("World_")) {
-				// skip world file for geocoding (World_basemap and World_seamarks)
+				// World_basemap does not contain address or routing data
+				// World_seamarks contains routing data only
 				continue;
 			}
 			BinaryMapIndexReader reader = null;
