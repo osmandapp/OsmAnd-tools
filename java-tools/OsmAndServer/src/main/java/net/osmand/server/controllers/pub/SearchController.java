@@ -13,6 +13,7 @@ import net.osmand.shared.wiki.WikiMetadata;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,6 @@ import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
-import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
@@ -78,9 +78,22 @@ public class SearchController {
                                             @RequestParam String locale,
                                             @RequestParam double lat,
                                             @RequestParam double lon,
-                                            @RequestParam(required = false) Boolean baseSearch) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch);
+                                            @RequestParam(required = false) Boolean baseSearch,
+                                            @RequestParam (defaultValue = "0") long clientTime,
+                                            @RequestParam (required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, clientTimeC);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
+    }
+
+    @Nullable
+    private static Calendar getClientTime(long clientTime, String timeZone) {
+        Calendar calendar = null;
+        if (clientTime > 0) {
+            calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
+            calendar.setTimeInMillis(clientTime);
+        }
+        return calendar;
     }
 
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
@@ -89,7 +102,9 @@ public class SearchController {
                                          @RequestParam String pin,
                                          @RequestParam (required = false) String name,
                                          @RequestParam (required = false) Long osmId,
-                                         @RequestParam (required = false) Long wikidataId) throws IOException {
+                                         @RequestParam (required = false) Long wikidataId,
+                                         @RequestParam (defaultValue = "0") long clientTime,
+                                         @RequestParam (required = false) String timeZone) throws IOException {
         Feature poiSearchResult;
 
         if (pin == null || pin.isEmpty()) {
@@ -108,7 +123,10 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
         }
 
-        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId);
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+
+        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId,
+                clientTimeC);
 
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
