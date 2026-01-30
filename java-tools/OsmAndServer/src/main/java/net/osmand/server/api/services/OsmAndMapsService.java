@@ -363,8 +363,8 @@ public class OsmAndMapsService {
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag, boolean useGeocoding) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
-			if (useGeocoding && ref.file.getName().toLowerCase().startsWith("world_seamarks")) {
-				// Geocoding does not need sea maps — skip to avoid locking readers
+			if (useGeocoding && ref.file.getName().startsWith("World_")) {
+				// skip world file for geocoding (World_basemap and World_seamarks)
 				continue;
 			}
 			BinaryMapIndexReader reader = null;
