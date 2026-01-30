@@ -198,7 +198,7 @@ public class OsmGpxController {
 		List<String> normalized = new ArrayList<>();
 		for (String tag : tags) {
 			if (!Algorithms.isEmpty(tag)) {
-				normalized.add(tag.trim().toLowerCase());
+				normalized.add(tag.trim());
 			}
 		}
 		if (normalized.isEmpty()) {
