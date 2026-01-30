@@ -138,7 +138,9 @@ public class OsmGpxController {
 	public ResponseEntity<String> getTags(@RequestParam String minLat,
 	                                      @RequestParam String maxLat,
 	                                      @RequestParam String minLon,
-	                                      @RequestParam String maxLon) {
+	                                      @RequestParam String maxLon,
+	                                      @RequestParam(required = false) Integer year,
+	                                      @RequestParam(required = false) String activity) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -149,6 +151,25 @@ public class OsmGpxController {
 		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
 			return error;
+		}
+
+		// skip garbage and error activities
+		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
+		params.add("garbage");
+		params.add("error");
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (!Algorithms.isEmpty(activity)) {
+			error = filterByActivity(activity, params, conditions);
+			if (error != null) {
+				return error;
+			}
 		}
 
 		String query =
