@@ -138,9 +138,7 @@ public class OsmGpxController {
 	public ResponseEntity<String> getTags(@RequestParam String minLat,
 	                                      @RequestParam String maxLat,
 	                                      @RequestParam String minLon,
-	                                      @RequestParam String maxLon,
-	                                      @RequestParam(required = false) Integer year,
-	                                      @RequestParam(required = false) String activity) {
+	                                      @RequestParam String maxLon) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -151,25 +149,6 @@ public class OsmGpxController {
 		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
 			return error;
-		}
-
-		// skip garbage and error activities
-		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
-		params.add("garbage");
-		params.add("error");
-
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
-		}
-
-		if (!Algorithms.isEmpty(activity)) {
-			error = filterByActivity(activity, params, conditions);
-			if (error != null) {
-				return error;
-			}
 		}
 
 		String query =
@@ -195,29 +174,20 @@ public class OsmGpxController {
 		if (tags == null || tags.isEmpty()) {
 			return;
 		}
-		List<String> normalized = new ArrayList<>();
+		List<String> exactTags = new ArrayList<>();
 		for (String tag : tags) {
 			if (!Algorithms.isEmpty(tag)) {
-				normalized.add(tag.trim().toLowerCase());
+				exactTags.add(tag.trim());
 			}
 		}
-		if (normalized.isEmpty()) {
+		if (exactTags.isEmpty()) {
 			return;
 		}
-
-		// search for tags in a case-insensitive and trimmed way
-		String existsClause = "EXISTS (SELECT 1 FROM unnest(m.tags) AS t WHERE LOWER(TRIM(t::text)) = ?)";
-		if ("AND".equalsIgnoreCase(tagMatchMode)) {
-			for (String tag : normalized) {
-				conditions.append(" AND ").append(existsClause);
-				params.add(tag);
-			}
-		} else {
-			conditions.append(" AND (");
-			conditions.append(String.join(" OR ", Collections.nCopies(normalized.size(), existsClause)));
-			conditions.append(")");
-			params.addAll(normalized);
-		}
+		String op = "AND".equalsIgnoreCase(tagMatchMode) ? "@>" : "&&";
+		conditions.append(" AND m.tags ").append(op).append(" ARRAY[");
+		conditions.append(String.join(",", Collections.nCopies(exactTags.size(), "?")));
+		conditions.append("]::text[]");
+		params.addAll(exactTags);
 	}
 
 	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
