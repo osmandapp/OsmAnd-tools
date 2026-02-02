@@ -367,12 +367,11 @@ public class DownloadOsmGPX {
 									// only for non-garbage & non-error tracks
 									pointsCount = pointsSize;
 									distanceMeters = totalDistance;
-									if (analysis.getHasSpeedInTrack()) {
-										double avgSpeedMs = analysis.getAvgSpeed();
-										if (avgSpeedMs > 0) {
-											avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
-										}
+									double avgSpeedMs = analysis.getAvgSpeed();
+									if (avgSpeedMs > 0) {
+										avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
 									} else if (distanceMeters > 0) {
+										// Fallback: calculate speed manually when not available in track
 										double timeMs = analysis.getTimeMoving();
 										if (timeMs <= 0) {
 											timeMs = analysis.getTimeSpan();
@@ -565,21 +564,19 @@ public class DownloadOsmGPX {
 
 	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			if (analysis.getHasSpeedInTrack()) {
-				float avgSpeed = analysis.getAvgSpeed() * 3.6f;
-				if (avgSpeed > 0 && avgSpeed <= 12) {
-					return "foot";
-				} else if (avgSpeed <= 25) {
-					return "cycling";
-				} else if (avgSpeed <= 150) {
-					return "driving";
-				} else if (avgSpeed > 150) {
-					return "aviation";
-				} else {
-					return "other";
-				}
+			// Use avgSpeed from analysis (already calculated in Kotlin)
+			float avgSpeed = analysis.getAvgSpeed() * 3.6f;
+			if (avgSpeed > 0 && avgSpeed <= 12) {
+				return "foot";
+			} else if (avgSpeed > 12 && avgSpeed <= 25) {
+				return "cycling";
+			} else if (avgSpeed > 25 && avgSpeed <= 150) {
+				return "driving";
+			} else if (avgSpeed > 150) {
+				return "aviation";
+			} else {
+				return NOSPEED_ACTIVITY_TYPE;
 			}
-			return NOSPEED_ACTIVITY_TYPE;
 		}
 		return ERROR_ACTIVITY_TYPE;
 	}
