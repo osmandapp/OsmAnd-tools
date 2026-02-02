@@ -167,8 +167,16 @@ public class OsmGpxController {
 			return error;
 		}
 
-	String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
-			"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
+		// skip garbage and error activities
+		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
+		params.add("garbage");
+		params.add("error");
+
+		// only include records with valid distance and speed values
+		conditions.append(" AND m.distance > 0 AND m.speed > 0");
+
+		String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
 
 		Map<String, Integer> ranges = new LinkedHashMap<>();
 		jdbcTemplate.query(query, ps -> {
@@ -176,12 +184,10 @@ public class OsmGpxController {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
-			if (rs.next()) {
-				ranges.put("minDist", (int) rs.getFloat(1));
-				ranges.put("maxDist", (int) rs.getFloat(2));
-				ranges.put("minSpeed", (int) rs.getFloat(3));
-				ranges.put("maxSpeed", (int) rs.getFloat(4));
-			}
+			ranges.put("minDist", (int) rs.getFloat(1));
+			ranges.put("maxDist", (int) rs.getFloat(2));
+			ranges.put("minSpeed", (int) rs.getFloat(3));
+			ranges.put("maxSpeed", (int) rs.getFloat(4));
 		});
 
 		return ResponseEntity.ok(gson.toJson(ranges));
