@@ -212,7 +212,8 @@ public class OsmGpxController {
 	}
 
 	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
-		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon " +
+		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
+				"m.speed, m.distance, m.points " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
 				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
@@ -307,6 +308,9 @@ public class OsmGpxController {
 		point.put("lat", rs.getDouble("lat"));
 		point.put("lon", rs.getDouble("lon"));
 		feature.getProperties().put("point", point);
+		feature.getProperties().put("speed", rs.getObject("speed") != null ? (int) rs.getFloat("speed") : null);
+		feature.getProperties().put("dist", rs.getObject("distance") != null ? (int) rs.getFloat("distance") : null);
+		feature.getProperties().put("points", rs.getObject("points") != null ? rs.getInt("points") : null);
 
 		return feature;
 	}
