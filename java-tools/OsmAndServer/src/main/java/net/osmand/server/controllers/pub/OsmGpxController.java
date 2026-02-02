@@ -150,6 +150,46 @@ public class OsmGpxController {
 		}
 	}
 
+	@GetMapping(path = {"/ranges"}, produces = "application/json")
+	public ResponseEntity<String> getRanges(@RequestParam String minLat,
+	                                        @RequestParam String maxLat,
+	                                        @RequestParam String minLon,
+	                                        @RequestParam String maxLon) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		if (error != null) {
+			return error;
+		}
+
+		String query = "SELECT " +
+				"MIN(m.distance) AS minDist, MAX(m.distance) AS maxDist, " +
+				"MIN(m.speed) AS minSpeed, MAX(m.speed) AS maxSpeed " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions;
+
+		Map<String, Object> ranges = new LinkedHashMap<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			if (rs.next()) {
+				ranges.put("minDist", rs.getObject("minDist") != null ? (int) rs.getFloat("minDist") : null);
+				ranges.put("maxDist", rs.getObject("maxDist") != null ? (int) rs.getFloat("maxDist") : null);
+				ranges.put("minSpeed", rs.getObject("minSpeed") != null ? (int) rs.getFloat("minSpeed") : null);
+				ranges.put("maxSpeed", rs.getObject("maxSpeed") != null ? (int) rs.getFloat("maxSpeed") : null);
+			}
+		});
+
+		return ResponseEntity.ok(gson.toJson(ranges));
+	}
+
 	@GetMapping(path = {"/tags"}, produces = "application/json")
 	public ResponseEntity<String> getTags(@RequestParam String minLat,
 	                                      @RequestParam String maxLat,
