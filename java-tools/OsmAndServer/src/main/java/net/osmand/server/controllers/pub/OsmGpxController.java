@@ -167,8 +167,8 @@ public class OsmGpxController {
 			return error;
 		}
 
-		String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " WHERE 1 = 1 " + conditions;
+	String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
+			"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
 
 		Map<String, Integer> ranges = new LinkedHashMap<>();
 		jdbcTemplate.query(query, ps -> {
