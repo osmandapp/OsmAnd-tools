@@ -1,0 +1,44 @@
+[
+    {
+        "case_id": 4,
+        "point": 4,
+        "is_correct": false,
+        "expected_lane_codes": ["TL", "C", "TR"],
+        "expected_lane_actives": [false, false, true]
+    },
+    {
+        "case_id": 6,
+        "point": 6,
+        "is_correct": false,
+        "expected_lane_codes": ["C,TL", "TR"],
+        "expected_lane_actives": [false, true]
+    },
+    {
+        "case_id": 8,
+        "point": 5,
+        "is_correct": false,
+        "expected_lane_codes": ["TU,TL", "C", "C", "TR"],
+        "expected_lane_actives": [false, false, false, true]
+    },
+    {
+        "case_id": 9,
+        "point": 6,
+        "is_correct": false,
+        "expected_lane_codes": ["C,TL", "TR"],
+        "expected_lane_actives": [false, true]
+    },
+    {
+        "case_id": 10,
+        "point": 6,
+        "is_correct": false,
+        "expected_lane_codes": ["TU", "TL", "C", "C", "TR"],
+        "expected_lane_actives": [false, false, false, true]
+    },
+    {
+        "case_id": 11,
+        "point": 3,
+        "is_correct": false,
+        "expected_lane_codes": ["TL", "TL", "C", "C"],
+        "expected_lane_actives": [false, false, true, true]
+    }
+]
