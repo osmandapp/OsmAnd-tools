@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TimeZone;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
@@ -49,6 +51,7 @@ import javax.swing.SwingUtilities;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.imageio.ImageIO;
 
 import net.osmand.router.*;
 import net.osmand.shared.gpx.GpxFile;
@@ -102,6 +105,9 @@ import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.router.tester.RandomRouteEntry;
+import net.osmand.router.tester.RandomRouteGenerator;
+import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.util.MapUtils;
 
 
@@ -111,6 +117,14 @@ public class MapRouterLayer implements MapPanelLayer {
 
 	private static final double MIN_STRAIGHT_DIST = 50000;
 	private static final double ANGLE_TO_DECLINE = 15;
+	private static final String RANDOM_ROUTES_PROFILE = "car";
+	private static final String RANDOM_ROUTES_FILE_NAME = "random_routes.json";
+	private static final String ROUTE_DIR_PREFIX = "route_";
+	private static final int ROUTE_RENDER_DELAY_MS = 3000;
+	private static final int RANDOM_ROUTE_MIN_KM = 2;
+	private static final int RANDOM_ROUTE_MAX_KM = 3;
+	private static final int RANDOM_ROUTE_CENTER_RADIUS_KM = 5;
+	private static final int ROUTE_SCREEN_ZOOM = 16;
 
 	private static boolean USE_CACHE_CONTEXT = false;
 	private HHRoutingContext<NetworkDBPoint> cacheHHCtx;
@@ -130,6 +144,18 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton stopButton;
 	private GpxFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
+
+	private static class RouteSeed {
+		private final int index;
+		private final LatLon start;
+		private final LatLon end;
+
+		private RouteSeed(int index, LatLon start, LatLon end) {
+			this.index = index;
+			this.start = start;
+			this.end = end;
+		}
+	}
 
 
 	private List<RouteSegmentResult> previousRoute;
@@ -386,6 +412,26 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(straightRoute);
+
+		Action generateRandomRoutes = new AbstractAction("Generate random routes") {
+			private static final long serialVersionUID = 347156107455281238L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				generateRandomRoutes();
+			}
+		};
+		directions.add(generateRandomRoutes);
+
+		Action loadRandomRoutes = new AbstractAction("Load JSON and regenerate routes") {
+			private static final long serialVersionUID = 347156107455281239L;
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				loadRandomRoutes();
+			}
+		};
+		directions.add(loadRandomRoutes);
 
 		if (directionPointsFile == null) {
 			Action loadGeoJSON = new AbstractAction("Load Direction Points (GeoJSON)...") {
@@ -905,20 +951,84 @@ public class MapRouterLayer implements MapPanelLayer {
 		String pngName = savedPng[0].getName();
 		String jsonName = pngName.endsWith(".png") ? pngName.substring(0, pngName.length() - 4) + ".json" : pngName + ".json";
 		File jsonFile = new File(savedPng[0].getParentFile(), jsonName);
+		writeRouteJson(jsonFile, startRoute, endRoute, routeSegments);
+	}
 
+	private void exportScreenshotAndRouteJson(List<RouteSegmentResult> routeSegments, File outputDir, int routeIndex,
+			LatLon start, LatLon end) {
+		if (routeSegments == null || routeSegments.isEmpty()) {
+			return;
+		}
+		File savedPng = saveScreenshotToFile(outputDir, routeIndex);
+		if (savedPng == null) {
+			return;
+		}
+		File jsonFile = new File(outputDir, routeIndex + ".json");
+		writeRouteJson(jsonFile, start, end, routeSegments);
+	}
+
+	private File saveScreenshotToFile(File outputDir, int routeIndex) {
+		File[] savedPng = new File[1];
+		Runnable captureScreenshotRunnable = new Runnable() {
+			@Override
+			public void run() {
+				try {
+					if (!outputDir.exists() && !outputDir.mkdirs()) {
+						throw new IOException("Failed to create output directory: " + outputDir.getAbsolutePath());
+					}
+					if (!outputDir.isDirectory()) {
+						throw new IOException("Output path is not a directory: " + outputDir.getAbsolutePath());
+					}
+					map.prepareImage();
+					map.paintImmediately(0, 0, map.getWidth(), map.getHeight());
+					BufferedImage image = map.captureScreenshot();
+					File targetFile = new File(outputDir, routeIndex + ".png");
+					ImageIO.write(image, "png", targetFile);
+					savedPng[0] = targetFile;
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+		try {
+			if (SwingUtilities.isEventDispatchThread()) {
+				captureScreenshotRunnable.run();
+			} else {
+				SwingUtilities.invokeAndWait(captureScreenshotRunnable);
+			}
+		} catch (InvocationTargetException e) {
+			Throwable cause = e.getCause();
+			ExceptionHandler.handle(cause == null ? e : cause);
+			return null;
+		} catch (InterruptedException e) {
+			ExceptionHandler.handle(e);
+			return null;
+		} catch (RuntimeException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof IOException) {
+				ExceptionHandler.handle("Failed to save screenshot", cause);
+			} else {
+				ExceptionHandler.handle("Failed to save screenshot", e);
+			}
+			return null;
+		}
+		return savedPng[0];
+	}
+
+	private void writeRouteJson(File jsonFile, LatLon start, LatLon end, List<RouteSegmentResult> routeSegments) {
 		try (Writer writer = Files.newBufferedWriter(jsonFile.toPath(), StandardCharsets.UTF_8)) {
 			Gson gson = new GsonBuilder().setPrettyPrinting().create();
 			JsonObject root = new JsonObject();
-			if (startRoute != null) {
+			if (start != null) {
 				JsonObject startPoint = new JsonObject();
-				startPoint.addProperty("lat", startRoute.getLatitude());
-				startPoint.addProperty("lon", startRoute.getLongitude());
+				startPoint.addProperty("lat", start.getLatitude());
+				startPoint.addProperty("lon", start.getLongitude());
 				root.add("start_point", startPoint);
 			}
-			if (endRoute != null) {
+			if (end != null) {
 				JsonObject endPoint = new JsonObject();
-				endPoint.addProperty("lat", endRoute.getLatitude());
-				endPoint.addProperty("lon", endRoute.getLongitude());
+				endPoint.addProperty("lat", end.getLatitude());
+				endPoint.addProperty("lon", end.getLongitude());
 				root.add("end_point", endPoint);
 			}
 
@@ -962,6 +1072,297 @@ public class MapRouterLayer implements MapPanelLayer {
 		} catch (IOException e) {
 			ExceptionHandler.handle("Failed to write route json: " + jsonFile.getAbsolutePath(), e);
 		}
+	}
+
+	private void generateRandomRoutes() {
+		BinaryMapIndexReader[] readers;
+		try {
+			readers = DataExtractionSettings.getSettings().getObfReaders();
+		} catch (IOException e) {
+			ExceptionHandler.handle(e);
+			return;
+		}
+		if (readers.length == 0) {
+			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+					"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		File outputDir = createNextRouteOutputDir();
+		if (outputDir == null) {
+			return;
+		}
+		RandomRouteTester.GeneratorConfig config = new RandomRouteTester.GeneratorConfig();
+		config.MIN_DISTANCE_KM = RANDOM_ROUTE_MIN_KM;
+		config.MAX_DISTANCE_KM = RANDOM_ROUTE_MAX_KM;
+		config.CENTER_POINT = new LatLon(map.getLatitude(), map.getLongitude());
+		config.CENTER_RADIUS_KM = RANDOM_ROUTE_CENTER_RADIUS_KM;
+		config.RANDOM_PROFILES = new String[] { RANDOM_ROUTES_PROFILE };
+		RandomRouteGenerator generator = new RandomRouteGenerator(config);
+		List<RandomRouteEntry> entries = generator.generateTestList(List.of(readers));
+		List<RouteSeed> routes = new ArrayList<>();
+		int index = 1;
+		LatLon mapCenter = config.CENTER_POINT;
+		for (RandomRouteEntry entry : entries) {
+			LatLon start = entry.getStart();
+			LatLon end = entry.getFinish();
+			if (start != null && end != null
+					&& isRouteNearCenter(mapCenter, start, end)
+					&& isRouteInSingleScreen(start, end)) {
+				routes.add(new RouteSeed(index++, start, end));
+			}
+		}
+		if (routes.isEmpty()) {
+			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+					"No routes were generated", "Random routes", JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		File obfFile = readers[0].getFile();
+		writeRandomRoutesJson(new File(outputDir, RANDOM_ROUTES_FILE_NAME), obfFile.getName(), routes);
+		runBatchRoutes(routes, outputDir);
+	}
+
+	private void loadRandomRoutes() {
+		JFileChooser fileChooser = new JFileChooser(DataExtractionSettings.getSettings().getDefaultWorkingDir());
+		fileChooser.setDialogTitle("Load random_routes.json");
+		if (fileChooser.showOpenDialog(map) != JFileChooser.APPROVE_OPTION) {
+			return;
+		}
+		File jsonFile = fileChooser.getSelectedFile();
+		if (jsonFile == null || !jsonFile.isFile()) {
+			return;
+		}
+		BinaryMapIndexReader[] readers;
+		try {
+			readers = DataExtractionSettings.getSettings().getObfReaders();
+		} catch (IOException e) {
+			ExceptionHandler.handle(e);
+			return;
+		}
+		if (readers.length == 0) {
+			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+					"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		if (readers.length > 1) {
+			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+					"Please select a single obf file in settings", "Multiple obf files", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		File outputDir = createNextRouteOutputDir();
+		if (outputDir == null) {
+			return;
+		}
+		File obfFile = readers[0].getFile();
+		List<RouteSeed> routes = readRandomRoutesJson(jsonFile, obfFile.getName());
+		if (routes.isEmpty()) {
+			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+					"No routes were loaded", "Random routes", JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		writeRandomRoutesJson(new File(outputDir, RANDOM_ROUTES_FILE_NAME), obfFile.getName(), routes);
+		runBatchRoutes(routes, outputDir);
+	}
+
+	private void runBatchRoutes(List<RouteSeed> routes, File outputDir) {
+		new Thread(() -> {
+			String previousRouteMode = DataExtractionSettings.getSettings().getRouteMode();
+			boolean previousAnimate = DataExtractionSettings.getSettings().isAnimateRouting();
+			try {
+				DataExtractionSettings.getSettings().setRouteMode(RANDOM_ROUTES_PROFILE);
+				DataExtractionSettings.getSettings().setAnimateRouting(false);
+				intermediates.clear();
+				for (RouteSeed route : routes) {
+					previousRoute = null;
+					setStart(route.start);
+					setEnd(route.end);
+					RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);
+					List<Entity> entities = selfRoute(route.start, route.end, intermediates, false, previousRoute,
+							router, RouteCalculationMode.NORMAL);
+					if (entities == null || previousRoute == null || previousRoute.isEmpty()) {
+						continue;
+					}
+					DataTileManager<Entity> points = new DataTileManager<Entity>(11);
+					for (Entity w : entities) {
+						LatLon n = w.getLatLon();
+						points.registerObject(n.getLatitude(), n.getLongitude(), w);
+					}
+					List<RouteSegmentResult> routeSegmentsToExport = new ArrayList<>(previousRoute);
+					SwingUtilities.invokeAndWait(() -> {
+						map.setPoints(points);
+						LatLon center = MapUtils.calculateMidPoint(route.start, route.end);
+						map.setLatLon(center.getLatitude(), center.getLongitude());
+						map.setZoom(ROUTE_SCREEN_ZOOM);
+						map.refresh();
+						map.fillPopupActions();
+					});
+					try {
+						Thread.sleep(ROUTE_RENDER_DELAY_MS);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+					SwingUtilities.invokeAndWait(() ->
+						exportScreenshotAndRouteJson(routeSegmentsToExport, outputDir, route.index, route.start, route.end));
+				}
+			} catch (Exception e) {
+				ExceptionHandler.handle(e);
+			} finally {
+				DataExtractionSettings.getSettings().setRouteMode(previousRouteMode);
+				DataExtractionSettings.getSettings().setAnimateRouting(previousAnimate);
+			}
+		}).start();
+	}
+
+	private File createNextRouteOutputDir() {
+		File baseDir = DataExtractionSettings.getSettings().getDefaultWorkingDir();
+		if (!baseDir.exists() && !baseDir.mkdirs()) {
+			ExceptionHandler.handle(new IOException("Failed to create working directory: " + baseDir.getAbsolutePath()));
+			return null;
+		}
+		File[] existingDirs = baseDir.listFiles(File::isDirectory);
+		int maxIndex = 0;
+		if (existingDirs != null) {
+			for (File dir : existingDirs) {
+				String name = dir.getName();
+				if (!name.startsWith(ROUTE_DIR_PREFIX)) {
+					continue;
+				}
+				String numberPart = name.substring(ROUTE_DIR_PREFIX.length());
+				try {
+					int value = Integer.parseInt(numberPart);
+					if (value > maxIndex) {
+						maxIndex = value;
+					}
+				} catch (NumberFormatException ex) {
+					// ignore non-numeric names
+				}
+			}
+		}
+		int nextIndex = maxIndex + 1;
+		String dirName = String.format(Locale.US, "%s%04d", ROUTE_DIR_PREFIX, nextIndex);
+		File outputDir = new File(baseDir, dirName);
+		if (!outputDir.exists() && !outputDir.mkdirs()) {
+			ExceptionHandler.handle(new IOException("Failed to create output directory: " + outputDir.getAbsolutePath()));
+			return null;
+		}
+		return outputDir;
+	}
+
+	private void writeRandomRoutesJson(File jsonFile, String obfFileName, List<RouteSeed> routes) {
+		try (Writer writer = Files.newBufferedWriter(jsonFile.toPath(), StandardCharsets.UTF_8)) {
+			Gson gson = new GsonBuilder().setPrettyPrinting().create();
+			JsonObject root = new JsonObject();
+			root.addProperty("schema_version", 1);
+			root.addProperty("created_at", formatUtcDate(new Date()));
+			root.addProperty("profile", RANDOM_ROUTES_PROFILE);
+			root.addProperty("obf_file_name", obfFileName);
+			root.addProperty("route_count", routes.size());
+			JsonArray routesJson = new JsonArray();
+			for (RouteSeed route : routes) {
+				JsonObject entry = new JsonObject();
+				entry.addProperty("index", route.index);
+				entry.addProperty("start", formatLatLon(route.start));
+				entry.addProperty("end", formatLatLon(route.end));
+				routesJson.add(entry);
+			}
+			root.add("routes", routesJson);
+			gson.toJson(root, writer);
+		} catch (IOException e) {
+			ExceptionHandler.handle("Failed to write random routes json: " + jsonFile.getAbsolutePath(), e);
+		}
+	}
+
+	private List<RouteSeed> readRandomRoutesJson(File jsonFile, String expectedObfFileName) {
+		List<RouteSeed> routes = new ArrayList<>();
+		try (Reader reader = Files.newBufferedReader(jsonFile.toPath(), StandardCharsets.UTF_8)) {
+			Gson gson = new Gson();
+			JsonObject root = gson.fromJson(reader, JsonObject.class);
+			if (root == null) {
+				return routes;
+			}
+			int schemaVersion = root.has("schema_version") ? root.get("schema_version").getAsInt() : 0;
+			if (schemaVersion != 1) {
+				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+						"Unsupported schema version: " + schemaVersion, "Random routes", JOptionPane.ERROR_MESSAGE);
+				return routes;
+			}
+			String obfFileName = root.has("obf_file_name") ? root.get("obf_file_name").getAsString() : null;
+			if (obfFileName == null || !obfFileName.equals(expectedObfFileName)) {
+				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
+						"OBF mismatch: expected " + expectedObfFileName + " but found " + obfFileName,
+						"Random routes", JOptionPane.ERROR_MESSAGE);
+				return routes;
+			}
+			JsonArray routesJson = root.has("routes") ? root.getAsJsonArray("routes") : null;
+			if (routesJson == null) {
+				return routes;
+			}
+			for (JsonElement element : routesJson) {
+				JsonObject entry = element.getAsJsonObject();
+				int index = entry.has("index") ? entry.get("index").getAsInt() : routes.size() + 1;
+				LatLon start = parseLatLon(entry.get("start").getAsString());
+				LatLon end = parseLatLon(entry.get("end").getAsString());
+				if (start != null && end != null) {
+					routes.add(new RouteSeed(index, start, end));
+				}
+			}
+		} catch (Exception e) {
+			ExceptionHandler.handle("Failed to read random routes json: " + jsonFile.getAbsolutePath(), e);
+		}
+		return routes;
+	}
+
+	private String formatLatLon(LatLon latLon) {
+		return String.format(Locale.US, "%.6f, %.6f", latLon.getLatitude(), latLon.getLongitude());
+	}
+
+	private LatLon parseLatLon(String value) {
+		if (value == null) {
+			return null;
+		}
+		String[] parts = value.split(",");
+		if (parts.length < 2) {
+			return null;
+		}
+		try {
+			double lat = Double.parseDouble(parts[0].trim());
+			double lon = Double.parseDouble(parts[1].trim());
+			return new LatLon(lat, lon);
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
+	private String formatUtcDate(Date date) {
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
+		return format.format(date);
+	}
+
+	private boolean isRouteNearCenter(LatLon mapCenter, LatLon start, LatLon end) {
+		if (mapCenter == null || start == null || end == null) {
+			return false;
+		}
+		double radiusMeters = RANDOM_ROUTE_CENTER_RADIUS_KM * 1000.0;
+		return MapUtils.getDistance(mapCenter, start) <= radiusMeters
+				&& MapUtils.getDistance(mapCenter, end) <= radiusMeters;
+	}
+
+	private boolean isRouteInSingleScreen(LatLon start, LatLon end) {
+		double centerLat = (start.getLatitude() + end.getLatitude()) / 2.0;
+		double centerLon = (start.getLongitude() + end.getLongitude()) / 2.0;
+		double centerTileX = MapUtils.getTileNumberX(ROUTE_SCREEN_ZOOM, centerLon);
+		double centerTileY = MapUtils.getTileNumberY(ROUTE_SCREEN_ZOOM, centerLat);
+		double halfWidthTiles = (map.getWidth() / map.getTileSize()) / 2.0;
+		double halfHeightTiles = (map.getHeight() / map.getTileSize()) / 2.0;
+		double startTileX = MapUtils.getTileNumberX(ROUTE_SCREEN_ZOOM, start.getLongitude());
+		double startTileY = MapUtils.getTileNumberY(ROUTE_SCREEN_ZOOM, start.getLatitude());
+		double endTileX = MapUtils.getTileNumberX(ROUTE_SCREEN_ZOOM, end.getLongitude());
+		double endTileY = MapUtils.getTileNumberY(ROUTE_SCREEN_ZOOM, end.getLatitude());
+		return Math.abs(startTileX - centerTileX) <= halfWidthTiles
+				&& Math.abs(endTileX - centerTileX) <= halfWidthTiles
+				&& Math.abs(startTileY - centerTileY) <= halfHeightTiles
+				&& Math.abs(endTileY - centerTileY) <= halfHeightTiles;
 	}
 
 	private static String getTurnLanesString(RouteSegmentResult segment) {

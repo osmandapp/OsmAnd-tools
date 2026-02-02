@@ -13,13 +13,33 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-class RandomRouteEntry {
+public class RandomRouteEntry {
 	LatLon start;
 	LatLon finish;
 	List<LatLon> via = new ArrayList<>(); // inter points
 
 	String profile = "car";
 	List<String> params = new ArrayList<>();
+
+	public LatLon getStart() {
+		return start;
+	}
+
+	public LatLon getFinish() {
+		return finish;
+	}
+
+	public List<LatLon> getVia() {
+		return via;
+	}
+
+	public String getProfile() {
+		return profile;
+	}
+
+	public List<String> getParams() {
+		return params;
+	}
 
 	List<RandomRouteResult> routeResults = new ArrayList<>();
 	List<RandomRouteResult> transportResults = new ArrayList<>();

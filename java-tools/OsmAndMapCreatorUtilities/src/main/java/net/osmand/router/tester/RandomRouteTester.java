@@ -33,6 +33,7 @@ import net.osmand.router.TransportRoutingContext;
 import net.osmand.util.Algorithms;
 
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.LatLon;
 import net.osmand.util.MapUtils;
 
 public class RandomRouteTester {
@@ -41,22 +42,24 @@ public class RandomRouteTester {
 
 	static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8 * 2; // ~ 4 GB
 
-	static class GeneratorConfig {
-		String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
+	public static class GeneratorConfig {
+		public String[] PREDEFINED_TESTS = { // optional predefined routes in "url" format (imply ITERATIONS=0)
 //				"https://test.osmand.net/map/?start=48.913403,11.872949&finish=49.079640,11.752095&type=osmand&profile=car#10/48.996521/11.812522"
 //				"start=48.211348,24.478998&finish=48.172382,24.421492&type=osmand&profile=bicycle&params=bicycle,height_obstacles",
 //	/*example*/ "start=L,L&finish=L,L&via=L,L;L,L&profile=pedestrian&params=height_obstacles"
 		};
 
 		// random tests settings
-		int ITERATIONS = 10; // number of random routes
-		int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
-		int MIN_DISTANCE_KM = 10; // min distance between start and finish (10)
-		int MAX_DISTANCE_KM = 20; // max distance between start and finish (20)
-		int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
-		int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
+		public int ITERATIONS = 10; // number of random routes
+		public int MAX_INTER_POINTS = 0; // 0-2 intermediate points // (0)
+		public int MIN_DISTANCE_KM = 10; // min distance between start and finish (10)
+		public int MAX_DISTANCE_KM = 20; // max distance between start and finish (20)
+		public LatLon CENTER_POINT = null; // optional: only use random points within CENTER_RADIUS_KM from this point
+		public int CENTER_RADIUS_KM = 0; // 0 = disabled
+		public int MAX_SHIFT_ALL_POINTS_M = 500; // shift LatLon of all points by 0-500 meters (500)
+		public int OPTIONAL_SLOW_DOWN_THREADS = 0; // "endless" threads to slow down routing (emulate device speed) (0-100)
 
-		String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
+		public String[] RANDOM_PROFILES = { // randomly selected profiles[,params] for each iteration
 //				"car",
 //				"bicycle",
 //				"car,short_way",
@@ -66,19 +69,19 @@ public class RandomRouteTester {
 		};
 
 		// cost/distance deviation limits
-		double DEVIATION_RED = 5.0F; // > 5% - mark as failed
-		double DEVIATION_YELLOW = 1.0F; // > 1% - mark as acceptable
+		public double DEVIATION_RED = 5.0F; // > 5% - mark as failed
+		public double DEVIATION_YELLOW = 1.0F; // > 1% - mark as acceptable
 
 		// enable Android mode for BRP
-		boolean CAR_2PHASE_MODE = false;
-		long USE_TIME_CONDITIONAL_ROUTING = 1; // 0 disable, 1 auto, >1 exact time in milliseconds
+		public boolean CAR_2PHASE_MODE = false;
+		public long USE_TIME_CONDITIONAL_ROUTING = 1; // 0 disable, 1 auto, >1 exact time in milliseconds
 //		long USE_TIME_CONDITIONAL_ROUTING = 1727816400000L; // date -d "2024-10-01 23:00:00" "+%s000L"
 //		long USE_TIME_CONDITIONAL_ROUTING = 1730498400000L; // date -d "2024-11-01 23:00:00" "+%s000L"
 
-		final static Map<String, String> ambiguousConditionalTags = null;
+		public final static Map<String, String> ambiguousConditionalTags = null;
 //		final static Map <String, String> ambiguousConditionalTags = HHRoutingPrepareContext.ambiguousConditionalTags;
 
-		RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
+		public RandomPointsSource optRandomPointsSource = RandomPointsSource.ROUTE_SECTION_POINTS;
 	}
 
 	public static void main(String[] args) throws Exception {

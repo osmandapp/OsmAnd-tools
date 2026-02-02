@@ -25,16 +25,16 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-class RandomRouteGenerator {
+public class RandomRouteGenerator {
 	private final RandomRouteTester.GeneratorConfig config;
 	private final List<RandomRouteEntry> testList = new ArrayList<>();
 	private List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
 
-	RandomRouteGenerator(RandomRouteTester.GeneratorConfig config) {
+	public RandomRouteGenerator(RandomRouteTester.GeneratorConfig config) {
 		this.config = config;
 	}
 
-	List<RandomRouteEntry> generateTestList(List<BinaryMapIndexReader> obfReaders) {
+	public List<RandomRouteEntry> generateTestList(List<BinaryMapIndexReader> obfReaders) {
 		this.obfReaders = obfReaders;
 		if (config.PREDEFINED_TESTS.length > 0) {
 			parsePredefinedTests();
@@ -146,7 +146,7 @@ class RandomRouteGenerator {
 				Collections.shuffle(points, new Random(shuffleSeed));
 				for (HHRouteDataStructure.NetworkDBPoint p : points) {
 					LatLon ll = new LatLon(MapUtils.get31LatitudeY(p.startY), MapUtils.get31LongitudeX(p.startX));
-					if (isPointInsideRegionsPolygons(ll, regions)) {
+					if (isPointInsideRegionsPolygons(ll, regions) && isPointWithinConfiguredCenterRadius(ll)) {
 						randomPoints.add(ll);
 						if (added++ > limit) {
 							return;
@@ -205,8 +205,11 @@ class RandomRouteGenerator {
 									int pointIndex = fixedRandom(nPoints, RandomActions.HIGHWAY_TO_POINT, osmId, seed);
 									double lat = MapUtils.get31LatitudeY(obj.pointsY[pointIndex]);
 									double lon = MapUtils.get31LongitudeX(obj.pointsX[pointIndex]);
-									randomPoints.add(new LatLon(lat, lon));
-									added.value++;
+									LatLon ll = new LatLon(lat, lon);
+									if (isPointWithinConfiguredCenterRadius(ll)) {
+										randomPoints.add(ll);
+										added.value++;
+									}
 									break;
 								}
 							}
@@ -240,6 +243,14 @@ class RandomRouteGenerator {
 				case HH_SECTION_POINTS -> hhRandomPointsReader(obfReader, randomPoints, pointsPerObf, seed);
 			}
 		}
+	}
+
+	private boolean isPointWithinConfiguredCenterRadius(LatLon point) {
+		if (config.CENTER_POINT == null || config.CENTER_RADIUS_KM <= 0) {
+			return true;
+		}
+		double radiusMeters = config.CENTER_RADIUS_KM * 1000.0;
+		return MapUtils.getDistance(config.CENTER_POINT, point) <= radiusMeters;
 	}
 
 	// decrease LatLon precision via %f
