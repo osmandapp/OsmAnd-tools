@@ -564,19 +564,21 @@ public class DownloadOsmGPX {
 
 	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			// Use avgSpeed from analysis (already calculated in Kotlin)
-			float avgSpeed = analysis.getAvgSpeed() * 3.6f;
-			if (avgSpeed > 0 && avgSpeed <= 12) {
-				return "foot";
-			} else if (avgSpeed > 12 && avgSpeed <= 25) {
-				return "cycling";
-			} else if (avgSpeed > 25 && avgSpeed <= 150) {
-				return "driving";
-			} else if (avgSpeed > 150) {
-				return "aviation";
-			} else {
-				return NOSPEED_ACTIVITY_TYPE;
+			if (analysis.getHasSpeedInTrack()) {
+				float avgSpeed = analysis.getAvgSpeed() * 3.6f;
+				if (avgSpeed > 0 && avgSpeed <= 12) {
+					return "foot";
+				} else if (avgSpeed <= 25) {
+					return "cycling";
+				} else if (avgSpeed <= 150) {
+					return "driving";
+				} else if (avgSpeed > 150) {
+					return "aviation";
+				} else {
+					return "other";
+				}
 			}
+			return NOSPEED_ACTIVITY_TYPE;
 		}
 		return ERROR_ACTIVITY_TYPE;
 	}
