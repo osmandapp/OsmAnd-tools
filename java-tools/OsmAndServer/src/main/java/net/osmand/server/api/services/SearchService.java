@@ -19,7 +19,6 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
-import net.osmand.util.OpeningHoursParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -44,6 +43,7 @@ import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+import static net.osmand.util.OpeningHoursParser.*;
 import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
 @Service
@@ -51,7 +51,7 @@ public class SearchService {
 
 	private static final Log LOGGER = LogFactory.getLog(SearchService.class);
     public static final String IS_OPENED_PREFIX = "open:";
-    public static final String INFO = "_info";
+	public static final String OPENING_HOURS_INFO_SUFFIX = "_info";
 
     @Autowired
     OsmAndMapsService osmAndMapsService;
@@ -1223,11 +1223,11 @@ public class SearchService {
 			String value = unzipContent(entry.getValue());
 			feature.prop(entry.getKey(), value);
 		}
-		String oh = tags.get(AMENITY_PREFIX + OPENING_HOURS);
-		if (clientTime != null && oh != null) {
-			String openingHoursInfo = getOpeningHoursInfo(oh, clientTime);
+		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
+		if (clientTime != null && openingHoursValue != null) {
+			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
 			if (openingHoursInfo != null) {
-				feature.prop(AMENITY_PREFIX + OPENING_HOURS + INFO, openingHoursInfo);
+				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
 			}
 		}
 		Map<String, String> names = amenity.getNamesMap(true);
@@ -1251,13 +1251,14 @@ public class SearchService {
 		return feature;
 	}
 
-	private String getOpeningHoursInfo(String oh, Calendar calendar) {
-		OpeningHoursParser.OpeningHours openingHours = parseOpenedHours(oh);
-		List<OpeningHoursParser.OpeningHours.Info> ohInfo;
+	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
+		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
+		List<OpeningHours.Info> openingHoursInfo;
 		if (openingHours != null) {
-			ohInfo = openingHours.getInfo(calendar);
-			if (ohInfo != null) {
-				return (ohInfo.get(0).isOpened() ? IS_OPENED_PREFIX : "") + ohInfo.get(0).getInfo();
+			openingHoursInfo = openingHours.getInfo(calendar);
+			if (!Algorithms.isEmpty(openingHoursInfo)) {
+				OpeningHours.Info info = openingHoursInfo.get(0);
+				return (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
 			}
 		}
 		return null;
