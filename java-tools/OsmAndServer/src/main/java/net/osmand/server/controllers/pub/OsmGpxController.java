@@ -167,23 +167,20 @@ public class OsmGpxController {
 			return error;
 		}
 
-		String query = "SELECT " +
-				"MIN(m.distance) AS minDist, MAX(m.distance) AS maxDist, " +
-				"MIN(m.speed) AS minSpeed, MAX(m.speed) AS maxSpeed " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions;
+		String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " WHERE 1 = 1 " + conditions;
 
-		Map<String, Object> ranges = new LinkedHashMap<>();
+		Map<String, Integer> ranges = new LinkedHashMap<>();
 		jdbcTemplate.query(query, ps -> {
 			for (int i = 0; i < params.size(); i++) {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
 			if (rs.next()) {
-				ranges.put("minDist", rs.getObject("minDist") != null ? (int) rs.getFloat("minDist") : null);
-				ranges.put("maxDist", rs.getObject("maxDist") != null ? (int) rs.getFloat("maxDist") : null);
-				ranges.put("minSpeed", rs.getObject("minSpeed") != null ? (int) rs.getFloat("minSpeed") : null);
-				ranges.put("maxSpeed", rs.getObject("maxSpeed") != null ? (int) rs.getFloat("maxSpeed") : null);
+				ranges.put("minDist", (int) rs.getFloat(1));
+				ranges.put("maxDist", (int) rs.getFloat(2));
+				ranges.put("minSpeed", (int) rs.getFloat(3));
+				ranges.put("maxSpeed", (int) rs.getFloat(4));
 			}
 		});
 
@@ -363,10 +360,21 @@ public class OsmGpxController {
 		Map<String, Object> point = new LinkedHashMap<>();
 		point.put("lat", rs.getDouble("lat"));
 		point.put("lon", rs.getDouble("lon"));
+
 		feature.getProperties().put("point", point);
-		feature.getProperties().put("speed", rs.getObject("speed") != null ? (int) rs.getFloat("speed") : null);
-		feature.getProperties().put("dist", rs.getObject("distance") != null ? (int) rs.getFloat("distance") : null);
-		feature.getProperties().put("points", rs.getObject("points") != null ? rs.getInt("points") : null);
+
+		int speed = (int) rs.getFloat("speed");
+		if (speed != 0) {
+			feature.getProperties().put("speed", speed);
+		}
+		int dist = (int) rs.getFloat("distance");
+		if (dist != 0) {
+			feature.getProperties().put("dist", dist);
+		}
+		int points = rs.getInt("points");
+		if (points != 0) {
+			feature.getProperties().put("points", points);
+		}
 
 		return feature;
 	}
