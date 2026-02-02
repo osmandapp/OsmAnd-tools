@@ -81,7 +81,9 @@ public class OsmGpxController {
 			String minLon,
 			String maxLon,
 			List<String> tags,
-			String tagMatchMode
+			String tagMatchMode,
+			List<Integer> distanceRange,
+			List<Integer> speedRange
 	) {
 	}
 
@@ -115,6 +117,20 @@ public class OsmGpxController {
 
 		if (!Algorithms.isEmpty(req.activity())) {
 			error = filterByActivity(req.activity(), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.distanceRange() != null && !req.distanceRange().isEmpty()) {
+			error = filterByRange("m.distance", req.distanceRange(), params, conditions, "distance");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.speedRange() != null && !req.speedRange().isEmpty()) {
+			error = filterByRange("m.speed", req.speedRange(), params, conditions, "speed");
 			if (error != null) {
 				return error;
 			}
@@ -432,6 +448,29 @@ public class OsmGpxController {
 		return null;
 	}
 
+	private ResponseEntity<String> filterByRange(String column, List<Integer> range, List<Object> params, StringBuilder conditions, String fieldName) {
+		if (range == null || range.isEmpty()) {
+			return null;
+		}
+		if (range.size() != 2) {
+			return ResponseEntity.badRequest().body("Invalid " + fieldName + " range format. Expected [min, max].");
+		}
+		Integer min = range.get(0);
+		Integer max = range.get(1);
+		if (min != null && max != null && min > max) {
+			return ResponseEntity.badRequest().body("Invalid " + fieldName + " range: min cannot be greater than max.");
+		}
+		if (min != null) {
+			conditions.append(" AND ").append(column).append(" >= ?");
+			params.add(min);
+		}
+		if (max != null) {
+			conditions.append(" AND ").append(column).append(" <= ?");
+			params.add(max);
+		}
+		return null;
+	}
+
 	private void addGeoDataToFeature(RouteFile file, Feature feature) {
 		GpxFile gpxFile = file.gpxFile;
 		List<WptPt> points = gpxFile.getAllSegmentsPoints();
@@ -454,7 +493,6 @@ public class OsmGpxController {
 				}
 			});
 			feature.getProperties().put("geo", result);
-			feature.getProperties().put("distance", analysis.getTotalDistance());
 		}
 	}
 
