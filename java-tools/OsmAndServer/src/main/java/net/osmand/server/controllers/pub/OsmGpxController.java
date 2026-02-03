@@ -188,8 +188,8 @@ public class OsmGpxController {
 			}
 		}
 
-		// only include records with valid distance and speed values
-		conditions.append(" AND m.distance > 0 AND m.speed > 0");
+		// only include records with valid distance or speed values
+		conditions.append(" AND m.distance > 0 OR m.speed > 0");
 
 		String query = "SELECT MIN(distance), MAX(distance), MIN(speed), MAX(speed) " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
