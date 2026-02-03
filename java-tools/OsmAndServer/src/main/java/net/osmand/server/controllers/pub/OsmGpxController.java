@@ -194,8 +194,8 @@ public class OsmGpxController {
 		String query = "SELECT " +
 				"MIN(CASE WHEN distance > 0 THEN distance END), " +
 				"MAX(CASE WHEN distance > 0 THEN distance END), " +
-				"MIN(CASE WHEN speed > 0 THEN speed END), " +
-				"MAX(CASE WHEN speed > 0 THEN speed END) " +
+				"MIN(CASE WHEN speed >= 0 THEN speed END), " +
+				"MAX(CASE WHEN speed >= 0 THEN speed END) " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
 
 		Map<String, Integer> ranges = new LinkedHashMap<>();
