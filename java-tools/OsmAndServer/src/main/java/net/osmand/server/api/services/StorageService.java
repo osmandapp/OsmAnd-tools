@@ -352,6 +352,7 @@ public class StorageService {
 					gos.write(buffer, 0, len);
 				}
 			}
+			Files.deleteIfExists(file.toPath());
 			return zipfile;
 		}
 

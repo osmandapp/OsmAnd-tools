@@ -3,8 +3,12 @@ package net.osmand.server.controllers.pub;
 import java.io.File;
 import java.io.Serial;
 import java.io.Serializable;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import jakarta.servlet.annotation.WebListener;
 import jakarta.servlet.http.HttpSession;
@@ -22,6 +26,8 @@ import net.osmand.router.RouteCalculationProgress;
 @WebListener
 @Component
 public class UserSessionResources implements HttpSessionListener {
+
+	private static final Log LOG = LogFactory.getLog(UserSessionResources.class);
 
 	protected static final String SESSION_GPX = "gpx";
 	protected static final String SESSION_ROUTING = "routing";
@@ -66,9 +72,16 @@ public class UserSessionResources implements HttpSessionListener {
 	@Override
 	public void sessionDestroyed(HttpSessionEvent se) {
 		GPXSessionContext ctx = (GPXSessionContext) se.getSession().getAttribute(SESSION_GPX);
-		if (ctx != null) {
-            for (File f : ctx.tempFiles) {
-				f.delete();
+		if (ctx != null && ctx.tempFiles != null) {
+			for (File f : ctx.tempFiles) {
+				if (f == null) {
+					continue;
+				}
+				try {
+					Files.deleteIfExists(f.toPath());
+				} catch (Exception e) {
+					LOG.warn("Session cleanup: failed to delete temp file: " + f.getAbsolutePath(), e);
+				}
 			}
 			ctx.tempFiles.clear();
 			ctx.files.clear();
