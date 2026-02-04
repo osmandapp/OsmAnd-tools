@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
+import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PREF;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -11,12 +12,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -28,9 +29,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
+import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.server.api.repo.*;
+import net.osmand.shared.api.SettingsAPI;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.SmartFolderHelper;
 import net.osmand.shared.io.KFile;
 import okio.GzipSource;
 import okio.Okio;
@@ -315,6 +319,20 @@ public class UserdataService {
 	        if (allVersions) {
 		        res.allFiles.add(sf);
 	        }
+			if (Objects.equals(sf.type, FILE_TYPE_GLOBAL)) {
+				String settings;
+				UserFile userFile = getLastFileVersion(userId, sf.name, sf.type);
+				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
+					settings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+				System.out.println(settings);
+				net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+				JSONObject obj = new JSONObject(settings);
+				SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
+				res.smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
+			}
         }
         return res;
     }
@@ -1396,6 +1414,13 @@ public class UserdataService {
 				file.setModifiedTime(userFile.updatetime.getTime());
 				files.put(userFile.name, file);
 			}
+		}
+	}
+
+	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
+		@Override
+		public SettingsAPI getSettings() {
+			return null;
 		}
 	}
 }

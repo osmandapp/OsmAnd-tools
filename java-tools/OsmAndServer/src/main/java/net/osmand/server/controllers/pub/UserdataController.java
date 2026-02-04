@@ -22,6 +22,7 @@ import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.shared.gpx.data.SmartFolder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -478,6 +479,7 @@ public class UserdataController {
 		public int totalFileVersions;
 		public List<UserFileNoData> allFiles;
 		public List<UserFileNoData> uniqueFiles;
+		public List<SmartFolder> smartFolders;
 		public int userid;
 		public long maximumAccountSize;
 
