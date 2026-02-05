@@ -35,6 +35,7 @@ import net.osmand.shared.api.SettingsAPI;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.SmartFolderHelper;
+import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.io.KFile;
 import okio.GzipSource;
 import okio.Okio;
@@ -43,6 +44,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -331,13 +333,32 @@ public class UserdataService {
 				net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
 				JSONObject obj = new JSONObject(settings);
 				SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
-				res.smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
+				res.smartFolders = createWebSmartFolders(SmartFolderHelper.INSTANCE.getSmartFolders(), files, userId);
 			}
         }
         return res;
     }
 
-    public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
+	private List<UserdataController.SmartFolderWeb> createWebSmartFolders(@NotNull List<SmartFolder> smartFolders,
+																		  List<UserFileNoData> files, int userid) {
+		List<GpxFile> gpxFiles = new ArrayList<>();
+		for(UserFileNoData file: files ) {
+			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && file.filesize > 0) {
+				UserFile uf = filesRepository.findLatestNonEmptyFile(userid, file.name, file.type);
+				InputStream in = getInputStream(uf);
+				gpxFiles.add(GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false));
+			}
+		}
+		List<UserdataController.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
+		for (SmartFolder sf:smartFolders) {
+			UserdataController.SmartFolderWeb smartFolderWeb = new UserdataController.SmartFolderWeb();
+			smartFolderWeb.name = sf.getFolderName();
+			smartFolderWebs.add(smartFolderWeb);
+		}
+		return smartFolderWebs;
+	}
+
+	public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
         if (checkExistingServerMap) {

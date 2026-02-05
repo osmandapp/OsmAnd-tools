@@ -42,8 +42,14 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
 			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
-	
-	
+
+	@Query("""
+			   SELECT uf FROM UserFile uf
+			   WHERE uf.userid = :userid AND uf.name = :name AND uf.type = :type AND uf.filesize > 0
+			   ORDER BY uf.updatetime DESC
+			""")
+	UserFile findLatestNonEmptyFile(int userid, String name, String type);
+
 //	@Modifying
 //	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
 //	@Transactional
