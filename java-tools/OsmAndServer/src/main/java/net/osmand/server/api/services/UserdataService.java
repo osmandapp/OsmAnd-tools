@@ -906,9 +906,16 @@ public class UserdataService {
     }
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
+        return getZipFile(file, newName, null);
+    }
+
+    public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName, HttpSession session) throws IOException {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
+            if (session != null) {
+                sessionResources.addGpxTempFilesToSession(session, tmpGpx);
+            }
             zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
@@ -920,6 +927,9 @@ public class UserdataService {
                 Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
                 if (exception != null) {
                     return null;
+                }
+                if (session != null) {
+                    sessionResources.addGpxTempFilesToSession(session, tmpGpx);
                 }
                 zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             }

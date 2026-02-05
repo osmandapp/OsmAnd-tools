@@ -378,7 +378,7 @@ public class WebUserdataService {
 				zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(updatedFile);
 			}
 			if (zipFile == null) {
-				zipFile = userdataService.getZipFile(file, newName);
+				zipFile = userdataService.getZipFile(file, newName, session);
 			}
 			if (zipFile != null) {
 				try {
