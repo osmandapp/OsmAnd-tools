@@ -24,6 +24,7 @@ import java.util.zip.ZipOutputStream;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
@@ -60,6 +61,7 @@ import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.WebGpxParser;
@@ -112,6 +114,9 @@ public class UserdataService {
 
     @Autowired
     protected GpxService gpxService;
+	
+	@Autowired
+	UserSessionResources sessionResources;
 
     Gson gson = new Gson();
 
@@ -354,6 +359,11 @@ public class UserdataService {
 
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
+		return uploadMultipartFile(file, dev, name, type, clienttime, null);
+	}
+
+	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
+			String name, String type, Long clienttime, HttpSession session) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -368,6 +378,9 @@ public class UserdataService {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
+					if (session != null) {
+						sessionResources.addGpxTempFilesToSession(session, tmpGpxFile);
+					}
 					zipfile = InternalZipFile.buildFromFileAndDelete(tmpGpxFile);
 				} else {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
