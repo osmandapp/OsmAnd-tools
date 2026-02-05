@@ -372,9 +372,7 @@ public class WebUserdataService {
 			File updatedFile = renameGpxTrack(file, newName);
 			StorageService.InternalZipFile zipFile = null;
 			if (updatedFile != null) {
-				if (session != null) {
-					sessionResources.addGpxTempFilesToSession(session, updatedFile);
-				}
+				sessionResources.addGpxTempFilesToSession(session, updatedFile);
 				zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(updatedFile);
 			}
 			if (zipFile == null) {
@@ -518,9 +516,7 @@ public class WebUserdataService {
 				fos.write(updated);
 			}
 			// upload new file
-			if (session != null) {
-				sessionResources.addGpxTempFilesToSession(session, tmpInfo);
-			}
+			sessionResources.addGpxTempFilesToSession(session, tmpInfo);
 			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo);
 			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
 			if (res.getStatusCode().is2xxSuccessful()) {

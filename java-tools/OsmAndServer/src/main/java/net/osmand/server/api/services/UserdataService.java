@@ -378,9 +378,7 @@ public class UserdataService {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
-					if (session != null) {
-						sessionResources.addGpxTempFilesToSession(session, tmpGpxFile);
-					}
+					sessionResources.addGpxTempFilesToSession(session, tmpGpxFile);
 					zipfile = InternalZipFile.buildFromFileAndDelete(tmpGpxFile);
 				} else {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
@@ -913,9 +911,7 @@ public class UserdataService {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
-            if (session != null) {
-                sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-            }
+            sessionResources.addGpxTempFilesToSession(session, tmpGpx);
             zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
@@ -928,9 +924,7 @@ public class UserdataService {
                 if (exception != null) {
                     return null;
                 }
-                if (session != null) {
-                    sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-                }
+                sessionResources.addGpxTempFilesToSession(session, tmpGpx);
                 zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             }
         }

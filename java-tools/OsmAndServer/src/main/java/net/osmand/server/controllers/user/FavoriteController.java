@@ -56,7 +56,7 @@ public class FavoriteController {
                                             @RequestParam Long updatetime,
 											HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime, session);
         if (file != null) {
             file.deleteWptPt(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
         } else
@@ -75,7 +75,7 @@ public class FavoriteController {
                                                      @RequestParam boolean updateTimestamp,
                                                      HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime, session);
         UserdataService.ResponseFileStatus respNewGroup;
         if (file != null) {
             boolean hidden = false;
@@ -94,9 +94,7 @@ public class FavoriteController {
             file.updatePointsGroup(groupName, file.getPointsGroups().get(groupName));
 
             File newTmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
-            if (session != null) {
-                sessionResources.addGpxTempFilesToSession(session, newTmpGpx);
-            }
+            sessionResources.addGpxTempFilesToSession(session, newTmpGpx);
             Date clienttime = null;
             
             if (!updateTimestamp) {
@@ -123,7 +121,7 @@ public class FavoriteController {
                                          @RequestParam(required = false) Long updatetime,
 										 HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime);
+        GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime, session);
         if (file != null) {
             file.addPoint(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
         } else
@@ -148,7 +146,7 @@ public class FavoriteController {
                                             HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
-        GpxFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime);
+        GpxFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime, session);
         if (newGpxFile != null) {
             newGpxFile.updateWptPt(wptName, ind, wptPt, true);
         } else
@@ -158,7 +156,7 @@ public class FavoriteController {
         boolean changeGroup = !oldGroupName.equals(newGroupName);
         GpxFile oldGpxFile = null;
         if (changeGroup) {
-            oldGpxFile = favoriteService.createGpxFile(oldGroupName, dev, oldGroupUpdatetime);
+            oldGpxFile = favoriteService.createGpxFile(oldGroupName, dev, oldGroupUpdatetime, session);
             if (oldGpxFile != null) {
                 oldGpxFile.deleteWptPt(wptName, ind);
             } else
@@ -167,17 +165,13 @@ public class FavoriteController {
         }
         
         File newTmpGpx = gpxService.createTmpFileByGpxFile(newGpxFile, newGroupName);
-        if (session != null) {
-            sessionResources.addGpxTempFilesToSession(session, newTmpGpx);
-        }
+        sessionResources.addGpxTempFilesToSession(session, newTmpGpx);
         favoriteService.uploadFavoriteFile(newTmpGpx, dev, newGroupName, newGroupUpdatetime);
         
         File oldTmpGpx = null;
         if (changeGroup) {
             oldTmpGpx = gpxService.createTmpFileByGpxFile(oldGpxFile, oldGroupName);
-            if (session != null) {
-                sessionResources.addGpxTempFilesToSession(session, oldTmpGpx);
-            }
+            sessionResources.addGpxTempFilesToSession(session, oldTmpGpx);
             favoriteService.uploadFavoriteFile(oldTmpGpx, dev, oldGroupName, oldGroupUpdatetime);
         }
         
@@ -191,10 +185,11 @@ public class FavoriteController {
     
     @PostMapping(value = "/add-group")
     @ResponseBody
-    public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName) throws IOException {
+    public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName,
+                                           HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
-        return favoriteService.addNewGroup(trackData, groupName, dev);
+        return favoriteService.addNewGroup(trackData, groupName, dev, session);
     }
 
     @PostMapping(value = "/update-group")
@@ -202,10 +197,11 @@ public class FavoriteController {
     public ResponseEntity<String> updateGroup(@RequestBody String data,
                                               @RequestParam String fileName,
                                               @RequestParam String groupName,
-                                              @RequestParam Long updatetime) throws IOException {
+                                              @RequestParam Long updatetime,
+                                              HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData groupData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
-        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime);
+        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime, session);
     }
     
     @GetMapping(value = "/rename-fav-group")
@@ -217,7 +213,7 @@ public class FavoriteController {
                                               @RequestParam Long oldUpdatetime,
                                               HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        GpxFile gpxFile = favoriteService.createGpxFile(fullOldName, dev, oldUpdatetime);
+        GpxFile gpxFile = favoriteService.createGpxFile(fullOldName, dev, oldUpdatetime, session);
         if (gpxFile != null) {
             GpxUtilities.PointsGroup pointsGroup = gpxFile.getPointsGroups().get(oldName);
             pointsGroup.setName(newName);
@@ -225,9 +221,7 @@ public class FavoriteController {
             gpxFile.updatePointsGroup(oldName, pointsGroup);
             
             File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fullNewName);
-            if (session != null) {
-                sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-            }
+            sessionResources.addGpxTempFilesToSession(session, tmpGpx);
             InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             
             return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);

@@ -82,9 +82,7 @@ public class FavoriteService {
     public ResponseEntity<String> updateFavoriteFile(String fileName, CloudUserDevicesRepository.CloudUserDevice dev,
                                                      Long updatetime, GpxFile file, @Nullable HttpSession session) throws IOException {
         File tmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
-        if (session != null) {
-            sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-        }
+        sessionResources.addGpxTempFilesToSession(session, tmpGpx);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, file, tmpGpx);
         return ResponseEntity.ok(gson.toJson(resp));
@@ -106,11 +104,12 @@ public class FavoriteService {
     }
 
     @Nullable
-    public GpxFile createGpxFile(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
+    public GpxFile createGpxFile(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime,
+                                 @Nullable HttpSession session) throws IOException {
         CloudUserFilesRepository.UserFile userGroupFile = userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
         if (userGroupFile == null || userGroupFile.filesize == -1) {
             if (groupName.equals(DEFAULT_GROUP_FILE_NAME)) {
-                userGroupFile = createDefaultGroup(groupName, dev, updatetime);
+                userGroupFile = createDefaultGroup(groupName, dev, updatetime, session);
             } else {
                 throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
             }
@@ -136,19 +135,23 @@ public class FavoriteService {
         return null;
     }
     
-    private CloudUserFilesRepository.UserFile createDefaultGroup(String groupName, CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
+    private CloudUserFilesRepository.UserFile createDefaultGroup(String groupName, CloudUserDevicesRepository.CloudUserDevice dev,
+                                                                 Long updatetime, @Nullable HttpSession session) throws IOException {
         GpxFile gpxFile = new GpxFile(OSMAND_ROUTER_V2);
         gpxFile.getMetadata().setName(DEFAULT_GROUP_NAME);
         File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, groupName);
+        sessionResources.addGpxTempFilesToSession(session, tmpGpx);
         uploadFavoriteFile(tmpGpx, dev, groupName, updatetime);
         return userdataService.getLastFileVersion(dev.userid, groupName, FILE_TYPE_FAVOURITES);
     }
     
-    public ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+    public ResponseEntity<String> addNewGroup(WebGpxParser.TrackData trackData, String groupName, CloudUserDevicesRepository.CloudUserDevice dev,
+                                              @Nullable HttpSession session) throws IOException {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
         gpxFile.getMetadata().setName(groupName);
         String name = DEFAULT_GROUP_NAME + "-" + groupName + FILE_EXT_GPX;
         File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, name);
+        sessionResources.addGpxTempFilesToSession(session, tmpGpx);
         uploadFavoriteFile(tmpGpx, dev, name, null);
         UserdataService.ResponseFileStatus resp = createResponse(dev, name, gpxFile, tmpGpx);
         if (resp != null) {
@@ -158,10 +161,11 @@ public class FavoriteService {
         }
         return ResponseEntity.ok(gson.toJson(resp));
     }
-
+    
     public ResponseEntity<String> updateGroup(String fileName, WebGpxParser.TrackData updateGroupData, String groupName,
-                                              CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime) throws IOException {
-        GpxFile gpxFile = createGpxFile(fileName, dev, updatetime);
+                                              CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime,
+                                              @Nullable HttpSession session) throws IOException {
+        GpxFile gpxFile = createGpxFile(fileName, dev, updatetime, session);
         GpxFile gpxUpdateGroupData = webGpxParser.createGpxFileFromTrackData(updateGroupData);
         if (gpxFile == null) {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
@@ -169,6 +173,7 @@ public class FavoriteService {
         }
         gpxFile.updatePointsGroup(groupName, gpxUpdateGroupData.getPointsGroups().get(groupName));
         File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fileName);
+        sessionResources.addGpxTempFilesToSession(session, tmpGpx);
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, gpxFile, tmpGpx);
         return ResponseEntity.ok(gson.toJson(resp));
