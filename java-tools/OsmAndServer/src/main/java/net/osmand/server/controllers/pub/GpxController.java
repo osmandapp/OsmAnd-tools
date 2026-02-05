@@ -261,6 +261,7 @@ public class GpxController {
 			gpxFile = gpxService.createSimplifiedGpxFile(gpxFile);
 		}
 		File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + httpSession.getId(), ".gpx");
+		session.getGpxResources(httpSession).tempFiles.add(tmpGpx);
 
 		Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 		if (exception != null) {
