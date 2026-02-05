@@ -88,6 +88,7 @@ public class UserSessionResources implements HttpSessionListener {
 					Files.deleteIfExists(f.toPath());
 				} catch (Exception e) {
 					LOG.warn("Session cleanup: failed to delete temp file: " + f.getAbsolutePath(), e);
+					f.deleteOnExit();
 				}
 			}
 			ctx.tempFiles.clear();
