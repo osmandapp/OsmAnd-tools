@@ -4,10 +4,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Nullable;
+import jakarta.servlet.http.HttpSession;
 import jakarta.transaction.Transactional;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -44,6 +46,9 @@ public class FavoriteService {
     
     @Autowired
     protected GpxService gpxService;
+
+	@Autowired
+	UserSessionResources sessionResources;
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -75,11 +80,13 @@ public class FavoriteService {
     }
     
     public ResponseEntity<String> updateFavoriteFile(String fileName, CloudUserDevicesRepository.CloudUserDevice dev,
-                                                     Long updatetime, GpxFile file) throws IOException {
+                                                     Long updatetime, GpxFile file, @Nullable HttpSession session) throws IOException {
         File tmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
+        if (session != null) {
+            sessionResources.addGpxTempFilesToSession(session, tmpGpx);
+        }
         uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, file, tmpGpx);
-        
         return ResponseEntity.ok(gson.toJson(resp));
     }
     

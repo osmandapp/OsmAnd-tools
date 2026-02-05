@@ -19,8 +19,6 @@ import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import org.springframework.stereotype.Component;
 
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.RouteCalculationProgress;
 
 @WebListener
@@ -54,6 +52,15 @@ public class UserSessionResources implements HttpSessionListener {
 			httpSession.setAttribute(SESSION_GPX, ctx);
 		}
 		return ctx;
+	}
+
+	public void addGpxTempFilesToSession(HttpSession httpSession, File gpxFile) {
+		if (httpSession == null || gpxFile == null) {
+			return;
+		}
+		GPXSessionContext ctx = getGpxResources(httpSession);
+		ctx.tempFiles.add(gpxFile);
+		ctx.tempFiles.add(new File(gpxFile.getAbsolutePath() + ".gz"));
 	}
 	
 	public RouteCalculationProgress getRoutingProgress(HttpSession session) {
