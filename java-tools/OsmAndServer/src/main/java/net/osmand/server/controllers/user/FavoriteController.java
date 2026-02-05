@@ -206,7 +206,7 @@ public class FavoriteController {
             gpxFile.updatePointsGroup(oldName, pointsGroup);
             
             File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fullNewName);
-            InternalZipFile fl = InternalZipFile.buildFromFile(tmpGpx);
+            InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             
             return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
         }

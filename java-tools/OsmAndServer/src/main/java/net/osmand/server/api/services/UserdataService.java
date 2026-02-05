@@ -16,7 +16,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -369,7 +368,7 @@ public class UserdataService {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
-					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
+					zipfile = InternalZipFile.buildFromFileAndDelete(tmpGpxFile);
 				} else {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
 				}
@@ -897,7 +896,7 @@ public class UserdataService {
         InternalZipFile zipFile = null;
         File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
-            zipFile = InternalZipFile.buildFromFile(tmpGpx);
+            zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
@@ -909,7 +908,7 @@ public class UserdataService {
                 if (exception != null) {
                     return null;
                 }
-                zipFile = InternalZipFile.buildFromFile(tmpGpx);
+                zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             }
         }
         return zipFile;

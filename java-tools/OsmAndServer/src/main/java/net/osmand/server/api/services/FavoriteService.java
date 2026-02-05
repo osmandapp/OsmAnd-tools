@@ -66,7 +66,7 @@ public class FavoriteService {
     }
     
     public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
-        StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFile(tmpFile);
+        StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile);
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
         userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
         if (updatetime != null) {
