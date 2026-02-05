@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import jakarta.servlet.http.HttpSession;
 import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
@@ -58,6 +60,9 @@ public class WebUserdataService {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	UserSessionResources sessionResources;
 
 	private static final String METADATA = "metadata";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
@@ -360,16 +365,18 @@ public class WebUserdataService {
 	}
 
 	@Transactional
-	public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+	public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev,
+	                                         boolean saveCopy, HttpSession session) throws IOException {
 		CloudUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName, type);
 		if (file != null && file.filesize != -1) {
 			File updatedFile = renameGpxTrack(file, newName);
 			StorageService.InternalZipFile zipFile = null;
 			if (updatedFile != null) {
-				zipFile = StorageService.InternalZipFile.buildFromFile(updatedFile);
+				sessionResources.addGpxTempFilesToSession(session, updatedFile);
+				zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(updatedFile);
 			}
 			if (zipFile == null) {
-				zipFile = userdataService.getZipFile(file, newName);
+				zipFile = userdataService.getZipFile(file, newName, session);
 			}
 			if (zipFile != null) {
 				try {
@@ -379,7 +386,7 @@ public class WebUserdataService {
 				}
 				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
 				if (res.getStatusCode().is2xxSuccessful()) {
-					boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy);
+					boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy, session);
 					if (!renamed) {
 						return ResponseEntity.badRequest().body("Error rename info file!");
 					}
@@ -462,7 +469,8 @@ public class WebUserdataService {
 		return null;
 	}
 
-	private boolean renameInfoFile(String oldName, String newName, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
+	private boolean renameInfoFile(String oldName, String newName, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy,
+	                               HttpSession session) throws IOException {
 		CloudUserFilesRepository.UserFile file = userdataService.getLastFileVersion(dev.userid, oldName + INFO_FILE_EXT, FILE_TYPE_GPX);
 		if (file == null || file.filesize == -1) {
 			return true;
@@ -508,7 +516,8 @@ public class WebUserdataService {
 				fos.write(updated);
 			}
 			// upload new file
-			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFile(tmpInfo);
+			sessionResources.addGpxTempFilesToSession(session, tmpInfo);
+			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo);
 			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
 			if (res.getStatusCode().is2xxSuccessful()) {
 				if (!saveCopy) {

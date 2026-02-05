@@ -338,7 +338,7 @@ public class StorageService {
 			throw new IllegalStateException();
         }
 		
-		public static InternalZipFile buildFromFile(File file) throws IOException {
+		public static InternalZipFile buildFromFileAndDelete(File file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
 			String path = file.getPath();
@@ -352,6 +352,7 @@ public class StorageService {
 					gos.write(buffer, 0, len);
 				}
 			}
+			Files.deleteIfExists(file.toPath());
 			return zipfile;
 		}
 
