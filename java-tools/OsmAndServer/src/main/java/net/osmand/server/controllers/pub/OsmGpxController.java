@@ -271,6 +271,47 @@ public class OsmGpxController {
 		return ResponseEntity.ok(gson.toJson(rows));
 	}
 
+	@GetMapping(path = {"/activities"}, produces = "application/json")
+	public ResponseEntity<String> getActivities(@RequestParam String minLat,
+	                                            @RequestParam String maxLat,
+	                                            @RequestParam String minLon,
+	                                            @RequestParam String maxLon,
+	                                            @RequestParam(required = false) Integer year) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		if (error != null) {
+			return error;
+		}
+
+		// only non-null, non-empty activities; exclude garbage and error
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity <> ? AND m.activity <> ?");
+		params.add("garbage");
+		params.add("error");
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		String query =
+				"SELECT m.activity AS id, COUNT(*) AS count " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions +
+				" GROUP BY m.activity " +
+				"ORDER BY count DESC";
+
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
+		return ResponseEntity.ok(gson.toJson(rows));
+	}
+
 	private void applyTagsFilter(List<String> tags,
 	                             String tagMatchMode,
 	                             StringBuilder conditions,
