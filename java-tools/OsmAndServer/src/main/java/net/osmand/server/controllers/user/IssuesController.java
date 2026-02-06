@@ -448,18 +448,15 @@ public class IssuesController {
 					LOGGER.info("LLM stream done. Total chars: " + streamedContent.length());
 				}
 
-				if (pricing != null) {
-					double cost = ((double) inputTokens[0] / 1_000_000 * pricing.inputCost)
-							+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
-					DecimalFormat df = new DecimalFormat("#.######");
-					String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
-							+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
-					LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " "
-							+ costInfo.replace("\n", " "));
-					writer.write(costInfo);
-					writer.flush();
-				}
-
+				double cost = pricing == null ? 0.0 : ((double) inputTokens[0] / 1_000_000 * pricing.inputCost)
+						+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
+				DecimalFormat df = new DecimalFormat("#.######");
+				String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
+						+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
+				LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " "
+						+ costInfo.replace("\n", " "));
+				writer.write(costInfo);
+				writer.flush();
 			} catch (Exception e) {
 				e.printStackTrace();
 				writer.write("\n\nError processing LLM stream: " + e.getMessage());
