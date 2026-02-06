@@ -309,6 +309,11 @@ public class IssuesController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
 					writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
 		}
+		String apiUrl = System.getenv("ISSUE_API_URL");
+		if (apiUrl == null || apiUrl.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+					writer -> writer.write("Error: ISSUE_API_URL environment variable not set.".getBytes()));
+		}
 
 		refreshCache();
 
@@ -329,18 +334,27 @@ public class IssuesController {
 			messages.add(createMessage("user", request.prompt));
 		}
 
-		refreshModelPricingCache();
-		ModelPricing pricing = modelPricingCache.get(request.model);
+		ModelPricing pricing;
+		if (!request.model.startsWith("ollama")) {
+			refreshModelPricingCache();
+			pricing = modelPricingCache.get(request.model);
+		} else {
+			pricing = null;
+		}
 
+		final String finalApiUrl = apiUrl, finalApiKey = apiKey;
 		StreamingResponseBody stream = out -> {
 			PrintWriter writer = new PrintWriter(out);
 			try {
+				String jsonReq = objectMapper.writeValueAsString(
+						Map.of("model", request.model, "messages", messages, "stream", true));
+				// LOGGER.info("LLM Request: " + jsonReq);
+
 				HttpRequest openRouterRequest = HttpRequest.newBuilder()
-						.uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
-						.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
+						.uri(URI.create(finalApiUrl))
+						.header("Authorization", "Bearer " + finalApiKey).header("Content-Type", "application/json")
 						.timeout(Duration.of(5, ChronoUnit.MINUTES))
-						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
-								Map.of("model", request.model, "messages", messages, "stream", true))))
+						.POST(HttpRequest.BodyPublishers.ofString(jsonReq))
 						.build();
 
 				HttpResponse<Stream<String>> response = httpClient.send(openRouterRequest,
@@ -355,54 +369,95 @@ public class IssuesController {
 
 				final int[] inputTokens = { 0 };
 				final int[] outputTokens = { 0 };
+				final StringBuilder streamedContent = new StringBuilder();
+				final boolean[] streamDone = { false };
 
 				response.body().forEach(line -> {
+					// LOGGER.info("LLM Response line: " + line);
+					if (line == null || line.isBlank()) {
+						return;
+					}
+					if (!line.startsWith("data: ") && !line.startsWith("{")) {
+						return;
+					}
+
+					String json = line;
 					if (line.startsWith("data: ")) {
-						String json = line.substring(6);
-						if ("[DONE]".equals(json))
+						json = line.substring(6);
+						if ("[DONE]".equals(json)) {
 							return;
-
-						try {
-							JsonNode node = objectMapper.readTree(json);
-
-							// Extract token usage from the 'x-openrouter' extension
-							if (node.has("usage")) {
-								JsonNode usageNode = node.get("usage");
-								inputTokens[0] = usageNode.get("prompt_tokens").asInt();
-								outputTokens[0] = usageNode.get("completion_tokens").asInt();
-							}
-
-							if (node.has("choices")) {
-								JsonNode choices = node.get("choices");
-								if (choices.isArray() && !choices.isEmpty()) {
-									JsonNode delta = choices.get(0).get("delta");
-									if (delta != null && delta.has("content")) {
-										String content = delta.get("content").asText();
-										if (!content.isEmpty()) {
-											writer.write(content);
-											writer.flush();
-										}
-									}
-								}
-							}
-						} catch (IOException e) {
-							// Ignore parsing errors for now
 						}
 					}
-				});
 
-				if (pricing != null) {
-					double cost = ((double) inputTokens[0] / 1_000_000 * pricing.inputCost)
-							+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
-					DecimalFormat df = new DecimalFormat("#.######");
-					String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
-							+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
-					LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " "
-							+ costInfo.replace("\n", " "));
-					writer.write(costInfo);
-					writer.flush();
+					try {
+						JsonNode node = objectMapper.readTree(json);
+
+						// OpenRouter: { usage: {prompt_tokens, completion_tokens} }
+						if (node.has("usage")) {
+							JsonNode usageNode = node.get("usage");
+							if (usageNode.has("prompt_tokens")) {
+								inputTokens[0] = usageNode.get("prompt_tokens").asInt();
+							}
+							if (usageNode.has("completion_tokens")) {
+								outputTokens[0] = usageNode.get("completion_tokens").asInt();
+							}
+						}
+
+						// Ollama (/api/chat): { prompt_eval_count, eval_count }
+						if (node.has("prompt_eval_count")) {
+							inputTokens[0] = node.get("prompt_eval_count").asInt(inputTokens[0]);
+						}
+						if (node.has("eval_count")) {
+							outputTokens[0] = node.get("eval_count").asInt(outputTokens[0]);
+						}
+
+						String content = null;
+
+						// OpenRouter SSE chunk: { choices: [ { delta: { content } } ] }
+						if (node.has("choices")) {
+							JsonNode choices = node.get("choices");
+							if (choices.isArray() && !choices.isEmpty()) {
+								JsonNode delta = choices.get(0).get("delta");
+								if (delta != null && delta.has("content")) {
+									content = delta.get("content").asText();
+								}
+							}
+						}
+
+						// Ollama JSONL chunk: { message: { content }, done: boolean }
+						if (content == null && node.has("message")) {
+							JsonNode messageNode = node.get("message");
+							if (messageNode != null && messageNode.has("content")) {
+								content = messageNode.get("content").asText();
+							}
+						}
+						if (node.has("done") && node.get("done").asBoolean(false)) {
+							streamDone[0] = true;
+						}
+
+						if (content != null && !content.isEmpty()) {
+							streamedContent.append(content);
+							writer.write(content);
+							writer.flush();
+						}
+					} catch (IOException e) {
+						LOGGER.error("LLM issues parsing error: " + e.getMessage());
+						LOGGER.info("Response: " + json);
+					}
+				});
+				if (streamDone[0]) {
+					LOGGER.info("LLM stream done. Total chars: " + streamedContent.length());
 				}
 
+				double cost = pricing == null ? 0.0 : ((double) inputTokens[0] / 1_000_000 * pricing.inputCost)
+						+ ((double) outputTokens[0] / 1_000_000 * pricing.outputCost);
+				DecimalFormat df = new DecimalFormat("#.######");
+				String costInfo = "\n\n---\n**Tokens:** " + inputTokens[0] + " input / " + outputTokens[0]
+						+ " output. **Cost:** $" + df.format(cost * COST_MULTIPLIER);
+				LOGGER.info("LLM issues " + request.model + " messages: " + messages.size() + " "
+						+ costInfo.replace("\n", " "));
+				writer.write(costInfo);
+				writer.flush();
 			} catch (Exception e) {
 				e.printStackTrace();
 				writer.write("\n\nError processing LLM stream: " + e.getMessage());
