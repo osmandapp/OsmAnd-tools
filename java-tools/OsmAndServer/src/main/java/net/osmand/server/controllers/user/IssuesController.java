@@ -364,7 +364,6 @@ public class IssuesController {
 							+ errorBody);
 					return;
 				}
-				LOGGER.info("LLM Response status: " + response.statusCode());
 
 				final int[] inputTokens = { 0 };
 				final int[] outputTokens = { 0 };
