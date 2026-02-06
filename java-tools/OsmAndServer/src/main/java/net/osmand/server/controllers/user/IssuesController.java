@@ -344,12 +344,15 @@ public class IssuesController {
 		StreamingResponseBody stream = out -> {
 			PrintWriter writer = new PrintWriter(out);
 			try {
+				String jsonReq = objectMapper.writeValueAsString(
+						Map.of("model", request.model, "messages", messages, "stream", true));
+				LOGGER.info("LLM Request: " + jsonReq);
+
 				HttpRequest openRouterRequest = HttpRequest.newBuilder()
 						.uri(URI.create(finalApiUrl))
 						.header("Authorization", "Bearer " + finalApiKey).header("Content-Type", "application/json")
 						.timeout(Duration.of(5, ChronoUnit.MINUTES))
-						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
-								Map.of("model", request.model, "messages", messages, "stream", true))))
+						.POST(HttpRequest.BodyPublishers.ofString(jsonReq))
 						.build();
 
 				HttpResponse<Stream<String>> response = httpClient.send(openRouterRequest,
@@ -361,11 +364,14 @@ public class IssuesController {
 							+ errorBody);
 					return;
 				}
+				LOGGER.info("LLM Response status: " + response.statusCode());
 
 				final int[] inputTokens = { 0 };
 				final int[] outputTokens = { 0 };
 
 				response.body().forEach(line -> {
+					LOGGER.info("LLM Response line: " + line);
+
 					if (line.startsWith("data: ")) {
 						String json = line.substring(6);
 						if ("[DONE]".equals(json))
