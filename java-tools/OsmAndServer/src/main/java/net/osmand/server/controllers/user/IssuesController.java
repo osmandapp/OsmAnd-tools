@@ -332,8 +332,13 @@ public class IssuesController {
 			messages.add(createMessage("user", request.prompt));
 		}
 
-		refreshModelPricingCache();
-		ModelPricing pricing = modelPricingCache.get(request.model);
+		ModelPricing pricing;
+		if (!request.model.startsWith("ollama")) {
+			refreshModelPricingCache();
+			pricing = modelPricingCache.get(request.model);
+		} else {
+			pricing = null;
+		}
 
 		final String finalApiUrl = apiUrl, finalApiKey = apiKey;
 		StreamingResponseBody stream = out -> {
@@ -390,7 +395,8 @@ public class IssuesController {
 								}
 							}
 						} catch (IOException e) {
-							// Ignore parsing errors for now
+							LOGGER.error("LLM issues parsing error: " + e.getMessage());
+							LOGGER.info("Response: " + json);
 						}
 					}
 				});
