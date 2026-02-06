@@ -1492,23 +1492,30 @@ public class HHRoutingSubGraphCreator {
 //					System.err.println("Ignore (same cluster points to merge): " + lstMerge);
 //					continue;
 //				}
-				List<RouteSegmentBorderPoint> multiplePointClusters = new ArrayList<>();
+				List<RouteSegmentBorderPoint> pointsOfSingleMultiCluster = new ArrayList<>();
 				int multiClusterId = -1;
 				for (RouteSegmentBorderPoint p : lstMerge) {
 					if (clusters.get(p.clusterDbId) > 1) {
-						multiplePointClusters.add(p);
-						if(multiClusterId == -1) {
+						pointsOfSingleMultiCluster.add(p);
+						if (multiClusterId == -1) {
 							multiClusterId = p.clusterDbId;
-						} else if(multiClusterId != p.clusterDbId){
-							// there are multiple clusters with multiple points
+						} else if (multiClusterId != p.clusterDbId) {
+							// there are multiple clusters with multiple points - situation unclear
 							multiClusterId = -1;
 							break;
 						}
 					}
 				}
+				if (multiClusterId == -1 && pointsOfSingleMultiCluster.size() == 0) {
+					// every point is single, peak the first 1
+					RouteSegmentBorderPoint pnt = lstMerge.get(0);
+					pointsOfSingleMultiCluster.add(pnt);
+					multiClusterId = pnt.clusterDbId;
+				}
 				if (multiClusterId != -1) {
-					lstMerge.removeAll(multiplePointClusters);
-					RouteSegmentBorderPoint[] arr = multiplePointClusters.toArray(new RouteSegmentBorderPoint[multiplePointClusters.size()]);
+					// single multicluster points will be deleted and intersection point will covered by multicluster
+					lstMerge.removeAll(pointsOfSingleMultiCluster);
+					RouteSegmentBorderPoint[] pointsOfMultiCluster = pointsOfSingleMultiCluster.toArray(new RouteSegmentBorderPoint[pointsOfSingleMultiCluster.size()]);
 					int ind = 0;
 					for (RouteSegmentBorderPoint singlePointCluster : lstMerge) {
 						ind++;
@@ -1516,8 +1523,8 @@ public class HHRoutingSubGraphCreator {
 								"Complex scenario with [%d] clusters (%s): main point (%d of %d) (%s) merging with lstMerge [%d] (%s)\n",
 								clusters.size(), clusters, 
 								ind, lstMerge.size(), 
-								singlePointCluster, arr.length, Arrays.toString(arr));
-						simpleMerge(ctx, singlePointCluster, multiClusterId, arr);
+								singlePointCluster, pointsOfMultiCluster.length, Arrays.toString(pointsOfMultiCluster));
+						simpleMerge(ctx, singlePointCluster, multiClusterId, pointsOfMultiCluster);
 					}
 					continue;
 				}

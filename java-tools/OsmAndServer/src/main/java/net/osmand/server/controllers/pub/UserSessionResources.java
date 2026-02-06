@@ -3,8 +3,12 @@ package net.osmand.server.controllers.pub;
 import java.io.File;
 import java.io.Serial;
 import java.io.Serializable;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 import jakarta.servlet.annotation.WebListener;
 import jakarta.servlet.http.HttpSession;
@@ -15,13 +19,13 @@ import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import org.springframework.stereotype.Component;
 
-import net.osmand.gpx.GPXTrackAnalysis;
-import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.RouteCalculationProgress;
 
 @WebListener
 @Component
 public class UserSessionResources implements HttpSessionListener {
+
+	private static final Log LOG = LogFactory.getLog(UserSessionResources.class);
 
 	protected static final String SESSION_GPX = "gpx";
 	protected static final String SESSION_ROUTING = "routing";
@@ -49,6 +53,15 @@ public class UserSessionResources implements HttpSessionListener {
 		}
 		return ctx;
 	}
+
+	public void addGpxTempFilesToSession(HttpSession httpSession, File gpxFile) {
+		if (httpSession == null || gpxFile == null) {
+			return;
+		}
+		GPXSessionContext ctx = getGpxResources(httpSession);
+		ctx.tempFiles.add(gpxFile);
+		ctx.tempFiles.add(new File(gpxFile.getAbsolutePath() + ".gz"));
+	}
 	
 	public RouteCalculationProgress getRoutingProgress(HttpSession session) {
 		if (session.getAttribute(SESSION_ROUTING) instanceof RouteCalculationProgress) {
@@ -66,9 +79,17 @@ public class UserSessionResources implements HttpSessionListener {
 	@Override
 	public void sessionDestroyed(HttpSessionEvent se) {
 		GPXSessionContext ctx = (GPXSessionContext) se.getSession().getAttribute(SESSION_GPX);
-		if (ctx != null) {
-            for (File f : ctx.tempFiles) {
-				f.delete();
+		if (ctx != null && ctx.tempFiles != null) {
+			for (File f : ctx.tempFiles) {
+				if (f == null) {
+					continue;
+				}
+				try {
+					Files.deleteIfExists(f.toPath());
+				} catch (Exception e) {
+					LOG.warn("Session cleanup: failed to delete temp file: " + f.getAbsolutePath(), e);
+					f.deleteOnExit();
+				}
 			}
 			ctx.tempFiles.clear();
 			ctx.files.clear();

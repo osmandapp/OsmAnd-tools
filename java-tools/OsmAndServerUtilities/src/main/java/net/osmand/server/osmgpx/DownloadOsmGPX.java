@@ -258,9 +258,9 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
 
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed) WHERE speed > 0");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance) WHERE distance > 0");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points) WHERE points > 0");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points)");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
@@ -367,12 +367,11 @@ public class DownloadOsmGPX {
 									// only for non-garbage & non-error tracks
 									pointsCount = pointsSize;
 									distanceMeters = totalDistance;
-									if (analysis.getHasSpeedInTrack()) {
-										double avgSpeedMs = analysis.getAvgSpeed();
-										if (avgSpeedMs > 0) {
-											avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
-										}
+									double avgSpeedMs = analysis.getAvgSpeed();
+									if (avgSpeedMs > 0) {
+										avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
 									} else if (distanceMeters > 0) {
+										// Fallback: calculate speed manually when not available in track
 										double timeMs = analysis.getTimeMoving();
 										if (timeMs <= 0) {
 											timeMs = analysis.getTimeSpan();

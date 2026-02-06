@@ -74,14 +74,16 @@ public class OsmGpxController {
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 
 	public record RoutesListRequest(
-			String activity,
+			List<String> activityArr,
 			Integer year,
 			String minLat,
 			String maxLat,
 			String minLon,
 			String maxLon,
 			List<String> tags,
-			String tagMatchMode
+			String tagMatchMode,
+			List<Integer> distanceRange,
+			List<Integer> speedRange
 	) {
 	}
 
@@ -113,8 +115,22 @@ public class OsmGpxController {
 			}
 		}
 
-		if (!Algorithms.isEmpty(req.activity())) {
-			error = filterByActivity(req.activity(), params, conditions);
+		if (req.activityArr() != null && !req.activityArr().isEmpty()) {
+			error = filterByActivity(req.activityArr(), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.distanceRange() != null && !req.distanceRange().isEmpty()) {
+			error = filterByRange("m.distance", req.distanceRange(), params, conditions, "distance");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.speedRange() != null && !req.speedRange().isEmpty()) {
+			error = filterByRange("m.speed", req.speedRange(), params, conditions, "speed");
 			if (error != null) {
 				return error;
 			}
@@ -134,13 +150,13 @@ public class OsmGpxController {
 		}
 	}
 
-	@GetMapping(path = {"/tags"}, produces = "application/json")
-	public ResponseEntity<String> getTags(@RequestParam String minLat,
-	                                      @RequestParam String maxLat,
-	                                      @RequestParam String minLon,
-	                                      @RequestParam String maxLon,
-	                                      @RequestParam(required = false) Integer year,
-	                                      @RequestParam(required = false) String activity) {
+	@GetMapping(path = {"/ranges"}, produces = "application/json")
+	public ResponseEntity<String> getRanges(@RequestParam String minLat,
+	                                        @RequestParam String maxLat,
+	                                        @RequestParam String minLon,
+	                                        @RequestParam String maxLon,
+	                                        @RequestParam(required = false) Integer year,
+	                                        @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -165,8 +181,75 @@ public class OsmGpxController {
 			}
 		}
 
-		if (!Algorithms.isEmpty(activity)) {
-			error = filterByActivity(activity, params, conditions);
+		if (activityArr != null && !activityArr.isEmpty()) {
+			error = filterByActivity(activityArr, params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		// only include records with valid distance or speed values
+		conditions.append(" AND (m.distance > 0 OR m.speed > 0)");
+
+		String query = "SELECT " +
+				"MIN(CASE WHEN distance > 0 THEN distance END), " +
+				"MAX(CASE WHEN distance > 0 THEN distance END), " +
+				"MIN(CASE WHEN speed >= 0 THEN speed END), " +
+				"MAX(CASE WHEN speed >= 0 THEN speed END) " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
+
+		Map<String, Integer> ranges = new LinkedHashMap<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			float minDist = rs.getFloat(1);
+			ranges.put("minDist", rs.wasNull() ? 0 : (int) minDist);
+			float maxDist = rs.getFloat(2);
+			ranges.put("maxDist", rs.wasNull() ? 0 : (int) maxDist);
+			float minSpeed = rs.getFloat(3);
+			ranges.put("minSpeed", rs.wasNull() ? 0 : (int) minSpeed);
+			float maxSpeed = rs.getFloat(4);
+			ranges.put("maxSpeed", rs.wasNull() ? 0 : (int) maxSpeed);
+		});
+
+		return ResponseEntity.ok(gson.toJson(ranges));
+	}
+
+	@GetMapping(path = {"/tags"}, produces = "application/json")
+	public ResponseEntity<String> getTags(@RequestParam String minLat,
+	                                      @RequestParam String maxLat,
+	                                      @RequestParam String minLon,
+	                                      @RequestParam String maxLon,
+	                                      @RequestParam(required = false) Integer year,
+	                                      @RequestParam(required = false) List<String> activityArr) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		if (error != null) {
+			return error;
+		}
+
+		// skip garbage and error activities
+		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
+		params.add("garbage");
+		params.add("error");
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (activityArr != null && !activityArr.isEmpty()) {
+			error = filterByActivity(activityArr, params, conditions);
 			if (error != null) {
 				return error;
 			}
@@ -188,6 +271,47 @@ public class OsmGpxController {
 		return ResponseEntity.ok(gson.toJson(rows));
 	}
 
+	@GetMapping(path = {"/activities"}, produces = "application/json")
+	public ResponseEntity<String> getActivities(@RequestParam String minLat,
+	                                            @RequestParam String maxLat,
+	                                            @RequestParam String minLon,
+	                                            @RequestParam String maxLon,
+	                                            @RequestParam(required = false) Integer year) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		if (error != null) {
+			return error;
+		}
+
+		// only non-null, non-empty activities; exclude garbage and error
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity <> ? AND m.activity <> ?");
+		params.add("garbage");
+		params.add("error");
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		String query =
+				"SELECT m.activity AS id, COUNT(*) AS count " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions +
+				" GROUP BY m.activity " +
+				"ORDER BY count DESC";
+
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
+		return ResponseEntity.ok(gson.toJson(rows));
+	}
+
 	private void applyTagsFilter(List<String> tags,
 	                             String tagMatchMode,
 	                             StringBuilder conditions,
@@ -198,7 +322,7 @@ public class OsmGpxController {
 		List<String> normalized = new ArrayList<>();
 		for (String tag : tags) {
 			if (!Algorithms.isEmpty(tag)) {
-				normalized.add(tag.trim().toLowerCase());
+				normalized.add(tag.trim());
 			}
 		}
 		if (normalized.isEmpty()) {
@@ -212,7 +336,8 @@ public class OsmGpxController {
 	}
 
 	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
-		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon " +
+		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
+				"m.speed, m.distance, m.points " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
 				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
@@ -306,7 +431,21 @@ public class OsmGpxController {
 		Map<String, Object> point = new LinkedHashMap<>();
 		point.put("lat", rs.getDouble("lat"));
 		point.put("lon", rs.getDouble("lon"));
+
 		feature.getProperties().put("point", point);
+
+		int speed = (int) rs.getFloat("speed");
+		if (speed != 0) {
+			feature.getProperties().put("speed", speed);
+		}
+		int dist = (int) rs.getFloat("distance");
+		if (dist != 0) {
+			feature.getProperties().put("dist", dist);
+		}
+		int points = rs.getInt("points");
+		if (points != 0) {
+			feature.getProperties().put("points", points);
+		}
 
 		return feature;
 	}
@@ -405,10 +544,12 @@ public class OsmGpxController {
 		}
 	}
 
-	private ResponseEntity<String> filterByActivity(String activity, List<Object> params, StringBuilder conditions) {
-		if (!Algorithms.isEmpty(activity)) {
-			conditions.append(" AND m.activity = ?");
-			params.add(activity);
+	private ResponseEntity<String> filterByActivity(List<String> activityArr, List<Object> params, StringBuilder conditions) {
+		if (activityArr != null && !activityArr.isEmpty()) {
+			conditions.append(" AND m.activity IN (");
+			conditions.append(String.join(",", Collections.nCopies(activityArr.size(), "?")));
+			conditions.append(")");
+			params.addAll(activityArr);
 			return null;
 		} else {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");
@@ -424,6 +565,29 @@ public class OsmGpxController {
 			} catch (NumberFormatException e) {
 				return ResponseEntity.badRequest().body("Invalid year format.");
 			}
+		}
+		return null;
+	}
+
+	private ResponseEntity<String> filterByRange(String column, List<Integer> range, List<Object> params, StringBuilder conditions, String fieldName) {
+		if (range == null || range.isEmpty()) {
+			return null;
+		}
+		if (range.size() != 2) {
+			return ResponseEntity.badRequest().body("Invalid " + fieldName + " range format. Expected [min, max].");
+		}
+		Integer min = range.get(0);
+		Integer max = range.get(1);
+		if (min != null && max != null && min > max) {
+			return ResponseEntity.badRequest().body("Invalid " + fieldName + " range: min cannot be greater than max.");
+		}
+		if (min != null) {
+			conditions.append(" AND ").append(column).append(" >= ?");
+			params.add(min);
+		}
+		if (max != null) {
+			conditions.append(" AND ").append(column).append(" <= ?");
+			params.add(max);
 		}
 		return null;
 	}
@@ -450,7 +614,6 @@ public class OsmGpxController {
 				}
 			});
 			feature.getProperties().put("geo", result);
-			feature.getProperties().put("distance", analysis.getTotalDistance());
 		}
 	}
 
