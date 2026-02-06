@@ -306,11 +306,13 @@ public class IssuesController {
 			throws IOException, InterruptedException {
 		String apiKey = System.getenv("ISSUE_OPENROUTER_TOKEN");
 		if (apiKey == null || apiKey.isEmpty()) {
-			apiKey = "ollama";
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+					writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
 		}
 		String apiUrl = System.getenv("ISSUE_API_URL");
 		if (apiUrl == null || apiUrl.isEmpty()) {
-			apiUrl = "https://veles.osmand.net/api/chat"; // https://openrouter.ai/api/v1/chat/completions";
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+					writer -> writer.write("Error: ISSUE_API_URL environment variable not set.".getBytes()));
 		}
 
 		refreshCache();
