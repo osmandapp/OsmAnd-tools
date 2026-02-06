@@ -306,8 +306,11 @@ public class IssuesController {
 			throws IOException, InterruptedException {
 		String apiKey = System.getenv("ISSUE_OPENROUTER_TOKEN");
 		if (apiKey == null || apiKey.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-					writer -> writer.write("Error: ISSUE_OPENROUTER_TOKEN environment variable not set.".getBytes()));
+			apiKey = "ollama";
+		}
+		String apiUrl = System.getenv("ISSUE_API_URL");
+		if (apiUrl == null || apiUrl.isEmpty()) {
+			apiUrl = "https://veles.osmand.net/api/chat"; // https://openrouter.ai/api/v1/chat/completions";
 		}
 
 		refreshCache();
@@ -332,12 +335,13 @@ public class IssuesController {
 		refreshModelPricingCache();
 		ModelPricing pricing = modelPricingCache.get(request.model);
 
+		final String finalApiUrl = apiUrl, finalApiKey = apiKey;
 		StreamingResponseBody stream = out -> {
 			PrintWriter writer = new PrintWriter(out);
 			try {
 				HttpRequest openRouterRequest = HttpRequest.newBuilder()
-						.uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
-						.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
+						.uri(URI.create(finalApiUrl))
+						.header("Authorization", "Bearer " + finalApiKey).header("Content-Type", "application/json")
 						.timeout(Duration.of(5, ChronoUnit.MINUTES))
 						.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(
 								Map.of("model", request.model, "messages", messages, "stream", true))))
