@@ -1190,7 +1190,7 @@ public class WikiDatabasePreparation {
 			}
 			wikipediaSqliteName = resultDB.isEmpty() ? wikipediaFolder + WIKIPEDIA_SQLITE : resultDB;
 		}
-		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("create-osm-wikidata")) {
+		if (mode.equals("create-wikidata") || mode.equals("test-wikidata") || mode.equals("update-wikidata") || mode.equals("update-wikidata-daily") || mode.equals("create-osm-wikidata")) {
 			if (resultDB.isEmpty()) {
 				throw new RuntimeException("Correct arguments weren't supplied. --result_db= is not set");
 			}
@@ -1480,7 +1480,7 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void processWikidata(File wikidataSqlite, final String wikidataFile,
-			OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit)
+									   OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file",
