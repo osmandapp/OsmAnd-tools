@@ -19,6 +19,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
+import net.osmand.util.TextDirectionUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -43,6 +44,7 @@ import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+import static net.osmand.util.LocationParser.parseOpenLocationCode;
 import static net.osmand.util.OpeningHoursParser.*;
 import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
@@ -1471,9 +1473,22 @@ public class SearchService {
     public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
-    public LatLon parseLocation(String locationString) {
+    public LatLon parseLocation(String locationString, LatLon bboxCentre) {
         if (locationString == null || locationString.trim().isEmpty()) {
             return null;
+        }
+        locationString = TextDirectionUtil.clearDirectionMarks(locationString);
+        LocationParser.ParsedOpenLocationCode olcParsed = parseOpenLocationCode(locationString);
+        if (olcParsed != null) {
+            if (olcParsed.isFull()) {
+                return olcParsed.getLatLon();
+            }
+            if (bboxCentre != null) {
+                LatLon recovered = olcParsed.recover(bboxCentre);
+                if (recovered != null) {
+                    return recovered;
+                }
+            }
         }
         return LocationParser.parseLocation(locationString);
     }
