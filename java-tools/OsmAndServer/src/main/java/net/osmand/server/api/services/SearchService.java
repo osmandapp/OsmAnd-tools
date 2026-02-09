@@ -1473,14 +1473,22 @@ public class SearchService {
     public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
-    public LatLon parseLocation(String locationString) {
+    public LatLon parseLocation(String locationString, LatLon bboxCentre) {
         if (locationString == null || locationString.trim().isEmpty()) {
             return null;
         }
         locationString = TextDirectionUtil.clearDirectionMarks(locationString);
         LocationParser.ParsedOpenLocationCode olcParsed = parseOpenLocationCode(locationString);
-        if (olcParsed != null && olcParsed.isFull()) {
-            return olcParsed.getLatLon();
+        if (olcParsed != null) {
+            if (olcParsed.isFull()) {
+                return olcParsed.getLatLon();
+            }
+            if (bboxCentre != null) {
+                LatLon recovered = olcParsed.recover(bboxCentre);
+                if (recovered != null) {
+                    return recovered;
+                }
+            }
         }
         return LocationParser.parseLocation(locationString);
     }

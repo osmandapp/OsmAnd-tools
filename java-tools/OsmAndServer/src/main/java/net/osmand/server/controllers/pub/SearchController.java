@@ -387,8 +387,11 @@ public class SearchController {
 
     @GetMapping(path = {"/parse-location"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseLocation(@RequestParam String location) {
-        LatLon coordinates = searchService.parseLocation(location);
+    public ResponseEntity<String> parseLocation(@RequestParam String location,
+                                                @RequestParam String lat,
+                                                @RequestParam String lon) {
+        LatLon bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+        LatLon coordinates = searchService.parseLocation(location, bboxCentre);
         if (coordinates == null) {
             return ResponseEntity.ok(gson.toJson(null));
         }
