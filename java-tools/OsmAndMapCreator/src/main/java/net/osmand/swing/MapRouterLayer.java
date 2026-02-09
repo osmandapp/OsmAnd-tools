@@ -53,6 +53,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.imageio.ImageIO;
 
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.OsmandIndex;
 import net.osmand.router.*;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -144,6 +146,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton stopButton;
 	private GpxFile selectedGPXFile;
 	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
+	private boolean isPointShowingOridinary = true;
 
 	private static class RouteSeed {
 		private final int index;
@@ -422,16 +425,6 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		};
 		directions.add(generateRandomRoutes);
-
-		Action loadRandomRoutes = new AbstractAction("Load JSON and regenerate routes") {
-			private static final long serialVersionUID = 347156107455281239L;
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				loadRandomRoutes();
-			}
-		};
-		directions.add(loadRandomRoutes);
 
 		if (directionPointsFile == null) {
 			Action loadGeoJSON = new AbstractAction("Load Direction Points (GeoJSON)...") {
@@ -1074,6 +1067,35 @@ public class MapRouterLayer implements MapPanelLayer {
 		}
 	}
 
+	private BinaryMapIndexReader filterMaps(LatLon point, BinaryMapIndexReader[] readers) {
+		if (readers == null || readers.length == 0) {
+			return null;
+		}
+		if (point == null) {
+			return readers[0];
+		}
+		int point31x = MapUtils.get31TileNumberX(point.getLongitude());
+		int point31y = MapUtils.get31TileNumberY(point.getLatitude());
+		int routeZoom = 15;
+		for (BinaryMapIndexReader reader : readers) {
+			if (reader == null || !reader.containsRouteData()) {
+				continue;
+			}
+			if (reader.containsRouteData(point31x, point31y, point31x, point31y, routeZoom)) {
+				return reader;
+			}
+		}
+		for (BinaryMapIndexReader reader : readers) {
+			if (reader == null) {
+				continue;
+			}
+			if (reader.containsMapData(point31x, point31y, map.getZoom())) {
+				return reader;
+			}
+		}
+		return readers[0];
+	}
+
 	private void generateRandomRoutes() {
 		BinaryMapIndexReader[] readers;
 		try {
@@ -1087,6 +1109,8 @@ public class MapRouterLayer implements MapPanelLayer {
 					"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
 			return;
 		}
+
+		BinaryMapIndexReader reader = filterMaps(new LatLon(map.getLatitude(), map.getLongitude()), readers);
 		File outputDir = createNextRouteOutputDir();
 		if (outputDir == null) {
 			return;
@@ -1097,8 +1121,9 @@ public class MapRouterLayer implements MapPanelLayer {
 		config.CENTER_POINT = new LatLon(map.getLatitude(), map.getLongitude());
 		config.CENTER_RADIUS_KM = RANDOM_ROUTE_CENTER_RADIUS_KM;
 		config.RANDOM_PROFILES = new String[] { RANDOM_ROUTES_PROFILE };
+
 		RandomRouteGenerator generator = new RandomRouteGenerator(config);
-		List<RandomRouteEntry> entries = generator.generateTestList(List.of(readers));
+		List<RandomRouteEntry> entries = generator.generateTestList(List.of(reader));
 		List<RouteSeed> routes = new ArrayList<>();
 		int index = 1;
 		LatLon mapCenter = config.CENTER_POINT;
@@ -1117,48 +1142,6 @@ public class MapRouterLayer implements MapPanelLayer {
 			return;
 		}
 		File obfFile = readers[0].getFile();
-		writeRandomRoutesJson(new File(outputDir, RANDOM_ROUTES_FILE_NAME), obfFile.getName(), routes);
-		runBatchRoutes(routes, outputDir);
-	}
-
-	private void loadRandomRoutes() {
-		JFileChooser fileChooser = new JFileChooser(DataExtractionSettings.getSettings().getDefaultWorkingDir());
-		fileChooser.setDialogTitle("Load random_routes.json");
-		if (fileChooser.showOpenDialog(map) != JFileChooser.APPROVE_OPTION) {
-			return;
-		}
-		File jsonFile = fileChooser.getSelectedFile();
-		if (jsonFile == null || !jsonFile.isFile()) {
-			return;
-		}
-		BinaryMapIndexReader[] readers;
-		try {
-			readers = DataExtractionSettings.getSettings().getObfReaders();
-		} catch (IOException e) {
-			ExceptionHandler.handle(e);
-			return;
-		}
-		if (readers.length == 0) {
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
-					"Please specify obf file in settings", "Obf file not found", JOptionPane.ERROR_MESSAGE);
-			return;
-		}
-		if (readers.length > 1) {
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
-					"Please select a single obf file in settings", "Multiple obf files", JOptionPane.ERROR_MESSAGE);
-			return;
-		}
-		File outputDir = createNextRouteOutputDir();
-		if (outputDir == null) {
-			return;
-		}
-		File obfFile = readers[0].getFile();
-		List<RouteSeed> routes = readRandomRoutesJson(jsonFile, obfFile.getName());
-		if (routes.isEmpty()) {
-			JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(),
-					"No routes were loaded", "Random routes", JOptionPane.WARNING_MESSAGE);
-			return;
-		}
 		writeRandomRoutesJson(new File(outputDir, RANDOM_ROUTES_FILE_NAME), obfFile.getName(), routes);
 		runBatchRoutes(routes, outputDir);
 	}
@@ -1838,10 +1821,18 @@ public class MapRouterLayer implements MapPanelLayer {
 			String name = "";
 			if (tt != null) {
 				name = (++indVisual) + ". ";
+				if (isPointShowingOridinary) {
+					name +=  tt.toXmlString() + (tt.isSkipToSpeak() ? "*" : "");
+					if (tt.getLanes() != null) {
+						name += " [" + TurnType.lanesToString(tt.getLanes()) + "]";
+					}
+				}
 			}
 
 			way.putTag(OSMTagKey.NAME.getValue(), name);
-			way.putTag("colour", "blue");
+			if (!isPointShowingOridinary) {
+				way.putTag("colour", "blue");
+			}
 
 			if (prevSegm != null
 					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
