@@ -388,9 +388,15 @@ public class SearchController {
     @GetMapping(path = {"/parse-location"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> parseLocation(@RequestParam String location,
-                                                @RequestParam String lat,
-                                                @RequestParam String lon) {
-        LatLon bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+                                                @RequestParam(required = false) String lat,
+                                                @RequestParam(required = false) String lon) {
+        if (Algorithms.isBlank(location)) {
+            return ResponseEntity.badRequest().body("Location parameter is required!");
+        }
+        LatLon bboxCentre = null;
+        if (!Algorithms.isBlank(lat) && !Algorithms.isBlank(lon)) {
+            bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+        }
         LatLon coordinates = searchService.parseLocation(location, bboxCentre);
         if (coordinates == null) {
             return ResponseEntity.ok(gson.toJson(null));
