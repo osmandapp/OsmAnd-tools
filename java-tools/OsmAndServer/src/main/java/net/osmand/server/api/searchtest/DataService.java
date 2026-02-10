@@ -325,6 +325,16 @@ public interface DataService extends BaseService {
 				if (searchResult != null && searchResult.stat() != null) {
 					row.put("stat_bytes", searchResult.stat().totalBytes);
 					row.put("stat_time", searchResult.stat().totalTime);
+					for (Map.Entry<String, BinaryMapIndexReaderStats.SearchStat.TimingSummary> e : searchResult.stat().getTimingSummary().entrySet()) {
+						row.put("stat_time_" + e.getKey(), e.getValue().getTotalNs());
+						row.put("stat_count_" + e.getKey(), e.getValue().getCount());
+
+						row.put("stat_first_key_" + e.getKey(), e.getValue().subKey[0]);
+						row.put("stat_first_value_" + e.getKey(), e.getValue().subTime[0]);
+
+						row.put("stat_second_key_" + e.getKey(), e.getValue().subKey[1]);
+						row.put("stat_second_value_" + e.getKey(), e.getValue().subTime[1]);
+					}
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -663,7 +673,7 @@ public interface DataService extends BaseService {
 				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
 	}
 
-	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats) {}
+	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats, Map<String, BinaryMapIndexReaderStats.SearchStat.TimingSummary> timingSummary) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
@@ -676,7 +686,7 @@ public interface DataService extends BaseService {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().getWordStats().values());
+		return new ResultsWithStats(results, result.stat().getWordStats().values(), result.stat().getTimingSummary());
 	}
 
     private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
