@@ -1517,7 +1517,7 @@ public class SearchService {
             searchUICore.updateSettings(settings);
             SearchCoreFactory.SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
             searchUICore.registerAPI(amenitiesApi);
-            searchUICore.registerAPI(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi, searchUICore.getHttpRedirectRequester()));
+            searchUICore.registerAPI(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi));
 
             SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(locationString, bboxCentre);
             if (resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty()) {
