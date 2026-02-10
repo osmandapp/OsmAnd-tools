@@ -202,14 +202,29 @@ public class SearchService {
         return bbox;
     }
 
+    public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
+                                Double radiusToLoadMaps, String northWest, String southEast) {
+        public double getRadius() {
+            return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
+        }
+    }
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
+    public record SearchResults(List<SearchResult> results,
+                                SearchSettings settings,
+                                String unitTestJson) {
+        public SearchResults(List<SearchResult> results) {
+            this(results, null, null);
+        }
+    }
+
 	public List<Feature> search(SearchContext ctx, Calendar clientTime) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(ctx, new SearchOption(false, null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
-					(System.currentTimeMillis() - tm) / 1000.0, searchResults.stat));
+					(System.currentTimeMillis() - tm) / 1000.0, searchResults.settings.getStat()));
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
@@ -219,20 +234,10 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-	public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
-	                            Double radiusToLoadMaps, String northWest, String southEast) {
-		public double getRadius() {
-			return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
-		}
-	}
-	public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
-	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat,
-	                                  SearchSettings settings, String unitTestJson) {}
-
-    public SearchResultWrapper searchResults(SearchContext ctx, SearchOption option,
-                                             Consumer<List<SearchResult>> consumerInContext) throws IOException {
+    public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+                                                   Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+            return new SearchResults(Collections.emptyList());
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(ctx.locale), ctx.locale, false);
         if (!option.unlimited) {
@@ -247,15 +252,14 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
             if (list.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
             if (usedMapList.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
-	        settings.setStat(stat);
+	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
@@ -281,7 +285,7 @@ public class SearchService {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
 				unitTestJson = json == null ? null : json.toString();
 			}
-			return new SearchResultWrapper(res, stat, settings, unitTestJson);
+			return new SearchResults(res, settings, unitTestJson);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
@@ -1473,7 +1477,7 @@ public class SearchService {
     public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
-    public LatLon parseLocation(String locationString, LatLon bboxCentre) {
+    public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
         if (locationString == null || locationString.trim().isEmpty()) {
             return null;
         }
@@ -1483,14 +1487,45 @@ public class SearchService {
             if (olcParsed.isFull()) {
                 return olcParsed.getLatLon();
             }
-            if (bboxCentre != null) {
-                LatLon recovered = olcParsed.recover(bboxCentre);
-                if (recovered != null) {
-                    return recovered;
-                }
+            LatLon location = searchOlcOnBasemap(locationString, bboxCentre);
+            if (location != null) {
+                return location;
             }
         }
         return LocationParser.parseLocation(locationString);
+    }
+
+    private LatLon searchOlcOnBasemap(String locationString, LatLon bboxCentre) throws IOException {
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+
+        try {
+            QuadRect world = new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> refs = getMapsForSearch(world, true);
+            if (refs.isEmpty()) {
+                return null;
+            }
+            usedMapList = osmAndMapsService.getReaders(refs, null);
+
+            SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, false);
+            SearchSettings settings = searchUICore.getSearchSettings();
+            settings.setOfflineIndexes(usedMapList);
+            settings.setSearchBBox31(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE));
+            searchUICore.updateSettings(settings);
+            SearchCoreFactory.SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
+            searchUICore.registerAPI(amenitiesApi);
+            searchUICore.registerAPI(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi, searchUICore.getHttpRedirectRequester()));
+
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(locationString, bboxCentre);
+            if (resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty()) {
+                SearchResult result = resultCollection.getCurrentSearchResults().get(0);
+                if (result.object instanceof LatLon location) {
+                    return location;
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+            return null;
     }
 
 }

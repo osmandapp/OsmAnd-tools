@@ -276,7 +276,7 @@ public interface DataService extends BaseService {
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
 	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
-	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
+	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null) {
 			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, "", error, duration,
@@ -322,9 +322,9 @@ public interface DataService extends BaseService {
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
 				}
-				if (searchResult != null && searchResult.stat() != null) {
-					row.put("stat_bytes", searchResult.stat().totalBytes);
-					row.put("stat_time", searchResult.stat().totalTime);
+				if (searchResult != null && searchResult.settings().getStat() != null) {
+					row.put("stat_bytes", searchResult.settings().getStat().totalBytes);
+					row.put("stat_time", searchResult.settings().getStat().totalTime);
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -358,8 +358,8 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
-				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalBytes : null,
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalTime : null
 		};
 	}
 
@@ -669,14 +669,14 @@ public interface DataService extends BaseService {
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
-		SearchService.SearchResultWrapper result = getSearchService().searchResults(ctx, option, null);
+		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().getWordStats().values());
+		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values());
 	}
 
     private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
@@ -698,8 +698,8 @@ public interface DataService extends BaseService {
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+		SearchService.SearchResults result = getSearchService()
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
