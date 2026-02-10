@@ -1513,7 +1513,7 @@ public class SearchService {
             SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, false);
             SearchSettings settings = searchUICore.getSearchSettings();
             settings.setOfflineIndexes(usedMapList);
-            settings.setSearchBBox31(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE));
+            settings.setSearchBBox31(world);
             searchUICore.updateSettings(settings);
             SearchCoreFactory.SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
             searchUICore.registerAPI(amenitiesApi);
