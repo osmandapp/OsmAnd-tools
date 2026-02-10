@@ -1253,12 +1253,12 @@ public class SearchService {
 
 	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
-		List<OpeningHours.Info> openingHoursInfo;
 		if (openingHours != null) {
-			openingHoursInfo = openingHours.getInfo(calendar);
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
-				OpeningHours.Info info = openingHoursInfo.get(0);
-				return (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
+				return openingHoursInfo.stream()
+						.map(info -> (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo())
+						.collect(Collectors.joining(";"));
 			}
 		}
 		return null;
