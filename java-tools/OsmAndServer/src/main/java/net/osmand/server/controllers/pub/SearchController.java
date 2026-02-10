@@ -389,7 +389,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> parseLocation(@RequestParam String location,
                                                 @RequestParam(required = false) String lat,
-                                                @RequestParam(required = false) String lon) {
+                                                @RequestParam(required = false) String lon) throws IOException {
         if (Algorithms.isBlank(location)) {
             return ResponseEntity.badRequest().body("Location parameter is required!");
         }
