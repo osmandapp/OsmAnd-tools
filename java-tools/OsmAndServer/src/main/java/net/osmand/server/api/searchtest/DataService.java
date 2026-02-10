@@ -286,6 +286,14 @@ public interface DataService extends BaseService {
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 
+		BinaryMapIndexReaderStats.SearchStat stat = null;
+		if (searchResult != null) {
+			SearchSettings settings = searchResult.settings();
+			if (settings != null) {
+				stat = settings.getStat();
+			}
+		}
+
 		Map<String, Object> row = finder.getRow();
 		Result firstResult = finder.getFirstResult();
 		Result actualResult = finder.getActualResult();
@@ -322,9 +330,9 @@ public interface DataService extends BaseService {
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
 				}
-				if (searchResult != null && searchResult.settings().getStat() != null) {
-					row.put("stat_bytes", searchResult.settings().getStat().totalBytes);
-					row.put("stat_time", searchResult.settings().getStat().totalTime);
+				if (stat != null) {
+					row.put("stat_bytes", stat.totalBytes);
+					row.put("stat_time", stat.totalTime);
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -358,8 +366,8 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalBytes : null,
-				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalTime : null
+				stat != null ? stat.totalBytes : null,
+				stat != null ? stat.totalTime : null
 		};
 	}
 
@@ -676,7 +684,13 @@ public interface DataService extends BaseService {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values());
+		SearchSettings settings = result.settings();
+		BinaryMapIndexReaderStats.SearchStat stat = settings != null ? settings.getStat() : null;
+		Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats =
+				stat != null && stat.getWordStats() != null
+						? stat.getWordStats().values()
+						: Collections.emptyList();
+		return new ResultsWithStats(results, wordStats);
 	}
 
     private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {

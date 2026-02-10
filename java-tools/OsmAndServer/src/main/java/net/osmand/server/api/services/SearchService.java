@@ -222,9 +222,10 @@ public class SearchService {
 		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
+            BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
-					(System.currentTimeMillis() - tm) / 1000.0, searchResults.settings.getStat()));
+					(System.currentTimeMillis() - tm) / 1000.0, stat));
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
@@ -1496,6 +1497,9 @@ public class SearchService {
     }
 
     private LatLon searchOlcOnBasemap(String locationString, LatLon bboxCentre) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 
         try {
