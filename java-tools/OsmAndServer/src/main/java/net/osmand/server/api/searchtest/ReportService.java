@@ -44,7 +44,9 @@ public interface ReportService {
 			long partial,
 			long totalBytes,
 			long totalTime,
-			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, Object[]> subStats,
+			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, long[]> subStats,
+			Map<String, long[]> subStatsObf,
+			long[] statsCounts,
 			Map<String, Number> distanceHistogram,
 			TestCaseStatus generatedChart) {
 	}
@@ -216,7 +218,7 @@ public interface ReportService {
 		}
 	}
 
-	default Optional<RunStatus> getRunStatus(Long runId) {
+	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
 		String prefixSQL = """
 				SELECT run.status, run.threads_count, COALESCE(finish - start, sum(duration)) AS time_duration,
 				    count(*) AS total,
@@ -226,49 +228,65 @@ public interface ReportService {
 				    count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count,
 					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
 					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
-					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
+					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time,
+					sum(COALESCE(json_extract(row, '$.stat_results'), 0)) AS stat_results,
+					sum(COALESCE(json_extract(row, '$.stat_amenity_count'), 0)) AS stat_amenity_count,
+					sum(COALESCE(json_extract(row, '$.stat_address_count'), 0)) AS stat_address_count
 				""";
 
 		StringBuilder sql = new StringBuilder(prefixSQL);
-		for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
-			String subOpName = subOp.name();
-			String aliasSuffix = subOpName.toLowerCase(java.util.Locale.US);
-			sql.append(", sum(COALESCE(json_extract(row, '$.stat_time_")
-					.append(subOpName)
-					.append("'), 0)) AS time_")
-					.append(aliasSuffix);
-			sql.append(", sum(COALESCE(json_extract(row, '$.stat_count_")
-					.append(subOpName)
-					.append("'), 0)) AS count_")
-					.append(aliasSuffix);
+		if (isFull)
+			for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
+				String subOpName = subOp.name();
+				String aliasSuffix = subOpName.toLowerCase(java.util.Locale.US);
+				sql.append(", sum(COALESCE(json_extract(row, '$.stat_time_")
+						.append(subOpName)
+						.append("'), 0)) AS time_")
+						.append(aliasSuffix);
+				sql.append(", sum(COALESCE(json_extract(row, '$.stat_count_")
+						.append(subOpName)
+						.append("'), 0)) AS count_")
+						.append(aliasSuffix);
 
-			// stat_first_key / stat_first_value: pick key with first SUM(stat_first_value) (tie-break: key ASC)
-			sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
-					.append(subOpName)
-					.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_")
-					.append(subOpName)
-					.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_key_")
-					.append(aliasSuffix);
-			sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
-					.append(subOpName)
-					.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_")
-					.append(subOpName)
-					.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_value_")
-					.append(aliasSuffix);
+				// stat_first_key / stat_first_value_time: pick key with first SUM(stat_first_value_time) (tie-break: key ASC)
+				sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_time_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_key_")
+						.append(aliasSuffix);
+				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_time_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_value_")
+						.append(aliasSuffix);
+				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_count_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_value_count_")
+						.append(aliasSuffix);
 
-			sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
-					.append(subOpName)
-					.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_")
-					.append(subOpName)
-					.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_key_")
-					.append(aliasSuffix);
-			sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
-					.append(subOpName)
-					.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_")
-					.append(subOpName)
-					.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_")
-					.append(aliasSuffix);
-		}
+				sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_time_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_key_")
+						.append(aliasSuffix);
+				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_time_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_")
+						.append(aliasSuffix);
+				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
+						.append(subOpName)
+						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_count_")
+						.append(subOpName)
+						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_count_")
+						.append(aliasSuffix);
+			}
 		sql.append(" FROM run_result, run WHERE run.id = run_id AND run_id = ?");
 
 		try {
@@ -305,23 +323,53 @@ public interface ReportService {
 			number = ((Number) result.get("total_time"));
 			long totalTime = number == null ? 0 : number.longValue();
 
-			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, Object[]> subStats = new HashMap<>();
-			for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
-				String suffix = subOp.name().toLowerCase(java.util.Locale.US);
-				Number timeNs = (Number) result.get("time_" + suffix);
-				Number countOp = (Number) result.get("count_" + suffix);
-				String firstKey = (String) result.get("first_key_" + suffix);
-				Number firstValue = (Number) result.get("first_value_" + suffix);
-				String secondKey = (String) result.get("second_key_" + suffix);
-				Number secondValue = (Number) result.get("second_value_" + suffix);
-				long timeValue = timeNs == null ? 0 : timeNs.longValue();
-				long countValue = countOp == null ? 0 : countOp.longValue();
-				long firstValueLong = firstValue == null ? 0 : firstValue.longValue();
-				long secondValueLong = secondValue == null ? 0 : secondValue.longValue();
-				subStats.put(subOp, new Object[] { timeValue, countValue, firstKey, firstValueLong, secondKey, secondValueLong });
+			number = ((Number) result.get("stat_results"));
+			long count1 = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("stat_amenity_count"));
+			long count2 = number == null ? 0 : number.longValue();
+			number = ((Number) result.get("stat_address_count"));
+			long count3 = number == null ? 0 : number.longValue();
+			long[] statsCounts = new long[] {count1, count2, count3};
+
+			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, long[]> subStats = new HashMap<>();
+			List<Map.Entry<String, long[]>> subStatsObfEntries = new ArrayList<>();
+			if (isFull)
+				for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
+					String suffix = subOp.name().toLowerCase(java.util.Locale.US);
+					Number timeNs = (Number) result.get("time_" + suffix);
+					Number countOp = (Number) result.get("count_" + suffix);
+					long timeValue = timeNs == null ? 0 : timeNs.longValue();
+					long countValue = countOp == null ? 0 : countOp.longValue();
+					if (timeValue > 0 || countValue > 0) {
+						subStats.put(subOp, new long[]{timeValue, countValue});
+
+						String firstKey = (String) result.get("first_key_" + suffix);
+						Number firstTime = (Number) result.get("first_value_" + suffix);
+						Number firstCount = (Number) result.get("first_value_count_" + suffix);
+						String secondKey = (String) result.get("second_key_" + suffix);
+						Number secondTime = (Number) result.get("second_value_" + suffix);
+						Number secondCount = (Number) result.get("second_value_count_" + suffix);
+						long firstTimeLong = firstTime == null ? 0 : firstTime.longValue();
+						long firstCountLong = firstCount == null ? 0 : firstCount.longValue();
+						long secondTimeLong = secondTime == null ? 0 : secondTime.longValue();
+						long secondCountLong = secondCount == null ? 0 : secondCount.longValue();
+
+						String subOpKey = subOp.name();
+						if (firstKey != null && !firstKey.isEmpty() && (firstTimeLong > 0 || firstCountLong > 0)) {
+							subStatsObfEntries.add(Map.entry(subOpKey + '|' + firstKey, new long[] {firstTimeLong, firstCountLong}));
+						}
+						if (secondKey != null && !secondKey.isEmpty() && (secondTimeLong > 0 || secondCountLong > 0)) {
+							subStatsObfEntries.add(Map.entry(subOpKey  + '|' + secondKey, new long[] {secondTimeLong, secondCountLong}));
+						}
+					}
+				}
+			subStatsObfEntries.sort((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0]));
+			Map<String, long[]> subStatsObf = new LinkedHashMap<>();
+			for (Map.Entry<String, long[]> entry : subStatsObfEntries) {
+				subStatsObf.put(entry.getKey(), entry.getValue());
 			}
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					timeDuration, searchDuration, threadsCount, found, partial, totalBytes, totalTime, subStats, null, null);
+					timeDuration, searchDuration, threadsCount, found, partial, totalBytes, totalTime, subStats, subStatsObf, statsCounts, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -337,7 +385,7 @@ public interface ReportService {
 
 		final RunStatus status;
 		if (runId != null) {
-			Optional<RunStatus> opt = getRunStatus(runId);
+			Optional<RunStatus> opt = getRunStatus(runId, true);
 			if (opt.isEmpty())
 				return Optional.empty();
 			status = opt.get();
@@ -361,10 +409,12 @@ public interface ReportService {
 		if (status == null) {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
-					caseStatus.failed(), caseStatus.duration(), caseStatus.duration(), 0, 0, 0, 0, 0, null, distanceHistogram, caseStatus);
+					caseStatus.failed(), caseStatus.duration(), caseStatus.duration(), 0, 0, 0,
+					0, 0, null, null, null,  distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.searchDuration, status.threadsCount, status.found(), status.partial(), status.totalBytes, status.totalTime, status.subStats, distanceHistogram, optCase.get());
+					status.duration(), status.searchDuration, status.threadsCount, status.found(), status.partial(),
+					status.totalBytes, status.totalTime, status.subStats, status.subStatsObf, status.statsCounts, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}

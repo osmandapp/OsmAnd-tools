@@ -325,15 +325,52 @@ public interface DataService extends BaseService {
 				if (searchResult != null && searchResult.stat() != null) {
 					row.put("stat_bytes", searchResult.stat().totalBytes);
 					row.put("stat_time", searchResult.stat().totalTime);
+					int statResultsCount = 0;
+					int statAmenityCount = 0;
+					int statTransportCount = 0;
+					int statAddressCount = 0;
+					for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : searchResult.stat().getWordStats().values()) {
+						if (wordSearchStat == null) {
+							continue;
+						}
+						statResultsCount += wordSearchStat.results;
+						if (wordSearchStat.resultCounts == null) {
+							continue;
+						}
+						for (Map.Entry<String, Integer> entry : wordSearchStat.resultCounts.entrySet()) {
+							String key = entry.getKey();
+							Integer value = entry.getValue();
+							int resCount = value == null ? 0 : value;
+							if (key != null && key.startsWith("Amenity")) {
+								statAmenityCount += resCount;
+							} else if (key != null && key.startsWith("Transport")) {
+								statTransportCount += resCount;
+							} else {
+								statAddressCount += resCount;
+							}
+						}
+					}
+					row.put("stat_results", statResultsCount);
+					row.put("stat_amenity_count", statAmenityCount);
+					row.put("stat_transport_count", statTransportCount);
+					row.put("stat_address_count", statAddressCount);
+
 					for (Map.Entry<String, BinaryMapIndexReaderStats.SearchStat.TimingSummary> e : searchResult.stat().getTimingSummary().entrySet()) {
 						row.put("stat_time_" + e.getKey(), e.getValue().getTotalNs());
 						row.put("stat_count_" + e.getKey(), e.getValue().getCount());
 
-						row.put("stat_first_key_" + e.getKey(), e.getValue().subKey[0]);
-						row.put("stat_first_value_" + e.getKey(), e.getValue().subTime[0]);
+						Iterator<Map.Entry<String, long[]>> it = e.getValue().subKeys.entrySet().iterator();
+						Map.Entry<String, long[]> first = it.next();
+						row.put("stat_first_key_" + e.getKey(), first.getKey());
+						row.put("stat_first_value_time_" + e.getKey(), first.getValue()[0]);
+						row.put("stat_first_value_count_" + e.getKey(), first.getValue()[1]);
 
-						row.put("stat_second_key_" + e.getKey(), e.getValue().subKey[1]);
-						row.put("stat_second_value_" + e.getKey(), e.getValue().subTime[1]);
+						if (it.hasNext()) {
+							Map.Entry<String, long[]> second = it.next();
+							row.put("stat_second_key_" + e.getKey(), second.getKey());
+							row.put("stat_first_value_time_" + e.getKey(), second.getValue()[0]);
+							row.put("stat_first_value_count_" + e.getKey(), second.getValue()[1]);
+						}
 					}
 				}
 				row.put("time", duration);
