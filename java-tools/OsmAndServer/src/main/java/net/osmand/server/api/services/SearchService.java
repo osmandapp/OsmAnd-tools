@@ -659,8 +659,8 @@ public class SearchService {
             return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
         }));
     }
-    
-    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, Calendar clientTime) throws IOException {
         final String RELATION_TYPE = "3";
         final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
         final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
@@ -689,7 +689,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res, null);
+            return getPoiFeature(res, clientTime);
         }
         return null;
     }
