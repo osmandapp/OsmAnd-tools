@@ -228,14 +228,14 @@ public interface ReportService {
 				    count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count,
 					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
 					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
-					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time,
-					sum(COALESCE(json_extract(row, '$.stat_results'), 0)) AS stat_results,
-					sum(COALESCE(json_extract(row, '$.stat_amenity_count'), 0)) AS stat_amenity_count,
-					sum(COALESCE(json_extract(row, '$.stat_address_count'), 0)) AS stat_address_count
+					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
 				""";
 
 		StringBuilder sql = new StringBuilder(prefixSQL);
-		if (isFull)
+		if (isFull) {
+			sql.append(", sum(COALESCE(json_extract(row, '$.stat_results'), 0)) AS stat_results,");
+			sql.append("sum(COALESCE(json_extract(row, '$.stat_amenity_count'), 0)) AS stat_amenity_count, ");
+			sql.append("sum(COALESCE(json_extract(row, '$.stat_address_count'), 0)) AS stat_address_count");
 			for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
 				String subOpName = subOp.name();
 				String aliasSuffix = subOpName.toLowerCase(java.util.Locale.US);
@@ -287,6 +287,7 @@ public interface ReportService {
 						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_count_")
 						.append(aliasSuffix);
 			}
+		}
 		sql.append(" FROM run_result, run WHERE run.id = run_id AND run_id = ?");
 
 		try {
@@ -323,13 +324,18 @@ public interface ReportService {
 			number = ((Number) result.get("total_time"));
 			long totalTime = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("stat_results"));
-			long count1 = number == null ? 0 : number.longValue();
-			number = ((Number) result.get("stat_amenity_count"));
-			long count2 = number == null ? 0 : number.longValue();
-			number = ((Number) result.get("stat_address_count"));
-			long count3 = number == null ? 0 : number.longValue();
-			long[] statsCounts = new long[] {count1, count2, count3};
+			final long[] statsCounts;
+			if (isFull) {
+				number = ((Number) result.get("stat_results"));
+				long count1 = number == null ? 0 : number.longValue();
+				number = ((Number) result.get("stat_amenity_count"));
+				long count2 = number == null ? 0 : number.longValue();
+				number = ((Number) result.get("stat_address_count"));
+				long count3 = number == null ? 0 : number.longValue();
+				statsCounts = new long[] {count1, count2, count3};
+			} else {
+				statsCounts = null;
+			}
 
 			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, long[]> subStats = new HashMap<>();
 			List<Map.Entry<String, long[]>> subStatsObfEntries = new ArrayList<>();
