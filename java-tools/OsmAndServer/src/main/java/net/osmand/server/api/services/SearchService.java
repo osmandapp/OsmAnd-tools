@@ -1256,9 +1256,12 @@ public class SearchService {
 		if (openingHours != null) {
 			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
-				return openingHoursInfo.stream()
-						.map(info -> (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo())
-						.collect(Collectors.joining(";"));
+				StringJoiner openHoursInfos = new StringJoiner(";");
+				for (OpeningHours.Info info : openingHoursInfo) {
+					String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
+					openHoursInfos.add(s);
+				}
+				return openHoursInfos.toString();
 			}
 		}
 		return null;
