@@ -1258,8 +1258,11 @@ public class SearchService {
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
 				StringJoiner openHoursInfos = new StringJoiner(";");
 				for (OpeningHours.Info info : openingHoursInfo) {
-					String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
-					openHoursInfos.add(s);
+					String infoString = info.getInfo();
+					if (!Algorithms.isEmpty(infoString)) {
+						String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + infoString;
+						openHoursInfos.add(s);
+					}
 				}
 				return openHoursInfos.toString();
 			}
