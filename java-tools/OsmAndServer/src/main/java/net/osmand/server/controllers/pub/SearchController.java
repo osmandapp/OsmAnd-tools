@@ -281,10 +281,13 @@ public class SearchController {
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
-                                                 @RequestParam double lon,
-                                                 @RequestParam long osmid,
-                                                @RequestParam String type) throws IOException {
-        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
+                                                @RequestParam double lon,
+                                                @RequestParam long osmid,
+                                                @RequestParam String type,
+                                                @RequestParam(defaultValue = "0") long clientTime,
+                                                @RequestParam(required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, clientTimeC);
         return ResponseEntity.ok(gson.toJson(poi));
     }
 

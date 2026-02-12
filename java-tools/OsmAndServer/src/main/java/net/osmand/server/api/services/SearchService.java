@@ -666,8 +666,8 @@ public class SearchService {
             return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
         }));
     }
-    
-    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, Calendar clientTime) throws IOException {
         final String RELATION_TYPE = "3";
         final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
         final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
@@ -696,7 +696,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res, null);
+            return getPoiFeature(res, clientTime);
         }
         return null;
     }
@@ -1260,12 +1260,18 @@ public class SearchService {
 
 	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
-		List<OpeningHours.Info> openingHoursInfo;
 		if (openingHours != null) {
-			openingHoursInfo = openingHours.getInfo(calendar);
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
-				OpeningHours.Info info = openingHoursInfo.get(0);
-				return (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
+				StringJoiner openHoursInfos = new StringJoiner(";");
+				for (OpeningHours.Info info : openingHoursInfo) {
+					String infoString = info.getInfo();
+					if (!Algorithms.isEmpty(infoString)) {
+						String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + infoString;
+						openHoursInfos.add(s);
+					}
+				}
+				return openHoursInfos.toString();
 			}
 		}
 		return null;
