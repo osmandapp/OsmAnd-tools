@@ -28,6 +28,7 @@ WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/
 PROXY_FILE_URL = os.getenv('PROXY_FILE_URL', None)
 MAX_TRIES = int(os.getenv('MAX_TRIES', '10'))
 MAX_SLEEP = int(os.getenv('MAX_SLEEP', '60'))
+
 CONNECT_TIMEOUT = 10
 READ_TIMEOUT = 60
 
@@ -44,6 +45,7 @@ PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
 ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '50'))
 MONITORING_INTERVAL = int(os.getenv('MONITORING_INTERVAL', '600'))
 PARALLEL = int(os.getenv('PARALLEL', '2'))
+MIN_ERRORS_TO_TERMINATE = 3000
 
 PHOTOS_PER_PLACE = int(os.getenv('PHOTOS_PER_PLACE', '40'))
 ASTRO_IMAGES_ONLY = os.getenv("ASTRO_IMAGES_ONLY", "false") == "true"
@@ -420,6 +422,7 @@ def count_images_to_download() -> tuple[int, int]:
 
 
 def monitoring_thread() -> None:
+    nothing_counter = 0
     while True:
         with monitoring_counter_lock:
             errors_before = monitoring_error_count
@@ -449,13 +452,17 @@ def monitoring_thread() -> None:
                   f"ETA {datetime.timedelta(seconds=eta_seconds)}"
                   "\n")
         else:
-            print(f"{now} nothing happened")
+            nothing_counter += 1
+            print(f"{now} nothing happened ({nothing_counter})")
+            if nothing_counter >= MAX_TRIES:
+                print(f"Nothing terminates downloading :)")
+                os.kill(os.getpid(), signal.SIGTERM)
 
         with monitoring_counter_lock:
-            if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > 100):
+            if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > MIN_ERRORS_TO_TERMINATE):
                 current_errors_percent = int(errors / (errors + success) * 100)
                 if current_errors_percent > ERROR_LIMIT_PERCENT:
-                    print(f"Monitoring thread terminates downloading")
+                    print(f"ERROR_LIMIT_PERCENT terminates downloading")
                     print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
                     print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
                     os.kill(os.getpid(), signal.SIGTERM)
