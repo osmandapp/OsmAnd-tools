@@ -32,10 +32,9 @@ import jakarta.transaction.Transactional;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.api.SettingsAPI;
-import net.osmand.shared.gpx.GpxFile;
-import net.osmand.shared.gpx.GpxUtilities;
-import net.osmand.shared.gpx.SmartFolderHelper;
+import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
+import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
 import okio.GzipSource;
 import okio.Okio;
@@ -321,38 +320,54 @@ public class UserdataService {
 	        if (allVersions) {
 		        res.allFiles.add(sf);
 	        }
+
+		}
+		String settings = null;
+		for (UserFileNoData sf : res.uniqueFiles) {
 			if (Objects.equals(sf.type, FILE_TYPE_GLOBAL)) {
-				String settings;
 				UserFile userFile = getLastFileVersion(userId, sf.name, sf.type);
 				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
 					settings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
-				System.out.println(settings);
-				net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-				JSONObject obj = new JSONObject(settings);
-				SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
-				res.smartFolders = createWebSmartFolders(SmartFolderHelper.INSTANCE.getSmartFolders(), files, userId);
 			}
-        }
-        return res;
-    }
+		}
+		if (settings != null) {
+			System.out.println(settings);
+			net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+			JSONObject obj = new JSONObject(settings);
+			SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
+			res.smartFolders = createWebSmartFolders(SmartFolderHelper.INSTANCE.getSmartFolders(), res.uniqueFiles, userId);
+		}
+		return res;
+	}
 
 	private List<UserdataController.SmartFolderWeb> createWebSmartFolders(@NotNull List<SmartFolder> smartFolders,
 																		  List<UserFileNoData> files, int userid) {
 		List<GpxFile> gpxFiles = new ArrayList<>();
 		for(UserFileNoData file: files ) {
-			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && file.filesize > 0) {
+			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && file.filesize > 0 && !file.name.endsWith(".info")) {
 				UserFile uf = filesRepository.findLatestNonEmptyFile(userid, file.name, file.type);
 				InputStream in = getInputStream(uf);
-				gpxFiles.add(GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false));
+				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
+				gpxFile.setPath(uf.name);
+				gpxFile.setModifiedTime(uf.clienttime.getTime());
+				TrackItem ti = new TrackItem(gpxFile);
+				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(ti);
+				gpxFiles.add(gpxFile);
 			}
 		}
+		
+		
 		List<UserdataController.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
 		for (SmartFolder sf:smartFolders) {
 			UserdataController.SmartFolderWeb smartFolderWeb = new UserdataController.SmartFolderWeb();
 			smartFolderWeb.name = sf.getFolderName();
+			OrganizeByParams organizeByParams = sf.getOrganizeByParams();
+			if (organizeByParams != null) {
+				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
+			}
 			smartFolderWebs.add(smartFolderWeb);
 		}
 		return smartFolderWebs;
