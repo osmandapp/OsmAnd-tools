@@ -3,11 +3,14 @@ package net.osmand.server.api.searchtest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletOutputStream;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReaderStats;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.server.api.services.OsmAndMapsService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.poi.ss.usermodel.*;
@@ -43,9 +46,9 @@ public interface ReportService {
 			long partial,
 			long totalBytes,
 			long totalTime,
-			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, long[]> subStats,
-			Map<String, long[]> subStatsObf,
 			long[] statsCounts,
+			Map<String, long[]> mainStats,
+			Map<String, long[]> subStats,
 			Map<String, Number> distanceHistogram,
 			TestCaseStatus generatedChart) {
 	}
@@ -88,6 +91,8 @@ public interface ReportService {
 	SearchTestRunRepository getTestRunRepo();
 
 	Logger getLogger();
+
+	OsmAndMapsService getMapsService();
 
 	default List<Map<String, Object>> getTestCaseResults(Long caseId) throws IOException {
 		TestCase test = getTestCaseRepo().findById(caseId).orElseThrow(() ->
@@ -217,6 +222,30 @@ public interface ReportService {
 		}
 	}
 
+	private long[] getSectionSize(List<BinaryMapIndexReader> offlineIndexes, String fileName) {
+		BinaryMapIndexReader reader = offlineIndexes.stream().filter(r -> r.getFile().getName().equals(fileName)).findFirst().orElse(null);
+		if (reader == null) {
+			return new long[] { 0, 0 };
+		}
+		long addressSectionBytes = 0;
+		long amenitySectionBytes = 0;
+		for (BinaryIndexPart indexPart : reader.getIndexes()) {
+			if (indexPart == null) {
+				continue;
+			}
+			String partName = indexPart.getPartName();
+			if (addressSectionBytes == 0 && "Address".equals(partName)) {
+				addressSectionBytes = indexPart.getLength();
+			} else if (amenitySectionBytes == 0 && "POI".equals(partName)) {
+				amenitySectionBytes = indexPart.getLength();
+			}
+			if (addressSectionBytes > 0 && amenitySectionBytes > 0) {
+				break;
+			}
+		}
+		return new long[] { addressSectionBytes, amenitySectionBytes };
+	}
+
 	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
 		String prefixSQL = """
 				SELECT run.status, run.threads_count, COALESCE(finish - start, sum(duration)) AS time_duration,
@@ -234,56 +263,11 @@ public interface ReportService {
 			sql.append(", sum(COALESCE(json_extract(row, '$.stat_results'), 0)) AS stat_results,");
 			sql.append("sum(COALESCE(json_extract(row, '$.stat_amenity_count'), 0)) AS stat_amenity_count, ");
 			sql.append("sum(COALESCE(json_extract(row, '$.stat_address_count'), 0)) AS stat_address_count");
-			for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
-				String subOpName = subOp.name();
-				String aliasSuffix = subOpName.toLowerCase(java.util.Locale.US);
-				sql.append(", sum(COALESCE(json_extract(row, '$.stat_time_")
-						.append(subOpName)
-						.append("'), 0)) AS time_")
-						.append(aliasSuffix);
-				sql.append(", sum(COALESCE(json_extract(row, '$.stat_count_")
-						.append(subOpName)
-						.append("'), 0)) AS count_")
-						.append(aliasSuffix);
-
-				// stat_first_key / stat_first_value_time: pick key with first SUM(stat_first_value_time) (tie-break: key ASC)
-				sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_time_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_key_")
-						.append(aliasSuffix);
-				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_time_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_value_")
-						.append(aliasSuffix);
-				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_first_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_first_value_count_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS first_value_count_")
-						.append(aliasSuffix);
-
-				sql.append(", (SELECT k FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_time_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_key_")
-						.append(aliasSuffix);
-				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_time_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_")
-						.append(aliasSuffix);
-				sql.append(", (SELECT v FROM (SELECT json_extract(r2.row, '$.stat_second_key_")
-						.append(subOpName)
-						.append("') AS k, SUM(COALESCE(json_extract(r2.row, '$.stat_second_value_count_")
-						.append(subOpName)
-						.append("'), 0)) AS v FROM run_result r2 WHERE r2.run_id = run.id GROUP BY k ORDER BY v DESC, k ASC LIMIT 1) t) AS second_value_count_")
-						.append(aliasSuffix);
+			for (BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName api : BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName.values()) {
+				String aliasSuffix = api.name().toLowerCase(java.util.Locale.US);
+				sql.append(", sum(COALESCE(json_extract(row, '$.stat_time_").append(api.name()).append("'), 0)) AS time_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(json_extract(row, '$.stat_bytes_").append(api.name()).append("'), 0)) AS bytes_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(json_extract(row, '$.stat_calls_").append(api.name()).append("'), 0)) AS calls_").append(aliasSuffix);
 			}
 		}
 		sql.append(" FROM run_result, run WHERE run.id = run_id AND run_id = ?");
@@ -320,7 +304,9 @@ public interface ReportService {
 			number = ((Number) result.get("total_time"));
 			long totalTime = number == null ? 0 : number.longValue();
 
-			final long[] statsCounts;
+			final long[] totalStats;
+			Map<String, long[]> mainStats = new HashMap<>();
+			Map<String, long[]> subStats = new LinkedHashMap<>();
 			if (isFull) {
 				number = ((Number) result.get("stat_results"));
 				long count1 = number == null ? 0 : number.longValue();
@@ -328,50 +314,53 @@ public interface ReportService {
 				long count2 = number == null ? 0 : number.longValue();
 				number = ((Number) result.get("stat_address_count"));
 				long count3 = number == null ? 0 : number.longValue();
-				statsCounts = new long[] {count1, count2, count3};
-			} else {
-				statsCounts = null;
-			}
+				totalStats = new long[] { count1, count2, count3 };
 
-			Map<BinaryMapIndexReaderStats.SearchStat.SubOp, long[]> subStats = new HashMap<>();
-			List<Map.Entry<String, long[]>> subStatsObfEntries = new ArrayList<>();
-			if (isFull)
-				for (BinaryMapIndexReaderStats.SearchStat.SubOp subOp : BinaryMapIndexReaderStats.SearchStat.SubOp.values()) {
-					String suffix = subOp.name().toLowerCase(java.util.Locale.US);
-					Number timeNs = (Number) result.get("time_" + suffix);
-					Number countOp = (Number) result.get("count_" + suffix);
-					long timeValue = timeNs == null ? 0 : timeNs.longValue();
-					long countValue = countOp == null ? 0 : countOp.longValue();
-					if (timeValue > 0 || countValue > 0) {
-						subStats.put(subOp, new long[]{timeValue, countValue});
-
-						String firstKey = (String) result.get("first_key_" + suffix);
-						Number firstTime = (Number) result.get("first_value_" + suffix);
-						Number firstCount = (Number) result.get("first_value_count_" + suffix);
-						String secondKey = (String) result.get("second_key_" + suffix);
-						Number secondTime = (Number) result.get("second_value_" + suffix);
-						Number secondCount = (Number) result.get("second_value_count_" + suffix);
-						long firstTimeLong = firstTime == null ? 0 : firstTime.longValue();
-						long firstCountLong = firstCount == null ? 0 : firstCount.longValue();
-						long secondTimeLong = secondTime == null ? 0 : secondTime.longValue();
-						long secondCountLong = secondCount == null ? 0 : secondCount.longValue();
-
-						String subOpKey = subOp.name();
-						if (firstKey != null && !firstKey.isEmpty() && (firstTimeLong > 0 || firstCountLong > 0)) {
-							subStatsObfEntries.add(Map.entry(subOpKey + '|' + firstKey, new long[] {firstTimeLong, firstCountLong}));
-						}
-						if (secondKey != null && !secondKey.isEmpty() && (secondTimeLong > 0 || secondCountLong > 0)) {
-							subStatsObfEntries.add(Map.entry(subOpKey  + '|' + secondKey, new long[] {secondTimeLong, secondCountLong}));
-						}
-					}
+				for (BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName api : BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName.values()) {
+					String aliasSuffix = api.name().toLowerCase(java.util.Locale.US);
+					Number time = (Number) result.get("time_" + aliasSuffix);
+					Number bytes = (Number) result.get("bytes_" + aliasSuffix);
+					Number calls = (Number) result.get("calls_" + aliasSuffix);
+					mainStats.put(api.name(), new long[] {
+							time == null ? 0 : time.longValue(),
+							bytes == null ? 0 : bytes.longValue(),
+							calls == null ? 0 : calls.longValue()
+					});
 				}
-			subStatsObfEntries.sort((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0]));
-			Map<String, long[]> subStatsObf = new LinkedHashMap<>();
-			for (Map.Entry<String, long[]> entry : subStatsObfEntries) {
-				subStatsObf.put(entry.getKey(), entry.getValue());
+
+				String subStatsSql = "SELECT json_extract(ss.value, '$.api') api, json_extract(ss.value, '$.subApi') sub_api, json_extract(ss.value, '$.mapName') map_name, " +
+						"SUM(json_extract(ss.value, '$.time')) AS time, " +
+						"SUM(json_extract(ss.value, '$.size')) AS size, " +
+						"SUM(json_extract(ss.value, '$.bytes')) AS bytes, " +
+						"SUM(json_extract(ss.value, '$.count')) AS count " +
+						"FROM run_result, json_each(row, '$.sub_stats') ss, run " +
+						"WHERE run.id = run_id AND run_id = ? " +
+						"GROUP BY json_extract(ss.value, '$.api'), json_extract(ss.value, '$.subApi'), json_extract(ss.value, '$.mapName') " +
+						"ORDER BY SUM(json_extract(ss.value, '$.time')) DESC";
+				List<Map<String, Object>> subStatsRows = getJdbcTemplate().queryForList(subStatsSql, runId);
+				for (Map<String, Object> row : subStatsRows) {
+					String api = row.get("api") == null ? "" : row.get("api").toString();
+					String subApi = row.get("sub_api") == null ? "" : row.get("sub_api").toString();
+					String mapName = row.get("map_name") == null ? "" : row.get("map_name").toString();
+					if (api.isEmpty() || subApi.isEmpty() || mapName.isEmpty()) {
+						continue;
+					}
+					Number ssTime = (Number) row.get("time");
+					Number ssSize = (Number) row.get("size");
+					Number ssBytes = (Number) row.get("bytes");
+					Number ssCount = (Number) row.get("count");
+					subStats.put(api + '|' + subApi + '|' + mapName, new long[] {
+							ssTime == null ? 0 : ssTime.longValue(),
+							ssSize == null ? 0 : ssSize.longValue(),
+							ssBytes == null ? 0 : ssBytes.longValue(),
+							ssCount == null ? 0 : ssCount.longValue()
+					});
+				}
+			} else {
+				totalStats = null;
 			}
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					timeDuration, threadsCount, found, partial, totalBytes, totalTime, subStats, subStatsObf, statsCounts, null, null);
+					timeDuration, threadsCount, found, partial, totalBytes, totalTime, totalStats, mainStats, subStats, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -416,7 +405,7 @@ public interface ReportService {
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
 					status.duration(), status.threadsCount, status.found(), status.partial(),
-					status.totalBytes, status.totalTime, status.subStats, status.subStatsObf, status.statsCounts, distanceHistogram, optCase.get());
+					status.totalBytes, status.totalTime, status.statsCounts, status.mainStats, status.subStats, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}

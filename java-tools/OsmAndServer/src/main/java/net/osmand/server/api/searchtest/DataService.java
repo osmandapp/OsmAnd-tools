@@ -355,23 +355,12 @@ public interface DataService extends BaseService {
 					row.put("stat_transport_count", statTransportCount);
 					row.put("stat_address_count", statAddressCount);
 
-					for (Map.Entry<String, BinaryMapIndexReaderStats.SearchStat.TimingSummary> e : searchResult.stat().getTimingSummary().entrySet()) {
-						row.put("stat_time_" + e.getKey(), e.getValue().getTotalNs());
-						row.put("stat_count_" + e.getKey(), e.getValue().getCount());
-
-						Iterator<Map.Entry<String, long[]>> it = e.getValue().subKeys.entrySet().iterator();
-						Map.Entry<String, long[]> first = it.next();
-						row.put("stat_first_key_" + e.getKey(), first.getKey());
-						row.put("stat_first_value_time_" + e.getKey(), first.getValue()[0]);
-						row.put("stat_first_value_count_" + e.getKey(), first.getValue()[1]);
-
-						if (it.hasNext()) {
-							Map.Entry<String, long[]> second = it.next();
-							row.put("stat_second_key_" + e.getKey(), second.getKey());
-							row.put("stat_first_value_time_" + e.getKey(), second.getValue()[0]);
-							row.put("stat_first_value_count_" + e.getKey(), second.getValue()[1]);
-						}
+					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : searchResult.stat().getByApis().entrySet()) {
+						row.put("stat_time_" + e.getKey().name(), e.getValue().time);
+						row.put("stat_bytes_" + e.getKey().name(), e.getValue().bytes);
+						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
 					}
+					row.put("sub_stats", searchResult.stat().getSubStatsSummary());
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -710,7 +699,8 @@ public interface DataService extends BaseService {
 				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
 	}
 
-	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats, Map<String, BinaryMapIndexReaderStats.SearchStat.TimingSummary> timingSummary) {}
+	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats,
+	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
@@ -723,7 +713,7 @@ public interface DataService extends BaseService {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().getWordStats().values(), result.stat().getTimingSummary());
+		return new ResultsWithStats(results, result.stat().getWordStats().values(), result.stat().getByApis());
 	}
 
     private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
