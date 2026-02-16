@@ -1158,7 +1158,7 @@ public class SearchService {
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity);
+                result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
                 foundFeatures.put(osmId, getPoiFeature(result, clientTime));
                 remainingLimit--;
             }
