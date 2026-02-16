@@ -286,6 +286,7 @@ public class SearchTestService implements ReportService, DataService {
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
+		run.start = LocalDateTime.now();
 		run = runRepo.save(run);
 
 		test.locale = run.locale;
@@ -321,8 +322,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 
 		try {
-			run.start = LocalDateTime.now();
-			run.finish = LocalDateTime.now();
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;

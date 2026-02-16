@@ -248,7 +248,7 @@ public interface ReportService {
 
 	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
 		String prefixSQL = """
-				SELECT run.status, run.threads_count, COALESCE(finish - start, sum(duration)) AS time_duration,
+				SELECT run.status, run.threads_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration,
 				    count(*) AS total,
 				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
 				    count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed,
