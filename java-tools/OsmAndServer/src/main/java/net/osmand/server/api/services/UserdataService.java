@@ -353,13 +353,14 @@ public class UserdataService {
 				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
 				gpxFile.setPath(uf.name);
 				gpxFile.setModifiedTime(uf.clienttime.getTime());
-				TrackItem ti = new TrackItem(gpxFile);
-				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(ti);
+				gpxFile.getAnalysis(0);
+				TrackItem trackItem = new TrackItem(gpxFile);
+				trackItem.setDataItem(GpxDataItem.Companion.fromGpxFile(gpxFile,uf.name));
+				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
 				gpxFiles.add(gpxFile);
 			}
 		}
-		
-		
+
 		List<UserdataController.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
 		for (SmartFolder sf:smartFolders) {
 			UserdataController.SmartFolderWeb smartFolderWeb = new UserdataController.SmartFolderWeb();
@@ -1457,6 +1458,11 @@ public class UserdataService {
 		@Override
 		public SettingsAPI getSettings() {
 			return null;
+		}
+
+		@Override
+		public KFile getGpxDir() {
+			return new KFile("");
 		}
 	}
 }
