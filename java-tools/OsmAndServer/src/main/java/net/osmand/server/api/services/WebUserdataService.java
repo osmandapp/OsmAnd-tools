@@ -59,7 +59,7 @@ public class WebUserdataService {
 	@Autowired
 	UserdataService userdataService;
 
-	private static final String METADATA = "metadata";
+	public static final String METADATA = "metadata";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";

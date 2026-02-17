@@ -367,6 +367,16 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
+	@GetMapping(value = "/update-smartfolders")
+	public ResponseEntity<String> updateSmartFolders() {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		List<UserdataService.SmartFolderWeb> res = userdataService.updateWebSmartFolders(dev.userid);
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
 	@PostMapping(value = "/refresh-list-files")
 	public ResponseEntity<String> refreshListFiles(@RequestBody List<UserFileUpdate> files) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();

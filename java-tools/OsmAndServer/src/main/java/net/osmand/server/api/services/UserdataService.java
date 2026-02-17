@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PREF;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
@@ -43,7 +44,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -258,6 +258,86 @@ public class UserdataService {
 		return getUserFilesResults(allFiles, userId, allVersions);
 	}
 
+	public List<UserdataService.SmartFolderWeb> updateWebSmartFolders(int userId) {
+		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
+		String generalSettings = getGeneralSettings(userId, uniqueFiles);
+		if (generalSettings != null) {
+			System.out.println(generalSettings);
+			net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+			JSONObject obj = new JSONObject(generalSettings);
+			SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
+		}
+		Map<TrackItem, UserFileNoData> trackItemUserFileMap = new HashMap<>();
+		for (UserFileNoData file : uniqueFiles) {
+			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
+				UserFile uf = filesRepository.findLatestNonEmptyFile(userId, file.name, file.type);
+				InputStream in = getInputStream(uf);
+				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
+				gpxFile.setPath(uf.name);
+				gpxFile.setModifiedTime(uf.clienttime.getTime());
+				gpxFile.getMetadata().setTime(uf.details.getAsJsonObject(METADATA)
+						.getAsJsonPrimitive("time").getAsLong());
+				GpxTrackAnalysis analysis = new GpxTrackAnalysis();
+				analysis.setTotalDistance(uf.details.getAsJsonObject(ANALYSIS)
+						.getAsJsonPrimitive("totalDistance").getAsLong());
+				TrackItem trackItem = new TrackItem(gpxFile);
+				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+				dataItem.setAnalysis(analysis);
+				trackItem.setDataItem(dataItem);
+				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+				trackItemUserFileMap.put(trackItem, file);
+			}
+		}
+
+		List<UserdataService.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
+		List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
+		for (SmartFolder sf : smartFolders) {
+			UserdataService.SmartFolderWeb smartFolderWeb = new UserdataService.SmartFolderWeb();
+			smartFolderWeb.name = sf.getFolderName();
+			OrganizeByParams organizeByParams = sf.getOrganizeByParams();
+			if (organizeByParams != null) {
+				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
+			}
+			for (TrackItem ti : sf.getTrackItems()) {
+				smartFolderWeb.files.add(trackItemUserFileMap.get(ti));
+			}
+			smartFolderWebs.add(smartFolderWeb);
+		}
+		return smartFolderWebs;
+	}
+
+	private String getGeneralSettings(int userId, List<UserFileNoData> uniqueFiles) {
+		String generalSettings = null;
+		for (UserFileNoData sf : uniqueFiles) {
+			if (Objects.equals(sf.type, FILE_TYPE_GLOBAL)) {
+				UserFile userFile = getLastFileVersion(userId, sf.name, sf.type);
+				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
+					generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+		return generalSettings;
+	}
+
+	private List<UserFileNoData> getUniqueFiles(int userId) {
+		List<UserFileNoData> fl = new ArrayList<>();
+		for (String t : new String[]{FILE_TYPE_GPX, FILE_TYPE_GLOBAL}) {
+			fl.addAll(filesRepository.listFilesByUseridWithDetails(userId, null, t));
+		}
+		List<UserFileNoData> res = new ArrayList<>();
+		Set<String> fileIds = new TreeSet<>();
+		for (UserFileNoData sf : fl) {
+			String fileId = sf.type + "____" + sf.name;
+			boolean isNewestFile = fileIds.add(fileId);
+			if (isNewestFile && sf.filesize >= 0) {
+				res.add(sf);
+			}
+		}
+		return res;
+	}
+
 	public Set<String> parseFileTypes(String types) {
 		if (types == null || types.isEmpty()) {
 			return Collections.emptySet();
@@ -322,56 +402,7 @@ public class UserdataService {
 	        }
 
 		}
-		String settings = null;
-		for (UserFileNoData sf : res.uniqueFiles) {
-			if (Objects.equals(sf.type, FILE_TYPE_GLOBAL)) {
-				UserFile userFile = getLastFileVersion(userId, sf.name, sf.type);
-				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
-					settings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		if (settings != null) {
-			System.out.println(settings);
-			net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-			JSONObject obj = new JSONObject(settings);
-			SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
-			res.smartFolders = createWebSmartFolders(SmartFolderHelper.INSTANCE.getSmartFolders(), res.uniqueFiles, userId);
-		}
 		return res;
-	}
-
-	private List<UserdataController.SmartFolderWeb> createWebSmartFolders(@NotNull List<SmartFolder> smartFolders,
-																		  List<UserFileNoData> files, int userid) {
-		List<GpxFile> gpxFiles = new ArrayList<>();
-		for(UserFileNoData file: files ) {
-			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && file.filesize > 0 && !file.name.endsWith(".info")) {
-				UserFile uf = filesRepository.findLatestNonEmptyFile(userid, file.name, file.type);
-				InputStream in = getInputStream(uf);
-				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
-				gpxFile.setPath(uf.name);
-				gpxFile.setModifiedTime(uf.clienttime.getTime());
-				gpxFile.getAnalysis(0);
-				TrackItem trackItem = new TrackItem(gpxFile);
-				trackItem.setDataItem(GpxDataItem.Companion.fromGpxFile(gpxFile,uf.name));
-				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-				gpxFiles.add(gpxFile);
-			}
-		}
-
-		List<UserdataController.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
-		for (SmartFolder sf:smartFolders) {
-			UserdataController.SmartFolderWeb smartFolderWeb = new UserdataController.SmartFolderWeb();
-			smartFolderWeb.name = sf.getFolderName();
-			OrganizeByParams organizeByParams = sf.getOrganizeByParams();
-			if (organizeByParams != null) {
-				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
-			}
-			smartFolderWebs.add(smartFolderWeb);
-		}
-		return smartFolderWebs;
 	}
 
 	public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
@@ -1452,6 +1483,12 @@ public class UserdataService {
 				files.put(userFile.name, file);
 			}
 		}
+	}
+
+	public static class SmartFolderWeb {
+		public String name;
+		public String organizeBy;
+		public List<UserFileNoData> files = new ArrayList<>();
 	}
 
 	static class OsmEmptyContext extends ToolsOsmAndContextImpl {

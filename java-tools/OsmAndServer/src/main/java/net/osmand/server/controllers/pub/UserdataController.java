@@ -479,7 +479,6 @@ public class UserdataController {
 		public int totalFileVersions;
 		public List<UserFileNoData> allFiles;
 		public List<UserFileNoData> uniqueFiles;
-		public List<SmartFolderWeb> smartFolders;
 		public int userid;
 		public long maximumAccountSize;
 
@@ -506,11 +505,5 @@ public class UserdataController {
 			return userdataService.confirmCode(username, token);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
-	}
-
-	public static class SmartFolderWeb {
-		public String name;
-		public String organizeBy;
-		public List<UserFileNoData> files;
 	}
 }
