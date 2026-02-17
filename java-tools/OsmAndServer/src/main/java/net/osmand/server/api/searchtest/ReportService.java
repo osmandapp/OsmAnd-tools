@@ -330,9 +330,9 @@ public interface ReportService {
 
 				String subStatsSql = "SELECT json_extract(ss.value, '$.api') api, json_extract(ss.value, '$.subApi') sub_api, json_extract(ss.value, '$.mapName') map_name, " +
 						"SUM(json_extract(ss.value, '$.time')) AS time, " +
-						"SUM(json_extract(ss.value, '$.size')) AS size, " +
+						"SUM(json_extract(ss.value, '$.count')) AS count, " +
 						"SUM(json_extract(ss.value, '$.bytes')) AS bytes, " +
-						"SUM(json_extract(ss.value, '$.count')) AS count " +
+						"SUM(json_extract(ss.value, '$.calls')) AS calls " +
 						"FROM run_result, json_each(row, '$.sub_stats') ss, run " +
 						"WHERE run.id = run_id AND run_id = ? " +
 						"GROUP BY json_extract(ss.value, '$.api'), json_extract(ss.value, '$.subApi'), json_extract(ss.value, '$.mapName') " +
@@ -346,14 +346,14 @@ public interface ReportService {
 						continue;
 					}
 					Number ssTime = (Number) row.get("time");
-					Number ssSize = (Number) row.get("size");
-					Number ssBytes = (Number) row.get("bytes");
 					Number ssCount = (Number) row.get("count");
+					Number ssBytes = (Number) row.get("bytes");
+					Number ssCalls = (Number) row.get("calls");
 					subStats.put(api + '|' + subApi + '|' + mapName, new long[] {
 							ssTime == null ? 0 : ssTime.longValue(),
-							ssSize == null ? 0 : ssSize.longValue(),
+							ssCount == null ? 0 : ssCount.longValue(),
 							ssBytes == null ? 0 : ssBytes.longValue(),
-							ssCount == null ? 0 : ssCount.longValue()
+							ssCalls == null ? 0 : ssCalls.longValue()
 					});
 				}
 			} else {
