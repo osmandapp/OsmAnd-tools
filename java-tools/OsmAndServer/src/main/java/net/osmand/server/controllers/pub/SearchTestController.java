@@ -3,7 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
-import net.osmand.server.api.searchtest.DataService;
+import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchService;
@@ -355,9 +355,16 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
+	@GetMapping(value = "/sections", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestParam String obf,
+	                                                        @RequestParam(required = false) String fieldPath) {
+		return ResponseEntity.ok(testSearchService.getSectionSizes(obf, fieldPath));
+	}
+
 	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<DataService.ResultsWithStats> getResults(
+	public ResponseEntity<OBFService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam(required = false) Double radius,
@@ -379,7 +386,7 @@ public class SearchTestController {
 			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
+			@RequestBody(required = false) OBFService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");

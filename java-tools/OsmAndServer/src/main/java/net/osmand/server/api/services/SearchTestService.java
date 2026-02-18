@@ -3,10 +3,7 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.DataService;
-import net.osmand.server.api.searchtest.MapDataObjectFinder;
-import net.osmand.server.api.searchtest.PolyglotEngine;
-import net.osmand.server.api.searchtest.ReportService;
+import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
@@ -39,7 +36,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService {
+public class SearchTestService implements ReportService, DataService, OBFService {
 	/**
 	 * Lightweight DTO for listing test-cases with parent dataset name.
 	 */
@@ -142,7 +139,7 @@ public class SearchTestService implements ReportService, DataService {
 
 	private ExecutorService createExecutor() {
 		int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
-				Math.max(1, Runtime.getRuntime().availableProcessors()));;
+				Math.max(1, Runtime.getRuntime().availableProcessors()));
 		ThreadFactory tf = r -> {
 			Thread t = new Thread(r);
 			t.setName("search-test-exec-" + t.getId());
