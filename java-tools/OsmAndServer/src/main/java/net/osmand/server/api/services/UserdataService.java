@@ -28,6 +28,7 @@ import java.util.zip.ZipOutputStream;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.JsonPrimitive;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -264,12 +265,16 @@ public class UserdataService {
 	public List<UserdataService.SmartFolderWeb> updateWebSmartFolders(int userId) {
 		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
 		String generalSettings = getGeneralSettings(userId, uniqueFiles);
-		if (generalSettings != null) {
-			System.out.println(generalSettings);
-			net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-			JSONObject obj = new JSONObject(generalSettings);
-			SmartFolderHelper.INSTANCE.readJson(obj.get(TRACK_FILTERS_SETTINGS_PREF).toString());
+		if (generalSettings == null) {
+			return null;
 		}
+		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+		JSONObject obj = new JSONObject(generalSettings);
+		String trackFiltersSettings = obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
+		if (trackFiltersSettings == null) {
+			return null;
+		}
+		SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
 		Map<TrackItem, UserFileNoData> trackItemUserFileMap = new HashMap<>();
 		for (UserFileNoData file : uniqueFiles) {
 			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
@@ -309,7 +314,7 @@ public class UserdataService {
 
 	void setAppearance(GpxFile gpxFile, String name, int userId) {
 		CloudUserFilesRepository.UserFile file = getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (file == null || file.filesize == -1) {
+		if (file == null || file.filesize == -1 || file.data == null) {
 			return;
 		}
 		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(file.data))) {
@@ -335,12 +340,30 @@ public class UserdataService {
 	GpxTrackAnalysis getAnalysis(JsonObject details) {
 		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
 		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
-		analysis.setTotalDistance(analysisJson.getAsJsonPrimitive("points").getAsLong());
-		analysis.setEndTime(analysisJson.getAsJsonPrimitive("endTime").getAsLong());
-		analysis.setStartTime(analysisJson.getAsJsonPrimitive("startTime").getAsLong());
-		analysis.setWptPoints(analysisJson.getAsJsonPrimitive("wptPoints").getAsInt());
-		analysis.setTimeMoving(analysisJson.getAsJsonPrimitive("timeMoving").getAsLong());
-		analysis.setTotalDistance(analysisJson.getAsJsonPrimitive("totalDistance").getAsLong());
+		JsonPrimitive points = analysisJson.getAsJsonPrimitive("points");
+		if (points != null) {
+			analysis.setPoints(points.getAsInt());
+		}
+		JsonPrimitive endTime = analysisJson.getAsJsonPrimitive("endTime");
+		if (endTime != null) {
+			analysis.setEndTime(endTime.getAsLong());
+		}
+		JsonPrimitive startTime = analysisJson.getAsJsonPrimitive("startTime");
+		if (startTime != null) {
+			analysis.setStartTime(startTime.getAsLong());
+		}
+		JsonPrimitive wptPoints = analysisJson.getAsJsonPrimitive("wptPoints");
+		if (wptPoints != null) {
+			analysis.setWptPoints(wptPoints.getAsInt());
+		}
+		JsonPrimitive timeMoving = analysisJson.getAsJsonPrimitive("timeMoving");
+		if (timeMoving != null) {
+			analysis.setTimeMoving(timeMoving.getAsLong());
+		}
+		JsonPrimitive totalDistance = analysisJson.getAsJsonPrimitive("totalDistance");
+		if (totalDistance != null) {
+			analysis.setTotalDistance(totalDistance.getAsLong());
+		}
 		return analysis;
 	}
 
@@ -352,7 +375,9 @@ public class UserdataService {
 				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
 					generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 				} catch (IOException e) {
-					throw new RuntimeException(e);
+					String isError = String.format(
+							"Read GeneralSettings error: (%s)", e.getMessage());
+					LOG.error(isError);
 				}
 			}
 		}
