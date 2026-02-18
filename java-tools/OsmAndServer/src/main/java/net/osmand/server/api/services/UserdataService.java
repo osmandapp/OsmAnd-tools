@@ -25,6 +25,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -277,12 +280,10 @@ public class UserdataService {
 				gpxFile.setModifiedTime(uf.clienttime.getTime());
 				gpxFile.getMetadata().setTime(uf.details.getAsJsonObject(METADATA)
 						.getAsJsonPrimitive("time").getAsLong());
-				GpxTrackAnalysis analysis = new GpxTrackAnalysis();
-				analysis.setTotalDistance(uf.details.getAsJsonObject(ANALYSIS)
-						.getAsJsonPrimitive("totalDistance").getAsLong());
+				setAppearance(gpxFile, file.name, userId);
 				TrackItem trackItem = new TrackItem(gpxFile);
 				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-				dataItem.setAnalysis(analysis);
+				dataItem.setAnalysis(getAnalysis(uf.details));
 				trackItem.setDataItem(dataItem);
 				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
 				trackItemUserFileMap.put(trackItem, file);
@@ -304,6 +305,43 @@ public class UserdataService {
 			smartFolderWebs.add(smartFolderWeb);
 		}
 		return smartFolderWebs;
+	}
+
+	void setAppearance(GpxFile gpxFile, String name, int userId) {
+		CloudUserFilesRepository.UserFile file = getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
+		if (file == null || file.filesize == -1) {
+			return;
+		}
+		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(file.data))) {
+			ObjectMapper mapper = new ObjectMapper();
+
+			ObjectNode json = (ObjectNode) mapper.readTree(gis);
+			JsonNode color = json.get("color");
+			if(color != null) {
+				gpxFile.setColor(color.asText());
+			}
+			JsonNode width = json.get("width");
+			if(width != null) {
+				gpxFile.setWidth(width.asText());
+			}
+		} catch (Exception e) {
+			String isError = String.format(
+					"ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
+					file.name, file.id, file.userid, e.getMessage());
+			LOG.error(isError);
+		}
+	}
+
+	GpxTrackAnalysis getAnalysis(JsonObject details) {
+		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
+		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
+		analysis.setTotalDistance(analysisJson.getAsJsonPrimitive("points").getAsLong());
+		analysis.setEndTime(analysisJson.getAsJsonPrimitive("endTime").getAsLong());
+		analysis.setStartTime(analysisJson.getAsJsonPrimitive("startTime").getAsLong());
+		analysis.setWptPoints(analysisJson.getAsJsonPrimitive("wptPoints").getAsInt());
+		analysis.setTimeMoving(analysisJson.getAsJsonPrimitive("timeMoving").getAsLong());
+		analysis.setTotalDistance(analysisJson.getAsJsonPrimitive("totalDistance").getAsLong());
+		return analysis;
 	}
 
 	private String getGeneralSettings(int userId, List<UserFileNoData> uniqueFiles) {

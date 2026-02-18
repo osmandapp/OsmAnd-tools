@@ -47,7 +47,7 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 			   SELECT uf FROM UserFile uf
 			   WHERE uf.userid = :userid AND uf.name = :name AND uf.type = :type AND uf.filesize > 0
 			   AND uf.details is not null
-			   ORDER BY uf.updatetime DESC
+			   ORDER BY uf.updatetime DESC LIMIT 1
 			""")
 	UserFile findLatestNonEmptyFile(int userid, String name, String type);
 
