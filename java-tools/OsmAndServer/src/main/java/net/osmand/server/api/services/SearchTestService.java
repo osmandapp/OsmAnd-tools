@@ -27,8 +27,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -631,5 +634,59 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		double roundedLon = BigDecimal.valueOf(sumLon /
 				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
 		return new LatLon(roundedLat, roundedLon);
+	}
+
+	public static void main(String[] args) {
+		String mapDir = System.getenv("MAP_DIR");
+		if (mapDir == null || mapDir.trim().isEmpty()) {
+			System.err.println("MAP_DIR env is required");
+			return;
+		}
+		String fieldPathEnv = System.getenv("FIELD_PATH");
+		String fieldName = System.getenv("FIELD_NAME");
+		String filter = System.getenv("MAP_FILTER");
+		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
+
+		OBFService svc = new SearchTestService(null);
+
+		Path root = Path.of(mapDir);
+		if (!Files.exists(root)) {
+			System.err.println("MAP_DIR doesn't exist: " + root);
+			return;
+		}
+
+		List<Path> obfFiles = new ArrayList<>();
+		try {
+			try (java.util.stream.Stream<Path> s = Files.walk(root)) {
+				s.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".obf"))
+						.forEach(obfFiles::add);
+			}
+		} catch (IOException e) {
+			System.err.println("Failed to list OBF files in MAP_DIR: " + e.getMessage());
+			return;
+		}
+
+		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
+		System.out.println("MAP_DIR=" + root.toAbsolutePath());
+		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
+		System.out.println("FIELD_PATH=" + (fieldPath == null ? "" : fieldPath + "." + fieldName));
+
+		long totalSize = 0;
+		for (Path p : obfFiles) {
+			String obf = p.getFileName().toString();
+			if (filter != null && !obf.startsWith(filter))
+				continue;
+
+			try {
+				Map<String, long[]> m = svc.getSectionSizes(p.toAbsolutePath().toString(), fieldPath);
+				long[] s = m.get(fieldName);
+				long sum = s == null ? 0 : s[0];
+				totalSize += sum;
+				System.out.println(obf + ", " + sum);
+			} catch (RuntimeException e) {
+				System.err.println(obf + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
+			}
+		}
+		System.out.println("TOTAL: " + totalSize);
 	}
 }
