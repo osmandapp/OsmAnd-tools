@@ -30,6 +30,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
@@ -40,51 +41,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class SearchTestService implements ReportService, DataService, OBFService {
-	/**
-	 * Lightweight DTO for listing test-cases with parent dataset name.
-	 */
-	public static class TestCaseItem {
-		public TestCaseItem() {
-		}
-		public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-		                    Long lastRunId, String status, LocalDateTime updated, String error,
-		                    long total, long failed, long duration) {
-			this.id = id;
-			this.name = name;
-			this.labels = labels;
-			this.datasetId = datasetId;
-			this.datasetName = datasetName;
-			this.lastRunId = lastRunId;
-			this.status = status;
-			this.updated = updated;
-			this.error = error;
-			this.total = total;
-			this.failed = failed;
-			this.duration = duration;
-		}
-		public Long id;
-		public String name;
-		public String labels;
-		public Long datasetId;
-		public String datasetName;
-		public Long lastRunId;
-		public String status;
-		public LocalDateTime updated;
-		public String error;
-		public long total;
-		public long failed;
-		public long duration;
-	}
+    /**
+     * Lightweight DTO for listing test-cases with parent dataset name.
+     */
+    public record TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
+                                Long lastRunId, String status, LocalDateTime updated, String error,
+                                long total, long failed, long duration) {}
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-	private static volatile ExecutorService EXECUTOR;
-	private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
+    private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+    private static volatile ExecutorService EXECUTOR;
+    private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
 
-	// Batch insert support for run_result
-	private static final int RUN_RESULT_BATCH_SIZE = 10;
+    // Batch insert support for run_result
+    private static final int RUN_RESULT_BATCH_SIZE = 10;
 
-	private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
-	private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -673,18 +645,28 @@ public class SearchTestService implements ReportService, DataService, OBFService
 
 		long totalSize = 0;
 		for (Path p : obfFiles) {
-			String obf = p.getFileName().toString();
-			if (filter != null && !obf.startsWith(filter))
+			String obfName = p.getFileName().toString();
+			if (filter != null && !obfName.startsWith(filter))
 				continue;
 
 			try {
-				Map<String, long[]> m = svc.getSectionSizes(p.toAbsolutePath().toString(), fieldPath);
+				String obf = p.toAbsolutePath().toString();
+				Map<String, long[]> m = svc.getSectionSizes(obf, fieldPath);
 				long[] s = m.get(fieldName);
 				long sum = s == null ? 0 : s[0];
 				totalSize += sum;
 				System.out.println(obf + ", " + sum);
-			} catch (RuntimeException e) {
-				System.err.println(obf + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
+
+				String json = svc.getSectionJson(obf, fieldPath);
+				String obfBaseName = obfName.toLowerCase(Locale.ROOT).endsWith(".obf")
+						? obfName.substring(0, obfName.length() - 4)
+						: obfName;
+
+				Path jsonOutPath = root.resolve(obfBaseName + ".json");
+				Files.writeString(jsonOutPath, json, StandardCharsets.UTF_8);
+				System.out.println("JSON file: " + jsonOutPath);
+			} catch (Exception e) {
+				System.err.println(obfName + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
 			}
 		}
 		System.out.println("TOTAL: " + totalSize);
