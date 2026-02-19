@@ -613,14 +613,14 @@ public class WikiService {
 		final String WIKIDATA_QUERY = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
 				" FROM top_images_final WHERE wikidata_id = ? and dup_sim < ";
 
-		final String CATEGORY_QUERY = "SELECT c.imgId AS mediaId, c.imgName AS imageTitle, " +
+		final String CATEGORY_QUERY_PREFIX = "SELECT c.imgId AS mediaId, c.imgName AS imageTitle, " +
 				"COALESCE(m.date, '') AS date, COALESCE(m.author, '') AS author, " +
 				"COALESCE(m.license, '') AS license, COALESCE(m.description, '') AS description, c.views AS views " +
-				"FROM wiki.categoryimages c " +
-				"LEFT JOIN wiki.common_meta m ON c.imgId = m.id " +
-				"WHERE c.catName = ? AND c.imgName != '' " +
-				"AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg') " +
+				"FROM (SELECT imgId, imgName, views FROM wiki.categoryimages " +
+				"WHERE catName = ? AND imgName != '' " +
+				"AND (imgName ILIKE '%.jpg' OR imgName ILIKE '%.png' OR imgName ILIKE '%.jpeg') " +
 				"ORDER BY views DESC, imgName ASC LIMIT ";
+		final String CATEGORY_QUERY_SUFFIX = ") c LEFT JOIN wiki.common_meta m ON c.imgId = m.id";
 		
 		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
@@ -642,14 +642,14 @@ public class WikiService {
 				return;
 			}
 			String catParam = categoryName.replace(' ', '_');
-			processImageQuery(CATEGORY_QUERY + remainingLimit, ps -> ps.setString(1, catParam), rs -> {
+			processImageQuery(CATEGORY_QUERY_PREFIX + remainingLimit + CATEGORY_QUERY_SUFFIX, ps -> ps.setString(1, catParam), rs -> {
 				if (!wikidataMediaIds.contains(rs.getLong("mediaId"))) {
 					rowCallbackHandler.processRow(rs);
 				}
 			});
 		} else if (hasCategory) {
 			String catParam = categoryName.replace(' ', '_');
-			processImageQuery(CATEGORY_QUERY + LIMIT_PHOTOS_QUERY, ps -> ps.setString(1, catParam), rowCallbackHandler);
+			processImageQuery(CATEGORY_QUERY_PREFIX + LIMIT_PHOTOS_QUERY + CATEGORY_QUERY_SUFFIX, ps -> ps.setString(1, catParam), rowCallbackHandler);
 		}
 	}
 
