@@ -369,13 +369,13 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	@GetMapping(value = "/update-smartfolders")
-	public ResponseEntity<String> updateSmartFolders() {
+	@GetMapping(value = "/create-smartfolders")
+	public ResponseEntity<String> createSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<UserdataService.SmartFolderWeb> res = userdataService.updateWebSmartFolders(dev.userid);
+		List<UserdataService.SmartFolderWeb> res = userdataService.createWebSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

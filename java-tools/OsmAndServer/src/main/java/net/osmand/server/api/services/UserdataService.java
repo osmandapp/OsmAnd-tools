@@ -42,6 +42,7 @@ import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
+import net.osmand.shared.util.PlatformUtil;
 import okio.GzipSource;
 import okio.Okio;
 import org.apache.commons.collections4.IterableUtils;
@@ -267,13 +268,13 @@ public class UserdataService {
 		return getUserFilesResults(allFiles, userId, allVersions);
 	}
 
-	public List<UserdataService.SmartFolderWeb> updateWebSmartFolders(int userId) {
+	public List<UserdataService.SmartFolderWeb> createWebSmartFolders(int userId) {
 		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
 		String generalSettings = getGeneralSettings(userId, uniqueFiles);
 		if (generalSettings == null) {
 			return null;
 		}
-		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
 		JSONObject obj = new JSONObject(generalSettings);
 		String trackFiltersSettings = obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
 		if (trackFiltersSettings == null) {
@@ -283,25 +284,32 @@ public class UserdataService {
 		Map<TrackItem, UserFileNoData> trackItemUserFileMap = new HashMap<>();
 		for (UserFileNoData file : uniqueFiles) {
 			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
-				UserFile uf = filesRepository.findLatestNonEmptyFile(userId, file.name, file.type);
-				try (InputStream in = getInputStream(uf);
-					 GzipSource gzipSource = new GzipSource(Okio.source(in))) {
-					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, gzipSource, null, false);
-					gpxFile.setPath(uf.name);
-					gpxFile.setModifiedTime(uf.clienttime.getTime());
-					gpxFile.getMetadata().setTime(uf.details.getAsJsonObject(METADATA)
-							.getAsJsonPrimitive("time").getAsLong());
-					setAppearance(gpxFile, file.name, userId);
-					TrackItem trackItem = new TrackItem(gpxFile);
-					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-					dataItem.setAnalysis(getAnalysis(uf.details));
-					trackItem.setDataItem(dataItem);
-					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-					trackItemUserFileMap.put(trackItem, file);
-				} catch (IOException e) {
-					String isError = String.format("Failed to process GPX file %s id=%d userid=%d error (%s)",
-							file.name, file.id, file.userid, e.getMessage());
-					LOG.error(isError);
+				UserFile uf = getLastFileVersion(userId, file.name, file.type);
+				if (uf != null && uf.filesize > 0) {
+					try (InputStream in = getInputStream(uf);
+						 GzipSource gzipSource = new GzipSource(Okio.source(in))) {
+						GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, gzipSource, null, false);
+						gpxFile.setPath(uf.name);
+						gpxFile.setModifiedTime(uf.clienttime.getTime());
+						JsonObject metadata = uf.details.getAsJsonObject(METADATA);
+						if (metadata != null) {
+							JsonPrimitive time = metadata.getAsJsonPrimitive("time");
+							if (time != null) {
+								gpxFile.getMetadata().setTime(time.getAsLong());
+							}
+						}
+						setAppearance(gpxFile, file.name, userId);
+						TrackItem trackItem = new TrackItem(gpxFile);
+						GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+						dataItem.setAnalysis(getAnalysis(uf.details));
+						trackItem.setDataItem(dataItem);
+						SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+						trackItemUserFileMap.put(trackItem, file);
+					} catch (IOException e) {
+						String isError = String.format("Failed to process GPX file %s id=%d userid=%d error (%s)",
+								file.name, file.id, file.userid, e.getMessage());
+						LOG.error(isError);
+					}
 				}
 			}
 		}
@@ -316,7 +324,10 @@ public class UserdataService {
 				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
 			}
 			for (TrackItem ti : sf.getTrackItems()) {
-				smartFolderWeb.files.add(trackItemUserFileMap.get(ti));
+				UserFileNoData userFileNoData = trackItemUserFileMap.get(ti);
+				if (userFileNoData != null) {
+					smartFolderWeb.files.add(userFileNoData);
+				}
 			}
 			smartFolderWebs.add(smartFolderWeb);
 		}
