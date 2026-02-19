@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import jakarta.servlet.http.HttpSession;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
@@ -242,7 +243,7 @@ public class MapApiController {
 
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> uploadFile(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
-	                                     @RequestParam String name, @RequestParam String type) throws IOException {
+	                                     @RequestParam String name, @RequestParam String type, HttpSession session) throws IOException {
 		// This could be slow series of checks (token, user, subscription, amount of space):
 		// probably it's better to support multiple file upload without these checks
 		CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -250,7 +251,7 @@ public class MapApiController {
 		if (dev == null || name.contains("/../")) {
 			return userdataService.tokenNotValidResponse();
 		}
-		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis());
+		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis(), session);
 
 		return okStatus();
 	}
@@ -292,13 +293,14 @@ public class MapApiController {
 	public ResponseEntity<String> renameFile(@RequestParam String oldName,
 	                                         @RequestParam String newName,
 	                                         @RequestParam String type,
-	                                         @RequestParam boolean saveCopy) throws IOException {
+	                                         @RequestParam boolean saveCopy,
+	                                         HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		if (!oldName.equals(newName)) {
-			return webUserdataService.renameFile(oldName, newName, type, dev, saveCopy);
+			return webUserdataService.renameFile(oldName, newName, type, dev, saveCopy, session);
 		}
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}

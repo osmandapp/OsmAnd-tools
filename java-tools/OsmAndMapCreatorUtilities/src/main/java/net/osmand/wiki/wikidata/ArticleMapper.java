@@ -3,17 +3,14 @@ package net.osmand.wiki.wikidata;
 import com.google.gson.*;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.commons.logging.Log;
 
 import net.osmand.PlatformUtil;
 
 public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
-	private static final long ERROR_BATCH_SIZE = 5000L;
+	private static final long ERROR_BATCH_SIZE = 50L;
 	public static final String LABELS_KEY = "labels";
 	public static final String SITELINKS_KEY = "sitelinks";
 	public static final String TITLE_KEY = "title";
@@ -26,8 +23,7 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 	public static final String LANGUAGE_KEY = "language";
 	private static int errorCount;
 	private static final Log log = PlatformUtil.getLog(ArticleMapper.class);
-	public static final String[] PROP_IMAGE = {"P18", "P180"};
-	public static final String PROP_COMMON_CAT = "P373";
+	public static final String[] PROPERTIES = {"P18", "P373"};
 	private final String PROP_COMMON_COORDS = "P625";
 
 	@Override
@@ -50,26 +46,15 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 						article.setLon(lon);
 					}
 				}
-				for (String property : PROP_IMAGE) {
-					JsonArray propImage = claims.getAsJsonArray(property);
-					if (propImage != null) {
-						JsonObject imageDataValue = propImage.get(0).getAsJsonObject().getAsJsonObject(MAINSNAK_KEY)
+				for (String property : PROPERTIES) {
+					JsonArray propertyArray = claims.getAsJsonArray(property);
+					if (propertyArray != null) {
+						JsonObject dataValue = propertyArray.get(0).getAsJsonObject().getAsJsonObject(MAINSNAK_KEY)
 								.getAsJsonObject(DATAVALUE_KEY);
-						if (imageDataValue != null) {
-							String image = imageDataValue.getAsJsonPrimitive(VALUE_KEY).getAsString();
-							article.setImage(image);
-							article.setImageProp(property);
+						if (dataValue != null) {
+							String value = dataValue.getAsJsonPrimitive(VALUE_KEY).getAsString();
+							article.putProperty(property, value);
 						}
-						break;
-					}
-				}
-				JsonArray propCommonCat = claims.getAsJsonArray(PROP_COMMON_CAT);
-				if (propCommonCat != null) {
-					JsonObject ccDataValue = propCommonCat.get(0).getAsJsonObject().getAsJsonObject(MAINSNAK_KEY)
-							.getAsJsonObject(DATAVALUE_KEY);
-					if (ccDataValue != null) {
-						String commonCat = ccDataValue.getAsJsonPrimitive(VALUE_KEY).getAsString();
-						article.setCommonCat(commonCat);
 					}
 				}
 			}
@@ -125,11 +110,8 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 		private List<SiteLink> siteLinks = new ArrayList<>();
 		private double lat;
 		private double lon;
-		private String image;
-		private String imageProp;
-		private String commonCat;
 		private Map<String, String> labels;
-
+		private final Map<String, String> properties = new HashMap<>();
 		public List<SiteLink> getSiteLinks() {
 			return siteLinks;
 		}
@@ -140,14 +122,6 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 
 		public double getLat() {
 			return lat;
-		}
-
-		public String getImage() {
-			return image;
-		}
-
-		public String getCommonCat() {
-			return commonCat;
 		}
 
 		public void setLon(double lon) {
@@ -162,28 +136,20 @@ public class ArticleMapper implements JsonDeserializer<ArticleMapper.Article> {
 			this.siteLinks = siteLinks;
 		}
 
-		public void setImage(String img) {
-			this.image = img;
-		}
-
-		public void setCommonCat(String cc) {
-			this.commonCat = cc;
-		}
-
-		public String getImageProp() {
-			return imageProp;
-		}
-
-		public void setImageProp(String imageProp) {
-			this.imageProp = imageProp;
-		}
-
 		public Map<String, String> getLabels() {
 			return labels;
 		}
 
 		public void setLabels(Map<String, String> labels) {
 			this.labels = labels;
+		}
+
+		public Map<String, String> getProperties() {
+			return properties;
+		}
+
+		public void putProperty(String property, String value) {
+			properties.put(property, value);
 		}
 	}
 

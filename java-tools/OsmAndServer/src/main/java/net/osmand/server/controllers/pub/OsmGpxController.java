@@ -74,7 +74,7 @@ public class OsmGpxController {
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 
 	public record RoutesListRequest(
-			String activity,
+			List<String> activityArr,
 			Integer year,
 			String minLat,
 			String maxLat,
@@ -115,8 +115,8 @@ public class OsmGpxController {
 			}
 		}
 
-		if (!Algorithms.isEmpty(req.activity())) {
-			error = filterByActivity(req.activity(), params, conditions);
+		if (req.activityArr() != null && !req.activityArr().isEmpty()) {
+			error = filterByActivity(req.activityArr(), params, conditions);
 			if (error != null) {
 				return error;
 			}
@@ -156,7 +156,7 @@ public class OsmGpxController {
 	                                        @RequestParam String minLon,
 	                                        @RequestParam String maxLon,
 	                                        @RequestParam(required = false) Integer year,
-	                                        @RequestParam(required = false) String activity) {
+	                                        @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -181,8 +181,8 @@ public class OsmGpxController {
 			}
 		}
 
-		if (!Algorithms.isEmpty(activity)) {
-			error = filterByActivity(activity, params, conditions);
+		if (activityArr != null && !activityArr.isEmpty()) {
+			error = filterByActivity(activityArr, params, conditions);
 			if (error != null) {
 				return error;
 			}
@@ -223,7 +223,7 @@ public class OsmGpxController {
 	                                      @RequestParam String minLon,
 	                                      @RequestParam String maxLon,
 	                                      @RequestParam(required = false) Integer year,
-	                                      @RequestParam(required = false) String activity) {
+	                                      @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -248,8 +248,8 @@ public class OsmGpxController {
 			}
 		}
 
-		if (!Algorithms.isEmpty(activity)) {
-			error = filterByActivity(activity, params, conditions);
+		if (activityArr != null && !activityArr.isEmpty()) {
+			error = filterByActivity(activityArr, params, conditions);
 			if (error != null) {
 				return error;
 			}
@@ -266,6 +266,47 @@ public class OsmGpxController {
 				"GROUP BY tag " +
 				"ORDER BY cnt DESC " +
 				"LIMIT " + MAX_TAGS_PER_BBOX;
+
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
+		return ResponseEntity.ok(gson.toJson(rows));
+	}
+
+	@GetMapping(path = {"/activities"}, produces = "application/json")
+	public ResponseEntity<String> getActivities(@RequestParam String minLat,
+	                                            @RequestParam String maxLat,
+	                                            @RequestParam String minLon,
+	                                            @RequestParam String maxLon,
+	                                            @RequestParam(required = false) Integer year) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		List<Object> params = new ArrayList<>();
+
+		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		if (error != null) {
+			return error;
+		}
+
+		// only non-null, non-empty activities; exclude garbage and error
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity <> ? AND m.activity <> ?");
+		params.add("garbage");
+		params.add("error");
+
+		if (year != null) {
+			error = filterByYear(String.valueOf(year), params, conditions);
+			if (error != null) {
+				return error;
+			}
+		}
+
+		String query =
+				"SELECT m.activity AS id, COUNT(*) AS count " +
+				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions +
+				" GROUP BY m.activity " +
+				"ORDER BY count DESC";
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
 		return ResponseEntity.ok(gson.toJson(rows));
@@ -503,10 +544,12 @@ public class OsmGpxController {
 		}
 	}
 
-	private ResponseEntity<String> filterByActivity(String activity, List<Object> params, StringBuilder conditions) {
-		if (!Algorithms.isEmpty(activity)) {
-			conditions.append(" AND m.activity = ?");
-			params.add(activity);
+	private ResponseEntity<String> filterByActivity(List<String> activityArr, List<Object> params, StringBuilder conditions) {
+		if (activityArr != null && !activityArr.isEmpty()) {
+			conditions.append(" AND m.activity IN (");
+			conditions.append(String.join(",", Collections.nCopies(activityArr.size(), "?")));
+			conditions.append(")");
+			params.addAll(activityArr);
 			return null;
 		} else {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");

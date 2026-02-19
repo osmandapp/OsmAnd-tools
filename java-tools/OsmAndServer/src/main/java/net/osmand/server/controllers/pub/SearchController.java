@@ -281,10 +281,13 @@ public class SearchController {
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
-                                                 @RequestParam double lon,
-                                                 @RequestParam long osmid,
-                                                @RequestParam String type) throws IOException {
-        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
+                                                @RequestParam double lon,
+                                                @RequestParam long osmid,
+                                                @RequestParam String type,
+                                                @RequestParam(defaultValue = "0") long clientTime,
+                                                @RequestParam(required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, clientTimeC);
         return ResponseEntity.ok(gson.toJson(poi));
     }
 
@@ -387,8 +390,17 @@ public class SearchController {
 
     @GetMapping(path = {"/parse-location"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseLocation(@RequestParam String location) {
-        LatLon coordinates = searchService.parseLocation(location);
+    public ResponseEntity<String> parseLocation(@RequestParam String location,
+                                                @RequestParam(required = false) String lat,
+                                                @RequestParam(required = false) String lon) throws IOException {
+        if (Algorithms.isBlank(location)) {
+            return ResponseEntity.badRequest().body("Location parameter is required!");
+        }
+        LatLon bboxCentre = null;
+        if (!Algorithms.isBlank(lat) && !Algorithms.isBlank(lon)) {
+            bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+        }
+        LatLon coordinates = searchService.parseLocation(location, bboxCentre);
         if (coordinates == null) {
             return ResponseEntity.ok(gson.toJson(null));
         }

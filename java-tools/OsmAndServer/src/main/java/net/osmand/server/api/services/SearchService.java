@@ -19,6 +19,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
+import net.osmand.util.TextDirectionUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -43,6 +44,7 @@ import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+import static net.osmand.util.LocationParser.parseOpenLocationCode;
 import static net.osmand.util.OpeningHoursParser.*;
 import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
@@ -200,14 +202,30 @@ public class SearchService {
         return bbox;
     }
 
+    public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
+                                Double radiusToLoadMaps, String northWest, String southEast) {
+        public double getRadius() {
+            return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
+        }
+    }
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
+    public record SearchResults(List<SearchResult> results,
+                                SearchSettings settings,
+                                String unitTestJson) {
+        public SearchResults(List<SearchResult> results) {
+            this(results, null, null);
+        }
+    }
+
 	public List<Feature> search(SearchContext ctx, Calendar clientTime) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(ctx, new SearchOption(false, null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
+            BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
-					(System.currentTimeMillis() - tm) / 1000.0, searchResults.stat));
+					(System.currentTimeMillis() - tm) / 1000.0, stat));
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
@@ -217,20 +235,10 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-	public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
-	                            Double radiusToLoadMaps, String northWest, String southEast) {
-		public double getRadius() {
-			return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
-		}
-	}
-	public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
-	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat,
-	                                  SearchSettings settings, String unitTestJson) {}
-
-    public SearchResultWrapper searchResults(SearchContext ctx, SearchOption option,
-                                             Consumer<List<SearchResult>> consumerInContext) throws IOException {
+    public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+                                                   Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+            return new SearchResults(Collections.emptyList());
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(ctx.locale), ctx.locale, false);
         if (!option.unlimited) {
@@ -245,15 +253,14 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
             if (list.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
             if (usedMapList.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
-	        settings.setStat(stat);
+	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
@@ -279,7 +286,7 @@ public class SearchService {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
 				unitTestJson = json == null ? null : json.toString();
 			}
-			return new SearchResultWrapper(res, stat, settings, unitTestJson);
+			return new SearchResults(res, settings, unitTestJson);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
@@ -659,8 +666,8 @@ public class SearchService {
             return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
         }));
     }
-    
-    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, Calendar clientTime) throws IOException {
         final String RELATION_TYPE = "3";
         final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
         final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
@@ -689,7 +696,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res, null);
+            return getPoiFeature(res, clientTime);
         }
         return null;
     }
@@ -1151,7 +1158,7 @@ public class SearchService {
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity);
+                result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
                 foundFeatures.put(osmId, getPoiFeature(result, clientTime));
                 remainingLimit--;
             }
@@ -1253,12 +1260,18 @@ public class SearchService {
 
 	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
-		List<OpeningHours.Info> openingHoursInfo;
 		if (openingHours != null) {
-			openingHoursInfo = openingHours.getInfo(calendar);
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
-				OpeningHours.Info info = openingHoursInfo.get(0);
-				return (info.isOpened() ? IS_OPENED_PREFIX : "") + info.getInfo();
+				StringJoiner openHoursInfos = new StringJoiner(";");
+				for (OpeningHours.Info info : openingHoursInfo) {
+					String infoString = info.getInfo();
+					if (!Algorithms.isEmpty(infoString)) {
+						String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + infoString;
+						openHoursInfos.add(s);
+					}
+				}
+				return openHoursInfos.toString();
 			}
 		}
 		return null;
@@ -1471,11 +1484,58 @@ public class SearchService {
     public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
-    public LatLon parseLocation(String locationString) {
+    public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
         if (locationString == null || locationString.trim().isEmpty()) {
             return null;
         }
+        locationString = TextDirectionUtil.clearDirectionMarks(locationString);
+        LocationParser.ParsedOpenLocationCode olcParsed = parseOpenLocationCode(locationString);
+        if (olcParsed != null) {
+            if (olcParsed.isFull()) {
+                return olcParsed.getLatLon();
+            }
+            LatLon location = searchOlcOnBasemap(locationString, bboxCentre);
+            if (location != null) {
+                return location;
+            }
+        }
         return LocationParser.parseLocation(locationString);
+    }
+
+    private LatLon searchOlcOnBasemap(String locationString, LatLon bboxCentre) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+
+        try {
+            QuadRect world = new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> refs = getMapsForSearch(world, true);
+            if (refs.isEmpty()) {
+                return null;
+            }
+            usedMapList = osmAndMapsService.getReaders(refs, null);
+
+            SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, false);
+            SearchSettings settings = searchUICore.getSearchSettings();
+            settings.setOfflineIndexes(usedMapList);
+            settings.setSearchBBox31(world);
+            searchUICore.updateSettings(settings);
+            SearchCoreFactory.SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
+            searchUICore.registerAPI(amenitiesApi);
+            searchUICore.registerAPI(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi));
+
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(locationString, bboxCentre);
+            if (resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty()) {
+                SearchResult result = resultCollection.getCurrentSearchResults().get(0);
+                if (result.object instanceof LatLon location) {
+                    return location;
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+            return null;
     }
 
 }
