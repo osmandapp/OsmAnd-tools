@@ -371,7 +371,7 @@ public class MapApiController {
 	public ResponseEntity<String> updateSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
-			return userdataService.tokenNotValidError();
+			return userdataService.tokenNotValidResponse();
 		}
 		List<UserdataService.SmartFolderWeb> res = userdataService.updateWebSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));

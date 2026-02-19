@@ -279,19 +279,25 @@ public class UserdataService {
 		for (UserFileNoData file : uniqueFiles) {
 			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
 				UserFile uf = filesRepository.findLatestNonEmptyFile(userId, file.name, file.type);
-				InputStream in = getInputStream(uf);
-				GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
-				gpxFile.setPath(uf.name);
-				gpxFile.setModifiedTime(uf.clienttime.getTime());
-				gpxFile.getMetadata().setTime(uf.details.getAsJsonObject(METADATA)
-						.getAsJsonPrimitive("time").getAsLong());
-				setAppearance(gpxFile, file.name, userId);
-				TrackItem trackItem = new TrackItem(gpxFile);
-				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-				dataItem.setAnalysis(getAnalysis(uf.details));
-				trackItem.setDataItem(dataItem);
-				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-				trackItemUserFileMap.put(trackItem, file);
+				try (InputStream in = getInputStream(uf);
+					 GzipSource gzipSource = new GzipSource(Okio.source(in))) {
+					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, gzipSource, null, false);
+					gpxFile.setPath(uf.name);
+					gpxFile.setModifiedTime(uf.clienttime.getTime());
+					gpxFile.getMetadata().setTime(uf.details.getAsJsonObject(METADATA)
+							.getAsJsonPrimitive("time").getAsLong());
+					setAppearance(gpxFile, file.name, userId);
+					TrackItem trackItem = new TrackItem(gpxFile);
+					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+					dataItem.setAnalysis(getAnalysis(uf.details));
+					trackItem.setDataItem(dataItem);
+					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+					trackItemUserFileMap.put(trackItem, file);
+				} catch (IOException e) {
+					String isError = String.format("Failed to process GPX file %s id=%d userid=%d error (%s)",
+							file.name, file.id, file.userid, e.getMessage());
+					LOG.error(isError);
+				}
 			}
 		}
 
@@ -322,16 +328,15 @@ public class UserdataService {
 
 			ObjectNode json = (ObjectNode) mapper.readTree(gis);
 			JsonNode color = json.get("color");
-			if(color != null) {
+			if (color != null) {
 				gpxFile.setColor(color.asText());
 			}
 			JsonNode width = json.get("width");
-			if(width != null) {
+			if (width != null) {
 				gpxFile.setWidth(width.asText());
 			}
 		} catch (Exception e) {
-			String isError = String.format(
-					"ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
+			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
 					file.name, file.id, file.userid, e.getMessage());
 			LOG.error(isError);
 		}
@@ -340,6 +345,9 @@ public class UserdataService {
 	GpxTrackAnalysis getAnalysis(JsonObject details) {
 		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
 		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
+		if (analysisJson == null) {
+			return analysis;
+		}
 		JsonPrimitive points = analysisJson.getAsJsonPrimitive("points");
 		if (points != null) {
 			analysis.setPoints(points.getAsInt());
@@ -375,9 +383,7 @@ public class UserdataService {
 				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
 					generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 				} catch (IOException e) {
-					String isError = String.format(
-							"Read GeneralSettings error: (%s)", e.getMessage());
-					LOG.error(isError);
+					LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
 				}
 			}
 		}
