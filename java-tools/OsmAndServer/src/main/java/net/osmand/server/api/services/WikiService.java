@@ -610,46 +610,51 @@ public class WikiService {
 	}
 
 	private void queryImagesByWikidataAndCategory(String wikidataId, String categoryName, RowCallbackHandler rowCallbackHandler) {
-		List<Object> params = new ArrayList<>();
+		final String WIKIDATA_QUERY = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
+				" FROM top_images_final WHERE wikidata_id = ? and dup_sim < ";
 
+		final String CATEGORY_QUERY = "SELECT c.imgId AS mediaId, c.imgName AS imageTitle, " +
+				"COALESCE(m.date, '') AS date, COALESCE(m.author, '') AS author, " +
+				"COALESCE(m.license, '') AS license, COALESCE(m.description, '') AS description, c.views AS views " +
+				"FROM wiki.categoryimages c " +
+				"LEFT JOIN wiki.common_meta m ON c.imgId = m.id " +
+				"WHERE c.catName = ? AND c.imgName != '' " +
+				"AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg') " +
+				"ORDER BY views DESC, imgName ASC LIMIT ";
+		
 		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
 
-		if (hasWikidataId) {
-			// Remove "Q" prefix from Wikidata ID if present
-			wikidataId = wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
-		}
-
-		String query;
-		if (hasWikidataId) {
-			query = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF +
-					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(wikidataId);
+		if (hasWikidataId && !hasCategory) {
+			String wikidataParam = stripWikidataPrefix(wikidataId);
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, wikidataParam), rowCallbackHandler);
+		} else if (hasWikidataId) {
+			String wikidataParam = stripWikidataPrefix(wikidataId);
+			Set<Long> wikidataMediaIds = new HashSet<>();
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, wikidataParam), rs -> {
+						wikidataMediaIds.add(rs.getLong("mediaId"));
+						rowCallbackHandler.processRow(rs);
+					});
+			int remainingLimit = LIMIT_PHOTOS_QUERY - wikidataMediaIds.size();
+			if (remainingLimit <= 0) {
+				return;
+			}
+			String catParam = categoryName.replace(' ', '_');
+			processImageQuery(CATEGORY_QUERY + remainingLimit, ps -> ps.setString(1, catParam), rs -> {
+				if (!wikidataMediaIds.contains(rs.getLong("mediaId"))) {
+					rowCallbackHandler.processRow(rs);
+				}
+			});
 		} else if (hasCategory) {
-			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
-			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, '' AS description, c.views as views"
-					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
-					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
-					+ " ORDER BY views DESC, imgName ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(categoryName.replace(' ', '_'));
-		} else {
-			return;
+			String catParam = categoryName.replace(' ', '_');
+			processImageQuery(CATEGORY_QUERY + LIMIT_PHOTOS_QUERY, ps -> ps.setString(1, catParam), rowCallbackHandler);
 		}
+	}
 
-		processImageQuery(
-				query,
-				ps -> {
-					for (int i = 0; i < params.size(); i++) {
-						if (params.get(i) != null) {
-							ps.setString(i + 1, (String) params.get(i));
-						} else {
-							ps.setNull(i + 1, Types.VARCHAR);
-						}
-					}
-				},
-				rowCallbackHandler
-		);
+	private static String stripWikidataPrefix(String wikidataId) {
+		return wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
 	}
 
 	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
@@ -679,9 +684,7 @@ public class WikiService {
 	}
 
 	private Long getPhotoIdFromWikidata(String wikidataId) {
-		if (wikidataId.startsWith("Q")) {
-			wikidataId = wikidataId.substring(1);
-		}
+		wikidataId = stripWikidataPrefix(wikidataId);
 		String query = "SELECT photoId FROM wiki.wikidata WHERE id = ? LIMIT 1";
 		try {
 			return jdbcTemplate.queryForObject(query, Long.class, wikidataId);
