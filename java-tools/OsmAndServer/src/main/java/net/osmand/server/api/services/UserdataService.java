@@ -286,30 +286,23 @@ public class UserdataService {
 			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
 				UserFile uf = getLastFileVersion(userId, file.name, file.type);
 				if (uf != null && uf.filesize > 0) {
-					try (InputStream in = getInputStream(uf);
-						 GzipSource gzipSource = new GzipSource(Okio.source(in))) {
-						GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, gzipSource, null, false);
-						gpxFile.setPath(uf.name);
-						gpxFile.setModifiedTime(uf.clienttime.getTime());
-						JsonObject metadata = uf.details.getAsJsonObject(METADATA);
-						if (metadata != null) {
-							JsonPrimitive time = metadata.getAsJsonPrimitive("time");
-							if (time != null) {
-								gpxFile.getMetadata().setTime(time.getAsLong());
-							}
+					GpxFile gpxFile = new GpxFile(null);
+					gpxFile.setPath(uf.name);
+					gpxFile.setModifiedTime(uf.clienttime.getTime());
+					JsonObject metadata = uf.details.getAsJsonObject(METADATA);
+					if (metadata != null) {
+						JsonPrimitive time = metadata.getAsJsonPrimitive("time");
+						if (time != null) {
+							gpxFile.getMetadata().setTime(time.getAsLong());
 						}
-						setAppearance(gpxFile, file.name, userId);
-						TrackItem trackItem = new TrackItem(gpxFile);
-						GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-						dataItem.setAnalysis(getAnalysis(uf.details));
-						trackItem.setDataItem(dataItem);
-						SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-						trackItemUserFileMap.put(trackItem, file);
-					} catch (IOException e) {
-						String isError = String.format("Failed to process GPX file %s id=%d userid=%d error (%s)",
-								file.name, file.id, file.userid, e.getMessage());
-						LOG.error(isError);
 					}
+					setAppearance(gpxFile, file.name, userId);
+					TrackItem trackItem = new TrackItem(gpxFile);
+					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+					dataItem.setAnalysis(getAnalysis(uf.details));
+					trackItem.setDataItem(dataItem);
+					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+					trackItemUserFileMap.put(trackItem, file);
 				}
 			}
 		}
