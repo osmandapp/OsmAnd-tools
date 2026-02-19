@@ -637,8 +637,12 @@ public class WikiService {
 						wikidataMediaIds.add(rs.getLong("mediaId"));
 						rowCallbackHandler.processRow(rs);
 					});
+			int remainingLimit = LIMIT_PHOTOS_QUERY - wikidataMediaIds.size();
+			if (remainingLimit <= 0) {
+				return;
+			}
 			String catParam = categoryName.replace(' ', '_');
-			processImageQuery(CATEGORY_QUERY + LIMIT_PHOTOS_QUERY, ps -> ps.setString(1, catParam), rs -> {
+			processImageQuery(CATEGORY_QUERY + remainingLimit, ps -> ps.setString(1, catParam), rs -> {
 				if (!wikidataMediaIds.contains(rs.getLong("mediaId"))) {
 					rowCallbackHandler.processRow(rs);
 				}
@@ -680,9 +684,7 @@ public class WikiService {
 	}
 
 	private Long getPhotoIdFromWikidata(String wikidataId) {
-		if (wikidataId.startsWith("Q")) {
-			wikidataId = wikidataId.substring(1);
-		}
+		wikidataId = stripWikidataPrefix(wikidataId);
 		String query = "SELECT photoId FROM wiki.wikidata WHERE id = ? LIMIT 1";
 		try {
 			return jdbcTemplate.queryForObject(query, Long.class, wikidataId);
