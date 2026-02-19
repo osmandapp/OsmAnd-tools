@@ -609,19 +609,19 @@ public class WikiService {
 		jdbcTemplate.query(query, pss, rowCallbackHandler);
 	}
 
-	private static final String WIKIDATA_QUERY = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
-			" FROM top_images_final WHERE wikidata_id = ? and dup_sim < ";
-
-	private static final String CATEGORY_QUERY = "SELECT c.imgId AS mediaId, c.imgName AS imageTitle, " +
-			"COALESCE(m.date, '') AS date, COALESCE(m.author, '') AS author, " +
-			"COALESCE(m.license, '') AS license, COALESCE(m.description, '') AS description, c.views AS views " +
-			"FROM wiki.categoryimages c " +
-			"LEFT JOIN wiki.common_meta m ON c.imgId = m.id " +
-			"WHERE c.catName = ? AND c.imgName != '' " +
-			"AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg') " +
-			"ORDER BY views DESC, imgName ASC LIMIT ";
-
 	private void queryImagesByWikidataAndCategory(String wikidataId, String categoryName, RowCallbackHandler rowCallbackHandler) {
+		final String WIKIDATA_QUERY = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
+				" FROM top_images_final WHERE wikidata_id = ? and dup_sim < ";
+
+		final String CATEGORY_QUERY = "SELECT c.imgId AS mediaId, c.imgName AS imageTitle, " +
+				"COALESCE(m.date, '') AS date, COALESCE(m.author, '') AS author, " +
+				"COALESCE(m.license, '') AS license, COALESCE(m.description, '') AS description, c.views AS views " +
+				"FROM wiki.categoryimages c " +
+				"LEFT JOIN wiki.common_meta m ON c.imgId = m.id " +
+				"WHERE c.catName = ? AND c.imgName != '' " +
+				"AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg') " +
+				"ORDER BY views DESC, imgName ASC LIMIT ";
+		
 		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
 		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
 
