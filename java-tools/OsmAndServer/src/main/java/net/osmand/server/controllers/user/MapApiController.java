@@ -375,7 +375,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<UserdataService.SmartFolderWeb> res = userdataService.createWebSmartFolders(dev.userid);
+		List<SmartFolderDto> res = userdataService.createWebSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

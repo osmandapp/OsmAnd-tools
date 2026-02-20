@@ -50,6 +50,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -269,45 +270,51 @@ public class UserdataService {
 		return getUserFilesResults(allFiles, userId, allVersions);
 	}
 
-	public List<UserdataService.SmartFolderWeb> createWebSmartFolders(int userId) {
+	public List<SmartFolderDto> createWebSmartFolders(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
-			return null;
+			return Collections.emptyList();
 		}
 		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-		SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
-		Map<String, UserFileNoData> UserFileByPath = new HashMap<>();
-		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
-		for (UserFileNoData uf : uniqueFiles) {
-			if (!uf.name.endsWith(INFO_FILE_EXT)) {
-				GpxFile gpxFile = buildGpxFile(userId, uf);
-				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-				dataItem.setAnalysis(getAnalysis(uf.details));
-				TrackItem trackItem = new TrackItem(gpxFile);
-				trackItem.setDataItem(dataItem);
-				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-				UserFileByPath.put(trackItem.getPath(), uf);
-			}
-		}
-
-		List<SmartFolderWeb> smartFolderWebs = new ArrayList<>();
-		List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
-		for (SmartFolder smartFolder : smartFolders) {
-			SmartFolderWeb smartFolderWeb = new SmartFolderWeb();
-			smartFolderWeb.name = smartFolder.getFolderName();
-			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
-			if (organizeByParams != null) {
-				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
-			}
-			for (TrackItem trackItem : smartFolder.getTrackItems()) {
-				UserFileNoData userFileNoData = UserFileByPath.get(trackItem.getPath());
-				if (userFileNoData != null) {
-					smartFolderWeb.files.add(userFileNoData);
+		synchronized (SmartFolderHelper.INSTANCE) {
+			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
+			Map<String, Long> fileIdByPath = new HashMap<>();
+			List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
+			for (UserFileNoData uf : uniqueFiles) {
+				if (!uf.name.endsWith(INFO_FILE_EXT)) {
+					GpxFile gpxFile = buildGpxFile(userId, uf);
+					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+					dataItem.setAnalysis(getAnalysis(uf.details));
+					TrackItem trackItem = new TrackItem(gpxFile);
+					trackItem.setDataItem(dataItem);
+					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+					fileIdByPath.put(trackItem.getPath(), uf.id);
 				}
 			}
-			smartFolderWebs.add(smartFolderWeb);
+			List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
+			return getSmartFolderDtos(fileIdByPath, smartFolders);
 		}
-		return smartFolderWebs;
+	}
+
+	private List<SmartFolderDto> getSmartFolderDtos(Map<String, Long> fileIdByPath, List<SmartFolder> smartFolders) {
+		List<SmartFolderDto> smartFolderList = new ArrayList<>();
+		
+		for (SmartFolder smartFolder : smartFolders) {
+			SmartFolderDto smartFolderDto = new SmartFolderDto();
+			smartFolderDto.name = smartFolder.getFolderName();
+			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
+			if (organizeByParams != null) {
+				smartFolderDto.organizeBy = organizeByParams.getType().getName();
+			}
+			for (TrackItem trackItem : smartFolder.getTrackItems()) {
+				Long fileId = fileIdByPath.get(trackItem.getPath());
+				if (fileId != null) {
+					smartFolderDto.fileIds.add(fileId);
+				}
+			}
+			smartFolderList.add(smartFolderDto);
+		}
+		return smartFolderList;
 	}
 
 	private GpxFile buildGpxFile(int userId, UserFileNoData uf) {
@@ -403,13 +410,12 @@ public class UserdataService {
 	}
 
 	private List<UserFileNoData> getUniqueFiles(int userId) {
-		List<UserFileNoData> fileList = new ArrayList<>();
-		fileList.addAll(filesRepository.listFilesByUseridWithDetails(userId, null, FILE_TYPE_GPX));
+		List<UserFileNoData> fileList = new ArrayList<>(filesRepository
+				.listFilesByUseridWithDetails(userId, null, FILE_TYPE_GPX));
 		List<UserFileNoData> res = new ArrayList<>();
 		Set<String> fileIds = new TreeSet<>();
 		for (UserFileNoData sf : fileList) {
-			String fileId = sf.name;
-			boolean isNewestFile = fileIds.add(fileId);
+			boolean isNewestFile = fileIds.add(sf.name);
 			if (isNewestFile && sf.filesize > 0) {
 				res.add(sf);
 			}
@@ -1576,10 +1582,10 @@ public class UserdataService {
 		}
 	}
 
-	public static class SmartFolderWeb {
+	public static class SmartFolderDto {
 		public String name;
 		public String organizeBy;
-		public List<UserFileNoData> files = new ArrayList<>();
+		public List<Long> fileIds = new ArrayList<>();
 	}
 
 	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
