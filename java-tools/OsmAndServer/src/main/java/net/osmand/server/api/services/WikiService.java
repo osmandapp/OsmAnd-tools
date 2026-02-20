@@ -63,6 +63,12 @@ public class WikiService {
 	private static final int LIMIT_PHOTOS_QUERY = 100;
 	private static final String SIMILARITY_CF = "0.975";
 
+	private static final String MEDIA_ID_KEY = "mediaId";
+	private static final String DATE_KEY = "date";
+	private static final String AUTHOR_KEY = "author";
+	private static final String LICENSE_KEY = "license";
+	private static final String DESCRIPTION_KEY = "description";
+
 	private static final Pattern DIGITS = Pattern.compile("\\d+");
 	private static final Gson gson = new Gson();
 
@@ -99,11 +105,11 @@ public class WikiService {
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
 			Feature f = new Feature(Geometry.point(new LatLon(lat, lon)));
 			f.properties.put("id", rs.getLong("wikidata_id"));
-			f.properties.put("mediaId", rs.getLong("mediaId"));
+			f.properties.put(MEDIA_ID_KEY, rs.getLong(MEDIA_ID_KEY));
 			f.properties.put("imageTitle", rs.getString("imageTitle"));
-			f.properties.put("date", rs.getString("date"));
-			f.properties.put("author", rs.getString("author"));
-			f.properties.put("license", getLicense(rs.getString("license")));
+			f.properties.put(DATE_KEY, rs.getString(DATE_KEY));
+			f.properties.put(AUTHOR_KEY, rs.getString(AUTHOR_KEY));
+			f.properties.put(LICENSE_KEY, getLicense(rs.getString(LICENSE_KEY)));
 			return f;
 		});
 		
@@ -566,12 +572,12 @@ public class WikiService {
 				Map<String, Object> imageDetails = new HashMap<>();
 				String imageTitle = rs.getString("imageTitle");
 
-				imageDetails.put("mediaId", rs.getLong("mediaId"));
+				imageDetails.put(MEDIA_ID_KEY, rs.getLong(MEDIA_ID_KEY));
 				imageDetails.put("image", createImageUrl(imageTitle));
-				imageDetails.put("date", rs.getString("date"));
-				imageDetails.put("author", rs.getString("author"));
-				imageDetails.put("license", getLicense(rs.getString("license")));
-				imageDetails.put("description", rs.getString("description"));
+				imageDetails.put(DATE_KEY, rs.getString(DATE_KEY));
+				imageDetails.put(AUTHOR_KEY, rs.getString(AUTHOR_KEY));
+				imageDetails.put(LICENSE_KEY, getLicense(rs.getString(LICENSE_KEY)));
+				imageDetails.put(DESCRIPTION_KEY, rs.getString(DESCRIPTION_KEY));
 
 				imagesWithDetails.add(imageDetails);
 			};
@@ -579,6 +585,9 @@ public class WikiService {
 				articleId = retrieveArticleIdFromWikiUrl(wiki);
 			}
 			queryImagesByWikidataAndCategory(articleId, categoryName, h);
+			if (!Algorithms.isEmpty(categoryName)) {
+				fillImageMetadata(imagesWithDetails);
+			}
 
 			if (articleId != null && !Algorithms.isEmpty(articleId)) {
 				moveWikidataPhotoToFirst(imagesWithDetails, articleId);
@@ -610,46 +619,76 @@ public class WikiService {
 	}
 
 	private void queryImagesByWikidataAndCategory(String wikidataId, String categoryName, RowCallbackHandler rowCallbackHandler) {
-		List<Object> params = new ArrayList<>();
+		final String WIKIDATA_QUERY = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
+				" FROM top_images_final WHERE wikidata_id = ? and dup_sim < ";
 
-		boolean hasWikidataId = wikidataId != null && !Algorithms.isEmpty(wikidataId);
-		boolean hasCategory = categoryName != null && !Algorithms.isEmpty(categoryName);
+		final String CATEGORY_QUERY = "SELECT imgId AS mediaId, imgName AS imageTitle, " +
+				"'' AS date, '' AS author, '' AS license, '' AS description, views " +
+				"FROM wiki.categoryimages " +
+				"WHERE catName = ? AND imgName != '' " +
+				"AND (imgName ILIKE '%.jpg' OR imgName ILIKE '%.png' OR imgName ILIKE '%.jpeg') " +
+				"ORDER BY views DESC, imgName ASC LIMIT ";
+		
+		boolean hasWikidataId = !Algorithms.isEmpty(wikidataId);
+		boolean hasCategory = !Algorithms.isEmpty(categoryName);
 
-		if (hasWikidataId) {
-			// Remove "Q" prefix from Wikidata ID if present
-			wikidataId = wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
-		}
-
-		String query;
-		if (hasWikidataId) {
-			query = "SELECT mediaId, imageTitle, date, author, license, description, score AS views " +
-					" FROM top_images_final WHERE wikidata_id = ? and dup_sim < " + SIMILARITY_CF +
-					" ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(wikidataId);
+		if (hasWikidataId && !hasCategory) {
+			String wikidataParam = stripWikidataPrefix(wikidataId);
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, wikidataParam), rowCallbackHandler);
+		} else if (hasWikidataId) {
+			String wikidataParam = stripWikidataPrefix(wikidataId);
+			Set<Long> wikidataMediaIds = new HashSet<>();
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+					ps -> ps.setString(1, wikidataParam), rs -> {
+						wikidataMediaIds.add(rs.getLong(MEDIA_ID_KEY));
+						rowCallbackHandler.processRow(rs);
+					});
+			int remainingLimit = LIMIT_PHOTOS_QUERY - wikidataMediaIds.size();
+			if (remainingLimit <= 0) {
+				return;
+			}
+			String catParam = categoryName.replace(' ', '_');
+			processImageQuery(CATEGORY_QUERY + remainingLimit, ps -> ps.setString(1, catParam), rs -> {
+				if (!wikidataMediaIds.contains(rs.getLong(MEDIA_ID_KEY))) {
+					rowCallbackHandler.processRow(rs);
+				}
+			});
 		} else if (hasCategory) {
-			// Retrieve images based on the category name, following Python's VALID_EXTENSIONS_LOWERCASE
-			query = " SELECT DISTINCT c.imgId AS mediaId, c.imgName AS imageTitle, '' AS date, '' AS author, '' AS license, '' AS description, c.views as views"
-					+ " FROM wiki.categoryimages c WHERE c.catName = ? AND c.imgName != ''"
-					+ " AND (c.imgName ILIKE '%.jpg' OR c.imgName ILIKE '%.png' OR c.imgName ILIKE '%.jpeg')"
-					+ " ORDER BY views DESC, imgName ASC LIMIT " + LIMIT_PHOTOS_QUERY;
-			params.add(categoryName.replace(' ', '_'));
-		} else {
+			String catParam = categoryName.replace(' ', '_');
+			processImageQuery(CATEGORY_QUERY + LIMIT_PHOTOS_QUERY, ps -> ps.setString(1, catParam), rowCallbackHandler);
+		}
+	}
+
+	private void fillImageMetadata(Set<Map<String, Object>> images) {
+		Map<Long, Map<String, Object>> toFill = new HashMap<>();
+		for (Map<String, Object> img : images) {
+			if (Algorithms.isEmpty((String) img.get(DATE_KEY)) && Algorithms.isEmpty((String) img.get(AUTHOR_KEY))
+					&& Algorithms.isEmpty((String) img.get(LICENSE_KEY)) && Algorithms.isEmpty((String) img.get(DESCRIPTION_KEY))) {
+				toFill.put((Long) img.get(MEDIA_ID_KEY), img);
+			}
+		}
+		if (toFill.isEmpty()) {
 			return;
 		}
-
-		processImageQuery(
-				query,
-				ps -> {
-					for (int i = 0; i < params.size(); i++) {
-						if (params.get(i) != null) {
-							ps.setString(i + 1, (String) params.get(i));
-						} else {
-							ps.setNull(i + 1, Types.VARCHAR);
-						}
+		String inClause = toFill.keySet().stream().map(String::valueOf).collect(Collectors.joining(","));
+		jdbcTemplate.query(
+				"SELECT id, COALESCE(date, '') AS date, COALESCE(author, '') AS author, " +
+				"COALESCE(license, '') AS license, COALESCE(description, '') AS description " +
+				"FROM wiki.common_meta WHERE id IN (" + inClause + ")",
+				rs -> {
+					Map<String, Object> img = toFill.get(rs.getLong("id"));
+					if (img != null) {
+						img.put(DATE_KEY, rs.getString(DATE_KEY));
+						img.put(AUTHOR_KEY, rs.getString(AUTHOR_KEY));
+						img.put(LICENSE_KEY, getLicense(rs.getString(LICENSE_KEY)));
+						img.put(DESCRIPTION_KEY, rs.getString(DESCRIPTION_KEY));
 					}
-				},
-				rowCallbackHandler
-		);
+				});
+	}
+
+	private static String stripWikidataPrefix(String wikidataId) {
+		return wikidataId.startsWith("Q") ? wikidataId.substring(1) : wikidataId;
 	}
 
 	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
@@ -663,7 +702,7 @@ public class WikiService {
 		}
 
 		Map<Boolean, List<Map<String, Object>>> partitioned = imagesWithDetails.stream()
-				.collect(Collectors.partitioningBy(img -> photoId.equals(img.get("mediaId"))));
+				.collect(Collectors.partitioningBy(img -> photoId.equals(img.get(MEDIA_ID_KEY))));
 
 		List<Map<String, Object>> matched = partitioned.get(true);
 		if (matched.isEmpty()) {
@@ -679,9 +718,7 @@ public class WikiService {
 	}
 
 	private Long getPhotoIdFromWikidata(String wikidataId) {
-		if (wikidataId.startsWith("Q")) {
-			wikidataId = wikidataId.substring(1);
-		}
+		wikidataId = stripWikidataPrefix(wikidataId);
 		String query = "SELECT photoId FROM wiki.wikidata WHERE id = ? LIMIT 1";
 		try {
 			return jdbcTemplate.queryForObject(query, Long.class, wikidataId);
@@ -699,12 +736,12 @@ public class WikiService {
 		try {
 			return jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
 				Map<String, Object> imageDetails = new HashMap<>();
-				imageDetails.put("mediaId", rs.getLong("mediaId"));
+				imageDetails.put(MEDIA_ID_KEY, rs.getLong(MEDIA_ID_KEY));
 				imageDetails.put("image", createImageUrl(rs.getString("imageTitle")));
-				imageDetails.put("date", rs.getString("date"));
-				imageDetails.put("author", rs.getString("author"));
-				imageDetails.put("license", getLicense(rs.getString("license")));
-				imageDetails.put("description", rs.getString("description"));
+				imageDetails.put(DATE_KEY, rs.getString(DATE_KEY));
+				imageDetails.put(AUTHOR_KEY, rs.getString(AUTHOR_KEY));
+				imageDetails.put(LICENSE_KEY, getLicense(rs.getString(LICENSE_KEY)));
+				imageDetails.put(DESCRIPTION_KEY, rs.getString(DESCRIPTION_KEY));
 				return imageDetails;
 			}, mediaId);
 		} catch (EmptyResultDataAccessException e) {
@@ -749,11 +786,11 @@ public class WikiService {
 			Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
 			feature.properties.put("imageTitle", imageDetails.getImageName());
 			WikiMetadata.Metadata metadata = imageDetails.getMetadata();
-			feature.properties.put("date", metadata.getDate());
-			feature.properties.put("author", metadata.getAuthor());
-			feature.properties.put("license", metadata.getLicense());
-			feature.properties.put("description", metadata.getDescription());
-			feature.properties.put("mediaId", imageDetails.getMediaId());
+			feature.properties.put(DATE_KEY, metadata.getDate());
+			feature.properties.put(AUTHOR_KEY, metadata.getAuthor());
+			feature.properties.put(LICENSE_KEY, metadata.getLicense());
+			feature.properties.put(DESCRIPTION_KEY, metadata.getDescription());
+			feature.properties.put(MEDIA_ID_KEY, imageDetails.getMediaId());
 			return feature;
 		}).toList();
 		

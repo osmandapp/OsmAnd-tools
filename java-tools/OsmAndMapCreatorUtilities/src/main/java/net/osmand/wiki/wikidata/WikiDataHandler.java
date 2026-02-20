@@ -382,18 +382,11 @@ public class WikiDataHandler extends DefaultHandler {
 				mappingPrep.setString(3, siteLink.title());
 				addBatch(mappingPrep, mappingBatch);
 			}
-			if (article.getImage() != null) {
-				String image = StringEscapeUtils.unescapeJava(article.getImage());
+			for (Map.Entry<String, String> entry : article.getProperties().entrySet()) {
+				String value = StringEscapeUtils.unescapeJava(entry.getValue());
 				wikidataPropPrep.setLong(1, id);
-				wikidataPropPrep.setString(2, article.getImageProp());
-				wikidataPropPrep.setString(3, image);
-				addBatch(wikidataPropPrep, wikidataPropBatch);
-			}
-			if (article.getCommonCat() != null) {
-				String commonCat = StringEscapeUtils.unescapeJava(article.getCommonCat());
-				wikidataPropPrep.setLong(1, id);
-				wikidataPropPrep.setString(2, ArticleMapper.PROP_COMMON_CAT);
-				wikidataPropPrep.setString(3, commonCat);
+				wikidataPropPrep.setString(2, entry.getKey());
+				wikidataPropPrep.setString(3, value);
 				addBatch(wikidataPropPrep, wikidataPropBatch);
 			}
 			if (storeJson) {
