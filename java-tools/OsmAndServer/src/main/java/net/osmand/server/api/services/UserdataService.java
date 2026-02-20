@@ -82,7 +82,8 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserdataService {
 
-    @Autowired
+	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
+	@Autowired
     protected UserSubscriptionService userSubService;
 
     @Autowired
@@ -269,55 +270,37 @@ public class UserdataService {
 	}
 
 	public List<UserdataService.SmartFolderWeb> createWebSmartFolders(int userId) {
-		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
-		String generalSettings = getGeneralSettings(userId, uniqueFiles);
-		if (generalSettings == null) {
-			return null;
-		}
-		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-		JSONObject obj = new JSONObject(generalSettings);
-		String trackFiltersSettings = obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
+		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
 			return null;
 		}
+		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
 		SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
-		Map<TrackItem, UserFileNoData> trackItemUserFileMap = new HashMap<>();
-		for (UserFileNoData file : uniqueFiles) {
-			if (file.type.equalsIgnoreCase(FILE_TYPE_GPX) && !file.name.endsWith(INFO_FILE_EXT)) {
-				UserFile uf = getLastFileVersion(userId, file.name, file.type);
-				if (uf != null && uf.filesize > 0) {
-					GpxFile gpxFile = new GpxFile(null);
-					gpxFile.setPath(uf.name);
-					gpxFile.setModifiedTime(uf.clienttime.getTime());
-					JsonObject metadata = uf.details.getAsJsonObject(METADATA);
-					if (metadata != null) {
-						JsonPrimitive time = metadata.getAsJsonPrimitive("time");
-						if (time != null) {
-							gpxFile.getMetadata().setTime(time.getAsLong());
-						}
-					}
-					setAppearance(gpxFile, file.name, userId);
-					TrackItem trackItem = new TrackItem(gpxFile);
-					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-					dataItem.setAnalysis(getAnalysis(uf.details));
-					trackItem.setDataItem(dataItem);
-					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-					trackItemUserFileMap.put(trackItem, file);
-				}
+		Map<String, UserFileNoData> UserFileByPath = new HashMap<>();
+		List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
+		for (UserFileNoData uf : uniqueFiles) {
+			if (!uf.name.endsWith(INFO_FILE_EXT)) {
+				GpxFile gpxFile = buildGpxFile(userId, uf);
+				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+				dataItem.setAnalysis(getAnalysis(uf.details));
+				TrackItem trackItem = new TrackItem(gpxFile);
+				trackItem.setDataItem(dataItem);
+				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+				UserFileByPath.put(trackItem.getPath(), uf);
 			}
 		}
 
-		List<UserdataService.SmartFolderWeb> smartFolderWebs = new ArrayList<>();
+		List<SmartFolderWeb> smartFolderWebs = new ArrayList<>();
 		List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
-		for (SmartFolder sf : smartFolders) {
-			UserdataService.SmartFolderWeb smartFolderWeb = new UserdataService.SmartFolderWeb();
-			smartFolderWeb.name = sf.getFolderName();
-			OrganizeByParams organizeByParams = sf.getOrganizeByParams();
+		for (SmartFolder smartFolder : smartFolders) {
+			SmartFolderWeb smartFolderWeb = new SmartFolderWeb();
+			smartFolderWeb.name = smartFolder.getFolderName();
+			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
 			if (organizeByParams != null) {
 				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
 			}
-			for (TrackItem ti : sf.getTrackItems()) {
-				UserFileNoData userFileNoData = trackItemUserFileMap.get(ti);
+			for (TrackItem trackItem : smartFolder.getTrackItems()) {
+				UserFileNoData userFileNoData = UserFileByPath.get(trackItem.getPath());
 				if (userFileNoData != null) {
 					smartFolderWeb.files.add(userFileNoData);
 				}
@@ -325,6 +308,30 @@ public class UserdataService {
 			smartFolderWebs.add(smartFolderWeb);
 		}
 		return smartFolderWebs;
+	}
+
+	private GpxFile buildGpxFile(int userId, UserFileNoData uf) {
+		GpxFile gpxFile = new GpxFile(null);
+		gpxFile.setPath(uf.name);
+		gpxFile.setModifiedTime(uf.clienttime.getTime());
+		JsonObject metadata = uf.details.getAsJsonObject(METADATA);
+		if (metadata != null) {
+			JsonPrimitive time = metadata.getAsJsonPrimitive("time");
+			if (time != null) {
+				gpxFile.getMetadata().setTime(time.getAsLong());
+			}
+		}
+		setAppearance(gpxFile, uf.name, userId);
+		return gpxFile;
+	}
+
+	private String getFiltersSettings(int userId) {
+		String generalSettings = getGeneralSettings(userId);
+		if (generalSettings == null) {
+			return null;
+		}
+		JSONObject obj = new JSONObject(generalSettings);
+		return obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
 	}
 
 	void setAppearance(GpxFile gpxFile, String name, int userId) {
@@ -384,32 +391,26 @@ public class UserdataService {
 		return analysis;
 	}
 
-	private String getGeneralSettings(int userId, List<UserFileNoData> uniqueFiles) {
+	private String getGeneralSettings(int userId) {
 		String generalSettings = null;
-		for (UserFileNoData sf : uniqueFiles) {
-			if (Objects.equals(sf.type, FILE_TYPE_GLOBAL)) {
-				UserFile userFile = getLastFileVersion(userId, sf.name, sf.type);
-				try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
-					generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-				} catch (IOException e) {
-					LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
-				}
-			}
+		UserFile userFile = getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
+		try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
+			generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
 		}
 		return generalSettings;
 	}
 
 	private List<UserFileNoData> getUniqueFiles(int userId) {
-		List<UserFileNoData> fl = new ArrayList<>();
-		for (String t : new String[]{FILE_TYPE_GPX, FILE_TYPE_GLOBAL}) {
-			fl.addAll(filesRepository.listFilesByUseridWithDetails(userId, null, t));
-		}
+		List<UserFileNoData> fileList = new ArrayList<>();
+		fileList.addAll(filesRepository.listFilesByUseridWithDetails(userId, null, FILE_TYPE_GPX));
 		List<UserFileNoData> res = new ArrayList<>();
 		Set<String> fileIds = new TreeSet<>();
-		for (UserFileNoData sf : fl) {
-			String fileId = sf.type + "____" + sf.name;
+		for (UserFileNoData sf : fileList) {
+			String fileId = sf.name;
 			boolean isNewestFile = fileIds.add(fileId);
-			if (isNewestFile && sf.filesize >= 0) {
+			if (isNewestFile && sf.filesize > 0) {
 				res.add(sf);
 			}
 		}

@@ -369,7 +369,7 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	@GetMapping(value = "/create-smartfolders")
+	@GetMapping(value = "/create-smart-folders")
 	public ResponseEntity<String> createSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
