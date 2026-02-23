@@ -897,14 +897,14 @@ public interface OBFService extends BaseService {
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
-		SearchService.SearchResultWrapper result = getSearchService().searchResults(ctx, option, null);
+		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
-		return new ResultsWithStats(results, result.stat().getWordStats().values(), result.stat().getByApis());
+		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
 	}
 
 	private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
@@ -926,8 +926,8 @@ public interface OBFService extends BaseService {
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResultWrapper result = getSearchService()
-				.searchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+		SearchService.SearchResults result = getSearchService()
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");

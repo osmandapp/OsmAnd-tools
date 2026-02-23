@@ -270,7 +270,7 @@ public interface DataService extends BaseService {
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
 	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
-	                                   SearchService.SearchResultWrapper searchResult, LatLon targetPoint,
+	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null) {
 			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, "", error, duration,
@@ -316,14 +316,15 @@ public interface DataService extends BaseService {
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
 				}
-				if (searchResult != null && searchResult.stat() != null) {
-					row.put("stat_bytes", searchResult.stat().totalBytes);
-					row.put("stat_time", searchResult.stat().totalTime);
+				if (searchResult != null && searchResult.settings().getStat() != null) {
+					BinaryMapIndexReaderStats.SearchStat stat = searchResult.settings().getStat();
+					row.put("stat_bytes", stat.totalBytes);
+					row.put("stat_time", stat.totalTime);
 					int statResultsCount = 0;
 					int statAmenityCount = 0;
 					int statTransportCount = 0;
 					int statAddressCount = 0;
-					for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : searchResult.stat().getWordStats().values()) {
+					for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : stat.getWordStats().values()) {
 						if (wordSearchStat == null) {
 							continue;
 						}
@@ -349,12 +350,12 @@ public interface DataService extends BaseService {
 					row.put("stat_transport_count", statTransportCount);
 					row.put("stat_address_count", statAddressCount);
 
-					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : searchResult.stat().getByApis().entrySet()) {
+					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
 						row.put("stat_time_" + e.getKey().name(), e.getValue().time);
 						row.put("stat_bytes_" + e.getKey().name(), e.getValue().bytes);
 						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
 					}
-					row.put("sub_stats", searchResult.stat().getSubStatsSummary());
+					row.put("sub_stats", stat.getSubStatsSummary());
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -388,8 +389,8 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalBytes : null,
-				searchResult != null && searchResult.stat() != null ? searchResult.stat().totalTime : null
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalBytes : null,
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalTime : null
 		};
 	}
 
