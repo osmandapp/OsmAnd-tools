@@ -1,8 +1,6 @@
 package net.osmand.server.api.services;
 
-import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
-import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PREF;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -13,7 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -25,24 +22,15 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.gson.JsonPrimitive;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
-import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.server.api.repo.*;
-import net.osmand.shared.api.SettingsAPI;
 import net.osmand.shared.gpx.*;
-import net.osmand.shared.gpx.data.SmartFolder;
-import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
-import net.osmand.shared.util.PlatformUtil;
 import okio.GzipSource;
 import okio.Okio;
 import org.apache.commons.collections4.IterableUtils;
@@ -50,7 +38,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -83,7 +70,6 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserdataService {
 
-	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
 	@Autowired
     protected UserSubscriptionService userSubService;
 
@@ -268,159 +254,6 @@ public class UserdataService {
 		sanitizeFileNames(allFiles);
 
 		return getUserFilesResults(allFiles, userId, allVersions);
-	}
-
-	public List<SmartFolderDto> createWebSmartFolders(int userId) {
-		String trackFiltersSettings = getFiltersSettings(userId);
-		if (trackFiltersSettings == null) {
-			return Collections.emptyList();
-		}
-		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-		synchronized (SmartFolderHelper.INSTANCE) {
-			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
-			Map<String, Long> fileIdByPath = new HashMap<>();
-			List<UserFileNoData> uniqueFiles = getUniqueFiles(userId);
-			for (UserFileNoData uf : uniqueFiles) {
-				if (!uf.name.endsWith(INFO_FILE_EXT)) {
-					GpxFile gpxFile = buildGpxFile(userId, uf);
-					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-					dataItem.setAnalysis(getAnalysis(uf.details));
-					TrackItem trackItem = new TrackItem(gpxFile);
-					trackItem.setDataItem(dataItem);
-					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-					fileIdByPath.put(trackItem.getPath(), uf.id);
-				}
-			}
-			List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
-			return getSmartFolderDtos(fileIdByPath, smartFolders);
-		}
-	}
-
-	private List<SmartFolderDto> getSmartFolderDtos(Map<String, Long> fileIdByPath, List<SmartFolder> smartFolders) {
-		List<SmartFolderDto> smartFolderList = new ArrayList<>();
-		
-		for (SmartFolder smartFolder : smartFolders) {
-			SmartFolderDto smartFolderDto = new SmartFolderDto();
-			smartFolderDto.name = smartFolder.getFolderName();
-			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
-			if (organizeByParams != null) {
-				smartFolderDto.organizeBy = organizeByParams.getType().getName();
-			}
-			for (TrackItem trackItem : smartFolder.getTrackItems()) {
-				Long fileId = fileIdByPath.get(trackItem.getPath());
-				if (fileId != null) {
-					smartFolderDto.fileIds.add(fileId);
-				}
-			}
-			smartFolderList.add(smartFolderDto);
-		}
-		return smartFolderList;
-	}
-
-	private GpxFile buildGpxFile(int userId, UserFileNoData uf) {
-		GpxFile gpxFile = new GpxFile(null);
-		gpxFile.setPath(uf.name);
-		gpxFile.setModifiedTime(uf.clienttime.getTime());
-		JsonObject metadata = uf.details.getAsJsonObject(METADATA);
-		if (metadata != null) {
-			JsonPrimitive time = metadata.getAsJsonPrimitive("time");
-			if (time != null) {
-				gpxFile.getMetadata().setTime(time.getAsLong());
-			}
-		}
-		setAppearance(gpxFile, uf.name, userId);
-		return gpxFile;
-	}
-
-	private String getFiltersSettings(int userId) {
-		String generalSettings = getGeneralSettings(userId);
-		if (generalSettings == null) {
-			return null;
-		}
-		JSONObject obj = new JSONObject(generalSettings);
-		return obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
-	}
-
-	void setAppearance(GpxFile gpxFile, String name, int userId) {
-		CloudUserFilesRepository.UserFile file = getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (file == null || file.filesize == -1 || file.data == null) {
-			return;
-		}
-		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(file.data))) {
-			ObjectMapper mapper = new ObjectMapper();
-
-			ObjectNode json = (ObjectNode) mapper.readTree(gis);
-			JsonNode color = json.get("color");
-			if (color != null) {
-				gpxFile.setColor(color.asText());
-			}
-			JsonNode width = json.get("width");
-			if (width != null) {
-				gpxFile.setWidth(width.asText());
-			}
-		} catch (Exception e) {
-			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
-					file.name, file.id, file.userid, e.getMessage());
-			LOG.error(isError);
-		}
-	}
-
-	GpxTrackAnalysis getAnalysis(JsonObject details) {
-		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
-		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
-		if (analysisJson == null) {
-			return analysis;
-		}
-		JsonPrimitive points = analysisJson.getAsJsonPrimitive("points");
-		if (points != null) {
-			analysis.setPoints(points.getAsInt());
-		}
-		JsonPrimitive endTime = analysisJson.getAsJsonPrimitive("endTime");
-		if (endTime != null) {
-			analysis.setEndTime(endTime.getAsLong());
-		}
-		JsonPrimitive startTime = analysisJson.getAsJsonPrimitive("startTime");
-		if (startTime != null) {
-			analysis.setStartTime(startTime.getAsLong());
-		}
-		JsonPrimitive wptPoints = analysisJson.getAsJsonPrimitive("wptPoints");
-		if (wptPoints != null) {
-			analysis.setWptPoints(wptPoints.getAsInt());
-		}
-		JsonPrimitive timeMoving = analysisJson.getAsJsonPrimitive("timeMoving");
-		if (timeMoving != null) {
-			analysis.setTimeMoving(timeMoving.getAsLong());
-		}
-		JsonPrimitive totalDistance = analysisJson.getAsJsonPrimitive("totalDistance");
-		if (totalDistance != null) {
-			analysis.setTotalDistance(totalDistance.getAsLong());
-		}
-		return analysis;
-	}
-
-	private String getGeneralSettings(int userId) {
-		String generalSettings = null;
-		UserFile userFile = getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
-		try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
-			generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
-		}
-		return generalSettings;
-	}
-
-	private List<UserFileNoData> getUniqueFiles(int userId) {
-		List<UserFileNoData> fileList = new ArrayList<>(filesRepository
-				.listFilesByUseridWithDetails(userId, null, FILE_TYPE_GPX));
-		List<UserFileNoData> res = new ArrayList<>();
-		Set<String> fileIds = new TreeSet<>();
-		for (UserFileNoData sf : fileList) {
-			boolean isNewestFile = fileIds.add(sf.name);
-			if (isNewestFile && sf.filesize > 0) {
-				res.add(sf);
-			}
-		}
-		return res;
 	}
 
 	public Set<String> parseFileTypes(String types) {
@@ -1579,24 +1412,6 @@ public class UserdataService {
 				file.setModifiedTime(userFile.updatetime.getTime());
 				files.put(userFile.name, file);
 			}
-		}
-	}
-
-	public static class SmartFolderDto {
-		public String name;
-		public String organizeBy;
-		public List<Long> fileIds = new ArrayList<>();
-	}
-
-	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
-		@Override
-		public SettingsAPI getSettings() {
-			return null;
-		}
-
-		@Override
-		public KFile getGpxDir() {
-			return new KFile("");
 		}
 	}
 }

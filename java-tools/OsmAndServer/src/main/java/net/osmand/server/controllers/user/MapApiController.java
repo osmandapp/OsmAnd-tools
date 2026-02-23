@@ -94,6 +94,9 @@ public class MapApiController {
 	private UserSubscriptionService userSubService;
 
 	@Autowired
+	private SmartFolderService smartFolderService;
+
+	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
@@ -375,7 +378,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<SmartFolderDto> res = userdataService.createWebSmartFolders(dev.userid);
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.createWebSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
