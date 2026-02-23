@@ -65,8 +65,7 @@ public class SmartFolderService {
 			}
 		}
 		synchronized (SmartFolderHelper.INSTANCE) {
-			SmartFolderHelper.INSTANCE.resetSmartFoldersItems();
-			SmartFolderHelper.INSTANCE.getAllAvailableTrackItems().clear();
+			SmartFolderHelper.INSTANCE.resetSmartFolders();
 			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
 			for (TrackItem trackItem : trackItems) {
 				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
