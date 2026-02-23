@@ -51,28 +51,31 @@ public class SmartFolderService {
 			return Collections.emptyList();
 		}
 		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
-		synchronized (SmartFolderHelper.INSTANCE) {
-			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
-			Map<String, Long> fileIdByPath = new HashMap<>();
-			List<CloudUserFilesRepository.UserFileNoData> uniqueFiles = userDataService
-					.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
-			for (CloudUserFilesRepository.UserFileNoData uf : uniqueFiles) {
-				if (!uf.name.endsWith(INFO_FILE_EXT)) {
-					GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
-					GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-					dataItem.setAnalysis(getAnalysis(uf.details));
-					TrackItem trackItem = new TrackItem(gpxFile);
-					trackItem.setDataItem(dataItem);
-					SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
-					fileIdByPath.put(trackItem.getPath(), uf.id);
-				}
+		List<CloudUserFilesRepository.UserFileNoData> uniqueFiles = userDataService
+				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
+		List<TrackItem> trackItems = new ArrayList<>(uniqueFiles.size());
+		for (CloudUserFilesRepository.UserFileNoData uf : uniqueFiles) {
+			if (!uf.name.endsWith(INFO_FILE_EXT)) {
+				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
+				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+				dataItem.setAnalysis(getAnalysis(uf.details));
+				TrackItem trackItem = new TrackItem(gpxFile);
+				trackItem.setDataItem(dataItem);
+				trackItems.add(trackItem);
 			}
-			List<SmartFolder> smartFolders = SmartFolderHelper.INSTANCE.getSmartFolders();
-			return getSmartFolderDtos(fileIdByPath, smartFolders);
+		}
+		synchronized (SmartFolderHelper.INSTANCE) {
+			SmartFolderHelper.INSTANCE.resetSmartFoldersItems();
+			SmartFolderHelper.INSTANCE.getAllAvailableTrackItems().clear();
+			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
+			for (TrackItem trackItem : trackItems) {
+				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+			}
+			return getSmartFoldersWeb(SmartFolderHelper.INSTANCE.getSmartFolders());
 		}
 	}
 
-	private List<SmartFolderWeb> getSmartFolderDtos(Map<String, Long> fileIdByPath, List<SmartFolder> smartFolders) {
+	private List<SmartFolderWeb> getSmartFoldersWeb(List<SmartFolder> smartFolders) {
 		List<SmartFolderWeb> smartFolderList = new ArrayList<>();
 		for (SmartFolder smartFolder : smartFolders) {
 			SmartFolderWeb smartFolderWeb = new SmartFolderWeb();
@@ -82,9 +85,9 @@ public class SmartFolderService {
 				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
 			}
 			for (TrackItem trackItem : smartFolder.getTrackItems()) {
-				Long fileId = fileIdByPath.get(trackItem.getPath());
-				if (fileId != null) {
-					smartFolderWeb.fileIds.add(fileId);
+				KFile file = trackItem.getFile();
+				if (file != null) {
+					smartFolderWeb.userFilePaths.add(file.path());
 				}
 			}
 			smartFolderList.add(smartFolderWeb);
@@ -192,7 +195,7 @@ public class SmartFolderService {
 	public static class SmartFolderWeb {
 		public String name;
 		public String organizeBy;
-		public List<Long> fileIds = new ArrayList<>();
+		public List<String> userFilePaths = new ArrayList<>();
 	}
 
 	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
