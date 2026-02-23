@@ -65,6 +65,11 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
     }
 
     @Override
+    public KFile getColorPaletteDir() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+    
+    @Override
     public SettingsAPI getSettings() {
         throw new UnsupportedOperationException("Not yet implemented");
     }
