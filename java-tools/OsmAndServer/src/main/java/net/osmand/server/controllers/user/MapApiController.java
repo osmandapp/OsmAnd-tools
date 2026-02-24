@@ -372,13 +372,13 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	@GetMapping(value = "/create-smart-folders")
+	@GetMapping(value = "/create-smart-folders", produces = "application/json")
 	public ResponseEntity<String> createSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.createWebSmartFolders(dev.userid);
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

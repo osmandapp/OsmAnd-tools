@@ -40,12 +40,9 @@ public class SmartFolderService {
 	private UserdataService userDataService;
 
 	@Autowired
-	private CloudUserFilesRepository filesRepository;
-
-	@Autowired
 	private WebUserdataService webUserdataService;
 
-	public List<SmartFolderWeb> createWebSmartFolders(int userId) {
+	public List<SmartFolderWeb> getSmartFolders(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
 			return Collections.emptyList();
@@ -70,11 +67,11 @@ public class SmartFolderService {
 			for (TrackItem trackItem : trackItems) {
 				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
 			}
-			return getSmartFoldersWeb(SmartFolderHelper.INSTANCE.getSmartFolders());
+			return toSmartFolderWebList(SmartFolderHelper.INSTANCE.getSmartFolders());
 		}
 	}
 
-	private List<SmartFolderWeb> getSmartFoldersWeb(List<SmartFolder> smartFolders) {
+	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
 		List<SmartFolderWeb> smartFolderList = new ArrayList<>();
 		for (SmartFolder smartFolder : smartFolders) {
 			SmartFolderWeb smartFolderWeb = new SmartFolderWeb();

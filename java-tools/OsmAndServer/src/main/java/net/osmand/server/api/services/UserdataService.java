@@ -29,7 +29,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
 import net.osmand.server.api.repo.*;
-import net.osmand.shared.gpx.*;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.io.KFile;
 import okio.GzipSource;
 import okio.Okio;
@@ -318,10 +319,9 @@ public class UserdataService {
 	        if (allVersions) {
 		        res.allFiles.add(sf);
 	        }
-
-		}
-		return res;
-	}
+        }
+        return res;
+    }
 
 	public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
