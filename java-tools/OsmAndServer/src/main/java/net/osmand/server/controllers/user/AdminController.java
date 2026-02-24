@@ -1133,7 +1133,7 @@ public class AdminController {
 				}
 			}
 			// add up tail
-			last = Math.min(last, 0.9);
+			last = Math.min(last, 0.8);
 			sum += prod  * last / (1 - last); // add tail
 			
 			
