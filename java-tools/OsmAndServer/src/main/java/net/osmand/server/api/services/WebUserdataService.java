@@ -268,7 +268,7 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			AnalysisDetails analysisDetails = getDetails(analysis);
+			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
 			if (analysisDetails != null) {
 				file.details.add(tag, gsonWithNans.toJsonTree(analysisDetails));
 			}
@@ -321,7 +321,7 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			AnalysisDetails analysisDetails = getDetails(analysis);
+			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
 			if (analysisDetails != null) {
 				details.add(ANALYSIS, gsonWithNans.toJsonTree(analysisDetails));
 			}
@@ -348,7 +348,7 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private AnalysisDetails getDetails(GpxTrackAnalysis analysis) {
+	private AnalysisDetails getAnalysisFromGpx(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			analysis.getPointAttributes().clear();
 			return new AnalysisDetails(analysis);
@@ -356,7 +356,7 @@ public class WebUserdataService {
 		return null;
 	}
 
-	GpxTrackAnalysis getAnalysis(JsonObject details) {
+	GpxTrackAnalysis getAnalysisFromJson(JsonObject details) {
 		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
 		if (details == null || !analysisPresent(ANALYSIS, details)) {
 			return analysis;

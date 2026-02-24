@@ -55,7 +55,7 @@ public class SmartFolderService {
 			if (!uf.name.endsWith(INFO_FILE_EXT)) {
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
 				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-				dataItem.setAnalysis(webUserdataService.getAnalysis(uf.details));
+				dataItem.setAnalysis(webUserdataService.getAnalysisFromJson(uf.details));
 				TrackItem trackItem = new TrackItem(gpxFile);
 				trackItem.setDataItem(dataItem);
 				trackItems.add(trackItem);
