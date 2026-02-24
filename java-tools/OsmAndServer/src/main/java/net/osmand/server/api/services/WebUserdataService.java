@@ -83,12 +83,6 @@ public class WebUserdataService {
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
 	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
-	public static final String ANALYSIS_END_TIME = "endTime";
-	public static final String ANALYSIS_START_TIME = "startTime";
-	public static final String ANALYSIS_WPT_POINTS = "wptPoints";
-	public static final String ANALYSIS_TIME_MOVING = "timeMoving";
-	public static final String ANALYSIS_TOTAL_DISTANCE = "totalDistance";
-	public static final String ANALYSIS_POINTS = "points";
 
 	Gson gson = new Gson();
 

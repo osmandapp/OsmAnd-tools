@@ -74,18 +74,20 @@ public class SmartFolderService {
 	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
 		List<SmartFolderWeb> smartFolderList = new ArrayList<>();
 		for (SmartFolder smartFolder : smartFolders) {
-			SmartFolderWeb smartFolderWeb = new SmartFolderWeb();
-			smartFolderWeb.name = smartFolder.getFolderName();
+			String name = smartFolder.getFolderName();
 			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
+			String organizeBy = null;
 			if (organizeByParams != null) {
-				smartFolderWeb.organizeBy = organizeByParams.getType().getName();
+				organizeBy = organizeByParams.getType().getName();
 			}
+			List<String> userFilePaths = new ArrayList<>();
 			for (TrackItem trackItem : smartFolder.getTrackItems()) {
 				KFile file = trackItem.getFile();
 				if (file != null) {
-					smartFolderWeb.userFilePaths.add(file.path());
+					userFilePaths.add(file.path());
 				}
 			}
+			SmartFolderWeb smartFolderWeb = new SmartFolderWeb(name, organizeBy, userFilePaths);
 			smartFolderList.add(smartFolderWeb);
 		}
 		return smartFolderList;
@@ -155,10 +157,7 @@ public class SmartFolderService {
 		return generalSettings;
 	}
 
-	public static class SmartFolderWeb {
-		public String name;
-		public String organizeBy;
-		public List<String> userFilePaths = new ArrayList<>();
+	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths) {
 	}
 
 	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
