@@ -1077,7 +1077,7 @@ public class AdminController {
 		Map<String, Integer> skuTotal = new TreeMap<>();
 		for (Subscription s : subs) {
 			if (s.currentPeriod == 0) {
-				skuTotal.compute(s.sku, (t, u) -> u == null ? 1 : u + 1);
+				skuTotal.compute(s.getSku(), (t, u) -> u == null ? 1 : u + 1);
 			}
 			if (s.currentPeriod == 0 && s.totalPeriods > 0) {
 				TIntArrayList retentionList = skuRetentions.get(s.getSku());
