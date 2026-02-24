@@ -1074,7 +1074,11 @@ public class AdminController {
 		Map<String, TIntArrayList> skuRetentions = new TreeMap<>();
 		Map<String, TDoubleArrayList> skuResult = new TreeMap<>();
 		Map<String, Subscription> skuExamples = new TreeMap<>();
+		Map<String, Integer> skuTotal = new TreeMap<>();
 		for (Subscription s : subs) {
+			if (s.currentPeriod == 0) {
+				skuTotal.compute(s.sku, (t, u) -> u == null ? 1 : u + 1);
+			}
 			if (s.currentPeriod == 0 && s.totalPeriods > 0) {
 				TIntArrayList retentionList = skuRetentions.get(s.getSku());
 				if (retentionList == null) {
@@ -1104,11 +1108,9 @@ public class AdminController {
 			TIntArrayList arrays = skuRetentions.get(sku);
 			Subscription sub = skuExamples.get(sku);
 			TDoubleArrayList actualRetention = new TDoubleArrayList();
-			int allTotal = 0;
 			for (int i = 0; i < arrays.size(); i += 2) {
 				int total = arrays.get(i);
 				int left = arrays.get(i + 1);
-				allTotal = Math.max(total, allTotal); 
 				if (total == 0 || left == 0) {
 					break;
 				}
@@ -1138,9 +1140,9 @@ public class AdminController {
 			
 			
 			double ltv = sub.defPriceEurMillis / 1000 * sum;
-			String msg = String.format("%d %.0f$ - %s = %.1f$ * %.2f [%d%%] : %s", allTotal, ltv, sku, sub.defPriceEurMillis / 1000.0, sum, 
+			String msg = String.format("%d %.0f$ - %s = %.1f$ * %.2f [%d%%] : %s", skuTotal.get(sku), ltv, sku, sub.defPriceEurMillis / 1000.0, sum, 
 					(int) (sub.retention * 100), bld.toString());
-			finalTable.put(msg, allTotal *ltv);
+			finalTable.put(msg, skuTotal.get(sku) * ltv);
 			actualRetention.insert(0, sum);
 			skuResult.put(sku, actualRetention);
 		}
