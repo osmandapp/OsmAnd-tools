@@ -1111,7 +1111,7 @@ public class AdminController {
 			for (int i = 0; i < arrays.size(); i += 2) {
 				int total = arrays.get(i);
 				int left = arrays.get(i + 1);
-				if (total == 0 || left == 0) {
+				if (total <= 5 || left <= 5) {
 					break;
 				}
 				actualRetention.add(((double) left) / total);
