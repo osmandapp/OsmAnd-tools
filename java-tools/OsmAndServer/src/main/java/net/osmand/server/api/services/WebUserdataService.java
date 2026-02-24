@@ -274,9 +274,9 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				file.details.add(tag, gsonWithNans.toJsonTree(res));
+			AnalysisDetails analysisDetails = getDetails(analysis);
+			if (analysisDetails != null) {
+				file.details.add(tag, gsonWithNans.toJsonTree(analysisDetails));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -327,9 +327,9 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+			AnalysisDetails analysisDetails = getDetails(analysis);
+			if (analysisDetails != null) {
+				details.add(ANALYSIS, gsonWithNans.toJsonTree(analysisDetails));
 			}
 		}
 	}
@@ -354,20 +354,12 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
+	private AnalysisDetails getDetails(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			Map<String, Object> res = new HashMap<>();
 			analysis.getPointAttributes().clear();
-			res.put(ANALYSIS_TOTAL_DISTANCE, analysis.getTotalDistance());
-			res.put(ANALYSIS_START_TIME, analysis.getStartTime());
-			res.put(ANALYSIS_END_TIME, analysis.getEndTime());
-			res.put(ANALYSIS_TIME_MOVING, analysis.getTimeMoving());
-			res.put(ANALYSIS_POINTS, analysis.getPoints());
-			res.put(ANALYSIS_WPT_POINTS, analysis.getWptPoints());
-
-			return res;
+			return new AnalysisDetails(analysis);
 		}
-		return Collections.emptyMap();
+		return null;
 	}
 
 	GpxTrackAnalysis getAnalysis(JsonObject details) {
@@ -375,30 +367,12 @@ public class WebUserdataService {
 		if (details == null || !analysisPresent(ANALYSIS, details)) {
 			return analysis;
 		}
-		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
-		JsonElement points = analysisJson.get(ANALYSIS_POINTS);
-		if (points != null) {
-			analysis.setPoints(points.getAsInt());
-		}
-		JsonElement endTime = analysisJson.get(ANALYSIS_END_TIME);
-		if (endTime != null) {
-			analysis.setEndTime(endTime.getAsLong());
-		}
-		JsonElement startTime = analysisJson.get(ANALYSIS_START_TIME);
-		if (startTime != null) {
-			analysis.setStartTime(startTime.getAsLong());
-		}
-		JsonElement wptPoints = analysisJson.get(ANALYSIS_WPT_POINTS);
-		if (wptPoints != null) {
-			analysis.setWptPoints(wptPoints.getAsInt());
-		}
-		JsonElement timeMoving = analysisJson.get(ANALYSIS_TIME_MOVING);
-		if (timeMoving != null) {
-			analysis.setTimeMoving(timeMoving.getAsLong());
-		}
-		JsonElement totalDistance = analysisJson.get(ANALYSIS_TOTAL_DISTANCE);
-		if (totalDistance != null) {
-			analysis.setTotalDistance(totalDistance.getAsLong());
+		JsonElement analysisElement = details.get(ANALYSIS);
+		if (analysisElement != null && !analysisElement.isJsonNull()) {
+			AnalysisDetails analysisDetails = gson.fromJson(analysisElement, AnalysisDetails.class);
+			if (analysisDetails != null) {
+				analysisDetails.applyToAnalysis(analysis);
+			}
 		}
 		return analysis;
 	}
@@ -566,5 +540,36 @@ public class WebUserdataService {
 			}
 		}
 		return false;
+	}
+
+	public static class AnalysisDetails {
+		private float totalDistance;
+		private long startTime;
+		private long endTime;
+		private long timeMoving;
+		private int points;
+		private int wptPoints;
+
+		public AnalysisDetails(GpxTrackAnalysis analysis) {
+			if (analysis != null) {
+				this.totalDistance = analysis.getTotalDistance();
+				this.startTime = analysis.getStartTime();
+				this.endTime = analysis.getEndTime();
+				this.timeMoving = analysis.getTimeMoving();
+				this.points = analysis.getPoints();
+				this.wptPoints = analysis.getWptPoints();
+			}
+		}
+
+		public void applyToAnalysis(GpxTrackAnalysis analysis) {
+			if (analysis != null) {
+				analysis.setTotalDistance(this.totalDistance);
+				analysis.setStartTime(this.startTime);
+				analysis.setEndTime(this.endTime);
+				analysis.setTimeMoving(this.timeMoving);
+				analysis.setPoints(this.points);
+				analysis.setWptPoints(this.wptPoints);
+			}
+		}
 	}
 }
