@@ -55,7 +55,7 @@ public class SmartFolderService {
 			if (!uf.name.endsWith(INFO_FILE_EXT)) {
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
 				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
-				dataItem.setAnalysis(getAnalysis(uf.details));
+				dataItem.setAnalysis(webUserdataService.getAnalysis(uf.details));
 				TrackItem trackItem = new TrackItem(gpxFile);
 				trackItem.setDataItem(dataItem);
 				trackItems.add(trackItem);
@@ -140,39 +140,6 @@ public class SmartFolderService {
 					file.name, file.id, file.userid, e.getMessage());
 			LOG.error(isError);
 		}
-	}
-
-	GpxTrackAnalysis getAnalysis(JsonObject details) {
-		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
-		if (details == null || !webUserdataService.analysisPresent(ANALYSIS, details)) {
-			return analysis;
-		}
-		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
-		JsonElement points = analysisJson.get("points");
-		if (points != null) {
-			analysis.setPoints(points.getAsInt());
-		}
-		JsonElement endTime = analysisJson.get("endTime");
-		if (endTime != null) {
-			analysis.setEndTime(endTime.getAsLong());
-		}
-		JsonElement startTime = analysisJson.get("startTime");
-		if (startTime != null) {
-			analysis.setStartTime(startTime.getAsLong());
-		}
-		JsonElement wptPoints = analysisJson.get("wptPoints");
-		if (wptPoints != null) {
-			analysis.setWptPoints(wptPoints.getAsInt());
-		}
-		JsonElement timeMoving = analysisJson.get("timeMoving");
-		if (timeMoving != null) {
-			analysis.setTimeMoving(timeMoving.getAsLong());
-		}
-		JsonElement totalDistance = analysisJson.get("totalDistance");
-		if (totalDistance != null) {
-			analysis.setTotalDistance(totalDistance.getAsLong());
-		}
-		return analysis;
 	}
 
 	private String getGeneralSettings(int userId) {

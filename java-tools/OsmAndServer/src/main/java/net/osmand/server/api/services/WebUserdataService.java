@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpSession;
 import jakarta.transaction.Transactional;
@@ -82,7 +83,12 @@ public class WebUserdataService {
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
 	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
-
+	public static final String ANALYSIS_END_TIME = "endTime";
+	public static final String ANALYSIS_START_TIME = "startTime";
+	public static final String ANALYSIS_WPT_POINTS = "wptPoints";
+	public static final String ANALYSIS_TIME_MOVING = "timeMoving";
+	public static final String ANALYSIS_TOTAL_DISTANCE = "totalDistance";
+	public static final String ANALYSIS_POINTS = "points";
 
 	Gson gson = new Gson();
 
@@ -352,16 +358,49 @@ public class WebUserdataService {
 		if (analysis != null) {
 			Map<String, Object> res = new HashMap<>();
 			analysis.getPointAttributes().clear();
-			res.put("totalDistance", analysis.getTotalDistance());
-			res.put("startTime", analysis.getStartTime());
-			res.put("endTime", analysis.getEndTime());
-			res.put("timeMoving", analysis.getTimeMoving());
-			res.put("points", analysis.getPoints());
-			res.put("wptPoints", analysis.getWptPoints());
+			res.put(ANALYSIS_TOTAL_DISTANCE, analysis.getTotalDistance());
+			res.put(ANALYSIS_START_TIME, analysis.getStartTime());
+			res.put(ANALYSIS_END_TIME, analysis.getEndTime());
+			res.put(ANALYSIS_TIME_MOVING, analysis.getTimeMoving());
+			res.put(ANALYSIS_POINTS, analysis.getPoints());
+			res.put(ANALYSIS_WPT_POINTS, analysis.getWptPoints());
 
 			return res;
 		}
 		return Collections.emptyMap();
+	}
+
+	GpxTrackAnalysis getAnalysis(JsonObject details) {
+		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
+		if (details == null || !analysisPresent(ANALYSIS, details)) {
+			return analysis;
+		}
+		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
+		JsonElement points = analysisJson.get(ANALYSIS_POINTS);
+		if (points != null) {
+			analysis.setPoints(points.getAsInt());
+		}
+		JsonElement endTime = analysisJson.get(ANALYSIS_END_TIME);
+		if (endTime != null) {
+			analysis.setEndTime(endTime.getAsLong());
+		}
+		JsonElement startTime = analysisJson.get(ANALYSIS_START_TIME);
+		if (startTime != null) {
+			analysis.setStartTime(startTime.getAsLong());
+		}
+		JsonElement wptPoints = analysisJson.get(ANALYSIS_WPT_POINTS);
+		if (wptPoints != null) {
+			analysis.setWptPoints(wptPoints.getAsInt());
+		}
+		JsonElement timeMoving = analysisJson.get(ANALYSIS_TIME_MOVING);
+		if (timeMoving != null) {
+			analysis.setTimeMoving(timeMoving.getAsLong());
+		}
+		JsonElement totalDistance = analysisJson.get(ANALYSIS_TOTAL_DISTANCE);
+		if (totalDistance != null) {
+			analysis.setTotalDistance(totalDistance.getAsLong());
+		}
+		return analysis;
 	}
 
 	@Transactional
