@@ -1138,7 +1138,7 @@ public class AdminController {
 			
 			
 			double ltv = sub.defPriceEurMillis / 1000 * sum;
-			String msg = String.format("%.0f$ - %s = %.1f$ * %.2f [%d%%] : %s", allTotal, ltv, sku, sub.defPriceEurMillis / 1000.0, sum, 
+			String msg = String.format("%d %.0f$ - %s = %.1f$ * %.2f [%d%%] : %s", allTotal, ltv, sku, sub.defPriceEurMillis / 1000.0, sum, 
 					(int) (sub.retention * 100), bld.toString());
 			finalTable.put(msg, allTotal *ltv);
 			actualRetention.insert(0, sum);
