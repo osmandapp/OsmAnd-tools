@@ -1053,6 +1053,7 @@ public class SearchService {
                 tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), category.getIconKeyName());
                 tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), category.getKeyName());
             }
+            tags.put(PoiTypeField.POI_ADD_CATEGORY_NAME.getFieldName(), type.getPoiAdditionalCategory());
         } else if (obj instanceof PoiFilter type) {
             tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
             PoiCategory category = type.getPoiCategory();
