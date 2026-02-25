@@ -5,13 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.osmand.obf.ToolsOsmAndContextImpl;
-import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
-import net.osmand.shared.util.PlatformUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -25,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
+import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GLOBAL;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.server.api.services.WebUserdataService.*;
@@ -50,22 +48,21 @@ public class SmartFolderService {
 		if (trackFiltersSettings == null) {
 			return Collections.emptyList();
 		}
-		OsmEmptyContext osmAndContext = new OsmEmptyContext();
-		PlatformUtil.INSTANCE.initialize(osmAndContext);
-		List<CloudUserFilesRepository.UserFileNoData> uniqueFiles = userDataService
+		List<UserFileNoData> uniqueFiles = userDataService
 				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
 		List<TrackItem> trackItems = new ArrayList<>(uniqueFiles.size());
-		for (CloudUserFilesRepository.UserFileNoData uf : uniqueFiles) {
+		for (UserFileNoData uf : uniqueFiles) {
 			if (!uf.name.endsWith(INFO_FILE_EXT)) {
+				GpxDataItem dataItem = new GpxDataItem(new KFile(""));
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
-				GpxDataItem dataItem = GpxDataItem.Companion.fromGpxFile(gpxFile, uf.name);
+				dataItem.readGpxParams(gpxFile);
 				dataItem.setAnalysis(webUserdataService.getAnalysisFromJson(uf.details));
 				TrackItem trackItem = new TrackItem(gpxFile);
 				trackItem.setDataItem(dataItem);
 				trackItems.add(trackItem);
 			}
 		}
-		SmartFolderHelper smartFolderHelper = osmAndContext.getSmartFolderHelper();
+		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
 		smartFolderHelper.readJson(trackFiltersSettings);
 		for (TrackItem trackItem : trackItems) {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
@@ -95,7 +92,7 @@ public class SmartFolderService {
 		return smartFolderList;
 	}
 
-	private GpxFile createGpxFileWithAppearance(int userId, CloudUserFilesRepository.UserFileNoData uf) {
+	private GpxFile createGpxFileWithAppearance(int userId, UserFileNoData uf) {
 		GpxFile gpxFile = new GpxFile(null);
 		gpxFile.setPath(uf.name);
 		gpxFile.setModifiedTime(uf.clienttime.getTime());
@@ -123,7 +120,7 @@ public class SmartFolderService {
 	}
 
 	void setAppearance(GpxFile gpxFile, String name, int userId) {
-		CloudUserFilesRepository.UserFile file = userDataService.getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
+		UserFile file = userDataService.getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
 		if (file == null || file.filesize == -1 || file.data == null) {
 			return;
 		}
@@ -148,7 +145,7 @@ public class SmartFolderService {
 
 	private String getGeneralSettings(int userId) {
 		String generalSettings = null;
-		CloudUserFilesRepository.UserFile userFile = userDataService.getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
+		UserFile userFile = userDataService.getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
 		if (userFile != null) {
 			try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
 				generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -160,19 +157,6 @@ public class SmartFolderService {
 	}
 
 	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths) {
-	}
-
-	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
-
-		@Override
-		public KFile getGpxDir() {
-			return new KFile("");
-		}
-
-		@Override
-		public SmartFolderHelper getSmartFolderHelper() {
-			return new SmartFolderHelper();
-		}
 	}
 
 }
