@@ -12,6 +12,8 @@ import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.util.PlatformUtil;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PRE
 
 @Service
 public class SmartFolderService {
+
+	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
 
@@ -63,9 +67,9 @@ public class SmartFolderService {
 		}
 		SmartFolderHelper smartFolderHelper = osmAndContext.getSmartFolderHelper();
 		smartFolderHelper.readJson(trackFiltersSettings);
-			for (TrackItem trackItem : trackItems) {
-				smartFolderHelper.addTrackItemToSmartFolder(trackItem);
-			}
+		for (TrackItem trackItem : trackItems) {
+			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
+		}
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
 	}
 
