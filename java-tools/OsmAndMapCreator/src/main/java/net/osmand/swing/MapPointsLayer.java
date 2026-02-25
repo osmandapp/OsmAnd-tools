@@ -313,7 +313,7 @@ public class MapPointsLayer implements MapPanelLayer {
 		} else {
 			palette = ColorPalette.Companion.getMIN_MAX_PALETTE();
 		}
-		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType, palette);
+		RouteColorize routeColorize = new RouteColorize(gpxFile, colorizationType, palette, false);
 		//double[][] palette = {{routeColorize.minValue, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		//double[][] palette = {{routeColorize.minValue,46,185,0,191}, {(routeColorize.maxValue + routeColorize.minValue) / 2, RouteColorize.YELLOW}, {routeColorize.maxValue, RouteColorize.RED}};
 		routeColorize.setPalette(palette);
