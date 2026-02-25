@@ -7,7 +7,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
-import net.osmand.shared.api.SettingsAPI;
 import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
@@ -47,7 +46,8 @@ public class SmartFolderService {
 		if (trackFiltersSettings == null) {
 			return Collections.emptyList();
 		}
-		PlatformUtil.INSTANCE.initialize(new OsmEmptyContext());
+		OsmEmptyContext osmAndContext = new OsmEmptyContext();
+		PlatformUtil.INSTANCE.initialize(osmAndContext);
 		List<CloudUserFilesRepository.UserFileNoData> uniqueFiles = userDataService
 				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
 		List<TrackItem> trackItems = new ArrayList<>(uniqueFiles.size());
@@ -61,14 +61,12 @@ public class SmartFolderService {
 				trackItems.add(trackItem);
 			}
 		}
-		synchronized (SmartFolderHelper.INSTANCE) {
-			SmartFolderHelper.INSTANCE.resetSmartFolders();
-			SmartFolderHelper.INSTANCE.readJson(trackFiltersSettings);
+		SmartFolderHelper smartFolderHelper = osmAndContext.getSmartFolderHelper();
+		smartFolderHelper.readJson(trackFiltersSettings);
 			for (TrackItem trackItem : trackItems) {
-				SmartFolderHelper.INSTANCE.addTrackItemToSmartFolder(trackItem);
+				smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 			}
-			return toSmartFolderWebList(SmartFolderHelper.INSTANCE.getSmartFolders());
-		}
+		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
 	}
 
 	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
@@ -161,14 +159,15 @@ public class SmartFolderService {
 	}
 
 	static class OsmEmptyContext extends ToolsOsmAndContextImpl {
-		@Override
-		public SettingsAPI getSettings() {
-			return null;
-		}
 
 		@Override
 		public KFile getGpxDir() {
 			return new KFile("");
+		}
+
+		@Override
+		public SmartFolderHelper getSmartFolderHelper() {
+			return new SmartFolderHelper();
 		}
 	}
 

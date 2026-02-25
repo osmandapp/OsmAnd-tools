@@ -6,6 +6,7 @@ import net.osmand.shared.api.SettingsAPI;
 import net.osmand.shared.data.KLatLon;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.SmartFolderHelper;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.settings.enums.AltitudeMetrics;
 import net.osmand.shared.settings.enums.MetricsConstants;
@@ -109,4 +110,9 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
 	public void searchNearestCityName(KLatLon arg0, Function1<? super String, Unit> arg1) {
 		throw new UnsupportedOperationException("Not yet implemented");
 	}
+
+    @Override
+    public SmartFolderHelper getSmartFolderHelper() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
 }
