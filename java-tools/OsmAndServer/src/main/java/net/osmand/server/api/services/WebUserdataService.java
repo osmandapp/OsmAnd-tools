@@ -544,6 +544,8 @@ public class WebUserdataService {
 		private int points;
 		private int wptPoints;
 
+		public AnalysisDetails() {}
+
 		public AnalysisDetails(GpxTrackAnalysis analysis) {
 			if (analysis != null) {
 				this.totalDistance = analysis.getTotalDistance();
