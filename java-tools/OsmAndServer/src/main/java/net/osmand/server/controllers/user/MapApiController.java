@@ -94,6 +94,9 @@ public class MapApiController {
 	private UserSubscriptionService userSubService;
 
 	@Autowired
+	private SmartFolderService smartFolderService;
+
+	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
@@ -366,6 +369,16 @@ public class MapApiController {
 				webUserdataService.addDeviceInformation(nd, devices);
 			}
 		}
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	@GetMapping(value = "/create-smart-folders", produces = "application/json")
+	public ResponseEntity<String> createSmartFolders() {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
