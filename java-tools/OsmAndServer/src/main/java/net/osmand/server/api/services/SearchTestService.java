@@ -3,10 +3,7 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.LatLon;
-import net.osmand.server.api.searchtest.DataService;
-import net.osmand.server.api.searchtest.MapDataObjectFinder;
-import net.osmand.server.api.searchtest.PolyglotEngine;
-import net.osmand.server.api.searchtest.ReportService;
+import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
@@ -30,8 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -39,52 +40,23 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService {
-	/**
-	 * Lightweight DTO for listing test-cases with parent dataset name.
-	 */
-	public static class TestCaseItem {
-		public TestCaseItem() {
-		}
-		public TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-		                    Long lastRunId, String status, LocalDateTime updated, String error,
-		                    long total, long failed, long duration) {
-			this.id = id;
-			this.name = name;
-			this.labels = labels;
-			this.datasetId = datasetId;
-			this.datasetName = datasetName;
-			this.lastRunId = lastRunId;
-			this.status = status;
-			this.updated = updated;
-			this.error = error;
-			this.total = total;
-			this.failed = failed;
-			this.duration = duration;
-		}
-		public Long id;
-		public String name;
-		public String labels;
-		public Long datasetId;
-		public String datasetName;
-		public Long lastRunId;
-		public String status;
-		public LocalDateTime updated;
-		public String error;
-		public long total;
-		public long failed;
-		public long duration;
-	}
+public class SearchTestService implements ReportService, DataService, OBFService {
+    /**
+     * Lightweight DTO for listing test-cases with parent dataset name.
+     */
+    public record TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
+                                Long lastRunId, String status, LocalDateTime updated, String error,
+                                long total, long failed, long duration) {}
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-	private static volatile ExecutorService EXECUTOR;
-	private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
+    private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+    private static volatile ExecutorService EXECUTOR;
+    private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
 
-	// Batch insert support for run_result
-	private static final int RUN_RESULT_BATCH_SIZE = 10;
+    // Batch insert support for run_result
+    private static final int RUN_RESULT_BATCH_SIZE = 10;
 
-	private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
-	private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -142,7 +114,7 @@ public class SearchTestService implements ReportService, DataService {
 
 	private ExecutorService createExecutor() {
 		int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
-				Math.max(1, Runtime.getRuntime().availableProcessors()));;
+				Math.max(1, Runtime.getRuntime().availableProcessors()));
 		ThreadFactory tf = r -> {
 			Thread t = new Thread(r);
 			t.setName("search-test-exec-" + t.getId());
@@ -286,6 +258,7 @@ public class SearchTestService implements ReportService, DataService {
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
+		run.start = LocalDateTime.now();
 		run = runRepo.save(run);
 
 		test.locale = run.locale;
@@ -321,8 +294,6 @@ public class SearchTestService implements ReportService, DataService {
 		});
 
 		try {
-			run.start = LocalDateTime.now();
-			run.finish = LocalDateTime.now();
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
@@ -635,5 +606,77 @@ public class SearchTestService implements ReportService, DataService {
 		double roundedLon = BigDecimal.valueOf(sumLon /
 				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
 		return new LatLon(roundedLat, roundedLon);
+	}
+
+	public static void main(String[] args) {
+		String mapDir = System.getenv("MAP_DIR");
+		if (mapDir == null || mapDir.trim().isEmpty()) {
+			System.err.println("MAP_DIR env is required");
+			return;
+		}
+		String fieldPathEnv = System.getenv("FIELD_PATH");
+		String fieldName = System.getenv("FIELD_NAME");
+		String filter = System.getenv("MAP_FILTER");
+		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
+		String jsonFieldPath;
+		if (fieldPath == null || fieldPath.isEmpty()) {
+			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
+		} else if (fieldName == null || fieldName.trim().isEmpty()) {
+			jsonFieldPath = fieldPath;
+		} else {
+			jsonFieldPath = fieldPath + "." + fieldName.trim();
+		}
+
+		OBFService svc = new SearchTestService(null);
+
+		Path root = Path.of(mapDir);
+		if (!Files.exists(root)) {
+			System.err.println("MAP_DIR doesn't exist: " + root);
+			return;
+		}
+
+		List<Path> obfFiles = new ArrayList<>();
+		try {
+			try (java.util.stream.Stream<Path> s = Files.walk(root)) {
+				s.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".obf"))
+						.forEach(obfFiles::add);
+			}
+		} catch (IOException e) {
+			System.err.println("Failed to list OBF files in MAP_DIR: " + e.getMessage());
+			return;
+		}
+
+		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
+		System.out.println("MAP_DIR=" + root.toAbsolutePath());
+		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
+		System.out.println("FIELD_PATH=" + (fieldPath == null ? "" : fieldPath + "." + fieldName));
+
+		long totalSize = 0;
+		for (Path p : obfFiles) {
+			String obfName = p.getFileName().toString();
+			if (filter != null && !obfName.startsWith(filter))
+				continue;
+
+			try {
+				String obf = p.toAbsolutePath().toString();
+				Map<String, long[]> m = svc.getSectionSizes(obf, fieldPath);
+				long[] s = m.get(fieldName);
+				long sum = s == null ? 0 : s[0];
+				totalSize += sum;
+				System.out.println(obf + ", " + sum);
+
+				String json = svc.getSectionJson(obf, jsonFieldPath);
+				String obfBaseName = obfName.toLowerCase(Locale.ROOT).endsWith(".obf")
+						? obfName.substring(0, obfName.length() - 4)
+						: obfName;
+
+				Path jsonOutPath = root.resolve(obfBaseName + ".json");
+				Files.writeString(jsonOutPath, json, StandardCharsets.UTF_8);
+				System.out.println("JSON file: " + jsonOutPath);
+			} catch (Exception e) {
+				System.err.println(obfName + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
+			}
+		}
+		System.out.println("TOTAL: " + totalSize);
 	}
 }
