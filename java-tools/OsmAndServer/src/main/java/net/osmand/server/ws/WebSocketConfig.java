@@ -15,7 +15,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-	private static final long HEARBIT_TIMEOUT = 10000;
+	private static final long HEARTBEAT_TIMEOUT = 10000;
 	
 	@Autowired
 	private SubscriptionInterceptor subscriptionInterceptor;
@@ -29,7 +29,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	@Override
 	public void configureMessageBroker(MessageBrokerRegistry config) {
 		config.enableSimpleBroker("/topic", "/queue").setTaskScheduler(heartbeatScheduler())
-				.setHeartbeatValue(new long[] { HEARBIT_TIMEOUT, HEARBIT_TIMEOUT });
+				.setHeartbeatValue(new long[] { HEARTBEAT_TIMEOUT, HEARTBEAT_TIMEOUT });
 		config.setApplicationDestinationPrefixes("/app");
 		config.setUserDestinationPrefix("/user");
 	}

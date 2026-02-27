@@ -35,6 +35,7 @@ public class UserTranslationPlainObject {
 			if (deque != null) {
 				sh.lastLocation = deque.getLast();
 			}
+			sh.allLocations = new ArrayList<>(deque);
 			this.shareLocations.add(sh);
 		}
 	}
@@ -44,6 +45,7 @@ public class UserTranslationPlainObject {
 		public long expireTime;
 		public long startTime;
 		public WptPt lastLocation;
+		public List<WptPt> allLocations;
 	}
 	
 }
