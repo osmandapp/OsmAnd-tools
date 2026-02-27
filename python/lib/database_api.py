@@ -24,6 +24,7 @@ VALID_EXTENSIONS_LOWERCASE = set(ext.lower() for ext in os.getenv('VALID_EXTENSI
 QUAD_ALPHABET = os.getenv('QUAD_ALPHABET', "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~")
 MAX_EXECUTION_TIME = int(os.getenv('DB_TIMEOUT', '900'))
 POI_SUBTYPE = ",".join([f"'{w.strip()}'" if w else '' for w in os.getenv('POI_SUBTYPE', '').split(",")])
+PHOTOS_PER_PLACE = int(os.getenv('PHOTOS_PER_PLACE', '40'))
 
 if not all([CLICKHOUSE_HOST, CLICKHOUSE_PWD]):
     raise ValueError("Missing required environment variables (CLICKHOUSE_HOST, CLICKHOUSE_PWD)")
