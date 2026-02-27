@@ -22,8 +22,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
@@ -40,7 +38,10 @@ import javax.xml.stream.XMLStreamException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Source;
 import okio.Buffer;
@@ -77,7 +78,6 @@ import net.osmand.util.Algorithms;
 import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
-import rtree.RTree;
 
 public class DownloadOsmGPX {
 
@@ -117,18 +117,18 @@ public class DownloadOsmGPX {
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 
 	private static final String GPX_FILE_PREIX = "OG";
+	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 
-	static SimpleDateFormat FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-	static SimpleDateFormat FORMAT2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-	static {
-		FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-		FORMAT2.setTimeZone(TimeZone.getTimeZone("UTC"));
+	private static float round2(float value) {
+		return Math.round(value * 100) / 100.0f;
 	}
+
 	private boolean sslInit;
 	private Connection dbConn;
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
 	
 	public DownloadOsmGPX() throws SQLException {
+		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 		initDBConnection();
 	}
 	
@@ -225,6 +225,8 @@ public class DownloadOsmGPX {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
 			utility.addActivityColumnAndPopulate(args[1]);
+		} else if ("update_activity".equals(main)) {
+			utility.updateActivity(args[1]);
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
 			for (int i = 0; i < args.length; i++) {
@@ -248,37 +250,62 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
-		LOG.info("Starting the process to add activity column and indexes...");
+	private void ensureActivitySchema() throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
-			// add activity column if not exists
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
-			// add index for activity column
+
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
+
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points)");
+
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
-			// add indexes for coordinates
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
+
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
 			statement.executeUpdate(
 					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
 							"ON " + GPX_METADATA_TABLE_NAME +
 							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
 			);
-			// add indexes for date
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
 		}
-		LOG.info("All indexes created successfully.");
-		LOG.info("Creating activities map...");
+		LOG.info("Activity schema (columns and indexes) ensured.");
+	}
+
+	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
+		LOG.info("Starting add_activity (column/indexes + populate only activity IS NULL)...");
+		ensureActivitySchema();
 		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
 		} else {
-			fillActivityColumn(activitiesMap);
+			fillActivityColumn(activitiesMap, false);
 		}
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap) throws SQLException {
-		LOG.info("Starting to populate the 'activity' column...");
+	protected void updateActivity(String rootPath) throws SQLException {
+		LOG.info("Starting update_activity (all records)...");
+		ensureActivitySchema();
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping.");
+			return;
+		}
+		fillActivityColumn(activitiesMap, true);
+		LOG.info("Update activity finished.");
+	}
+
+	private void fillActivityColumn(Map<String, List<String>> activitiesMap, boolean update) throws SQLException {
+		LOG.info("Starting to populate the 'activity' column" + (update ? " (all records)" : " (only activity IS NULL)") + "...");
 		dbConn.setAutoCommit(false);
-		PreparedStatement updateStmt = dbConn.prepareStatement(
+		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ? WHERE id = ?"
+		);
+		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
 		);
 
@@ -286,15 +313,17 @@ public class DownloadOsmGPX {
 		final int BATCH_LIMIT = 1000;
 		int processedCount = 0;
 		int identifiedActivityCount = 0;
+		long lastUpdatedId = -1; // so id=0 is included when present
 		boolean hasMoreRecords = true;
 		try {
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
+				String selectSql = update
+						? "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > " + lastUpdatedId + " ORDER BY id LIMIT " + BATCH_LIMIT
+						: "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE activity IS NULL LIMIT " + BATCH_LIMIT;
 				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery(
-						     "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME +
-								     " WHERE activity IS NULL LIMIT " + BATCH_LIMIT)) {
+				     ResultSet rs = selectStmt.executeQuery(selectSql)) {
 					if (!rs.isBeforeFirst()) {
 						break; // no more records to process
 					}
@@ -304,6 +333,9 @@ public class DownloadOsmGPX {
 						long id = rs.getLong("id");
 						GpxFile gpxFile = null;
 						GpxTrackAnalysis analysis = null;
+						int pointsCount = 0;
+						float distanceMeters = 0f;
+						float avgSpeedKmh = 0f;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
@@ -325,10 +357,30 @@ public class DownloadOsmGPX {
 							if (gpxFile != null && gpxFile.getError() == null) {
 								analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 								List<WptPt> points = gpxFile.getAllSegmentsPoints();
-								if (points.isEmpty() || points.size() < MIN_POINTS_SIZE
-										|| analysis.getTotalDistance() < MIN_DISTANCE
+								int pointsSize = points.size();
+								float totalDistance = analysis.getTotalDistance();
+								if (pointsSize < MIN_POINTS_SIZE
+										|| totalDistance < MIN_DISTANCE
 										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
 									activity = GARBAGE_ACTIVITY_TYPE;
+								} else {
+									// only for non-garbage & non-error tracks
+									pointsCount = pointsSize;
+									distanceMeters = totalDistance;
+									double avgSpeedMs = analysis.getAvgSpeed();
+									if (avgSpeedMs > 0) {
+										avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
+									} else if (distanceMeters > 0) {
+										// Fallback: calculate speed manually when not available in track
+										double timeMs = analysis.getTimeMoving();
+										if (timeMs <= 0) {
+											timeMs = analysis.getTimeSpan();
+										}
+										if (timeMs > 0) {
+											double speedMs = distanceMeters / (timeMs / 1000d);
+											avgSpeedKmh = (float) (speedMs * 3.6d);
+										}
+									}
 								}
 							} else {
 								activity = ERROR_ACTIVITY_TYPE;
@@ -336,9 +388,11 @@ public class DownloadOsmGPX {
 						}
 
 						if (activity == null) {
+							activity = getActivityByRouteActivity(gpxFile, activitiesMap);
+						}
+						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
-
 						if (activity == null) {
 							activity = analyzeActivityFromGpx(analysis);
 						}
@@ -351,15 +405,29 @@ public class DownloadOsmGPX {
 							identifiedActivityCount++;
 						}
 
-						updateStmt.setString(1, activity);
-						updateStmt.setLong(2, id);
-						updateStmt.addBatch();
+						boolean fillMetrics = !GARBAGE_ACTIVITY_TYPE.equals(activity) && !ERROR_ACTIVITY_TYPE.equals(activity);
+						if (fillMetrics) {
+							updateStmtMetrics.setString(1, activity);
+							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
+							updateStmtMetrics.setFloat(3, round2(distanceMeters));
+							updateStmtMetrics.setInt(4, pointsCount);
+							updateStmtMetrics.setLong(5, id);
+							updateStmtMetrics.addBatch();
+						} else {
+							updateStmtActivityOnly.setString(1, activity);
+							updateStmtActivityOnly.setLong(2, id);
+							updateStmtActivityOnly.addBatch();
+						}
 
 						batchSize++;
 						processedCount++;
+						if (update) {
+							lastUpdatedId = id;
+						}
 
 						if (batchSize >= BATCH_LIMIT) {
-							updateStmt.executeBatch();
+							updateStmtMetrics.executeBatch();
+							updateStmtActivityOnly.executeBatch();
 							dbConn.commit();
 							batchSize = 0;
 							LOG.info("Processed " + processedCount + " records so far. Identified " + identifiedActivityCount + " activities.");
@@ -369,7 +437,8 @@ public class DownloadOsmGPX {
 			}
 
 			if (batchSize > 0) {
-				updateStmt.executeBatch();
+				updateStmtMetrics.executeBatch();
+				updateStmtActivityOnly.executeBatch();
 				dbConn.commit();
 			}
 		} catch (SQLException e) {
@@ -377,9 +446,28 @@ public class DownloadOsmGPX {
 			throw e;
 		} finally {
 			dbConn.setAutoCommit(true);
-			updateStmt.close();
+			updateStmtMetrics.close();
+			updateStmtActivityOnly.close();
 		}
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
+	}
+
+	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
+		if (gpxFile == null || activitiesMap.isEmpty()) {
+			return null;
+		}
+		RouteActivity routeActivity = gpxFile.getMetadata()
+				.getRouteActivity(routeActivityHelper.getActivities());
+		if (routeActivity == null) {
+			return null;
+		}
+
+		String activityId = routeActivity.getId();
+		if (activitiesMap.containsKey(activityId)) {
+			return activityId;
+		}
+
+		return null;
 	}
 
 	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
@@ -402,8 +490,16 @@ public class DownloadOsmGPX {
 			}
 		}
 
-		Map<String, String> tagMap = new LinkedHashMap<>();
+		// check tags first
+		for (String tag : tags) {
+			RouteActivity activity = routeActivityHelper.findActivityByTag(tag);
+			if (activity != null && activitiesMap.containsKey(activity.getId())) {
+				return activity.getId();
+			}
+		}
 
+		// check name/desc
+		Map<String, String> tagMap = new LinkedHashMap<>();
 		activitiesMap.forEach((activityId, tagList) ->
 				tagList.stream()
 						.sorted((tag1, tag2) -> Integer.compare(tag2.length(), tag1.length()))
@@ -413,9 +509,6 @@ public class DownloadOsmGPX {
 		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
-			if (tags.contains(tag)) {
-				return activityId;
-			}
 			if (name != null && name.toLowerCase().contains(tag)) {
 				return activityId;
 			}
@@ -1003,7 +1096,7 @@ public class DownloadOsmGPX {
 	}
 
 	private static OsmGpxFile parseGPXFiles(StringReader inputReader, List<OsmGpxFile> gpxFiles)
-			throws XmlPullParserException, IOException, ParseException {
+			throws XmlPullParserException, IOException {
 		XmlPullParser parser = PlatformUtil.newXMLPullParser();
 		parser.setInput(inputReader);
 		int tok;
@@ -1019,7 +1112,8 @@ public class DownloadOsmGPX {
 					p.visibility = parser.getAttributeValue("", "visibility");
 					p.pending = "true".equals(parser.getAttributeValue("", "visibility"));
 					p.id = Long.parseLong(parser.getAttributeValue("", "id"));
-					p.timestamp = FORMAT.parse(parser.getAttributeValue("", "timestamp"));
+					String tsStr = parser.getAttributeValue("", "timestamp");
+					p.timestamp = tsStr != null ? new Date(GpxUtilities.INSTANCE.parseTime(tsStr)) : new Date(0);
 					p.lat = Double.parseDouble(getAttributeDoubleValue(parser, "lat"));
 					p.lon = Double.parseDouble(getAttributeDoubleValue(parser, "lon"));
 				} else if(parser.getName().equals("description") && p != null) {
@@ -1078,10 +1172,11 @@ public class DownloadOsmGPX {
 	
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {
 		String vl = parser.getAttributeValue("", key);
-		if(isEmpty(vl)) {
+		if (isEmpty(vl)) {
 			return "0";
 		}
-		return vl;
+		// Normalize decimal separator: API/XML may use comma (e.g. "0,000000")
+		return vl.replace(',', '.');
 	}
 
 	private static boolean isEmpty(String vl) {

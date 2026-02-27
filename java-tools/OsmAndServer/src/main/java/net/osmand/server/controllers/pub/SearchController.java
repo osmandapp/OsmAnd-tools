@@ -13,6 +13,7 @@ import net.osmand.shared.wiki.WikiMetadata;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,6 @@ import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
-import org.xmlpull.v1.XmlPullParserException;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
@@ -63,12 +63,15 @@ public class SearchController {
                                          @RequestParam String locale,
                                          @RequestParam (required = false) String northWest,
                                          @RequestParam (required = false) String southEast,
-                                         @RequestParam(required = false) Boolean baseSearch) throws IOException {
+                                         @RequestParam(required = false) Boolean baseSearch,
+                                         @RequestParam(defaultValue = "0") long clientTime,
+                                         @RequestParam(required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
         List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-		        baseSearch != null && baseSearch, null, northWest, southEast));
+                baseSearch != null && baseSearch, null, northWest, southEast), clientTimeC);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
@@ -78,9 +81,22 @@ public class SearchController {
                                             @RequestParam String locale,
                                             @RequestParam double lat,
                                             @RequestParam double lon,
-                                            @RequestParam(required = false) Boolean baseSearch) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch);
+                                            @RequestParam(required = false) Boolean baseSearch,
+                                            @RequestParam(defaultValue = "0") long clientTime,
+                                            @RequestParam(required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, clientTimeC);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
+    }
+
+    @Nullable
+    private static Calendar getClientTime(long clientTime, String timeZone) {
+        Calendar calendar = null;
+        if (clientTime > 0 && !Algorithms.isBlank(timeZone)) {
+            calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
+            calendar.setTimeInMillis(clientTime);
+        }
+        return calendar;
     }
 
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
@@ -89,7 +105,9 @@ public class SearchController {
                                          @RequestParam String pin,
                                          @RequestParam (required = false) String name,
                                          @RequestParam (required = false) Long osmId,
-                                         @RequestParam (required = false) Long wikidataId) throws IOException {
+                                         @RequestParam (required = false) Long wikidataId,
+                                         @RequestParam(defaultValue = "0") long clientTime,
+                                         @RequestParam(required = false) String timeZone) throws IOException {
         Feature poiSearchResult;
 
         if (pin == null || pin.isEmpty()) {
@@ -108,7 +126,10 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
         }
 
-        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId);
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+
+        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId,
+                clientTimeC);
 
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
@@ -260,10 +281,13 @@ public class SearchController {
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
-                                                 @RequestParam double lon,
-                                                 @RequestParam long osmid,
-                                                @RequestParam String type) throws IOException {
-        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
+                                                @RequestParam double lon,
+                                                @RequestParam long osmid,
+                                                @RequestParam String type,
+                                                @RequestParam(defaultValue = "0") long clientTime,
+                                                @RequestParam(required = false) String timeZone) throws IOException {
+        Calendar clientTimeC = getClientTime(clientTime, timeZone);
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, clientTimeC);
         return ResponseEntity.ok(gson.toJson(poi));
     }
 
@@ -366,8 +390,17 @@ public class SearchController {
 
     @GetMapping(path = {"/parse-location"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> parseLocation(@RequestParam String location) {
-        LatLon coordinates = searchService.parseLocation(location);
+    public ResponseEntity<String> parseLocation(@RequestParam String location,
+                                                @RequestParam(required = false) String lat,
+                                                @RequestParam(required = false) String lon) throws IOException {
+        if (Algorithms.isBlank(location)) {
+            return ResponseEntity.badRequest().body("Location parameter is required!");
+        }
+        LatLon bboxCentre = null;
+        if (!Algorithms.isBlank(lat) && !Algorithms.isBlank(lon)) {
+            bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
+        }
+        LatLon coordinates = searchService.parseLocation(location, bboxCentre);
         if (coordinates == null) {
             return ResponseEntity.ok(gson.toJson(null));
         }

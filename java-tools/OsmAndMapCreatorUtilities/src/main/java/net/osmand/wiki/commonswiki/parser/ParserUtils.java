@@ -16,6 +16,8 @@ public final class ParserUtils {
 	public static final String FIELD_DATE = "date";
 	public static final String FIELD_DESCRIPTION = "description";
 	public static final String FIELD_LICENSE = "license";
+	public static final String FIELD_SOURCE = "source";
+	public static final String FILE_PREFIX = "File:";
 
 	private ParserUtils() {
 		// Utility class - no instantiation
@@ -100,9 +102,33 @@ public final class ParserUtils {
 		if (text == null) {
 			return null;
 		}
-		String withoutLinks = removeWikiLinkBrackets(text);
+		String withoutLinks = removeWikiLinks(text);
+		withoutLinks = removeWikiLinkBrackets(withoutLinks);
 		// removeWikiLinkBrackets returns null only if input is null, which we already checked
 		return removeTemplateBrackets(withoutLinks);
+	}
+
+	/**
+	 * Removes wiki links from a string.
+	 * Eleanor Stackhouse Atkinson (:wikisource:Author:Eleanor Stackhouse Atkinson|Wikisource, :en:Eleanor Stackhouse Atkinson|Wikipedia)
+	 * -> Eleanor Stackhouse Atkinson (Wikisource, Wikipedia)
+	 *
+	 * @param text The text to clean
+	 * @return Cleaned text
+	 */
+
+	private static String removeWikiLinks(String text) {
+		StringBuilder sb = new StringBuilder(text);
+		int startIdx;
+		while ((startIdx = sb.indexOf(":")) != -1) {
+			int secondIdx = sb.indexOf(":", startIdx + 1);
+			int endIdx = sb.indexOf("|", secondIdx + 1);
+			if (secondIdx == -1 || endIdx == -1) {
+				break;
+			}
+			sb.delete(startIdx, endIdx + 1);
+		}
+		return sb.toString();
 	}
 
 	/**
@@ -205,6 +231,34 @@ public final class ParserUtils {
 		return patternAuthor.matcher(vallc).find() || patternPhotographer.matcher(vallc).find() || 
 			   patternDate.matcher(vallc).find() || patternDescription.matcher(vallc).find() ||
 			   patternLicense.matcher(vallc).find() || patternPermission.matcher(vallc).find();
+	}
+
+	/**
+	 * Extract the image file name from the source string. The file name starts with the "File:" prefix.
+	 * {{own}} (Reference: [[:File:Bahla.jpg]])
+	 * {{Extracted from|File:Dr. Goodluck Ebele Jonathan GCFR.jpg}}
+	 * Wikimedia [[File:Digitized Sky Survey Image of the Eagle Nebula.jpg]]
+	 *
+	 * @param sourceFile - source string
+	 * @return extracted file name
+	 */
+	public static String extractImageName(String sourceFile) {
+
+		int idx;
+		if (sourceFile == null || (idx = sourceFile.indexOf(FILE_PREFIX)) < 0) {
+			return null;
+		}
+		sourceFile = sourceFile.substring(idx + FILE_PREFIX.length());
+		if (sourceFile.contains("]")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf(']'));
+		}
+		if (sourceFile.contains("}")) {
+			sourceFile = sourceFile.substring(0, sourceFile.indexOf('}'));
+		}
+		if (sourceFile.contains("[[") || sourceFile.contains("|")) {
+			return null;
+		}
+		return sourceFile;
 	}
 }
 

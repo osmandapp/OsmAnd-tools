@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
 public class GpxService {
@@ -299,7 +300,7 @@ public class GpxService {
     }
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
-        File tmpFile = File.createTempFile("gpx_" + httpSessionId, GPX_FILE_EXT);
+        File tmpFile = File.createTempFile(GPX_FILE_PREFIX + httpSessionId, GPX_FILE_EXT);
         InputStream is = file.getInputStream();
         FileOutputStream fous = new FileOutputStream(tmpFile);
         Algorithms.streamCopy(is, fous);
@@ -310,7 +311,7 @@ public class GpxService {
     
     public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
         String sanitizedPrefix = fileName.replace("/../", "/");
-        File tmpGpx = File.createTempFile(sanitizedPrefix, GPX_FILE_EXT);
+        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + sanitizedPrefix, GPX_FILE_EXT);
         Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);

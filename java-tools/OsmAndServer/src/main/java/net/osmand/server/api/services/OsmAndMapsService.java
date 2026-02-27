@@ -357,8 +357,17 @@ public class OsmAndMapsService {
 	}
 
 	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag) {
+		return getReaders(refs, incompleteFlag, false);
+	}
+
+	public List<BinaryMapIndexReader> getReaders(List<BinaryMapIndexReaderReference> refs, boolean[] incompleteFlag, boolean useGeocoding) {
 		List<BinaryMapIndexReader> res = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : refs) {
+			if (useGeocoding && ref.file.getName().startsWith("World_")) {
+				// World_basemap does not contain address or routing data
+				// World_seamarks contains routing data only
+				continue;
+			}
 			BinaryMapIndexReader reader = null;
 			try {
 				reader = ref.getReader(cacheFiles, 1000);
@@ -366,7 +375,9 @@ public class OsmAndMapsService {
 				LOGGER.error(e.getMessage(), e);
 			}
 			if (reader != null) {
-				res.add(reader);
+				if (!useGeocoding || (reader.containsAddressData() && reader.containsRouteData())) {
+					res.add(reader);
+				}
 			} else if (incompleteFlag != null) {
 				incompleteFlag[0] = true;
 			}
@@ -414,7 +425,8 @@ public class OsmAndMapsService {
 				}
 			}
 			System.gc();
-			long brpReservedBytes = routingCaches.size() == 0 ? 0 : routingCaches.size() * routingCaches.get(0).rCtx.config.memoryLimitation;
+			long brpReservedBytes = routingCaches.isEmpty() || routingCaches.get(0).rCtx == null ? 0
+					: routingCaches.size() * routingCaches.get(0).rCtx.config.memoryLimitation;
 			long futureFreeMemory = rt.maxMemory() - rt.totalMemory() + rt.freeMemory();
 			boolean criticalMemory = futureFreeMemory < brpReservedBytes;
 			if (criticalMemory) {
@@ -645,7 +657,7 @@ public class OsmAndMapsService {
 		try {
 			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
 			boolean[] incomplete = new boolean[1];
-			usedMapList = getReaders(list, incomplete);
+			usedMapList = getReaders(list, incomplete, true);
 			if (incomplete[0]) {
 				return Collections.emptyList();
 			}

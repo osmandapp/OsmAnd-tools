@@ -19,6 +19,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
 
+import net.osmand.util.TextDirectionUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -37,15 +38,22 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
+import static net.osmand.data.Amenity.OPENING_HOURS;
 import static net.osmand.data.MapObject.unzipContent;
+import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.*;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+import static net.osmand.util.LocationParser.parseOpenLocationCode;
+import static net.osmand.util.OpeningHoursParser.*;
+import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
 @Service
 public class SearchService {
-    
+
 	private static final Log LOGGER = LogFactory.getLog(SearchService.class);
+    public static final String IS_OPENED_PREFIX = "open:";
+	public static final String OPENING_HOURS_INFO_SUFFIX = "_info";
 
     @Autowired
     OsmAndMapsService osmAndMapsService;
@@ -194,37 +202,43 @@ public class SearchService {
         return bbox;
     }
 
-	public List<Feature> search(SearchContext ctx) throws IOException {
+    public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
+                                Double radiusToLoadMaps, String northWest, String southEast) {
+        public double getRadius() {
+            return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
+        }
+    }
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
+    public record SearchResults(List<SearchResult> results,
+                                SearchSettings settings,
+                                String unitTestJson) {
+        public SearchResults(List<SearchResult> results) {
+            this(results, null, null);
+        }
+    }
+
+	public List<Feature> search(SearchContext ctx, Calendar clientTime) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResultWrapper searchResults = searchResults(ctx, new SearchOption(false, null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
+            BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
 			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
-					(System.currentTimeMillis() - tm) / 1000.0, searchResults.stat));
+					(System.currentTimeMillis() - tm) / 1000.0, stat));
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
-			saveSearchResult(res, features);
+			saveSearchResult(res, features, clientTime);
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-	public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
-	                            Double radiusToLoadMaps, String northWest, String southEast) {
-		public double getRadius() {
-			return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
-		}
-	}
-	public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
-	public record SearchResultWrapper(List<SearchResult> results, BinaryMapIndexReaderStats.SearchStat stat,
-	                                  SearchSettings settings, String unitTestJson) {}
-
-    public SearchResultWrapper searchResults(SearchContext ctx, SearchOption option,
-                                             Consumer<List<SearchResult>> consumerInContext) throws IOException {
+    public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+                                                   Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
-            return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+            return new SearchResults(Collections.emptyList());
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(ctx.locale), ctx.locale, false);
         if (!option.unlimited) {
@@ -239,15 +253,14 @@ public class SearchService {
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
             if (list.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             usedMapList = osmAndMapsService.getReaders(list,null);
             if (usedMapList.isEmpty()) {
-                return new SearchResultWrapper(Collections.emptyList(), null, null, null);
+                return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
-	        settings.setStat(stat);
+	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
@@ -273,13 +286,13 @@ public class SearchService {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
 				unitTestJson = json == null ? null : json.toString();
 			}
-			return new SearchResultWrapper(res, stat, settings, unitTestJson);
+			return new SearchResults(res, settings, unitTestJson);
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
     }
 
-    public Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
+    public Feature getPoi(String type, String name, LatLon loc, Long osmId, Calendar clientTime) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
@@ -309,9 +322,9 @@ public class SearchService {
             }
 
             if (name != null) {
-                feature = getPoiFeatureByName(rc, name);
+                feature = getPoiFeatureByName(rc, name, clientTime);
             } else if (osmId != null) {
-                feature = getPoiFeatureByOsmId(rc, osmId);
+                feature = getPoiFeatureByOsmId(rc, osmId, clientTime);
             }
 
         } finally {
@@ -320,13 +333,13 @@ public class SearchService {
         return feature;
     }
 
-    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name) {
+    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name, Calendar clientTime) {
         for (SearchResult r : rc.getCurrentSearchResults()) {
             if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
                 continue;
             }
             if (matchesName(a, name)) {
-                Feature f = getPoiFeature(r);
+                Feature f = getPoiFeature(r, clientTime);
                 if (f != null) {
                     return f;
                 }
@@ -335,13 +348,13 @@ public class SearchService {
         return null;
     }
 
-    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId) {
+    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId, Calendar clientTime) {
         for (SearchResult r : rc.getCurrentSearchResults()) {
             if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
                 continue;
             }
             if (ObfConstants.getOsmObjectId(a) == osmId) {
-                Feature f = getPoiFeature(r);
+                Feature f = getPoiFeature(r, clientTime);
                 if (f != null) {
                     return f;
                 }
@@ -350,8 +363,8 @@ public class SearchService {
         return null;
     }
 
-    public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId) throws IOException {
-        Feature poiFeature = getPoi(type, name, loc, osmId);
+    public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId, Calendar clientTime) throws IOException {
+        Feature poiFeature = getPoi(type, name, loc, osmId, clientTime);
 
         if (poiFeature != null && wikidataId == null) {
             Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
@@ -505,7 +518,7 @@ public class SearchService {
         return searchUICore;
     }
 
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch, Calendar clientTime) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -526,7 +539,7 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
 
             if (data.categories.size() == 1) {
-                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures);
+                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures, clientTime);
                 useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
             } else {
                 PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), TOTAL_LIMIT_POI, false);
@@ -536,7 +549,8 @@ public class SearchService {
                         break;
                     }
                     int categoryStartSize = foundFeatures.size();
-                    searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit);
+                    searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit,
+                            clientTime);
                     int categoryEndSize = foundFeatures.size();
                     poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
                     if (poiSearchLimit.useLimit) {
@@ -558,13 +572,14 @@ public class SearchService {
     }
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
-                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures) throws IOException {
-        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null);
+                                         List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
+                                         Calendar clientTime) throws IOException {
+        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, clientTime);
     }
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
                                          List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
-                                         PoiSearchLimit poiSearchLimit) throws IOException {
+                                         PoiSearchLimit poiSearchLimit, Calendar clientTime) throws IOException {
         if (searchBbox == null) {
             return;
         }
@@ -612,7 +627,7 @@ public class SearchService {
             int remaining = poiSearchLimit != null 
                     ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
                     : TOTAL_LIMIT_POI - foundFeatures.size();
-            saveAmenityResults(amenities, foundFeatures, remaining, locale);
+            saveAmenityResults(amenities, foundFeatures, remaining, locale, clientTime);
             if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
                 break;
             }
@@ -651,8 +666,8 @@ public class SearchService {
             return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
         }));
     }
-    
-    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
+
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, Calendar clientTime) throws IOException {
         final String RELATION_TYPE = "3";
         final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
         final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
@@ -681,7 +696,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res);
+            return getPoiFeature(res, clientTime);
         }
         return null;
     }
@@ -712,7 +727,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res);
+            return getPoiFeature(res, null);
         }
         return null;
     }
@@ -1108,14 +1123,15 @@ public class SearchService {
             return fieldName;
         }
     }
-    
-    private void saveSearchResult(List<SearchResult> res, List<Feature> features) {
+
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features, Calendar clientTime) {
         for (SearchResult result : res) {
-            features.add(getFeature(result));
+            features.add(getFeature(result, clientTime));
         }
     }
 
-    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit, String locale) {
+    private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit,
+                                    String locale, Calendar clientTime) {
         String dominatedCity = "";
         Map<String, Integer> cityCounter = new TreeMap<>();
         for (Amenity amenity : amenities) {
@@ -1142,18 +1158,14 @@ public class SearchService {
                 result.object = amenity;
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
-                result.addressName = calculateAddressString(amenity, cityName, mainCity, dominatedCity);
-                foundFeatures.put(osmId, getPoiFeature(result));
+                result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
+                foundFeatures.put(osmId, getPoiFeature(result, clientTime));
                 remainingLimit--;
             }
         }
     }
 
-    private String calculateAddressString(Amenity amenity, String locale, String mainCity, String dominatedCity) {
-        String cityName = amenity.getCityFromTagGroups(locale);
-        if (cityName == null) {
-            cityName = "";
-        }
+    private String calculateAddressString(Amenity amenity, String cityName, String mainCity, String dominatedCity) {
         String streetName = amenity.getStreetName();
         if (Algorithms.isEmpty(streetName)) {
             return cityName.isEmpty() ? null : cityName;
@@ -1164,10 +1176,10 @@ public class SearchService {
         return createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
-	public Feature getFeature(SearchResult result) {
+	public Feature getFeature(SearchResult result, Calendar clientTime) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
-			feature = getPoiFeature(result);
+			feature = getPoiFeature(result, clientTime);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
 			feature = new Feature(geometry)
@@ -1182,8 +1194,8 @@ public class SearchService {
 					feature.prop(PoiTypeField.ADDRESS_2.getFieldName(), parentResult.localeRelatedObjectName);
 				}
 			} else if (result.objectType == ObjectType.STREET_INTERSECTION) {
-                feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
-            }
+				feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName + " - " + result.localeRelatedObjectName);
+			}
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
@@ -1191,8 +1203,8 @@ public class SearchService {
 		}
 		return feature;
 	}
-    
-	private Feature getPoiFeature(SearchResult result) {
+
+	private Feature getPoiFeature(SearchResult result, Calendar clientTime) {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
@@ -1218,6 +1230,13 @@ public class SearchService {
 			String value = unzipContent(entry.getValue());
 			feature.prop(entry.getKey(), value);
 		}
+		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
+		if (clientTime != null && openingHoursValue != null) {
+			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
+			if (openingHoursInfo != null) {
+				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
+			}
+		}
 		Map<String, String> names = amenity.getNamesMap(true);
 		for (Map.Entry<String, String> entry : names.entrySet()) {
 			feature.prop(PoiTypeField.POI_NAME.getFieldName() + ":" + entry.getKey(), entry.getValue());
@@ -1237,6 +1256,25 @@ public class SearchService {
 
 		}
 		return feature;
+	}
+
+	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
+		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
+		if (openingHours != null) {
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
+			if (!Algorithms.isEmpty(openingHoursInfo)) {
+				StringJoiner openHoursInfos = new StringJoiner(";");
+				for (OpeningHours.Info info : openingHoursInfo) {
+					String infoString = info.getInfo();
+					if (!Algorithms.isEmpty(infoString)) {
+						String s = (info.isOpened() ? IS_OPENED_PREFIX : "") + infoString;
+						openHoursInfos.add(s);
+					}
+				}
+				return openHoursInfos.toString();
+			}
+		}
+		return null;
 	}
 
     private void filterWikiTags(Map<String, String> tags) {
@@ -1446,11 +1484,58 @@ public class SearchService {
     public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
     }
 
-    public LatLon parseLocation(String locationString) {
+    public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
         if (locationString == null || locationString.trim().isEmpty()) {
             return null;
         }
+        locationString = TextDirectionUtil.clearDirectionMarks(locationString);
+        LocationParser.ParsedOpenLocationCode olcParsed = parseOpenLocationCode(locationString);
+        if (olcParsed != null) {
+            if (olcParsed.isFull()) {
+                return olcParsed.getLatLon();
+            }
+            LatLon location = searchOlcOnBasemap(locationString, bboxCentre);
+            if (location != null) {
+                return location;
+            }
+        }
         return LocationParser.parseLocation(locationString);
+    }
+
+    private LatLon searchOlcOnBasemap(String locationString, LatLon bboxCentre) throws IOException {
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return null;
+        }
+        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+
+        try {
+            QuadRect world = new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> refs = getMapsForSearch(world, true);
+            if (refs.isEmpty()) {
+                return null;
+            }
+            usedMapList = osmAndMapsService.getReaders(refs, null);
+
+            SearchUICore searchUICore = new SearchUICore(MapPoiTypes.getDefault(), DEFAULT_SEARCH_LANG, false);
+            SearchSettings settings = searchUICore.getSearchSettings();
+            settings.setOfflineIndexes(usedMapList);
+            settings.setSearchBBox31(world);
+            searchUICore.updateSettings(settings);
+            SearchCoreFactory.SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
+            searchUICore.registerAPI(amenitiesApi);
+            searchUICore.registerAPI(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi));
+
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(locationString, bboxCentre);
+            if (resultCollection != null && !resultCollection.getCurrentSearchResults().isEmpty()) {
+                SearchResult result = resultCollection.getCurrentSearchResults().get(0);
+                if (result.object instanceof LatLon location) {
+                    return location;
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(usedMapList);
+        }
+            return null;
     }
 
 }

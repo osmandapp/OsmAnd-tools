@@ -451,9 +451,9 @@ public class SearchTestService implements ReportService, DataService {
 				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
 				Object[] args = null;
 				try {
-					SearchService.SearchResultWrapper searchResult = null;
+					SearchService.SearchResults searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
-						searchResult = searchService.searchResults(
+						searchResult = searchService.getImmediateSearchResults(
 								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, SearchService.SEARCH_RADIUS_DEGREE, bbox[0], bbox[1]),
 								new SearchService.SearchOption(true, null), finder);

@@ -1070,11 +1070,15 @@ public class AdminController {
 
 	private Map<String, TDoubleArrayList> calculateRetentionRates(List<Subscription> subs) {
 		// calculate retention rate
-		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
+		
 		Map<String, TIntArrayList> skuRetentions = new TreeMap<>();
 		Map<String, TDoubleArrayList> skuResult = new TreeMap<>();
 		Map<String, Subscription> skuExamples = new TreeMap<>();
+		Map<String, Integer> skuTotal = new TreeMap<>();
 		for (Subscription s : subs) {
+			if (s.currentPeriod == 0) {
+				skuTotal.compute(s.getSku(), (t, u) -> u == null ? 1 : u + 1);
+			}
 			if (s.currentPeriod == 0 && s.totalPeriods > 0) {
 				TIntArrayList retentionList = skuRetentions.get(s.getSku());
 				if (retentionList == null) {
@@ -1099,14 +1103,15 @@ public class AdminController {
 				}
 			}
 		}
-		for (String s : skuRetentions.keySet()) {
-			TIntArrayList arrays = skuRetentions.get(s);
-			Subscription sub = skuExamples.get(s);
+		Map<String, Double> finalTable = new HashMap<String, Double>();
+		for (String sku : skuRetentions.keySet()) {
+			TIntArrayList arrays = skuRetentions.get(sku);
+			Subscription sub = skuExamples.get(sku);
 			TDoubleArrayList actualRetention = new TDoubleArrayList();
 			for (int i = 0; i < arrays.size(); i += 2) {
 				int total = arrays.get(i);
 				int left = arrays.get(i + 1);
-				if (total == 0 || left == 0) {
+				if (total <= 5 || left <= 5) {
 					break;
 				}
 				actualRetention.add(((double) left) / total);
@@ -1114,7 +1119,7 @@ public class AdminController {
 			boolean trim = trimRetention(actualRetention, sub.durationMonth > 1 ? (sub.durationMonth > 3 ? 2 : 3) : 6);
 			StringBuilder bld = new StringBuilder();
 			double sum = 1;
-			if (s.endsWith("-%")) {
+			if (sku.endsWith("-%")) {
 				sum = 0.5;
 			}
 			double prod = 1;
@@ -1124,23 +1129,39 @@ public class AdminController {
 				prod *= last;
 				sum += prod;
 				if (i == actualRetention.size() - 1 && trim) {
-					bld.append(String.format("... [%.2f %%] ", 100 * (double) actualRetention.get(i)));
+					bld.append(String.format("... %.0f%%", 100 * (double) actualRetention.get(i)));
 				} else {
-					bld.append(String.format("%.0f %%, ", 100 * (double) actualRetention.get(i)));
+					bld.append(String.format("%.0f%%, ", 100 * (double) actualRetention.get(i)));
 				}
 			}
 			// add up tail
-			last = Math.min(last, 0.95);
+			last = Math.min(last, 0.8);
 			sum += prod  * last / (1 - last); // add tail
 			
 			
 			double ltv = sub.defPriceEurMillis / 1000 * sum;
-			String msg = String.format("%.0f$ %s - %.1f $ * %.2f: %d%% ~ %s", ltv, s, sub.defPriceEurMillis / 1000.0, sum, 
+			String msg = String.format("%d %.0f$ - %s = %.1f$ * %.2f [%d%%] : %s", skuTotal.get(sku), ltv, sku, sub.defPriceEurMillis / 1000.0, sum, 
 					(int) (sub.retention * 100), bld.toString());
-			System.out.println(msg);
+			finalTable.put(msg, skuTotal.get(sku) * ltv);
 			actualRetention.insert(0, sum);
-			skuResult.put(s, actualRetention);
+			skuResult.put(sku, actualRetention);
 		}
+		ArrayList<String> msgs = new ArrayList<>(finalTable.keySet());
+		Collections.sort(msgs, new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				return -Double.compare(finalTable.get(o1), finalTable.get(o2));
+			}
+		});
+		System.out.println("Annual retentions (MOVE TO WEB PAGE): ");
+		System.out.println("ALL * (Life Time Value) - SKU - Price * Period (Years, Months = LTV) [Active %]: Stats by year");
+		System.out.println("---------------");
+		
+		for (String msg : msgs) {
+			System.out.println(msg);
+		}
+		System.out.println("---------------");
 		return skuResult;
 	}
 

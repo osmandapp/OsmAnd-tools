@@ -201,6 +201,13 @@ public class WikiAuthorParsingTest {
 		assertEquals("Photoglob Zürich", webResults.get("author"));
 	}
 
+	@Test
+	public void test27() throws IOException, SQLException {
+		Map<String, String> webResults = new HashMap<>();
+		invoke(informationBlock("|author=Сергій Нужненко / [[:en:Kyiv City State Administration|Kyiv City State Administration]]\n"), webResults);
+		assertEquals("Сергій Нужненко / Kyiv City State Administration", webResults.get("author"));
+	}
+
 	private void invoke(String text, Map<String, String> webResults)
 			throws IOException, SQLException {
 		Map<WikivoyageTemplates, List<String>> blockResults = new EnumMap<>(WikivoyageTemplates.class);

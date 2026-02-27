@@ -32,6 +32,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
+
 @Service
 public class StorageService {
 
@@ -336,10 +338,11 @@ public class StorageService {
 			throw new IllegalStateException();
         }
 		
-		public static InternalZipFile buildFromFile(File file) throws IOException {
+		public static InternalZipFile buildFromFileAndDelete(File file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
-			zipfile.tempzipfile = new File(file.getPath().substring(0, file.getPath().indexOf(GPX)) + GPX_GZ);
+			String path = file.getPath();
+			zipfile.tempzipfile = new File(path.substring(0, path.lastIndexOf(GPX_FILE_EXT)) + GPX_GZ);
 			zipfile.contentSize = file.length();
 			try (FileInputStream fis = new FileInputStream(file);
 			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
@@ -349,6 +352,7 @@ public class StorageService {
 					gos.write(buffer, 0, len);
 				}
 			}
+			Files.deleteIfExists(file.toPath());
 			return zipfile;
 		}
 

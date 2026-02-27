@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
 import java.io.ByteArrayInputStream;
@@ -15,7 +16,6 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -24,6 +24,7 @@ import java.util.zip.ZipOutputStream;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 
@@ -60,6 +61,7 @@ import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.WebGpxParser;
@@ -112,6 +114,9 @@ public class UserdataService {
 
     @Autowired
     protected GpxService gpxService;
+	
+	@Autowired
+	UserSessionResources sessionResources;
 
     Gson gson = new Gson();
 
@@ -354,6 +359,11 @@ public class UserdataService {
 
     public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
+		return uploadMultipartFile(file, dev, name, type, clienttime, null);
+	}
+
+	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
+			String name, String type, Long clienttime, HttpSession session) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -368,7 +378,8 @@ public class UserdataService {
 					InputStream is = new GZIPInputStream(file.getInputStream());
 					GpxFile gpxFile = gpxService.importGpx(Okio.source(is), originalFilename);
 					File tmpGpxFile = gpxService.createTmpFileByGpxFile(gpxFile, name);
-					zipfile = InternalZipFile.buildFromFile(tmpGpxFile);
+					sessionResources.addGpxTempFilesToSession(session, tmpGpxFile);
+					zipfile = InternalZipFile.buildFromFileAndDelete(tmpGpxFile);
 				} else {
 					zipfile = InternalZipFile.buildFromMultipartFile(file);
 				}
@@ -893,10 +904,15 @@ public class UserdataService {
     }
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName) throws IOException {
+        return getZipFile(file, newName, null);
+    }
+
+    public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName, HttpSession session) throws IOException {
         InternalZipFile zipFile = null;
-        File tmpGpx = File.createTempFile(newName.replace("/../", "/"), ".gpx");
+        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
-            zipFile = InternalZipFile.buildFromFile(tmpGpx);
+            sessionResources.addGpxTempFilesToSession(session, tmpGpx);
+            zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
@@ -908,7 +924,8 @@ public class UserdataService {
                 if (exception != null) {
                     return null;
                 }
-                zipFile = InternalZipFile.buildFromFile(tmpGpx);
+                sessionResources.addGpxTempFilesToSession(session, tmpGpx);
+                zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
             }
         }
         return zipFile;
