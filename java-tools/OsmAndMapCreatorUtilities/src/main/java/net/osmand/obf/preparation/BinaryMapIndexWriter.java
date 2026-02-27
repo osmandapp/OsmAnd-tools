@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -1781,17 +1782,87 @@ public class BinaryMapIndexWriter {
 	private Map<String, BinaryFileReference> writeIndexedTable(int tag, Collection<String> indexedTable) throws IOException {
 		codedOutStream.writeTag(tag, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		Map<String, BinaryFileReference> res = new LinkedHashMap<String, BinaryFileReference>();
-		long init = getFilePointer();
-		for (String e : indexedTable) {
-			codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, e);
-			codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
-			codedOutStream.writeFixed32NoTag(0);
-			res.put(e, ref);
+
+		IndexedStringTableNode root = new IndexedStringTableNode();
+		for (String key : indexedTable) {
+			if (key == null) {
+				continue;
+			}
+			root.addKey(key, 0);
 		}
+
+		Map<String, BinaryFileReference> res = new LinkedHashMap<>();
+		long init = getFilePointer();
+		root.writeNode("", res, init);
 		writeInt32Size();
 		return res;
+	}
+
+	private final class IndexedStringTableNode {
+		private final TreeMap<String, IndexedStringTableNode> subNodes = new TreeMap<>();
+		private boolean terminal;
+
+		private void addKey(String key, int start) {
+			if (start >= key.length()) {
+				terminal = true;
+				return;
+			}
+			int end = Math.min(start + 2, key.length());
+			String nextKeySuffix = key.substring(start, end);
+			IndexedStringTableNode child = subNodes.get(nextKeySuffix);
+			if (child == null) {
+				child = new IndexedStringTableNode();
+				subNodes.put(nextKeySuffix, child);
+			}
+			child.addKey(key, end);
+		}
+
+		private int computeSize() {
+			int size = 0;
+			for (Map.Entry<String, IndexedStringTableNode> entry : subNodes.entrySet()) {
+				String childKey = entry.getKey();
+				IndexedStringTableNode child = entry.getValue();
+				if (child == null) {
+					continue;
+				}
+				size += CodedOutputStream.computeStringSize(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, childKey);
+				if (child.terminal) {
+					size += CodedOutputStream.computeTagSize(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER);
+					size += 4;
+				}
+				if (!child.subNodes.isEmpty()) {
+					int nestedSize = child.computeSize();
+					size += CodedOutputStream.computeTagSize(OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER);
+					size += CodedOutputStream.computeUInt32SizeNoTag(nestedSize);
+					size += nestedSize;
+				}
+			}
+			return size;
+		}
+
+		private void writeNode(String prefix, Map<String, BinaryFileReference> res, long init) throws IOException {
+			for (Map.Entry<String, IndexedStringTableNode> entry : subNodes.entrySet()) {
+				String subKey = entry.getKey();
+				IndexedStringTableNode child = entry.getValue();
+				if (child == null) {
+					continue;
+				}
+				String fullKey = prefix + subKey;
+				codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, subKey);
+				if (child.terminal) {
+					codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+					codedOutStream.writeFixed32NoTag(0);
+					BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
+					res.put(fullKey, ref);
+				}
+				if (!child.subNodes.isEmpty()) {
+					codedOutStream.writeTag(OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+					int subtableSize = child.computeSize();
+					codedOutStream.writeUInt32NoTag(subtableSize);
+					child.writeNode(fullKey, res, init);
+				}
+			}
+		}
 	}
 
 
