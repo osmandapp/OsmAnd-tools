@@ -1,13 +1,38 @@
 package net.osmand.server.controllers.pub;
 
-import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
-import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
-import static net.osmand.server.api.repo.SupportersRepository.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.google.gson.Gson;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,28 +40,29 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-
-import net.osmand.server.api.repo.*;
-import net.osmand.server.api.services.*;
-import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
-
-import net.osmand.server.controllers.user.MapApiController;
-import net.osmand.server.utils.exception.OsmAndPublicApiException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import com.google.gson.Gson;
-
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.repo.SupportersRepository;
+import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.DownloadIndexesService;
+import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
+import net.osmand.server.api.services.EmailSenderService;
+import net.osmand.server.api.services.StorageService;
+import net.osmand.server.api.services.UserSubscriptionService;
+import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.controllers.user.MapApiController;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.server.ws.UserTranslation;
+import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
 @RestController
@@ -51,9 +77,13 @@ public class UserdataController {
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
-	// This is a permanent token for users who can't receive email but validated identity differently
+	// This is a permanent token for users who can't receive email but validated
+	// identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
+	private final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
+
+	private static final long CACHE_TTL = 15 * 60 * 1000; // Minutes Validity
 
 	Gson gson = new Gson();
 
@@ -79,22 +109,25 @@ public class UserdataController {
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
+	protected UserTranslationsService userTranlsationService;
+
+	@Autowired
 	EmailSenderService emailSender;
 
 	@Autowired
 	UserdataService userdataService;
 
-    @Autowired
-    DeviceInAppPurchasesRepository iapsRepository;
+	@Autowired
+	DeviceInAppPurchasesRepository iapsRepository;
 
-    @Autowired
-    DeviceSubscriptionsRepository subscriptionsRepository;
+	@Autowired
+	DeviceSubscriptionsRepository subscriptionsRepository;
 
-    @Autowired
-    CloudUsersRepository premiumUsersRepository;
+	@Autowired
+	CloudUsersRepository premiumUsersRepository;
 
-    @Autowired
-    SupportersRepository supportersRepository;
+	@Autowired
+	SupportersRepository supportersRepository;
 
 	public static class TokenPost {
 		public String token;
@@ -105,12 +138,39 @@ public class UserdataController {
 		public String lang;
 	}
 
-	private CloudUserDevice checkToken(int deviceId, String accessToken) {
+	private static class CachedInfoDevice {
+		final CloudUserDevice device;
+		final long timestamp;
+		public CloudUser user;
+
+		CachedInfoDevice(CloudUserDevice device, CloudUser user) {
+			this.device = device;
+			this.timestamp = System.currentTimeMillis();
+		}
+	}
+	
+	private CachedInfoDevice checkTokenСache(int deviceId, String accessToken) {
+		CachedInfoDevice cached = cacheByDeviceId.get(deviceId);
+		if (cached != null && (System.currentTimeMillis() - cached.timestamp) < CACHE_TTL) {
+			if (Algorithms.stringsEqual(cached.device.accesstoken, accessToken)) {
+				return cached;
+			}
+		}
 		CloudUserDevice d = devicesRepository.findById(deviceId);
 		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
-			return d;
+			CachedInfoDevice cache = new CachedInfoDevice(d, null);
+			cacheByDeviceId.put(deviceId, new CachedInfoDevice(d, null));
+			return cache;
 		}
 		return null;
+	}
+
+	private CloudUserDevice checkToken(int deviceId, String accessToken) {
+		CachedInfoDevice checkTokenСache = checkTokenСache(deviceId, accessToken);
+		if (checkTokenСache == null) {
+			return null;
+		}
+		return checkTokenСache.device;
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
@@ -146,8 +206,8 @@ public class UserdataController {
 
 	@GetMapping(value = "/user-validate-sub")
 	public ResponseEntity<String> check(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken,
-			HttpServletRequest request) throws IOException {
+			@RequestParam(name = "accessToken", required = true) String accessToken, HttpServletRequest request)
+			throws IOException {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -163,11 +223,35 @@ public class UserdataController {
 		return ResponseEntity.ok(gson.toJson(pu));
 	}
 
+	@RequestMapping(value = "/translation/msg")
+	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken, HttpServletRequest request)
+			throws IOException {
+		CachedInfoDevice dev = checkTokenСache(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		if (dev.user == null) {
+			dev.user = usersRepository.findById(dev.device.userid);
+			if (dev.user == null) {
+				logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+			}
+//			String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
+//			if (errorMsg != null) {
+//				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
+//			}
+		}
+		boolean ok = userTranlsationService.sendDeviceMessage(dev.device, dev.user, request);
+		if (ok) {
+			return ResponseEntity.ok("OK");
+		}
+		return ResponseEntity.notFound().build();
+	}
+
 	@PostMapping(value = "/user-update-orderid")
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam String email,
-	                                                @RequestParam(name = "deviceid", required = false) String deviceId,
-	                                                @RequestParam(required = false) String orderid,
-	                                                HttpServletRequest request) {
+			@RequestParam(name = "deviceid", required = false) String deviceId,
+			@RequestParam(required = false) String orderid, HttpServletRequest request) {
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
@@ -186,16 +270,15 @@ public class UserdataController {
 		return userdataService.ok();
 	}
 
-    @PostMapping(value = "/user-register")
-    @Transactional // Make linking atomic with registration
-    public ResponseEntity<String> userRegister(@RequestParam String email,
-                                               @RequestParam(name = "deviceid", required = false) String deviceId, // PremiumUserDevice deviceId (e.g., "web")
-                                               @RequestParam(required = false) String orderid, // Subscription orderId
-                                               @RequestParam(required = false) Boolean login,
-                                               @RequestParam(required = false) String lang,
-                                               @RequestParam(required = false) String userId,
-                                               @RequestParam(required = false) String userToken,
-                                               HttpServletRequest request) {
+	@PostMapping(value = "/user-register")
+	@Transactional // Make linking atomic with registration
+	public ResponseEntity<String> userRegister(@RequestParam String email,
+			@RequestParam(name = "deviceid", required = false) String deviceId, // PremiumUserDevice deviceId (e.g.,
+																				// "web")
+			@RequestParam(required = false) String orderid, // Subscription orderId
+			@RequestParam(required = false) Boolean login, @RequestParam(required = false) String lang,
+			@RequestParam(required = false) String userId, @RequestParam(required = false) String userToken,
+			HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
@@ -204,7 +287,8 @@ public class UserdataController {
 		}
 		if (pu != null) {
 			if (!Boolean.TRUE.equals(login)) {
-				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
+				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED,
+						"user was already registered with such email");
 			}
 			// don't check order id validity for login
 			// keep old order id
@@ -222,77 +306,83 @@ public class UserdataController {
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
-			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
+			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl
+			// params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
 		CloudUser saved = usersRepository.saveAndFlush(pu);
-	    if (orderid != null) {
-		    discardPreviousAccountOrderId(saved.id, orderid, email, request);
-	    }
+		if (orderid != null) {
+			discardPreviousAccountOrderId(saved.id, orderid, email, request);
+		}
 
-        // --- Attempt to Link Supporter IAPs ---
-        if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
-            Supporter supporter = null;
-            try {
-                Optional<Supporter> supOpt = supportersRepository.findById(Long.parseLong(userId));
-                supporter = supOpt.orElse(null);
-                if (supporter != null && !userToken.equals(supporter.token)) {
-                    LOG.warn("Supporter token mismatch during cloud registration for supporterId: " + userId);
-                    supporter = null;
-                }
-            } catch (NumberFormatException e) {
-                LOG.warn("Supporter ID is in wrong format: " + userId);
-            }
-            if (supporter != null) {
-                // Supporter verified, find their IAPs
-                List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findBySupporterId(supporter.userId);
-                int linkedCount = 0;
-                for (SupporterDeviceInAppPurchase iap : iapsToLink) {
-                    // Update the userId to the PremiumUser ID
-                    if (iap.userId == null) { // Check if update is needed
-                        iap.userId = pu.id;
-                        iapsRepository.save(iap); // Save the updated IAP record
-                        linkedCount++;
-                    }
-                }
-                if (linkedCount > 0) {
-                    LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
-                }
-                // Optionally link subscription orderId if needed
-                List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository.findAllBySupporterId(supporter.userId);
-                linkedCount = 0;
-                for (SupporterDeviceSubscription sub : subsToLink) {
-                    // Update the userId to the PremiumUser ID
-                    if (sub.userId == null) { // Check if update is needed
-                        sub.userId = pu.id;
-                        subscriptionsRepository.save(sub); // Save the updated subscription record
-                        linkedCount++;
-                    }
-                }
-                if (linkedCount > 0) {
-                    LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser " + pu.id + " during cloud registration.");
-                }
-            } else {
-                LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);
-            }
-        } else {
-            LOG.info("No supporter context provided during cloud registration for email: " + email);
-        }
-        // --- End Linking Logic ---
+		// --- Attempt to Link Supporter IAPs ---
+		if (!Algorithms.isEmpty(userId) && !Algorithms.isEmpty(userToken)) {
+			Supporter supporter = null;
+			try {
+				Optional<Supporter> supOpt = supportersRepository.findById(Long.parseLong(userId));
+				supporter = supOpt.orElse(null);
+				if (supporter != null && !userToken.equals(supporter.token)) {
+					LOG.warn("Supporter token mismatch during cloud registration for supporterId: " + userId);
+					supporter = null;
+				}
+			} catch (NumberFormatException e) {
+				LOG.warn("Supporter ID is in wrong format: " + userId);
+			}
+			if (supporter != null) {
+				// Supporter verified, find their IAPs
+				List<SupporterDeviceInAppPurchase> iapsToLink = iapsRepository.findBySupporterId(supporter.userId);
+				int linkedCount = 0;
+				for (SupporterDeviceInAppPurchase iap : iapsToLink) {
+					// Update the userId to the PremiumUser ID
+					if (iap.userId == null) { // Check if update is needed
+						iap.userId = pu.id;
+						iapsRepository.save(iap); // Save the updated IAP record
+						linkedCount++;
+					}
+				}
+				if (linkedCount > 0) {
+					LOG.info("Linked " + linkedCount + " IAPs from Supporter " + userId + " to PremiumUser " + pu.id
+							+ " during cloud registration.");
+				}
+				// Optionally link subscription orderId if needed
+				List<SupporterDeviceSubscription> subsToLink = subscriptionsRepository
+						.findAllBySupporterId(supporter.userId);
+				linkedCount = 0;
+				for (SupporterDeviceSubscription sub : subsToLink) {
+					// Update the userId to the PremiumUser ID
+					if (sub.userId == null) { // Check if update is needed
+						sub.userId = pu.id;
+						subscriptionsRepository.save(sub); // Save the updated subscription record
+						linkedCount++;
+					}
+				}
+				if (linkedCount > 0) {
+					LOG.info("Linked " + linkedCount + " Subscriptions from Supporter " + userId + " to PremiumUser "
+							+ pu.id + " during cloud registration.");
+				}
+			} else {
+				LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);
+			}
+		} else {
+			LOG.info("No supporter context provided during cloud registration for email: " + email);
+		}
+		// --- End Linking Logic ---
 
-	    if (pu != null) {
-		    userSubService.verifyAndRefreshProOrderId(pu);
-	    }
+		if (pu != null) {
+			userSubService.verifyAndRefreshProOrderId(pu);
+		}
 
 		return userdataService.ok();
 	}
 
-	protected void discardPreviousAccountOrderId(int newUserId, String orderid, String currentEmail, HttpServletRequest request) {
-		CloudUser previousUser =
-				usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid, currentEmail);
+	protected void discardPreviousAccountOrderId(int newUserId, String orderid, String currentEmail,
+			HttpServletRequest request) {
+		CloudUser previousUser = usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderid,
+				currentEmail);
 		if (previousUser != null) {
 			if (DISCARD_ANOTHER_USER_PAYMENT_IF_NEW_REGISTERED) {
-				LOG.info("Discarding orderId " + orderid + " from previous user " + previousUser.id + " because it was used to register new user " + newUserId);
+				LOG.info("Discarding orderId " + orderid + " from previous user " + previousUser.id
+						+ " because it was used to register new user " + newUserId);
 				userSubService.relinkPurchasesToNewAccount(previousUser, newUserId);
 			} else {
 				logErrorWithThrow(request, ERROR_CODE_SUBSCRIPTION_WAS_USED_FOR_ANOTHER_ACCOUNT,
@@ -303,12 +393,11 @@ public class UserdataController {
 
 	@PostMapping(value = "/device-register")
 	public ResponseEntity<String> deviceRegister(@RequestParam(name = "email", required = true) String email,
-												 @RequestParam(name = "token", required = true) String token,
-												 @RequestParam(name = "deviceid", required = false) String deviceId,
-												 @RequestParam(name = "brand", required = false) String brand,
-												 @RequestParam(name = "model", required = false) String model,
-												 @RequestParam(name = "lang", required = false) String lang
-	) throws IOException {
+			@RequestParam(name = "token", required = true) String token,
+			@RequestParam(name = "deviceid", required = false) String deviceId,
+			@RequestParam(name = "brand", required = false) String brand,
+			@RequestParam(name = "model", required = false) String model,
+			@RequestParam(name = "lang", required = false) String lang) throws IOException {
 		email = email.toLowerCase().trim();
 		String accessToken = UUID.randomUUID().toString();
 		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, brand, model);
@@ -330,11 +419,11 @@ public class UserdataController {
 
 	@PostMapping(value = "/delete-file-version")
 	public ResponseEntity<String> deleteFile(HttpServletResponse response, HttpServletRequest request,
-	                                         @RequestParam(name = "name", required = true) String name,
-	                                         @RequestParam(name = "type", required = true) String type,
-	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
-	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
-	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
+			@RequestParam(name = "name", required = true) String name,
+			@RequestParam(name = "type", required = true) String type,
+			@RequestParam(name = "updatetime", required = true) Long updatetime,
+			@RequestParam(name = "deviceid", required = true) int deviceId,
+			@RequestParam(name = "accessToken", required = true) String accessToken) {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -350,7 +439,8 @@ public class UserdataController {
 			@RequestParam(name = "deviceid", required = true) int deviceId,
 			@RequestParam(name = "accessToken", required = false) String accessToken,
 			@RequestParam(name = "clienttime", required = false) Long clienttime) throws IOException {
-		// This could be slow series of checks (token, user, subscription, amount of space):
+		// This could be slow series of checks (token, user, subscription, amount of
+		// space):
 		// probably it's better to support multiple file upload without these checks
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 
@@ -376,11 +466,13 @@ public class UserdataController {
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		// remap needs to happen to all users & temporarily service should find files by both names (download)
+		// remap needs to happen to all users & temporarily service should find files by
+		// both names (download)
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
 			if (fl != null && fl.filesize > 0) {
-				storageService.remapFileNames(fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
+				storageService.remapFileNames(fl.storage, userdataService.userFolder(fl),
+						userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
 			}
 		}
 		return userdataService.ok();
@@ -400,8 +492,8 @@ public class UserdataController {
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
 			if (fl != null && fl.filesize > 0) {
-				String newStorage = storageService.backupData(storageId, userdataService.userFolder(fl), userdataService.storageFileName(fl),
-						fl.storage, fl.data);
+				String newStorage = storageService.backupData(storageId, userdataService.userFolder(fl),
+						userdataService.storageFileName(fl), fl.storage, fl.data);
 				if (newStorage != null) {
 					fl.storage = newStorage;
 					filesRepository.save(fl);
@@ -412,12 +504,9 @@ public class UserdataController {
 	}
 
 	@GetMapping(value = "/download-file")
-	public void getFile(HttpServletResponse response, HttpServletRequest request,
-	                    @RequestParam String name,
-	                    @RequestParam String type,
-	                    @RequestParam(required = false) Long updatetime,
-	                    @RequestParam(name = "deviceid") int deviceId,
-	                    @RequestParam String accessToken) throws IOException {
+	public void getFile(HttpServletResponse response, HttpServletRequest request, @RequestParam String name,
+			@RequestParam String type, @RequestParam(required = false) Long updatetime,
+			@RequestParam(name = "deviceid") int deviceId, @RequestParam String accessToken) throws IOException {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev != null) {
 			CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
@@ -444,11 +533,10 @@ public class UserdataController {
 	}
 
 	// TokenPost for backward compatibility
-	@PostMapping(path = {"/delete-account"})
+	@PostMapping(path = { "/delete-account" })
 	public ResponseEntity<String> deleteAccount(@RequestBody TokenPost token,
-	                                            @RequestParam(name = "deviceid") int deviceId,
-	                                            @RequestParam String accessToken,
-			HttpServletRequest request) throws ServletException {
+			@RequestParam(name = "deviceid") int deviceId, @RequestParam String accessToken, HttpServletRequest request)
+			throws ServletException {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -456,10 +544,9 @@ public class UserdataController {
 		return userdataService.deleteAccount(token.token, dev, request);
 	}
 
-	@PostMapping(path = {"/send-code"})
+	@PostMapping(path = { "/send-code" })
 	public ResponseEntity<String> sendCode(@RequestBody EmailSenderInfo data,
-	                                       @RequestParam(name = "deviceid") int deviceId,
-			@RequestParam String accessToken) {
+			@RequestParam(name = "deviceid") int deviceId, @RequestParam String accessToken) {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -486,17 +573,18 @@ public class UserdataController {
 	private void logErrorWithThrow(HttpServletRequest request, int code, String msg) throws OsmAndPublicApiException {
 		Map<String, String[]> params = request.getParameterMap();
 		String url = request.getRequestURI();
-		String ipAddress = request.getHeader("X-FORWARDED-FOR") == null ? request.getRemoteAddr() : request.getHeader("X-FORWARDED-FOR");
+		String ipAddress = request.getHeader("X-FORWARDED-FOR") == null ? request.getRemoteAddr()
+				: request.getHeader("X-FORWARDED-FOR");
 		String m = "";
 		for (Map.Entry<String, String[]> e : params.entrySet()) {
 			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
 			m += ", " + e.getKey() + ":" + v;
 		}
-		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);
+		LOG.error("URL:" + url + ", ip:" + ipAddress + ", code:" + code + ", message:" + msg + m);
 		throw new OsmAndPublicApiException(code, msg);
 	}
 
-	@PostMapping(path = {"/auth/confirm-code"})
+	@PostMapping(path = { "/auth/confirm-code" })
 	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost credentials) {
 		if (emailSender.isEmail(credentials.username)) {
 			String username = credentials.username;
@@ -504,5 +592,11 @@ public class UserdataController {
 			return userdataService.confirmCode(username, token);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
+	}
+
+	@Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS) // Run every hour
+	public void clearExpiredTokens() {
+		long now = System.currentTimeMillis();
+		cacheByDeviceId.values().removeIf(c -> (now - c.timestamp) > CACHE_TTL);
 	}
 }
