@@ -268,6 +268,116 @@ public interface OBFService extends BaseService {
 		}
 	}
 
+	static JSONObject readIndexedStringTableToJson(CodedInputStream codedIS, int depth) throws IOException {
+		JsonDumpState state = JSON_DUMP_STATE.get();
+		if (state != null && depth > state.maxDepth) {
+			codedIS.skipRawBytes(codedIS.getBytesUntilLimit());
+			JSONObject out = new JSONObject();
+			out.put("_truncated", true);
+			out.put("_reason", "maxDepth");
+			return out;
+		}
+		JSONObject out = new JSONObject();
+		JSONArray entries = new JSONArray();
+		JSONObject lastEntry = null;
+		while (true) {
+			if (state != null && state.isFieldLimitReached()) {
+				codedIS.skipRawBytes(codedIS.getBytesUntilLimit());
+				out.put("_truncated", true);
+				out.put("_reason", "maxFields");
+				break;
+			}
+			int t = codedIS.readTag();
+			int fieldNumber = WireFormat.getTagFieldNumber(t);
+			if (fieldNumber == 0) {
+				break;
+			}
+			if (fieldNumber == OsmandOdb.IndexedStringTable.PREFIX_FIELD_NUMBER) {
+				String prefix = codedIS.readString();
+				out.put("prefix", prefix);
+				if (state != null) {
+					state.onFieldAdded();
+				}
+				continue;
+			}
+			if (fieldNumber == OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER) {
+				String key = codedIS.readString();
+				JSONObject entry = new JSONObject();
+				entry.put("key", key);
+				entries.put(entry);
+				lastEntry = entry;
+				if (state != null) {
+					state.onFieldAdded();
+				}
+				continue;
+			}
+			if (fieldNumber == OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER) {
+				Object v = readScalarValueByWireType(codedIS, t);
+				if (lastEntry != null && !lastEntry.has("val")) {
+					lastEntry.put("val", v);
+				} else {
+					JSONObject entry = new JSONObject();
+					entry.put("val", v);
+					entries.put(entry);
+					lastEntry = entry;
+				}
+				if (state != null) {
+					state.onFieldAdded();
+				}
+				continue;
+			}
+			if (fieldNumber == OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER) {
+				long payloadLength = readPayloadLengthByWireType(codedIS, t);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, t);
+					continue;
+				}
+				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				try {
+					JSONObject nested = readIndexedStringTableToJson(codedIS, depth + 1);
+					if (lastEntry != null) {
+						if (!lastEntry.has("subtables")) {
+							JSONArray st = new JSONArray();
+							st.put(nested);
+							lastEntry.put("subtables", st);
+						} else {
+							Object existing = lastEntry.get("subtables");
+							if (existing instanceof JSONArray arr) {
+								if (state == null || arr.length() < state.maxArrayLength) {
+									arr.put(nested);
+								}
+								lastEntry.put("subtables", arr);
+							} else {
+								JSONArray arr = new JSONArray();
+								arr.put(existing);
+								if (state == null || arr.length() < state.maxArrayLength) {
+									arr.put(nested);
+								}
+								lastEntry.put("subtables", arr);
+							}
+						}
+					} else {
+						JSONObject entry = new JSONObject();
+						JSONArray st = new JSONArray();
+						st.put(nested);
+						entry.put("subtables", st);
+						entries.put(entry);
+						lastEntry = entry;
+					}
+				} finally {
+					codedIS.popLimit(oldLimit);
+				}
+				if (state != null) {
+					state.onFieldAdded();
+				}
+				continue;
+			}
+			skipUnknownField(codedIS, t);
+		}
+		out.put("entries", entries);
+		return out;
+	}
+
 	static void normalizeExpandableCounts(Map<String, long[]> out) {
 		for (long[] stats : out.values()) {
 			if (stats == null) {
@@ -439,10 +549,12 @@ public interface OBFService extends BaseService {
 		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
 			CodedInputStream codedIS = CodedInputStream.newInstance(r);
 			codedIS.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+			JsonDumpState state = JsonDumpState.fromEnv();
+			JSON_DUMP_STATE.set(state);
 
 			Object result;
 			if (path.length == 0) {
-				result = readMessageToJson(codedIS, "OsmAndStructure");
+				result = readMessageToJson(codedIS, "OsmAndStructure", 0);
 			} else {
 				RootSpec rootSpec = resolveRootSpec(path[0]);
 				int rootFieldNumber = rootSpec.rootFieldNumber;
@@ -497,12 +609,14 @@ public interface OBFService extends BaseService {
 		} catch (IOException e) {
 			getLogger().error("Failed to read OBF file: {}", file, e);
 			throw new RuntimeException("Failed to read OBF file: " + e.getMessage(), e);
+		} finally {
+			JSON_DUMP_STATE.remove();
 		}
 	}
 
 	static Object readMessageAtPathToJson(CodedInputStream codedIS, String messageType, String[] path, int pathIndex) throws IOException {
 		if (pathIndex >= path.length) {
-			return readMessageToJson(codedIS, messageType);
+			return readMessageToJson(codedIS, messageType, 0);
 		}
 		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
 		String next = path[pathIndex];
@@ -542,10 +656,27 @@ public interface OBFService extends BaseService {
 		return matches;
 	}
 
-	static JSONObject readMessageToJson(CodedInputStream codedIS, String messageType) throws IOException {
+	static JSONObject readMessageToJson(CodedInputStream codedIS, String messageType, int depth) throws IOException {
+		if ("IndexedStringTable".equals(messageType)) {
+			return readIndexedStringTableToJson(codedIS, depth);
+		}
+		JsonDumpState state = JSON_DUMP_STATE.get();
+		if (state != null && depth > state.maxDepth) {
+			codedIS.skipRawBytes(codedIS.getBytesUntilLimit());
+			JSONObject out = new JSONObject();
+			out.put("_truncated", true);
+			out.put("_reason", "maxDepth");
+			return out;
+		}
 		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
 		JSONObject out = new JSONObject();
 		while (true) {
+			if (state != null && state.isFieldLimitReached()) {
+				codedIS.skipRawBytes(codedIS.getBytesUntilLimit());
+				out.put("_truncated", true);
+				out.put("_reason", "maxFields");
+				return out;
+			}
 			int t = codedIS.readTag();
 			int fieldNumber = WireFormat.getTagFieldNumber(t);
 			if (fieldNumber == 0) {
@@ -562,7 +693,7 @@ public interface OBFService extends BaseService {
 				}
 				long oldLimit = codedIS.pushLimitLong(payloadLength);
 				try {
-					JSONObject nested = readMessageToJson(codedIS, spec.childMessageType());
+					JSONObject nested = readMessageToJson(codedIS, spec.childMessageType(), depth + 1);
 					addJsonValue(out, fieldName, nested);
 				} finally {
 					codedIS.popLimit(oldLimit);
@@ -577,6 +708,60 @@ public interface OBFService extends BaseService {
 			}
 			Object scalar = readScalarValueByWireType(codedIS, t);
 			addJsonValue(out, fieldName, scalar);
+		}
+	}
+
+	static final ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
+
+	static final class JsonDumpState {
+		final int maxDepth;
+		final long maxFields;
+		final int maxArrayLength;
+		long fieldsSeen;
+
+		private JsonDumpState(int maxDepth, long maxFields, int maxArrayLength) {
+			this.maxDepth = maxDepth;
+			this.maxFields = maxFields;
+			this.maxArrayLength = maxArrayLength;
+		}
+
+		static JsonDumpState fromEnv() {
+			int maxDepth = parseEnvInt("OBF_JSON_MAX_DEPTH", 50);
+			long maxFields = parseEnvLong("OBF_JSON_MAX_FIELDS", 200_000L);
+			int maxArrayLength = parseEnvInt("OBF_JSON_MAX_ARRAY", 10_000);
+			return new JsonDumpState(maxDepth, maxFields, maxArrayLength);
+		}
+
+		boolean isFieldLimitReached() {
+			return fieldsSeen >= maxFields;
+		}
+
+		void onFieldAdded() {
+			fieldsSeen++;
+		}
+	}
+
+	static int parseEnvInt(String key, int def) {
+		String v = System.getenv(key);
+		if (v == null || v.trim().isEmpty()) {
+			return def;
+		}
+		try {
+			return Integer.parseInt(v.trim());
+		} catch (Exception e) {
+			return def;
+		}
+	}
+
+	static long parseEnvLong(String key, long def) {
+		String v = System.getenv(key);
+		if (v == null || v.trim().isEmpty()) {
+			return def;
+		}
+		try {
+			return Long.parseLong(v.trim());
+		} catch (Exception e) {
+			return def;
 		}
 	}
 
@@ -609,6 +794,7 @@ public interface OBFService extends BaseService {
 	}
 
 	static void addJsonValue(JSONObject out, String fieldName, Object value) {
+		JsonDumpState state = JSON_DUMP_STATE.get();
 		if (out.has(fieldName)) {
 			Object existing = out.get(fieldName);
 			JSONArray arr;
@@ -618,10 +804,15 @@ public interface OBFService extends BaseService {
 				arr = new JSONArray();
 				arr.put(existing);
 			}
-			arr.put(value);
+			if (state == null || arr.length() < state.maxArrayLength) {
+				arr.put(value);
+			}
 			out.put(fieldName, arr);
 		} else {
 			out.put(fieldName, value);
+		}
+		if (state != null) {
+			state.onFieldAdded();
 		}
 	}
 
@@ -634,7 +825,7 @@ public interface OBFService extends BaseService {
 		} else if (wireType == WireFormat.WIRETYPE_FIXED64) {
 			return codedIS.readRawLittleEndian64();
 		} else if (wireType == WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED) {
-			return codedIS.readRawLittleEndian32();
+			return readFixed32Length(codedIS);
 		} else if (wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
 			long payloadLength = readPayloadLengthByWireType(codedIS, tag);
 			if (payloadLength <= 0) {
@@ -681,7 +872,7 @@ public interface OBFService extends BaseService {
 			if (ch == '\n' || ch == '\r' || ch == '\t') {
 				continue;
 			}
-			if (ch < 0x20 || ch > 0x7E) {
+			if (Character.isISOControl(ch)) {
 				return null;
 			}
 		}

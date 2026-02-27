@@ -618,6 +618,14 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		String fieldName = System.getenv("FIELD_NAME");
 		String filter = System.getenv("MAP_FILTER");
 		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
+		String jsonFieldPath;
+		if (fieldPath == null || fieldPath.isEmpty()) {
+			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
+		} else if (fieldName == null || fieldName.trim().isEmpty()) {
+			jsonFieldPath = fieldPath;
+		} else {
+			jsonFieldPath = fieldPath + "." + fieldName.trim();
+		}
 
 		OBFService svc = new SearchTestService(null);
 
@@ -657,7 +665,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				totalSize += sum;
 				System.out.println(obf + ", " + sum);
 
-				String json = svc.getSectionJson(obf, fieldPath);
+				String json = svc.getSectionJson(obf, jsonFieldPath);
 				String obfBaseName = obfName.toLowerCase(Locale.ROOT).endsWith(".obf")
 						? obfName.substring(0, obfName.length() - 4)
 						: obfName;
