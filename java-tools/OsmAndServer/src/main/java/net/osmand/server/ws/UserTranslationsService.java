@@ -183,12 +183,12 @@ public class UserTranslationsService {
 
 		Deque<WptPt> locations = locationByUser.get(user.id);
 		if (locations != null && !locations.isEmpty()) {
-			ust.sendLocation(user.id, locations.getLast());
+			ust.sendLocation(user.id, locations.getFirst());
 		}
-		
-		if(!environment.acceptsProfiles(Profiles.of("production"))) {
-			startSimulation(user, ust);
-		}
+		// for local 
+//		if (!environment.acceptsProfiles(Profiles.of("production"))) {
+//			startSimulation(user, ust);
+//		}
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		ust.getSharingOptions().add(opts);
 		shareLocationByUser(ust, user.id);
@@ -197,7 +197,7 @@ public class UserTranslationsService {
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 	
-	private void startSimulation(CloudUser user, UserTranslation ust) {
+	public void startSimulation(CloudUser user, UserTranslation ust) {
 		Thread simThread = new Thread(() -> {
 			double simLat = 50.4501;
 			double simLon = 30.5234;
@@ -241,6 +241,7 @@ public class UserTranslationsService {
 				it.remove();
 			}
 		}
+		ust.clearLocation(userId);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));

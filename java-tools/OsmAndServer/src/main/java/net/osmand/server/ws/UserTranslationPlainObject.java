@@ -32,8 +32,9 @@ public class UserTranslationPlainObject {
 			sh.startTime = o.startTime;
 			sh.nickname = o.nickname;
 			Deque<WptPt> deque = us.getLocations().get(o.userId);
+			sh.allLocations = new ArrayList<WptPt>();
 			if (deque != null) {
-				sh.lastLocation = deque.getLast();
+				sh.lastLocation = deque.getFirst();
 				sh.allLocations = new ArrayList<>(deque);
 			}
 			this.shareLocations.add(sh);

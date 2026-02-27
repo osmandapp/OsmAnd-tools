@@ -33,6 +33,13 @@ public class UserTranslation {
 		deque.push(wptPt);
 	}
 	
+	public void clearLocation(int userid) {
+		Deque<WptPt> deque = locations.get(userid);
+		if (deque != null) {
+			deque.clear();
+		}
+	}
+	
 	public void setPassword(String password) {
 		this.password = password;
 	}
