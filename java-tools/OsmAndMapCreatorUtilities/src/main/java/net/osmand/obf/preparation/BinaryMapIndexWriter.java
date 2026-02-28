@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -102,6 +103,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
+import net.osmand.CollatorStringMatcher;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -998,8 +1000,9 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 
-		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Entry<String, List<MapObject>> entry : namesIndex.entrySet()) {
+		Map<String, List<MapObject>> normalizedNamesIndex = normalizeIndex(namesIndex);
+		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, normalizedNamesIndex.keySet());
+		for (Entry<String, List<MapObject>> entry : normalizedNamesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
 
 			codedOutStream.writeTag(OsmAndAddressNameIndexData.ATOM_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
@@ -1736,8 +1739,9 @@ public class BinaryMapIndexWriter {
 		preserveInt32Size();
 
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
-		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
+		Map<String, Set<PoiTileBox>> normalizedIndex = normalizeIndex(namesIndex);
+		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, normalizedIndex.keySet());
+		for (Map.Entry<String, Set<PoiTileBox>> e : normalizedIndex.entrySet()) {
 			codedOutStream.writeTag(OsmandOdb.OsmAndPoiNameIndex.DATA_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 			BinaryFileReference nameTableRef = indexedTable.get(e.getKey());
 			codedOutStream.flush();
@@ -1777,6 +1781,32 @@ public class BinaryMapIndexWriter {
 
 
 		return fpToWriteSeeks;
+	}
+
+	private static String normalizeIndexedStringTableKey(String key) {
+		if (key == null) {
+			return null;
+		}
+		String normalized = CollatorStringMatcher.alignChars(key);
+		normalized = normalized.toLowerCase(Locale.ROOT);
+		return normalized;
+	}
+
+	private static <V extends Collection> Map<String, V> normalizeIndex(Map<String, V> namesIndex) {
+		Map<String, V> normalized = new TreeMap<>();
+		for (Entry<String, V> e : namesIndex.entrySet()) {
+			String normalizedKey = normalizeIndexedStringTableKey(e.getKey());
+			if (normalizedKey == null || normalizedKey.isEmpty()) {
+				continue;
+			}
+			V existing = normalized.get(normalizedKey);
+			if (existing == null) {
+				normalized.put(normalizedKey, e.getValue());
+			} else {
+				existing.addAll(e.getValue());
+			}
+		}
+		return normalized;
 	}
 
 	private Map<String, BinaryFileReference> writeIndexedTable(int tag, Collection<String> indexedTable) throws IOException {
@@ -1851,8 +1881,8 @@ public class BinaryMapIndexWriter {
 				codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, subKey);
 				if (child.terminal) {
 					codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					codedOutStream.writeFixed32NoTag(0);
 					BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
+					codedOutStream.writeFixed32NoTag(0);
 					res.put(fullKey, ref);
 				}
 				if (!child.subNodes.isEmpty()) {
