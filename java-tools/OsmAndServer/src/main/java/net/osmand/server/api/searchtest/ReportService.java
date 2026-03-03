@@ -161,7 +161,7 @@ public interface ReportService {
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {
-						if (exclude.contains(fn))
+						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats"))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
 						if (outProps.contains(fn)) {
