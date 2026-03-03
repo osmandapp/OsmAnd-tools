@@ -278,46 +278,62 @@ public class TrackAnalyzerService {
 					if (startInd >= points.size() - 1 || finalInd >= points.size()) {
 						return res;
 					}
-
-					TrkSegment r = new TrkSegment();
-
-					LatLon startProj = MapUtils.getProjection(start.getLatitude(), start.getLongitude(),
-							lat(s, startInd - 1), lon(s, startInd - 1), lat(s, startInd), lon(s, startInd));
-
-					double startDist = MapUtils.getDistance(lat(s, startInd - 1), lon(s, startInd - 1),
-							lat(s, startInd), lon(s, startInd));
-					double stPercent = startDist == 0 ? 0 :
-							MapUtils.getDistance(startProj, lat(s, startInd), lon(s, startInd)) / startDist;
-
-					WptPt st = new WptPt(startProj.getLatitude(), startProj.getLongitude());
-					st.setTime(time(s, startInd - 1) + (long) (stPercent * (time(s, startInd) - time(s, startInd - 1))));
-					st.setEle(points.get(startInd).getEle());
-
-					LatLon endProj = MapUtils.getProjection(end.getLatitude(), end.getLongitude(),
-							lat(s, finalInd - 1), lon(s, finalInd - 1), lat(s, finalInd), lon(s, finalInd));
-
-					double endDist = MapUtils.getDistance(lat(s, finalInd - 1), lon(s, finalInd - 1),
-							lat(s, finalInd), lon(s, finalInd));
-					double enPercent = endDist == 0 ? 0 :
-							MapUtils.getDistance(endProj, lat(s, finalInd), lon(s, finalInd)) / endDist;
-
-					WptPt en = new WptPt(endProj.getLatitude(), endProj.getLongitude());
-					en.setTime(time(s, finalInd - 1) + (long) (enPercent * (time(s, finalInd) - time(s, finalInd - 1))));
-					en.setEle(points.get(finalInd).getEle());
-
-					r.getPoints().add(st);
-					for (int k = startInd + 1; k <= finalInd; k++) {
-						r.getPoints().add(points.get(k));
-					}
-					r.getPoints().add(en);
-					r.setName(trackName);
-					res.add(r);
+					res.add(extractSegment(s, start, end, startInd, finalInd, trackName));
 					startInd = -1;
 				}
 			}
 			i++;
 		}
+		if (startInd != -1 && res.isEmpty() && distThreshold < MAX_DIST_THRESHOLD) {
+			for (int i = startInd + 1; i < points.size(); i++) {
+				double dist = MapUtils.getOrthogonalDistance(end.getLatitude(), end.getLongitude(),
+						points.get(i - 1).getLat(), points.get(i - 1).getLon(),
+						points.get(i).getLat(), points.get(i).getLon());
+				if (dist < MAX_DIST_THRESHOLD) {
+					int finalInd = i;
+					if (startInd < points.size() - 1 && finalInd < points.size()) {
+						res.add(extractSegment(s, start, end, startInd, finalInd, trackName));
+					}
+					break;
+				}
+			}
+		}
 		return res;
+	}
+
+	private TrkSegment extractSegment(TrkSegment s, WptPt start, WptPt end, int startInd, int finalInd, String trackName) {
+		List<WptPt> points = s.getPoints();
+		TrkSegment r = new TrkSegment();
+
+		LatLon startProj = MapUtils.getProjection(start.getLatitude(), start.getLongitude(),
+				lat(s, startInd - 1), lon(s, startInd - 1), lat(s, startInd), lon(s, startInd));
+
+		double startDist = MapUtils.getDistance(lat(s, startInd - 1), lon(s, startInd - 1), lat(s, startInd), lon(s, startInd));
+		double stPercent = startDist == 0 ? 0 : MapUtils.getDistance(startProj, lat(s, startInd), lon(s, startInd)) / startDist;
+
+		WptPt st = new WptPt(startProj.getLatitude(), startProj.getLongitude());
+		st.setTime(time(s, startInd - 1) + (long) (stPercent * (time(s, startInd) - time(s, startInd - 1))));
+		st.setEle(points.get(startInd).getEle());
+
+		LatLon endProj = MapUtils.getProjection(end.getLatitude(), end.getLongitude(),
+				lat(s, finalInd - 1), lon(s, finalInd - 1), lat(s, finalInd), lon(s, finalInd));
+
+		double endDist = MapUtils.getDistance(lat(s, finalInd - 1), lon(s, finalInd - 1), lat(s, finalInd), lon(s, finalInd));
+		double enPercent = endDist == 0 ? 0 : MapUtils.getDistance(endProj, lat(s, finalInd), lon(s, finalInd)) / endDist;
+
+		WptPt en = new WptPt(endProj.getLatitude(), endProj.getLongitude());
+		en.setTime(time(s, finalInd - 1) + (long) (enPercent * (time(s, finalInd) - time(s, finalInd - 1))));
+		en.setEle(points.get(finalInd).getEle());
+
+		r.getPoints().add(st);
+
+		for (int k = startInd + 1; k <= finalInd; k++) {
+			r.getPoints().add(points.get(k));
+		}
+		r.getPoints().add(en);
+		r.setName(trackName);
+
+		return r;
 	}
 
 	private List<TrkSegment> processSegmentsForOnePoint(String trackName, TrkSegment s, WptPt point, double distThreshold) {
