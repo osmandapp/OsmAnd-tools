@@ -260,17 +260,7 @@ public class TrackAnalyzerService {
 					points.get(i).getLat(), points.get(i).getLon());
 
 			if (dist < distThreshold) {
-				int ind = i;
-				for (int j = ind + 1; j < points.size() && j < ind + 10; j++) {
-					double d2 = MapUtils.getOrthogonalDistance(pnt.getLatitude(), pnt.getLongitude(),
-							points.get(j - 1).getLat(), points.get(j - 1).getLon(),
-							points.get(j).getLat(), points.get(j).getLon());
-
-					if (d2 < dist) {
-						dist = d2;
-						i = j;
-					}
-				}
+				i = nearestSegmentInRange(pnt, points, i);
 				if (startInd == -1) {
 					startInd = i;
 				} else {
@@ -290,7 +280,7 @@ public class TrackAnalyzerService {
 						points.get(i - 1).getLat(), points.get(i - 1).getLon(),
 						points.get(i).getLat(), points.get(i).getLon());
 				if (dist < MAX_DIST_THRESHOLD) {
-					int finalInd = i;
+					int finalInd = nearestSegmentInRange(end, points, i);
 					if (startInd < points.size() - 1 && finalInd < points.size()) {
 						res.add(extractSegment(s, start, end, startInd, finalInd, trackName));
 					}
@@ -299,6 +289,23 @@ public class TrackAnalyzerService {
 			}
 		}
 		return res;
+	}
+
+	private static int nearestSegmentInRange(WptPt point, List<WptPt> points, int fromInd) {
+		double bestDist = MapUtils.getOrthogonalDistance(point.getLatitude(), point.getLongitude(),
+				points.get(fromInd - 1).getLat(), points.get(fromInd - 1).getLon(),
+				points.get(fromInd).getLat(), points.get(fromInd).getLon());
+		int best = fromInd;
+		for (int j = fromInd + 1; j < points.size() && j < fromInd + 10; j++) {
+			double d = MapUtils.getOrthogonalDistance(point.getLatitude(), point.getLongitude(),
+					points.get(j - 1).getLat(), points.get(j - 1).getLon(),
+					points.get(j).getLat(), points.get(j).getLon());
+			if (d < bestDist) {
+				bestDist = d;
+				best = j;
+			}
+		}
+		return best;
 	}
 
 	private TrkSegment extractSegment(TrkSegment s, WptPt start, WptPt end, int startInd, int finalInd, String trackName) {
