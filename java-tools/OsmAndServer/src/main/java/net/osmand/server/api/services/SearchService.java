@@ -1376,10 +1376,24 @@ public class SearchService {
                 }
                 for (TransportRoute route : routes) {
                     if (route.getId() == routeId) {
-                        List<Long> stops = route.getForwardStops()
-                                .stream()
-                                .map(TransportStop::getId)
-                                .toList();
+                        Integer intervalSeconds = route.hasInterval() ? route.calcIntervalInSeconds() : null;
+
+                        List<TransportStop> forwardStops = route.getForwardStops();
+                        List<TransportStopWithTime> stopsWithTime = new ArrayList<>();
+                        TransportSchedule schedule = route.getSchedule();
+                        int cumulative = 0;
+
+                        for (int i = 0; i < forwardStops.size(); i++) {
+                            Integer travelTime = null;
+                            if (schedule != null && schedule.avgStopIntervals != null && schedule.avgStopIntervals.size() >= i) {
+                                travelTime = cumulative;
+                                if (i < schedule.avgStopIntervals.size()) {
+                                    cumulative += schedule.avgStopIntervals.getQuick(i);
+                                }
+                            }
+                            stopsWithTime.add(new TransportStopWithTime(forwardStops.get(i).getId(), travelTime));
+                        }
+
                         List<List<LatLon>> nodes = route.getForwardWays()
                                 .stream()
                                 .map(way -> way.getNodes()
@@ -1387,7 +1401,7 @@ public class SearchService {
                                         .map(Node::getLatLon)
                                         .toList())
                                 .toList();
-                        return new TransportRouteFeature(route.getId(), stops, nodes);
+                        return new TransportRouteFeature(route.getId(), intervalSeconds, stopsWithTime, nodes);
                     }
                 }
             }
@@ -1482,7 +1496,9 @@ public class SearchService {
     public record TransportStopFeature(long id, String name, String type, String ref, String color) {
     }
 
-    public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
+    public record TransportStopWithTime(long stopId, Integer travelTimeSeconds) {}
+
+    public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithTime> stops, List<List<LatLon>> nodes) {
     }
 
     public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
