@@ -73,7 +73,6 @@ public class SmartFolderService {
 	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
 		List<SmartFolderWeb> smartFolderList = new ArrayList<>();
 		for (SmartFolder smartFolder : smartFolders) {
-			String name = smartFolder.getFolderName();
 			OrganizeByParams organizeByParams = smartFolder.getOrganizeByParams();
 			String organizeBy = null;
 			if (organizeByParams != null) {
@@ -86,7 +85,9 @@ public class SmartFolderService {
 					userFilePaths.add(file.path());
 				}
 			}
-			SmartFolderWeb smartFolderWeb = new SmartFolderWeb(name, organizeBy, userFilePaths);
+			String name = smartFolder.getFolderName();
+			long creationTime = smartFolder.getCreationTime();
+			SmartFolderWeb smartFolderWeb = new SmartFolderWeb(name, organizeBy, userFilePaths, creationTime);
 			smartFolderList.add(smartFolderWeb);
 		}
 		return smartFolderList;
@@ -156,7 +157,7 @@ public class SmartFolderService {
 		return generalSettings;
 	}
 
-	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths) {
+	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long lastModifiedMs) {
 	}
 
 }
