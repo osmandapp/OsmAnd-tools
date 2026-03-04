@@ -1379,7 +1379,7 @@ public class SearchService {
                         Integer intervalSeconds = route.hasInterval() ? route.calcIntervalInSeconds() : null;
 
                         List<TransportStop> forwardStops = route.getForwardStops();
-                        List<TransportStopWithTime> stopsWithTime = new ArrayList<>();
+                        List<TransportStopWithDetails> stopsWithTime = new ArrayList<>();
                         TransportSchedule schedule = route.getSchedule();
                         int cumulative = 0;
 
@@ -1391,7 +1391,8 @@ public class SearchService {
                                     cumulative += schedule.avgStopIntervals.getQuick(i);
                                 }
                             }
-                            stopsWithTime.add(new TransportStopWithTime(forwardStops.get(i).getId(), travelTime));
+                            TransportStop stop = forwardStops.get(i);
+                            stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), findRoutesByStop(stop), travelTime));
                         }
 
                         List<List<LatLon>> nodes = route.getForwardWays()
@@ -1473,16 +1474,19 @@ public class SearchService {
         feature.prop("id", stop.getId());
         feature.prop("name", stop.getName());
 
-        List<TransportRoute> routes = stop.getRoutes();
-        if (routes != null && !routes.isEmpty()) {
-            List<TransportStopFeature> stopFeatures = new ArrayList<>();
-            routes.forEach(route -> {
-                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor()));
-            });
-            feature.prop("routes", stopFeatures);
-        }
+        feature.prop("routes", findRoutesByStop(stop));
 
         return feature;
+    }
+
+    private List<TransportStopRouteFeature> findRoutesByStop(TransportStop stop) {
+        List<TransportRoute> routes = stop.getRoutes();
+        if (routes != null && !routes.isEmpty()) {
+            List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
+            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor())));
+            return stopRoutes;
+        }
+        return Collections.emptyList();
     }
 
     private record TransportStopsReaderResult(TransportStopsRouteReader transportReaders,
@@ -1493,12 +1497,12 @@ public class SearchService {
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
     }
 
-    public record TransportStopFeature(long id, String name, String type, String ref, String color) {
+    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color) {
     }
 
-    public record TransportStopWithTime(long stopId, Integer travelTimeSeconds) {}
+    public record TransportStopWithDetails(long stopId, String name, List<TransportStopRouteFeature> routes, Integer travelTimeSeconds) {}
 
-    public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithTime> stops, List<List<LatLon>> nodes) {
+    public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
     }
 
     public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
