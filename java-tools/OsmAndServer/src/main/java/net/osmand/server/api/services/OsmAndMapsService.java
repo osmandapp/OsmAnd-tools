@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -1505,5 +1506,10 @@ public class OsmAndMapsService {
 			return style;
 		}
 		return style.equals(INTERACTIVE_KEY) ? DEFAULT_INTERACTIVE_STYLE : style.split(INTERACTIVE_KEY + INTERACTIVE_STYLE_DELIMITER)[1];
+	}
+
+	public List<String> getOBFs() throws IOException {
+		initObfReaders();
+		return obfFiles.values().stream().map(ref -> ref.file.getAbsolutePath()).collect(Collectors.toList());
 	}
 }

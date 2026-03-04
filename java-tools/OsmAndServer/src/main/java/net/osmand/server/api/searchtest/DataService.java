@@ -1,12 +1,8 @@
 package net.osmand.server.api.searchtest;
 
-import com.amazonaws.util.StringInputStream;
 import net.osmand.binary.*;
 import net.osmand.data.*;
-import net.osmand.obf.OBFDataCreator;
-import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.SearchSettings;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
 import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -14,15 +10,12 @@ import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.SearchService;
-import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
-import org.json.JSONObject;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,18 +24,12 @@ import org.springframework.scheduling.annotation.Async;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 public interface DataService extends BaseService {
 
@@ -51,6 +38,13 @@ public interface DataService extends BaseService {
 	SearchTestCaseRepository getTestCaseRepo();
 
 	PolyglotEngine getEngine();
+
+	static String sanitize(String input) {
+		if (input == null) {
+			return "";
+		}
+		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
+	}
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
 		reload = dataset.total == null || reload;
@@ -286,14 +280,6 @@ public interface DataService extends BaseService {
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
 
-		BinaryMapIndexReaderStats.SearchStat stat = null;
-		if (searchResult != null) {
-			SearchSettings settings = searchResult.settings();
-			if (settings != null) {
-				stat = settings.getStat();
-			}
-		}
-
 		Map<String, Object> row = finder.getRow();
 		Result firstResult = finder.getFirstResult();
 		Result actualResult = finder.getActualResult();
@@ -330,9 +316,46 @@ public interface DataService extends BaseService {
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
 				}
-				if (stat != null) {
+				if (searchResult != null && searchResult.settings().getStat() != null) {
+					BinaryMapIndexReaderStats.SearchStat stat = searchResult.settings().getStat();
 					row.put("stat_bytes", stat.totalBytes);
 					row.put("stat_time", stat.totalTime);
+					int statResultsCount = 0;
+					int statAmenityCount = 0;
+					int statTransportCount = 0;
+					int statAddressCount = 0;
+					for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : stat.getWordStats().values()) {
+						if (wordSearchStat == null) {
+							continue;
+						}
+						statResultsCount += wordSearchStat.results;
+						if (wordSearchStat.resultCounts == null) {
+							continue;
+						}
+						for (Map.Entry<String, Integer> entry : wordSearchStat.resultCounts.entrySet()) {
+							String key = entry.getKey();
+							Integer value = entry.getValue();
+							int resCount = value == null ? 0 : value;
+							if (key != null && key.startsWith("Amenity")) {
+								statAmenityCount += resCount;
+							} else if (key != null && key.startsWith("Transport")) {
+								statTransportCount += resCount;
+							} else {
+								statAddressCount += resCount;
+							}
+						}
+					}
+					row.put("stat_results", statResultsCount);
+					row.put("stat_amenity_count", statAmenityCount);
+					row.put("stat_transport_count", statTransportCount);
+					row.put("stat_address_count", statAddressCount);
+
+					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
+						row.put("stat_time_" + e.getKey().name(), e.getValue().time);
+						row.put("stat_bytes_" + e.getKey().name(), e.getValue().bytes);
+						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
+					}
+					row.put("sub_stats", stat.getSubStatsSummary());
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -366,8 +389,8 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				stat != null ? stat.totalBytes : null,
-				stat != null ? stat.totalTime : null
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalBytes : null,
+				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalTime : null
 		};
 	}
 
@@ -522,256 +545,5 @@ public interface DataService extends BaseService {
 		if (id == null) return false;
 		int n = getJdbcTemplate().update("DELETE FROM domain WHERE id = ?", id);
 		return n > 0;
-	}
-
-	OsmAndMapsService getMapsService();
-
-	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
-		radius = radius == null ? 1.5 : radius;
-		double latPlusRadius = (lat == null ? MapUtils.MAX_LATITUDE : lat) + radius;
-		double lonMinusRadius = (lon == null ? MapUtils.MIN_LONGITUDE : lon) - radius;
-		double latMinusRadius = (lat == null ? MapUtils.MIN_LATITUDE : lat) - radius;
-		double lonPlusRadius = (lon == null ? MapUtils.MAX_LONGITUDE : lon) + radius;
-		QuadRect points = getMapsService().points(null,
-				new LatLon(latPlusRadius, lonMinusRadius),
-				new LatLon(latMinusRadius, lonPlusRadius));
-
-		List<String> obfList = new ArrayList<>();
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(points, null,
-				"search-test");
-		for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
-			obfList.add(ref.getFile().getAbsolutePath());
-		return obfList;
-	}
-
-	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record Address(String name, LatLon point) {}
-	record StreetAddress(String name, List<Address> houses) {}
-
-	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
-		List<Record> results = new ArrayList<>();
-		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
-		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
-		boolean isHouseEmpty = houseRegExp == null || houseRegExp.trim().isEmpty();
-		boolean isPoiEmpty = poiRegExp == null || poiRegExp.trim().isEmpty();
-		if (isCityEmpty && isStreetEmpty && isPoiEmpty)
-			return results;
-
-		File file = new File(obf);
-		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			final Pattern cityPattern, streetPattern, housePattern, poiPattern;
-			try {
-				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
-				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
-				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
-				poiPattern = !(isCityEmpty || isStreetEmpty) || !isHouseEmpty || isPoiEmpty ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
-			} catch (PatternSyntaxException e) {
-				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
-			}
-
-			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
-			try {
-				for (BinaryIndexPart p : index.getIndexes()) {
-					if (poiPattern == null && p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
-						for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
-							if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
-								continue;
-
-							final List<City> cities = index.getCities(null, type, region, null);
-							for (City c : cities) {
-								final boolean isBoundaryOrPostcode = c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE;
-								if (isBoundaryOrPostcode && !includesBoundaryPostcode) {
-									continue;
-								}
-
-								final String cityName = c.getName(lang);
-								List<StreetAddress> streets = new ArrayList<>();
-								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
-									continue;
-
-								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
-									continue;
-								}
-
-								index.preloadStreets(c, null, null);
-								for (Street s : new ArrayList<>(c.getStreets())) {
-									List<Address> buildings = new ArrayList<>();
-									final String streetName = s.getName(lang);
-									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
-										continue;
-
-									if (isHouseEmpty) {
-										streets.add(new StreetAddress(streetName, buildings));
-										continue;
-									}
-
-									index.preloadBuildings(s, null, null);
-									final List<Building> bs = s.getBuildings();
-									if (bs != null && !bs.isEmpty()) {
-										for (Building b : bs) {
-											final String houseName = b.getName(lang);
-											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(new Address(houseName, b.getLocation()));
-										}
-									}
-									if (!buildings.isEmpty()) {
-										StreetAddress street = new StreetAddress(streetName, buildings);
-										streets.add(street);
-									}
-								}
-								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
-							}
-						}
-					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
-						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
-								null, null);
-						for (Amenity amenity : index.searchPoi(req, poi)) {
-							final String poiName = amenity.getName(lang);
-							if (poiName == null || !poiPattern.matcher(poiName).find())
-								continue;
-							results.add(new Address(poiName, amenity.getLocation()));
-						}
-					}
-				}
-			} finally {
-				index.close();
-			}
-			// Sort results by name (case-insensitive) for CityAddress and Address records
-			results.sort(Comparator.comparing(o -> {
-				if (o instanceof CityAddress ca) {
-					return ca.name();
-				} else if (o instanceof Address a) {
-					return a.name();
-				}
-				return "";
-			}, String.CASE_INSENSITIVE_ORDER));
-			return results;
-		} catch (Exception e) {
-			getLogger().error("Failed to read OBF {}", file, e);
-			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
-		}
-	}
-
-	static String sanitize(String input) {
-		if (input == null) {
-			return "";
-		}
-		return input.trim().toLowerCase().replaceAll("[^a-zA-Z0-9_]", "_");
-	}
-
-	SearchService getSearchService();
-
-	default ResultMetric toMetric(SearchResult r) {
-		return new ResultMetric(r.file == null ? "" : r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
-				r.getUnknownPhraseMatchWeight(), r.getOtherWordsMatch(), r.location == null ? null :
-				MapUtils.getDistance(r.requiredSearchPhrase.getSettings().getOriginalLocation(), r.location)/1000.0,
-				r.getCompleteMatchRes().allWordsEqual, r.getCompleteMatchRes().allWordsInPhraseAreInResult);
-	}
-
-	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats) {}
-	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
-	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
-
-	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
-		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
-
-		List<AddressResult> results = new ArrayList<>();
-		for (SearchResult r : result.results()) {
-			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
-			results.add(rec);
-		}
-		SearchSettings settings = result.settings();
-		BinaryMapIndexReaderStats.SearchStat stat = settings != null ? settings.getStat() : null;
-		Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats =
-				stat != null && stat.getWordStats() != null
-						? stat.getWordStats().values()
-						: Collections.emptyList();
-		return new ResultsWithStats(results, wordStats);
-	}
-
-    private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
-        if (r == null || r == r.parentSearchResult)
-            return null;
-
-	    ResultMetric metric = toMetric(r);
-	    String type = r.objectType.name().toLowerCase();
-
-	    // If we've already visited this node, break the cycle by not traversing further
-        if (!seen.add(r))
-            return new AddressResult(r.toString(), type, r.addressName, null, metric);
-
-	    AddressResult parent = toResult(r.parentSearchResult, seen);
-        return new AddressResult(r.toString(), type, r.addressName, parent, metric);
-    }
-
-	record UnitTestPayload(String name, String[] queries) {}
-
-	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
-		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
-
-		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
-		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
-		try {
-			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
-			String unitTestJson = result.unitTestJson();
-			if (unitTestJson == null)
-				return;
-			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
-
-			OBFDataCreator creator = new OBFDataCreator();
-			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
-					new String[] {jsonFile.getAbsolutePath()});
-
-			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
-			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
-			JSONObject settingsJson = settings.toJSON();
-			Map<String, Object> rootJson = new LinkedHashMap<>();
-			rootJson.put("settings", settingsJson);
-			rootJson.put("phrases", unitTest.queries);
-			rootJson.put("results", Arrays.stream(unitTest.queries()).map(x -> "").toArray());
-
-			unitTestJson = new JSONObject(rootJson).toString(4);
-			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
-				// JSON metadata entry
-				if (jsonFile.exists()) {
-					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
-					zipOut.putNextEntry(jsonEntry);
-					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
-						Algorithms.streamCopy(jsonIn, zipOut);
-					}
-					zipOut.closeEntry();
-				}
-
-				// Gzipped data archive entry
-				if (outFile.exists()) {
-					ZipEntry gzEntry = new ZipEntry(outFile.getName());
-					zipOut.putNextEntry(gzEntry);
-					try (InputStream gzIn = new FileInputStream(outFile)) {
-						Algorithms.streamCopy(gzIn, zipOut);
-					}
-					zipOut.closeEntry();
-				}
-
-				zipOut.finish();
-				out.flush();
-			}
-		} finally {
-			if (dirPath != null && Files.exists(dirPath)) {
-				Files.walk(dirPath)
-					.sorted(Comparator.reverseOrder())
-					.forEach(p -> {
-						File f = p.toFile();
-						if (!f.delete()) {
-							f.deleteOnExit();
-						}
-					});
-			}
-		}
 	}
 }
