@@ -157,7 +157,7 @@ public class SmartFolderService {
 		return generalSettings;
 	}
 
-	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long lastModifiedMs) {
+	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long creationTime) {
 	}
 
 }
