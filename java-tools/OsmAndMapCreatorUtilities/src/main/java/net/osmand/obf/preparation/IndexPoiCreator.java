@@ -659,6 +659,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiConnection.commit();
 
 		Map<String, Set<PoiTileBox>> namesIndex = new TreeMap<String, Set<PoiTileBox>>();
+		Map<String, Set<String>> namesIndexTokens = new TreeMap<>();
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
@@ -666,7 +667,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTopIndexMap();
 		collectTagGroups();
 		// 0. process all entities
-		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		processPOIIntoTree(poiGeocoding, namesIndex, namesIndexTokens, zoomToStart, bbox, rootZoomsTree);
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
@@ -677,7 +678,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 
 		// 2.5 write names table
-		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, namesIndexTokens, startFpPoiIndex);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -878,7 +879,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     }
 
 
-	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
+	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex,
+			Map<String, Set<String>> namesIndexTokens, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
@@ -1052,7 +1054,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames);
+					namesIndex, namesIndexTokens, otherNames, idNames);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1084,50 +1086,62 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names, Set<String> idNames) {
+			Map<String, Set<String>> poiDataTokens, Set<String> names, Set<String> idNames) {
 		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
+			parsePrefix(name, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
+			parsePrefix(nameEn, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
+					parsePrefix(nk, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
+					parsePrefix(nk, data, poiData, poiDataTokens, settings.charsToBuildPoiIdNameIndex);
 				}
 			}
 		}
 	}
 
-    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
+    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
+			Map<String, Set<String>> poiDataTokens, int ind) {
         name = Algorithms.normalizeSearchText(name);
-        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
+        Set<String> splitName = new LinkedHashSet<>(Algorithms.splitByWordsLowercase(name));
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
                 splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
             }
         }
-        for (String str : splitName) {
-            if (str.length() > ind) {
-                str = str.substring(0, ind);
+        for (String splitToken : splitName) {
+            if (Algorithms.isEmpty(splitToken)) {
+                continue;
             }
-            if (!poiData.containsKey(str)) {
-                poiData.put(str, new LinkedHashSet<>());
+            String indexKey = splitToken;
+            if (indexKey.length() > ind) {
+                indexKey = indexKey.substring(0, ind);
             }
-            poiData.get(str).add(data);
+            if (!poiData.containsKey(indexKey)) {
+                poiData.put(indexKey, new LinkedHashSet<>());
+            }
+            poiData.get(indexKey).add(data);
+            if (poiDataTokens != null) {
+                Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
+                keyTokens.add(splitToken);
+                if (data.atomHash == null) {
+                    data.atomHash = splitToken.hashCode();
+                }
+            }
         }
     }
 
@@ -1194,6 +1208,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int x;
 		int y;
 		int zoom;
+		Integer atomHash;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
@@ -1209,6 +1224,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public int getZoom() {
 			return zoom;
+		}
+
+		public Integer getAtomHash() {
+			return atomHash;
 		}
 
 
