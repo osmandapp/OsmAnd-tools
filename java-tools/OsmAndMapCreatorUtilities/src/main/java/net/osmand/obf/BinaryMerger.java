@@ -681,9 +681,9 @@ public class BinaryMerger {
 			}
 		}
 		String nm = fileToExtract.getName();
-		int i = nm.indexOf('_');
-		if (i > 0) {
-			nm = nm.substring(0, i);
+		int i = nm.indexOf('.');
+		if (i > -1) {
+            nm = Algorithms.capitalizeFirstLetterAndLowercase(nm.substring(0, i));
 		}
 		if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
 			combineAddressIndex(nm, writer, addressRegions, indexes);
