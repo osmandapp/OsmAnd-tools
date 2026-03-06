@@ -1376,10 +1376,25 @@ public class SearchService {
                 }
                 for (TransportRoute route : routes) {
                     if (route.getId() == routeId) {
-                        List<Long> stops = route.getForwardStops()
-                                .stream()
-                                .map(TransportStop::getId)
-                                .toList();
+                        Integer intervalSeconds = route.hasInterval() ? route.calcIntervalInSeconds() : null;
+
+                        List<TransportStop> forwardStops = route.getForwardStops();
+                        List<TransportStopWithDetails> stopsWithTime = new ArrayList<>();
+                        TransportSchedule schedule = route.getSchedule();
+                        int cumulative = 0;
+
+                        for (int i = 0; i < forwardStops.size(); i++) {
+                            Integer travelTime = null;
+                            if (schedule != null && schedule.avgStopIntervals != null && schedule.avgStopIntervals.size() >= i) {
+                                travelTime = cumulative;
+                                if (i < schedule.avgStopIntervals.size()) {
+                                    cumulative += schedule.avgStopIntervals.getQuick(i);
+                                }
+                            }
+                            TransportStop stop = forwardStops.get(i);
+                            stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), stop.getLocation(), travelTime));
+                        }
+
                         List<List<LatLon>> nodes = route.getForwardWays()
                                 .stream()
                                 .map(way -> way.getNodes()
@@ -1387,7 +1402,7 @@ public class SearchService {
                                         .map(Node::getLatLon)
                                         .toList())
                                 .toList();
-                        return new TransportRouteFeature(route.getId(), stops, nodes);
+                        return new TransportRouteFeature(route.getId(), intervalSeconds, stopsWithTime, nodes);
                     }
                 }
             }
@@ -1459,16 +1474,22 @@ public class SearchService {
         feature.prop("id", stop.getId());
         feature.prop("name", stop.getName());
 
-        List<TransportRoute> routes = stop.getRoutes();
-        if (routes != null && !routes.isEmpty()) {
-            List<TransportStopFeature> stopFeatures = new ArrayList<>();
-            routes.forEach(route -> {
-                stopFeatures.add(new TransportStopFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor()));
-            });
-            feature.prop("routes", stopFeatures);
-        }
+        feature.prop("routes", findRoutesByStop(stop));
 
         return feature;
+    }
+
+    private List<TransportStopRouteFeature> findRoutesByStop(TransportStop stop) {
+        if (stop == null) {
+            return Collections.emptyList();
+        }
+        List<TransportRoute> routes = stop.getRoutes();
+        if (routes != null && !routes.isEmpty()) {
+            List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
+            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor())));
+            return stopRoutes;
+        }
+        return Collections.emptyList();
     }
 
     private record TransportStopsReaderResult(TransportStopsRouteReader transportReaders,
@@ -1479,10 +1500,12 @@ public class SearchService {
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
     }
 
-    public record TransportStopFeature(long id, String name, String type, String ref, String color) {
+    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color) {
     }
 
-    public record TransportRouteFeature(long id, List<Long> stops, List<List<LatLon>> nodes) {
+    public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
+
+    public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
     }
 
     public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {
