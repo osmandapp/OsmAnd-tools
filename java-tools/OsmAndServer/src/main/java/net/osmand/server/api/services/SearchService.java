@@ -1392,7 +1392,7 @@ public class SearchService {
                                 }
                             }
                             TransportStop stop = forwardStops.get(i);
-                            stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), findRoutesByStop(stop), travelTime));
+                            stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), stop.getLocation(), travelTime));
                         }
 
                         List<List<LatLon>> nodes = route.getForwardWays()
@@ -1480,6 +1480,9 @@ public class SearchService {
     }
 
     private List<TransportStopRouteFeature> findRoutesByStop(TransportStop stop) {
+        if (stop == null) {
+            return Collections.emptyList();
+        }
         List<TransportRoute> routes = stop.getRoutes();
         if (routes != null && !routes.isEmpty()) {
             List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
@@ -1500,7 +1503,7 @@ public class SearchService {
     public record TransportStopRouteFeature(long id, String name, String type, String ref, String color) {
     }
 
-    public record TransportStopWithDetails(long stopId, String name, List<TransportStopRouteFeature> routes, Integer travelTimeSeconds) {}
+    public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
 
     public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
     }
