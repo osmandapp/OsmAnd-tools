@@ -31,6 +31,7 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.BloomFilter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
@@ -1138,9 +1139,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             if (poiDataTokens != null) {
                 Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
                 keyTokens.add(splitToken);
-                if (data.atomName == null) {
-                    data.atomName = splitToken;
-                }
+				data.atomBloom |= BloomFilter.buildInt32(Collections.singleton(splitToken), true);
             }
         }
     }
@@ -1208,7 +1207,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int x;
 		int y;
 		int zoom;
-		String atomName;
+		int atomBloom;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
@@ -1226,8 +1225,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-		public String getAtomName() {
-			return atomName;
+		public int getAtomBloom() {
+			return atomBloom;
 		}
 
 
