@@ -1138,8 +1138,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             if (poiDataTokens != null) {
                 Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
                 keyTokens.add(splitToken);
-                if (data.atomHash == null) {
-                    data.atomHash = splitToken.hashCode();
+                if (data.atomName == null) {
+                    data.atomName = splitToken;
                 }
             }
         }
@@ -1208,7 +1208,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int x;
 		int y;
 		int zoom;
-		Integer atomHash;
+		String atomName;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
@@ -1226,8 +1226,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-		public Integer getAtomHash() {
-			return atomHash;
+		public String getAtomName() {
+			return atomName;
 		}
 
 

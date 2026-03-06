@@ -120,7 +120,7 @@ public class BinaryMapIndexWriter {
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
 	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static final int POI_NAME_INDEX_DATA_KEY_BLOOM_FIELD_NUMBER = 6;
-	private static final int POI_NAME_INDEX_DATA_ATOM_HASH_FIELD_NUMBER = 15;
+	private static final int POI_NAME_INDEX_DATA_ATOM_NAME_FIELD_NUMBER = 15;
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -1763,8 +1763,8 @@ public class BinaryMapIndexWriter {
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.X_FIELD_NUMBER, box.getX());
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.Y_FIELD_NUMBER, box.getY());
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.ZOOM_FIELD_NUMBER, box.getZoom());
-		if (box.getAtomHash() != null) {
-			atomOut.writeInt32(POI_NAME_INDEX_DATA_ATOM_HASH_FIELD_NUMBER, box.getAtomHash());
+		if (!Algorithms.isEmpty(box.getAtomName())) {
+			atomOut.writeString(POI_NAME_INDEX_DATA_ATOM_NAME_FIELD_NUMBER, box.getAtomName());
 		}
 		atomOut.writeFixed32(OsmandOdb.OsmAndPoiNameIndexDataAtom.SHIFTTO_FIELD_NUMBER, 0);
 		atomOut.flush();

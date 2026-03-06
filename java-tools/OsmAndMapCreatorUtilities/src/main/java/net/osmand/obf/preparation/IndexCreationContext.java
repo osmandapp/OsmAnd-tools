@@ -100,7 +100,8 @@ public class IndexCreationContext {
 		is.close();
 
 		File regionsFinalFile = new File(REGIONS_OCBF);
-		Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+		if (!regionsFinalFile.exists())
+			Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
 
 		return regionsFinalFile;
 	}
