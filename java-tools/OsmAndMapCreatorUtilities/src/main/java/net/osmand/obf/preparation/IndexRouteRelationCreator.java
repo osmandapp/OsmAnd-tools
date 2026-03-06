@@ -697,6 +697,10 @@ public class IndexRouteRelationCreator {
 			return true;
 		}
 
+		boolean keepWayDirection = "yes".equals(candidate.getTag("oneway"))
+				|| "downhill".equals(candidate.getTag("piste:type"))
+				|| "yes".equals(candidate.getTag("piste:oneway"));
+
 		LatLon firstNodeLL = result.get(0).getLatLon();
 		LatLon lastNodeLL = result.get(result.size() - 1).getLatLon();
 		LatLon firstCandidateLL = candidate.getNodes().get(0).getLatLon();
@@ -704,9 +708,9 @@ public class IndexRouteRelationCreator {
 
 		if (MapUtils.areLatLonEqual(lastNodeLL, firstCandidateLL)) {
 			addWayToNodes(result, false, candidate, false); // result + Candidate
-		} else if (MapUtils.areLatLonEqual(lastNodeLL, lastCandidateLL)) {
+		} else if (!keepWayDirection && MapUtils.areLatLonEqual(lastNodeLL, lastCandidateLL)) {
 			addWayToNodes(result, false, candidate, true); // result + etadidnaC
-		} else if (MapUtils.areLatLonEqual(firstNodeLL, firstCandidateLL)) {
+		} else if (!keepWayDirection && MapUtils.areLatLonEqual(firstNodeLL, firstCandidateLL)) {
 			addWayToNodes(result, true, candidate, true); // etadidnaC + result
 		} else if (MapUtils.areLatLonEqual(firstNodeLL, lastCandidateLL)) {
 			addWayToNodes(result, true, candidate, false); // Candidate + result
