@@ -1788,7 +1788,8 @@ public class BinaryMapIndexWriter {
 			nameTableRef.writeReference(raf, getFilePointer());
 
 			List<PoiTileBox> tileBoxes = new ArrayList<>(e.getValue());
-			Set<String> keyTokens = normalizedTokens.get(e.getKey());
+			Set<String> keyTokensRaw = normalizedTokens.get(e.getKey());
+			Set<String> keyTokens = keyTokensRaw == null ? Collections.emptySet() : keyTokensRaw;
 			byte[] keyBloomBytes = BloomFilter.build(keyTokens, true);
 			List<Integer> atomMessageSizes = new ArrayList<>(tileBoxes.size());
 			ByteArrayOutputStream dataPayload = new ByteArrayOutputStream();
