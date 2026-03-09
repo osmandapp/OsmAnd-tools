@@ -1524,8 +1524,9 @@ public class SearchService {
         }
         List<TransportRoute> routes = stop.getRoutes();
         if (routes != null && !routes.isEmpty()) {
+            long stopId = stop.getId();
             List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
-            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor())));
+            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor(), stopId)));
             return stopRoutes;
         }
         return Collections.emptyList();
@@ -1539,7 +1540,7 @@ public class SearchService {
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
     }
 
-    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color) {
+    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, long stopId) {
     }
 
     public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
