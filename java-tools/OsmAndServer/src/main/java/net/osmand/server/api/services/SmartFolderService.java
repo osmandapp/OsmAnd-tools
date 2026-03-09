@@ -122,10 +122,14 @@ public class SmartFolderService {
 
 	void setAppearance(GpxFile gpxFile, String name, int userId) {
 		UserFile file = userDataService.getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (file == null || file.filesize == -1 || file.data == null) {
+		if (file == null || file.filesize == -1) {
 			return;
 		}
-		try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(file.data))) {
+		InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
+		if (in == null) {
+			return;
+		}
+		try (GZIPInputStream gis = new GZIPInputStream(in)) {
 			ObjectMapper mapper = new ObjectMapper();
 
 			ObjectNode json = (ObjectNode) mapper.readTree(gis);
@@ -146,13 +150,18 @@ public class SmartFolderService {
 
 	private String getGeneralSettings(int userId) {
 		String generalSettings = null;
-		UserFile userFile = userDataService.getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
-		if (userFile != null) {
-			try (InputStream is = new GZIPInputStream(new ByteArrayInputStream(userFile.data))) {
-				generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-			} catch (IOException e) {
-				LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
-			}
+		UserFile file = userDataService.getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
+		if (file == null) {
+			return null;
+		}
+		InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
+		if (in == null) {
+			return null;
+		}
+		try (InputStream is = new GZIPInputStream(in)) {
+			generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
 		}
 		return generalSettings;
 	}
