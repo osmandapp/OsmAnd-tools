@@ -1524,12 +1524,22 @@ public class SearchService {
         }
         List<TransportRoute> routes = stop.getRoutes();
         if (routes != null && !routes.isEmpty()) {
-            long stopId = stop.getId();
+            TransportStopInfo stopInfo = toStopInfo(stop);
             List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
-            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor(), stopId)));
+            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor(), stopInfo)));
             return stopRoutes;
         }
         return Collections.emptyList();
+    }
+
+    private static TransportStopInfo toStopInfo(TransportStop stop) {
+        LatLon loc = stop != null ? stop.getLocation() : null;
+        if (loc == null) {
+            return null;
+        }
+        double lat = loc.getLatitude();
+        double lon = loc.getLongitude();
+        return new TransportStopInfo(stop.getId(), lat, lon);
     }
 
     private record TransportStopsReaderResult(TransportStopsRouteReader transportReaders,
@@ -1540,7 +1550,10 @@ public class SearchService {
     public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
     }
 
-    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, long stopId) {
+    public record TransportStopInfo(long id, double lat, double lon) {
+    }
+
+    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, TransportStopInfo stop) {
     }
 
     public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
