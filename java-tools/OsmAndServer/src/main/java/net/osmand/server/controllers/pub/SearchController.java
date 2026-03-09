@@ -349,6 +349,16 @@ public class SearchController {
         return ResponseEntity.ok(gson.toJson(result));
     }
 
+    @GetMapping(path = {"/get-nearby-transport-stops"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getNearbyTransportStops(@RequestParam double lat,
+                                                         @RequestParam double lon,
+                                                         @RequestParam long stopId) throws IOException {
+        LatLon stopCoords = new LatLon(lat, lon);
+        Map<String, Object> result = searchService.getNearbyTransportStops(stopCoords, stopId);
+        return ResponseEntity.ok(gson.toJson(result));
+    }
+
     @PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {

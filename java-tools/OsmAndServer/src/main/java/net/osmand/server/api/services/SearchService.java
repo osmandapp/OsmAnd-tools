@@ -73,6 +73,10 @@ public class SearchService {
     private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
     private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
+    private static final int SHOW_STOPS_RADIUS_METERS = 150;
+    private static final double SHOW_STOPS_RADIUS_DEGREE = SHOW_STOPS_RADIUS_METERS / 111320.0;
+    private static final String KEY_NEARBY_ROUTES = "nearbyRoutes";
+
     private static final String DEFAULT_SEARCH_LANG = "en";
     private static final String AND_RES = "/androidResources/";
     
@@ -1431,6 +1435,44 @@ public class SearchService {
             osmAndMapsService.unlockReaders(readerResult.readers);
         }
         return null;
+    }
+
+    public Map<String, Object> getNearbyTransportStops(LatLon stopCoords, long excludeStopId) throws IOException {
+        List<LatLon> bbox = Arrays.asList(
+                new LatLon(stopCoords.getLatitude() + SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() - SHOW_STOPS_RADIUS_DEGREE),
+                new LatLon(stopCoords.getLatitude() - SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() + SHOW_STOPS_RADIUS_DEGREE)
+        );
+        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
+        if (readerResult == null) {
+            return Map.of(KEY_NEARBY_ROUTES, Collections.<TransportStopRouteFeature>emptyList());
+        }
+        Set<Long> excludeRouteIds = new HashSet<>();
+        Map<Long, TransportStopRouteFeature> routesById = new LinkedHashMap<>();
+        int stopsCount = 0;
+        try {
+            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
+                if (s.getId() == excludeStopId) {
+                    for (TransportStopRouteFeature r : findRoutesByStop(s)) {
+                        excludeRouteIds.add(r.id());
+                    }
+                    continue;
+                }
+                if (stopsCount >= TOTAL_LIMIT_TRANSPORT_STOPS) {
+                    break;
+                }
+                if (!s.isDeleted() && !s.isMissingStop()) {
+                    stopsCount++;
+                    for (TransportStopRouteFeature r : findRoutesByStop(s)) {
+                        if (!excludeRouteIds.contains(r.id())) {
+                            routesById.putIfAbsent(r.id(), r);
+                        }
+                    }
+                }
+            }
+        } finally {
+            osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+        return Map.of(KEY_NEARBY_ROUTES, new ArrayList<>(routesById.values()));
     }
 
     private TransportStopsReaderResult getTransportStopsReader(List<LatLon> bbox) throws IOException {
