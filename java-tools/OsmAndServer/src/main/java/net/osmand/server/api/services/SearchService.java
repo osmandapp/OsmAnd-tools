@@ -1447,30 +1447,27 @@ public class SearchService {
             return Map.of(KEY_NEARBY_ROUTES, Collections.<TransportStopRouteFeature>emptyList());
         }
         Set<Long> excludeRouteIds = new HashSet<>();
-        Map<Long, TransportStopRouteFeature> routesById = new LinkedHashMap<>();
-        int stopsCount = 0;
+        List<TransportStop> stops = new ArrayList<>();
         try {
             for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
                 if (s.getId() == excludeStopId) {
                     for (TransportStopRouteFeature r : findRoutesByStop(s)) {
                         excludeRouteIds.add(r.id());
                     }
-                    continue;
-                }
-                if (stopsCount >= TOTAL_LIMIT_TRANSPORT_STOPS) {
-                    break;
-                }
-                if (!s.isDeleted() && !s.isMissingStop()) {
-                    stopsCount++;
-                    for (TransportStopRouteFeature r : findRoutesByStop(s)) {
-                        if (!excludeRouteIds.contains(r.id())) {
-                            routesById.putIfAbsent(r.id(), r);
-                        }
-                    }
+                } else if (!s.isDeleted() && !s.isMissingStop() && stops.size() < TOTAL_LIMIT_TRANSPORT_STOPS) {
+                    stops.add(s);
                 }
             }
         } finally {
             osmAndMapsService.unlockReaders(readerResult.readers);
+        }
+        Map<Long, TransportStopRouteFeature> routesById = new LinkedHashMap<>();
+        for (TransportStop s : stops) {
+            for (TransportStopRouteFeature r : findRoutesByStop(s)) {
+                if (!excludeRouteIds.contains(r.id())) {
+                    routesById.putIfAbsent(r.id(), r);
+                }
+            }
         }
         return Map.of(KEY_NEARBY_ROUTES, new ArrayList<>(routesById.values()));
     }
