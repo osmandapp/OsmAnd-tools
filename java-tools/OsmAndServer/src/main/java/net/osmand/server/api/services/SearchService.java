@@ -600,6 +600,25 @@ public class SearchService {
         int top31 = (int) searchBbox.top;
         int bottom31 = (int) searchBbox.bottom;
 
+        ResultMatcher<Amenity> additionalsMatcher = null;
+        if (filter != null && !filter.isEmpty() && !poiAdditionals.isEmpty()) {
+            Set<String> addSet = new LinkedHashSet<>(poiAdditionals);
+            additionalsMatcher = new ResultMatcher<>() {
+                @Override
+                public boolean publish(Amenity object) {
+                    for (String add : addSet) {
+                        if (object.getAdditionalInfoKeys().contains(add)) return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return false;
+                }
+            };
+        }
+
         int categoryStartSize = foundFeatures.size();
 
         for (BinaryMapIndexReader reader : readers) {
@@ -618,24 +637,6 @@ public class SearchService {
                     continue;
                 }
             } else {
-                ResultMatcher<Amenity> additionalsMatcher = null;
-                if (!poiAdditionals.isEmpty()) {
-                    Set<String> addSet = new LinkedHashSet<>(poiAdditionals);
-                    additionalsMatcher = new ResultMatcher<>() {
-	                    @Override
-	                    public boolean publish(Amenity object) {
-		                    for (String add : addSet) {
-			                    if (object.getAdditionalInfoKeys().contains(add)) return true;
-		                    }
-		                    return false;
-	                    }
-
-	                    @Override
-	                    public boolean isCancelled() {
-		                    return false;
-	                    }
-                    };
-                }
                 request = BinaryMapIndexReader.buildSearchPoiRequest(
                         left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, additionalsMatcher);
             }
