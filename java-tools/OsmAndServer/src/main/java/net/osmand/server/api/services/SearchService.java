@@ -10,8 +10,6 @@ import net.osmand.data.City.CityType;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
-import net.osmand.osm.edit.Node;
-import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
 import net.osmand.server.utils.MapPoiTypesTranslator;
@@ -70,12 +68,7 @@ public class SearchService {
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
-    private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
-    private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
-
-    private static final int SHOW_STOPS_RADIUS_METERS = 150;
-    private static final double SHOW_STOPS_RADIUS_DEGREE = SHOW_STOPS_RADIUS_METERS / 111320.0;
-    private static final String KEY_NEARBY_ROUTES = "nearbyRoutes";
+    static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
 
     private static final String DEFAULT_SEARCH_LANG = "en";
     private static final String AND_RES = "/androidResources/";
@@ -790,7 +783,7 @@ public class SearchService {
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
-    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox, boolean baseSearch) throws IOException {
+    List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox, boolean baseSearch) throws IOException {
         OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
         if (baseSearch) {
             return List.of(basemap);
@@ -1315,250 +1308,6 @@ public class SearchService {
     public static boolean isOsmUrlAvailable(MapObject object) {
         Long id = object.getId();
         return id != null && id > 0;
-    }
-
-    public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
-        List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
-        if (bbox.size() != 2) {
-            return new TransportStopsSearchResult(false, new FeatureCollection());
-        }
-
-        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
-        if (readerResult == null) {
-            return new TransportStopsSearchResult(false, new FeatureCollection());
-        }
-
-        List<Feature> features = new ArrayList<>();
-        boolean useLimit = false;
-        
-        try {
-            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
-                if (features.size() >= TOTAL_LIMIT_TRANSPORT_STOPS) {
-                    useLimit = true;
-                    break;
-                }
-                if (!s.isDeleted() && !s.isMissingStop()) {
-                    Feature feature = convertTransportStopToFeature(s);
-                    if (feature != null) {
-                        features.add(feature);
-                    }
-                }
-            }
-        } finally {
-            osmAndMapsService.unlockReaders(readerResult.readers);
-        }
-
-        if (features.isEmpty()) {
-            return new TransportStopsSearchResult(false, new FeatureCollection());
-        }
-        return new TransportStopsSearchResult(useLimit, new FeatureCollection(features.toArray(new Feature[0])));
-    }
-
-    public TransportRouteFeature getTransportRoute(LatLon transportStopCoords, long stopId, long routeId) throws IOException {
-        List<LatLon> bbox = Arrays.asList(
-                new LatLon(transportStopCoords.getLatitude() + SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
-                new LatLon(transportStopCoords.getLatitude() - SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SEARCH_POI_RADIUS_DEGREE)
-        );
-
-        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
-        if (readerResult == null) {
-            return null;
-        }
-
-        try {
-            TransportStop foundStop = null;
-            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
-                if (s.getId() == stopId) {
-                    foundStop = s;
-                    break;
-                }
-            }
-            if (foundStop != null) {
-                List<TransportRoute> routes = foundStop.getRoutes();
-                if (routes == null || routes.isEmpty()) {
-                    return null;
-                }
-                for (TransportRoute route : routes) {
-                    if (route.getId() == routeId) {
-                        Integer intervalSeconds = route.hasInterval() ? route.calcIntervalInSeconds() : null;
-
-                        List<TransportStop> forwardStops = route.getForwardStops();
-                        List<TransportStopWithDetails> stopsWithTime = new ArrayList<>();
-                        TransportSchedule schedule = route.getSchedule();
-                        int cumulative = 0;
-
-                        for (int i = 0; i < forwardStops.size(); i++) {
-                            Integer travelTime = null;
-                            if (schedule != null && schedule.avgStopIntervals != null && schedule.avgStopIntervals.size() >= i) {
-                                travelTime = cumulative;
-                                if (i < schedule.avgStopIntervals.size()) {
-                                    cumulative += schedule.avgStopIntervals.getQuick(i);
-                                }
-                            }
-                            TransportStop stop = forwardStops.get(i);
-                            stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), stop.getLocation(), travelTime));
-                        }
-
-                        List<List<LatLon>> nodes = route.getForwardWays()
-                                .stream()
-                                .map(way -> way.getNodes()
-                                        .stream()
-                                        .map(Node::getLatLon)
-                                        .toList())
-                                .toList();
-                        return new TransportRouteFeature(route.getId(), intervalSeconds, stopsWithTime, nodes);
-                    }
-                }
-            }
-        } finally {
-            osmAndMapsService.unlockReaders(readerResult.readers);
-        }
-        return null;
-    }
-
-    public Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
-        List<LatLon> bbox = Arrays.asList(
-                new LatLon(transportStopCoords.getLatitude() + SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SEARCH_POI_RADIUS_DEGREE),
-                new LatLon(transportStopCoords.getLatitude() - SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SEARCH_POI_RADIUS_DEGREE)
-        );
-        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
-        if (readerResult == null) {
-            return null;
-        }
-        try {
-            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
-                if (s.getId() == stopId) {
-                    return convertTransportStopToFeature(s);
-                }
-            }
-        } finally {
-            osmAndMapsService.unlockReaders(readerResult.readers);
-        }
-        return null;
-    }
-
-    public Map<String, Object> getNearbyTransportStops(LatLon stopCoords, long excludeStopId) throws IOException {
-        List<LatLon> bbox = Arrays.asList(
-                new LatLon(stopCoords.getLatitude() + SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() - SHOW_STOPS_RADIUS_DEGREE),
-                new LatLon(stopCoords.getLatitude() - SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() + SHOW_STOPS_RADIUS_DEGREE)
-        );
-        TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
-        if (readerResult == null) {
-            return Map.of(KEY_NEARBY_ROUTES, Collections.<TransportStopRouteFeature>emptyList());
-        }
-        Set<Long> excludeRouteIds = new HashSet<>();
-        List<TransportStop> stops = new ArrayList<>();
-        try {
-            for (TransportStop s : readerResult.transportReaders.readMergedTransportStops(readerResult.request)) {
-                if (s.getId() == excludeStopId) {
-                    for (TransportStopRouteFeature r : findRoutesByStop(s)) {
-                        excludeRouteIds.add(r.id());
-                    }
-                } else if (!s.isDeleted() && !s.isMissingStop() && stops.size() < TOTAL_LIMIT_TRANSPORT_STOPS) {
-                    stops.add(s);
-                }
-            }
-        } finally {
-            osmAndMapsService.unlockReaders(readerResult.readers);
-        }
-        Map<Long, TransportStopRouteFeature> routesById = new LinkedHashMap<>();
-        for (TransportStop s : stops) {
-            for (TransportStopRouteFeature r : findRoutesByStop(s)) {
-                if (!excludeRouteIds.contains(r.id())) {
-                    routesById.putIfAbsent(r.id(), r);
-                }
-            }
-        }
-        return Map.of(KEY_NEARBY_ROUTES, new ArrayList<>(routesById.values()));
-    }
-
-    private TransportStopsReaderResult getTransportStopsReader(List<LatLon> bbox) throws IOException {
-        if (!osmAndMapsService.validateAndInitConfig()) {
-            return null;
-        }
-
-        QuadRect searchBbox = getSearchBbox(bbox);
-        if (searchBbox == null) {
-            return null;
-        }
-
-        int left31 = (int) searchBbox.left;
-        int right31 = (int) searchBbox.right;
-        int top31 = (int) searchBbox.top;
-        int bottom31 = (int) searchBbox.bottom;
-
-        List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, false);
-        if (mapList.isEmpty()) {
-            return null;
-        }
-        List<BinaryMapIndexReader> readers = osmAndMapsService.getReaders(mapList, null);
-        if (readers.isEmpty()) {
-            return null;
-        }
-        TransportStopsRouteReader transportReaders = new TransportStopsRouteReader(readers);
-        SearchRequest<TransportStop> request = BinaryMapIndexReader.buildSearchTransportRequest(
-                left31, right31, top31, bottom31, -1, new ArrayList<>());
-
-        return new TransportStopsReaderResult(transportReaders, readers, request);
-    }
-
-    private Feature convertTransportStopToFeature(TransportStop stop) {
-        if (stop == null || stop.getLocation() == null) {
-            return null;
-        }
-
-        LatLon location = stop.getLocation();
-        Feature feature = new Feature(Geometry.point(location));
-
-        feature.prop("id", stop.getId());
-        feature.prop("name", stop.getName());
-
-        feature.prop("routes", findRoutesByStop(stop));
-
-        return feature;
-    }
-
-    private List<TransportStopRouteFeature> findRoutesByStop(TransportStop stop) {
-        if (stop == null) {
-            return Collections.emptyList();
-        }
-        List<TransportRoute> routes = stop.getRoutes();
-        if (routes != null && !routes.isEmpty()) {
-            TransportStopInfo stopInfo = toStopInfo(stop);
-            List<TransportStopRouteFeature> stopRoutes = new ArrayList<>();
-            routes.forEach(route -> stopRoutes.add(new TransportStopRouteFeature(route.getId(), route.getName(), route.getType(), route.getRef(), route.getColor(), stopInfo)));
-            return stopRoutes;
-        }
-        return Collections.emptyList();
-    }
-
-    private static TransportStopInfo toStopInfo(TransportStop stop) {
-        LatLon loc = stop != null ? stop.getLocation() : null;
-        if (loc == null) {
-            return null;
-        }
-        double lat = loc.getLatitude();
-        double lon = loc.getLongitude();
-        return new TransportStopInfo(stop.getId(), lat, lon);
-    }
-
-    private record TransportStopsReaderResult(TransportStopsRouteReader transportReaders,
-                                              List<BinaryMapIndexReader> readers,
-                                              SearchRequest<TransportStop> request) {
-    }
-
-    public record TransportStopsSearchResult(boolean useLimit, FeatureCollection features) {
-    }
-
-    public record TransportStopInfo(long id, double lat, double lon) {
-    }
-
-    public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, TransportStopInfo stop) {
-    }
-
-    public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
-
-    public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
     }
 
     public LatLon parseLocation(String locationString, LatLon bboxCentre) throws IOException {

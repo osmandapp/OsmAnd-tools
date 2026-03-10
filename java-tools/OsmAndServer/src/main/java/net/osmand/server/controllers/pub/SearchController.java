@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
@@ -44,6 +45,9 @@ public class SearchController {
     
     @Autowired
     SearchService searchService;
+
+    @Autowired
+    TransportStopsService transportStopsService;
     
     @Autowired
     protected CloudUserDevicesRepository devicesRepository;
@@ -318,7 +322,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchTransportStops(@RequestParam String northWest,
                                                        @RequestParam String southEast) throws IOException {
-        SearchService.TransportStopsSearchResult result = searchService.searchTransportStops(northWest, southEast);
+        TransportStopsService.TransportStopsSearchResult result = transportStopsService.searchTransportStops(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(result));
     }
 
@@ -329,7 +333,7 @@ public class SearchController {
                                                     @RequestParam long stopId,
                                                     @RequestParam long routeId) throws IOException {
         LatLon transportStopCoords = new LatLon(lat, lon);
-        SearchService.TransportRouteFeature result = searchService.getTransportRoute(transportStopCoords, stopId, routeId);
+        TransportStopsService.TransportRouteFeature result = transportStopsService.getTransportRoute(transportStopCoords, stopId, routeId);
         if (result == null) {
             return ResponseEntity.badRequest().body("Error getting transport route!");
         }
@@ -342,7 +346,7 @@ public class SearchController {
                                                     @RequestParam double lon,
                                                     @RequestParam long stopId) throws IOException {
         LatLon transportStopCoords = new LatLon(lat, lon);
-        Feature result = searchService.getTransportStop(transportStopCoords, stopId);
+        Feature result = transportStopsService.getTransportStop(transportStopCoords, stopId);
         if (result == null) {
             return ResponseEntity.badRequest().body("Error getting transport stop!");
         }
@@ -355,7 +359,7 @@ public class SearchController {
                                                          @RequestParam double lon,
                                                          @RequestParam long stopId) throws IOException {
         LatLon stopCoords = new LatLon(lat, lon);
-        Map<String, Object> result = searchService.getNearbyTransportStops(stopCoords, stopId);
+        Map<String, Object> result = transportStopsService.getNearbyTransportStops(stopCoords, stopId);
         return ResponseEntity.ok(gson.toJson(result));
     }
 
