@@ -91,32 +91,13 @@ public class TransportStopsService {
 				for (TransportRoute route : routes) {
 					if (route.getId() == routeId) {
 						Integer intervalSeconds = route.hasInterval() ? route.calcIntervalInSeconds() : null;
-
-						List<TransportStop> forwardStops = route.getForwardStops();
-						List<TransportStopWithDetails> stopsWithTime = new ArrayList<>();
-						TransportSchedule schedule = route.getSchedule();
-						int cumulative = 0;
-
-						for (int i = 0; i < forwardStops.size(); i++) {
-							Integer travelTime = null;
-							if (schedule != null && schedule.avgStopIntervals != null && schedule.avgStopIntervals.size() >= i) {
-								travelTime = cumulative;
-								if (i < schedule.avgStopIntervals.size()) {
-									cumulative += schedule.avgStopIntervals.getQuick(i);
-								}
-							}
-							TransportStop stop = forwardStops.get(i);
-							stopsWithTime.add(new TransportStopWithDetails(stop.getId(), stop.getName(), stop.getLocation(), travelTime));
-						}
-
-						List<List<LatLon>> nodes = route.getForwardWays()
-								.stream()
-								.map(way -> way.getNodes()
-										.stream()
-										.map(Node::getLatLon)
-										.toList())
+						List<TransportStopWithDetails> stops = route.getForwardStops().stream()
+								.map(s -> new TransportStopWithDetails(s.getId(), s.getName(), s.getLocation()))
 								.toList();
-						return new TransportRouteFeature(route.getId(), intervalSeconds, stopsWithTime, nodes);
+						List<List<LatLon>> nodes = route.getForwardWays().stream()
+								.map(way -> way.getNodes().stream().map(Node::getLatLon).toList())
+								.toList();
+						return new TransportRouteFeature(route.getId(), intervalSeconds, stops, nodes);
 					}
 				}
 			}
@@ -260,7 +241,7 @@ public class TransportStopsService {
 	public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, TransportStopInfo stop) {
 	}
 
-	public record TransportStopWithDetails(long stopId, String name, LatLon coords, Integer travelTimeSeconds) {}
+	public record TransportStopWithDetails(long stopId, String name, LatLon coords) {}
 
 	public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
 	}
