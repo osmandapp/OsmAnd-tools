@@ -5,6 +5,7 @@ import net.osmand.data.*;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.server.controllers.pub.GeojsonClasses;
+import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,9 +22,14 @@ public class TransportStopsService {
 	OsmAndMapsService osmAndMapsService;
 
 	private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
-	private static final int SHOW_STOPS_RADIUS_METERS = 150;
-	private static final double SHOW_STOPS_RADIUS_DEGREE = SHOW_STOPS_RADIUS_METERS / 111320.0;
+	private static final int SHOW_NEARBY_ROUTES_RADIUS_METERS = 150;
+	private static final int SEARCH_STOP_RADIUS_METERS = 50;
 	private static final String KEY_NEARBY_ROUTES = "nearbyRoutes";
+
+	private static List<LatLon> bboxAroundPoint(double lat, double lon, int radiusMeters) {
+		QuadRect rect = MapUtils.calculateLatLonBbox(lat, lon, radiusMeters);
+		return Arrays.asList(new LatLon(rect.top, rect.left), new LatLon(rect.bottom, rect.right));
+	}
 
 	public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
 		List<LatLon> bbox = searchService.getBboxCoords(Arrays.asList(northWest, southEast));
@@ -63,11 +69,7 @@ public class TransportStopsService {
 	}
 
 	public TransportRouteFeature getTransportRoute(LatLon transportStopCoords, long stopId, long routeId) throws IOException {
-		List<LatLon> bbox = Arrays.asList(
-				new LatLon(transportStopCoords.getLatitude() + SearchService.SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SearchService.SEARCH_POI_RADIUS_DEGREE),
-				new LatLon(transportStopCoords.getLatitude() - SearchService.SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SearchService.SEARCH_POI_RADIUS_DEGREE)
-		);
-
+		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), SEARCH_STOP_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return null;
@@ -125,10 +127,7 @@ public class TransportStopsService {
 	}
 
 	public GeojsonClasses.Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
-		List<LatLon> bbox = Arrays.asList(
-				new LatLon(transportStopCoords.getLatitude() + SearchService.SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() - SearchService.SEARCH_POI_RADIUS_DEGREE),
-				new LatLon(transportStopCoords.getLatitude() - SearchService.SEARCH_POI_RADIUS_DEGREE, transportStopCoords.getLongitude() + SearchService.SEARCH_POI_RADIUS_DEGREE)
-		);
+		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), SEARCH_STOP_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return null;
@@ -146,10 +145,7 @@ public class TransportStopsService {
 	}
 
 	public Map<String, Object> getNearbyTransportStops(LatLon stopCoords, long excludeStopId) throws IOException {
-		List<LatLon> bbox = Arrays.asList(
-				new LatLon(stopCoords.getLatitude() + SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() - SHOW_STOPS_RADIUS_DEGREE),
-				new LatLon(stopCoords.getLatitude() - SHOW_STOPS_RADIUS_DEGREE, stopCoords.getLongitude() + SHOW_STOPS_RADIUS_DEGREE)
-		);
+		List<LatLon> bbox = bboxAroundPoint(stopCoords.getLatitude(), stopCoords.getLongitude(), SHOW_NEARBY_ROUTES_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return Map.of(KEY_NEARBY_ROUTES, Collections.<TransportStopRouteFeature>emptyList());
