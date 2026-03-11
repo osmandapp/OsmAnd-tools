@@ -1763,8 +1763,11 @@ public class BinaryMapIndexWriter {
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.X_FIELD_NUMBER, box.getX());
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.Y_FIELD_NUMBER, box.getY());
 		atomOut.writeUInt32(OsmandOdb.OsmAndPoiNameIndexDataAtom.ZOOM_FIELD_NUMBER, box.getZoom());
-		if (box.getAtomBloom() != 0) {
-			atomOut.writeInt32(POI_NAME_INDEX_DATA_ATOM_BLOOM_FIELD_NUMBER, box.getAtomBloom());
+		byte[] bloom = box.getAtomBloom();
+		if (bloom != null && bloom.length > 0) {
+			atomOut.writeTag(POI_NAME_INDEX_DATA_ATOM_BLOOM_FIELD_NUMBER, FieldType.BYTES.getWireType());
+			atomOut.writeRawVarint32(bloom.length);
+			atomOut.writeRawBytes(bloom);
 		}
 		atomOut.writeFixed32(OsmandOdb.OsmAndPoiNameIndexDataAtom.SHIFTTO_FIELD_NUMBER, 0);
 		atomOut.flush();
@@ -1790,14 +1793,14 @@ public class BinaryMapIndexWriter {
 			List<PoiTileBox> tileBoxes = new ArrayList<>(e.getValue());
 			Set<String> keyTokensRaw = normalizedTokens.get(e.getKey());
 			Set<String> keyTokens = keyTokensRaw == null ? Collections.emptySet() : keyTokensRaw;
-			byte[] keyBloomBytes = BloomFilter.build(keyTokens, true);
+			byte[] bloom = BloomFilter.build(keyTokens, true);
 			List<Integer> atomMessageSizes = new ArrayList<>(tileBoxes.size());
 			ByteArrayOutputStream dataPayload = new ByteArrayOutputStream();
 			CodedOutputStream dataOut = CodedOutputStream.newInstance(dataPayload);
-			if (keyBloomBytes != null && keyBloomBytes.length > 0) {
+			if (bloom != null && bloom.length > 0) {
 				dataOut.writeTag(POI_NAME_INDEX_DATA_KEY_BLOOM_FIELD_NUMBER, FieldType.BYTES.getWireType());
-				dataOut.writeRawVarint32(keyBloomBytes.length);
-				dataOut.writeRawBytes(keyBloomBytes);
+				dataOut.writeRawVarint32(bloom.length);
+				dataOut.writeRawBytes(bloom);
 			}
 			for (PoiTileBox box : tileBoxes) {
 				byte[] atomBytes = buildPoiNameIndexDataAtomBytes(box);

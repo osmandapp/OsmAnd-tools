@@ -773,7 +773,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-
+		log.info("Avg index's tokens: " + BloomFilter.writeIndexAcc.sum() + "/" + BloomFilter.writeIndexCount.sum());
+		log.info("Avg index bloom bits: " + BloomFilter.writeIndexBitAcc.sum() + "/" + BloomFilter.writeIndexCount.sum());
+		log.info("Avg box's tokens: " + BloomFilter.writeBoxAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
+		log.info("Avg box bloom bits: " + BloomFilter.writeBoxBitAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1137,10 +1140,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             }
             poiData.get(indexKey).add(data);
             if (poiDataTokens != null) {
-                Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
-                keyTokens.add(splitToken);
-				data.atomBloom |= BloomFilter.buildInt32(Collections.singleton(splitToken), true);
-            }
+				Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
+				keyTokens.add(splitToken);
+				data.addAtomToken(splitToken);
+			}
         }
     }
 
@@ -1207,10 +1210,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int x;
 		int y;
 		int zoom;
-		int atomBloom;
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
+		final Set<String> boxTokens = new LinkedHashSet<>();
+		private byte[] cachedBoxBloom = null;
 
 		public int getX() {
 			return x;
@@ -1225,11 +1229,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-		public int getAtomBloom() {
-			return atomBloom;
+		public byte[] getAtomBloom() {
+			if (cachedBoxBloom == null) {
+				cachedBoxBloom = BloomFilter.build(boxTokens, false);
+			}
+			return cachedBoxBloom;
 		}
 
-
+		public void addAtomToken(String token) {
+			if (boxTokens.add(token)) {
+				cachedBoxBloom = null;
+			}
+		}
 	}
 
 	private static class Tree<T> {
