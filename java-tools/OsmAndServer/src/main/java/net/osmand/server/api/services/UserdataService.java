@@ -391,6 +391,16 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
+	public void uploadInfoFile(MultipartFile file, String name, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+		CloudUserFilesRepository.UserFile lastFileVersion = getLastFileVersion(dev.userid, name, UserdataService.FILE_TYPE_GPX);
+		StorageService.InternalZipFile zipfile = StorageService.InternalZipFile.buildFromMultipartFile(file);
+		uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
+		if (lastFileVersion != null) {
+			long updatetime = lastFileVersion.updatetime.getTime();
+			deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
+		}
+	}
+
 	private boolean isKmlKmzFileByName(String originalFilename) {
 		return originalFilename.toLowerCase().endsWith(".kml") || originalFilename.toLowerCase().endsWith(".kmz");
 	}
