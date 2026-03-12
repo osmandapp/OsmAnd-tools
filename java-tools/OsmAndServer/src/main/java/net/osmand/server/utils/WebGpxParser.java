@@ -728,7 +728,7 @@ public class WebGpxParser {
             }
             filePoint.setLat(point.lat);
             filePoint.setLon(point.lng);
-            filePoint.setSpeed(point.speed);
+            filePoint.setSpeed((float) point.speed);
             filePoint.setEle((!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN);
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
