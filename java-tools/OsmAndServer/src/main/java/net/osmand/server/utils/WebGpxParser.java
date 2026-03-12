@@ -273,7 +273,7 @@ public class WebGpxParser {
     
             if (!Double.isNaN(point.getSpeed())) {
                 speed = point.getSpeed();
-                point.setSpeed(Double.NaN);
+                point.setSpeed(Float.NaN);
             }
             
             Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -721,7 +721,7 @@ public class WebGpxParser {
                 filePoint = new WptPt();
             }
             if (filePoint.getHdop() == -1) {
-                filePoint.setHdop(Double.NaN);
+                filePoint.setHdop(Float.NaN);
             }
             if (filePoint.getHeading() == 0) {
                 filePoint.setHeading(Float.NaN);
