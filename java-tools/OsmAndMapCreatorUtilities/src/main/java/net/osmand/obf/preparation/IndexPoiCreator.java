@@ -679,7 +679,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 
 		// 2.5 write names table
-		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, namesIndexTokens, startFpPoiIndex);
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -773,10 +773,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-		log.info("Avg index's tokens: " + BloomFilter.writeIndexAcc.sum() + "/" + BloomFilter.writeIndexCount.sum());
-		log.info("Avg index bloom bits: " + BloomFilter.writeIndexBitAcc.sum() + "/" + BloomFilter.writeIndexCount.sum());
 		log.info("Avg box's tokens: " + BloomFilter.writeBoxAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
-		log.info("Avg box bloom bits: " + BloomFilter.writeBoxBitAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
+		log.info("Avg bloom bits: " + BloomFilter.writeBoxBitAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1231,7 +1229,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public byte[] getAtomBloom() {
 			if (cachedBoxBloom == null) {
-				cachedBoxBloom = BloomFilter.build(boxTokens, false);
+				cachedBoxBloom = BloomFilter.getInstance().build(boxTokens);
 			}
 			return cachedBoxBloom;
 		}
