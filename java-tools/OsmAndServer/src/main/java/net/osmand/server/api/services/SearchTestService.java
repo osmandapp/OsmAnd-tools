@@ -294,7 +294,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			}
 		});
 
-		BloomFilter.reset();
+		BloomFilter.resetStats();
 		try {
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
@@ -347,8 +347,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
 
-			LOGGER.info("Skip index ratio: {}", BloomFilter.skipIndexAcc.sum() / (double) BloomFilter.readIndexCount.sum());
-			LOGGER.info("Skip box ratio: {}", BloomFilter.skipBoxAcc.sum() / (double) BloomFilter.readBoxCount.sum());
+			LOGGER.info("Skip POI box ratio: {} / {} = {}", BloomFilter.skipBoxAcc.sum(), (double) BloomFilter.readBoxCount.sum(), BloomFilter.skipBoxAcc.sum() / (double) BloomFilter.readBoxCount.sum());
 		}
 	}
 
