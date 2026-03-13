@@ -1140,7 +1140,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             if (poiDataTokens != null) {
 				Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
 				keyTokens.add(splitToken);
-				data.addAtomToken(splitToken);
+				data.addToken(splitToken);
 			}
         }
     }
@@ -1218,7 +1218,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return x;
 		}
 
-
 		public int getY() {
 			return y;
 		}
@@ -1227,14 +1226,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-		public byte[] getAtomBloom() {
+		public byte[] getIndexBloom() {
 			if (cachedBoxBloom == null) {
 				cachedBoxBloom = BloomFilter.getInstance().build(boxTokens);
 			}
 			return cachedBoxBloom;
 		}
 
-		public void addAtomToken(String token) {
+		public void addToken(String token) {
 			if (boxTokens.add(token)) {
 				cachedBoxBloom = null;
 			}

@@ -1756,7 +1756,7 @@ public class BinaryMapIndexWriter {
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
 				bs.setShiftTo(0);
-				bs.addBloomIndex(ByteString.copyFrom(box.getAtomBloom()));
+				bs.addBloomIndex(ByteString.copyFrom(box.getIndexBloom()));
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
