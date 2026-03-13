@@ -102,6 +102,9 @@ public class MapApiController {
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 
+	@Autowired
+	private InfoFileService infoFileService;
+
 	OsmandRegions osmandRegions;
 
 	Gson gson = new Gson();
@@ -254,11 +257,20 @@ public class MapApiController {
 		if (dev == null || name.contains("/../")) {
 			return userdataService.tokenNotValidResponse();
 		}
-		if (name.endsWith(INFO_FILE_EXT)) {
-			userdataService.uploadInfoFile(file, name, dev);
-		} else {
-			userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis(), session);
+		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis(), session);
+
+		return okStatus();
+	}
+
+	@PostMapping("/update-info")
+	public ResponseEntity<String> updateInfo(@RequestParam String name,
+	                                         @RequestBody Map<String, Object> diff,
+	                                         HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null || name.contains("/../")) {
+			return userdataService.tokenNotValidResponse();
 		}
+		infoFileService.updateInfoFile(dev, name, diff, session);
 		return okStatus();
 	}
 
