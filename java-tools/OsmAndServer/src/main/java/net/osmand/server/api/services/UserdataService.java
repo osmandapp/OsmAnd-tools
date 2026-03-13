@@ -71,7 +71,7 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserdataService {
 
-    @Autowired
+	@Autowired
     protected UserSubscriptionService userSubService;
 
     @Autowired
@@ -323,7 +323,7 @@ public class UserdataService {
         return res;
     }
 
-    public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
+	public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
         if (checkExistingServerMap) {

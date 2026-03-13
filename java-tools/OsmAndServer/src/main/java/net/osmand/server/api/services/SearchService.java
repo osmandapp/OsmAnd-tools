@@ -590,14 +590,34 @@ public class SearchService {
         SearchCoreFactory.SearchAmenityByTypeAPI searchAmenityByTypesAPI = new SearchCoreFactory.SearchAmenityByTypeAPI(mapPoiTypes, searchAmenityTypesAPI);
         SearchPoiTypeFilter filter = null;
 
+        Set<String> poiAdditionals = new LinkedHashSet<>();
         if (poiType != null) {
-            filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, new LinkedHashSet<>());
+            filter = searchAmenityByTypesAPI.getPoiTypeFilter(poiType, poiAdditionals);
         }
 
         int left31 = (int) searchBbox.left;
         int right31 = (int) searchBbox.right;
         int top31 = (int) searchBbox.top;
         int bottom31 = (int) searchBbox.bottom;
+
+        ResultMatcher<Amenity> additionalsMatcher = null;
+        if (filter != null && !filter.isEmpty() && !poiAdditionals.isEmpty()) {
+            Set<String> addSet = new LinkedHashSet<>(poiAdditionals);
+            additionalsMatcher = new ResultMatcher<>() {
+                @Override
+                public boolean publish(Amenity object) {
+                    for (String add : addSet) {
+                        if (object.getAdditionalInfoKeys().contains(add)) return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return false;
+                }
+            };
+        }
 
         int categoryStartSize = foundFeatures.size();
 
@@ -618,7 +638,7 @@ public class SearchService {
                 }
             } else {
                 request = BinaryMapIndexReader.buildSearchPoiRequest(
-                        left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, null);
+                        left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter, additionalsMatcher);
             }
             if (request == null) {
                 continue;

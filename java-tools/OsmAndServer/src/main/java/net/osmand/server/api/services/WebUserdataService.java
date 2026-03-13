@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpSession;
 import jakarta.transaction.Transactional;
@@ -64,7 +65,7 @@ public class WebUserdataService {
 	@Autowired
 	UserSessionResources sessionResources;
 
-	private static final String METADATA = "metadata";
+	public static final String METADATA = "metadata";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
@@ -82,7 +83,6 @@ public class WebUserdataService {
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
 	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
-
 
 	Gson gson = new Gson();
 
@@ -268,9 +268,9 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				file.details.add(tag, gsonWithNans.toJsonTree(res));
+			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
+			if (analysisDetails != null) {
+				file.details.add(tag, gsonWithNans.toJsonTree(analysisDetails));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -321,9 +321,9 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
+			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
+			if (analysisDetails != null) {
+				details.add(ANALYSIS, gsonWithNans.toJsonTree(analysisDetails));
 			}
 		}
 	}
@@ -348,20 +348,27 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
+	private AnalysisDetails getAnalysisFromGpx(GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			Map<String, Object> res = new HashMap<>();
 			analysis.getPointAttributes().clear();
-			res.put("totalDistance", analysis.getTotalDistance());
-			res.put("startTime", analysis.getStartTime());
-			res.put("endTime", analysis.getEndTime());
-			res.put("timeMoving", analysis.getTimeMoving());
-			res.put("points", analysis.getPoints());
-			res.put("wptPoints", analysis.getWptPoints());
-
-			return res;
+			return new AnalysisDetails(analysis);
 		}
-		return Collections.emptyMap();
+		return null;
+	}
+
+	GpxTrackAnalysis getAnalysisFromJson(JsonObject details) {
+		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
+		if (details == null || !analysisPresent(ANALYSIS, details)) {
+			return analysis;
+		}
+		JsonElement analysisElement = details.get(ANALYSIS);
+		if (analysisElement != null && !analysisElement.isJsonNull()) {
+			AnalysisDetails analysisDetails = gson.fromJson(analysisElement, AnalysisDetails.class);
+			if (analysisDetails != null) {
+				analysisDetails.applyToAnalysis(analysis);
+			}
+		}
+		return analysis;
 	}
 
 	@Transactional
@@ -527,5 +534,38 @@ public class WebUserdataService {
 			}
 		}
 		return false;
+	}
+
+	public static class AnalysisDetails {
+		private float totalDistance;
+		private long startTime;
+		private long endTime;
+		private long timeMoving;
+		private int points;
+		private int wptPoints;
+
+		public AnalysisDetails() {}
+
+		public AnalysisDetails(GpxTrackAnalysis analysis) {
+			if (analysis != null) {
+				this.totalDistance = analysis.getTotalDistance();
+				this.startTime = analysis.getStartTime();
+				this.endTime = analysis.getEndTime();
+				this.timeMoving = analysis.getTimeMoving();
+				this.points = analysis.getPoints();
+				this.wptPoints = analysis.getWptPoints();
+			}
+		}
+
+		public void applyToAnalysis(GpxTrackAnalysis analysis) {
+			if (analysis != null) {
+				analysis.setTotalDistance(this.totalDistance);
+				analysis.setStartTime(this.startTime);
+				analysis.setEndTime(this.endTime);
+				analysis.setTimeMoving(this.timeMoving);
+				analysis.setPoints(this.points);
+				analysis.setWptPoints(this.wptPoints);
+			}
+		}
 	}
 }
