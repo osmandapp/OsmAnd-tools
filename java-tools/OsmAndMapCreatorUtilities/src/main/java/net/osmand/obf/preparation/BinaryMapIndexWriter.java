@@ -1815,7 +1815,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeTag(tag, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 
-		IndexedStringTableNode root = new IndexedStringTableNode();
+		IndexedStringTableNode root = new IndexedStringTableNode(this);
 		for (String key : indexedTable) {
 			if (key == null) {
 				continue;
@@ -1824,79 +1824,10 @@ public class BinaryMapIndexWriter {
 		}
 
 		Map<String, BinaryFileReference> res = new LinkedHashMap<>();
-		long init = getFilePointer();
-		root.writeNode("", res, init);
+		root.writeNode("", res, getFilePointer());
 		writeInt32Size();
 		return res;
 	}
-
-	private final class IndexedStringTableNode {
-		private final TreeMap<String, IndexedStringTableNode> subNodes = new TreeMap<>();
-		private boolean terminal;
-
-		private void addKey(String key, int start) {
-			if (start >= key.length()) {
-				terminal = true;
-				return;
-			}
-			int end = Math.min(start + 2, key.length());
-			String nextKeySuffix = key.substring(start, end);
-			IndexedStringTableNode child = subNodes.get(nextKeySuffix);
-			if (child == null) {
-				child = new IndexedStringTableNode();
-				subNodes.put(nextKeySuffix, child);
-			}
-			child.addKey(key, end);
-		}
-
-		private int computeSize() {
-			int size = 0;
-			for (Map.Entry<String, IndexedStringTableNode> entry : subNodes.entrySet()) {
-				String childKey = entry.getKey();
-				IndexedStringTableNode child = entry.getValue();
-				if (child == null) {
-					continue;
-				}
-				size += CodedOutputStream.computeStringSize(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, childKey);
-				if (child.terminal) {
-					size += CodedOutputStream.computeTagSize(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER);
-					size += 4;
-				}
-				if (!child.subNodes.isEmpty()) {
-					int nestedSize = child.computeSize();
-					size += CodedOutputStream.computeTagSize(OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER);
-					size += CodedOutputStream.computeUInt32SizeNoTag(nestedSize);
-					size += nestedSize;
-				}
-			}
-			return size;
-		}
-
-		private void writeNode(String prefix, Map<String, BinaryFileReference> res, long init) throws IOException {
-			for (Map.Entry<String, IndexedStringTableNode> entry : subNodes.entrySet()) {
-				String subKey = entry.getKey();
-				IndexedStringTableNode child = entry.getValue();
-				if (child == null) {
-					continue;
-				}
-				String fullKey = prefix + subKey;
-				codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, subKey);
-				if (child.terminal) {
-					codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
-					codedOutStream.writeFixed32NoTag(0);
-					res.put(fullKey, ref);
-				}
-				if (!child.subNodes.isEmpty()) {
-					codedOutStream.writeTag(OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-					int subtableSize = child.computeSize();
-					codedOutStream.writeUInt32NoTag(subtableSize);
-					child.writeNode(fullKey, res, init);
-				}
-			}
-		}
-	}
-
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
 								 String type, String subtype, Map<PoiAdditionalType, String> additionalNames,
