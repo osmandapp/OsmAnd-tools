@@ -660,7 +660,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiConnection.commit();
 
 		Map<String, Set<PoiTileBox>> namesIndex = new TreeMap<String, Set<PoiTileBox>>();
-		Map<String, Set<String>> namesIndexTokens = new TreeMap<>();
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
@@ -668,7 +667,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTopIndexMap();
 		collectTagGroups();
 		// 0. process all entities
-		processPOIIntoTree(poiGeocoding, namesIndex, namesIndexTokens, zoomToStart, bbox, rootZoomsTree);
+		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
@@ -881,8 +880,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     }
 
 
-	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex,
-			Map<String, Set<String>> namesIndexTokens, int zoomToStart, IntBbox bbox,
+	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
@@ -1056,7 +1054,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, namesIndexTokens, otherNames, idNames);
+					namesIndex, otherNames, idNames);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1088,60 +1086,54 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Map<String, Set<String>> poiDataTokens, Set<String> names, Set<String> idNames) {
+			Set<String> names, Set<String> idNames) {
 		if (name != null) {
-			parsePrefix(name, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
+			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
+			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, poiDataTokens, settings.charsToBuildPoiNameIndex);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, poiDataTokens, settings.charsToBuildPoiIdNameIndex);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
 				}
 			}
 		}
 	}
 
-    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Map<String, Set<String>> poiDataTokens, int ind) {
+    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
         name = Algorithms.normalizeSearchText(name);
-        Set<String> splitName = new LinkedHashSet<>(Algorithms.splitByWordsLowercase(name));
+        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
                 splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
             }
         }
-        for (String splitToken : splitName) {
-            if (Algorithms.isEmpty(splitToken)) {
-                continue;
+        for (String str : splitName) {
+	        if (Algorithms.isEmpty(str)) {
+		        continue;
+	        }
+            if (str.length() > ind) {
+                str = str.substring(0, ind);
             }
-            String indexKey = splitToken;
-            if (indexKey.length() > ind) {
-                indexKey = indexKey.substring(0, ind);
+            if (!poiData.containsKey(str)) {
+                poiData.put(str, new LinkedHashSet<>());
             }
-            if (!poiData.containsKey(indexKey)) {
-                poiData.put(indexKey, new LinkedHashSet<>());
-            }
-            poiData.get(indexKey).add(data);
-            if (poiDataTokens != null) {
-				Set<String> keyTokens = poiDataTokens.computeIfAbsent(indexKey, k -> new LinkedHashSet<>());
-				keyTokens.add(splitToken);
-				data.addToken(splitToken);
-			}
+            poiData.get(str).add(data);
+	        data.addToken(str);
         }
     }
 
@@ -1212,7 +1204,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
 		final Set<String> boxTokens = new LinkedHashSet<>();
-		private byte[] cachedBoxBloom = null;
+		private byte[] cachedBloom = null;
 
 		public int getX() {
 			return x;
@@ -1227,15 +1219,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		public byte[] getIndexBloom() {
-			if (cachedBoxBloom == null) {
-				cachedBoxBloom = BloomFilter.getInstance().build(boxTokens);
+			if (cachedBloom == null) {
+				cachedBloom = BloomFilter.getInstance().build(boxTokens);
 			}
-			return cachedBoxBloom;
+			return cachedBloom;
 		}
 
 		public void addToken(String token) {
 			if (boxTokens.add(token)) {
-				cachedBoxBloom = null;
+				cachedBloom = null;
 			}
 		}
 	}
