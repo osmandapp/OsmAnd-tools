@@ -347,7 +347,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
 
-			LOGGER.info("Skip POI box ratio: {} / {} = {}", BloomFilter.skipBoxAcc.sum(), (double) BloomFilter.readBoxCount.sum(), BloomFilter.skipBoxAcc.sum() / (double) BloomFilter.readBoxCount.sum());
+			LOGGER.info("Skip POI box ratio: ", BloomFilter.getInstance().logSkipRatio());
 		}
 	}
 
