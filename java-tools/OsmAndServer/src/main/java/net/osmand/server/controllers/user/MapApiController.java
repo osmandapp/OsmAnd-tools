@@ -267,7 +267,7 @@ public class MapApiController {
 	                                         @RequestBody Map<String, Object> diff,
 	                                         HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
-		if (dev == null || name.contains("/../")) {
+		if (dev == null || name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
 			return userdataService.tokenNotValidResponse();
 		}
 		infoFileService.updateInfoFile(dev, name, diff, session);

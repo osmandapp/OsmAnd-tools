@@ -391,22 +391,6 @@ public class UserdataService {
 		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
-	public void uploadInfoFile(MultipartFile file, String name, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
-		CloudUserFilesRepository.UserFile lastFileVersion = getLastFileVersion(dev.userid, name, UserdataService.FILE_TYPE_GPX);
-		InternalZipFile zipfile;
-		try {
-			zipfile = StorageService.InternalZipFile.buildFromMultipartFile(file);
-		} catch (IOException e) {
-			throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
-		}
-		validateUserForUpload(dev, FILE_TYPE_GPX, zipfile.getSize());
-		uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
-		if (lastFileVersion != null) {
-			long updatetime = lastFileVersion.updatetime.getTime();
-			deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
-		}
-	}
-
 	private boolean isKmlKmzFileByName(String originalFilename) {
 		return originalFilename.toLowerCase().endsWith(".kml") || originalFilename.toLowerCase().endsWith(".kmz");
 	}

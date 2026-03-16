@@ -34,7 +34,7 @@ public class InfoFileService {
 			throws IOException {
 		UserFile lastFileVersion = userdataService.getLastFileVersion(dev.userid, name, UserdataService.FILE_TYPE_GPX);
 		ObjectNode originalJson = MAPPER.createObjectNode();
-		if (lastFileVersion != null) {
+		if (lastFileVersion != null && lastFileVersion.filesize != -1) {
 			originalJson = getOriginalJson(lastFileVersion);
 		}
 		JsonNode diffJson = MAPPER.valueToTree(diff);
@@ -79,7 +79,7 @@ public class InfoFileService {
 
 	private void uploadMergedFile(CloudUserDevice dev, String name, HttpSession session, JsonNode merged,
 	                              UserFile lastFileVersion) throws IOException {
-		File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + name + INFO_FILE_EXT, INFO_FILE_EXT);
+		File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + session.getId(), INFO_FILE_EXT);
 		try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
 			MAPPER.writeValue(fos, merged);
 		}
@@ -87,7 +87,7 @@ public class InfoFileService {
 		StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo);
 		userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zipFile.getSize());
 		userdataService.uploadFile(zipFile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
-		if (lastFileVersion != null) {
+		if (lastFileVersion != null && lastFileVersion.filesize != -1) {
 			long updatetime = lastFileVersion.updatetime.getTime();
 			userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
 		}
