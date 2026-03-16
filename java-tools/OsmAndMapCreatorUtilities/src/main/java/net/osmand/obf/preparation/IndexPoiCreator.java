@@ -772,8 +772,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-		log.info("Avg box's tokens: " + BloomFilter.writeBoxAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
-		log.info("Avg bloom bits: " + BloomFilter.writeBoxBitAcc.sum() + "/" + BloomFilter.writeBoxCount.sum());
+		BloomFilter.getInstance().logInfo();
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
