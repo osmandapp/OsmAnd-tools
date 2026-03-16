@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import net.osmand.binary.BloomFilter;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -293,6 +294,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			}
 		});
 
+		BloomFilter.resetStats();
 		try {
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
@@ -344,6 +346,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
  			runStatusFlags.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
+
+			LOGGER.info("Skip POI box ratio: {} / {} = {}", BloomFilter.skipBoxAcc.sum(), (double) BloomFilter.readBoxCount.sum(), BloomFilter.skipBoxAcc.sum() / (double) BloomFilter.readBoxCount.sum());
 		}
 	}
 
