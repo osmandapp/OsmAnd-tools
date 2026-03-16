@@ -267,8 +267,10 @@ public class MapApiController {
 	                                         @RequestBody Map<String, Object> diff,
 	                                         HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
-		if (dev == null || name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
+		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
+		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
+			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
 		}
 		infoFileService.updateInfoFile(dev, name, diff, session);
 		return okStatus();

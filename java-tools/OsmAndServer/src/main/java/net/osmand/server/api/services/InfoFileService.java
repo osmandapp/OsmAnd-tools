@@ -16,7 +16,7 @@ import java.util.zip.GZIPInputStream;
 import static net.osmand.server.api.repo.CloudUserDevicesRepository.*;
 import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
 import static net.osmand.server.api.services.UserdataService.*;
-import static net.osmand.server.api.services.WebUserdataService.INFO_FILE_EXT;
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
@@ -79,7 +79,7 @@ public class InfoFileService {
 
 	private void uploadMergedFile(CloudUserDevice dev, String name, HttpSession session, JsonNode merged,
 	                              UserFile lastFileVersion) throws IOException {
-		File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + session.getId(), INFO_FILE_EXT);
+		File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + session.getId(), GPX_FILE_EXT);
 		try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
 			MAPPER.writeValue(fos, merged);
 		}
