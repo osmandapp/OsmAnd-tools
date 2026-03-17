@@ -15,10 +15,12 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -42,6 +44,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
+import net.osmand.binary.BloomFilter;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
@@ -101,6 +104,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
+import net.osmand.CollatorStringMatcher;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -997,8 +1001,9 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 
-		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Entry<String, List<MapObject>> entry : namesIndex.entrySet()) {
+		Map<String, List<MapObject>> normalizedNamesIndex = normalizeIndex(namesIndex);
+		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, normalizedNamesIndex.keySet());
+		for (Entry<String, List<MapObject>> entry : normalizedNamesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
 
 			codedOutStream.writeTag(OsmAndAddressNameIndexData.ATOM_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
@@ -1733,6 +1738,8 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
+		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.FILTERS_FIELD_NUMBER,
+				OsmandOdb.OsmAndBloomFilterAlgorithm.newBuilder().setVersion(BloomFilter.VERSION).build());
 
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
@@ -1750,6 +1757,7 @@ public class BinaryMapIndexWriter {
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
 				bs.setShiftTo(0);
+				bs.addBloomIndex(ByteString.copyFrom(box.getIndexBloom()));
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
@@ -1778,22 +1786,49 @@ public class BinaryMapIndexWriter {
 		return fpToWriteSeeks;
 	}
 
+	private static String normalizeIndexedStringTableKey(String key) {
+		if (key == null) {
+			return null;
+		}
+		String normalized = CollatorStringMatcher.alignChars(key);
+		normalized = normalized.toLowerCase(Locale.ROOT);
+		return normalized;
+	}
+
+	private static <V extends Collection> Map<String, V> normalizeIndex(Map<String, V> namesIndex) {
+		Map<String, V> normalized = new TreeMap<>();
+		for (Entry<String, V> e : namesIndex.entrySet()) {
+			String normalizedKey = normalizeIndexedStringTableKey(e.getKey());
+			if (normalizedKey == null || normalizedKey.isEmpty()) {
+				continue;
+			}
+			V existing = normalized.get(normalizedKey);
+			if (existing == null) {
+				normalized.put(normalizedKey, e.getValue());
+			} else {
+				existing.addAll(e.getValue());
+			}
+		}
+		return normalized;
+	}
+
 	private Map<String, BinaryFileReference> writeIndexedTable(int tag, Collection<String> indexedTable) throws IOException {
 		codedOutStream.writeTag(tag, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		Map<String, BinaryFileReference> res = new LinkedHashMap<String, BinaryFileReference>();
-		long init = getFilePointer();
-		for (String e : indexedTable) {
-			codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, e);
-			codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
-			codedOutStream.writeFixed32NoTag(0);
-			res.put(e, ref);
+
+		IndexedStringTableNode root = new IndexedStringTableNode(this);
+		for (String key : indexedTable) {
+			if (key == null) {
+				continue;
+			}
+			root.addKey(key, 0);
 		}
+
+		Map<String, BinaryFileReference> res = new LinkedHashMap<>();
+		root.writeNode("", res, getFilePointer());
 		writeInt32Size();
 		return res;
 	}
-
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
 								 String type, String subtype, Map<PoiAdditionalType, String> additionalNames,

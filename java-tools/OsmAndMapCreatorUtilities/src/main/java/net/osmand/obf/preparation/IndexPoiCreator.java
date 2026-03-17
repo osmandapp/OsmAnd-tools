@@ -31,6 +31,7 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.BloomFilter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
@@ -771,7 +772,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-
+		BloomFilter.getInstance().logInfo();
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1121,6 +1122,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             }
         }
         for (String str : splitName) {
+	        if (Algorithms.isEmpty(str)) {
+		        continue;
+	        }
             if (str.length() > ind) {
                 str = str.substring(0, ind);
             }
@@ -1128,6 +1132,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                 poiData.put(str, new LinkedHashSet<>());
             }
             poiData.get(str).add(data);
+	        data.addToken(str);
         }
     }
 
@@ -1197,11 +1202,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
+		final Set<String> boxTokens = new LinkedHashSet<>();
+		private byte[] cachedBloom = null;
 
 		public int getX() {
 			return x;
 		}
-
 
 		public int getY() {
 			return y;
@@ -1211,7 +1217,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
+		public byte[] getIndexBloom() {
+			if (cachedBloom == null) {
+				cachedBloom = BloomFilter.getInstance().build(boxTokens);
+			}
+			return cachedBloom;
+		}
 
+		public void addToken(String token) {
+			if (boxTokens.add(token)) {
+				cachedBloom = null;
+			}
+		}
 	}
 
 	private static class Tree<T> {
