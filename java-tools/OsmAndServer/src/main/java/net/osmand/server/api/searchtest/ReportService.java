@@ -332,7 +332,12 @@ public interface ReportService {
 						"SUM(json_extract(ss.value, '$.time')) AS time, " +
 						"SUM(json_extract(ss.value, '$.count')) AS count, " +
 						"SUM(json_extract(ss.value, '$.bytes')) AS bytes, " +
-						"SUM(json_extract(ss.value, '$.calls')) AS calls " +
+						"SUM(json_extract(ss.value, '$.calls')) AS calls, " +
+						"SUM(json_extract(ss.value, '$.bytesLoaded')) AS bytes_loaded, " +
+						"SUM(json_extract(ss.value, '$.bytesSkippedBySeek')) AS bytes_skipped_by_seek, " +
+						"SUM(json_extract(ss.value, '$.payloadBytesParsed')) AS payload_bytes_parsed, " +
+						"SUM(json_extract(ss.value, '$.decodeTime')) AS decode_time, " +
+						"SUM(json_extract(ss.value, '$.matcherTime')) AS matcher_time " +
 						"FROM run_result, json_each(row, '$.sub_stats') ss, run " +
 						"WHERE run.id = run_id AND run_id = ? " +
 						"GROUP BY json_extract(ss.value, '$.api'), json_extract(ss.value, '$.subApi'), json_extract(ss.value, '$.mapName') " +
@@ -349,11 +354,21 @@ public interface ReportService {
 					Number ssCount = (Number) row.get("count");
 					Number ssBytes = (Number) row.get("bytes");
 					Number ssCalls = (Number) row.get("calls");
+					Number ssBytesLoaded = (Number) row.get("bytes_loaded");
+					Number ssBytesSkippedBySeek = (Number) row.get("bytes_skipped_by_seek");
+					Number ssPayloadBytesParsed = (Number) row.get("payload_bytes_parsed");
+					Number ssDecodeTimeNs = (Number) row.get("decode_time");
+					Number ssMatcherTimeNs = (Number) row.get("matcher_time");
 					subStats.put(api + '|' + subApi + '|' + mapName, new long[] {
 							ssTime == null ? 0 : ssTime.longValue(),
 							ssCount == null ? 0 : ssCount.longValue(),
 							ssBytes == null ? 0 : ssBytes.longValue(),
-							ssCalls == null ? 0 : ssCalls.longValue()
+							ssCalls == null ? 0 : ssCalls.longValue(),
+							ssBytesLoaded == null ? 0 : ssBytesLoaded.longValue(),
+							ssBytesSkippedBySeek == null ? 0 : ssBytesSkippedBySeek.longValue(),
+							ssPayloadBytesParsed == null ? 0 : ssPayloadBytesParsed.longValue(),
+							ssDecodeTimeNs == null ? 0 : ssDecodeTimeNs.longValue(),
+							ssMatcherTimeNs == null ? 0 : ssMatcherTimeNs.longValue()
 					});
 				}
 			} else {

@@ -1089,6 +1089,7 @@ public interface OBFService extends BaseService {
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
+		BloomFilter.resetStats();
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
 
 		List<AddressResult> results = new ArrayList<>();
@@ -1096,6 +1097,9 @@ public interface OBFService extends BaseService {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
+		getLogger().info(result.settings().getStat().toDetailedString());
+		getLogger().info(BloomFilter.getInstance().logSkipRatio());
+
 		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
 	}
 
