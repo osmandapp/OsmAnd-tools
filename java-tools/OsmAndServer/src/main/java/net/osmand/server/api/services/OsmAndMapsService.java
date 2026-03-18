@@ -66,8 +66,6 @@ import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.OsmandIndex.FileIndex;
-import net.osmand.binary.OsmandIndex.RoutingPart;
-import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.gpx.GPXFile;
@@ -1345,7 +1343,7 @@ public class OsmAndMapsService {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
 				files.add(ref);
 				if (f.getName().length() > 20) {
-					names.append(f.getName().substring(0, 20)).append("..,");
+					names.append(f.getName(), 0, 20).append("..,");
 				} else {
 					names.append(f.getName()).append(",");
 				}
@@ -1356,22 +1354,38 @@ public class OsmAndMapsService {
 	}
 
 	private List<File> getMaps(QuadRect quadRect) throws IOException {
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+
 		List<File> files = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState()) {
+			return files;
+		}
+
+		QuadRect queryLatLon = new QuadRect(
+				MapUtils.get31LongitudeX((int) Math.min(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
+				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			boolean intersects;
-			fileOverlaps:
-			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
-				for (RoutingSubregion s : rp.getSubregionsList()) {
-					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
-							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
-					if (intersects) {
-						files.add(ref.file);
-						break fileOverlaps;
-					}
+			String downloadName = getDownloadNameByFileName(ref.file.getName());
+			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(downloadName);
+			if (wr == null || wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload()) {
+				continue;
+			}
+			List<QuadRect> polyBboxes = wr.getAllPolygonsBounds();
+			if (polyBboxes != null && !polyBboxes.isEmpty()) {
+				if (polyBboxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
+					files.add(ref.file);
 				}
+			} else if (wr.getBoundingBox() != null && QuadRect.intersects(wr.getBoundingBox(), queryLatLon)) {
+				files.add(ref.file);
 			}
 		}
-		return filterMap(files);
+		return files;
 	}
 
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
