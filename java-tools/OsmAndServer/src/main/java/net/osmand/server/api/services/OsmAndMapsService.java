@@ -1320,7 +1320,7 @@ public class OsmAndMapsService {
 	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
-		List<File> filesToUse = getMaps(quadRect, bbox);
+		List<File> filesToUse = getMaps(quadRect, bbox, reason);
 		StringBuilder names = new StringBuilder();
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
@@ -1337,9 +1337,12 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox) throws IOException {
+	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
 		List<File> files = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			if ("search".equals(reason) && ref.file.getName().startsWith("Us_alaska")) {
+				continue;
+			}
 			boolean intersects;
 			fileOverlaps:
 			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
