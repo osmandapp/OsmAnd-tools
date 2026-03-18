@@ -1372,15 +1372,20 @@ public class OsmAndMapsService {
 				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
 
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			String downloadName = getDownloadNameByFileName(ref.file.getName());
+			File file = ref.file;
+			String downloadName = getDownloadNameByFileName(file.getName());
 			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(downloadName);
-			if (wr == null || wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload()) {
+			if (wr == null) {
+				continue;
+			}
+			if (wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload()) {
+				LOGGER.error("Deprecated joint OBF filtered: " + file.getName());
 				continue;
 			}
 			List<QuadRect> polyBboxes = wr.getAllPolygonsBounds();
 			if (polyBboxes != null && !polyBboxes.isEmpty()
 					&& polyBboxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
-				files.add(ref.file);
+				files.add(file);
 			}
 		}
 		return files;
