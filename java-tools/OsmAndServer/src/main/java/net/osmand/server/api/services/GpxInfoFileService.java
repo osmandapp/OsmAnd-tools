@@ -27,8 +27,7 @@ public class GpxInfoFileService {
 		StorageService.InternalZipFile zipfile = StorageService.InternalZipFile.buildFromMultipartFile(file);
 		userdataService.uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
 		if (lastFileVersion != null && lastFileVersion.filesize != -1) {
-			long updatetime = lastFileVersion.updatetime.getTime();
-			userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
+			userdataService.deleteFileVersion(null, dev.userid, name, FILE_TYPE_GPX, lastFileVersion);
 		}
 	}
 }

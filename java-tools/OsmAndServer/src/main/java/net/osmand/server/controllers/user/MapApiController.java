@@ -262,7 +262,7 @@ public class MapApiController {
 		return okStatus();
 	}
 
-	@PostMapping("/update-info")
+	@PostMapping(value = "/update-info", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                         @RequestParam String name) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
