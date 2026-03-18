@@ -153,6 +153,24 @@ public class OsmAndMapsService {
 
 	private final Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
 
+	public enum ObfReason {
+		SEARCH("search"),
+		SEARCH_TEST("search-test"),
+		GEOCODING("geocoding"),
+		APPROXIMATE("approximate"),
+		ROUTING("routing");
+
+		private final String value;
+
+		ObfReason(String value) {
+			this.value = value;
+		}
+
+		public String value() {
+			return value;
+		}
+	}
+
 	CachedOsmandIndexes cacheFiles = null;
 
 	final List<RoutingCacheContext> routingCaches = new ArrayList<>();
@@ -656,7 +674,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.GEOCODING.value());
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete, true);
 			if (incomplete[0]) {
@@ -704,7 +722,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, "approximate");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, ObfReason.APPROXIMATE.value());
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -1011,7 +1029,7 @@ public class OsmAndMapsService {
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "routing");
+				List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.ROUTING.value());
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1317,10 +1335,10 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 
-	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
-		List<File> filesToUse = getMaps(quadRect, bbox, reason);
+		List<File> filesToUse = getMaps(quadRect, reason);
 		StringBuilder names = new StringBuilder();
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
@@ -1337,10 +1355,10 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
+	private List<File> getMaps(QuadRect quadRect, String reason) throws IOException {
 		List<File> files = new ArrayList<>();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			if ("search".equals(reason) && ref.file.getName().startsWith("Us_alaska")) {
+			if (ObfReason.SEARCH.value().equals(reason) && ref.file.getName().startsWith("Us_alaska")) {
 				continue;
 			}
 			boolean intersects;

@@ -456,7 +456,7 @@ public class SearchService {
             QuadRect searchBbox = getSearchBbox(bbox);
             List<BinaryMapIndexReader> readers = new ArrayList<>();
             try {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, baseSearch);
+                List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(searchBbox, baseSearch);
                 readers = osmAndMapsService.getReaders(mapList, null);
                 if (readers.isEmpty()) {
                     return res.stream().filter(r-> r.objectType != ObjectType.POI_TYPE || r.file == null).toList();
@@ -529,7 +529,7 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         boolean useLimit = false;
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(data.bbox, searchBbox, baseSearch);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(searchBbox, baseSearch);
             if (mapList.isEmpty()) {
                 return new PoiSearchResult(false, true, false, null);
             }
@@ -757,7 +757,7 @@ public class SearchService {
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         SearchResult res = null;
         try {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(bbox, searchBbox, baseSearch);
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(searchBbox, baseSearch);
             if (!mapList.isEmpty()) {
                 usedMapList = osmAndMapsService.getReaders(mapList, null);
                 for (BinaryMapIndexReader map : usedMapList) {
@@ -804,29 +804,19 @@ public class SearchService {
         return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
     }
     
-    List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(List<LatLon> bbox, QuadRect searchBbox, boolean baseSearch) throws IOException {
+    List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect searchBbox, boolean baseSearch) throws IOException {
         OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
         if (baseSearch) {
             return List.of(basemap);
         } else {
             if (searchBbox != null) {
-                List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(searchBbox, bbox, "search");
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(
+                    searchBbox, OsmAndMapsService.ObfReason.SEARCH.value());
                 list.add(basemap);
                 return list;
             }
         }
         return Collections.emptyList();
-    }
-
-    private List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapsForSearch(QuadRect points, boolean baseSearch) throws IOException {
-        OsmAndMapsService.BinaryMapIndexReaderReference basemap = osmAndMapsService.getBaseMap();
-        if (baseSearch) {
-            return List.of(basemap);
-        } else {
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService.getObfReaders(points, null, "search");
-            list.add(basemap);
-            return list;
-        }
     }
     
     public SearchUICore.SearchResultCollection searchPoiByCategory(SearchUICore searchUICore, String text, int limit) throws IOException {
