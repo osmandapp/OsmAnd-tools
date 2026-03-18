@@ -103,7 +103,7 @@ public class MapApiController {
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 
 	@Autowired
-	private InfoFileService infoFileService;
+	private GpxInfoFileService gpxInfoFileService;
 
 	OsmandRegions osmandRegions;
 
@@ -263,16 +263,15 @@ public class MapApiController {
 	}
 
 	@PostMapping("/update-info")
-	public ResponseEntity<String> updateInfo(@RequestParam String name,
-	                                         @RequestBody Map<String, Object> diff,
-	                                         HttpSession session) throws IOException {
+	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         @RequestParam String name) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
 			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
 		}
-		infoFileService.updateInfoFile(dev, name, diff, session);
+		gpxInfoFileService.updateGpxInfoFile(file, name, dev);
 		return okStatus();
 	}
 
