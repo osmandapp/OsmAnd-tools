@@ -46,7 +46,7 @@ public class SmartFolderService {
 	public List<SmartFolderWeb> getSmartFolders(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
-			return Collections.emptyList();
+			return new ArrayList<>();
 		}
 		List<UserFileNoData> uniqueFiles = userDataService
 				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
@@ -125,21 +125,21 @@ public class SmartFolderService {
 		if (file == null || file.filesize == -1) {
 			return;
 		}
-		InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
-		if (in == null) {
-			return;
-		}
-		try (GZIPInputStream gis = new GZIPInputStream(in)) {
-			ObjectMapper mapper = new ObjectMapper();
-
-			ObjectNode json = (ObjectNode) mapper.readTree(gis);
-			JsonNode color = json.get(COLOR_NAME_EXTENSION);
-			if (color != null) {
-				gpxFile.setColor(color.asText());
+		try (InputStream in = getInputStreamFromFile(file)) {
+			if (in == null) {
+				return;
 			}
-			JsonNode width = json.get(LINE_WIDTH_EXTENSION);
-			if (width != null) {
-				gpxFile.setWidth(width.asText());
+			try (GZIPInputStream gis = new GZIPInputStream(in)) {
+				ObjectMapper mapper = new ObjectMapper();
+				ObjectNode json = (ObjectNode) mapper.readTree(gis);
+				JsonNode color = json.get(COLOR_NAME_EXTENSION);
+				if (color != null) {
+					gpxFile.setColor(color.asText());
+				}
+				JsonNode width = json.get(LINE_WIDTH_EXTENSION);
+				if (width != null) {
+					gpxFile.setWidth(width.asText());
+				}
 			}
 		} catch (Exception e) {
 			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
@@ -149,21 +149,28 @@ public class SmartFolderService {
 	}
 
 	private String getGeneralSettings(int userId) {
-		String generalSettings = null;
 		UserFile file = userDataService.getLastFileVersion(userId, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL);
 		if (file == null) {
 			return null;
 		}
-		InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
-		if (in == null) {
+		try (InputStream in = getInputStreamFromFile(file)) {
+			if (in == null) {
+				return null;
+			}
+			try (InputStream gzipStream = new GZIPInputStream(in)) {
+				return new String(gzipStream.readAllBytes(), StandardCharsets.UTF_8);
+			}
+		} catch (IOException e) {
+			LOG.error(String.format("Read GeneralSettings error for id=%d: %s", file.id, e.getMessage()));
 			return null;
 		}
-		try (InputStream is = new GZIPInputStream(in)) {
-			generalSettings = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			LOG.error(String.format("Read GeneralSettings error: (%s)", e.getMessage()));
+	}
+
+	private InputStream getInputStreamFromFile(UserFile file) {
+		if (file == null) {
+			return null;
 		}
-		return generalSettings;
+		return file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
 	}
 
 	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long creationTime) {
