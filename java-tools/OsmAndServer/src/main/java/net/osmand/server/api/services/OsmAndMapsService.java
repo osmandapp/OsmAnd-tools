@@ -1353,6 +1353,7 @@ public class OsmAndMapsService {
 		return files;
 	}
 
+	// World_seamarks is skipped as an optimization since it match every bbox.
 	private List<File> getMaps(QuadRect quadRect) throws IOException {
 		if (osmandRegions == null) {
 			osmandRegions = new OsmandRegions();
@@ -1377,11 +1378,8 @@ public class OsmAndMapsService {
 				continue;
 			}
 			List<QuadRect> polyBboxes = wr.getAllPolygonsBounds();
-			if (polyBboxes != null && !polyBboxes.isEmpty()) {
-				if (polyBboxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
-					files.add(ref.file);
-				}
-			} else if (wr.getBoundingBox() != null && QuadRect.intersects(wr.getBoundingBox(), queryLatLon)) {
+			if (polyBboxes != null && !polyBboxes.isEmpty()
+					&& polyBboxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
 				files.add(ref.file);
 			}
 		}
