@@ -20,6 +20,7 @@ import net.osmand.util.MapUtils;
 import net.osmand.util.TextDirectionUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -214,7 +215,7 @@ public class SearchService {
         }
     }
 
-	public List<Feature> search(SearchContext ctx, Calendar clientTime) throws IOException {
+	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
 		List<SearchResult> res = searchResults.results();
@@ -226,7 +227,7 @@ public class SearchService {
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
-			saveSearchResult(res, features, clientTime);
+			saveSearchResult(res, features, timeZone);
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();
@@ -289,7 +290,7 @@ public class SearchService {
         }
     }
 
-    public Feature getPoi(String type, String name, LatLon loc, Long osmId, Calendar clientTime) throws IOException {
+    public Feature getPoi(String type, String name, LatLon loc, Long osmId, String timeZone) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return null;
         }
@@ -319,9 +320,9 @@ public class SearchService {
             }
 
             if (name != null) {
-                feature = getPoiFeatureByName(rc, name, clientTime);
+                feature = getPoiFeatureByName(rc, name, timeZone);
             } else if (osmId != null) {
-                feature = getPoiFeatureByOsmId(rc, osmId, clientTime);
+                feature = getPoiFeatureByOsmId(rc, osmId, timeZone);
             }
 
         } finally {
@@ -330,13 +331,13 @@ public class SearchService {
         return feature;
     }
 
-    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name, Calendar clientTime) {
+    private Feature getPoiFeatureByName(SearchUICore.SearchResultCollection rc, String name, String timeZone) {
         for (SearchResult r : rc.getCurrentSearchResults()) {
             if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
                 continue;
             }
             if (matchesName(a, name)) {
-                Feature f = getPoiFeature(r, clientTime);
+                Feature f = getPoiFeature(r, timeZone);
                 if (f != null) {
                     return f;
                 }
@@ -345,13 +346,13 @@ public class SearchService {
         return null;
     }
 
-    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId, Calendar clientTime) {
+    private Feature getPoiFeatureByOsmId(SearchUICore.SearchResultCollection rc, long osmId, String timeZone) {
         for (SearchResult r : rc.getCurrentSearchResults()) {
             if (r.objectType != ObjectType.POI || !(r.object instanceof Amenity a)) {
                 continue;
             }
             if (ObfConstants.getOsmObjectId(a) == osmId) {
-                Feature f = getPoiFeature(r, clientTime);
+                Feature f = getPoiFeature(r, timeZone);
                 if (f != null) {
                     return f;
                 }
@@ -360,8 +361,8 @@ public class SearchService {
         return null;
     }
 
-    public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId, Calendar clientTime) throws IOException {
-        Feature poiFeature = getPoi(type, name, loc, osmId, clientTime);
+    public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId, String timeZone) throws IOException {
+        Feature poiFeature = getPoi(type, name, loc, osmId, timeZone);
 
         if (poiFeature != null && wikidataId == null) {
             Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
@@ -515,7 +516,7 @@ public class SearchService {
         return searchUICore;
     }
 
-    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch, Calendar clientTime) throws IOException {
+    public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch, String timeZone) throws IOException {
         if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
             return new PoiSearchResult(false, false, true, null);
         }
@@ -536,7 +537,7 @@ public class SearchService {
             usedMapList = osmAndMapsService.getReaders(mapList, null);
 
             if (data.categories.size() == 1) {
-                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures, clientTime);
+                searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures, timeZone);
                 useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
             } else {
                 PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(), TOTAL_LIMIT_POI, false);
@@ -547,7 +548,7 @@ public class SearchService {
                     }
                     int categoryStartSize = foundFeatures.size();
                     searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit,
-                            clientTime);
+                            timeZone);
                     int categoryEndSize = foundFeatures.size();
                     poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
                     if (poiSearchLimit.useLimit) {
@@ -570,13 +571,13 @@ public class SearchService {
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
                                          List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
-                                         Calendar clientTime) throws IOException {
-        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, clientTime);
+                                         String timeZone) throws IOException {
+        searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, timeZone);
     }
 
     private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
                                          List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures,
-                                         PoiSearchLimit poiSearchLimit, Calendar clientTime) throws IOException {
+                                         PoiSearchLimit poiSearchLimit, String timeZone) throws IOException {
         if (searchBbox == null) {
             return;
         }
@@ -644,7 +645,7 @@ public class SearchService {
             int remaining = poiSearchLimit != null 
                     ? poiSearchLimit.getRemainingForSave(categoryStartSize, foundFeatures.size())
                     : TOTAL_LIMIT_POI - foundFeatures.size();
-            saveAmenityResults(amenities, foundFeatures, remaining, locale, clientTime);
+            saveAmenityResults(amenities, foundFeatures, remaining, locale, timeZone);
             if (poiSearchLimit != null && poiSearchLimit.shouldStopCategory(categoryStartSize, foundFeatures.size())) {
                 break;
             }
@@ -684,7 +685,7 @@ public class SearchService {
         }));
     }
 
-    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, Calendar clientTime) throws IOException {
+    public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
         final String RELATION_TYPE = "3";
         final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
         final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
@@ -713,7 +714,7 @@ public class SearchService {
 
         SearchResult res = searchPoiByReq(req, p1, p2, false);
         if (res != null) {
-            return getPoiFeature(res, clientTime);
+            return getPoiFeature(res, timeZone);
         }
         return null;
     }
@@ -1142,14 +1143,14 @@ public class SearchService {
         }
     }
 
-    private void saveSearchResult(List<SearchResult> res, List<Feature> features, Calendar clientTime) {
+    private void saveSearchResult(List<SearchResult> res, List<Feature> features, String timeZone) {
         for (SearchResult result : res) {
-            features.add(getFeature(result, clientTime));
+            features.add(getFeature(result, timeZone));
         }
     }
 
     private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit,
-                                    String locale, Calendar clientTime) {
+                                    String locale, String timeZone) {
         String dominatedCity = "";
         Map<String, Integer> cityCounter = new TreeMap<>();
         for (Amenity amenity : amenities) {
@@ -1177,7 +1178,7 @@ public class SearchService {
                 result.objectType = ObjectType.POI;
                 result.location = amenity.getLocation();
                 result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
-                foundFeatures.put(osmId, getPoiFeature(result, clientTime));
+                foundFeatures.put(osmId, getPoiFeature(result, timeZone));
                 remainingLimit--;
             }
         }
@@ -1194,10 +1195,10 @@ public class SearchService {
         return createAddressString(cityName, mainCity, dominatedCity, addr);
     }
 
-	public Feature getFeature(SearchResult result, Calendar clientTime) {
+	public Feature getFeature(SearchResult result, String timeZone) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
-			feature = getPoiFeature(result, clientTime);
+			feature = getPoiFeature(result, timeZone);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
 			feature = new Feature(geometry)
@@ -1222,7 +1223,7 @@ public class SearchService {
 		return feature;
 	}
 
-	private Feature getPoiFeature(SearchResult result, Calendar clientTime) {
+	private Feature getPoiFeature(SearchResult result, String timeZone) {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
@@ -1249,6 +1250,7 @@ public class SearchService {
 			feature.prop(entry.getKey(), value);
 		}
 		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
+        Calendar clientTime = getClientTime(timeZone);
 		if (clientTime != null && openingHoursValue != null) {
 			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
 			if (openingHoursInfo != null) {
@@ -1382,6 +1384,16 @@ public class SearchService {
             osmAndMapsService.unlockReaders(usedMapList);
         }
             return null;
+    }
+
+    @Nullable
+    private static Calendar getClientTime(String timeZone) {
+        if (Algorithms.isBlank(timeZone)) {
+            return null;
+        }
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
+        calendar.setTimeInMillis(System.currentTimeMillis());
+        return calendar;
     }
 
 }
