@@ -172,7 +172,7 @@ public class TransportStopsService {
 		int top31 = (int) searchBbox.top;
 		int bottom31 = (int) searchBbox.bottom;
 
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = searchService.getMapsForSearch(bbox, searchBbox, false);
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = searchService.getMapsForSearch(searchBbox, false);
 		if (mapList.isEmpty()) {
 			return null;
 		}

@@ -66,8 +66,6 @@ import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.OsmandIndex.FileIndex;
-import net.osmand.binary.OsmandIndex.RoutingPart;
-import net.osmand.binary.OsmandIndex.RoutingSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.gpx.GPXFile;
@@ -152,6 +150,24 @@ public class OsmAndMapsService {
 
 
 	private final Map<String, BinaryMapIndexReaderReference> obfFiles = new LinkedHashMap<>();
+
+	public enum ObfReason {
+		SEARCH("search"),
+		SEARCH_TEST("search-test"),
+		GEOCODING("geocoding"),
+		APPROXIMATE("approximate"),
+		ROUTING("routing");
+
+		private final String value;
+
+		ObfReason(String value) {
+			this.value = value;
+		}
+
+		public String value() {
+			return value;
+		}
+	}
 
 	CachedOsmandIndexes cacheFiles = null;
 
@@ -656,7 +672,7 @@ public class OsmAndMapsService {
 		List<GeocodingResult> complete;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "geocoding");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.GEOCODING.value());
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete, true);
 			if (incomplete[0]) {
@@ -704,7 +720,7 @@ public class OsmAndMapsService {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, null, "approximate");
+			List<BinaryMapIndexReaderReference> list = getObfReaders(quadRect, ObfReason.APPROXIMATE.value());
 			boolean[] incomplete = new boolean[1];
 			usedMapList = getReaders(list, incomplete);
 			if (incomplete[0]) {
@@ -1011,7 +1027,7 @@ public class OsmAndMapsService {
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<BinaryMapIndexReaderReference> list = getObfReaders(points, null, "routing");
+				List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.ROUTING.value());
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1317,17 +1333,17 @@ public class OsmAndMapsService {
 		LOGGER.info("Init new obf file " + target.getName() + " " + (System.currentTimeMillis() - val) + " ms");
 	}
 
-	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, List<LatLon> bbox, String reason) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReaders(QuadRect quadRect, String reason) throws IOException {
 		initObfReaders();
 		List<BinaryMapIndexReaderReference> files = new ArrayList<>();
-		List<File> filesToUse = getMaps(quadRect, bbox);
+		List<File> filesToUse = getMaps(quadRect);
 		StringBuilder names = new StringBuilder();
 		if (!filesToUse.isEmpty()) {
 			for (File f : filesToUse) {
 				BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
 				files.add(ref);
 				if (f.getName().length() > 20) {
-					names.append(f.getName().substring(0, 20)).append("..,");
+					names.append(f.getName(), 0, 20).append("..,");
 				} else {
 					names.append(f.getName()).append(",");
 				}
@@ -1337,23 +1353,42 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-	private List<File> getMaps(QuadRect quadRect, List<LatLon> bbox) throws IOException {
+	// World_seamarks is skipped as an optimization since it match every bbox.
+	private List<File> getMaps(QuadRect quadRect) throws IOException {
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions();
+			osmandRegions.prepareFile();
+		}
+
 		List<File> files = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState()) {
+			return files;
+		}
+
+		QuadRect queryLatLon = new QuadRect(
+				MapUtils.get31LongitudeX((int) Math.min(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
+				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
-			boolean intersects;
-			fileOverlaps:
-			for (RoutingPart rp : ref.fileIndex.getRoutingIndexList()) {
-				for (RoutingSubregion s : rp.getSubregionsList()) {
-					intersects = quadRect.left <= s.getRight() && quadRect.right >= s.getLeft()
-							&& quadRect.top <= s.getBottom() && quadRect.bottom >= s.getTop();
-					if (intersects) {
-						files.add(ref.file);
-						break fileOverlaps;
-					}
-				}
+			File file = ref.file;
+			String downloadName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = osmandRegions.getRegionDataByDownloadName(downloadName);
+			if (wr == null) {
+				continue;
+			}
+			if (wr.isRegionJoinMapDownload() || wr.isRegionJoinRoadsDownload()) {
+				LOGGER.error("Deprecated joint OBF filtered: " + file.getName());
+				continue;
+			}
+			List<QuadRect> polyBboxes = wr.getAllPolygonsBounds();
+			if (polyBboxes != null && !polyBboxes.isEmpty()
+					&& polyBboxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
+				files.add(file);
 			}
 		}
-		return filterMap(files);
+		return files;
 	}
 
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
