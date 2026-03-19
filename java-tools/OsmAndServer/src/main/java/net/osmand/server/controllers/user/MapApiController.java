@@ -102,6 +102,9 @@ public class MapApiController {
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 
+	@Autowired
+	private GpxInfoFileService gpxInfoFileService;
+
 	OsmandRegions osmandRegions;
 
 	Gson gson = new Gson();
@@ -257,6 +260,19 @@ public class MapApiController {
 		userdataService.uploadMultipartFile(file, dev, name, type, System.currentTimeMillis(), session);
 
 		return okStatus();
+	}
+
+	@PostMapping(value = "/update-info", consumes = MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         @RequestParam String name,
+	                                         @RequestParam(required = false)  Long updatetime) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
+			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
+		}
+		return gpxInfoFileService.updateGpxInfoFile(file, name, dev, updatetime);
 	}
 
 	@PostMapping(value = "/delete-file")
