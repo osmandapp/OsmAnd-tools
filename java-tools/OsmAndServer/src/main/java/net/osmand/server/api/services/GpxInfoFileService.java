@@ -18,15 +18,18 @@ public class GpxInfoFileService {
 	@Autowired
 	UserdataService userdataService;
 
-	// Updating the entire gpx.info file is efficient for most cases.
-	// For large info files with many waypoint groups, using a diff may be the better approach.
-
+	/**
+	 * Updates or creates a GPX info file
+	 * Updating the entire gpx.info file is efficient for most cases.
+	 * For large info files with many waypoint groups, using a diff may be the better approach.
+	 */
 	@Transactional
 	public ResponseEntity<String> updateGpxInfoFile(MultipartFile file, String name, CloudUserDevice dev,
 	                                                Long updatetime) throws IOException {
 		InternalZipFile zipfile = InternalZipFile.buildFromMultipartFile(file);
 		ResponseEntity<String> res = userdataService.uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
-		if (updatetime != null) {
+		//if updatetime is null, this is a new info file; upload it only
+		if (updatetime != null) { 
 			userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
 		}
 		return res;
