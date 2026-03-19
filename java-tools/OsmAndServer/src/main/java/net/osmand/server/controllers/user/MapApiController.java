@@ -265,7 +265,7 @@ public class MapApiController {
 	@PostMapping(value = "/update-info", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                         @RequestParam String name,
-	                                         @RequestParam Long updatetime) throws IOException {
+	                                         @RequestParam(required = false)  Long updatetime) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
