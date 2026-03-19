@@ -712,9 +712,9 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	static final ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
+	ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
 
-	static final class JsonDumpState {
+	final class JsonDumpState {
 		final int maxDepth;
 		final long maxFields;
 		final int maxArrayLength;
@@ -1123,7 +1123,7 @@ public interface OBFService extends BaseService {
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, false), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");

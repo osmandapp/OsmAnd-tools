@@ -431,7 +431,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 						searchResult = searchService.getImmediateSearchResults(
 								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, SearchService.SEARCH_RADIUS_DEGREE, bbox[0], bbox[1]),
-								new SearchService.SearchOption(true, null), finder);
+								new SearchService.SearchOption(true, null, true), finder);
 					}
 
 					args = collectRunResults(finder, genId, count, run, query, searchResult,
