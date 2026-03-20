@@ -44,8 +44,8 @@ public interface OBFService extends BaseService {
 				new LatLon(latMinusRadius, lonPlusRadius));
 
 		List<String> obfList = new ArrayList<>();
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(points, null,
-				"search-test");
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
+				points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
 		for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
 			obfList.add(ref.getFile().getAbsolutePath());
 		return obfList;
