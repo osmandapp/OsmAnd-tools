@@ -42,7 +42,7 @@
 	
 	<regions siteToDownload="/home/osm-planet/osm-extract/{0}/{0}.pbf" >
 		<regionList url="https://raw.githubusercontent.com/osmandapp/OsmAnd-resources/master/countries-info/regions.xml"
-					filterStartsWith="Ukraine_"/>
+					filterStartsWith="Germany_"/>
 	</regions>
 
 </batch_process> 
