@@ -334,6 +334,10 @@ public interface ReportService {
 						"SUM(json_extract(ss.value, '$.bytes')) AS bytes, " +
 						"SUM(json_extract(ss.value, '$.calls')) AS calls, " +
 						"SUM(json_extract(ss.value, '$.bytesLoaded')) AS bytes_loaded, " +
+						"SUM(json_extract(ss.value, '$.blocksLoaded')) AS blocks_loaded, " +
+						"SUM(json_extract(ss.value, '$.objectsLoaded')) AS objects_loaded, " +
+						"SUM(json_extract(ss.value, '$.matchedObjects')) AS matched_objects, " +
+						"SUM(json_extract(ss.value, '$.maxObjectsPerBlock')) AS max_objects_per_block, " +
 						"SUM(json_extract(ss.value, '$.bytesSkippedBySeek')) AS bytes_skipped_by_seek, " +
 						"SUM(json_extract(ss.value, '$.payloadBytesParsed')) AS payload_bytes_parsed, " +
 						"SUM(json_extract(ss.value, '$.decodeTime')) AS decode_time, " +
@@ -355,6 +359,10 @@ public interface ReportService {
 					Number ssBytes = (Number) row.get("bytes");
 					Number ssCalls = (Number) row.get("calls");
 					Number ssBytesLoaded = (Number) row.get("bytes_loaded");
+					Number ssBlocksLoaded = (Number) row.get("blocks_loaded");
+					Number ssObjectsLoaded = (Number) row.get("objects_loaded");
+					Number ssMatchedObjects = (Number) row.get("matched_objects");
+					Number ssMaxObjectsPerBlock = (Number) row.get("max_objects_per_block");
 					Number ssBytesSkippedBySeek = (Number) row.get("bytes_skipped_by_seek");
 					Number ssPayloadBytesParsed = (Number) row.get("payload_bytes_parsed");
 					Number ssDecodeTimeNs = (Number) row.get("decode_time");
@@ -365,6 +373,10 @@ public interface ReportService {
 							ssBytes == null ? 0 : ssBytes.longValue(),
 							ssCalls == null ? 0 : ssCalls.longValue(),
 							ssBytesLoaded == null ? 0 : ssBytesLoaded.longValue(),
+							ssBlocksLoaded == null ? 0 : ssBlocksLoaded.longValue(),
+							ssObjectsLoaded == null ? 0 : ssObjectsLoaded.longValue(),
+							ssMatchedObjects == null ? 0 : ssMatchedObjects.longValue(),
+							ssMaxObjectsPerBlock == null ? 0 : ssMaxObjectsPerBlock.longValue(),
 							ssBytesSkippedBySeek == null ? 0 : ssBytesSkippedBySeek.longValue(),
 							ssPayloadBytesParsed == null ? 0 : ssPayloadBytesParsed.longValue(),
 							ssDecodeTimeNs == null ? 0 : ssDecodeTimeNs.longValue(),
