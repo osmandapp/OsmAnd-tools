@@ -395,6 +395,18 @@ public class UserdataService {
 		return originalFilename.toLowerCase().endsWith(".kml") || originalFilename.toLowerCase().endsWith(".kmz");
 	}
 
+	@Transactional
+	public ResponseEntity<String> updateGpxInfoFile(MultipartFile file, String name,
+	                                                CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                Long updatetime) throws IOException {
+		InternalZipFile zipfile = InternalZipFile.buildFromMultipartFile(file);
+		ResponseEntity<String> res = uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
+		if (updatetime != null) {
+			deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
+		}
+		return res;
+	}
+
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();

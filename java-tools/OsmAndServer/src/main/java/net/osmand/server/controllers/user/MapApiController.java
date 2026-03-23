@@ -102,9 +102,6 @@ public class MapApiController {
 	@Autowired
 	DeviceInAppPurchasesRepository deviceInAppPurchasesRepository;
 
-	@Autowired
-	private GpxInfoFileService gpxInfoFileService;
-
 	OsmandRegions osmandRegions;
 
 	Gson gson = new Gson();
@@ -272,7 +269,7 @@ public class MapApiController {
 		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
 			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
 		}
-		return gpxInfoFileService.updateGpxInfoFile(file, name, dev, updatetime);
+		return userdataService.updateGpxInfoFile(file, name, dev, updatetime);
 	}
 
 	@PostMapping(value = "/delete-file")
