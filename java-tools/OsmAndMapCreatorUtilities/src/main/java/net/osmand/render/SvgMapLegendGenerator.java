@@ -264,6 +264,8 @@ public class SvgMapLegendGenerator {
 			ArrayList<GroupDTO> resultGroups = new ArrayList<>();
 			GroupDTO tempGroup = new GroupDTO();
 			IconDTO tempIcon = new IconDTO();
+			Set<String> uniqueGroupIconsId = new HashSet<>();
+			Set<String> uniqueIconsId = new HashSet<>();
 
 			while ((next = parser.next()) != XmlPullParser.END_DOCUMENT) {
 				if (next == XmlPullParser.END_TAG) {
@@ -273,6 +275,8 @@ public class SvgMapLegendGenerator {
 						tempIcon = new IconDTO();
 					} else if (name.equals("group")) {
 						resultGroups.add(tempGroup);
+						uniqueIconsId.addAll(uniqueGroupIconsId);
+						uniqueGroupIconsId.clear();
 						tempGroup = new GroupDTO();
 					}
 				} else if (next == XmlPullParser.START_TAG) {
@@ -292,12 +296,10 @@ public class SvgMapLegendGenerator {
 							tempGroup.folderName = foldername;
 							tempGroup.type = GroupType.FOLDER;
 						}
-						tempGroup.anchor = parser.getAttributeValue("", "anchor");
-						if (tempGroup.anchor == null) {
-							tempGroup.anchor = tempGroup.groupName.toLowerCase()
-									.replaceAll("[^a-zA-Z]", "-")
-									.replaceAll("-+", "-");
-						}
+						tempGroup.anchor = tempGroup.groupName.toLowerCase()
+								.replaceAll("[^a-zA-Z]", "-")
+								.replaceAll("-+", "-");
+
 						String headerSign = parser.getAttributeValue("", "heading");
 						if (!Algorithms.isEmpty(headerSign)) {
 							tempGroup.headerSign = "#".repeat(Integer.parseInt(headerSign));
@@ -310,7 +312,12 @@ public class SvgMapLegendGenerator {
 					} else if (name.equals("icon")) {
 						tempIcon.name = parser.getAttributeValue("", "name");
 						if (tempGroup.type == GroupType.SPRITE) {
-							tempIcon.id = parser.getAttributeValue("", "id");
+							String id = parser.getAttributeValue("", "id");
+							if (!uniqueGroupIconsId.add(id)) {
+								throw new Exception("ERROR: parseXmlConfig() - icon id must be unique at the line "
+										+ parser.getLineNumber());
+							}
+							tempIcon.id = id;
 							if (Algorithms.isEmpty(tempIcon.name) || Algorithms.isEmpty(tempIcon.id)) {
 								throw new Exception("ERROR: parseXmlConfig() - icon fields invalid at map-legend.xml line "
 										+ parser.getLineNumber());
@@ -347,9 +354,23 @@ public class SvgMapLegendGenerator {
 					}
 				}
 			}
+			createUniqueAnchors(uniqueIconsId, resultGroups);
 			return resultGroups;
 		} catch (Exception e) {
 			throw new Exception("ERROR: parseConfig() failed to parse file " + filePath, e);
+		}
+	}
+
+	private static void createUniqueAnchors(Set<String> uniqueIconsId, ArrayList<GroupDTO> resultGroups) {
+		for (GroupDTO group : resultGroups) {
+			String baseAnchor = group.anchor;
+			String anchor = baseAnchor;
+			int suffix = 1;
+			while (!uniqueIconsId.add(anchor)) {
+				anchor = baseAnchor + suffix;
+				suffix++;
+			}
+			group.anchor = anchor;
 		}
 	}
 
