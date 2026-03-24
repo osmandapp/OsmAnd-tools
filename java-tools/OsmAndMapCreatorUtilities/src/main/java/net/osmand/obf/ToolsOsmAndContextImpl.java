@@ -19,6 +19,8 @@ import java.io.InputStream;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 
+import java.nio.charset.StandardCharsets;
+
 public class ToolsOsmAndContextImpl implements OsmAndContext {
 
     private final String resourcesDirectoryAsAssets = "resources"; // filled by collectActivities
@@ -26,19 +28,51 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
     @Override
     public String getAssetAsString(String name) {
         try {
-			String resourcePath = "/" + resourcesDirectoryAsAssets + "/" + name;
-			InputStream inputStream = this.getClass().getResourceAsStream(resourcePath);
-			if (inputStream == null) {
-			    throw new IOException("Resource not found: " + name);
+			try (InputStream inputStream = openAssetStream(name)) {
+				if (inputStream == null) {
+					throw new IOException("Resource not found: " + name);
+				}
+				return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
 			}
-
-			// Read the input stream into a string (requires Java 9 or later)
-			String content = new String(inputStream.readAllBytes());
-			return content;
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
     }
+
+	private InputStream openAssetStream(String name) {
+		String[] resourceCandidates = {
+				resourcesDirectoryAsAssets + "/" + name,
+				name,
+				"/" + resourcesDirectoryAsAssets + "/" + name,
+				"/" + name
+		};
+		ClassLoader[] classLoaders = {
+				Thread.currentThread().getContextClassLoader(),
+				getClass().getClassLoader()
+		};
+		for (ClassLoader classLoader : classLoaders) {
+			if (classLoader == null) {
+				continue;
+			}
+			for (String resourceCandidate : resourceCandidates) {
+				InputStream inputStream = classLoader.getResourceAsStream(stripLeadingSlash(resourceCandidate));
+				if (inputStream != null) {
+					return inputStream;
+				}
+			}
+		}
+		for (String resourceCandidate : resourceCandidates) {
+			InputStream inputStream = getClass().getResourceAsStream(resourceCandidate);
+			if (inputStream != null) {
+				return inputStream;
+			}
+		}
+		return null;
+	}
+
+	private String stripLeadingSlash(String value) {
+		return value.startsWith("/") ? value.substring(1) : value;
+	}
 
     @Override
     public KFile getAppDir() {

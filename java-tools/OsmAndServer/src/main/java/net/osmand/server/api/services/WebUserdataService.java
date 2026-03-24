@@ -340,6 +340,9 @@ public class WebUserdataService {
 	}
 
 	private boolean isHidden(WebGpxParser.WebPointsGroup group) {
+		if (group.hidden != null) {
+			return group.hidden;
+		}
 		for (WebGpxParser.Wpt wpt : group.points) {
 			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
