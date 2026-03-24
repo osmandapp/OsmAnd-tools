@@ -259,6 +259,19 @@ public class MapApiController {
 		return okStatus();
 	}
 
+	@PostMapping(value = "/update-info", consumes = MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         @RequestParam String name,
+	                                         @RequestParam(required = false)  Long updatetime) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
+			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
+		}
+		return userdataService.updateGpxInfoFile(file, name, dev, updatetime);
+	}
+
 	@PostMapping(value = "/delete-file")
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
