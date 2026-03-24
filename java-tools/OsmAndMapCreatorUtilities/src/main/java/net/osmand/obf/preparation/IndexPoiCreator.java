@@ -67,6 +67,8 @@ import net.osmand.util.MapUtils;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
+import static net.osmand.binary.BloomFilter.MAX_SATURATION_BITS;
+
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -81,7 +83,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
-	private static final int MAX_POI_DATA_PER_SUBBLOCK = 128;
+	private static final int MAX_POI_DATA_PER_SUBBLOCK = 32;
+	private static final int POI_PACKING_LEAF_PREFIX_LENGTH = 4;
+	private static final int POI_PACKING_CONTINUATION_LENGTH = 2;
+	private static final int MAX_CONTAMINATING_CONTINUATIONS_PER_SUBBLOCK = 2;
 	private static final double GEOCODING_DISTANCE = 150;
 	
 	private boolean useInMemoryCreator = true;
@@ -106,6 +111,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
+	private final List<LeafMetrics> leafMetrics = new ArrayList<>();
 
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
@@ -183,6 +189,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				QuadRect bbox = new QuadRect(left, top, right, bottom);
 				cityQuadTree.insert(m, bbox);
 			}
+		}
+	}
+
+	private void collectLeafMetrics(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
+		leafMetrics.clear();
+		for (Map.Entry<String, Set<PoiDataBlock>> entry : namesIndexBySubblock.entrySet()) {
+			List<PoiDataBlock> poiDataBlocks = new ArrayList<>(entry.getValue());
+			leafMetrics.add(LeafMetrics.from(entry.getKey(), poiDataBlocks));
 		}
 	}
 
@@ -685,7 +699,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		List<PoiDataBlock> orderedPoiDataBlocks = new ArrayList<>();
 		Map<String, Set<PoiDataBlock>> namesIndexBySubblock = new TreeMap<>();
 		buildPoiDataBlocks(rootZoomsTree, poiDataBlocksByTileBox, orderedPoiDataBlocks, namesIndexBySubblock);
+		collectLeafMetrics(namesIndexBySubblock);
 		Map<PoiDataBlock, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndexBySubblock, startFpPoiIndex);
+		writer.writeAtomMetricsReport(leafMetrics);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -1181,23 +1197,140 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return Collections.emptyList();
 		}
 		List<PoiData> sortedPoiData = new ArrayList<>(poiTileBox.poiData);
-		sortedPoiData.sort((o1, o2) -> -Integer.compare(o1.getRating(), o2.getRating()));
-		int totalPoiCount = sortedPoiData.size();
-		if (totalPoiCount <= MAX_POI_DATA_PER_SUBBLOCK) {
-			return Collections.singletonList(new PoiDataBlock(poiTileBox, sortedPoiData));
+		sortedPoiData.sort(this::comparePoiDataForSubblocks);
+		List<PoiDataBlock> poiDataBlocks = new ArrayList<>();
+		List<PoiData> currentBlock = new ArrayList<>(Math.min(sortedPoiData.size(), MAX_POI_DATA_PER_SUBBLOCK));
+		Set<String> currentBloomTokens = new LinkedHashSet<>();
+		Set<String> currentContinuationKeys = new LinkedHashSet<>();
+		for (PoiData poiData : sortedPoiData) {
+			if (currentBlock.isEmpty()) {
+				appendPoiToBlock(currentBlock, currentBloomTokens, currentContinuationKeys, poiData);
+				continue;
+			}
+			boolean wouldExceedSize = currentBlock.size() >= MAX_POI_DATA_PER_SUBBLOCK;
+			boolean wouldSaturateBloom = wouldSaturateBloom(currentBloomTokens, poiData.bloomTokens);
+			boolean wouldContaminateContinuation = wouldContaminateContinuation(currentContinuationKeys, poiData);
+			if (wouldExceedSize || wouldSaturateBloom || wouldContaminateContinuation) {
+				poiDataBlocks.add(new PoiDataBlock(poiTileBox, new ArrayList<>(currentBlock)));
+				currentBlock.clear();
+				currentBloomTokens.clear();
+				currentContinuationKeys.clear();
+			}
+			appendPoiToBlock(currentBlock, currentBloomTokens, currentContinuationKeys, poiData);
 		}
-		int subblockCount = (totalPoiCount + MAX_POI_DATA_PER_SUBBLOCK - 1) / MAX_POI_DATA_PER_SUBBLOCK;
-		int baseSize = totalPoiCount / subblockCount;
-		int remainder = totalPoiCount % subblockCount;
-		List<PoiDataBlock> poiDataBlocks = new ArrayList<>(subblockCount);
-		int start = 0;
-		for (int i = 0; i < subblockCount; i++) {
-			int subblockSize = baseSize + (i < remainder ? 1 : 0);
-			int end = start + subblockSize;
-			poiDataBlocks.add(new PoiDataBlock(poiTileBox, new ArrayList<>(sortedPoiData.subList(start, end))));
-			start = end;
+		if (!currentBlock.isEmpty()) {
+			poiDataBlocks.add(new PoiDataBlock(poiTileBox, new ArrayList<>(currentBlock)));
 		}
 		return poiDataBlocks;
+	}
+
+	private void appendPoiToBlock(List<PoiData> currentBlock, Set<String> currentBloomTokens,
+			Set<String> currentContinuationKeys, PoiData poiData) {
+		currentBlock.add(poiData);
+		currentBloomTokens.addAll(poiData.bloomTokens);
+		String continuationKey = getContinuationPackingKey(poiData);
+		if (!Algorithms.isEmpty(continuationKey)) {
+			currentContinuationKeys.add(continuationKey);
+		}
+	}
+
+	private boolean wouldContaminateContinuation(Set<String> currentContinuationKeys, PoiData poiData) {
+		String continuationKey = getContinuationPackingKey(poiData);
+		if (Algorithms.isEmpty(continuationKey) || currentContinuationKeys.isEmpty() || currentContinuationKeys.contains(continuationKey)) {
+			return false;
+		}
+		return currentContinuationKeys.size() >= MAX_CONTAMINATING_CONTINUATIONS_PER_SUBBLOCK;
+	}
+
+	private String getContinuationPackingKey(PoiData poiData) {
+		String primaryIndexToken = getPrimaryToken(poiData.indexTokens);
+		if (Algorithms.isEmpty(primaryIndexToken)) {
+			return null;
+		}
+		for (String bloomToken : poiData.bloomTokens) {
+			if (Algorithms.isEmpty(bloomToken) || !bloomToken.startsWith(primaryIndexToken)) {
+				continue;
+			}
+			if (primaryIndexToken.length() < POI_PACKING_LEAF_PREFIX_LENGTH) {
+				return primaryIndexToken;
+			}
+			if (bloomToken.length() >= primaryIndexToken.length() + POI_PACKING_CONTINUATION_LENGTH) {
+				return bloomToken.substring(0, primaryIndexToken.length() + POI_PACKING_CONTINUATION_LENGTH);
+			}
+			return primaryIndexToken;
+		}
+		return primaryIndexToken;
+	}
+
+	private boolean wouldSaturateBloom(Set<String> currentBloomTokens, Set<String> nextPoiBloomTokens) {
+		if (Algorithms.isEmpty(nextPoiBloomTokens)) {
+			return false;
+		}
+		Set<String> combinedBloomTokens = new LinkedHashSet<>(currentBloomTokens);
+		int previousTokenCount = combinedBloomTokens.size();
+		combinedBloomTokens.addAll(nextPoiBloomTokens);
+		if (combinedBloomTokens.size() == previousTokenCount) {
+			return false;
+		}
+		return countBloomBits(BloomFilter.getInstance().build(combinedBloomTokens)) > MAX_SATURATION_BITS;
+	}
+
+	private int countBloomBits(byte[] bloom) {
+		if (bloom == null) {
+			return 0;
+		}
+		int bitCount = 0;
+		for (byte value : bloom) {
+			bitCount += Integer.bitCount(value & 0xFF);
+		}
+		return bitCount;
+	}
+
+	private int comparePoiDataForSubblocks(PoiData left, PoiData right) {
+		int compare = compareNullableStrings(getPrimaryToken(left.indexTokens), getPrimaryToken(right.indexTokens));
+		if (compare != 0) {
+			return compare;
+		}
+		compare = compareNullableStrings(getPrimaryToken(left.bloomTokens), getPrimaryToken(right.bloomTokens));
+		if (compare != 0) {
+			return compare;
+		}
+		compare = Integer.compare(right.getRating(), left.getRating());
+		if (compare != 0) {
+			return compare;
+		}
+		compare = Long.compare(left.id, right.id);
+		if (compare != 0) {
+			return compare;
+		}
+		compare = Integer.compare(left.x, right.x);
+		if (compare != 0) {
+			return compare;
+		}
+		return Integer.compare(left.y, right.y);
+	}
+
+	private String getPrimaryToken(Set<String> tokens) {
+		String primaryToken = null;
+		for (String token : tokens) {
+			if (primaryToken == null || token.compareTo(primaryToken) < 0) {
+				primaryToken = token;
+			}
+		}
+		return primaryToken;
+	}
+
+	private int compareNullableStrings(String left, String right) {
+		if (left == null && right == null) {
+			return 0;
+		}
+		if (left == null) {
+			return 1;
+		}
+		if (right == null) {
+			return -1;
+		}
+		return left.compareTo(right);
 	}
 
 	private static class PoiData {
@@ -1267,6 +1400,159 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				cachedBloom = BloomFilter.getInstance().build(bloomTokens);
 			}
 			return cachedBloom;
+		}
+	}
+
+	public static class PoiNameSidecar {
+		final List<PoiNameSidecarEntry> entries;
+		final List<Integer> residualAtomIndexes;
+
+		PoiNameSidecar(List<PoiNameSidecarEntry> entries, List<Integer> residualAtomIndexes) {
+			this.entries = entries;
+			this.residualAtomIndexes = residualAtomIndexes;
+		}
+
+		public boolean isEmpty() {
+			return Algorithms.isEmpty(entries) && Algorithms.isEmpty(residualAtomIndexes);
+		}
+	}
+
+	public static class PoiNameSidecarEntry {
+		final String key;
+		final LinkedHashSet<Integer> atomIndexes = new LinkedHashSet<>();
+
+		PoiNameSidecarEntry(String key) {
+		this.key = key;
+		}
+
+		int estimateSerializedBytes() {
+			return 6 + atomIndexes.size() * 2;
+		}
+	}
+
+	public static class LeafMetrics {
+		public final String leafKey4;
+		public final int poiCount;
+		public final int atomCount;
+		public final int avgPoisPerAtom;
+		public final int p95PoisPerAtom;
+		public final int maxPoisPerAtom;
+		public final int avgUniqueBloomTokens;
+		public final int p95UniqueBloomTokens;
+		public final int maxUniqueBloomTokens;
+		public final int avgAtomKeyCount;
+		public final int p95AtomKeyCount;
+		public final int uniqKeys;
+		public final boolean sidecarBuilt;
+		public final int sidecarBytes;
+		public final int selectedKeyCount;
+		public final int residualAtomCount;
+		public final double residualMass;
+		public final double avgFrag;
+		public final double maxFrag;
+		public final int expectedCostNoSidecar;
+		public final double expectedCostWithSidecar;
+		public final double estimatedSpeedup;
+
+		private LeafMetrics(String leafKey4, int poiCount, int atomCount, int avgPoisPerAtom, int p95PoisPerAtom,
+		                    int maxPoisPerAtom, int avgUniqueBloomTokens, int p95UniqueBloomTokens, int maxUniqueBloomTokens,
+		                    int avgAtomKeyCount, int p95AtomKeyCount, int uniqKeys, boolean sidecarBuilt, int sidecarBytes,
+		                    int selectedKeyCount, int residualAtomCount, double residualMass, double avgFrag, double maxFrag,
+		                    int expectedCostNoSidecar, double expectedCostWithSidecar, double estimatedSpeedup) {
+			this.leafKey4 = leafKey4;
+			this.poiCount = poiCount;
+			this.atomCount = atomCount;
+			this.avgPoisPerAtom = avgPoisPerAtom;
+			this.p95PoisPerAtom = p95PoisPerAtom;
+			this.maxPoisPerAtom = maxPoisPerAtom;
+			this.avgUniqueBloomTokens = avgUniqueBloomTokens;
+			this.p95UniqueBloomTokens = p95UniqueBloomTokens;
+			this.maxUniqueBloomTokens = maxUniqueBloomTokens;
+			this.avgAtomKeyCount = avgAtomKeyCount;
+			this.p95AtomKeyCount = p95AtomKeyCount;
+			this.uniqKeys = uniqKeys;
+			this.sidecarBuilt = sidecarBuilt;
+			this.sidecarBytes = sidecarBytes;
+			this.selectedKeyCount = selectedKeyCount;
+			this.residualAtomCount = residualAtomCount;
+			this.residualMass = residualMass;
+			this.avgFrag = avgFrag;
+			this.maxFrag = maxFrag;
+			this.expectedCostNoSidecar = expectedCostNoSidecar;
+			this.expectedCostWithSidecar = expectedCostWithSidecar;
+			this.estimatedSpeedup = estimatedSpeedup;
+		}
+
+		static LeafMetrics from(String leafKey4, List<PoiDataBlock> poiDataBlocks) {
+			int atomCount = poiDataBlocks == null ? 0 : poiDataBlocks.size();
+			int poiCount = 0;
+			List<Integer> poisPerAtom = new ArrayList<>();
+			List<Integer> uniqueBloomTokenCounts = new ArrayList<>();
+			List<Integer> atomKeyCounts = new ArrayList<>();
+			Set<String> distinctKeys = new LinkedHashSet<>();
+			if (poiDataBlocks != null) {
+				for (PoiDataBlock poiDataBlock : poiDataBlocks) {
+					poiCount += poiDataBlock.poiData.size();
+					poisPerAtom.add(poiDataBlock.poiData.size());
+					uniqueBloomTokenCounts.add(poiDataBlock.bloomTokens.size());
+					atomKeyCounts.add(poiDataBlock.indexTokens.size());
+					distinctKeys.addAll(poiDataBlock.indexTokens);
+				}
+			}
+			int avgPoisPerAtom = averageInt(poisPerAtom);
+			int p95PoisPerAtom = percentileInt(poisPerAtom, 95);
+			int maxPoisPerAtom = maxInt(poisPerAtom);
+			int avgUniqueBloomTokens = averageInt(uniqueBloomTokenCounts);
+			int p95UniqueBloomTokens = percentileInt(uniqueBloomTokenCounts, 95);
+			int maxUniqueBloomTokens = maxInt(uniqueBloomTokenCounts);
+			int avgAtomKeyCount = averageInt(atomKeyCounts);
+			int p95AtomKeyCount = percentileInt(atomKeyCounts, 95);
+			int distinctNext2Keys = distinctKeys.size();
+			boolean sidecarBuilt = atomCount >= 64;
+			int selectedKeyCount = sidecarBuilt ? distinctNext2Keys : 0;
+			int sidecarBytes = sidecarBuilt ? selectedKeyCount * 8 : 0;
+			int residualAtomCount = Math.max(0, atomCount - selectedKeyCount);
+			double residualMass = atomCount == 0 ? 0d : residualAtomCount / (double) atomCount;
+			double avgFrag = atomCount == 0 ? 0d : Math.min(1d, selectedKeyCount / (double) Math.max(1, atomCount));
+			double maxFrag = sidecarBuilt ? 1d : 0d;
+			int expectedCostNoSidecar = atomCount;
+			double expectedCostWithSidecar = selectedKeyCount + residualAtomCount;
+			double estimatedSpeedup = expectedCostWithSidecar == 0d ? 1d : expectedCostNoSidecar / expectedCostWithSidecar;
+			return new LeafMetrics(leafKey4, poiCount, atomCount, avgPoisPerAtom, p95PoisPerAtom, maxPoisPerAtom,
+					avgUniqueBloomTokens, p95UniqueBloomTokens, maxUniqueBloomTokens, avgAtomKeyCount, p95AtomKeyCount,
+					distinctNext2Keys, sidecarBuilt, sidecarBytes, selectedKeyCount, residualAtomCount, residualMass,
+					avgFrag, maxFrag, expectedCostNoSidecar, expectedCostWithSidecar, estimatedSpeedup);
+		}
+
+		private static int averageInt(List<Integer> values) {
+			if (Algorithms.isEmpty(values)) {
+				return 0;
+			}
+			int sum = 0;
+			for (Integer value : values) {
+				sum += value;
+			}
+			return Math.round(sum / (float) values.size());
+		}
+
+		private static int percentileInt(List<Integer> values, int percentile) {
+			if (Algorithms.isEmpty(values)) {
+				return 0;
+			}
+			List<Integer> sorted = new ArrayList<>(values);
+			sorted.sort(Integer::compareTo);
+			int index = Math.min(sorted.size() - 1, Math.max(0, (int) Math.ceil(sorted.size() * (percentile / 100.0)) - 1));
+			return sorted.get(index);
+		}
+
+		private static int maxInt(List<Integer> values) {
+			int max = 0;
+			for (Integer value : values) {
+				if (value != null && value > max) {
+					max = value;
+				}
+			}
+			return max;
 		}
 	}
 

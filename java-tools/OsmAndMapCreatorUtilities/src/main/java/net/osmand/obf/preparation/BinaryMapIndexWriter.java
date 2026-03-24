@@ -6,22 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.Stack;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -95,6 +81,7 @@ import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiDataBlock;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorTagGroups;
+import net.osmand.obf.preparation.IndexPoiCreator.LeafMetrics;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
@@ -120,6 +107,35 @@ public class BinaryMapIndexWriter {
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
 	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
+	private static final int POI_NAME_SIDECAR_COUNT_THRESHOLD = 256;
+	private static final int POI_NAME_SIDECAR_SIZE_BUDGET = 2048;
+	private static final int MIN_POSTING_SIZE_FOR_SIDECAR = 3;
+	private static final int MAX_SELECTED_KEYS_PER_LEAF = 16;
+	private static final double MAX_SPAN_FRAG = 0.50d;
+	private static final double SIDE_CAR_BYTE_PENALTY = 0.0d;
+	private static final int RESCUE_MIN_POSTING_SIZE_FOR_SIDECAR = 2;
+	private static final double RESCUE_MAX_SPAN_FRAG = 0.75d;
+	private static final double RESIDUAL_RESCUE_MASS_THRESHOLD = 0.70d;
+	private static final double RESIDUAL_RESCUE_COVERAGE_THRESHOLD = 0.30d;
+	private static final int POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH = 2;
+	private static final int POI_NAME_SIDECAR_MAX_CONTINUATION_DEPTH = 6;
+	private static final int POI_NAME_SIDECAR_BRANCH_HEAVY_THRESHOLD = 64;
+	private static final double POI_NAME_SIDECAR_BRANCH_TOP1_MASS_MAX = 0.60d;
+	private static final double POI_NAME_SIDECAR_BRANCH_COVERAGE_MIN = 0.70d;
+	private static final double POI_NAME_SIDECAR_BRANCH_RESIDUAL_MIN = 0.30d;
+	private static final double BROAD_PREFIX_TOP3_MASS_THRESHOLD = 0.35d;
+	private static final int BROAD_PREFIX_MIN_ELIGIBLE_CANDIDATES = 3;
+	private static final int RESIDUAL_SPARSE_ATOM_THRESHOLD = 512;
+	private static final double RESIDUAL_SPARSE_MASS_MIN = 0.85d;
+	private static final double RESIDUAL_SPARSE_COVERAGE_MAX = 0.15d;
+	private static final int RESIDUAL_SPARSE_MAX_ELIGIBLE = 1;
+	private static final double RESIDUAL_SPARSE_TOP1_MAX = 0.10d;
+	private static final int MIN_PROBE_ELIGIBLE_KEYS = 2;
+	private static final double MIN_PROBE_COVERAGE = 0.15d;
+	private static final double MAX_PROBE_RESIDUAL = 0.85d;
+	private static final double MIN_PROBE_SPEEDUP = 1.10d;
+	private static final double PROBE_IMPROVEMENT_FACTOR = 0.90d;
+	private final Map<String, PoiNameSidecarSelectionResult> lastPoiNameSidecarSelections = new HashMap<>();
 
 	private static class Bounds {
 		public Bounds(int leftX, int rightX, int topY, int bottomY) {
@@ -251,14 +267,241 @@ public class BinaryMapIndexWriter {
 		}
 	}
 
+	private static class PoiNameSidecarEntry {
+		final String key;
+		final LinkedHashSet<Integer> atomIndexes = new LinkedHashSet<>();
+
+		PoiNameSidecarEntry(String key) {
+			this.key = key;
+		}
+	}
+
+	private static class PoiNameSidecarNode {
+		final int parentNodeIndex;
+		final String keySegment;
+		final int continuationDepth;
+		final List<Integer> atomIndexes;
+		final List<Integer> residualAtomIndexes;
+		final List<Integer> childNodeIndexes = new ArrayList<>();
+		boolean terminal;
+
+		PoiNameSidecarNode(int parentNodeIndex, String keySegment, int continuationDepth, List<Integer> atomIndexes,
+				List<Integer> residualAtomIndexes, boolean terminal) {
+			this.parentNodeIndex = parentNodeIndex;
+			this.keySegment = keySegment;
+			this.continuationDepth = continuationDepth;
+			this.atomIndexes = new ArrayList<>(atomIndexes);
+			this.residualAtomIndexes = new ArrayList<>(residualAtomIndexes);
+			this.terminal = terminal;
+		}
+	}
+
+	private static class PoiNameSidecarHierarchy {
+		final List<PoiNameSidecarNode> nodes;
+		final int bytes;
+		final int terminalNodeCount;
+		final int maxContinuationDepth;
+
+		PoiNameSidecarHierarchy(List<PoiNameSidecarNode> nodes, int bytes, int terminalNodeCount, int maxContinuationDepth) {
+			this.nodes = nodes;
+			this.bytes = bytes;
+			this.terminalNodeCount = terminalNodeCount;
+			this.maxContinuationDepth = maxContinuationDepth;
+		}
+
+		boolean isEmpty() {
+			return Algorithms.isEmpty(nodes);
+		}
+	}
+
+	private static class PoiNameSidecarProbeDepthResult {
+		final int continuationLength;
+		final int selectedKeyCount;
+		final int eligibleCandidateCount;
+		final int coveredAtomCount;
+		final double coveredAtomRatio;
+		final int residualAtomCount;
+		final double residualMass;
+		final double top1ContinuationMassRatio;
+		final double top3ContinuationMassRatio;
+		final double top5ContinuationMassRatio;
+		final double avgFrag;
+		final double maxFrag;
+		final double expectedCostWithSidecar;
+		final double estimatedSpeedup;
+		final int estimatedSidecarBytes;
+		final boolean accepted;
+
+		PoiNameSidecarProbeDepthResult(int continuationLength, int selectedKeyCount, int eligibleCandidateCount,
+				int coveredAtomCount, double coveredAtomRatio, int residualAtomCount, double residualMass,
+				double top1ContinuationMassRatio, double top3ContinuationMassRatio, double top5ContinuationMassRatio,
+				double avgFrag, double maxFrag, double expectedCostWithSidecar, double estimatedSpeedup,
+				int estimatedSidecarBytes, boolean accepted) {
+			this.continuationLength = continuationLength;
+			this.selectedKeyCount = selectedKeyCount;
+			this.eligibleCandidateCount = eligibleCandidateCount;
+			this.coveredAtomCount = coveredAtomCount;
+			this.coveredAtomRatio = coveredAtomRatio;
+			this.residualAtomCount = residualAtomCount;
+			this.residualMass = residualMass;
+			this.top1ContinuationMassRatio = top1ContinuationMassRatio;
+			this.top3ContinuationMassRatio = top3ContinuationMassRatio;
+			this.top5ContinuationMassRatio = top5ContinuationMassRatio;
+			this.avgFrag = avgFrag;
+			this.maxFrag = maxFrag;
+			this.expectedCostWithSidecar = expectedCostWithSidecar;
+			this.estimatedSpeedup = estimatedSpeedup;
+			this.estimatedSidecarBytes = estimatedSidecarBytes;
+			this.accepted = accepted;
+		}
+	}
+
+	static class PoiNameSidecarSelectionResult {
+		final List<PoiNameSidecarEntry> selectedEntries;
+		final List<Integer> residualAtomIndexes;
+		final List<PoiNameSidecarNode> sidecarNodes;
+		final int selectedKeyCount;
+		final int rescueSelectedKeyCount;
+		final int residualAtomCount;
+		final int coveredAtomCount;
+		final double residualMass;
+		final double coveredAtomRatio;
+		final double avgFrag;
+		final double maxFrag;
+		final int expectedSearchCostNoSidecar;
+		final double expectedSearchCostWithSidecar;
+		final double objectiveCostWithSidecar;
+		final int sidecarBytes;
+		final int sidecarNodeCount;
+		final int terminalSidecarNodeCount;
+		final int maxContinuationDepth;
+		final double avgGainDensity;
+		final int overlapFilteredCandidateCount;
+		final int coverageEligibleCandidateCount;
+		final int budgetRejectedCandidateCount;
+		final int eligibleCandidateCount;
+		final double top1ContinuationMassRatio;
+		final double top3ContinuationMassRatio;
+		final double top5ContinuationMassRatio;
+		final double selectedGainMassRatio;
+		final boolean broadPrefixLowSelectivity;
+		final boolean residualFallbackUsed;
+		final boolean residualDominatedSparseLeaf;
+		final boolean probeTried;
+		final int probeBestDepth;
+		final int probeAcceptedDepthCount;
+		final double probeBaselineCost;
+		final double probeBestCost;
+		final double probeImprovementRatio;
+		final List<PoiNameSidecarProbeDepthResult> probeDepthResults;
+
+		PoiNameSidecarSelectionResult(List<PoiNameSidecarEntry> selectedEntries, List<Integer> residualAtomIndexes,
+				List<PoiNameSidecarNode> sidecarNodes, int selectedKeyCount, int rescueSelectedKeyCount, int residualAtomCount, int coveredAtomCount,
+				double residualMass, double coveredAtomRatio, double avgFrag, double maxFrag,
+				int expectedSearchCostNoSidecar, double expectedSearchCostWithSidecar,
+				double objectiveCostWithSidecar, int sidecarBytes, int sidecarNodeCount, int terminalSidecarNodeCount,
+				int maxContinuationDepth, double avgGainDensity,
+				int overlapFilteredCandidateCount, int coverageEligibleCandidateCount, int budgetRejectedCandidateCount,
+				int eligibleCandidateCount,
+				double top1ContinuationMassRatio, double top3ContinuationMassRatio, double top5ContinuationMassRatio,
+				double selectedGainMassRatio, boolean broadPrefixLowSelectivity, boolean residualFallbackUsed,
+				boolean residualDominatedSparseLeaf, boolean probeTried, int probeBestDepth, int probeAcceptedDepthCount,
+				double probeBaselineCost, double probeBestCost, double probeImprovementRatio,
+				List<PoiNameSidecarProbeDepthResult> probeDepthResults) {
+			this.selectedEntries = selectedEntries;
+			this.residualAtomIndexes = residualAtomIndexes;
+			this.sidecarNodes = sidecarNodes;
+			this.selectedKeyCount = selectedKeyCount;
+			this.rescueSelectedKeyCount = rescueSelectedKeyCount;
+			this.residualAtomCount = residualAtomCount;
+			this.coveredAtomCount = coveredAtomCount;
+			this.residualMass = residualMass;
+			this.coveredAtomRatio = coveredAtomRatio;
+			this.avgFrag = avgFrag;
+			this.maxFrag = maxFrag;
+			this.expectedSearchCostNoSidecar = expectedSearchCostNoSidecar;
+			this.expectedSearchCostWithSidecar = expectedSearchCostWithSidecar;
+			this.objectiveCostWithSidecar = objectiveCostWithSidecar;
+			this.sidecarBytes = sidecarBytes;
+			this.sidecarNodeCount = sidecarNodeCount;
+			this.terminalSidecarNodeCount = terminalSidecarNodeCount;
+			this.maxContinuationDepth = maxContinuationDepth;
+			this.avgGainDensity = avgGainDensity;
+			this.overlapFilteredCandidateCount = overlapFilteredCandidateCount;
+			this.coverageEligibleCandidateCount = coverageEligibleCandidateCount;
+			this.budgetRejectedCandidateCount = budgetRejectedCandidateCount;
+			this.eligibleCandidateCount = eligibleCandidateCount;
+			this.top1ContinuationMassRatio = top1ContinuationMassRatio;
+			this.top3ContinuationMassRatio = top3ContinuationMassRatio;
+			this.top5ContinuationMassRatio = top5ContinuationMassRatio;
+			this.selectedGainMassRatio = selectedGainMassRatio;
+			this.broadPrefixLowSelectivity = broadPrefixLowSelectivity;
+			this.residualFallbackUsed = residualFallbackUsed;
+			this.residualDominatedSparseLeaf = residualDominatedSparseLeaf;
+			this.probeTried = probeTried;
+			this.probeBestDepth = probeBestDepth;
+			this.probeAcceptedDepthCount = probeAcceptedDepthCount;
+			this.probeBaselineCost = probeBaselineCost;
+			this.probeBestCost = probeBestCost;
+			this.probeImprovementRatio = probeImprovementRatio;
+			this.probeDepthResults = probeDepthResults;
+		}
+
+		boolean isEmpty() {
+			return selectedEntries.isEmpty() && residualAtomIndexes.isEmpty();
+		}
+	}
+
+	private static class PoiNameSidecarEntryMetrics {
+		final String key;
+		final List<Integer> atomIndexes;
+		final int postingSize;
+		final int spanCount;
+		final double frag;
+		final int estimatedBytes;
+		final double searchGain;
+		final double objectiveGain;
+		final double gainDensity;
+
+		PoiNameSidecarEntryMetrics(String key, List<Integer> atomIndexes, int postingSize, int spanCount, double frag,
+				int estimatedBytes, double searchGain, double objectiveGain, double gainDensity) {
+			this.key = key;
+			this.atomIndexes = atomIndexes;
+			this.postingSize = postingSize;
+			this.spanCount = spanCount;
+			this.frag = frag;
+			this.estimatedBytes = estimatedBytes;
+			this.searchGain = searchGain;
+			this.objectiveGain = objectiveGain;
+			this.gainDensity = gainDensity;
+		}
+	}
+
+	private static class PoiNameSidecarSelectionStep {
+		final PoiNameSidecarEntryMetrics candidate;
+		final List<Integer> selectedAtomIndexes;
+		final int estimatedBytes;
+		final double objectiveGain;
+		final double gainDensity;
+
+		PoiNameSidecarSelectionStep(PoiNameSidecarEntryMetrics candidate, List<Integer> selectedAtomIndexes,
+				int estimatedBytes, double objectiveGain, double gainDensity) {
+			this.candidate = candidate;
+			this.selectedAtomIndexes = selectedAtomIndexes;
+			this.estimatedBytes = estimatedBytes;
+			this.objectiveGain = objectiveGain;
+			this.gainDensity = gainDensity;
+		}
+	}
+
 	public void endWriteMapIndex() throws IOException {
 		popState(MAP_INDEX_INIT);
 		long len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
-	
-	
-	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable, 
+
+
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,
 			boolean longIndex, String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -403,7 +646,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-	
+
 	public void writeRouteEncodingRules(List<MapRouteType> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
@@ -534,7 +777,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteTreeElement(int leftX, int rightX, int topY, int bottomY) throws IOException {
 		checkPeekState(ROUTE_TREE, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -556,7 +799,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeSInt32(HHRoutePointsBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
-	
+
 	public void writeHHRoutePoints(List<NetworkDBPointWrite> l) throws IOException {
 		checkPeekState(ROUTE_TREE);
 		Bounds bounds = stackBounds.peek();
@@ -593,7 +836,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteBlockSegments(int idRangeStart, int idRangeLength, int profileId) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -607,7 +850,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeInt32(HHRouteBlockSegments.IDRANGELENGTH_FIELD_NUMBER, idRangeLength);
 		codedOutStream.writeInt32(HHRouteBlockSegments.PROFILEID_FIELD_NUMBER, profileId);
 	}
-	
+
 	public void writePointSegments(byte[] segmentsIn, byte[] segmentsOut) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS);
 		HHRoutePointSegments.Builder bld = HHRoutePointSegments.newBuilder();
@@ -616,7 +859,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessage(HHRouteBlockSegments.POINTSEGMENTS_FIELD_NUMBER, bld.build());
 	}
 
-	
+
 	public void endHHRouteBlockSegments() throws IOException {
 		popState(HH_BLOCK_SEGMENTS);
 		writeInt32Size();
@@ -867,9 +1110,9 @@ public class BinaryMapIndexWriter {
 						delta = skipSomeNodes(innerPolygonTypes, len, i, x, y, true);
 					}
 				}
-			}		
+			}
 		}
-		
+
 		if (labelCoordinates != null && labelCoordinates.length > 0 && sumLabelCount > 0) {
 			mapDataBuf.clear();
 			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
@@ -886,7 +1129,7 @@ public class BinaryMapIndexWriter {
 						+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 			}
 		}
-		
+
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);
@@ -1103,10 +1346,10 @@ public class BinaryMapIndexWriter {
 			boundarySize = CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 					+ CodedOutputStream.computeTagSize(CityIndex.BOUNDARY_FIELD_NUMBER) + mapDataBuf.size();
 		}
-		
+
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();
-		return BinaryFileReference.createShiftReference(getFilePointer() - 
+		return BinaryFileReference.createShiftReference(getFilePointer() -
 				boundarySize - 4, startMessage);
 
 	}
@@ -1415,7 +1658,7 @@ public class BinaryMapIndexWriter {
 			ptr = getFilePointer();
 			transportRoutesRegistry.put(idRoute, ptr);
 		}
-		
+
 		codedOutStream.writeMessageNoTag(tRoute.build());
 		return ptr;
 	}
@@ -1444,7 +1687,7 @@ public class BinaryMapIndexWriter {
 				pcalcx = pcalcx + tx;
 				pcalcy = pcalcy + ty;
 			}
-			
+
 		}
 	}
 
@@ -1568,7 +1811,7 @@ public class BinaryMapIndexWriter {
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
-	
+
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable, long transportIndexOffset) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
@@ -1583,7 +1826,7 @@ public class BinaryMapIndexWriter {
 		}
 		codedOutStream.writeMessage(OsmAndTransportIndex.INCOMPLETEROUTES_FIELD_NUMBER, irs.build());
 	}
-	
+
 	public void writeTransportStringTable(Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		// expect linked hash map
@@ -1736,6 +1979,7 @@ public class BinaryMapIndexWriter {
 
 	public Map<PoiDataBlock, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiDataBlock>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
+		lastPoiNameSidecarSelections.clear();
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.FILTERS_FIELD_NUMBER,
@@ -1749,9 +1993,9 @@ public class BinaryMapIndexWriter {
 			codedOutStream.flush();
 			nameTableRef.writeReference(raf, getFilePointer());
 
-			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
-			List<PoiDataBlock> tileBoxes = new ArrayList<>(e.getValue());
-			for (PoiDataBlock box : tileBoxes) {
+			List<PoiDataBlock> poiDataBlocks = new ArrayList<>(e.getValue());
+			List<OsmAndPoiNameIndexDataAtom> atoms = new ArrayList<>(poiDataBlocks.size());
+			for (PoiDataBlock box : poiDataBlocks) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
@@ -1762,31 +2006,1354 @@ public class BinaryMapIndexWriter {
 				if (atom.getBloomIndexCount() != 1) {
 					throw new IllegalStateException("POI name index atom must reference exactly one physical data block bloom");
 				}
-				builder.addAtoms(atom);
+				atoms.add(atom);
 			}
-			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-
-			codedOutStream.writeMessageNoTag(msg);
+			if (atoms.size() != poiDataBlocks.size()) {
+				throw new IllegalStateException("POI name index atom count must match PoiDataBlock count");
+			}
+			int sidecarContributionSize = writePoiNameIndexDataMessage(e.getKey(), poiDataBlocks, atoms);
 			long endPointer = getFilePointer();
 
 			// first message
-			int accumulateSize = 4;
-			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
-				PoiDataBlock box = tileBoxes.get(i);
+			int accumulateSize = 4 + sidecarContributionSize;
+			for (int i = poiDataBlocks.size() - 1; i >= 0; i--) {
+				PoiDataBlock box = poiDataBlocks.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
 				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(endPointer - accumulateSize, startPoiIndex));
 				accumulateSize += CodedOutputStream.computeMessageSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
-						msg.getAtoms(i));
+						atoms.get(i));
 
 			}
 		}
 
 		writeInt32Size();
-
-
 		return fpToWriteSeeks;
+	}
+
+	public void writeAtomMetricsReport(List<IndexPoiCreator.LeafMetrics> leafMetrics) {
+		System.out.println("=== ATOM_REPORT ===");
+		System.out.println("leafKey4,poiCount,atomCount,avg_PoisPerAtom,p95_PoisPerAtom,max_PoisPerAtom,avg_UniqueBloomTokens,p95_UniqueBloomTokens,max_UniqueBloomTokens,avg_AtomKeyCount,p95_AtomKeyCount,uniqKeys,sidecarBuilt,sidecarBytes,sidecarNodeCount,terminalSidecarNodeCount,maxContinuationDepth,selectedKeyCount,rescueSelectedKeyCount,residualAtomCount,coveredAtomCount,residualMass,coveredAtomRatio,avg_Frag,maxFrag,expectedCostNoSidecar,expectedCostWithSidecar,estimatedSpeedup,avgGainDensity,overlapFilteredCandidateCount,eligibleCandidateCount,top1ContinuationMassRatio,top3ContinuationMassRatio,top5ContinuationMassRatio,selectedGainMassRatio,broadPrefixLowSelectivity,residualFallbackUsed,heavyLeaves,heavyLeavesNoEligibleKeys,heavyLeavesNoPositiveGain,heavyLeavesRejectedByCoverage,heavyLeavesRejectedByResidual,heavyLeavesRejectedByBudget,residualDominatedSparseLeaf,probeTried,probeBestDepth,probeAcceptedDepthCount,probeBaselineCost,probeBestCost,probeImprovementRatio,probeCoverage_L2,probeCoverage_L3,probeCoverage_L4,probeCoverage_L5,probeCoverage_L6,probeResidual_L2,probeResidual_L3,probeResidual_L4,probeResidual_L5,probeResidual_L6,probeSpeedup_L2,probeSpeedup_L3,probeSpeedup_L4,probeSpeedup_L5,probeSpeedup_L6,probeEligible_L2,probeEligible_L3,probeEligible_L4,probeEligible_L5,probeEligible_L6");
+		if (leafMetrics == null) {
+			printSummaryReport(Collections.emptyList());
+			printAlertReport(Collections.emptyList());
+			printHeavyLeafReport(Collections.emptyList());
+			return;
+		}
+		List<IndexPoiCreator.LeafMetrics> safeLeafMetrics = new ArrayList<>();
+		for (IndexPoiCreator.LeafMetrics metrics : leafMetrics) {
+			if (metrics == null) {
+				continue;
+			}
+			safeLeafMetrics.add(metrics);
+			PoiNameSidecarSelectionResult selectionResult = lastPoiNameSidecarSelections.get(metrics.leafKey4);
+			boolean sidecarBuilt = selectionResult != null ? !selectionResult.selectedEntries.isEmpty() : metrics.sidecarBuilt;
+			int sidecarBytes = selectionResult != null ? selectionResult.sidecarBytes : metrics.sidecarBytes;
+			int selectedKeyCount = selectionResult != null ? selectionResult.selectedKeyCount : metrics.selectedKeyCount;
+			int rescueSelectedKeyCount = selectionResult != null ? selectionResult.rescueSelectedKeyCount : 0;
+			int sidecarNodeCount = selectionResult != null ? selectionResult.sidecarNodeCount : 0;
+			int terminalSidecarNodeCount = selectionResult != null ? selectionResult.terminalSidecarNodeCount : 0;
+			int maxContinuationDepth = selectionResult != null ? selectionResult.maxContinuationDepth : POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH;
+			int residualAtomCount = selectionResult != null ? selectionResult.residualAtomCount : metrics.residualAtomCount;
+			int coveredAtomCount = selectionResult != null ? selectionResult.coveredAtomCount : Math.max(0, metrics.atomCount - metrics.residualAtomCount);
+			double residualMass = selectionResult != null ? selectionResult.residualMass : metrics.residualMass;
+			double coveredAtomRatio = selectionResult != null ? selectionResult.coveredAtomRatio : (metrics.atomCount == 0 ? 0d : coveredAtomCount / (double) metrics.atomCount);
+			double avgFrag = selectionResult != null ? selectionResult.avgFrag : metrics.avgFrag;
+			double maxFrag = selectionResult != null ? selectionResult.maxFrag : metrics.maxFrag;
+			int expectedCostNoSidecar = selectionResult != null ? selectionResult.expectedSearchCostNoSidecar : metrics.expectedCostNoSidecar;
+			double expectedCostWithSidecar = selectionResult != null ? selectionResult.expectedSearchCostWithSidecar : metrics.expectedCostWithSidecar;
+			double estimatedSpeedup = expectedCostWithSidecar == 0d ? 1d : expectedCostNoSidecar / expectedCostWithSidecar;
+			double avgGainDensity = selectionResult != null ? selectionResult.avgGainDensity : 0d;
+			int overlapFilteredCandidateCount = selectionResult != null ? selectionResult.overlapFilteredCandidateCount : 0;
+			int coverageEligibleCandidateCount = selectionResult != null ? selectionResult.coverageEligibleCandidateCount : 0;
+			int budgetRejectedCandidateCount = selectionResult != null ? selectionResult.budgetRejectedCandidateCount : 0;
+			int eligibleCandidateCount = selectionResult != null ? selectionResult.eligibleCandidateCount : 0;
+			double top1ContinuationMassRatio = selectionResult != null ? selectionResult.top1ContinuationMassRatio : 0d;
+			double top3ContinuationMassRatio = selectionResult != null ? selectionResult.top3ContinuationMassRatio : 0d;
+			double top5ContinuationMassRatio = selectionResult != null ? selectionResult.top5ContinuationMassRatio : 0d;
+			double selectedGainMassRatio = selectionResult != null ? selectionResult.selectedGainMassRatio : 0d;
+			boolean broadPrefixLowSelectivity = selectionResult != null && selectionResult.broadPrefixLowSelectivity;
+			boolean residualFallbackUsed = selectionResult != null && selectionResult.residualFallbackUsed;
+			boolean residualDominatedSparseLeaf = selectionResult != null && selectionResult.residualDominatedSparseLeaf;
+			boolean probeTried = selectionResult != null && selectionResult.probeTried;
+			int probeBestDepth = selectionResult != null ? selectionResult.probeBestDepth : 0;
+			int probeAcceptedDepthCount = selectionResult != null ? selectionResult.probeAcceptedDepthCount : 0;
+			double probeBaselineCost = selectionResult != null ? selectionResult.probeBaselineCost : 0d;
+			double probeBestCost = selectionResult != null ? selectionResult.probeBestCost : 0d;
+			double probeImprovementRatio = selectionResult != null ? selectionResult.probeImprovementRatio : 0d;
+			int heavyLeaves = isHeavyLeaf(metrics.atomCount) ? 1 : 0;
+			int heavyLeavesNoEligibleKeys = heavyLeaves == 1 && coverageEligibleCandidateCount == 0 ? 1 : 0;
+			int heavyLeavesNoPositiveGain = heavyLeaves == 1 && coverageEligibleCandidateCount > 0 && eligibleCandidateCount == 0 ? 1 : 0;
+			int heavyLeavesRejectedByCoverage = heavyLeaves == 1 && !sidecarBuilt && coveredAtomRatio < RESIDUAL_RESCUE_COVERAGE_THRESHOLD ? 1 : 0;
+			int heavyLeavesRejectedByResidual = heavyLeaves == 1 && !sidecarBuilt && residualMass > RESIDUAL_RESCUE_MASS_THRESHOLD ? 1 : 0;
+			int heavyLeavesRejectedByBudget = heavyLeaves == 1 && budgetRejectedCandidateCount > 0 ? 1 : 0;
+			System.out.println(String.join(",",
+					csv(metrics.leafKey4),
+					Integer.toString(metrics.poiCount),
+					Integer.toString(metrics.atomCount),
+					Integer.toString(metrics.avgPoisPerAtom),
+					Integer.toString(metrics.p95PoisPerAtom),
+					Integer.toString(metrics.maxPoisPerAtom),
+					Integer.toString(metrics.avgUniqueBloomTokens),
+					Integer.toString(metrics.p95UniqueBloomTokens),
+					Integer.toString(metrics.maxUniqueBloomTokens),
+					Integer.toString(metrics.avgAtomKeyCount),
+					Integer.toString(metrics.p95AtomKeyCount),
+					Integer.toString(metrics.uniqKeys),
+					Boolean.toString(sidecarBuilt),
+					Integer.toString(sidecarBytes),
+					Integer.toString(sidecarNodeCount),
+					Integer.toString(terminalSidecarNodeCount),
+					Integer.toString(maxContinuationDepth),
+					Integer.toString(selectedKeyCount),
+					Integer.toString(rescueSelectedKeyCount),
+					Integer.toString(residualAtomCount),
+					Integer.toString(coveredAtomCount),
+					formatDouble(residualMass),
+					formatDouble(coveredAtomRatio),
+					formatDouble(avgFrag),
+					formatDouble(maxFrag),
+					Integer.toString(expectedCostNoSidecar),
+					formatDouble(expectedCostWithSidecar),
+					formatDouble(estimatedSpeedup),
+					formatDouble(avgGainDensity),
+					Integer.toString(overlapFilteredCandidateCount),
+					Integer.toString(eligibleCandidateCount),
+					formatDouble(top1ContinuationMassRatio),
+					formatDouble(top3ContinuationMassRatio),
+					formatDouble(top5ContinuationMassRatio),
+					formatDouble(selectedGainMassRatio),
+					Boolean.toString(broadPrefixLowSelectivity),
+					Boolean.toString(residualFallbackUsed),
+					Integer.toString(heavyLeaves),
+					Integer.toString(heavyLeavesNoEligibleKeys),
+					Integer.toString(heavyLeavesNoPositiveGain),
+					Integer.toString(heavyLeavesRejectedByCoverage),
+					Integer.toString(heavyLeavesRejectedByResidual),
+					Integer.toString(heavyLeavesRejectedByBudget),
+					Boolean.toString(residualDominatedSparseLeaf),
+					Boolean.toString(probeTried),
+					Integer.toString(probeBestDepth),
+					Integer.toString(probeAcceptedDepthCount),
+					formatDouble(probeBaselineCost),
+					formatDouble(probeBestCost),
+					formatDouble(probeImprovementRatio),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 2)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 3)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 4)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 5)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 6)),
+					formatDouble(getProbeResidualMass(selectionResult, 2)),
+					formatDouble(getProbeResidualMass(selectionResult, 3)),
+					formatDouble(getProbeResidualMass(selectionResult, 4)),
+					formatDouble(getProbeResidualMass(selectionResult, 5)),
+					formatDouble(getProbeResidualMass(selectionResult, 6)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 2)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 3)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 4)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 5)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 6)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 2)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 3)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 4)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 5)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 6))));
+		}
+		printSummaryReport(safeLeafMetrics);
+		printAlertReport(safeLeafMetrics);
+		printHeavyLeafReport(safeLeafMetrics);
+	}
+
+	private void printHeavyLeafReport(List<LeafMetrics> leafMetrics) {
+		System.out.println("=== HEAVY-LEAF_REPORT ===");
+		System.out.println("leafKey4,atomCount,sidecarBuilt,sidecarBytes,sidecarNodeCount,terminalSidecarNodeCount,maxContinuationDepth,selectedKeyCount,rescueSelectedKeyCount,residualAtomCount,coveredAtomCount,residualMass,coveredAtomRatio,avgFrag,maxFrag,expectedCostNoSidecar,expectedCostWithSidecar,estimatedSpeedup,eligibleCandidateCount,coverageEligibleCandidateCount,budgetRejectedCandidateCount,top1ContinuationMassRatio,top3ContinuationMassRatio,top5ContinuationMassRatio,broadPrefixLowSelectivity,residualFallbackUsed,residualDominatedSparseLeaf,probeTried,probeBestDepth,probeAcceptedDepthCount,probeBaselineCost,probeBestCost,probeImprovementRatio,probeCoverage_L2,probeCoverage_L3,probeCoverage_L4,probeCoverage_L5,probeCoverage_L6,probeResidual_L2,probeResidual_L3,probeResidual_L4,probeResidual_L5,probeResidual_L6,probeSpeedup_L2,probeSpeedup_L3,probeSpeedup_L4,probeSpeedup_L5,probeSpeedup_L6,probeEligible_L2,probeEligible_L3,probeEligible_L4,probeEligible_L5,probeEligible_L6");
+		if (Algorithms.isEmpty(leafMetrics)) {
+			return;
+		}
+		for (LeafMetrics metrics : leafMetrics) {
+			if (metrics == null || !isHeavyLeaf(metrics.atomCount)) {
+				continue;
+			}
+			PoiNameSidecarSelectionResult selectionResult = lastPoiNameSidecarSelections.get(metrics.leafKey4);
+			boolean sidecarBuilt = selectionResult != null ? !selectionResult.selectedEntries.isEmpty() : metrics.sidecarBuilt;
+			int sidecarBytes = selectionResult != null ? selectionResult.sidecarBytes : metrics.sidecarBytes;
+			int sidecarNodeCount = selectionResult != null ? selectionResult.sidecarNodeCount : 0;
+			int terminalSidecarNodeCount = selectionResult != null ? selectionResult.terminalSidecarNodeCount : 0;
+			int maxContinuationDepth = selectionResult != null ? selectionResult.maxContinuationDepth : POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH;
+			int selectedKeyCount = selectionResult != null ? selectionResult.selectedKeyCount : metrics.selectedKeyCount;
+			int rescueSelectedKeyCount = selectionResult != null ? selectionResult.rescueSelectedKeyCount : 0;
+			int residualAtomCount = selectionResult != null ? selectionResult.residualAtomCount : metrics.residualAtomCount;
+			int coveredAtomCount = selectionResult != null ? selectionResult.coveredAtomCount : Math.max(0, metrics.atomCount - metrics.residualAtomCount);
+			double residualMass = selectionResult != null ? selectionResult.residualMass : metrics.residualMass;
+			double coveredAtomRatio = selectionResult != null ? selectionResult.coveredAtomRatio : (metrics.atomCount == 0 ? 0d : coveredAtomCount / (double) metrics.atomCount);
+			double avgFrag = selectionResult != null ? selectionResult.avgFrag : metrics.avgFrag;
+			double maxFrag = selectionResult != null ? selectionResult.maxFrag : metrics.maxFrag;
+			int expectedCostNoSidecar = selectionResult != null ? selectionResult.expectedSearchCostNoSidecar : metrics.expectedCostNoSidecar;
+			double expectedCostWithSidecar = selectionResult != null ? selectionResult.expectedSearchCostWithSidecar : metrics.expectedCostWithSidecar;
+			double estimatedSpeedup = expectedCostWithSidecar == 0d ? 1d : expectedCostNoSidecar / expectedCostWithSidecar;
+			int eligibleCandidateCount = selectionResult != null ? selectionResult.eligibleCandidateCount : 0;
+			int coverageEligibleCandidateCount = selectionResult != null ? selectionResult.coverageEligibleCandidateCount : 0;
+			int budgetRejectedCandidateCount = selectionResult != null ? selectionResult.budgetRejectedCandidateCount : 0;
+			double top1ContinuationMassRatio = selectionResult != null ? selectionResult.top1ContinuationMassRatio : 0d;
+			double top3ContinuationMassRatio = selectionResult != null ? selectionResult.top3ContinuationMassRatio : 0d;
+			double top5ContinuationMassRatio = selectionResult != null ? selectionResult.top5ContinuationMassRatio : 0d;
+			boolean broadPrefixLowSelectivity = selectionResult != null && selectionResult.broadPrefixLowSelectivity;
+			boolean residualFallbackUsed = selectionResult != null && selectionResult.residualFallbackUsed;
+			boolean residualDominatedSparseLeaf = selectionResult != null && selectionResult.residualDominatedSparseLeaf;
+			boolean probeTried = selectionResult != null && selectionResult.probeTried;
+			int probeBestDepth = selectionResult != null ? selectionResult.probeBestDepth : 0;
+			int probeAcceptedDepthCount = selectionResult != null ? selectionResult.probeAcceptedDepthCount : 0;
+			double probeBaselineCost = selectionResult != null ? selectionResult.probeBaselineCost : 0d;
+			double probeBestCost = selectionResult != null ? selectionResult.probeBestCost : 0d;
+			double probeImprovementRatio = selectionResult != null ? selectionResult.probeImprovementRatio : 0d;
+			System.out.println(String.join(",",
+					csv(metrics.leafKey4),
+					Integer.toString(metrics.atomCount),
+					Boolean.toString(sidecarBuilt),
+					Integer.toString(sidecarBytes),
+					Integer.toString(sidecarNodeCount),
+					Integer.toString(terminalSidecarNodeCount),
+					Integer.toString(maxContinuationDepth),
+					Integer.toString(selectedKeyCount),
+					Integer.toString(rescueSelectedKeyCount),
+					Integer.toString(residualAtomCount),
+					Integer.toString(coveredAtomCount),
+					formatDouble(residualMass),
+					formatDouble(coveredAtomRatio),
+					formatDouble(avgFrag),
+					formatDouble(maxFrag),
+					Integer.toString(expectedCostNoSidecar),
+					formatDouble(expectedCostWithSidecar),
+					formatDouble(estimatedSpeedup),
+					Integer.toString(eligibleCandidateCount),
+					Integer.toString(coverageEligibleCandidateCount),
+					Integer.toString(budgetRejectedCandidateCount),
+					formatDouble(top1ContinuationMassRatio),
+					formatDouble(top3ContinuationMassRatio),
+					formatDouble(top5ContinuationMassRatio),
+					Boolean.toString(broadPrefixLowSelectivity),
+					Boolean.toString(residualFallbackUsed),
+					Boolean.toString(residualDominatedSparseLeaf),
+					Boolean.toString(probeTried),
+					Integer.toString(probeBestDepth),
+					Integer.toString(probeAcceptedDepthCount),
+					formatDouble(probeBaselineCost),
+					formatDouble(probeBestCost),
+					formatDouble(probeImprovementRatio),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 2)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 3)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 4)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 5)),
+					formatDouble(getProbeCoveredAtomRatio(selectionResult, 6)),
+					formatDouble(getProbeResidualMass(selectionResult, 2)),
+					formatDouble(getProbeResidualMass(selectionResult, 3)),
+					formatDouble(getProbeResidualMass(selectionResult, 4)),
+					formatDouble(getProbeResidualMass(selectionResult, 5)),
+					formatDouble(getProbeResidualMass(selectionResult, 6)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 2)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 3)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 4)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 5)),
+					formatDouble(getProbeEstimatedSpeedup(selectionResult, 6)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 2)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 3)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 4)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 5)),
+					Integer.toString(getProbeEligibleCandidateCount(selectionResult, 6))));
+		}
+	}
+
+	private void printSummaryReport(List<IndexPoiCreator.LeafMetrics> leafMetrics) {
+		System.out.println("=== SUMMARY_REPORT ===");
+		System.out.println("metric,value");
+		if (Algorithms.isEmpty(leafMetrics)) {
+			return;
+		}
+		List<Integer> atomCounts = new ArrayList<>();
+		List<Integer> poisPerAtom = new ArrayList<>();
+		List<Integer> uniqueBloomTokens = new ArrayList<>();
+		List<Integer> sidecarBytes = new ArrayList<>();
+		List<Integer> selectedKeyCounts = new ArrayList<>();
+		List<Integer> sidecarBytesHeavy = new ArrayList<>();
+		List<Integer> selectedKeyCountsHeavy = new ArrayList<>();
+		List<Integer> rescueSelectedKeyCountsHeavy = new ArrayList<>();
+		List<Double> coveredAtomRatioHeavy = new ArrayList<>();
+		List<Double> avgGainDensityHeavy = new ArrayList<>();
+		List<Integer> overlapFilteredCandidateCountsHeavy = new ArrayList<>();
+		List<Integer> eligibleCandidateCountsHeavy = new ArrayList<>();
+		List<Double> top1ContinuationMassRatiosHeavy = new ArrayList<>();
+		List<Double> top3ContinuationMassRatiosHeavy = new ArrayList<>();
+		List<Double> top5ContinuationMassRatiosHeavy = new ArrayList<>();
+		List<Double> selectedGainMassRatiosHeavy = new ArrayList<>();
+		List<Double> residualMassHeavy = new ArrayList<>();
+		List<Double> fragHeavy = new ArrayList<>();
+		List<Double> expectedNoSidecarHeavy = new ArrayList<>();
+		List<Double> expectedWithSidecarHeavy = new ArrayList<>();
+		List<Double> estimatedSpeedupHeavy = new ArrayList<>();
+		double totalExpectedCostNoSidecarHeavy = 0d;
+		double totalExpectedCostWithSidecarHeavy = 0d;
+		int sidecarBuiltLeaves = 0;
+		int broadPrefixLowSelectivityHeavyCount = 0;
+		int residualSparseLeafCount = 0;
+		int residualSparseLeafProbeTriedCount = 0;
+		int residualSparseLeafImprovedCount = 0;
+		int residualSparseLeafRejectedAllDepthsCount = 0;
+		int residualSparseLeafChosenL3Count = 0;
+		int residualSparseLeafChosenL4Count = 0;
+		int residualSparseLeafChosenL5Count = 0;
+		int residualSparseLeafChosenL6Count = 0;
+
+		for (LeafMetrics metrics : leafMetrics) {
+			PoiNameSidecarSelectionResult selectionResult = lastPoiNameSidecarSelections.get(metrics.leafKey4);
+			boolean sidecarBuilt = selectionResult != null ? !selectionResult.selectedEntries.isEmpty() : metrics.sidecarBuilt;
+			int sidecarBytesValue = selectionResult != null ? selectionResult.sidecarBytes : metrics.sidecarBytes;
+			int selectedKeyCountValue = selectionResult != null ? selectionResult.selectedKeyCount : metrics.selectedKeyCount;
+			int rescueSelectedKeyCountValue = selectionResult != null ? selectionResult.rescueSelectedKeyCount : 0;
+			double residualMassValue = selectionResult != null ? selectionResult.residualMass : metrics.residualMass;
+			double avgFragValue = selectionResult != null ? selectionResult.avgFrag : metrics.avgFrag;
+			int coverageEligibleCandidateCountValue = selectionResult != null ? selectionResult.coverageEligibleCandidateCount : 0;
+			int budgetRejectedCandidateCountValue = selectionResult != null ? selectionResult.budgetRejectedCandidateCount : 0;
+			int eligibleCandidateCountValue = selectionResult != null ? selectionResult.eligibleCandidateCount : 0;
+			int expectedCostNoSidecarValue = selectionResult != null ? selectionResult.expectedSearchCostNoSidecar : metrics.expectedCostNoSidecar;
+			double expectedCostWithSidecarValue = selectionResult != null ? selectionResult.expectedSearchCostWithSidecar : metrics.expectedCostWithSidecar;
+			double estimatedSpeedupValue = expectedCostWithSidecarValue == 0d ? 1d : expectedCostNoSidecarValue / expectedCostWithSidecarValue;
+			atomCounts.add(metrics.atomCount);
+			poisPerAtom.add(metrics.avgPoisPerAtom);
+			uniqueBloomTokens.add(metrics.avgUniqueBloomTokens);
+			sidecarBytes.add(sidecarBytesValue);
+			selectedKeyCounts.add(selectedKeyCountValue);
+			if (sidecarBuilt) {
+				sidecarBuiltLeaves++;
+				sidecarBytesHeavy.add(sidecarBytesValue);
+				selectedKeyCountsHeavy.add(selectedKeyCountValue);
+				rescueSelectedKeyCountsHeavy.add(rescueSelectedKeyCountValue);
+				coveredAtomRatioHeavy.add(selectionResult != null ? selectionResult.coveredAtomRatio : (metrics.atomCount == 0 ? 0d : (metrics.atomCount - metrics.residualAtomCount) / (double) metrics.atomCount));
+				avgGainDensityHeavy.add(selectionResult != null ? selectionResult.avgGainDensity : 0d);
+				overlapFilteredCandidateCountsHeavy.add(selectionResult != null ? selectionResult.overlapFilteredCandidateCount : 0);
+				eligibleCandidateCountsHeavy.add(selectionResult != null ? selectionResult.eligibleCandidateCount : 0);
+				top1ContinuationMassRatiosHeavy.add(selectionResult != null ? selectionResult.top1ContinuationMassRatio : 0d);
+				top3ContinuationMassRatiosHeavy.add(selectionResult != null ? selectionResult.top3ContinuationMassRatio : 0d);
+				top5ContinuationMassRatiosHeavy.add(selectionResult != null ? selectionResult.top5ContinuationMassRatio : 0d);
+				selectedGainMassRatiosHeavy.add(selectionResult != null ? selectionResult.selectedGainMassRatio : 0d);
+				if (selectionResult != null && selectionResult.broadPrefixLowSelectivity) {
+					broadPrefixLowSelectivityHeavyCount++;
+				}
+				residualMassHeavy.add(residualMassValue);
+				fragHeavy.add(avgFragValue);
+				expectedNoSidecarHeavy.add((double) expectedCostNoSidecarValue);
+				expectedWithSidecarHeavy.add(expectedCostWithSidecarValue);
+				estimatedSpeedupHeavy.add(estimatedSpeedupValue);
+				totalExpectedCostNoSidecarHeavy += expectedCostNoSidecarValue;
+				totalExpectedCostWithSidecarHeavy += expectedCostWithSidecarValue;
+			}
+			if (selectionResult != null && selectionResult.residualDominatedSparseLeaf) {
+				residualSparseLeafCount++;
+				if (selectionResult.probeTried) {
+					residualSparseLeafProbeTriedCount++;
+				}
+				if (selectionResult.probeBestDepth > POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH
+						&& selectionResult.probeBestCost > 0d
+						&& selectionResult.probeBestCost <= selectionResult.probeBaselineCost * PROBE_IMPROVEMENT_FACTOR) {
+					residualSparseLeafImprovedCount++;
+					if (selectionResult.probeBestDepth == 3) {
+						residualSparseLeafChosenL3Count++;
+					} else if (selectionResult.probeBestDepth == 4) {
+						residualSparseLeafChosenL4Count++;
+					} else if (selectionResult.probeBestDepth == 5) {
+						residualSparseLeafChosenL5Count++;
+					} else if (selectionResult.probeBestDepth == 6) {
+						residualSparseLeafChosenL6Count++;
+					}
+				} else if (selectionResult.probeTried) {
+					residualSparseLeafRejectedAllDepthsCount++;
+				}
+			}
+		}
+		print("totalLeaves", leafMetrics.size());
+		print("sidecarBuiltLeaves", sidecarBuiltLeaves);
+		print("avg_AtomCount", averageInt(atomCounts));
+		print("p95_AtomCount", percentileInt(atomCounts, 95));
+		print("avg_PoisPerAtom", averageInt(poisPerAtom));
+		print("p95_PoisPerAtom", percentileInt(poisPerAtom, 95));
+		print("max_PoisPerAtomGlobal", maxInt(poisPerAtom));
+		print("avg_UniqueBloomTokens", averageInt(uniqueBloomTokens));
+		print("p95_UniqueBloomTokens", percentileInt(uniqueBloomTokens, 95));
+		print("max_UniqueBloomTokensGlobal", maxInt(uniqueBloomTokens));
+		print("avg_SidecarBytesBuilt", averageInt(sidecarBytes));
+		print("p95_SidecarBytesBuilt", percentileInt(sidecarBytes, 95));
+		print("avg_SelectedKeyCount", averageInt(selectedKeyCounts));
+		print("p95_SelectedKeyCount", percentileInt(selectedKeyCounts, 95));
+		print("avg_ResidualMassHeavy", averageDouble(residualMassHeavy));
+		print("p95_ResidualMassHeavy", percentileDouble(residualMassHeavy, 95));
+		print("avg_FragHeavy", averageDouble(fragHeavy));
+		print("p95_FragHeavy", percentileDouble(fragHeavy, 95));
+		print("avg_ExpectedCostNoSidecarHeavy", averageDouble(expectedNoSidecarHeavy));
+		print("avg_ExpectedCostWithSidecarHeavy", averageDouble(expectedWithSidecarHeavy));
+		print("avg_PerLeafEstimatedSpeedupHeavy", averageDouble(estimatedSpeedupHeavy));
+		print("global_EstimatedSpeedupHeavy", totalExpectedCostWithSidecarHeavy == 0d ? 1d : totalExpectedCostNoSidecarHeavy / totalExpectedCostWithSidecarHeavy);
+		print("avg_SidecarBytesBuiltHeavy", averageInt(sidecarBytesHeavy));
+		print("p95_SidecarBytesBuiltHeavy", percentileInt(sidecarBytesHeavy, 95));
+		print("avg_SelectedKeyCountHeavy", averageInt(selectedKeyCountsHeavy));
+		print("p95_SelectedKeyCountHeavy", percentileInt(selectedKeyCountsHeavy, 95));
+		print("avg_RescueSelectedKeyCountHeavy", averageInt(rescueSelectedKeyCountsHeavy));
+		print("avg_CoveredAtomRatioHeavy", averageDouble(coveredAtomRatioHeavy));
+		print("avg_GainDensityHeavy", averageDouble(avgGainDensityHeavy));
+		print("avg_OverlapFilteredCandidateCountHeavy", averageInt(overlapFilteredCandidateCountsHeavy));
+		print("avg_EligibleCandidateCountHeavy", averageInt(eligibleCandidateCountsHeavy));
+		print("avg_Top1ContinuationMassRatioHeavy", averageDouble(top1ContinuationMassRatiosHeavy));
+		print("avg_Top3ContinuationMassRatioHeavy", averageDouble(top3ContinuationMassRatiosHeavy));
+		print("avg_Top5ContinuationMassRatioHeavy", averageDouble(top5ContinuationMassRatiosHeavy));
+		print("avg_SelectedGainMassRatioHeavy", averageDouble(selectedGainMassRatiosHeavy));
+		print("broadPrefixLowSelectivityHeavyCount", broadPrefixLowSelectivityHeavyCount);
+		print("residualSparseLeafCount", residualSparseLeafCount);
+		print("residualSparseLeafProbeTriedCount", residualSparseLeafProbeTriedCount);
+		print("residualSparseLeafImprovedCount", residualSparseLeafImprovedCount);
+		print("residualSparseLeafRejectedAllDepthsCount", residualSparseLeafRejectedAllDepthsCount);
+		print("residualSparseLeafChosenL3Count", residualSparseLeafChosenL3Count);
+		print("residualSparseLeafChosenL4Count", residualSparseLeafChosenL4Count);
+		print("residualSparseLeafChosenL5Count", residualSparseLeafChosenL5Count);
+		print("residualSparseLeafChosenL6Count", residualSparseLeafChosenL6Count);
+	}
+
+	private void print(String metric, int value) {
+		System.out.println(metric + "," + value);
+	}
+
+	private void print(String metric, double value) {
+		System.out.println(metric + "," + formatDouble(value));
+	}
+
+	private void printAlertReport(List<LeafMetrics> leafMetrics) {
+		System.out.println("=== ALERT_REPORT ===");
+		System.out.println("severity,leafKey4,alertType,observedValue,thresholdValue,context");
+		if (Algorithms.isEmpty(leafMetrics)) {
+			return;
+		}
+
+		for (LeafMetrics metrics : leafMetrics) {
+			if (metrics == null) {
+				continue;
+			}
+			PoiNameSidecarSelectionResult selectionResult = lastPoiNameSidecarSelections.get(metrics.leafKey4);
+			boolean sidecarBuilt = selectionResult != null ? !selectionResult.selectedEntries.isEmpty() : metrics.sidecarBuilt;
+			int selectedKeyCount = selectionResult != null ? selectionResult.selectedKeyCount : metrics.selectedKeyCount;
+			double avgFrag = selectionResult != null ? selectionResult.avgFrag : metrics.avgFrag;
+			int expectedCostNoSidecar = selectionResult != null ? selectionResult.expectedSearchCostNoSidecar : metrics.expectedCostNoSidecar;
+			double expectedCostWithSidecar = selectionResult != null ? selectionResult.expectedSearchCostWithSidecar : metrics.expectedCostWithSidecar;
+			double coveredAtomRatio = selectionResult != null ? selectionResult.coveredAtomRatio : (metrics.atomCount == 0 ? 0d : (metrics.atomCount - metrics.residualAtomCount) / (double) metrics.atomCount);
+			int overlapFilteredCandidateCount = selectionResult != null ? selectionResult.overlapFilteredCandidateCount : 0;
+			boolean broadPrefixLowSelectivity = selectionResult != null && selectionResult.broadPrefixLowSelectivity;
+			boolean residualFallbackUsed = selectionResult != null && selectionResult.residualFallbackUsed;
+			double estimatedSpeedup = expectedCostWithSidecar == 0d ? 1d : expectedCostNoSidecar / expectedCostWithSidecar;
+			if (metrics.maxPoisPerAtom > 128) {
+				print("ERROR", metrics.leafKey4, "POIS_PER_ATOM_EXCEEDS_BLOCK_SIZE",
+						Integer.toString(metrics.maxPoisPerAtom), "128", "maxPoisPerAtom");
+			}
+			if (sidecarBuilt && selectionResult != null && selectionResult.residualMass > 0.8d) {
+				print("WARN", metrics.leafKey4, "RESIDUAL_MASS_HIGH",
+						formatDouble(selectionResult.residualMass), "0.80", "heavy leaf residual mass");
+			}
+			if (sidecarBuilt && estimatedSpeedup < 1.2d) {
+				print("WARN", metrics.leafKey4, "SIDECAR_SPEEDUP_LOW",
+						formatDouble(estimatedSpeedup), "1.20", "estimated speedup");
+			}
+			if (sidecarBuilt && selectedKeyCount > MAX_SELECTED_KEYS_PER_LEAF) {
+				print("WARN", metrics.leafKey4, "SELECTED_KEY_COUNT_TOO_HIGH",
+						Integer.toString(selectedKeyCount), Integer.toString(MAX_SELECTED_KEYS_PER_LEAF), "selected key count cap");
+			}
+			if (sidecarBuilt && avgFrag >= 0.90d) {
+				print("WARN", metrics.leafKey4, "FRAGMENTATION_MAXED",
+						formatDouble(avgFrag), "0.90", "span fragmentation");
+			}
+			if (sidecarBuilt && expectedCostWithSidecar >= expectedCostNoSidecar) {
+				print("WARN", metrics.leafKey4, "SIDE_CAR_COST_NOT_BEATING_BASELINE",
+						formatDouble(expectedCostWithSidecar), Integer.toString(expectedCostNoSidecar), "search cost comparison");
+			}
+			if (sidecarBuilt && coveredAtomRatio < 0.25d) {
+				print("INFO", metrics.leafKey4, "LOW_SIDE_CAR_COVERAGE",
+						formatDouble(coveredAtomRatio), "0.25", "covered atom ratio");
+			}
+			if (sidecarBuilt && overlapFilteredCandidateCount > 0) {
+				print("INFO", metrics.leafKey4, "OVERLAP_FILTERING_ACTIVE",
+						Integer.toString(overlapFilteredCandidateCount), "0", "candidates filtered by overlap");
+			}
+			if (sidecarBuilt && residualFallbackUsed) {
+				print("INFO", metrics.leafKey4, "RESIDUAL_FALLBACK_USED",
+						Integer.toString(selectionResult.residualAtomCount), "0", "residual retained intentionally");
+			}
+			if (!sidecarBuilt && metrics.atomCount >= POI_NAME_SIDECAR_COUNT_THRESHOLD && broadPrefixLowSelectivity) {
+				print("INFO", metrics.leafKey4, "BROAD_PREFIX_LOW_SELECTIVITY",
+						formatDouble(selectionResult != null ? selectionResult.top3ContinuationMassRatio : 0d),
+						formatDouble(BROAD_PREFIX_TOP3_MASS_THRESHOLD), "low continuation concentration");
+			}
+			if (!sidecarBuilt && metrics.atomCount >= POI_NAME_SIDECAR_COUNT_THRESHOLD && !broadPrefixLowSelectivity) {
+				print("WARN", metrics.leafKey4, "HEAVY_LEAF_WITHOUT_SIDECAR",
+						Integer.toString(metrics.atomCount), Integer.toString(POI_NAME_SIDECAR_COUNT_THRESHOLD), "count threshold reached");
+			}
+
+		}
+	}
+
+	private void print(String severity, String leafKey4, String alertType, String observedValue, String thresholdValue, String context) {
+		System.out.println(String.join(",",
+				csv(severity),
+				csv(leafKey4),
+				csv(alertType),
+				csv(observedValue),
+				csv(thresholdValue),
+				csv(context)));
+	}
+
+	private int averageInt(List<Integer> values) {
+		if (Algorithms.isEmpty(values)) {
+			return 0;
+		}
+		int sum = 0;
+		for (Integer value : values) {
+			sum += value;
+		}
+		return Math.round(sum / (float) values.size());
+	}
+
+	private int percentileInt(List<Integer> values, int percentile) {
+		if (Algorithms.isEmpty(values)) {
+			return 0;
+		}
+		List<Integer> sorted = new ArrayList<>(values);
+		sorted.sort(Integer::compareTo);
+		int index = Math.min(sorted.size() - 1, Math.max(0, (int) Math.ceil(sorted.size() * (percentile / 100.0)) - 1));
+		return sorted.get(index);
+	}
+
+	private int maxInt(List<Integer> values) {
+		int max = 0;
+		if (values == null) {
+			return 0;
+		}
+		for (Integer value : values) {
+			if (value != null && value > max) {
+				max = value;
+			}
+		}
+		return max;
+	}
+
+	private double averageDouble(List<Double> values) {
+		if (Algorithms.isEmpty(values)) {
+			return 0d;
+		}
+		double sum = 0d;
+		for (Double value : values) {
+			sum += value;
+		}
+		return sum / values.size();
+	}
+
+	private double percentileDouble(List<Double> values, int percentile) {
+		if (Algorithms.isEmpty(values)) {
+			return 0d;
+		}
+		List<Double> sorted = new ArrayList<>(values);
+		sorted.sort(Double::compareTo);
+		int index = Math.min(sorted.size() - 1, Math.max(0, (int) Math.ceil(sorted.size() * (percentile / 100.0)) - 1));
+		return sorted.get(index);
+	}
+
+	private String csv(String value) {
+		if (value == null) {
+			return "";
+		}
+		if (value.indexOf(',') >= 0 || value.indexOf('"') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+			return '"' + value.replace("\"", "\"\"") + '"';
+		}
+		return value;
+	}
+
+	private String formatDouble(double value) {
+		return String.format(Locale.US, "%.6f", value);
+	}
+
+	private int writePoiNameIndexDataMessage(String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks,
+			List<OsmAndPoiNameIndexDataAtom> atoms) throws IOException {
+		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+		CodedOutputStream localOut = CodedOutputStream.newInstance(buffer);
+		int atomsContributionSize = 0;
+		for (OsmAndPoiNameIndexDataAtom atom : atoms) {
+			localOut.writeMessage(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
+			atomsContributionSize += CodedOutputStream.computeMessageSize(
+					OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
+		}
+		PoiNameSidecarSelectionResult sidecarSelection = buildMergedPoiNameSidecar(leafTokenPrefix, poiDataBlocks);
+		if (sidecarSelection != null && !Algorithms.isEmpty(sidecarSelection.sidecarNodes)) {
+			writePoiNameSidecar(localOut, sidecarSelection.sidecarNodes);
+		}
+		localOut.flush();
+		byte[] payload = buffer.toByteArray();
+		codedOutStream.writeRawVarint32(payload.length);
+		codedOutStream.writeRawBytes(payload);
+		return payload.length - atomsContributionSize;
+	}
+
+	private PoiNameSidecarSelectionResult buildMergedPoiNameSidecar(String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks) {
+		if (Algorithms.isEmpty(leafTokenPrefix) || Algorithms.isEmpty(poiDataBlocks)) {
+			lastPoiNameSidecarSelections.remove(leafTokenPrefix);
+			return null;
+		}
+		if (poiDataBlocks.size() < POI_NAME_SIDECAR_COUNT_THRESHOLD) {
+			lastPoiNameSidecarSelections.put(leafTokenPrefix, emptySelectionResult(poiDataBlocks.size()));
+			return null;
+		}
+		Map<String, PoiNameSidecarEntry> mergedEntriesByKey = collectMergedEntriesByKey(leafTokenPrefix, poiDataBlocks,
+				POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH);
+		PoiNameSidecarSelectionResult selectionResult = chooseBudgetedSidecarEntries(mergedEntriesByKey, poiDataBlocks.size(),
+				POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH);
+		selectionResult = maybeApplyResidualSparseDepthProbe(leafTokenPrefix, poiDataBlocks, selectionResult);
+		selectionResult = withHierarchy(selectionResult, leafTokenPrefix, poiDataBlocks);
+		lastPoiNameSidecarSelections.put(leafTokenPrefix, selectionResult);
+		if (selectionResult.isEmpty()) {
+			return null;
+		}
+		return selectionResult;
+	}
+
+	private Map<String, PoiNameSidecarEntry> collectMergedEntriesByKey(String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks,
+			int continuationLength) {
+		Map<String, PoiNameSidecarEntry> mergedEntriesByKey = new LinkedHashMap<>();
+		if (Algorithms.isEmpty(leafTokenPrefix) || Algorithms.isEmpty(poiDataBlocks) || continuationLength <= 0) {
+			return mergedEntriesByKey;
+		}
+		for (int atomIndex = 0; atomIndex < poiDataBlocks.size(); atomIndex++) {
+			PoiDataBlock poiDataBlock = poiDataBlocks.get(atomIndex);
+			for (String normalizedToken : poiDataBlock.bloomTokens) {
+				if (Algorithms.isEmpty(normalizedToken) || !normalizedToken.startsWith(leafTokenPrefix)) {
+					continue;
+				}
+				if (normalizedToken.length() >= leafTokenPrefix.length() + continuationLength) {
+					String key = encodeContinuationKey(normalizedToken, leafTokenPrefix.length(), continuationLength);
+					PoiNameSidecarEntry mergedEntry = mergedEntriesByKey.computeIfAbsent(key, PoiNameSidecarEntry::new);
+					mergedEntry.atomIndexes.add(atomIndex);
+				}
+			}
+		}
+		return mergedEntriesByKey;
+	}
+
+	private PoiNameSidecarSelectionResult chooseBudgetedSidecarEntries(Map<String, PoiNameSidecarEntry> mergedEntriesByKey,
+			int atomCount, int continuationLength) {
+		List<PoiNameSidecarEntryMetrics> candidates = new ArrayList<>();
+		double totalCandidateObjectiveGain = 0d;
+		int coverageEligibleCandidateCount = 0;
+		for (PoiNameSidecarEntry entry : mergedEntriesByKey.values()) {
+			if (entry == null || Algorithms.isEmpty(entry.atomIndexes)) {
+				continue;
+			}
+			List<Integer> atomIndexes = new ArrayList<>(entry.atomIndexes);
+			atomIndexes.sort(Integer::compareTo);
+			int postingSize = atomIndexes.size();
+			int spanCount = countSpans(atomIndexes);
+			double frag = postingSize == 0 ? 1d : spanCount / (double) postingSize;
+			if (postingSize < MIN_POSTING_SIZE_FOR_SIDECAR || frag > MAX_SPAN_FRAG) {
+				continue;
+			}
+			coverageEligibleCandidateCount++;
+			int estimatedBytes = estimateSidecarEntryBytes(entry);
+			double searchGain = postingSize - spanCount;
+			double objectiveGain = searchGain - (SIDE_CAR_BYTE_PENALTY * estimatedBytes);
+			double gainDensity = objectiveGain / Math.max(1d, estimatedBytes);
+			if (searchGain <= 0d || objectiveGain <= 0d) {
+				continue;
+			}
+			totalCandidateObjectiveGain += objectiveGain;
+			candidates.add(new PoiNameSidecarEntryMetrics(entry.key, atomIndexes, postingSize, spanCount, frag,
+					estimatedBytes, searchGain, objectiveGain, gainDensity));
+		}
+		int eligibleCandidateCount = candidates.size();
+		double top1ContinuationMassRatio = computeTopContinuationMassRatio(candidates, atomCount, 1);
+		double top3ContinuationMassRatio = computeTopContinuationMassRatio(candidates, atomCount, 3);
+		double top5ContinuationMassRatio = computeTopContinuationMassRatio(candidates, atomCount, 5);
+		boolean broadPrefixLowSelectivity = isBroadPrefixLowSelectivity(atomCount, eligibleCandidateCount, top3ContinuationMassRatio);
+		List<PoiNameSidecarEntry> selectedEntries = new ArrayList<>();
+		Set<Integer> selectedAtomIndexSet = new LinkedHashSet<>();
+		int selectedBytes = 0;
+		double gainDensityAcc = 0d;
+		double selectedObjectiveGainAcc = 0d;
+		int overlapFilteredCandidateCount = 0;
+		int budgetRejectedCandidateCount = 0;
+		while (selectedEntries.size() < MAX_SELECTED_KEYS_PER_LEAF) {
+			overlapFilteredCandidateCount += countOverlapFilteredCandidates(candidates, selectedEntries, selectedAtomIndexSet);
+			budgetRejectedCandidateCount += countBudgetRejectedCandidates(candidates, selectedEntries, selectedAtomIndexSet,
+					selectedBytes, MAX_SPAN_FRAG, MIN_POSTING_SIZE_FOR_SIDECAR);
+			PoiNameSidecarSelectionStep selectionStep = selectBestSidecarCandidate(candidates, selectedEntries,
+					selectedAtomIndexSet, selectedBytes, MAX_SPAN_FRAG, MIN_POSTING_SIZE_FOR_SIDECAR, true);
+			if (selectionStep == null) {
+				break;
+			}
+			PoiNameSidecarEntry selectedEntry = new PoiNameSidecarEntry(selectionStep.candidate.key);
+			selectedEntry.atomIndexes.addAll(selectionStep.selectedAtomIndexes);
+			selectedEntries.add(selectedEntry);
+			selectedAtomIndexSet.addAll(selectionStep.selectedAtomIndexes);
+			selectedBytes += selectionStep.estimatedBytes;
+			gainDensityAcc += selectionStep.gainDensity;
+			selectedObjectiveGainAcc += selectionStep.objectiveGain;
+		}
+		int rescueSelectedKeyCount = 0;
+		if (shouldRunResidualRescue(atomCount, selectedAtomIndexSet.size())) {
+			while (selectedEntries.size() < MAX_SELECTED_KEYS_PER_LEAF) {
+				overlapFilteredCandidateCount += countOverlapFilteredCandidates(candidates, selectedEntries, selectedAtomIndexSet);
+				budgetRejectedCandidateCount += countBudgetRejectedCandidates(candidates, selectedEntries, selectedAtomIndexSet,
+						selectedBytes, RESCUE_MAX_SPAN_FRAG, RESCUE_MIN_POSTING_SIZE_FOR_SIDECAR);
+				PoiNameSidecarSelectionStep rescueStep = selectBestSidecarCandidate(candidates, selectedEntries,
+						selectedAtomIndexSet, selectedBytes, RESCUE_MAX_SPAN_FRAG, RESCUE_MIN_POSTING_SIZE_FOR_SIDECAR, false);
+				if (rescueStep == null) {
+					break;
+				}
+				PoiNameSidecarEntry rescueEntry = new PoiNameSidecarEntry(rescueStep.candidate.key);
+				rescueEntry.atomIndexes.addAll(rescueStep.selectedAtomIndexes);
+				selectedEntries.add(rescueEntry);
+				selectedAtomIndexSet.addAll(rescueStep.selectedAtomIndexes);
+				selectedBytes += rescueStep.estimatedBytes;
+				gainDensityAcc += rescueStep.gainDensity;
+				selectedObjectiveGainAcc += rescueStep.objectiveGain;
+				rescueSelectedKeyCount++;
+				if (!shouldRunResidualRescue(atomCount, selectedAtomIndexSet.size())) {
+					break;
+				}
+			}
+		}
+		List<Integer> selectedAtomIndexes = new ArrayList<>(selectedAtomIndexSet);
+		Collections.sort(selectedAtomIndexes);
+		List<Integer> residualAtomIndexes = buildResidualAtomIndexes(atomCount, selectedAtomIndexes);
+		int selectedKeyCount = selectedEntries.size();
+		int residualAtomCount = residualAtomIndexes.size();
+		int coveredAtomCount = selectedAtomIndexes.size();
+		double residualMass = atomCount == 0 ? 0d : residualAtomCount / (double) atomCount;
+		double coveredAtomRatio = atomCount == 0 ? 0d : coveredAtomCount / (double) atomCount;
+		double avgFrag = selectedEntries.isEmpty() ? 0d : averageDoubleByCandidate(selectedEntries, mergedEntriesByKey);
+		double maxFrag = maxFragByCandidate(selectedEntries);
+		int expectedSearchCostNoSidecar = atomCount;
+		double expectedSearchCostWithSidecar = computeExpectedSearchCostWithSidecar(atomCount, selectedEntries, residualAtomIndexes);
+		double objectiveCostWithSidecar = expectedSearchCostWithSidecar + (SIDE_CAR_BYTE_PENALTY * selectedBytes);
+		double avgGainDensity = selectedEntries.isEmpty() ? 0d : gainDensityAcc / selectedEntries.size();
+		double selectedGainMassRatio = totalCandidateObjectiveGain <= 0d ? 0d : selectedObjectiveGainAcc / totalCandidateObjectiveGain;
+		boolean residualFallbackUsed = !selectedEntries.isEmpty() && residualAtomCount > 0;
+		return new PoiNameSidecarSelectionResult(selectedEntries, residualAtomIndexes, Collections.emptyList(), selectedKeyCount,
+				rescueSelectedKeyCount, residualAtomCount, coveredAtomCount, residualMass, coveredAtomRatio, avgFrag, maxFrag,
+				expectedSearchCostNoSidecar, expectedSearchCostWithSidecar, objectiveCostWithSidecar, selectedBytes, 0, 0,
+				continuationLength,
+				avgGainDensity, overlapFilteredCandidateCount, coverageEligibleCandidateCount, budgetRejectedCandidateCount,
+				eligibleCandidateCount, top1ContinuationMassRatio,
+				top3ContinuationMassRatio, top5ContinuationMassRatio, selectedGainMassRatio, broadPrefixLowSelectivity,
+				residualFallbackUsed, false, false, 0, 0, 0d, 0d, 0d, Collections.emptyList());
+	}
+
+	private PoiNameSidecarSelectionResult maybeApplyResidualSparseDepthProbe(String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks,
+			PoiNameSidecarSelectionResult baselineSelectionResult) {
+		if (baselineSelectionResult == null) {
+			return null;
+		}
+		boolean residualDominatedSparseLeaf = isResidualDominatedSparseLeaf(poiDataBlocks.size(), baselineSelectionResult)
+				&& !baselineSelectionResult.broadPrefixLowSelectivity;
+		if (!residualDominatedSparseLeaf) {
+			return withProbeMetadata(baselineSelectionResult, false, false, 0, 0,
+					baselineSelectionResult.expectedSearchCostWithSidecar, baselineSelectionResult.expectedSearchCostWithSidecar,
+					1d, Collections.singletonList(buildProbeDepthResult(baselineSelectionResult)));
+		}
+		List<PoiNameSidecarProbeDepthResult> probeDepthResults = new ArrayList<>();
+		probeDepthResults.add(buildProbeDepthResult(baselineSelectionResult));
+		PoiNameSidecarSelectionResult bestAcceptedSelectionResult = null;
+		int bestAcceptedDepth = 0;
+		int acceptedDepthCount = 0;
+		double baselineCost = baselineSelectionResult.expectedSearchCostWithSidecar;
+		double materialImprovementCostThreshold = baselineCost * PROBE_IMPROVEMENT_FACTOR;
+		for (int continuationLength = POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH + 1;
+				continuationLength <= POI_NAME_SIDECAR_MAX_CONTINUATION_DEPTH; continuationLength++) {
+			Map<String, PoiNameSidecarEntry> depthEntries = collectMergedEntriesByKey(leafTokenPrefix, poiDataBlocks, continuationLength);
+			PoiNameSidecarSelectionResult depthSelectionResult = chooseBudgetedSidecarEntries(depthEntries, poiDataBlocks.size(), continuationLength);
+			boolean accepted = isAcceptedProbeDepth(depthSelectionResult);
+			probeDepthResults.add(buildProbeDepthResult(depthSelectionResult, accepted));
+			if (accepted) {
+				acceptedDepthCount++;
+				if (depthSelectionResult.expectedSearchCostWithSidecar <= materialImprovementCostThreshold) {
+					if (bestAcceptedSelectionResult == null || continuationLength < bestAcceptedDepth) {
+						bestAcceptedSelectionResult = depthSelectionResult;
+						bestAcceptedDepth = continuationLength;
+					}
+				}
+			}
+		}
+		PoiNameSidecarSelectionResult selectedSelectionResult = bestAcceptedSelectionResult != null ? bestAcceptedSelectionResult : baselineSelectionResult;
+		double bestCost = bestAcceptedSelectionResult != null ? bestAcceptedSelectionResult.expectedSearchCostWithSidecar : baselineCost;
+		double improvementRatio = baselineCost == 0d ? 1d : bestCost / baselineCost;
+		return withProbeMetadata(selectedSelectionResult, true, true,
+				bestAcceptedSelectionResult != null ? bestAcceptedDepth : POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH,
+				acceptedDepthCount, baselineCost, bestCost, improvementRatio, probeDepthResults);
+	}
+
+	private boolean isResidualDominatedSparseLeaf(int atomCount, PoiNameSidecarSelectionResult profile) {
+		return profile != null
+				&& atomCount >= RESIDUAL_SPARSE_ATOM_THRESHOLD
+				&& profile.selectedKeyCount > 0
+				&& profile.residualMass >= RESIDUAL_SPARSE_MASS_MIN
+				&& profile.coveredAtomRatio <= RESIDUAL_SPARSE_COVERAGE_MAX
+				&& profile.eligibleCandidateCount <= RESIDUAL_SPARSE_MAX_ELIGIBLE
+				&& profile.top1ContinuationMassRatio <= RESIDUAL_SPARSE_TOP1_MAX;
+	}
+
+	private boolean isAcceptedProbeDepth(PoiNameSidecarSelectionResult selectionResult) {
+		if (selectionResult == null) {
+			return false;
+		}
+		double estimatedSpeedup = selectionResult.expectedSearchCostWithSidecar == 0d ? 1d
+				: selectionResult.expectedSearchCostNoSidecar / selectionResult.expectedSearchCostWithSidecar;
+		return selectionResult.selectedKeyCount > 0
+				&& selectionResult.eligibleCandidateCount >= MIN_PROBE_ELIGIBLE_KEYS
+				&& selectionResult.coveredAtomRatio >= MIN_PROBE_COVERAGE
+				&& selectionResult.residualMass <= MAX_PROBE_RESIDUAL
+				&& estimatedSpeedup >= MIN_PROBE_SPEEDUP
+				&& selectionResult.avgFrag <= MAX_SPAN_FRAG
+				&& selectionResult.sidecarBytes <= POI_NAME_SIDECAR_SIZE_BUDGET;
+	}
+
+	private PoiNameSidecarSelectionResult withProbeMetadata(PoiNameSidecarSelectionResult selectionResult,
+			boolean residualDominatedSparseLeaf, boolean probeTried, int probeBestDepth, int probeAcceptedDepthCount,
+			double probeBaselineCost, double probeBestCost, double probeImprovementRatio,
+			List<PoiNameSidecarProbeDepthResult> probeDepthResults) {
+		if (selectionResult == null) {
+			return null;
+		}
+		return new PoiNameSidecarSelectionResult(selectionResult.selectedEntries, selectionResult.residualAtomIndexes,
+				selectionResult.sidecarNodes, selectionResult.selectedKeyCount, selectionResult.rescueSelectedKeyCount,
+				selectionResult.residualAtomCount, selectionResult.coveredAtomCount, selectionResult.residualMass,
+				selectionResult.coveredAtomRatio, selectionResult.avgFrag, selectionResult.maxFrag,
+				selectionResult.expectedSearchCostNoSidecar, selectionResult.expectedSearchCostWithSidecar,
+				selectionResult.objectiveCostWithSidecar, selectionResult.sidecarBytes, selectionResult.sidecarNodeCount,
+				selectionResult.terminalSidecarNodeCount, selectionResult.maxContinuationDepth,
+				selectionResult.avgGainDensity, selectionResult.overlapFilteredCandidateCount,
+				selectionResult.coverageEligibleCandidateCount, selectionResult.budgetRejectedCandidateCount,
+				selectionResult.eligibleCandidateCount, selectionResult.top1ContinuationMassRatio,
+				selectionResult.top3ContinuationMassRatio, selectionResult.top5ContinuationMassRatio,
+				selectionResult.selectedGainMassRatio, selectionResult.broadPrefixLowSelectivity,
+				selectionResult.residualFallbackUsed, residualDominatedSparseLeaf, probeTried, probeBestDepth,
+				probeAcceptedDepthCount, probeBaselineCost, probeBestCost, probeImprovementRatio, probeDepthResults);
+	}
+
+	private PoiNameSidecarProbeDepthResult buildProbeDepthResult(PoiNameSidecarSelectionResult selectionResult) {
+		return buildProbeDepthResult(selectionResult, false);
+	}
+
+	private PoiNameSidecarProbeDepthResult buildProbeDepthResult(PoiNameSidecarSelectionResult selectionResult, boolean accepted) {
+		if (selectionResult == null) {
+			return new PoiNameSidecarProbeDepthResult(0, 0, 0, 0, 0d, 0, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0d, 0, false);
+		}
+		double estimatedSpeedup = selectionResult.expectedSearchCostWithSidecar == 0d ? 1d
+				: selectionResult.expectedSearchCostNoSidecar / selectionResult.expectedSearchCostWithSidecar;
+		return new PoiNameSidecarProbeDepthResult(selectionResult.maxContinuationDepth, selectionResult.selectedKeyCount,
+				selectionResult.eligibleCandidateCount, selectionResult.coveredAtomCount, selectionResult.coveredAtomRatio,
+				selectionResult.residualAtomCount, selectionResult.residualMass, selectionResult.top1ContinuationMassRatio,
+				selectionResult.top3ContinuationMassRatio, selectionResult.top5ContinuationMassRatio,
+				selectionResult.avgFrag, selectionResult.maxFrag, selectionResult.expectedSearchCostWithSidecar,
+				estimatedSpeedup, selectionResult.sidecarBytes, accepted);
+	}
+
+	private PoiNameSidecarSelectionResult emptySelectionResult(int atomCount) {
+		return new PoiNameSidecarSelectionResult(Collections.emptyList(), buildResidualAtomIndexes(atomCount, Collections.emptyList()),
+				Collections.emptyList(), 0, 0, atomCount, 0, atomCount == 0 ? 0d : 1d, 0d, 0d, 0d, atomCount, atomCount, atomCount, 0, 0,
+				0, POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH, 0d,
+				0, 0, 0, 0, 0d, 0d, 0d, 0d, false, false,
+				false, false, 0, 0, 0d, 0d, 0d, Collections.emptyList());
+	}
+
+	private PoiNameSidecarSelectionResult withHierarchy(PoiNameSidecarSelectionResult selectionResult,
+			String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks) {
+		if (selectionResult == null || Algorithms.isEmpty(selectionResult.selectedEntries)) {
+			return selectionResult;
+		}
+		PoiNameSidecarHierarchy hierarchy = buildHierarchicalSidecar(leafTokenPrefix, poiDataBlocks, selectionResult);
+		return new PoiNameSidecarSelectionResult(selectionResult.selectedEntries, selectionResult.residualAtomIndexes,
+				hierarchy.nodes, selectionResult.selectedKeyCount, selectionResult.rescueSelectedKeyCount,
+				selectionResult.residualAtomCount, selectionResult.coveredAtomCount, selectionResult.residualMass,
+				selectionResult.coveredAtomRatio, selectionResult.avgFrag, selectionResult.maxFrag,
+				selectionResult.expectedSearchCostNoSidecar, selectionResult.expectedSearchCostWithSidecar,
+				selectionResult.objectiveCostWithSidecar,
+				hierarchy.bytes > 0 ? hierarchy.bytes : selectionResult.sidecarBytes,
+				hierarchy.nodes.size(), hierarchy.terminalNodeCount, hierarchy.maxContinuationDepth,
+				selectionResult.avgGainDensity, selectionResult.overlapFilteredCandidateCount,
+				selectionResult.coverageEligibleCandidateCount, selectionResult.budgetRejectedCandidateCount,
+				selectionResult.eligibleCandidateCount, selectionResult.top1ContinuationMassRatio,
+				selectionResult.top3ContinuationMassRatio, selectionResult.top5ContinuationMassRatio,
+				selectionResult.selectedGainMassRatio, selectionResult.broadPrefixLowSelectivity,
+				selectionResult.residualFallbackUsed, selectionResult.residualDominatedSparseLeaf,
+				selectionResult.probeTried, selectionResult.probeBestDepth, selectionResult.probeAcceptedDepthCount,
+				selectionResult.probeBaselineCost, selectionResult.probeBestCost,
+				selectionResult.probeImprovementRatio, selectionResult.probeDepthResults);
+	}
+
+	private PoiNameSidecarHierarchy buildHierarchicalSidecar(String leafTokenPrefix, List<PoiDataBlock> poiDataBlocks,
+			PoiNameSidecarSelectionResult selectionResult) {
+		List<PoiNameSidecarNode> nodes = new ArrayList<>();
+		if (Algorithms.isEmpty(selectionResult.selectedEntries)) {
+			return new PoiNameSidecarHierarchy(nodes, 0, 0, POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH);
+		}
+		Set<Integer> globalCoveredAtomIndexes = new LinkedHashSet<>();
+		for (PoiNameSidecarEntry selectedEntry : selectionResult.selectedEntries) {
+			List<Integer> rootAtomIndexes = new ArrayList<>(selectedEntry.atomIndexes);
+			Collections.sort(rootAtomIndexes);
+			globalCoveredAtomIndexes.addAll(rootAtomIndexes);
+			int nodeIndex = nodes.size();
+			int rootContinuationLength = safeLength(selectedEntry.key);
+			PoiNameSidecarNode rootNode = new PoiNameSidecarNode(0xFFFFFFFF, selectedEntry.key,
+					rootContinuationLength, rootAtomIndexes, Collections.emptyList(), true);
+			nodes.add(rootNode);
+			refineSidecarNode(nodes, nodeIndex, leafTokenPrefix, selectedEntry.key, rootAtomIndexes, poiDataBlocks,
+					rootContinuationLength, 0);
+		}
+		List<Integer> residualAtomIndexes = buildResidualAtomIndexes(poiDataBlocks.size(), new ArrayList<>(globalCoveredAtomIndexes));
+		if (!Algorithms.isEmpty(residualAtomIndexes)) {
+			nodes.add(new PoiNameSidecarNode(0xFFFFFFFF, "", 0, Collections.emptyList(), residualAtomIndexes, true));
+		}
+		int terminalNodeCount = 0;
+		int maxContinuationDepth = 0;
+		int bytes = 0;
+		for (PoiNameSidecarNode node : nodes) {
+			if (node.terminal) {
+				terminalNodeCount++;
+			}
+			maxContinuationDepth = Math.max(maxContinuationDepth, node.continuationDepth);
+			bytes += estimateSidecarNodeBytes(node);
+		}
+		return new PoiNameSidecarHierarchy(nodes, bytes, terminalNodeCount, maxContinuationDepth);
+	}
+
+	private void refineSidecarNode(List<PoiNameSidecarNode> nodes, int nodeIndex, String leafTokenPrefix,
+			String branchKey, List<Integer> branchAtomIndexes, List<PoiDataBlock> poiDataBlocks,
+			int rootContinuationLength, int currentDepth) {
+		if (rootContinuationLength + currentDepth >= POI_NAME_SIDECAR_MAX_CONTINUATION_DEPTH) {
+			return;
+		}
+		if (!shouldDeepenBranch(leafTokenPrefix, branchKey, branchAtomIndexes, poiDataBlocks)) {
+			return;
+		}
+		Map<String, List<Integer>> childBranches = collectChildBranchAtomIndexes(leafTokenPrefix, branchKey, branchAtomIndexes, poiDataBlocks);
+		if (Algorithms.isEmpty(childBranches)) {
+			return;
+		}
+		Set<Integer> coveredByChildren = new LinkedHashSet<>();
+		PoiNameSidecarNode parentNode = nodes.get(nodeIndex);
+		parentNode.terminal = false;
+		for (Map.Entry<String, List<Integer>> entry : childBranches.entrySet()) {
+			List<Integer> childAtomIndexes = entry.getValue();
+			if (Algorithms.isEmpty(childAtomIndexes)) {
+				continue;
+			}
+			Collections.sort(childAtomIndexes);
+			coveredByChildren.addAll(childAtomIndexes);
+			int childNodeIndex = nodes.size();
+			PoiNameSidecarNode childNode = new PoiNameSidecarNode(nodeIndex, entry.getKey(),
+					rootContinuationLength + currentDepth + 1, childAtomIndexes, Collections.emptyList(), true);
+			nodes.add(childNode);
+			parentNode.childNodeIndexes.add(childNodeIndex);
+			refineSidecarNode(nodes, childNodeIndex, leafTokenPrefix, branchKey + entry.getKey(), childAtomIndexes,
+					poiDataBlocks, rootContinuationLength, currentDepth + 1);
+		}
+		parentNode.residualAtomIndexes.clear();
+		parentNode.residualAtomIndexes.addAll(buildResidualForBranch(branchAtomIndexes, coveredByChildren));
+	}
+
+	private boolean shouldDeepenBranch(String leafTokenPrefix, String branchKey, List<Integer> branchAtomIndexes,
+			List<PoiDataBlock> poiDataBlocks) {
+		int branchAtomCount = branchAtomIndexes.size();
+		if (branchAtomCount < POI_NAME_SIDECAR_BRANCH_HEAVY_THRESHOLD) {
+			return false;
+		}
+		Map<String, List<Integer>> childBranches = collectChildBranchAtomIndexes(leafTokenPrefix, branchKey, branchAtomIndexes, poiDataBlocks);
+		Map<String, Integer> childMass = collectChildBranchMass(childBranches);
+		if (Algorithms.isEmpty(childMass)) {
+			return false;
+		}
+		List<Integer> masses = new ArrayList<>(childMass.values());
+		masses.sort(Collections.reverseOrder());
+		double top1MassRatio = masses.get(0) / (double) branchAtomCount;
+		Set<Integer> coveredAtomIndexes = new LinkedHashSet<>();
+		for (List<Integer> childAtomIndexes : childBranches.values()) {
+			coveredAtomIndexes.addAll(childAtomIndexes);
+		}
+		int coveredAtomCount = coveredAtomIndexes.size();
+		double coveredAtomRatio = coveredAtomCount / (double) branchAtomCount;
+		double residualMass = 1d - coveredAtomRatio;
+		return top1MassRatio <= POI_NAME_SIDECAR_BRANCH_TOP1_MASS_MAX
+				&& coveredAtomRatio <= POI_NAME_SIDECAR_BRANCH_COVERAGE_MIN
+				&& residualMass >= POI_NAME_SIDECAR_BRANCH_RESIDUAL_MIN;
+	}
+
+	private Map<String, Integer> collectChildBranchMass(Map<String, List<Integer>> childBranches) {
+		Map<String, Integer> childMass = new LinkedHashMap<>();
+		for (Map.Entry<String, List<Integer>> entry : childBranches.entrySet()) {
+			childMass.put(entry.getKey(), entry.getValue().size());
+		}
+		return childMass;
+	}
+
+	private Map<String, List<Integer>> collectChildBranchAtomIndexes(String leafTokenPrefix, String branchKey,
+			List<Integer> branchAtomIndexes, List<PoiDataBlock> poiDataBlocks) {
+		Map<String, LinkedHashSet<Integer>> atomIndexesByChildKey = new LinkedHashMap<>();
+		String absolutePrefix = leafTokenPrefix + branchKey;
+		for (Integer atomIndex : branchAtomIndexes) {
+			PoiDataBlock poiDataBlock = poiDataBlocks.get(atomIndex);
+			for (String normalizedToken : poiDataBlock.bloomTokens) {
+				if (Algorithms.isEmpty(normalizedToken) || !normalizedToken.startsWith(absolutePrefix)) {
+					continue;
+				}
+				if (normalizedToken.length() <= absolutePrefix.length()) {
+					continue;
+				}
+				String keySegment = normalizedToken.substring(absolutePrefix.length(), absolutePrefix.length() + 1);
+				atomIndexesByChildKey.computeIfAbsent(keySegment, k -> new LinkedHashSet<>()).add(atomIndex);
+			}
+		}
+		Map<String, List<Integer>> childBranches = new LinkedHashMap<>();
+		for (Map.Entry<String, LinkedHashSet<Integer>> entry : atomIndexesByChildKey.entrySet()) {
+			List<Integer> atomIndexes = new ArrayList<>(entry.getValue());
+			int spanCount = countSpans(atomIndexes);
+			double frag = atomIndexes.isEmpty() ? 1d : spanCount / (double) atomIndexes.size();
+			if (atomIndexes.size() >= MIN_POSTING_SIZE_FOR_SIDECAR && frag <= MAX_SPAN_FRAG) {
+				childBranches.put(entry.getKey(), atomIndexes);
+			}
+		}
+		return childBranches;
+	}
+
+	private List<Integer> buildResidualForBranch(List<Integer> branchAtomIndexes, Set<Integer> coveredAtomIndexes) {
+		List<Integer> residualAtomIndexes = new ArrayList<>();
+		for (Integer atomIndex : branchAtomIndexes) {
+			if (!coveredAtomIndexes.contains(atomIndex)) {
+				residualAtomIndexes.add(atomIndex);
+			}
+		}
+		return residualAtomIndexes;
+	}
+
+	private PoiNameSidecarSelectionStep selectBestSidecarCandidate(List<PoiNameSidecarEntryMetrics> candidates,
+			List<PoiNameSidecarEntry> selectedEntries, Set<Integer> selectedAtomIndexSet, int selectedBytes,
+			double maxSpanFrag, int minPostingSize, boolean useGainDensityOrdering) {
+		PoiNameSidecarEntryMetrics bestCandidate = null;
+		List<Integer> bestUncoveredAtomIndexes = Collections.emptyList();
+		int bestEstimatedBytes = 0;
+		double bestObjectiveGain = 0d;
+		double bestGainDensity = 0d;
+		for (PoiNameSidecarEntryMetrics candidate : candidates) {
+			if (containsSelectedKey(selectedEntries, candidate.key)) {
+				continue;
+			}
+			List<Integer> uncoveredAtomIndexes = filterUncoveredAtomIndexes(candidate.atomIndexes, selectedAtomIndexSet);
+			if (uncoveredAtomIndexes.size() < minPostingSize) {
+				continue;
+			}
+			int uncoveredSpanCount = countSpans(uncoveredAtomIndexes);
+			double uncoveredFrag = uncoveredAtomIndexes.isEmpty() ? 1d : uncoveredSpanCount / (double) uncoveredAtomIndexes.size();
+			if (uncoveredFrag > maxSpanFrag) {
+				continue;
+			}
+			int estimatedBytes = estimateSidecarEntryBytes(candidate.key, uncoveredAtomIndexes);
+			if (selectedBytes + estimatedBytes > POI_NAME_SIDECAR_SIZE_BUDGET) {
+				continue;
+			}
+			double searchGain = uncoveredAtomIndexes.size() - uncoveredSpanCount;
+			double objectiveGain = searchGain - (SIDE_CAR_BYTE_PENALTY * estimatedBytes);
+			if (searchGain <= 0d || objectiveGain <= 0d) {
+				continue;
+			}
+			double gainDensity = objectiveGain / Math.max(1d, estimatedBytes);
+			boolean isBetterCandidate = bestCandidate == null;
+			if (!isBetterCandidate && useGainDensityOrdering) {
+				isBetterCandidate = gainDensity > bestGainDensity
+						|| (gainDensity == bestGainDensity && objectiveGain > bestObjectiveGain)
+						|| (gainDensity == bestGainDensity && objectiveGain == bestObjectiveGain && uncoveredAtomIndexes.size() > bestUncoveredAtomIndexes.size());
+			} else if (!isBetterCandidate) {
+				isBetterCandidate = objectiveGain > bestObjectiveGain
+						|| (objectiveGain == bestObjectiveGain && gainDensity > bestGainDensity)
+						|| (objectiveGain == bestObjectiveGain && gainDensity == bestGainDensity && uncoveredAtomIndexes.size() > bestUncoveredAtomIndexes.size());
+			}
+			if (isBetterCandidate) {
+				bestCandidate = candidate;
+				bestUncoveredAtomIndexes = uncoveredAtomIndexes;
+				bestEstimatedBytes = estimatedBytes;
+				bestObjectiveGain = objectiveGain;
+				bestGainDensity = gainDensity;
+			}
+		}
+		if (bestCandidate == null) {
+			return null;
+		}
+		return new PoiNameSidecarSelectionStep(bestCandidate, bestUncoveredAtomIndexes, bestEstimatedBytes, bestObjectiveGain, bestGainDensity);
+	}
+
+	private int countOverlapFilteredCandidates(List<PoiNameSidecarEntryMetrics> candidates, List<PoiNameSidecarEntry> selectedEntries,
+			Set<Integer> selectedAtomIndexSet) {
+		int overlapFilteredCandidateCount = 0;
+		for (PoiNameSidecarEntryMetrics candidate : candidates) {
+			if (containsSelectedKey(selectedEntries, candidate.key)) {
+				continue;
+			}
+			List<Integer> uncoveredAtomIndexes = filterUncoveredAtomIndexes(candidate.atomIndexes, selectedAtomIndexSet);
+			if (uncoveredAtomIndexes.size() != candidate.atomIndexes.size()) {
+				overlapFilteredCandidateCount++;
+			}
+		}
+		return overlapFilteredCandidateCount;
+	}
+
+	private int countBudgetRejectedCandidates(List<PoiNameSidecarEntryMetrics> candidates, List<PoiNameSidecarEntry> selectedEntries,
+			Set<Integer> selectedAtomIndexSet, int selectedBytes, double maxSpanFrag, int minPostingSize) {
+		int budgetRejectedCandidateCount = 0;
+		for (PoiNameSidecarEntryMetrics candidate : candidates) {
+			if (containsSelectedKey(selectedEntries, candidate.key)) {
+				continue;
+			}
+			List<Integer> uncoveredAtomIndexes = filterUncoveredAtomIndexes(candidate.atomIndexes, selectedAtomIndexSet);
+			if (uncoveredAtomIndexes.size() < minPostingSize) {
+				continue;
+			}
+			int uncoveredSpanCount = countSpans(uncoveredAtomIndexes);
+			double uncoveredFrag = uncoveredAtomIndexes.isEmpty() ? 1d : uncoveredSpanCount / (double) uncoveredAtomIndexes.size();
+			if (uncoveredFrag > maxSpanFrag) {
+				continue;
+			}
+			int estimatedBytes = estimateSidecarEntryBytes(candidate.key, uncoveredAtomIndexes);
+			if (selectedBytes + estimatedBytes > POI_NAME_SIDECAR_SIZE_BUDGET) {
+				budgetRejectedCandidateCount++;
+			}
+		}
+		return budgetRejectedCandidateCount;
+	}
+
+	private boolean isHeavyLeaf(int atomCount) {
+		return atomCount >= POI_NAME_SIDECAR_COUNT_THRESHOLD;
+	}
+
+	private boolean shouldRunResidualRescue(int atomCount, int coveredAtomCount) {
+		if (atomCount < POI_NAME_SIDECAR_COUNT_THRESHOLD || atomCount <= 0) {
+			return false;
+		}
+		double coveredAtomRatio = coveredAtomCount / (double) atomCount;
+		double residualMass = 1d - coveredAtomRatio;
+		return residualMass > RESIDUAL_RESCUE_MASS_THRESHOLD || coveredAtomRatio < RESIDUAL_RESCUE_COVERAGE_THRESHOLD;
+	}
+
+	private double computeTopContinuationMassRatio(List<PoiNameSidecarEntryMetrics> candidates, int atomCount, int topCount) {
+		if (atomCount <= 0 || Algorithms.isEmpty(candidates) || topCount <= 0) {
+			return 0d;
+		}
+		List<Integer> postingSizes = new ArrayList<>();
+		for (PoiNameSidecarEntryMetrics candidate : candidates) {
+			postingSizes.add(candidate.postingSize);
+		}
+		postingSizes.sort(Collections.reverseOrder());
+		int sum = 0;
+		for (int i = 0; i < Math.min(topCount, postingSizes.size()); i++) {
+			sum += postingSizes.get(i);
+		}
+		return sum / (double) atomCount;
+	}
+
+	private boolean isBroadPrefixLowSelectivity(int atomCount, int eligibleCandidateCount, double top3ContinuationMassRatio) {
+		return atomCount >= POI_NAME_SIDECAR_COUNT_THRESHOLD
+				&& eligibleCandidateCount >= BROAD_PREFIX_MIN_ELIGIBLE_CANDIDATES
+				&& top3ContinuationMassRatio < BROAD_PREFIX_TOP3_MASS_THRESHOLD;
+	}
+
+	private double getProbeCoveredAtomRatio(PoiNameSidecarSelectionResult selectionResult, int continuationLength) {
+		PoiNameSidecarProbeDepthResult probeDepthResult = findProbeDepthResult(selectionResult, continuationLength);
+		return probeDepthResult == null ? 0d : probeDepthResult.coveredAtomRatio;
+	}
+
+	private double getProbeResidualMass(PoiNameSidecarSelectionResult selectionResult, int continuationLength) {
+		PoiNameSidecarProbeDepthResult probeDepthResult = findProbeDepthResult(selectionResult, continuationLength);
+		return probeDepthResult == null ? 0d : probeDepthResult.residualMass;
+	}
+
+	private double getProbeEstimatedSpeedup(PoiNameSidecarSelectionResult selectionResult, int continuationLength) {
+		PoiNameSidecarProbeDepthResult probeDepthResult = findProbeDepthResult(selectionResult, continuationLength);
+		return probeDepthResult == null ? 0d : probeDepthResult.estimatedSpeedup;
+	}
+
+	private int getProbeEligibleCandidateCount(PoiNameSidecarSelectionResult selectionResult, int continuationLength) {
+		PoiNameSidecarProbeDepthResult probeDepthResult = findProbeDepthResult(selectionResult, continuationLength);
+		return probeDepthResult == null ? 0 : probeDepthResult.eligibleCandidateCount;
+	}
+
+	private PoiNameSidecarProbeDepthResult findProbeDepthResult(PoiNameSidecarSelectionResult selectionResult, int continuationLength) {
+		if (selectionResult == null || Algorithms.isEmpty(selectionResult.probeDepthResults)) {
+			return null;
+		}
+		for (PoiNameSidecarProbeDepthResult probeDepthResult : selectionResult.probeDepthResults) {
+			if (probeDepthResult != null && probeDepthResult.continuationLength == continuationLength) {
+				return probeDepthResult;
+			}
+		}
+		return null;
+	}
+
+	private List<Integer> buildResidualAtomIndexes(int atomCount, List<Integer> selectedAtomIndexes) {
+		if (atomCount <= 0) {
+			return Collections.emptyList();
+		}
+		Set<Integer> selected = new HashSet<>(selectedAtomIndexes);
+		List<Integer> residualAtomIndexes = new ArrayList<>();
+		for (int i = 0; i < atomCount; i++) {
+			if (!selected.contains(i)) {
+				residualAtomIndexes.add(i);
+			}
+		}
+		return residualAtomIndexes;
+	}
+
+	private boolean containsSelectedKey(List<PoiNameSidecarEntry> selectedEntries, String key) {
+		for (PoiNameSidecarEntry selectedEntry : selectedEntries) {
+			if (selectedEntry.key.equals(key)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private List<Integer> filterUncoveredAtomIndexes(List<Integer> atomIndexes, Set<Integer> selectedAtomIndexSet) {
+		if (Algorithms.isEmpty(atomIndexes)) {
+			return Collections.emptyList();
+		}
+		if (selectedAtomIndexSet.isEmpty()) {
+			return new ArrayList<>(atomIndexes);
+		}
+		List<Integer> uncoveredAtomIndexes = new ArrayList<>();
+		for (Integer atomIndex : atomIndexes) {
+			if (!selectedAtomIndexSet.contains(atomIndex)) {
+				uncoveredAtomIndexes.add(atomIndex);
+			}
+		}
+		return uncoveredAtomIndexes;
+	}
+
+	private int countSpans(Collection<Integer> atomIndexes) {
+		if (Algorithms.isEmpty(atomIndexes)) {
+			return 0;
+		}
+		int spans = 1;
+		Iterator<Integer> iterator = atomIndexes.iterator();
+		int prev = iterator.next();
+		while (iterator.hasNext()) {
+			int current = iterator.next();
+			if (current != prev + 1) {
+				spans++;
+			}
+			prev = current;
+		}
+		return spans;
+	}
+
+	private double averageDoubleByCandidate(List<PoiNameSidecarEntry> selectedEntries, Map<String, PoiNameSidecarEntry> mergedEntriesByKey) {
+		double sum = 0d;
+		int count = 0;
+		for (PoiNameSidecarEntry entry : selectedEntries) {
+			PoiNameSidecarEntry source = mergedEntriesByKey.get(entry.key);
+			if (source == null || Algorithms.isEmpty(source.atomIndexes)) {
+				continue;
+			}
+			int postingSize = source.atomIndexes.size();
+			int spanCount = countSpans(source.atomIndexes);
+			sum += postingSize == 0 ? 0d : spanCount / (double) postingSize;
+			count++;
+		}
+		return count == 0 ? 0d : sum / count;
+	}
+
+	private double maxFragByCandidate(List<PoiNameSidecarEntry> selectedEntries) {
+		double maxFrag = 0d;
+		for (PoiNameSidecarEntry entry : selectedEntries) {
+			int postingSize = entry.atomIndexes.size();
+			int spanCount = countSpans(entry.atomIndexes);
+			if (postingSize > 0) {
+				maxFrag = Math.max(maxFrag, spanCount / (double) postingSize);
+			}
+		}
+		return maxFrag;
+	}
+
+	private double computeExpectedSearchCostWithSidecar(int atomCount, List<PoiNameSidecarEntry> selectedEntries,
+			List<Integer> residualAtomIndexes) {
+		if (atomCount <= 0) {
+			return 0d;
+		}
+		double selectedCost = 0d;
+		for (PoiNameSidecarEntry entry : selectedEntries) {
+			int postingSize = entry.atomIndexes.size();
+			int spanCount = countSpans(entry.atomIndexes);
+			selectedCost += postingSize * (spanCount / (double) Math.max(1, postingSize));
+		}
+		double residualCost = residualAtomIndexes.size();
+		return selectedCost + residualCost;
+	}
+
+	private int estimateSidecarEntryBytes(PoiNameSidecarEntry entry) {
+		return 6 + entry.atomIndexes.size() * 2 + entry.key.length();
+	}
+
+	private int estimateSidecarEntryBytes(String key, List<Integer> atomIndexes) {
+		return 6 + atomIndexes.size() * 2 + key.length();
+	}
+
+	private int safeLength(String value) {
+		return value == null ? 0 : value.length();
+	}
+
+	private String encodeContinuationKey(String normalizedToken, int prefixLength) {
+		return encodeContinuationKey(normalizedToken, prefixLength, POI_NAME_SIDECAR_CONTINUATION_KEY_LENGTH);
+	}
+
+	private String encodeContinuationKey(String normalizedToken, int prefixLength, int continuationLength) {
+		return normalizedToken.substring(prefixLength, prefixLength + continuationLength);
+	}
+
+	private int estimateSidecarNodeBytes(PoiNameSidecarNode node) {
+		return 8 + node.keySegment.length() + node.atomIndexes.size() * 2 + node.residualAtomIndexes.size() * 2 + node.childNodeIndexes.size() * 2;
+	}
+
+	private void writePoiNameSidecar(CodedOutputStream localOut, List<PoiNameSidecarNode> sidecarNodes) throws IOException {
+		for (PoiNameSidecarNode node : sidecarNodes) {
+			ByteArrayOutputStream entryBuffer = new ByteArrayOutputStream();
+			CodedOutputStream entryOut = CodedOutputStream.newInstance(entryBuffer);
+			entryOut.writeUInt32(1, node.parentNodeIndex);
+			if (!Algorithms.isEmpty(node.keySegment)) {
+				entryOut.writeString(2, node.keySegment);
+			}
+			entryOut.writeUInt32(3, node.continuationDepth);
+			writePackedUInt32(entryOut, 4, node.atomIndexes);
+			writePackedUInt32(entryOut, 5, node.residualAtomIndexes);
+			writePackedUInt32(entryOut, 6, node.childNodeIndexes);
+			if (node.terminal) {
+				entryOut.writeBool(7, true);
+			}
+			entryOut.flush();
+			byte[] entryBytes = entryBuffer.toByteArray();
+			localOut.writeTag(7, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+			localOut.writeRawVarint32(entryBytes.length);
+			localOut.writeRawBytes(entryBytes);
+		}
+	}
+
+	private void writePackedUInt32(CodedOutputStream output, int fieldNumber, List<Integer> values) throws IOException {
+		if (Algorithms.isEmpty(values)) {
+			return;
+		}
+		ByteArrayOutputStream packedBuffer = new ByteArrayOutputStream();
+		CodedOutputStream packedOut = CodedOutputStream.newInstance(packedBuffer);
+		for (Integer value : values) {
+			packedOut.writeUInt32NoTag(value);
+		}
+		packedOut.flush();
+		byte[] packedBytes = packedBuffer.toByteArray();
+		output.writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+		output.writeRawVarint32(packedBytes.length);
+		output.writeRawBytes(packedBytes);
 	}
 
 	private static String normalizeIndexedStringTableKey(String key) {
