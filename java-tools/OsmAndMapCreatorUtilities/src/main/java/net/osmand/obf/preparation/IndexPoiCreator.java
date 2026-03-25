@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
@@ -81,7 +82,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_SAVE_START = 6;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
-	private static final int MAX_POI_DATA_PER_SUBBLOCK = 128;
 	private static final double GEOCODING_DISTANCE = 150;
 	
 	private boolean useInMemoryCreator = true;
@@ -106,6 +106,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
+	private PackingMonitoringReport packingMonitoringReport = new PackingMonitoringReport();
 
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
@@ -113,6 +114,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
+	private static final int MAX_SUBBLOCK_SIZE = 256;
+	private static final int MAX_UNIQUE_BLOOM_TOKENS_ALERT = 24;
+	private static final double GLOBAL_P95_BLOOM_SATURATION_MAX = 0.75d;
 
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
@@ -681,6 +685,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (!useInMemoryCreator) {
 			throw new IllegalStateException("POI subblock splitting requires useInMemoryCreator=true");
 		}
+		packingMonitoringReport = new PackingMonitoringReport();
 		Map<PoiTileBox, List<PoiDataBlock>> poiDataBlocksByTileBox = new LinkedHashMap<>();
 		List<PoiDataBlock> orderedPoiDataBlocks = new ArrayList<>();
 		Map<String, Set<PoiDataBlock>> namesIndexBySubblock = new TreeMap<>();
@@ -735,7 +740,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		writer.endWritePoiIndex();
-		BloomFilter.getInstance().logInfo();
+		packingMonitoringReport.printReports("wein");
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1094,13 +1099,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	        if (Algorithms.isEmpty(str)) {
 		        continue;
 	        }
-			if (bloomTokens != null) {
-				bloomTokens.add(str);
-			}
 			String indexToken = str;
             if (indexToken.length() > ind) {
-            	indexToken = indexToken.substring(0, ind);
+             	indexToken = indexToken.substring(0, ind);
             }
+			if (bloomTokens != null && str.startsWith(indexToken)) {
+				String continuation = str.substring(indexToken.length());
+				if (continuation.length() >= BloomFilter.MIN_BLOOM_CONTINUATION_PREFIX_LENGTH) {
+					bloomTokens.add(continuation);
+				}
+			}
 			if (!poiData.containsKey(indexToken)) {
 				poiData.put(indexToken, new LinkedHashSet<>());
 			}
@@ -1180,24 +1188,56 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (Algorithms.isEmpty(poiTileBox.poiData)) {
 			return Collections.emptyList();
 		}
+		packingMonitoringReport.recordLeaf();
 		List<PoiData> sortedPoiData = new ArrayList<>(poiTileBox.poiData);
 		sortedPoiData.sort((o1, o2) -> -Integer.compare(o1.getRating(), o2.getRating()));
-		int totalPoiCount = sortedPoiData.size();
-		if (totalPoiCount <= MAX_POI_DATA_PER_SUBBLOCK) {
-			return Collections.singletonList(new PoiDataBlock(poiTileBox, sortedPoiData));
+		List<PoiDataBlock> poiDataBlocks = new ArrayList<>();
+		List<PoiData> currentSubblockPoiData = new ArrayList<>();
+		Set<String> currentSubblockBloomTokens = new LinkedHashSet<>();
+		String leafKey4 = resolveLeafKey4(poiTileBox);
+		int subblockId = 1;
+		for (PoiData poiData : sortedPoiData) {
+			Set<String> candidateBloomTokens = new LinkedHashSet<>(currentSubblockBloomTokens);
+			candidateBloomTokens.addAll(poiData.bloomTokens);
+			boolean subblockIsNotEmpty = !currentSubblockPoiData.isEmpty();
+			boolean exceedsSubblockSize = currentSubblockPoiData.size() >= MAX_SUBBLOCK_SIZE;
+			boolean exceedsBloomSaturation = BloomFilter.getInstance().countExactBits(candidateBloomTokens) > BloomFilter.MAX_SATURATION_BITS;
+			if (subblockIsNotEmpty && (exceedsSubblockSize || exceedsBloomSaturation)) {
+				PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId++);
+				poiDataBlocks.add(poiDataBlock);
+				packingMonitoringReport.recordSubblock(poiDataBlock, exceedsSubblockSize ? CloseReason.SIZE : CloseReason.BLOOM_SATURATION);
+				currentSubblockPoiData.clear();
+				currentSubblockBloomTokens.clear();
+				candidateBloomTokens = new LinkedHashSet<>(poiData.bloomTokens);
+			}
+			currentSubblockPoiData.add(poiData);
+			currentSubblockBloomTokens.clear();
+			currentSubblockBloomTokens.addAll(candidateBloomTokens);
 		}
-		int subblockCount = (totalPoiCount + MAX_POI_DATA_PER_SUBBLOCK - 1) / MAX_POI_DATA_PER_SUBBLOCK;
-		int baseSize = totalPoiCount / subblockCount;
-		int remainder = totalPoiCount % subblockCount;
-		List<PoiDataBlock> poiDataBlocks = new ArrayList<>(subblockCount);
-		int start = 0;
-		for (int i = 0; i < subblockCount; i++) {
-			int subblockSize = baseSize + (i < remainder ? 1 : 0);
-			int end = start + subblockSize;
-			poiDataBlocks.add(new PoiDataBlock(poiTileBox, new ArrayList<>(sortedPoiData.subList(start, end))));
-			start = end;
+		if (!currentSubblockPoiData.isEmpty()) {
+			PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId);
+			poiDataBlocks.add(poiDataBlock);
+			packingMonitoringReport.recordSubblock(poiDataBlock, CloseReason.END_OF_LEAF);
 		}
 		return poiDataBlocks;
+	}
+
+	private String resolveLeafKey4(PoiTileBox poiTileBox) {
+		if (poiTileBox == null || Algorithms.isEmpty(poiTileBox.poiData)) {
+			return "";
+		}
+		String leafKey4 = null;
+		for (PoiData poiData : poiTileBox.poiData) {
+			for (String indexToken : poiData.indexTokens) {
+				if (Algorithms.isEmpty(indexToken)) {
+					continue;
+				}
+				if (leafKey4 == null || indexToken.compareTo(leafKey4) < 0) {
+					leafKey4 = indexToken;
+				}
+			}
+		}
+		return leafKey4 == null ? "" : leafKey4;
 	}
 
 	private static class PoiData {
@@ -1230,19 +1270,25 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	public static class PoiDataBlock {
+		private static final byte[] EMPTY_BLOOM = new byte[0];
+
 		final PoiTileBox sourceBox;
 		final int x;
 		final int y;
 		final int zoom;
+		final String leafKey4;
+		final int subblockId;
 		final List<PoiData> poiData;
 		final Set<String> indexTokens = new LinkedHashSet<>(), bloomTokens = new LinkedHashSet<>();
 		private byte[] cachedBloom;
 
-		PoiDataBlock(PoiTileBox sourceBox, List<PoiData> poiData) {
+		PoiDataBlock(PoiTileBox sourceBox, List<PoiData> poiData, String leafKey4, int subblockId) {
 			this.sourceBox = sourceBox;
 			this.x = sourceBox.x;
 			this.y = sourceBox.y;
 			this.zoom = sourceBox.zoom;
+			this.leafKey4 = leafKey4 == null ? "" : leafKey4;
+			this.subblockId = subblockId;
 			this.poiData = poiData;
 			for (PoiData data : poiData) {
 				indexTokens.addAll(data.indexTokens);
@@ -1265,9 +1311,412 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		public byte[] getIndexBloom() {
 			if (cachedBloom == null) {
 				cachedBloom = BloomFilter.getInstance().build(bloomTokens);
+				if (cachedBloom == null) {
+					cachedBloom = EMPTY_BLOOM;
+				}
 			}
 			return cachedBloom;
 		}
+	}
+
+	private enum CloseReason {
+		SIZE,
+		BLOOM_SATURATION,
+		END_OF_LEAF
+	}
+
+	private static class SubblockStats {
+		String leafKey4 = "";
+		String leafId = "";
+		int subblockId;
+		int poiCount;
+		String closeReason = "";
+		Set<String> indexTokens = new LinkedHashSet<>();
+		int indexTokenCount;
+		int uniqueBloomTokens;
+		String topLongestBloomTokens = "";
+		double bloomTokensPerPoi;
+		int setBits;
+		double saturationRatio;
+	}
+
+	private static class AlertRow {
+		String severity = "";
+		String scope = "";
+		String leafKey4 = "";
+		String subblockId = "";
+		String alertType = "";
+		String observedValue = "";
+		String thresholdValue = "";
+		String context = "";
+		Set<String> indexTokens = new LinkedHashSet<>();
+	}
+
+	private static class PackingMonitoringReport {
+		private int totalLeaves;
+		private int totalPois;
+		private int subblocksClosedBySize;
+		private int subblocksClosedByBloomSaturation;
+		private int subblocksClosedByEndOfLeaf;
+		private final List<SubblockStats> subblockStats = new ArrayList<>();
+		private final List<AlertRow> alerts = new ArrayList<>();
+
+		void recordLeaf() {
+			totalLeaves++;
+		}
+
+		void recordSubblock(PoiDataBlock poiDataBlock, CloseReason closeReason) {
+			SubblockStats stats = new SubblockStats();
+			stats.leafKey4 = safeCsv(poiDataBlock.leafKey4);
+			stats.leafId = buildLeafId(poiDataBlock);
+			stats.subblockId = poiDataBlock.subblockId;
+			stats.poiCount = poiDataBlock.poiData.size();
+			stats.closeReason = closeReason.name();
+			stats.indexTokens.addAll(poiDataBlock.indexTokens);
+			stats.indexTokenCount = poiDataBlock.indexTokens.size();
+			stats.uniqueBloomTokens = poiDataBlock.bloomTokens.size();
+			stats.topLongestBloomTokens = extractTopLongestBloomTokens(poiDataBlock.bloomTokens);
+			stats.bloomTokensPerPoi = stats.poiCount == 0 ? 0d : stats.uniqueBloomTokens / (double) stats.poiCount;
+			stats.setBits = countBits(poiDataBlock.getIndexBloom());
+			stats.saturationRatio = stats.setBits / (double) BloomFilter.BLOOM_BITS;
+			subblockStats.add(stats);
+			totalPois += stats.poiCount;
+			if (closeReason == CloseReason.SIZE) {
+				subblocksClosedBySize++;
+			} else if (closeReason == CloseReason.BLOOM_SATURATION) {
+				subblocksClosedByBloomSaturation++;
+			} else if (closeReason == CloseReason.END_OF_LEAF) {
+				subblocksClosedByEndOfLeaf++;
+			}
+			evaluateSubblockAlerts(stats);
+		}
+
+		void printReports(String key) {
+			String filteredKey = safeCsv(key);
+			List<SubblockStats> filteredSubblockStats = filterSubblockStats(filteredKey);
+			System.out.println("=== SUMMARY_REPORT ===");
+			System.out.println("metric,value");
+			printSummaryRow("totalLeaves", countLeaves(filteredSubblockStats));
+			printSummaryRow("totalSubblocks", filteredSubblockStats.size());
+			printSummaryRow("totalPois", sumPoiCount(filteredSubblockStats));
+			printSummaryRow("avg_PoisPerAtom", averageInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
+			printSummaryRow("p95_PoisPerAtom", percentileInt(filteredSubblockStats, SubblockMetric.POI_COUNT, 95));
+			printSummaryRow("max_PoisPerAtom", maxInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
+			printSummaryRow("avg_AtomKeyCount", averageInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT));
+			printSummaryRow("p95_AtomKeyCount", percentileInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT, 95));
+			printSummaryRow("max_AtomKeyCount", maxInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT));
+			printSummaryRow("avg_UniqueBloomTokens", averageInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS));
+			printSummaryRow("p95_UniqueBloomTokens", percentileInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS, 95));
+			printSummaryRow("max_UniqueBloomTokens", maxInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS));
+			printSummaryRow("avg_BloomSetBits", averageInt(filteredSubblockStats, SubblockMetric.SET_BITS));
+			printSummaryRow("p95_BloomSetBits", percentileInt(filteredSubblockStats, SubblockMetric.SET_BITS, 95));
+			printSummaryRow("max_BloomSetBits", maxInt(filteredSubblockStats, SubblockMetric.SET_BITS));
+			printSummaryRow("avg_BloomSaturationRatio", averageDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO));
+			printSummaryRow("p95_BloomSaturationRatio", percentileDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO, 95));
+			printSummaryRow("max_BloomSaturationRatio", maxDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO));
+			printSummaryRow("avg_BloomTokensPerPoi", averageDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
+			printSummaryRow("p95_BloomTokensPerPoi", percentileDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI, 95));
+			printSummaryRow("max_BloomTokensPerPoi", maxDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
+			printSummaryRow("subblocksClosedBySize", countCloseReason(filteredSubblockStats, CloseReason.SIZE));
+			printSummaryRow("subblocksClosedByBloomSaturation", countCloseReason(filteredSubblockStats, CloseReason.BLOOM_SATURATION));
+			printSummaryRow("subblocksClosedByContinuationContamination", 0);
+			printSummaryRow("subblocksClosedByEndOfLeaf", countCloseReason(filteredSubblockStats, CloseReason.END_OF_LEAF));
+
+			evaluateGlobalAlerts(filteredSubblockStats, filteredKey);
+			System.out.println();
+			System.out.println("=== SUBBLOCK_REPORT ===");
+			System.out.println("leafKey4,subblockId,poiCount,closeReason,uniqueBloomTokens,setBits,saturationRatio,topLongestBloomTokens");
+			for (SubblockStats stats : subblockStats) {
+				if (!matchesFilter(filteredKey, stats.indexTokens)) {
+					continue;
+				}
+				System.out.println(String.join(",",
+						stats.leafKey4,
+						Integer.toString(stats.subblockId),
+						Integer.toString(stats.poiCount),
+						stats.closeReason,
+						Integer.toString(stats.uniqueBloomTokens),
+						Integer.toString(stats.setBits),
+						formatDouble(stats.saturationRatio),
+						stats.topLongestBloomTokens));
+			}
+			System.out.println();
+			System.out.println("=== ALERTS_REPORT ===");
+			System.out.println("severity,scope,leafKey4,subblockId,alertType,observedValue,thresholdValue,context");
+			for (AlertRow alert : alerts) {
+				if (!matchesFilter(filteredKey, alert.indexTokens)) {
+					continue;
+				}
+				System.out.println(String.join(",",
+						alert.severity,
+						alert.scope,
+						alert.leafKey4,
+						alert.subblockId,
+						alert.alertType,
+						alert.observedValue,
+						alert.thresholdValue,
+						alert.context));
+			}
+		}
+
+		private boolean matchesFilter(String filteredKey, Set<String> rowIndexTokens) {
+			return Algorithms.isEmpty(filteredKey) || rowIndexTokens.contains(filteredKey);
+		}
+
+		private List<SubblockStats> filterSubblockStats(String filteredKey) {
+			if (Algorithms.isEmpty(filteredKey)) {
+				return subblockStats;
+			}
+			List<SubblockStats> filteredStats = new ArrayList<>();
+			for (SubblockStats stats : subblockStats) {
+				if (matchesFilter(filteredKey, stats.indexTokens)) {
+					filteredStats.add(stats);
+				}
+			}
+			return filteredStats;
+		}
+
+		private int countLeaves(List<SubblockStats> filteredSubblockStats) {
+			Set<String> leafIds = new LinkedHashSet<>();
+			for (SubblockStats stats : filteredSubblockStats) {
+				leafIds.add(stats.leafId);
+			}
+			return leafIds.size();
+		}
+
+		private String buildLeafId(PoiDataBlock poiDataBlock) {
+			return poiDataBlock.zoom + ":" + poiDataBlock.x + ":" + poiDataBlock.y;
+		}
+
+		private int sumPoiCount(List<SubblockStats> filteredSubblockStats) {
+			int sum = 0;
+			for (SubblockStats stats : filteredSubblockStats) {
+				sum += stats.poiCount;
+			}
+			return sum;
+		}
+
+		private int countCloseReason(List<SubblockStats> filteredSubblockStats, CloseReason closeReason) {
+			int count = 0;
+			for (SubblockStats stats : filteredSubblockStats) {
+				if (closeReason.name().equals(stats.closeReason)) {
+					count++;
+				}
+			}
+			return count;
+		}
+
+		private String extractTopLongestBloomTokens(Set<String> bloomTokens) {
+			if (Algorithms.isEmpty(bloomTokens)) {
+				return "";
+			}
+			List<String> sortedTokens = new ArrayList<>(bloomTokens);
+			sortedTokens.sort((leftToken, rightToken) -> {
+				int compareByLength = Integer.compare(rightToken.length(), leftToken.length());
+				if (compareByLength != 0) {
+					return compareByLength;
+				}
+				return leftToken.compareTo(rightToken);
+			});
+			List<String> topTokens = new ArrayList<>();
+			for (int index = 0; index < sortedTokens.size() && index < 5; index++) {
+				topTokens.add(sortedTokens.get(index).replace(';', ':'));
+			}
+			return String.join(";", topTokens);
+		}
+
+		private void evaluateSubblockAlerts(SubblockStats stats) {
+			if (stats.setBits > BloomFilter.MAX_SATURATION_BITS) {
+				addAlert("ERROR", "SUBBLOCK", stats.leafKey4, Integer.toString(stats.subblockId), stats.indexTokens, "BLOOM_OVER_SATURATED",
+						Integer.toString(stats.setBits), Integer.toString(BloomFilter.MAX_SATURATION_BITS), stats.closeReason);
+			}
+			if (stats.uniqueBloomTokens > MAX_UNIQUE_BLOOM_TOKENS_ALERT) {
+				addAlert("WARN", "SUBBLOCK", stats.leafKey4, Integer.toString(stats.subblockId), stats.indexTokens, "BLOOM_TOKEN_VOLUME_HIGH",
+						Integer.toString(stats.uniqueBloomTokens), Integer.toString(MAX_UNIQUE_BLOOM_TOKENS_ALERT), stats.closeReason);
+			}
+		}
+
+		private void evaluateGlobalAlerts(List<SubblockStats> filteredSubblockStats, String filteredKey) {
+			double p95BloomSaturationRatio = percentileDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO, 95);
+			if (p95BloomSaturationRatio > GLOBAL_P95_BLOOM_SATURATION_MAX) {
+				Set<String> filteredIndexTokens = new LinkedHashSet<>();
+				if (!Algorithms.isEmpty(filteredKey)) {
+					filteredIndexTokens.add(filteredKey);
+				}
+				addAlert("WARN", "GLOBAL", filteredKey, "", filteredIndexTokens, "GLOBAL_BLOOM_SATURATION_HIGH",
+						formatDouble(p95BloomSaturationRatio), formatDouble(GLOBAL_P95_BLOOM_SATURATION_MAX), "p95_BloomSaturationRatio");
+			}
+		}
+
+		private void addAlert(String severity, String scope, String leafKey4, String subblockId, Set<String> indexTokens, String alertType,
+				String observedValue, String thresholdValue, String context) {
+			AlertRow alert = new AlertRow();
+			alert.severity = safeCsv(severity);
+			alert.scope = safeCsv(scope);
+			alert.leafKey4 = safeCsv(leafKey4);
+			alert.subblockId = safeCsv(subblockId);
+			alert.indexTokens.addAll(indexTokens);
+			alert.alertType = safeCsv(alertType);
+			alert.observedValue = safeCsv(observedValue);
+			alert.thresholdValue = safeCsv(thresholdValue);
+			alert.context = safeCsv(context);
+			alerts.add(alert);
+		}
+
+		private void printSummaryRow(String metric, int value) {
+			System.out.println(metric + "," + value);
+		}
+
+		private void printSummaryRow(String metric, double value) {
+			System.out.println(metric + "," + formatDouble(value));
+		}
+
+		private double averageInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
+			if (filteredSubblockStats.isEmpty()) {
+				return 0d;
+			}
+			long sum = 0;
+			for (SubblockStats stats : filteredSubblockStats) {
+				sum += metric.intValue(stats);
+			}
+			return sum / (double) filteredSubblockStats.size();
+		}
+
+		private double averageDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
+			if (filteredSubblockStats.isEmpty()) {
+				return 0d;
+			}
+			double sum = 0d;
+			for (SubblockStats stats : filteredSubblockStats) {
+				sum += metric.doubleValue(stats);
+			}
+			return sum / filteredSubblockStats.size();
+		}
+
+		private int maxInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
+			int max = 0;
+			for (SubblockStats stats : filteredSubblockStats) {
+				max = Math.max(max, metric.intValue(stats));
+			}
+			return max;
+		}
+
+		private double maxDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
+			double max = 0d;
+			for (SubblockStats stats : filteredSubblockStats) {
+				max = Math.max(max, metric.doubleValue(stats));
+			}
+			return max;
+		}
+
+		private int percentileInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric, int percentile) {
+			if (filteredSubblockStats.isEmpty()) {
+				return 0;
+			}
+			List<Integer> values = new ArrayList<>();
+			for (SubblockStats stats : filteredSubblockStats) {
+				values.add(metric.intValue(stats));
+			}
+			Collections.sort(values);
+			int index = nearestRankIndex(values.size(), percentile);
+			return values.get(index);
+		}
+
+		private double percentileDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric, int percentile) {
+			if (filteredSubblockStats.isEmpty()) {
+				return 0d;
+			}
+			List<Double> values = new ArrayList<>();
+			for (SubblockStats stats : filteredSubblockStats) {
+				values.add(metric.doubleValue(stats));
+			}
+			Collections.sort(values);
+			int index = nearestRankIndex(values.size(), percentile);
+			return values.get(index);
+		}
+	}
+
+	private enum SubblockMetric {
+		POI_COUNT {
+			@Override
+			int intValue(SubblockStats stats) {
+				return stats.poiCount;
+			}
+		},
+		INDEX_TOKEN_COUNT {
+			@Override
+			int intValue(SubblockStats stats) {
+				return stats.indexTokenCount;
+			}
+		},
+		UNIQUE_BLOOM_TOKENS {
+			@Override
+			int intValue(SubblockStats stats) {
+				return stats.uniqueBloomTokens;
+			}
+		},
+		SET_BITS {
+			@Override
+			int intValue(SubblockStats stats) {
+				return stats.setBits;
+			}
+		},
+		SATURATION_RATIO {
+			@Override
+			double doubleValue(SubblockStats stats) {
+				return stats.saturationRatio;
+			}
+		},
+		BLOOM_TOKENS_PER_POI {
+			@Override
+			double doubleValue(SubblockStats stats) {
+				return stats.bloomTokensPerPoi;
+			}
+		};
+
+		int intValue(SubblockStats stats) {
+			throw new UnsupportedOperationException();
+		}
+
+		double doubleValue(SubblockStats stats) {
+			throw new UnsupportedOperationException();
+		}
+	}
+
+	private static int nearestRankIndex(int size, int percentile) {
+		if (size <= 0) {
+			return 0;
+		}
+		int rank = (int) Math.ceil(percentile / 100d * size);
+		rank = Math.max(1, Math.min(rank, size));
+		return rank - 1;
+	}
+
+	private static int countBits(byte[] bloom) {
+		if (bloom == null) {
+			return 0;
+		}
+		int sum = 0;
+		for (byte value : bloom) {
+			sum += Integer.bitCount(value & 0xFF);
+		}
+		return sum;
+	}
+
+	private static String formatDouble(double value) {
+		if (Double.isNaN(value) || Double.isInfinite(value)) {
+			return "";
+		}
+		BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+		return decimal.scale() < 0 ? decimal.setScale(0).toPlainString() : decimal.toPlainString();
+	}
+
+	private static String safeCsv(String value) {
+		if (value == null) {
+			return "";
+		}
+		String sanitized = value.replace('\r', ' ').replace('\n', ' ');
+		return sanitized.replace(',', ';');
 	}
 
 	public static class PoiTileBox {
