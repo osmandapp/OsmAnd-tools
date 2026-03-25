@@ -1121,10 +1121,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                 splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
             }
         }
-        for (String str : splitName) {
-	        if (Algorithms.isEmpty(str)) {
+        for (String token : splitName) {
+	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
+			String str = token;
             if (str.length() > ind) {
                 str = str.substring(0, ind);
             }
@@ -1132,7 +1133,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                 poiData.put(str, new LinkedHashSet<>());
             }
             poiData.get(str).add(data);
-	        data.addToken(str);
+	        data.addToken(token);
         }
     }
 
