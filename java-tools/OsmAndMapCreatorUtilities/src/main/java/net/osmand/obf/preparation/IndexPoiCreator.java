@@ -1398,20 +1398,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			printSummaryRow("p95_BloomTokensPerPoi", percentileDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI, 95));
 			printSummaryRow("max_BloomTokensPerPoi", maxDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
 			List<SubblockStats> oversizedBloomSubblocks = filterOversizedBloomSubblocks(filteredSubblockStats);
-			if (oversizedBloomSubblocks.isEmpty()) {
-				return;
-			}
-			System.out.println();
-			System.out.println("=== OVERSIZED-BLOOM_REPORT ===");
-			System.out.println("leafKey4,subblockId,poiCount,setBits,uniqueBloomTokensCount,tokensList");
-			for (SubblockStats stats : oversizedBloomSubblocks) {
-				System.out.println(String.join(",",
-						stats.leafKey4,
-						Integer.toString(stats.subblockId),
-						Integer.toString(stats.poiCount),
-						Integer.toString(stats.setBits),
-						Integer.toString(stats.uniqueBloomTokens),
-						stats.uniqueBloomTokensList));
+			if (!oversizedBloomSubblocks.isEmpty()) {
+				System.out.println();
+				System.out.println("=== OVERSIZED-BLOOM_REPORT ===");
+				System.out.println("leafKey4,subblockId,poiCount,setBits,uniqueBloomTokensCount,tokensList");
+				for (SubblockStats stats : oversizedBloomSubblocks) {
+					System.out.println(String.join(",",
+							stats.leafKey4,
+							Integer.toString(stats.subblockId),
+							Integer.toString(stats.poiCount),
+							Integer.toString(stats.setBits),
+							Integer.toString(stats.uniqueBloomTokens),
+							stats.uniqueBloomTokensList));
+				}
 			}
 
 			Set<PoiDataBlock> blocks = namesIndexBySubblock.get("wein");
