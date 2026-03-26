@@ -1413,6 +1413,23 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						Integer.toString(stats.uniqueBloomTokens),
 						stats.uniqueBloomTokensList));
 			}
+
+			Set<PoiDataBlock> blocks = namesIndexBySubblock.get("wein");
+			if (blocks != null) {
+				System.out.println();
+				System.out.println("=== SPECIAL_REPORT ===");
+				System.out.println("leafKey4,subblockId,poiCount,setBits,uniqueBloomTokensCount,tokensList");
+
+				for (SubblockStats stats : buildReportedSubblockStats(Collections.singletonMap("wein", blocks))) {
+					System.out.println(String.join(",",
+							stats.leafKey4,
+							Integer.toString(stats.subblockId),
+							Integer.toString(stats.poiCount),
+							Integer.toString(stats.setBits),
+							Integer.toString(stats.uniqueBloomTokens),
+							stats.uniqueBloomTokensList));
+				}
+			}
 		}
 
 		private int countLeaves(List<SubblockStats> filteredSubblockStats) {
