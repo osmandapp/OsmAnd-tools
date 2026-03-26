@@ -1330,6 +1330,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int poiCount;
 		String closeReason = "";
 		Set<String> indexTokens = new LinkedHashSet<>();
+		String uniqueBloomTokensList = "";
 		int indexTokenCount;
 		int uniqueBloomTokens;
 		String topLongestBloomTokens = "";
@@ -1357,6 +1358,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			stats.poiCount = poiDataBlock.poiData.size();
 			stats.closeReason = closeReason.name();
 			stats.indexTokens.addAll(poiDataBlock.indexTokens);
+			stats.uniqueBloomTokensList = formatBloomTokensList(poiDataBlock.bloomTokens);
 			stats.indexTokenCount = poiDataBlock.indexTokens.size();
 			stats.uniqueBloomTokens = poiDataBlock.bloomTokens.size();
 			stats.topLongestBloomTokens = extractTopLongestBloomTokens(poiDataBlock.bloomTokens);
@@ -1401,6 +1403,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			printSummaryRow("avg_BloomTokensPerPoi", averageDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
 			printSummaryRow("p95_BloomTokensPerPoi", percentileDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI, 95));
 			printSummaryRow("max_BloomTokensPerPoi", maxDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
+			List<SubblockStats> oversizedBloomSubblocks = filterOversizedBloomSubblocks(filteredSubblockStats);
+			if (oversizedBloomSubblocks.isEmpty()) {
+				return;
+			}
+			System.out.println();
+			System.out.println("=== OVERSIZED-BLOOM_REPORT ===");
+			System.out.println("leafKey4,subblockId,poiCount,setBits,uniqueBloomTokensCount,tokensList");
+			for (SubblockStats stats : oversizedBloomSubblocks) {
+				System.out.println(String.join(",",
+						stats.leafKey4,
+						Integer.toString(stats.subblockId),
+						Integer.toString(stats.poiCount),
+						Integer.toString(stats.setBits),
+						Integer.toString(stats.uniqueBloomTokens),
+						stats.uniqueBloomTokensList));
+			}
 		}
 
 		private int countLeaves(List<SubblockStats> filteredSubblockStats) {
@@ -1423,6 +1441,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return sum;
 		}
 
+		private List<SubblockStats> filterOversizedBloomSubblocks(List<SubblockStats> filteredSubblockStats) {
+			List<SubblockStats> oversizedBloomSubblocks = new ArrayList<>();
+			for (SubblockStats stats : filteredSubblockStats) {
+				if (stats.setBits > BloomFilter.MAX_SATURATION_BITS) {
+					oversizedBloomSubblocks.add(stats);
+				}
+			}
+			return oversizedBloomSubblocks;
+		}
+
 		private String extractTopLongestBloomTokens(Set<String> bloomTokens) {
 			if (Algorithms.isEmpty(bloomTokens)) {
 				return "";
@@ -1440,6 +1468,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				topTokens.add(sortedTokens.get(index).replace(';', ':'));
 			}
 			return String.join(";", topTokens);
+		}
+
+		private String formatBloomTokensList(Set<String> bloomTokens) {
+			if (Algorithms.isEmpty(bloomTokens)) {
+				return "";
+			}
+			List<String> sortedTokens = new ArrayList<>(bloomTokens);
+			Collections.sort(sortedTokens);
+			List<String> escapedTokens = new ArrayList<>();
+			for (String token : sortedTokens) {
+				escapedTokens.add(safeCsv(token).replace(';', ':'));
+			}
+			return String.join(";", escapedTokens);
 		}
 
 		private void printSummaryRow(String metric, int value) {
