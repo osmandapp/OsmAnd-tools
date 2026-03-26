@@ -7,21 +7,10 @@ import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
+import net.osmand.CollatorStringMatcher;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -1108,7 +1097,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (continuation.length() >= BloomFilter.MIN_BLOOM_CONTINUATION_PREFIX_LENGTH) {
 					bloomTokens.add(continuation);
 					if (reportBloomTokens != null) {
-						reportBloomTokens.computeIfAbsent(indexToken, key -> new LinkedHashSet<>()).add(str);
+						String normalizedIndexToken = normalizeReportedIndexKey(indexToken);
+						if (!Algorithms.isEmpty(normalizedIndexToken)) {
+							reportBloomTokens.computeIfAbsent(normalizedIndexToken, key -> new LinkedHashSet<>()).add(str);
+						}
 					}
 				}
 			}
@@ -1324,11 +1316,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public Set<String> getBloomTokensForIndexToken(String indexToken) {
 			Set<String> bloomTokensForIndexToken = new LinkedHashSet<>();
-			if (Algorithms.isEmpty(indexToken)) {
+			String normalizedIndexToken = normalizeReportedIndexKey(indexToken);
+			if (Algorithms.isEmpty(normalizedIndexToken)) {
 				return bloomTokensForIndexToken;
 			}
 			for (PoiData data : poiData) {
-				Set<String> bloomTokenSuffixes = data.reportBloomTokens.get(indexToken);
+				Set<String> bloomTokenSuffixes = data.reportBloomTokens.get(normalizedIndexToken);
 				if (bloomTokenSuffixes != null) {
 					bloomTokensForIndexToken.addAll(bloomTokenSuffixes);
 				}
@@ -1436,12 +1429,25 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		private List<SubblockStats> buildReportedSubblockStats(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
 			List<SubblockStats> reportedSubblockStats = new ArrayList<>();
+			Map<String, LinkedHashMap<String, PoiDataBlock>> normalizedBlocksByKey = new LinkedHashMap<>();
 			for (Map.Entry<String, Set<PoiDataBlock>> entry : namesIndexBySubblock.entrySet()) {
-				String fullKey = safeCsv(entry.getKey());
-				int subblockId = 1;
+				String normalizedKey = normalizeReportedIndexKey(entry.getKey());
+				if (Algorithms.isEmpty(normalizedKey)) {
+					continue;
+				}
+				LinkedHashMap<String, PoiDataBlock> uniqueBlocksById = normalizedBlocksByKey.computeIfAbsent(normalizedKey,
+						key -> new LinkedHashMap<>());
 				for (PoiDataBlock poiDataBlock : entry.getValue()) {
+					String blockId = buildReportedBlockId(poiDataBlock);
+					uniqueBlocksById.putIfAbsent(blockId, poiDataBlock);
+				}
+			}
+			for (Map.Entry<String, LinkedHashMap<String, PoiDataBlock>> normalizedEntry : normalizedBlocksByKey.entrySet()) {
+				String fullKey = safeCsv(normalizedEntry.getKey());
+				int subblockId = 1;
+				for (PoiDataBlock poiDataBlock : normalizedEntry.getValue().values()) {
 					SubblockStats stats = new SubblockStats();
-					Set<String> bloomTokensForKey = poiDataBlock.getBloomTokensForIndexToken(entry.getKey());
+					Set<String> bloomTokensForKey = poiDataBlock.getBloomTokensForIndexToken(normalizedEntry.getKey());
 					stats.leafKey4 = fullKey;
 					stats.leafId = fullKey;
 					stats.subblockId = subblockId++;
@@ -1456,6 +1462,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			return reportedSubblockStats;
+		}
+
+		private String buildReportedBlockId(PoiDataBlock poiDataBlock) {
+			return buildLeafId(poiDataBlock) + ":" + poiDataBlock.subblockId;
 		}
 
 		private int sumPoiCount(List<SubblockStats> filteredSubblockStats) {
@@ -1647,6 +1657,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		String sanitized = value.replace('\r', ' ').replace('\n', ' ');
 		return sanitized.replace(',', ';');
+	}
+
+	private static String normalizeReportedIndexKey(String key) {
+		if (key == null) {
+			return null;
+		}
+		String normalized = CollatorStringMatcher.alignChars(key);
+		normalized = normalized.toLowerCase(Locale.ROOT);
+		return normalized;
 	}
 
 	public static class PoiTileBox {
