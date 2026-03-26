@@ -1378,9 +1378,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			List<SubblockStats> filteredSubblockStats = subblockStats;
 			System.out.println("=== SUMMARY_REPORT ===");
 			System.out.println("metric,value");
-			printSummaryRow("totalLeaves", countLeaves(filteredSubblockStats));
-			printSummaryRow("totalSubblocks", filteredSubblockStats.size());
-			printSummaryRow("totalPois", sumPoiCount(filteredSubblockStats));
+			printSummaryRow("bloomFilterVersion", BloomFilter.VERSION);
+			printSummaryRow("bloomFilterPublish", BloomFilter.PUBLISH);
+			printSummaryRow("total_Blocks", countLeaves(filteredSubblockStats));
+			printSummaryRow("total_Subblocks", filteredSubblockStats.size());
+			printSummaryRow("total_Pois", sumPoiCount(filteredSubblockStats));
 			printSummaryRow("avg_PoisPerAtom", averageInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
 			printSummaryRow("p95_PoisPerAtom", percentileInt(filteredSubblockStats, SubblockMetric.POI_COUNT, 95));
 			printSummaryRow("max_PoisPerAtom", maxInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
@@ -1446,6 +1448,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		private void printSummaryRow(String metric, double value) {
 			System.out.println(metric + "," + formatDouble(value));
+		}
+
+		private void printSummaryRow(String metric, boolean value) {
+			System.out.println(metric + "," + value);
 		}
 
 		private double averageInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
