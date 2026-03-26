@@ -738,7 +738,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		writer.endWritePoiIndex();
-		packingMonitoringReport.printReports();
+		packingMonitoringReport.printReports(namesIndexBySubblock);
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1019,8 +1019,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			Set<String> bloomTokens = new LinkedHashSet<>();
+			Map<String, Set<String>> bloomTokensByIndexToken = new LinkedHashMap<>();
 			Set<String> indexTokens = addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames, bloomTokens);
+					namesIndex, otherNames, idNames, bloomTokens, bloomTokensByIndexToken);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1039,6 +1040,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
+				poiData.bloomTokensByIndexToken.putAll(bloomTokensByIndexToken);
 				poiData.indexTokens.addAll(indexTokens);
 				poiData.bloomTokens.addAll(bloomTokens);
 				prevTree.getNode().poiData.add(poiData);
@@ -1054,29 +1056,29 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private Set<String> addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names, Set<String> idNames, Set<String> bloomTokens) {
+			Set<String> names, Set<String> idNames, Set<String> bloomTokens, Map<String, Set<String>> bloomTokensByIndexToken) {
 		Set<String> indexTokens = new LinkedHashSet<>();
 		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex, indexTokens, bloomTokens);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
 				}
 			}
 		}
@@ -1084,7 +1086,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind,
-			Set<String> indexTokens, Set<String> bloomTokens) {
+			Set<String> indexTokens, Set<String> bloomTokens, Map<String, Set<String>> bloomTokensByIndexToken) {
 		name = Algorithms.normalizeSearchText(name);
 		Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
 		if (ArabicNormalizer.isSpecialArabic(name)) {
@@ -1105,6 +1107,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				String continuation = str.substring(indexToken.length());
 				if (continuation.length() >= BloomFilter.MIN_BLOOM_CONTINUATION_PREFIX_LENGTH) {
 					bloomTokens.add(continuation);
+					if (bloomTokensByIndexToken != null) {
+						bloomTokensByIndexToken.computeIfAbsent(indexToken, key -> new LinkedHashSet<>()).add(continuation);
+					}
 				}
 			}
 			if (!poiData.containsKey(indexToken)) {
@@ -1246,6 +1251,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
+		Map<String, Set<String>> bloomTokensByIndexToken = new LinkedHashMap<>();
 		Set<String> indexTokens = new LinkedHashSet<>(), bloomTokens = new LinkedHashSet<>();
 
 		public int getRating() {
@@ -1315,6 +1321,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			return cachedBloom;
 		}
+
+		public Set<String> getBloomTokensForIndexToken(String indexToken) {
+			Set<String> bloomTokensForIndexToken = new LinkedHashSet<>();
+			if (Algorithms.isEmpty(indexToken)) {
+				return bloomTokensForIndexToken;
+			}
+			for (PoiData data : poiData) {
+				Set<String> bloomTokenSuffixes = data.bloomTokensByIndexToken.get(indexToken);
+				if (bloomTokenSuffixes != null) {
+					bloomTokensForIndexToken.addAll(bloomTokenSuffixes);
+				}
+			}
+			return bloomTokensForIndexToken;
+		}
 	}
 
 	private enum CloseReason {
@@ -1328,12 +1348,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		String leafId = "";
 		int subblockId;
 		int poiCount;
-		String closeReason = "";
-		Set<String> indexTokens = new LinkedHashSet<>();
 		String uniqueBloomTokensList = "";
 		int indexTokenCount;
 		int uniqueBloomTokens;
-		String topLongestBloomTokens = "";
 		double bloomTokensPerPoi;
 		int setBits;
 		double saturationRatio;
@@ -1345,28 +1362,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private int subblocksClosedBySize;
 		private int subblocksClosedByBloomSaturation;
 		private int subblocksClosedByEndOfLeaf;
-		private final List<SubblockStats> subblockStats = new ArrayList<>();
 		void recordLeaf() {
 			totalLeaves++;
 		}
 
 		void recordSubblock(PoiDataBlock poiDataBlock, CloseReason closeReason) {
-			SubblockStats stats = new SubblockStats();
-			stats.leafKey4 = safeCsv(poiDataBlock.leafKey4);
-			stats.leafId = buildLeafId(poiDataBlock);
-			stats.subblockId = poiDataBlock.subblockId;
-			stats.poiCount = poiDataBlock.poiData.size();
-			stats.closeReason = closeReason.name();
-			stats.indexTokens.addAll(poiDataBlock.indexTokens);
-			stats.uniqueBloomTokensList = formatBloomTokensList(poiDataBlock.bloomTokens);
-			stats.indexTokenCount = poiDataBlock.indexTokens.size();
-			stats.uniqueBloomTokens = poiDataBlock.bloomTokens.size();
-			stats.topLongestBloomTokens = extractTopLongestBloomTokens(poiDataBlock.bloomTokens);
-			stats.bloomTokensPerPoi = stats.poiCount == 0 ? 0d : stats.uniqueBloomTokens / (double) stats.poiCount;
-			stats.setBits = countBits(poiDataBlock.getIndexBloom());
-			stats.saturationRatio = stats.setBits / (double) BloomFilter.BLOOM_BITS;
-			subblockStats.add(stats);
-			totalPois += stats.poiCount;
+			totalPois += poiDataBlock.poiData.size();
 			if (closeReason == CloseReason.SIZE) {
 				subblocksClosedBySize++;
 			} else if (closeReason == CloseReason.BLOOM_SATURATION) {
@@ -1376,8 +1377,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 		}
 
-		void printReports() {
-			List<SubblockStats> filteredSubblockStats = subblockStats;
+		void printReports(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
+			List<SubblockStats> filteredSubblockStats = buildReportedSubblockStats(namesIndexBySubblock);
 			System.out.println("=== SUMMARY_REPORT ===");
 			System.out.println("metric,value");
 			printSummaryRow("bloomFilterVersion", BloomFilter.VERSION);
@@ -1433,6 +1434,30 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return poiDataBlock.zoom + ":" + poiDataBlock.x + ":" + poiDataBlock.y;
 		}
 
+		private List<SubblockStats> buildReportedSubblockStats(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
+			List<SubblockStats> reportedSubblockStats = new ArrayList<>();
+			for (Map.Entry<String, Set<PoiDataBlock>> entry : namesIndexBySubblock.entrySet()) {
+				String fullKey = safeCsv(entry.getKey());
+				int subblockId = 1;
+				for (PoiDataBlock poiDataBlock : entry.getValue()) {
+					SubblockStats stats = new SubblockStats();
+					Set<String> bloomTokensForKey = poiDataBlock.getBloomTokensForIndexToken(entry.getKey());
+					stats.leafKey4 = fullKey;
+					stats.leafId = fullKey;
+					stats.subblockId = subblockId++;
+					stats.poiCount = poiDataBlock.poiData.size();
+					stats.indexTokenCount = 1;
+					stats.uniqueBloomTokensList = formatBloomTokensList(bloomTokensForKey);
+					stats.uniqueBloomTokens = bloomTokensForKey.size();
+					stats.bloomTokensPerPoi = stats.poiCount == 0 ? 0d : stats.uniqueBloomTokens / (double) stats.poiCount;
+					stats.setBits = BloomFilter.getInstance().countExactBits(bloomTokensForKey);
+					stats.saturationRatio = stats.setBits / (double) BloomFilter.BLOOM_BITS;
+					reportedSubblockStats.add(stats);
+				}
+			}
+			return reportedSubblockStats;
+		}
+
 		private int sumPoiCount(List<SubblockStats> filteredSubblockStats) {
 			int sum = 0;
 			for (SubblockStats stats : filteredSubblockStats) {
@@ -1449,25 +1474,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			return oversizedBloomSubblocks;
-		}
-
-		private String extractTopLongestBloomTokens(Set<String> bloomTokens) {
-			if (Algorithms.isEmpty(bloomTokens)) {
-				return "";
-			}
-			List<String> sortedTokens = new ArrayList<>(bloomTokens);
-			sortedTokens.sort((leftToken, rightToken) -> {
-				int compareByLength = Integer.compare(rightToken.length(), leftToken.length());
-				if (compareByLength != 0) {
-					return compareByLength;
-				}
-				return leftToken.compareTo(rightToken);
-			});
-			List<String> topTokens = new ArrayList<>();
-			for (int index = 0; index < sortedTokens.size() && index < 5; index++) {
-				topTokens.add(sortedTokens.get(index).replace(';', ':'));
-			}
-			return String.join(";", topTokens);
 		}
 
 		private String formatBloomTokensList(Set<String> bloomTokens) {
