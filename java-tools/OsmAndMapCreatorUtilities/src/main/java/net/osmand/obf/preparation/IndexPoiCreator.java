@@ -1019,9 +1019,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			Set<String> bloomTokens = new LinkedHashSet<>();
-			Map<String, Set<String>> bloomTokensByIndexToken = new LinkedHashMap<>();
+			Map<String, Set<String>> reportedBloomTokens = new LinkedHashMap<>();
 			Set<String> indexTokens = addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames, bloomTokens, bloomTokensByIndexToken);
+					namesIndex, otherNames, idNames, bloomTokens, reportedBloomTokens);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1040,7 +1040,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
-				poiData.bloomTokensByIndexToken.putAll(bloomTokensByIndexToken);
+				poiData.reportBloomTokens.putAll(reportedBloomTokens);
 				poiData.indexTokens.addAll(indexTokens);
 				poiData.bloomTokens.addAll(bloomTokens);
 				prevTree.getNode().poiData.add(poiData);
@@ -1056,29 +1056,29 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private Set<String> addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names, Set<String> idNames, Set<String> bloomTokens, Map<String, Set<String>> bloomTokensByIndexToken) {
+			Set<String> names, Set<String> idNames, Set<String> bloomTokens, Map<String, Set<String>> reportedBloomTokens) {
 		Set<String> indexTokens = new LinkedHashSet<>();
 		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
+			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, reportedBloomTokens);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
+			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, reportedBloomTokens);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens, reportedBloomTokens);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex, indexTokens, bloomTokens, bloomTokensByIndexToken);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex, indexTokens, bloomTokens, reportedBloomTokens);
 				}
 			}
 		}
@@ -1086,7 +1086,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind,
-			Set<String> indexTokens, Set<String> bloomTokens, Map<String, Set<String>> bloomTokensByIndexToken) {
+			Set<String> indexTokens, Set<String> bloomTokens, Map<String, Set<String>> reportBloomTokens) {
 		name = Algorithms.normalizeSearchText(name);
 		Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
 		if (ArabicNormalizer.isSpecialArabic(name)) {
@@ -1107,8 +1107,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				String continuation = str.substring(indexToken.length());
 				if (continuation.length() >= BloomFilter.MIN_BLOOM_CONTINUATION_PREFIX_LENGTH) {
 					bloomTokens.add(continuation);
-					if (bloomTokensByIndexToken != null) {
-						bloomTokensByIndexToken.computeIfAbsent(indexToken, key -> new LinkedHashSet<>()).add(continuation);
+					if (reportBloomTokens != null) {
+						reportBloomTokens.computeIfAbsent(indexToken, key -> new LinkedHashSet<>()).add(str);
 					}
 				}
 			}
@@ -1251,7 +1251,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
-		Map<String, Set<String>> bloomTokensByIndexToken = new LinkedHashMap<>();
+		Map<String, Set<String>> reportBloomTokens = new LinkedHashMap<>();
 		Set<String> indexTokens = new LinkedHashSet<>(), bloomTokens = new LinkedHashSet<>();
 
 		public int getRating() {
@@ -1328,7 +1328,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				return bloomTokensForIndexToken;
 			}
 			for (PoiData data : poiData) {
-				Set<String> bloomTokenSuffixes = data.bloomTokensByIndexToken.get(indexToken);
+				Set<String> bloomTokenSuffixes = data.reportBloomTokens.get(indexToken);
 				if (bloomTokenSuffixes != null) {
 					bloomTokensForIndexToken.addAll(bloomTokenSuffixes);
 				}
