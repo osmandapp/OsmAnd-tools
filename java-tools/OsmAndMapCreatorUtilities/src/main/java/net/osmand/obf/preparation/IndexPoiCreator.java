@@ -740,7 +740,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		writer.endWritePoiIndex();
-		packingMonitoringReport.printReports("wein");
+		packingMonitoringReport.printReports();
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1340,18 +1340,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		double saturationRatio;
 	}
 
-	private static class AlertRow {
-		String severity = "";
-		String scope = "";
-		String leafKey4 = "";
-		String subblockId = "";
-		String alertType = "";
-		String observedValue = "";
-		String thresholdValue = "";
-		String context = "";
-		Set<String> indexTokens = new LinkedHashSet<>();
-	}
-
 	private static class PackingMonitoringReport {
 		private int totalLeaves;
 		private int totalPois;
@@ -1359,8 +1347,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private int subblocksClosedByBloomSaturation;
 		private int subblocksClosedByEndOfLeaf;
 		private final List<SubblockStats> subblockStats = new ArrayList<>();
-		private final List<AlertRow> alerts = new ArrayList<>();
-
 		void recordLeaf() {
 			totalLeaves++;
 		}
@@ -1388,12 +1374,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			} else if (closeReason == CloseReason.END_OF_LEAF) {
 				subblocksClosedByEndOfLeaf++;
 			}
-			evaluateSubblockAlerts(stats);
 		}
 
-		void printReports(String key) {
-			String filteredKey = safeCsv(key);
-			List<SubblockStats> filteredSubblockStats = filterSubblockStats(filteredKey);
+		void printReports() {
+			List<SubblockStats> filteredSubblockStats = subblockStats;
 			System.out.println("=== SUMMARY_REPORT ===");
 			System.out.println("metric,value");
 			printSummaryRow("totalLeaves", countLeaves(filteredSubblockStats));
@@ -1417,63 +1401,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			printSummaryRow("avg_BloomTokensPerPoi", averageDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
 			printSummaryRow("p95_BloomTokensPerPoi", percentileDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI, 95));
 			printSummaryRow("max_BloomTokensPerPoi", maxDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
-			printSummaryRow("subblocksClosedBySize", countCloseReason(filteredSubblockStats, CloseReason.SIZE));
-			printSummaryRow("subblocksClosedByBloomSaturation", countCloseReason(filteredSubblockStats, CloseReason.BLOOM_SATURATION));
-			printSummaryRow("subblocksClosedByContinuationContamination", 0);
-			printSummaryRow("subblocksClosedByEndOfLeaf", countCloseReason(filteredSubblockStats, CloseReason.END_OF_LEAF));
-
-			evaluateGlobalAlerts(filteredSubblockStats, filteredKey);
-			System.out.println();
-			System.out.println("=== SUBBLOCK_REPORT ===");
-			System.out.println("leafKey4,subblockId,poiCount,closeReason,uniqueBloomTokens,setBits,saturationRatio,topLongestBloomTokens");
-			for (SubblockStats stats : subblockStats) {
-				if (!matchesFilter(filteredKey, stats.indexTokens)) {
-					continue;
-				}
-				System.out.println(String.join(",",
-						stats.leafKey4,
-						Integer.toString(stats.subblockId),
-						Integer.toString(stats.poiCount),
-						stats.closeReason,
-						Integer.toString(stats.uniqueBloomTokens),
-						Integer.toString(stats.setBits),
-						formatDouble(stats.saturationRatio),
-						stats.topLongestBloomTokens));
-			}
-			System.out.println();
-			System.out.println("=== ALERTS_REPORT ===");
-			System.out.println("severity,scope,leafKey4,subblockId,alertType,observedValue,thresholdValue,context");
-			for (AlertRow alert : alerts) {
-				if (!matchesFilter(filteredKey, alert.indexTokens)) {
-					continue;
-				}
-				System.out.println(String.join(",",
-						alert.severity,
-						alert.scope,
-						alert.leafKey4,
-						alert.subblockId,
-						alert.alertType,
-						alert.observedValue,
-						alert.thresholdValue,
-						alert.context));
-			}
-		}
-
-		private boolean matchesFilter(String filteredKey, Set<String> rowIndexTokens) {
-			return Algorithms.isEmpty(filteredKey) || rowIndexTokens.contains(filteredKey);
-		}
-
-		private List<SubblockStats> filterSubblockStats(String filteredKey) {
-			if (Algorithms.isEmpty(filteredKey)) {
-				return subblockStats;
-			}
-			List<SubblockStats> filteredStats = new ArrayList<>();
-			for (SubblockStats stats : subblockStats) {
-				if (matchesFilter(filteredKey, stats.indexTokens)) {
-					filteredStats.add(stats);
-				}
-			}
-			return filteredStats;
 		}
 
 		private int countLeaves(List<SubblockStats> filteredSubblockStats) {
@@ -1496,16 +1423,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return sum;
 		}
 
-		private int countCloseReason(List<SubblockStats> filteredSubblockStats, CloseReason closeReason) {
-			int count = 0;
-			for (SubblockStats stats : filteredSubblockStats) {
-				if (closeReason.name().equals(stats.closeReason)) {
-					count++;
-				}
-			}
-			return count;
-		}
-
 		private String extractTopLongestBloomTokens(Set<String> bloomTokens) {
 			if (Algorithms.isEmpty(bloomTokens)) {
 				return "";
@@ -1523,44 +1440,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				topTokens.add(sortedTokens.get(index).replace(';', ':'));
 			}
 			return String.join(";", topTokens);
-		}
-
-		private void evaluateSubblockAlerts(SubblockStats stats) {
-			if (stats.setBits > BloomFilter.MAX_SATURATION_BITS) {
-				addAlert("ERROR", "SUBBLOCK", stats.leafKey4, Integer.toString(stats.subblockId), stats.indexTokens, "BLOOM_OVER_SATURATED",
-						Integer.toString(stats.setBits), Integer.toString(BloomFilter.MAX_SATURATION_BITS), stats.closeReason);
-			}
-			if (stats.uniqueBloomTokens > MAX_UNIQUE_BLOOM_TOKENS_ALERT) {
-				addAlert("WARN", "SUBBLOCK", stats.leafKey4, Integer.toString(stats.subblockId), stats.indexTokens, "BLOOM_TOKEN_VOLUME_HIGH",
-						Integer.toString(stats.uniqueBloomTokens), Integer.toString(MAX_UNIQUE_BLOOM_TOKENS_ALERT), stats.closeReason);
-			}
-		}
-
-		private void evaluateGlobalAlerts(List<SubblockStats> filteredSubblockStats, String filteredKey) {
-			double p95BloomSaturationRatio = percentileDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO, 95);
-			if (p95BloomSaturationRatio > GLOBAL_P95_BLOOM_SATURATION_MAX) {
-				Set<String> filteredIndexTokens = new LinkedHashSet<>();
-				if (!Algorithms.isEmpty(filteredKey)) {
-					filteredIndexTokens.add(filteredKey);
-				}
-				addAlert("WARN", "GLOBAL", filteredKey, "", filteredIndexTokens, "GLOBAL_BLOOM_SATURATION_HIGH",
-						formatDouble(p95BloomSaturationRatio), formatDouble(GLOBAL_P95_BLOOM_SATURATION_MAX), "p95_BloomSaturationRatio");
-			}
-		}
-
-		private void addAlert(String severity, String scope, String leafKey4, String subblockId, Set<String> indexTokens, String alertType,
-				String observedValue, String thresholdValue, String context) {
-			AlertRow alert = new AlertRow();
-			alert.severity = safeCsv(severity);
-			alert.scope = safeCsv(scope);
-			alert.leafKey4 = safeCsv(leafKey4);
-			alert.subblockId = safeCsv(subblockId);
-			alert.indexTokens.addAll(indexTokens);
-			alert.alertType = safeCsv(alertType);
-			alert.observedValue = safeCsv(observedValue);
-			alert.thresholdValue = safeCsv(thresholdValue);
-			alert.context = safeCsv(context);
-			alerts.add(alert);
 		}
 
 		private void printSummaryRow(String metric, int value) {
@@ -1781,7 +1660,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 
 			}
-
 		}
 
 		public int getSubTreesOnLevel(int level) {
@@ -1801,7 +1679,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				return sum;
 			}
 		}
-
 	}
 
 	public static class PoiAdditionalType {
