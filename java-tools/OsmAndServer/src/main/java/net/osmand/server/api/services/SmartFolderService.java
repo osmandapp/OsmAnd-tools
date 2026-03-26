@@ -44,12 +44,19 @@ public class SmartFolderService {
 	private WebUserdataService webUserdataService;
 
 	public List<SmartFolderWeb> getSmartFolders(int userId) {
+		long startTime = System.currentTimeMillis();
 		String trackFiltersSettings = getFiltersSettings(userId);
+		long endTime = System.currentTimeMillis();
+		LOG.info("[Time] getFiltersSettings " + (endTime - startTime));
+		startTime = endTime;
 		if (trackFiltersSettings == null) {
 			return new ArrayList<>();
 		}
 		List<UserFileNoData> uniqueFiles = userDataService
 				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
+		endTime = System.currentTimeMillis();
+		LOG.info("[Time] get uniqueFiles " + (endTime - startTime));
+		startTime = endTime;
 		List<TrackItem> trackItems = new ArrayList<>(uniqueFiles.size());
 		for (UserFileNoData uf : uniqueFiles) {
 			if (!uf.name.endsWith(INFO_FILE_EXT)) {
@@ -62,11 +69,16 @@ public class SmartFolderService {
 				trackItems.add(trackItem);
 			}
 		}
+		endTime = System.currentTimeMillis();
+		LOG.info("[Time] Create trackItems " + (endTime - startTime));
+		startTime = endTime;
 		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
 		smartFolderHelper.readJson(trackFiltersSettings);
 		for (TrackItem trackItem : trackItems) {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 		}
+		endTime = System.currentTimeMillis();
+		LOG.info("[Time] Create SmartFolders " + (endTime - startTime));
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
 	}
 
@@ -107,7 +119,10 @@ public class SmartFolderService {
 				}
 			}
 		}
+		long startTime = System.currentTimeMillis();
 		setAppearance(gpxFile, uf.name, userId);
+		long endTime = System.currentTimeMillis();
+		LOG.info("[Time] setAppearance zip size: " + uf.zipSize + " time: " + (endTime - startTime));
 		return gpxFile;
 	}
 
