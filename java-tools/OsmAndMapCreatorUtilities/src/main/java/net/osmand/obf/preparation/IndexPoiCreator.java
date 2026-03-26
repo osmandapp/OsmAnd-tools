@@ -114,9 +114,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
-	private static final int MAX_SUBBLOCK_SIZE = 256;
-	private static final int MAX_UNIQUE_BLOOM_TOKENS_ALERT = 24;
-	private static final double GLOBAL_P95_BLOOM_SATURATION_MAX = 0.75d;
+	private static final int MAX_SUBBLOCK_SIZE = 512;
 
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
