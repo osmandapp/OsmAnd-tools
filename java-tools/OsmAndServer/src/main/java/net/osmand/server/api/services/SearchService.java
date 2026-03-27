@@ -206,7 +206,7 @@ public class SearchService {
             return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
         }
     }
-    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, boolean subApiEnabled) {}
     public record SearchResults(List<SearchResult> results,
                                 SearchSettings settings,
                                 String unitTestJson) {
@@ -217,11 +217,11 @@ public class SearchService {
 
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, false), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
             BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
-			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
+			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", ctx.text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
 					(System.currentTimeMillis() - tm) / 1000.0, stat));
 		}
@@ -243,6 +243,7 @@ public class SearchService {
             searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         }
         searchUICore.getSearchSettings().setRegions(osmandRegions);
+	    SearchSettings.subApiMetricsEnabled = option.subApiEnabled;
 
         QuadRect points = osmAndMapsService.points(null,
 		        new LatLon(ctx.lat + ctx.getRadius(), ctx.lon - ctx.getRadius()),

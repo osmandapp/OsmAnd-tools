@@ -376,7 +376,7 @@ public class SearchTestController {
 		}
 		return ResponseEntity.ok(testSearchService.getResults(
 				new SearchService.SearchContext(lat, lon, query, lang, false, radius, null, null),
-				new SearchService.SearchOption(unlimited == null || unlimited, null)));
+				new SearchService.SearchOption(unlimited == null || unlimited, null, true)));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")

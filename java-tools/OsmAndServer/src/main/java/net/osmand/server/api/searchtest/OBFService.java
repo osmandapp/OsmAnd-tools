@@ -712,9 +712,9 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	static final ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
+	ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
 
-	static final class JsonDumpState {
+	final class JsonDumpState {
 		final int maxDepth;
 		final long maxFields;
 		final int maxArrayLength;
@@ -1089,6 +1089,7 @@ public interface OBFService extends BaseService {
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
+		BloomFilter.resetStats();
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
 
 		List<AddressResult> results = new ArrayList<>();
@@ -1096,6 +1097,9 @@ public interface OBFService extends BaseService {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
+		getLogger().info(result.settings().getStat().toDetailedString());
+		getLogger().info(BloomFilter.getInstance().logSkipRatio());
+
 		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
 	}
 
@@ -1119,7 +1123,7 @@ public interface OBFService extends BaseService {
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, false), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
