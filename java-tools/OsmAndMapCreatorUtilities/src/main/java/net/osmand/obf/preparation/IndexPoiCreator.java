@@ -103,7 +103,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
-	private static final int MAX_SUBBLOCK_SIZE = 512;
 
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
@@ -1195,12 +1194,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			Set<String> candidateBloomTokens = new LinkedHashSet<>(currentSubblockBloomTokens);
 			candidateBloomTokens.addAll(poiData.bloomTokens);
 			boolean subblockIsNotEmpty = !currentSubblockPoiData.isEmpty();
-			boolean exceedsSubblockSize = currentSubblockPoiData.size() >= MAX_SUBBLOCK_SIZE;
 			boolean exceedsBloomSaturation = BloomFilter.getInstance().countExactBits(candidateBloomTokens) > BloomFilter.MAX_SATURATION_BITS;
-			if (subblockIsNotEmpty && (exceedsSubblockSize || exceedsBloomSaturation)) {
+			if (subblockIsNotEmpty && exceedsBloomSaturation) {
 				PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId++);
 				poiDataBlocks.add(poiDataBlock);
-				packingMonitoringReport.recordSubblock(poiDataBlock, exceedsSubblockSize ? CloseReason.SIZE : CloseReason.BLOOM_SATURATION);
+				packingMonitoringReport.recordSubblock(poiDataBlock, CloseReason.BLOOM_SATURATION);
 				currentSubblockPoiData.clear();
 				currentSubblockBloomTokens.clear();
 				candidateBloomTokens = new LinkedHashSet<>(poiData.bloomTokens);
