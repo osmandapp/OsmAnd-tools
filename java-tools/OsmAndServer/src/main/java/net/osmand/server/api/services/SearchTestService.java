@@ -294,7 +294,6 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			}
 		});
 
-		BloomFilter.resetStats();
 		try {
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
@@ -346,8 +345,6 @@ public class SearchTestService implements ReportService, DataService, OBFService
  			runStatusFlags.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
-
-			LOGGER.info(BloomFilter.getInstance().logSkipRatio());
 		}
 	}
 
@@ -621,9 +618,19 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		String fieldPathEnv = System.getenv("FIELD_PATH");
 		String fieldName = System.getenv("FIELD_NAME");
 		String filter = System.getenv("MAP_FILTER");
+        if (filter != null)
+            filter = filter.toLowerCase(Locale.ROOT);
 		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
+		String statsFieldPath;
+		if (fieldPath == null) {
+			statsFieldPath = fieldName == null || fieldName.trim().isEmpty() ? null : fieldName.trim();
+		} else if (fieldName == null || fieldName.trim().isEmpty()) {
+			statsFieldPath = fieldPath;
+		} else {
+			statsFieldPath = fieldPath + "." + fieldName.trim();
+		}
 		String jsonFieldPath;
-		if (fieldPath == null || fieldPath.isEmpty()) {
+		if (fieldPath == null) {
 			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
 		} else if (fieldName == null || fieldName.trim().isEmpty()) {
 			jsonFieldPath = fieldPath;
@@ -653,24 +660,25 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
 		System.out.println("MAP_DIR=" + root.toAbsolutePath());
 		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
-		System.out.println("FIELD_PATH=" + (fieldPath == null ? "" : fieldPath + "." + fieldName));
+		System.out.println("FIELD_PATH=" + (statsFieldPath == null ? "" : statsFieldPath));
+        System.out.println("OBFs count:" + obfFiles.size());
 
 		long totalSize = 0;
 		for (Path p : obfFiles) {
-			String obfName = p.getFileName().toString();
+			String obfName = p.getFileName().toString().toLowerCase(Locale.ROOT);
 			if (filter != null && !obfName.startsWith(filter))
 				continue;
 
 			try {
 				String obf = p.toAbsolutePath().toString();
-				Map<String, long[]> m = svc.getSectionSizes(obf, fieldPath);
-				long[] s = m.get(fieldName);
+				Map<String, long[]> m = svc.getSectionSizes(obf, statsFieldPath);
+				long[] s = m == null || statsFieldPath == null ? null : m.get(statsFieldPath);
 				long sum = s == null ? 0 : s[0];
 				totalSize += sum;
 				System.out.println(obf + ", " + sum);
 
 				String json = svc.getSectionJson(obf, jsonFieldPath);
-				String obfBaseName = obfName.toLowerCase(Locale.ROOT).endsWith(".obf")
+				String obfBaseName = obfName.endsWith(".obf")
 						? obfName.substring(0, obfName.length() - 4)
 						: obfName;
 
