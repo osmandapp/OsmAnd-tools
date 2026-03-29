@@ -4,13 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
 import java.util.*;
 import java.util.Map.Entry;
 
-import net.osmand.CollatorStringMatcher;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -72,7 +70,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final double GEOCODING_DISTANCE = 150;
-	
+
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -95,7 +93,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
-	private PackingMonitoringReport packingMonitoringReport = new PackingMonitoringReport();
 
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
@@ -214,7 +211,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 //				id = GENERATE_OBJ_ID--;
 				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
 				if (e instanceof Relation) {
-					// other ids couldn't be duplicated 
+					// other ids couldn't be duplicated
 					while (generatedIds.contains(id)) {
 						id += 2;
 					}
@@ -380,7 +377,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
-	
+
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
 
@@ -639,7 +636,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName, 
+	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName,
 			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
@@ -671,7 +668,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (!useInMemoryCreator) {
 			throw new IllegalStateException("POI subblock splitting requires useInMemoryCreator=true");
 		}
-		packingMonitoringReport = new PackingMonitoringReport();
+
 		Map<PoiTileBox, List<PoiDataBlock>> poiDataBlocksByTileBox = new LinkedHashMap<>();
 		List<PoiDataBlock> orderedPoiDataBlocks = new ArrayList<>();
 		Map<String, Set<PoiDataBlock>> namesIndexBySubblock = new TreeMap<>();
@@ -726,7 +723,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		writer.endWritePoiIndex();
-		packingMonitoringReport.printReports(namesIndexBySubblock);
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -865,7 +861,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
 		Set<String> duplicateWikiWids = new HashSet<String>();
-		
+
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -892,8 +888,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			if (geocodingCtx != null && 
-					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
+			if (geocodingCtx != null &&
+					Algorithms.isEmpty(additionalTags.get(streetRuleType)) &&
 					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {
 				long tm = System.currentTimeMillis();
 				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
@@ -1035,7 +1031,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
-		
+
 		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
 				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
@@ -1174,7 +1170,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (Algorithms.isEmpty(poiTileBox.poiData)) {
 			return Collections.emptyList();
 		}
-		packingMonitoringReport.recordLeaf();
+
 		List<PoiData> sortedPoiData = new ArrayList<>(poiTileBox.poiData);
 		sortedPoiData.sort((o1, o2) -> -Integer.compare(o1.getRating(), o2.getRating()));
 		List<PoiDataBlock> poiDataBlocks = new ArrayList<>();
@@ -1190,7 +1186,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (subblockIsNotEmpty && exceedsBloomSaturation) {
 				PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId++);
 				poiDataBlocks.add(poiDataBlock);
-				packingMonitoringReport.recordSubblock(poiDataBlock, CloseReason.BLOOM_SATURATION);
 				currentSubblockPoiData.clear();
 				currentSubblockBloomTokens.clear();
 				candidateBloomTokens = new LinkedHashSet<>(poiData.bloomTokens);
@@ -1202,7 +1197,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (!currentSubblockPoiData.isEmpty()) {
 			PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId);
 			poiDataBlocks.add(poiDataBlock);
-			packingMonitoringReport.recordSubblock(poiDataBlock, CloseReason.END_OF_LEAF);
 		}
 		return poiDataBlocks;
 	}
@@ -1304,335 +1298,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private enum CloseReason {
-		SIZE,
-		BLOOM_SATURATION,
-		END_OF_LEAF
-	}
-
-	private static class SubblockStats {
-		String leafKey4 = "";
-		String leafId = "";
-		int subblockId;
-		int poiCount;
-		String uniqueBloomTokensList = "";
-		int indexTokenCount;
-		int uniqueBloomTokens;
-		double bloomTokensPerPoi;
-		int setBits;
-		double saturationRatio;
-	}
-
-	private static class PackingMonitoringReport {
-		private int totalLeaves;
-		private int totalPois;
-		private int subblocksClosedBySize;
-		private int subblocksClosedByBloomSaturation;
-		private int subblocksClosedByEndOfLeaf;
-		void recordLeaf() {
-			totalLeaves++;
-		}
-
-		void recordSubblock(PoiDataBlock poiDataBlock, CloseReason closeReason) {
-			totalPois += poiDataBlock.poiData.size();
-			if (closeReason == CloseReason.SIZE) {
-				subblocksClosedBySize++;
-			} else if (closeReason == CloseReason.BLOOM_SATURATION) {
-				subblocksClosedByBloomSaturation++;
-			} else if (closeReason == CloseReason.END_OF_LEAF) {
-				subblocksClosedByEndOfLeaf++;
-			}
-		}
-
-		void printReports(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
-			List<SubblockStats> filteredSubblockStats = buildReportedSubblockStats(namesIndexBySubblock);
-			System.out.println("=== SUMMARY_REPORT ===");
-			System.out.println("metric,value");
-			printSummaryRow("bloomFilterVersion", BloomFilter.VERSION);
-			printSummaryRow("bloomFilterPublish", BloomFilter.PUBLISH);
-			printSummaryRow("total_Blocks", totalLeaves);
-			printSummaryRow("total_Subblocks", filteredSubblockStats.size());
-			printSummaryRow("total_Pois", sumPoiCount(filteredSubblockStats));
-			printSummaryRow("avg_PoisPerAtom", averageInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
-			printSummaryRow("p95_PoisPerAtom", percentileInt(filteredSubblockStats, SubblockMetric.POI_COUNT, 95));
-			printSummaryRow("max_PoisPerAtom", maxInt(filteredSubblockStats, SubblockMetric.POI_COUNT));
-			printSummaryRow("avg_AtomKeyCount", averageInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT));
-			printSummaryRow("p95_AtomKeyCount", percentileInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT, 95));
-			printSummaryRow("max_AtomKeyCount", maxInt(filteredSubblockStats, SubblockMetric.INDEX_TOKEN_COUNT));
-			printSummaryRow("avg_UniqueBloomTokens", averageInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS));
-			printSummaryRow("p95_UniqueBloomTokens", percentileInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS, 95));
-			printSummaryRow("max_UniqueBloomTokens", maxInt(filteredSubblockStats, SubblockMetric.UNIQUE_BLOOM_TOKENS));
-			printSummaryRow("avg_BloomSetBits", averageInt(filteredSubblockStats, SubblockMetric.SET_BITS));
-			printSummaryRow("p95_BloomSetBits", percentileInt(filteredSubblockStats, SubblockMetric.SET_BITS, 95));
-			printSummaryRow("max_BloomSetBits", maxInt(filteredSubblockStats, SubblockMetric.SET_BITS));
-			printSummaryRow("avg_BloomSaturationRatio", averageDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO));
-			printSummaryRow("p95_BloomSaturationRatio", percentileDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO, 95));
-			printSummaryRow("max_BloomSaturationRatio", maxDouble(filteredSubblockStats, SubblockMetric.SATURATION_RATIO));
-			printSummaryRow("avg_BloomTokensPerPoi", averageDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
-			printSummaryRow("p95_BloomTokensPerPoi", percentileDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI, 95));
-			printSummaryRow("max_BloomTokensPerPoi", maxDouble(filteredSubblockStats, SubblockMetric.BLOOM_TOKENS_PER_POI));
-			List<SubblockStats> oversizedBloomSubblocks = filterOversizedBloomSubblocks(filteredSubblockStats);
-			if (!oversizedBloomSubblocks.isEmpty()) {
-				System.out.println();
-				System.out.println("=== OVERSIZED-BLOOM_REPORT ===");
-				System.out.println("leafKey4,subblockId,poiCount,setBits,uniqueBloomTokensCount,tokensList");
-				for (SubblockStats stats : oversizedBloomSubblocks) {
-					System.out.println(String.join(",",
-							stats.leafKey4,
-							Integer.toString(stats.subblockId),
-							Integer.toString(stats.poiCount),
-							Integer.toString(stats.setBits),
-							Integer.toString(stats.uniqueBloomTokens),
-							stats.uniqueBloomTokensList));
-				}
-			}
-		}
-
-		private String buildLeafId(PoiDataBlock poiDataBlock) {
-			return poiDataBlock.zoom + ":" + poiDataBlock.x + ":" + poiDataBlock.y;
-		}
-
-		private List<SubblockStats> buildReportedSubblockStats(Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
-			List<SubblockStats> reportedSubblockStats = new ArrayList<>();
-			Map<String, LinkedHashMap<String, PoiDataBlock>> normalizedBlocksByKey = new LinkedHashMap<>();
-			for (Map.Entry<String, Set<PoiDataBlock>> entry : namesIndexBySubblock.entrySet()) {
-				String normalizedKey = normalizeReportedIndexKey(entry.getKey());
-				if (Algorithms.isEmpty(normalizedKey)) {
-					continue;
-				}
-				LinkedHashMap<String, PoiDataBlock> uniqueBlocksById = normalizedBlocksByKey.computeIfAbsent(normalizedKey,
-						key -> new LinkedHashMap<>());
-				for (PoiDataBlock poiDataBlock : entry.getValue()) {
-					String blockId = buildReportedBlockId(poiDataBlock);
-					uniqueBlocksById.putIfAbsent(blockId, poiDataBlock);
-				}
-			}
-			for (Map.Entry<String, LinkedHashMap<String, PoiDataBlock>> normalizedEntry : normalizedBlocksByKey.entrySet()) {
-				String fullKey = safeCsv(normalizedEntry.getKey());
-				int subblockId = 1;
-				for (PoiDataBlock poiDataBlock : normalizedEntry.getValue().values()) {
-					SubblockStats stats = new SubblockStats();
-					Set<String> bloomTokensForKey = poiDataBlock.bloomTokens;
-					stats.leafKey4 = fullKey;
-					stats.leafId = buildLeafId(poiDataBlock);
-					stats.subblockId = subblockId++;
-					stats.poiCount = poiDataBlock.poiData.size();
-					stats.indexTokenCount = 1;
-					stats.uniqueBloomTokensList = formatBloomTokensList(bloomTokensForKey);
-					stats.uniqueBloomTokens = bloomTokensForKey.size();
-					stats.bloomTokensPerPoi = stats.poiCount == 0 ? 0d : stats.uniqueBloomTokens / (double) stats.poiCount;
-					stats.setBits = BloomFilter.getInstance().countExactBits(bloomTokensForKey);
-					stats.saturationRatio = stats.setBits / (double) BloomFilter.BLOOM_BITS;
-					reportedSubblockStats.add(stats);
-				}
-			}
-			return reportedSubblockStats;
-		}
-
-		private String buildReportedBlockId(PoiDataBlock poiDataBlock) {
-			return buildLeafId(poiDataBlock) + ":" + poiDataBlock.subblockId;
-		}
-
-		private int sumPoiCount(List<SubblockStats> filteredSubblockStats) {
-			int sum = 0;
-			for (SubblockStats stats : filteredSubblockStats) {
-				sum += stats.poiCount;
-			}
-			return sum;
-		}
-
-		private List<SubblockStats> filterOversizedBloomSubblocks(List<SubblockStats> filteredSubblockStats) {
-			List<SubblockStats> oversizedBloomSubblocks = new ArrayList<>();
-			for (SubblockStats stats : filteredSubblockStats) {
-				if (stats.setBits > BloomFilter.MAX_SATURATION_BITS) {
-					oversizedBloomSubblocks.add(stats);
-				}
-			}
-			return oversizedBloomSubblocks;
-		}
-
-		private String formatBloomTokensList(Set<String> bloomTokens) {
-			if (Algorithms.isEmpty(bloomTokens)) {
-				return "";
-			}
-			List<String> sortedTokens = new ArrayList<>(bloomTokens);
-			Collections.sort(sortedTokens);
-			List<String> escapedTokens = new ArrayList<>();
-			for (String token : sortedTokens) {
-				escapedTokens.add(safeCsv(token).replace(';', ':'));
-			}
-			return String.join(";", escapedTokens);
-		}
-
-		private void printSummaryRow(String metric, int value) {
-			System.out.println(metric + "," + value);
-		}
-
-		private void printSummaryRow(String metric, double value) {
-			System.out.println(metric + "," + formatDouble(value));
-		}
-
-		private void printSummaryRow(String metric, boolean value) {
-			System.out.println(metric + "," + value);
-		}
-
-		private double averageInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
-			if (filteredSubblockStats.isEmpty()) {
-				return 0d;
-			}
-			long sum = 0;
-			for (SubblockStats stats : filteredSubblockStats) {
-				sum += metric.intValue(stats);
-			}
-			return sum / (double) filteredSubblockStats.size();
-		}
-
-		private double averageDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
-			if (filteredSubblockStats.isEmpty()) {
-				return 0d;
-			}
-			double sum = 0d;
-			for (SubblockStats stats : filteredSubblockStats) {
-				sum += metric.doubleValue(stats);
-			}
-			return sum / filteredSubblockStats.size();
-		}
-
-		private int maxInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
-			int max = 0;
-			for (SubblockStats stats : filteredSubblockStats) {
-				max = Math.max(max, metric.intValue(stats));
-			}
-			return max;
-		}
-
-		private double maxDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric) {
-			double max = 0d;
-			for (SubblockStats stats : filteredSubblockStats) {
-				max = Math.max(max, metric.doubleValue(stats));
-			}
-			return max;
-		}
-
-		private int percentileInt(List<SubblockStats> filteredSubblockStats, SubblockMetric metric, int percentile) {
-			if (filteredSubblockStats.isEmpty()) {
-				return 0;
-			}
-			List<Integer> values = new ArrayList<>();
-			for (SubblockStats stats : filteredSubblockStats) {
-				values.add(metric.intValue(stats));
-			}
-			Collections.sort(values);
-			int index = nearestRankIndex(values.size(), percentile);
-			return values.get(index);
-		}
-
-		private double percentileDouble(List<SubblockStats> filteredSubblockStats, SubblockMetric metric, int percentile) {
-			if (filteredSubblockStats.isEmpty()) {
-				return 0d;
-			}
-			List<Double> values = new ArrayList<>();
-			for (SubblockStats stats : filteredSubblockStats) {
-				values.add(metric.doubleValue(stats));
-			}
-			Collections.sort(values);
-			int index = nearestRankIndex(values.size(), percentile);
-			return values.get(index);
-		}
-	}
-
-	private enum SubblockMetric {
-		POI_COUNT {
-			@Override
-			int intValue(SubblockStats stats) {
-				return stats.poiCount;
-			}
-		},
-		INDEX_TOKEN_COUNT {
-			@Override
-			int intValue(SubblockStats stats) {
-				return stats.indexTokenCount;
-			}
-		},
-		UNIQUE_BLOOM_TOKENS {
-			@Override
-			int intValue(SubblockStats stats) {
-				return stats.uniqueBloomTokens;
-			}
-		},
-		SET_BITS {
-			@Override
-			int intValue(SubblockStats stats) {
-				return stats.setBits;
-			}
-		},
-		SATURATION_RATIO {
-			@Override
-			double doubleValue(SubblockStats stats) {
-				return stats.saturationRatio;
-			}
-		},
-		BLOOM_TOKENS_PER_POI {
-			@Override
-			double doubleValue(SubblockStats stats) {
-				return stats.bloomTokensPerPoi;
-			}
-		};
-
-		int intValue(SubblockStats stats) {
-			throw new UnsupportedOperationException();
-		}
-
-		double doubleValue(SubblockStats stats) {
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	private static int nearestRankIndex(int size, int percentile) {
-		if (size <= 0) {
-			return 0;
-		}
-		int rank = (int) Math.ceil(percentile / 100d * size);
-		rank = Math.max(1, Math.min(rank, size));
-		return rank - 1;
-	}
-
-	private static int countBits(byte[] bloom) {
-		if (bloom == null) {
-			return 0;
-		}
-		int sum = 0;
-		for (byte value : bloom) {
-			sum += Integer.bitCount(value & 0xFF);
-		}
-		return sum;
-	}
-
-	private static String formatDouble(double value) {
-		if (Double.isNaN(value) || Double.isInfinite(value)) {
-			return "";
-		}
-		BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
-		return decimal.scale() < 0 ? decimal.setScale(0).toPlainString() : decimal.toPlainString();
-	}
-
-	private static String safeCsv(String value) {
-		if (value == null) {
-			return "";
-		}
-		String sanitized = value.replace('\r', ' ').replace('\n', ' ');
-		return sanitized.replace(',', ';');
-	}
-
-	private static String normalizeReportedIndexKey(String key) {
-		if (key == null) {
-			return null;
-		}
-		String normalized = CollatorStringMatcher.alignChars(key);
-		normalized = normalized.toLowerCase(Locale.ROOT);
-		return normalized;
-	}
-
 	public static class PoiTileBox {
 		int x;
 		int y;
@@ -1695,6 +1360,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 
 			}
+
 		}
 
 		public int getSubTreesOnLevel(int level) {
@@ -1714,6 +1380,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				return sum;
 			}
 		}
+
 	}
 
 	public static class PoiAdditionalType {
