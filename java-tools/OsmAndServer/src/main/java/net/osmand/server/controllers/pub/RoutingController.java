@@ -71,6 +71,8 @@ public class RoutingController {
 
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
+	private volatile String routingModesJsonCache;
+	private final Object routingModesJsonLock = new Object();
 
 	public static class RoutingMode {
 		public String key;
@@ -128,7 +130,23 @@ public class RoutingController {
 	}
 
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routingParams() {
+	public ResponseEntity<String> routingParams() {
+		String json = routingModesJsonCache;
+		if (json != null) {
+			return ResponseEntity.ok(json);
+		}
+		synchronized (routingModesJsonLock) {
+			json = routingModesJsonCache;
+			if (json != null) {
+				return ResponseEntity.ok(json);
+			}
+			json = computeRoutingModesJson();
+			routingModesJsonCache = json;
+			return ResponseEntity.ok(json);
+		}
+	}
+
+	private String computeRoutingModesJson() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 
 		final String routingSection = "Routing (devel)";
@@ -207,7 +225,7 @@ public class RoutingController {
 
 			routers.put(rm.key, rm);
 		}
-		return ResponseEntity.ok(gson.toJson(routers));
+		return gson.toJson(routers);
 	}
 
 	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")
