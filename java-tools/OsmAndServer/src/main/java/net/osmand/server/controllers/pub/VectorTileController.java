@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
@@ -43,6 +44,12 @@ public class VectorTileController {
 
 	private final TileMemoryCache<VectorMetatile> tileMemoryCache = new TileMemoryCache<>();
 
+	private static final CacheControl STYLES_HTTP_CACHE =
+			CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic();
+
+	private volatile String stylesJsonCache;
+	private final Object stylesJsonCacheLock = new Object();
+
 	Gson gson = new Gson();
 
 	private ResponseEntity<?> errorConfig(String msg) {
@@ -51,7 +58,29 @@ public class VectorTileController {
 	}
 
 	@RequestMapping(path = "/styles", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<?> getStyles() {
+	public ResponseEntity<String> getStyles() {
+		String json = stylesJsonCache;
+		if (json != null) {
+			return ResponseEntity.ok()
+					.cacheControl(STYLES_HTTP_CACHE)
+					.body(json);
+		}
+		synchronized (stylesJsonCacheLock) {
+			json = stylesJsonCache;
+			if (json != null) {
+				return ResponseEntity.ok()
+						.cacheControl(STYLES_HTTP_CACHE)
+						.body(json);
+			}
+			json = computeStylesJson();
+			stylesJsonCache = json;
+			return ResponseEntity.ok()
+					.cacheControl(STYLES_HTTP_CACHE)
+					.body(json);
+		}
+	}
+
+	private String computeStylesJson() {
 		synchronized (config.style) {
 			for (VectorStyle vectorStyle : config.style.values()) {
 				vectorStyle.properties.clear();
@@ -63,7 +92,7 @@ public class VectorTileController {
 					}
 				}
 			}
-			return ResponseEntity.ok(gson.toJson(config.style));
+			return gson.toJson(config.style);
 		}
 	}
 
