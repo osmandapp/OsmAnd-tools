@@ -83,7 +83,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final double GEOCODING_DISTANCE = 150;
-	
+
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -224,7 +224,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 //				id = GENERATE_OBJ_ID--;
 				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
 				if (e instanceof Relation) {
-					// other ids couldn't be duplicated 
+					// other ids couldn't be duplicated
 					while (generatedIds.contains(id)) {
 						id += 2;
 					}
@@ -390,7 +390,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
-	
+
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
 
@@ -649,7 +649,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName, 
+	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName,
 			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
@@ -878,6 +878,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
+    private static final int BLOCK_SIZE_LIMIT = 32;
 
 	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
@@ -911,7 +912,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
 		Set<String> duplicateWikiWids = new HashSet<String>();
-		
+
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -938,8 +939,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			if (geocodingCtx != null && 
-					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
+			if (geocodingCtx != null &&
+					Algorithms.isEmpty(additionalTags.get(streetRuleType)) &&
 					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {
 				long tm = System.currentTimeMillis();
 				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
@@ -1005,8 +1006,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				Tree<PoiTileBox> subtree = null;
 				for (Tree<PoiTileBox> sub : prevTree.getSubtrees()) {
 					if (sub.getNode().x == xs && sub.getNode().y == ys && sub.getNode().zoom == i) {
-						subtree = sub;
-						break;
+                        if(sub.getNode().poiData.size() < BLOCK_SIZE_LIMIT) {
+                            subtree = sub;
+                            break;
+                        }
 					}
 				}
 				if (subtree == null) {
@@ -1078,7 +1081,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
-		
+
 		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
 				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
