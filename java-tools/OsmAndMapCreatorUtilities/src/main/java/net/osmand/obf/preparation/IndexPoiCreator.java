@@ -772,7 +772,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-		BloomFilter.getInstance().logInfo();
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1006,7 +1005,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				Tree<PoiTileBox> subtree = null;
 				for (Tree<PoiTileBox> sub : prevTree.getSubtrees()) {
 					if (sub.getNode().x == xs && sub.getNode().y == ys && sub.getNode().zoom == i) {
-                        if(sub.getNode().poiData.size() < BLOCK_SIZE_LIMIT) {
+                        if(sub.getNode().poiData != null && sub.getNode().poiData.size() < BLOCK_SIZE_LIMIT) {
                             subtree = sub;
                             break;
                         }
