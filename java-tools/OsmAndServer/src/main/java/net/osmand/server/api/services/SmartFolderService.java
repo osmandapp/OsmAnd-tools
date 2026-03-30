@@ -1,8 +1,6 @@
 package net.osmand.server.api.services;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.shared.gpx.*;
@@ -18,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -36,6 +35,7 @@ public class SmartFolderService {
 	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
+	private static final Gson gson = new Gson();
 
 	@Autowired
 	private UserdataService userDataService;
@@ -107,7 +107,14 @@ public class SmartFolderService {
 				}
 			}
 		}
-		setAppearance(gpxFile, uf.name, userId);
+		UserFile infoFile = userDataService.getLastFileVersion(userId, uf.name + INFO_FILE_EXT, FILE_TYPE_GPX);
+		if (infoFile != null) {
+			if (infoFile.details != null) {
+				setAppearanceFromJson(gpxFile, infoFile.details);
+			} else {
+				setAppearanceFromFile(gpxFile, infoFile);
+			}
+		}
 		return gpxFile;
 	}
 
@@ -117,11 +124,12 @@ public class SmartFolderService {
 			return null;
 		}
 		JSONObject obj = new JSONObject(generalSettings);
-		return obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
+		return obj.has(TRACK_FILTERS_SETTINGS_PREF)
+				? obj.optString(TRACK_FILTERS_SETTINGS_PREF, null)
+				: null;
 	}
 
-	void setAppearance(GpxFile gpxFile, String name, int userId) {
-		UserFile file = userDataService.getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
+	void setAppearanceFromFile(GpxFile gpxFile, UserFile file) {
 		if (file == null || file.filesize == -1) {
 			return;
 		}
@@ -129,22 +137,26 @@ public class SmartFolderService {
 			if (in == null) {
 				return;
 			}
-			try (GZIPInputStream gis = new GZIPInputStream(in)) {
-				ObjectMapper mapper = new ObjectMapper();
-				ObjectNode json = (ObjectNode) mapper.readTree(gis);
-				JsonNode color = json.get(COLOR_NAME_EXTENSION);
-				if (color != null) {
-					gpxFile.setColor(color.asText());
-				}
-				JsonNode width = json.get(LINE_WIDTH_EXTENSION);
-				if (width != null) {
-					gpxFile.setWidth(width.asText());
-				}
+			try (GZIPInputStream gis = new GZIPInputStream(in);
+			     InputStreamReader reader = new InputStreamReader(gis)) {
+				JsonObject json = gson.fromJson(reader, JsonObject.class);
+				setAppearanceFromJson(gpxFile, json);
 			}
 		} catch (Exception e) {
 			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
 					file.name, file.id, file.userid, e.getMessage());
 			LOG.error(isError);
+		}
+	}
+
+	private void setAppearanceFromJson(GpxFile gpxFile, JsonObject json) {
+		JsonElement color = json.get(COLOR_NAME_EXTENSION);
+		if (color != null) {
+			gpxFile.setColor(color.getAsString());
+		}
+		JsonElement width = json.get(LINE_WIDTH_EXTENSION);
+		if (width != null) {
+			gpxFile.setWidth(width.getAsString());
 		}
 	}
 

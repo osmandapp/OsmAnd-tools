@@ -7,6 +7,7 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -356,13 +357,15 @@ public class MapApiController {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			boolean isGpx = "gpx".equalsIgnoreCase(ext);
+			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
+			boolean isGpx = GPX_FILE_EXT.equalsIgnoreCase(ext);
+			boolean isInfo = INFO_FILE_EXT.equalsIgnoreCase(ext);
 
-			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && isGpx;
+			boolean isGPZTrack = nd.type.equalsIgnoreCase(FILE_TYPE_GPX) && isGpx;
+			boolean isInfoFile = nd.type.equalsIgnoreCase(FILE_TYPE_GPX) && isInfo;
 			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && isGpx;
 
-			if (isGPZTrack) {
+			if (isGPZTrack || isInfoFile) {
 				JsonObject details = nd.details != null ? nd.details : new JsonObject();
 				if (!webUserdataService.detailsPresent(details)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));

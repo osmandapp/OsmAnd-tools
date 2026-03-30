@@ -3,14 +3,9 @@ package net.osmand.server.api.services;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -22,6 +17,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import com.google.gson.JsonElement;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -408,7 +404,7 @@ public class UserdataService {
 	}
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
-			String name, String type, Long clienttime) throws IOException {
+	                                         String name, String type, Long clienttime) throws IOException {
 		CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
 		usf.name = name;
 		usf.type = type;
@@ -424,8 +420,32 @@ public class UserdataService {
 		if (storageService.storeLocally()) {
 			usf.data = zipfile.getBytes();
 		}
+		if (name.endsWith(INFO_EXT)) {
+			usf.details = getInfoDetails(zipfile);
+		}
 		filesRepository.saveAndFlush(usf);
 		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
+	}
+
+	public JsonObject getInfoDetails(InternalZipFile zipFile) {
+		InputStream inputStream;
+		try {
+			inputStream = zipFile.getInputStream();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		return getInfoDetails(inputStream);
+	}
+
+	public JsonObject getInfoDetails(InputStream inputStream) {
+		try (InputStream is = new GZIPInputStream(inputStream);
+		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			JsonElement element = gson.fromJson(reader, JsonElement.class);
+			return (element != null && element.isJsonObject()) ? element.getAsJsonObject() : null;
+		} catch (Exception e) {
+			LOG.warn("Failed to parse .info details JSON", e);
+			return null;
+		}
 	}
 
 

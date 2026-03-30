@@ -140,6 +140,11 @@ public class WebUserdataService {
 					continue;
 				}
 				if (in != null) {
+					if (of.get().name.endsWith(INFO_FILE_EXT)) {
+						uf.details = userdataService.getInfoDetails(in);
+						userFilesRepository.save(uf);
+						continue;
+					}
 					in = new GZIPInputStream(in);
 					try (Source source = new Buffer().readFrom(in)) {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
