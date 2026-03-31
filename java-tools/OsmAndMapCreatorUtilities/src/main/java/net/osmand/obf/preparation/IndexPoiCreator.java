@@ -877,7 +877,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
-    private static final int MAX_OBJECTS_PER_BLOCK = 32;
+    private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
 	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
@@ -1011,7 +1011,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 							break;
 						}
 						List<PoiData> existingPoiData = sub.getNode().poiData;
-						if (existingPoiData == null || existingPoiData.size() < MAX_OBJECTS_PER_BLOCK) {
+						if (existingPoiData == null || existingPoiData.size() < MAX_OBJECTS_PER_BLOCK_LIMIT) {
 							subtree = sub;
 							break;
 						}
