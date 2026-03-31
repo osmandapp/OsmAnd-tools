@@ -158,9 +158,12 @@ class RandomRouteGenerator {
 	}
 
 	private boolean isPointInsideRegionsPolygons(LatLon point, Set<WorldRegion> regions) {
+		double lat = point.getLatitude();
+		double lon = point.getLongitude();
+
 		for (WorldRegion r : regions) {
-			for (List<LatLon> polygon : r.getPolygons()) {
-				if (Algorithms.isPointInsidePolygon(point, polygon)) {
+			for (double[] polygon : r.getPolygons()) {
+				if (Algorithms.isPointInsidePolygon(lat, lon, polygon)) {
 					return true;
 				}
 			}
