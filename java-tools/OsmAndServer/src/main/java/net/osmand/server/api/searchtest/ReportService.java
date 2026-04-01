@@ -35,6 +35,14 @@ public interface ReportService {
 			long duration) {
 	}
 
+	private static String jsonExtractSafe(String jsonExpression, String path) {
+		return "CASE WHEN json_valid(" + jsonExpression + ") THEN json_extract(" + jsonExpression + ", '" + path + "') END";
+	}
+
+	private static String jsonObjectSafe(String jsonExpression) {
+		return "CASE WHEN json_valid(" + jsonExpression + ") THEN " + jsonExpression + " END";
+	}
+
 	record RunStatus(
 			SearchTestRunRepository.Run.Status status,
 			long total,
@@ -58,7 +66,7 @@ public interface ReportService {
 	String GEN_SQL = """
 			WITH gen AS (
 				SELECT DENSE_RANK() OVER (ORDER BY ds_result_id) AS ds_id, ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS tc_id,
-					id, gen_count, lat || ', ' || lon as lat_lon, query, row AS in_row, 
+					id, gen_count, lat || ', ' || lon as lat_lon, query, row AS in_row,
 					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) AS obj_id, error
 				FROM gen_result AS g WHERE case_id = ? ORDER BY g.id
 			)""";
@@ -68,15 +76,15 @@ public interface ReportService {
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
-			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, 
-			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, 
+			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance,
 			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
-			 UNION SELECT 'Generated' AS "group", CASE 
-			    WHEN error IS NOT NULL THEN 'Error' 
+			 UNION SELECT 'Generated' AS "group", CASE
+			    WHEN error IS NOT NULL THEN 'Error'
 			    WHEN gen_count <= 0 THEN 'Filtered'
-				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
-			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id, 
+				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
+			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
@@ -247,27 +255,27 @@ public interface ReportService {
 	}
 
 	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
-		String prefixSQL = """
-				SELECT run.status, run.threads_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration,
-				    count(*) AS total,
-				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
-				    count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed,
-				    count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count,
-					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
-					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
-					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
-				""";
+		String runResultActualPlaceSql = jsonExtractSafe("row", "$.actual_place");
+		String prefixSQL =
+				"SELECT run.status, run.threads_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
+						" count(*) AS total," +
+						" count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed," +
+						" count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed," +
+						" count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count," +
+						" count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(" + runResultActualPlaceSql + ", ''), 1, INSTR(" + runResultActualPlaceSql + ", ' -') - 1) IN ('2','3','4','5')) as partial_count," +
+						" sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes," +
+						" sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time";
 
 		StringBuilder sql = new StringBuilder(prefixSQL);
 		if (isFull) {
-			sql.append(", sum(COALESCE(json_extract(row, '$.stat_results'), 0)) AS stat_results,");
-			sql.append("sum(COALESCE(json_extract(row, '$.stat_amenity_count'), 0)) AS stat_amenity_count, ");
-			sql.append("sum(COALESCE(json_extract(row, '$.stat_address_count'), 0)) AS stat_address_count");
+			sql.append(", sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_results")).append(", 0)) AS stat_results,");
+			sql.append("sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_amenity_count")).append(", 0)) AS stat_amenity_count, ");
+			sql.append("sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_address_count")).append(", 0)) AS stat_address_count");
 			for (BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName api : BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName.values()) {
 				String aliasSuffix = api.name().toLowerCase(java.util.Locale.US);
-				sql.append(", sum(COALESCE(json_extract(row, '$.stat_time_").append(api.name()).append("'), 0)) AS time_").append(aliasSuffix);
-				sql.append(", sum(COALESCE(json_extract(row, '$.stat_bytes_").append(api.name()).append("'), 0)) AS bytes_").append(aliasSuffix);
-				sql.append(", sum(COALESCE(json_extract(row, '$.stat_calls_").append(api.name()).append("'), 0)) AS calls_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_time_" + api.name())).append(", 0)) AS time_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_bytes_" + api.name())).append(", 0)) AS bytes_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("row", "$.stat_calls_" + api.name())).append(", 0)) AS calls_").append(aliasSuffix);
 			}
 		}
 		sql.append(" FROM run_result, run WHERE run.id = run_id AND run_id = ?");
@@ -342,7 +350,7 @@ public interface ReportService {
 						"SUM(json_extract(ss.value, '$.payloadBytesParsed')) AS payload_bytes_parsed, " +
 						"SUM(json_extract(ss.value, '$.decodeTime')) AS decode_time, " +
 						"SUM(json_extract(ss.value, '$.matcherTime')) AS matcher_time " +
-						"FROM run_result, json_each(row, '$.sub_stats') ss, run " +
+						"FROM run_result, json_each(" + jsonObjectSafe("row") + ", '$.sub_stats') ss, run " +
 						"WHERE run.id = run_id AND run_id = ? " +
 						"GROUP BY json_extract(ss.value, '$.api'), json_extract(ss.value, '$.subApi'), json_extract(ss.value, '$.mapName') " +
 						"ORDER BY SUM(json_extract(ss.value, '$.time')) DESC";

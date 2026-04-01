@@ -2,7 +2,6 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import net.osmand.binary.BloomFilter;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -38,6 +37,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
@@ -50,7 +50,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
                                 long total, long failed, long duration) {}
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-    private static volatile ExecutorService EXECUTOR;
+    private static volatile ExecutorService EXECUTOR, SAVE_EXECUTOR;
     private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
 
     // Batch insert support for run_result
@@ -58,11 +58,12 @@ public class SearchTestService implements ReportService, DataService, OBFService
 
     private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+    private final Set<Long> loggedStoppedRuns = ConcurrentHashMap.newKeySet();
 
-	@Autowired
-	private ObjectMapper objectMapper;
-	@Autowired
-	private WebClient.Builder webClientBuilder;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private WebClient.Builder webClientBuilder;
 	private WebClient webClient;
 
 	@Autowired
@@ -111,6 +112,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		runStatusFlags.clear();
 
 		EXECUTOR = createExecutor();
+        SAVE_EXECUTOR = createBatchSaveExecutor();
 	}
 
 	private ExecutorService createExecutor() {
@@ -123,9 +125,23 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			return t;
 		};
 		LOGGER.info("Global search-test executor created with pool size = {}", maxCount);
-		return new ThreadPoolExecutor(maxCount, maxCount,60L, TimeUnit.SECONDS,
+		return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS,
 					new LinkedBlockingQueue<>(), tf);
 	}
+
+    private ExecutorService createBatchSaveExecutor() {
+        int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_BATCH_SAVE_THREAD_NUMBER"), 1);
+        maxCount = Math.max(1, maxCount);
+        ThreadFactory tf = r -> {
+            Thread t = new Thread(r);
+            t.setName("search-test-batch-save-" + t.getId());
+            t.setDaemon(true);
+            return t;
+        };
+        LOGGER.info("Search-test batch-save executor created with pool size = {}", maxCount);
+        return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(), tf);
+    }
 
 	@Override
 	public OsmAndMapsService getMapsService() {
@@ -202,19 +218,33 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				dataset.testRow = test.testRow;
 				test.allCols = dataset.allCols;
 
+				test.updated = LocalDateTime.now();
 				test = testCaseRepo.save(test);
 				datasetRepo.saveAndFlush(dataset);
-
-				test = generate(dataset, test);
+				startGeneration(dataset, test);
+				return test;
 			} catch (Exception e) {
 				LOGGER.error("Generation of test-case failed for on dataset {}", datasetId, e);
 				test.setError(e.getMessage());
 				test.status = TestCase.Status.FAILED;
-			} finally {
 				test.updated = LocalDateTime.now();
+				return testCaseRepo.save(test);
 			}
-			return testCaseRepo.save(test);
-		});
+		}, EXECUTOR);
+	}
+
+	private void startGeneration(Dataset dataset, TestCase test) {
+		CompletableFuture.runAsync(() -> {
+			try {
+				generate(dataset, test);
+			} catch (Exception e) {
+				LOGGER.error("Generation of test-case failed for on dataset {}", dataset.id, e);
+				test.setError(e.getMessage());
+				test.status = TestCase.Status.FAILED;
+				test.updated = LocalDateTime.now();
+				testCaseRepo.save(test);
+			}
+		}, EXECUTOR);
 	}
 
 	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
@@ -282,24 +312,13 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
-		// Local per-run limited executor built on top of the global EXECUTOR
 		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
-		final Semaphore permits = new Semaphore(maxParallel);
-		final Executor localExecutor = command -> EXECUTOR.execute(() -> {
-			permits.acquireUninterruptibly();
-			try {
-				command.run();
-			} finally {
-				permits.release();
-			}
-		});
 
 		try {
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
 				if (run.rerunId != null) {
-					// Re-run uses items from a previous run's results by joining gen_result with run_result
 					if (run.skipFound == null || !run.skipFound) {
 						sql = "SELECT count(*) FROM gen_result g " +
 								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
@@ -308,18 +327,27 @@ public class SearchTestService implements ReportService, DataService, OBFService
 								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
 					}
 					count = jdbcTemplate.queryForObject(sql, Long.class, run.rerunId);
-				} else
+				} else {
 					count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
+				}
 
 				final int chunkSize = Math.min((int) (count / maxParallel) + 1, CHUNK_SIZE);
-				for (int offset = 0; offset < count; offset += chunkSize) {
-					final int offsetLength = offset;
-					runTasks.add(CompletableFuture.runAsync(() ->
-							runChunk(run, chunkSize, offsetLength, statusRef), localExecutor));
+				final AtomicInteger nextOffset = new AtomicInteger(0);
+				for (int workerIndex = 0; workerIndex < maxParallel; workerIndex++) {
+					runTasks.add(CompletableFuture.runAsync(() -> {
+						while (statusRef.get() == Run.Status.RUNNING) {
+							int currentOffset = nextOffset.getAndAdd(chunkSize);
+							if (currentOffset >= count) {
+								break;
+							}
+							runChunk(run, chunkSize, currentOffset, statusRef);
+						}
+					}, EXECUTOR));
 				}
-			} else
+			} else {
 				runTasks.add(CompletableFuture.runAsync(() ->
-						runChunk(run, -1, 0, statusRef), localExecutor));
+						runChunk(run, -1, 0, statusRef), EXECUTOR));
+			}
 
 			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
 			List<Object[]> remainingBatches = runResultBatches.remove(run.id);
@@ -343,6 +371,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			runRepo.save(run);
  			// Cleanup in-memory status flag
  			runStatusFlags.remove(run.id);
+			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
 		}
@@ -387,7 +416,9 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				Run.Status current = statusRef.get();
 				if (current != Run.Status.RUNNING) {
 					run.status = current;
-					LOGGER.info("Run {} was stopped with status {}. Stopping execution.", run.id, current);
+					if (loggedStoppedRuns.add(run.id)) {
+						LOGGER.info("Run {} was stopped with status {}. Stopping execution.", run.id, current);
+					}
 					break;
 				}
 
@@ -463,20 +494,20 @@ public class SearchTestService implements ReportService, DataService, OBFService
  		}
  	}
 
- 	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
-	    String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
-			    "duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
-			    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
+		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
- 		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
- 			try {
- 				jdbcTemplate.batchUpdate(sql, batchArgs);
- 			} catch (Exception ex) {
- 				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
- 			}
- 		}, EXECUTOR);
- 		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
- 	}
+		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+			try {
+				jdbcTemplate.batchUpdate(sql, batchArgs);
+			} catch (Exception ex) {
+				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
+			}
+		}, SAVE_EXECUTOR);
+		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
+	}
 
 	@Async
 	public CompletableFuture<Run> cancelRun(Long runId) {
