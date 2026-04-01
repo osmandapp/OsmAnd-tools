@@ -1,6 +1,5 @@
 package net.osmand.server.api.services;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.shared.gpx.*;
@@ -34,7 +33,6 @@ public class SmartFolderService {
 	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
-	private static final Gson gson = new Gson();
 
 	@Autowired
 	private UserdataService userDataService;
@@ -124,12 +122,12 @@ public class SmartFolderService {
 				: null;
 	}
 
-	private void setAppearanceFromJson(GpxFile gpxFile, JsonObject json) {
-		JsonElement color = json.get(COLOR_NAME_EXTENSION);
+	private void setAppearanceFromJson(GpxFile gpxFile, JsonObject details) {
+		JsonElement color = details.get(COLOR_NAME_EXTENSION);
 		if (color != null) {
 			gpxFile.setColor(color.getAsString());
 		}
-		JsonElement width = json.get(LINE_WIDTH_EXTENSION);
+		JsonElement width = details.get(LINE_WIDTH_EXTENSION);
 		if (width != null) {
 			gpxFile.setWidth(width.getAsString());
 		}
