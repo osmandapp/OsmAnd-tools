@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -43,7 +42,7 @@ public class SmartFolderService {
 	@Autowired
 	private WebUserdataService webUserdataService;
 
-	public List<SmartFolderWeb> getSmartFolders(int userId) {
+	public List<SmartFolderWeb> getFilteredSmartFolders(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
 			return new ArrayList<>();
@@ -108,12 +107,8 @@ public class SmartFolderService {
 			}
 		}
 		UserFile infoFile = userDataService.getLastFileVersion(userId, uf.name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (infoFile != null) {
-			if (infoFile.details != null) {
-				setAppearanceFromJson(gpxFile, infoFile.details);
-			} else {
-				setAppearanceFromFile(gpxFile, infoFile);
-			}
+		if (infoFile != null && infoFile.details != null) {
+			setAppearanceFromJson(gpxFile, infoFile.details);
 		}
 		return gpxFile;
 	}
@@ -127,26 +122,6 @@ public class SmartFolderService {
 		return obj.has(TRACK_FILTERS_SETTINGS_PREF)
 				? obj.optString(TRACK_FILTERS_SETTINGS_PREF, null)
 				: null;
-	}
-
-	void setAppearanceFromFile(GpxFile gpxFile, UserFile file) {
-		if (file == null || file.filesize == -1) {
-			return;
-		}
-		try (InputStream in = getInputStreamFromFile(file)) {
-			if (in == null) {
-				return;
-			}
-			try (GZIPInputStream gis = new GZIPInputStream(in);
-			     InputStreamReader reader = new InputStreamReader(gis)) {
-				JsonObject json = gson.fromJson(reader, JsonObject.class);
-				setAppearanceFromJson(gpxFile, json);
-			}
-		} catch (Exception e) {
-			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
-					file.name, file.id, file.userid, e.getMessage());
-			LOG.error(isError);
-		}
 	}
 
 	private void setAppearanceFromJson(GpxFile gpxFile, JsonObject json) {

@@ -7,7 +7,6 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
-import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -47,13 +46,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
-import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
-import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -352,49 +348,16 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		Set<String> types = userdataService.parseFileTypes(type);
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
-		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
-
-		res.uniqueFiles.forEach(nd -> {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
-			boolean isGpx = GPX_FILE_EXT.equalsIgnoreCase(ext);
-			boolean isInfo = INFO_FILE_EXT.equalsIgnoreCase(ext);
-
-			boolean isGPZTrack = nd.type.equalsIgnoreCase(FILE_TYPE_GPX) && isGpx;
-			boolean isInfoFile = nd.type.equalsIgnoreCase(FILE_TYPE_GPX) && isInfo;
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && isGpx;
-
-			if (isGPZTrack || isInfoFile) {
-				JsonObject details = nd.details != null ? nd.details : new JsonObject();
-				if (!webUserdataService.detailsPresent(details)) {
-					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
-				}
-				nd.details = details;
-			}
-
-			if (isGPZTrack || isFavorite) {
-				boolean isSharedFile = webUserdataService.isShared(nd, sharedFilesMap);
-				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
-			}
-		});
-
-		if (addDevices && res.allFiles != null) {
-			Map<Integer, String> devices = new HashMap<>();
-			for (UserFileNoData nd : res.allFiles) {
-				webUserdataService.addDeviceInformation(nd, devices);
-			}
-		}
-		return ResponseEntity.ok(gson.toJson(res));
+		return webUserdataService.getListFiles(name, type, addDevices, allVersions, dev);
 	}
 
-	@GetMapping(value = "/create-smart-folders", produces = "application/json")
-	public ResponseEntity<String> createSmartFolders() {
+	@GetMapping(value = "/get-filtered-smart-folders", produces = "application/json")
+	public ResponseEntity<String> getFilteredSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFolders(dev.userid);
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getFilteredSmartFolders(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
