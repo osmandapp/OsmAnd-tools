@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import jakarta.validation.constraints.NotNull;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -71,6 +73,11 @@ public class RoutingController {
 
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
+	private static final CacheControl ROUTING_MODES_HTTP_CACHE =
+			CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic();
+
+	private volatile String routingModesJsonCache;
+	private final Object routingModesJsonLock = new Object();
 
 	public static class RoutingMode {
 		public String key;
@@ -128,7 +135,29 @@ public class RoutingController {
 	}
 
 	@RequestMapping(path = "/routing-modes", produces = {MediaType.APPLICATION_JSON_VALUE})
-	public ResponseEntity<?> routingParams() {
+	public ResponseEntity<String> routingParams() {
+		String json = routingModesJsonCache;
+		if (json != null) {
+			return ResponseEntity.ok()
+					.cacheControl(ROUTING_MODES_HTTP_CACHE)
+					.body(json);
+		}
+		synchronized (routingModesJsonLock) {
+			json = routingModesJsonCache;
+			if (json != null) {
+				return ResponseEntity.ok()
+						.cacheControl(ROUTING_MODES_HTTP_CACHE)
+						.body(json);
+			}
+			json = computeRoutingModesJson();
+			routingModesJsonCache = json;
+			return ResponseEntity.ok()
+					.cacheControl(ROUTING_MODES_HTTP_CACHE)
+					.body(json);
+		}
+	}
+
+	private String computeRoutingModesJson() {
 		Map<String, RoutingMode> routers = new LinkedHashMap<>();
 
 		final String routingSection = "Routing (devel)";
@@ -207,7 +236,7 @@ public class RoutingController {
 
 			routers.put(rm.key, rm);
 		}
-		return ResponseEntity.ok(gson.toJson(routers));
+		return gson.toJson(routers);
 	}
 
 	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")

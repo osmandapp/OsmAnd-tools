@@ -10,7 +10,9 @@ import net.osmand.shared.gpx.SmartFolderHelper;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.settings.enums.AltitudeMetrics;
 import net.osmand.shared.settings.enums.MetricsConstants;
+import net.osmand.shared.settings.enums.AngularConstants;
 import net.osmand.shared.settings.enums.SpeedConstants;
+import net.osmand.shared.units.TemperatureUnits;
 import net.osmand.shared.util.KStringMatcher;
 
 import java.io.IOException;
@@ -121,6 +123,16 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
     
     @Override
     public AltitudeMetrics getAltitudeMetric() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+    
+    @Override
+    public AngularConstants getAngularSystem() {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+    
+    @Override
+    public TemperatureUnits getTemperatureUnits() {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
