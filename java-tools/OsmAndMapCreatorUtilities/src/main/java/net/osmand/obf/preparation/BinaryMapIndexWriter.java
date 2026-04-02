@@ -93,8 +93,8 @@ import net.osmand.data.TransportStop;
 import net.osmand.data.TransportStopExit;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
+import net.osmand.obf.preparation.IndexPoiCreator.PoiDataBlock;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorTagGroups;
-import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
@@ -1734,7 +1734,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
-	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiTileBox>> namesIndex, long startPoiIndex) throws IOException {
+	public Map<PoiDataBlock, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiDataBlock>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
@@ -1743,17 +1743,17 @@ public class BinaryMapIndexWriter {
 					OsmandOdb.OsmAndBloomFilterAlgorithm.newBuilder().setVersion(BloomFilter.VERSION).build());
 		}
 
-		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
+		Map<PoiDataBlock, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiDataBlock, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
+		for (Map.Entry<String, Set<PoiDataBlock>> e : namesIndex.entrySet()) {
 			codedOutStream.writeTag(OsmandOdb.OsmAndPoiNameIndex.DATA_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 			BinaryFileReference nameTableRef = indexedTable.get(e.getKey());
 			codedOutStream.flush();
 			nameTableRef.writeReference(raf, getFilePointer());
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
-			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
-			for (PoiTileBox box : tileBoxes) {
+			List<PoiDataBlock> tileBoxes = new ArrayList<>(e.getValue());
+			for (PoiDataBlock box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
@@ -1763,6 +1763,9 @@ public class BinaryMapIndexWriter {
 					bs.addBloomIndex(ByteString.copyFrom(box.getIndexBloom()));
 				}
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
+				if (atom.getBloomIndexCount() != 1) {
+					throw new IllegalStateException("POI name index atom must reference exactly one physical data block bloom");
+				}
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
@@ -1773,7 +1776,7 @@ public class BinaryMapIndexWriter {
 			// first message
 			int accumulateSize = 4;
 			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
-				PoiTileBox box = tileBoxes.get(i);
+				PoiDataBlock box = tileBoxes.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
