@@ -40,7 +40,7 @@ public class SmartFolderService {
 	@Autowired
 	private WebUserdataService webUserdataService;
 
-	public List<SmartFolderWeb> getFilteredSmartFolders(int userId) {
+	public List<SmartFolderWeb> getSmartFoldersByUserId(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
 			return new ArrayList<>();
@@ -105,8 +105,8 @@ public class SmartFolderService {
 			}
 		}
 		UserFile infoFile = userDataService.getLastFileVersion(userId, uf.name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (infoFile != null && infoFile.details != null) {
-			setAppearanceFromJson(gpxFile, infoFile.details);
+		if (infoFile != null && infoFile.details != null && infoFile.details.has(DATA)) {
+			setAppearanceFromJson(gpxFile, infoFile.details.getAsJsonObject(DATA));
 		}
 		return gpxFile;
 	}

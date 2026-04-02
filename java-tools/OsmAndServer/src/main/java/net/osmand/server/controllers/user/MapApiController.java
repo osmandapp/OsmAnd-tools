@@ -2,8 +2,11 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpSession;
+import net.osmand.IndexConstants;
 import net.osmand.server.api.repo.*;
+import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
@@ -348,16 +351,60 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return webUserdataService.getListFiles(name, type, addDevices, allVersions, dev);
+		Set<String> types = userdataService.parseFileTypes(type);
+		UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
+		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
+
+		res.uniqueFiles.forEach(nd -> {
+			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
+			boolean isGpx = IndexConstants.GPX_FILE_EXT.equalsIgnoreCase(ext);
+
+			boolean isGPZTrack = isGpx && nd.type.equalsIgnoreCase(FILE_TYPE_GPX);
+			boolean isFavorite = isGpx && nd.type.equals(FILE_TYPE_FAVOURITES);
+			boolean isInfoFile = nd.name.endsWith(INFO_FILE_SUFFIX);
+
+			if (isGPZTrack) {
+				JsonObject details = getOrCreateDetails(nd);
+				if (!webUserdataService.detailsPresent(details)) {
+					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
+				}
+				nd.details = details;
+			}
+			if (isInfoFile) {
+				JsonObject details = getOrCreateDetails(nd);
+				if (!webUserdataService.detailsInfoPresent(details, nd.updatetimems)) {
+					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
+				}
+				nd.details = details;
+			}
+
+			if (isGPZTrack || isFavorite) {
+				boolean isSharedFile = webUserdataService.isShared(nd, sharedFilesMap);
+				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+			}
+		});
+
+		if (addDevices && res.allFiles != null) {
+			Map<Integer, String> devices = new HashMap<>();
+			for (CloudUserFilesRepository.UserFileNoData nd : res.allFiles) {
+				webUserdataService.addDeviceInformation(nd, devices);
+			}
+		}
+		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	@GetMapping(value = "/get-filtered-smart-folders", produces = "application/json")
-	public ResponseEntity<String> getFilteredSmartFolders() {
+	private JsonObject getOrCreateDetails(CloudUserFilesRepository.UserFileNoData nd) {
+		JsonObject details = nd.details != null ? nd.details : new JsonObject();
+		return details;
+	}
+
+	@GetMapping(value = "/get-smart-folders", produces = "application/json")
+	public ResponseEntity<String> getSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getFilteredSmartFolders(dev.userid);
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFoldersByUserId(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

@@ -69,6 +69,7 @@ public class WebUserdataService {
 	UserSessionResources sessionResources;
 
 	public static final String METADATA = "metadata";
+	public static final String DATA = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
@@ -80,7 +81,6 @@ public class WebUserdataService {
 
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
-	public static final String IS_INFO_FILE = "info";
 
 	public static final String INFO_FILE_EXT = ".info";
 	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
@@ -147,9 +147,8 @@ public class WebUserdataService {
 				}
 				if (in != null) {
 					if (of.get().name.endsWith(INFO_FILE_SUFFIX)) {
-						uf.details = getInfoDetails(in);
 						uf.details.addProperty(UPDATETIME, nd.updatetimems);
-						uf.details.addProperty(IS_INFO_FILE, true);
+						uf.details.add(DATA, getInfoDetails(in));
 						userFilesRepository.save(uf);
 						continue;
 					}
@@ -199,11 +198,10 @@ public class WebUserdataService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
-	public JsonObject getInfoDetails(InputStream inputStream) {
+	public JsonElement getInfoDetails(InputStream inputStream) {
 		try (InputStream is = new GZIPInputStream(inputStream);
 		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			JsonElement element = gson.fromJson(reader, JsonElement.class);
-			return (element != null && element.isJsonObject()) ? element.getAsJsonObject() : null;
+			return gson.fromJson(reader, JsonElement.class);
 		} catch (Exception e) {
 			LOG.warn("Failed to parse .info details JSON", e);
 			return null;
@@ -234,46 +232,8 @@ public class WebUserdataService {
 		return details;
 	}
 
-	public ResponseEntity<String> getListFiles(String name, String type, boolean addDevices, boolean allVersions,
-	                                           CloudUserDevicesRepository.CloudUserDevice dev) {
-		Set<String> types = userdataService.parseFileTypes(type);
-		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
-		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
-
-		res.uniqueFiles.forEach(nd -> {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
-			boolean isGpx = IndexConstants.GPX_FILE_EXT.equalsIgnoreCase(ext);
-
-			boolean isGPZTrack = isGpx && nd.type.equalsIgnoreCase(FILE_TYPE_GPX);
-			boolean isFavorite = isGpx && nd.type.equals(FILE_TYPE_FAVOURITES);
-			boolean isInfoFile = nd.name.endsWith(INFO_FILE_SUFFIX);
-
-			if (isGPZTrack || isInfoFile) {
-				JsonObject details = nd.details != null ? nd.details : new JsonObject();
-				if (!detailsPresent(details) || !detailsInfoPresent(details, nd.updatetimems)) {
-					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
-				}
-				nd.details = details;
-			}
-
-			if (isGPZTrack || isFavorite) {
-				boolean isSharedFile = isShared(nd, sharedFilesMap);
-				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
-			}
-		});
-
-		if (addDevices && res.allFiles != null) {
-			Map<Integer, String> devices = new HashMap<>();
-			for (CloudUserFilesRepository.UserFileNoData nd : res.allFiles) {
-				addDeviceInformation(nd, devices);
-			}
-		}
-		return ResponseEntity.ok(gson.toJson(res));
-	}
-
 	public boolean detailsPresent(JsonObject details) {
 		return details != null
-				&& !details.has(IS_INFO_FILE)
 				&& details.has(UPDATETIME)
 				&& (!details.has(ERROR_DETAILS) || detailsErrorWasChecked(details))
 				&& details.get(UPDATETIME).getAsLong() >= ANALYSIS_RERUN;
@@ -287,7 +247,7 @@ public class WebUserdataService {
 	}
 
 	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
-		return details.has(UPDATETIME) && details.get(UPDATETIME).getAsLong() == updatetimems;
+		return details != null && details.has(UPDATETIME) && details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {
