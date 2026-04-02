@@ -52,9 +52,8 @@ import com.google.gson.JsonObject;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
-
-import static net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
-import static net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController

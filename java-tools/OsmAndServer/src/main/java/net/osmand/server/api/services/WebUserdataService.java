@@ -79,7 +79,6 @@ public class WebUserdataService {
 
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
-
 	public static final String INFO_FILE_EXT = ".info";
 	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
 
