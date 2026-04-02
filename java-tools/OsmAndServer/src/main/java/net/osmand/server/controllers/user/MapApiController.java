@@ -2,14 +2,12 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
-import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpSession;
-import net.osmand.IndexConstants;
 import net.osmand.server.api.repo.*;
-import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
+import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -49,10 +47,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
+
+import static net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import static net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -352,12 +354,12 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
-		UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
+		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
-			boolean isGpx = IndexConstants.GPX_FILE_EXT.equalsIgnoreCase(ext);
+			boolean isGpx = GPX_FILE_EXT.equalsIgnoreCase(ext);
 
 			boolean isGPZTrack = isGpx && nd.type.equalsIgnoreCase(FILE_TYPE_GPX);
 			boolean isFavorite = isGpx && nd.type.equals(FILE_TYPE_FAVOURITES);
@@ -386,14 +388,14 @@ public class MapApiController {
 
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
-			for (CloudUserFilesRepository.UserFileNoData nd : res.allFiles) {
+			for (UserFileNoData nd : res.allFiles) {
 				webUserdataService.addDeviceInformation(nd, devices);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	private JsonObject getOrCreateDetails(CloudUserFilesRepository.UserFileNoData nd) {
+	private JsonObject getOrCreateDetails(UserFileNoData nd) {
 		JsonObject details = nd.details != null ? nd.details : new JsonObject();
 		return details;
 	}
