@@ -144,9 +144,17 @@ public class WebUserdataService {
 				}
 				if (in != null) {
 					if (of.get().name.endsWith(INFO_FILE_SUFFIX)) {
-						uf.details.addProperty(UPDATETIME, nd.updatetimems);
-						uf.details.add(DATA, getInfoDetails(in));
-						userFilesRepository.save(uf);
+						JsonElement infoDetails = getInfoDetails(in);
+						if (infoDetails != null) {
+							if (uf.details == null) {
+								uf.details = new JsonObject();
+							}
+							uf.details.addProperty(UPDATETIME, nd.updatetimems);
+							uf.details.add(DATA, infoDetails);
+							userFilesRepository.save(uf);
+							nd.details = uf.details;
+							result.add(nd);
+						}
 						continue;
 					}
 					in = new GZIPInputStream(in);
@@ -244,7 +252,10 @@ public class WebUserdataService {
 	}
 
 	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
-		return details != null && details.has(UPDATETIME) && details.get(UPDATETIME).getAsLong() == updatetimems;
+		return details != null
+				&& details.has(UPDATETIME)
+				&& details.has(DATA)
+				&& details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {
