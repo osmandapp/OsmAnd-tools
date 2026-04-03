@@ -67,7 +67,7 @@ public class WebUserdataService {
 	UserSessionResources sessionResources;
 
 	public static final String METADATA = "metadata";
-	public static final String DATA = "data";
+	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
@@ -150,7 +150,7 @@ public class WebUserdataService {
 								uf.details = new JsonObject();
 							}
 							uf.details.addProperty(UPDATETIME, nd.updatetimems);
-							uf.details.add(DATA, infoDetails);
+							uf.details.add(INFO_DATA_JSON, infoDetails);
 							userFilesRepository.save(uf);
 							nd.details = uf.details;
 							result.add(nd);
@@ -254,7 +254,7 @@ public class WebUserdataService {
 	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
 		return details != null
 				&& details.has(UPDATETIME)
-				&& details.has(DATA)
+				&& details.has(INFO_DATA_JSON)
 				&& details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 

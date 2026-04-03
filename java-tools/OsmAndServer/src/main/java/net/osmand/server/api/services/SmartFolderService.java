@@ -105,8 +105,8 @@ public class SmartFolderService {
 			}
 		}
 		UserFile infoFile = userDataService.getLastFileVersion(userId, uf.name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (infoFile != null && infoFile.details != null && infoFile.details.has(DATA)) {
-			setAppearanceFromJson(gpxFile, infoFile.details.getAsJsonObject(DATA));
+		if (infoFile != null && infoFile.details != null && infoFile.details.has(INFO_DATA_JSON)) {
+			setAppearanceFromJson(gpxFile, infoFile.details.getAsJsonObject(INFO_DATA_JSON));
 		}
 		return gpxFile;
 	}
