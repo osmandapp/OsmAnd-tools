@@ -1,8 +1,6 @@
 package net.osmand.server.controllers.pub;
 
-import java.io.Serial;
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -19,15 +17,16 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,7 +61,8 @@ public class GarminConnectController {
 	private static final String JSON_EXPIRES_IN = "expires_in";
 	private static final String JSON_USER_ID = "userId";
 
-	private static final String SESSION_ATTR_GARMIN_PKCE_PENDING = "GARMIN_OAUTH_PKCE_PENDING";
+	private static final String REDIS_KEY_PREFIX = "garmin:pkce:";
+	private static final Duration PKCE_TTL = Duration.ofMinutes(10);
 
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -73,6 +73,13 @@ public class GarminConnectController {
 
 	@Autowired
 	private OsmAndMapsService osmAndMapsService;
+
+	@Autowired(required = false)
+	private RedisConnectionFactory redisConnectionFactory;
+
+	private StringRedisTemplate redisTemplate;
+
+	private final ConcurrentHashMap<String, PendingEntry> localPendingMap = new ConcurrentHashMap<>();
 
 	@Value("${GARMIN_CLIENT_ID:}")
 	private String clientId;
@@ -86,9 +93,7 @@ public class GarminConnectController {
 	@Value("${GARMIN_SUCCESS_REDIRECT:}")
 	private String successRedirect;
 
-	private record PendingAuth(int userid, String codeVerifier) implements Serializable {
-		@Serial
-		private static final long serialVersionUID = 1L;
+	private record PendingEntry(int userid, String codeVerifier, long expiresAt) {
 	}
 
 	private enum DisconnectResult {
@@ -96,12 +101,56 @@ public class GarminConnectController {
 		NOT_LINKED
 	}
 
+	@PostConstruct
+	private void init() {
+		if (redisConnectionFactory != null) {
+			redisTemplate = new StringRedisTemplate(redisConnectionFactory);
+			redisTemplate.afterPropertiesSet();
+			LOG.info("GarminConnectController: PKCE store backed by Redis");
+		} else {
+			LOG.info("GarminConnectController: PKCE store backed by in-memory map (single instance only)");
+		}
+	}
+
+	private void storePending(String state, int userid, String codeVerifier) {
+		String json = GSON.toJson(Map.of("userid", userid, "codeVerifier", codeVerifier));
+		if (redisTemplate != null) {
+			redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + state, json, PKCE_TTL);
+		} else {
+			long expiresAt = System.currentTimeMillis() + PKCE_TTL.toMillis();
+			localPendingMap.put(state, new PendingEntry(userid, codeVerifier, expiresAt));
+			evictExpiredEntries();
+		}
+	}
+
+	private PendingEntry removePending(String state) {
+		if (redisTemplate != null) {
+			String json = redisTemplate.opsForValue().getAndDelete(REDIS_KEY_PREFIX + state);
+			if (json == null) {
+				return null;
+			}
+			JsonObject obj = new JsonParser().parse(json).getAsJsonObject();
+			return new PendingEntry(obj.get("userid").getAsInt(), obj.get("codeVerifier").getAsString(), 0);
+		} else {
+			PendingEntry entry = localPendingMap.remove(state);
+			if (entry == null || System.currentTimeMillis() > entry.expiresAt) {
+				return null;
+			}
+			return entry;
+		}
+	}
+
+	private void evictExpiredEntries() {
+		long now = System.currentTimeMillis();
+		localPendingMap.values().removeIf(pendingEntry -> now > pendingEntry.expiresAt);
+	}
+
 	public GarminUserConnection getConnectionOrNull(int userid) {
 		return garminUserConnectionRepository.findByUserid(userid);
 	}
 
 	@GetMapping("/mapapi/garmin/connect/start")
-	public void start(HttpServletRequest request, HttpServletResponse response) throws IOException {
+	public void start(HttpServletResponse response) throws IOException {
 		if (isNotConfigured()) {
 			response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "Garmin OAuth is not configured");
 			return;
@@ -111,12 +160,10 @@ public class GarminConnectController {
 			response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Login required");
 			return;
 		}
-		HttpSession session = request.getSession(true);
-		ConcurrentHashMap<String, PendingAuth> pending = pendingMap(session);
 		String verifier = generateCodeVerifier();
 		String challenge = codeChallengeS256(verifier);
 		String state = UUID.randomUUID().toString();
-		pending.put(state, new PendingAuth(dev.userid, verifier));
+		storePending(state, dev.userid, verifier);
 
 		String url = UriComponentsBuilder.fromUriString(AUTH_URL)
 				.queryParam("response_type", "code")
@@ -134,7 +181,6 @@ public class GarminConnectController {
 
 	@GetMapping("/garmin/oauth/callback")
 	public void callback(
-			HttpServletRequest request,
 			@RequestParam(value = "code", required = false) String code,
 			@RequestParam(value = "state", required = false) String state,
 			@RequestParam(value = "error", required = false) String error,
@@ -148,13 +194,7 @@ public class GarminConnectController {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing code or state");
 			return;
 		}
-		HttpSession httpSession = request.getSession(false);
-		if (httpSession == null) {
-			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Session expired, please try again");
-			return;
-		}
-		ConcurrentHashMap<String, PendingAuth> pendingByState = pendingMap(httpSession);
-		PendingAuth pending = pendingByState.remove(state);
+		PendingEntry pending = removePending(state);
 		if (pending == null) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid or expired state");
 			return;
@@ -180,7 +220,7 @@ public class GarminConnectController {
 
 			String garminUserId = fetchGarminUserId(row.accessToken);
 			if (garminUserId == null) {
-				LOG.warn("Garmin OAuth: authorization code was already consumed; user must start /mapapi/garmin/connect/start again (one-time code).");
+				LOG.warn("Garmin OAuth: could not fetch Garmin user id for userid=" + pending.userid);
 				response.sendError(HttpServletResponse.SC_BAD_GATEWAY, "Could not load Garmin user id");
 				return;
 			}
@@ -366,17 +406,6 @@ public class GarminConnectController {
 		return clientId == null || clientId.isBlank()
 				|| clientSecret == null || clientSecret.isBlank()
 				|| redirectUri == null || redirectUri.isBlank();
-	}
-
-	@SuppressWarnings("unchecked")
-	private static ConcurrentHashMap<String, PendingAuth> pendingMap(HttpSession session) {
-		Object raw = session.getAttribute(SESSION_ATTR_GARMIN_PKCE_PENDING);
-		if (raw instanceof ConcurrentHashMap<?, ?> existing) {
-			return (ConcurrentHashMap<String, PendingAuth>) existing;
-		}
-		ConcurrentHashMap<String, PendingAuth> map = new ConcurrentHashMap<>();
-		session.setAttribute(SESSION_ATTR_GARMIN_PKCE_PENDING, map);
-		return map;
 	}
 
 	private static String urlEncode(String v) {
