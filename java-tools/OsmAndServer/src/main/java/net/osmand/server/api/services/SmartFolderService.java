@@ -23,8 +23,7 @@ import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GLOBAL;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.server.api.services.WebUserdataService.*;
-import static net.osmand.shared.gpx.GpxUtilities.COLOR_NAME_EXTENSION;
-import static net.osmand.shared.gpx.GpxUtilities.LINE_WIDTH_EXTENSION;
+import static net.osmand.shared.gpx.GpxUtilities.*;
 import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PREF;
 
 @Service
@@ -33,6 +32,7 @@ public class SmartFolderService {
 	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
+	public static final String EXTENSIONS_JSON = "extensions";
 
 	@Autowired
 	private UserdataService userDataService;
@@ -54,6 +54,8 @@ public class SmartFolderService {
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
 				dataItem.readGpxParams(gpxFile);
 				dataItem.setAnalysis(webUserdataService.getAnalysisFromJson(uf.details));
+				dataItem.setParameter(GpxParameter.ACTIVITY_TYPE, gpxFile.getMetadata().getExtensionsToRead()
+						.get(ACTIVITY_TYPE));
 				TrackItem trackItem = new TrackItem(gpxFile);
 				trackItem.setDataItem(dataItem);
 				trackItems.add(trackItem);
@@ -101,6 +103,14 @@ public class SmartFolderService {
 				JsonElement time = metadata.get("time");
 				if (time != null) {
 					gpxFile.getMetadata().setTime(time.getAsLong());
+				}
+				JsonObject extensions = metadata.getAsJsonObject(EXTENSIONS_JSON);
+				if (extensions != null) {
+					JsonElement activityType = extensions.get(ACTIVITY_TYPE);
+					if (activityType != null) {
+						Map<String, String> extensionsToWrite = gpxFile.getMetadata().getExtensionsToWrite();
+						extensionsToWrite.put(ACTIVITY_TYPE, activityType.getAsString());
+					}
 				}
 			}
 		}
