@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserSessionResources;
-import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
@@ -66,6 +67,7 @@ public class WebUserdataService {
 	UserSessionResources sessionResources;
 
 	public static final String METADATA = "metadata";
+	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
@@ -78,6 +80,7 @@ public class WebUserdataService {
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
 	public static final String INFO_FILE_EXT = ".info";
+	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
 
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
@@ -108,7 +111,7 @@ public class WebUserdataService {
 				}
 			}
 			Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
-			UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
+			UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
 			if (res.uniqueFiles.isEmpty()) {
 				LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
 				continue;
@@ -140,6 +143,20 @@ public class WebUserdataService {
 					continue;
 				}
 				if (in != null) {
+					if (of.get().name.endsWith(INFO_FILE_SUFFIX)) {
+						JsonElement infoDetails = getInfoDetails(in);
+						if (infoDetails != null) {
+							if (uf.details == null) {
+								uf.details = new JsonObject();
+							}
+							uf.details.addProperty(UPDATETIME, nd.updatetimems);
+							uf.details.add(INFO_DATA_JSON, infoDetails);
+							userFilesRepository.save(uf);
+							nd.details = uf.details;
+							result.add(nd);
+						}
+						continue;
+					}
 					in = new GZIPInputStream(in);
 					try (Source source = new Buffer().readFrom(in)) {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
@@ -186,6 +203,16 @@ public class WebUserdataService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
+	public JsonElement getInfoDetails(InputStream inputStream) {
+		try (InputStream is = new GZIPInputStream(inputStream);
+		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			return gson.fromJson(reader, JsonElement.class);
+		} catch (Exception e) {
+			LOG.warn("Failed to parse .info details JSON", e);
+			return null;
+		}
+	}
+
 	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isShared) {
 		JsonObject details = new JsonObject();
 		if (gpxFile != null) {
@@ -222,6 +249,13 @@ public class WebUserdataService {
 				&& details.has(ERROR_DETAILS)
 				&& details.has(UPDATETIME)
 				&& System.currentTimeMillis() - details.get(UPDATETIME).getAsLong() < ERROR_LIFETIME;
+	}
+
+	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
+		return details != null
+				&& details.has(UPDATETIME)
+				&& details.has(INFO_DATA_JSON)
+				&& details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {
