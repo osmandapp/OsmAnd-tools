@@ -12,8 +12,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -36,6 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -54,7 +58,13 @@ public class GarminConnectController {
 	private static final String AUTH_URL = "https://connect.garmin.com/oauth2Confirm";
 	private static final String TOKEN_URL = "https://diauth.garmin.com/di-oauth2-service/oauth/token";
 	private static final String USER_ID_URL = "https://apis.garmin.com/wellness-api/rest/user/id";
+	private static final String USER_PERMISSIONS_URL = "https://apis.garmin.com/wellness-api/rest/user/permissions";
 	private static final String PARTNER_REGISTRATION_URL = "https://apis.garmin.com/wellness-api/rest/user/registration";
+
+	private static final String JSON_PERMISSIONS = "permissions";
+
+	private static final String PERM_HISTORICAL_DATA_EXPORT = "HISTORICAL_DATA_EXPORT";
+	private static final String PERM_ACTIVITY_EXPORT = "ACTIVITY_EXPORT";
 
 	private static final String JSON_ACCESS_TOKEN = "access_token";
 	private static final String JSON_REFRESH_TOKEN = "refresh_token";
@@ -232,6 +242,7 @@ public class GarminConnectController {
 			}
 
 			row.garminUserId = garminUserId;
+			applyUserPermissionsFromGarmin(row);
 			try {
 				garminUserConnectionRepository.save(row);
 			} catch (DataIntegrityViolationException ex) {
@@ -313,6 +324,64 @@ public class GarminConnectController {
 			return null;
 		}
 		return new JsonParser().parse(tokenRes.body()).getAsJsonObject();
+	}
+
+	private void applyUserPermissionsFromGarmin(GarminUserConnection row) {
+		row.historicalDataExport = false;
+		row.activityExport = false;
+		try {
+			JsonArray permArray = fetchGarminPermissionsArray(row.accessToken);
+			if (permArray == null) {
+				return;
+			}
+			Set<String> granted = permissionsToSet(permArray);
+			row.historicalDataExport = granted.contains(PERM_HISTORICAL_DATA_EXPORT);
+			row.activityExport = granted.contains(PERM_ACTIVITY_EXPORT);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			LOG.warn("Garmin user permissions interrupted");
+		} catch (Exception e) {
+			LOG.warn("Garmin user permissions request failed", e);
+		}
+	}
+
+	private JsonArray fetchGarminPermissionsArray(String accessToken) throws IOException, InterruptedException {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(USER_PERMISSIONS_URL))
+				.timeout(Duration.ofSeconds(15))
+				.header("Authorization", "Bearer " + accessToken)
+				.GET()
+				.build();
+		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		if (res.statusCode() / 100 != 2) {
+			LOG.warn("Garmin user permissions failed: HTTP " + res.statusCode() + " " + res.body());
+			return null;
+		}
+		return extractPermissionsArray(res.body());
+	}
+
+	private static JsonArray extractPermissionsArray(String jsonBody) {
+		JsonElement root = new JsonParser().parse(jsonBody);
+		if (root.isJsonObject()) {
+			JsonObject obj = root.getAsJsonObject();
+			if (obj.has(JSON_PERMISSIONS) && obj.get(JSON_PERMISSIONS).isJsonArray()) {
+				return obj.getAsJsonArray(JSON_PERMISSIONS);
+			}
+		} else if (root.isJsonArray()) {
+			return root.getAsJsonArray();
+		}
+		LOG.warn("Garmin user permissions: expected object with \"permissions\" array or a JSON array");
+		return null;
+	}
+
+	private static Set<String> permissionsToSet(JsonArray permArray) {
+		Set<String> granted = new HashSet<>();
+		for (JsonElement e : permArray) {
+			if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
+				granted.add(e.getAsString());
+			}
+		}
+		return granted;
 	}
 
 	private String fetchGarminUserId(String accessToken) throws IOException, InterruptedException {

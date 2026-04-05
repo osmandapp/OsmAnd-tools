@@ -43,5 +43,11 @@ public interface GarminUserConnectionRepository extends JpaRepository<GarminUser
 
 		@Column(name = "access_expires_time", nullable = false)
 		public long accessExpiresTime;
+
+		@Column(name = "historical_data_export", nullable = false)
+		public boolean historicalDataExport;
+
+		@Column(name = "activity_export", nullable = false)
+		public boolean activityExport;
 	}
 }
