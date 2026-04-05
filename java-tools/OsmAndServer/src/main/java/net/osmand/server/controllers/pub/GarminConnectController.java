@@ -76,6 +76,7 @@ public class GarminConnectController {
 
 	private static final String JSON_PERMISSIONS = "permissions";
 	private static final String JSON_ACTIVITY_FILES = "activityFiles";
+	private static final String JSON_USER_PERMISSIONS_CHANGE = "userPermissionsChange";
 
 	private static final String PERM_HISTORICAL_DATA_EXPORT = "HISTORICAL_DATA_EXPORT";
 	private static final String PERM_ACTIVITY_EXPORT = "ACTIVITY_EXPORT";
@@ -175,7 +176,14 @@ public class GarminConnectController {
 				return null;
 			}
 			JsonObject obj = new JsonParser().parse(json).getAsJsonObject();
-			return new PendingEntry(obj.get("userid").getAsInt(), obj.get("codeVerifier").getAsString(), 0);
+			if (!obj.has("userid") || obj.get("userid").isJsonNull()) {
+				return null;
+			}
+			String codeVerifier = jsonObjectMemberAsString(obj, "codeVerifier");
+			if (codeVerifier == null) {
+				return null;
+			}
+			return new PendingEntry(obj.get("userid").getAsInt(), codeVerifier, 0);
 		} else {
 			PendingEntry entry = localPendingMap.remove(state);
 			if (entry == null || System.currentTimeMillis() > entry.expiresAt) {
@@ -336,6 +344,16 @@ public class GarminConnectController {
 		return ResponseEntity.ok().build();
 	}
 
+	@PostMapping(value = "/garmin/webhook/user-permissions", consumes = "application/json")
+	public ResponseEntity<Void> userPermissionsWebhook(@RequestBody String body) {
+		try {
+			applyUserPermissionsWebhookPayload(body);
+		} catch (Exception e) {
+			LOG.error("Garmin user permissions webhook: processing failed", e);
+		}
+		return ResponseEntity.ok().build();
+	}
+
 	@GetMapping(value = "/mapapi/garmin/status", produces = "application/json")
 	public ResponseEntity<String> status() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -372,16 +390,13 @@ public class GarminConnectController {
 	}
 
 	private void applyUserPermissionsFromGarmin(GarminUserConnection row) {
-		row.historicalDataExport = false;
-		row.activityExport = false;
+		applyGarminPermissionFlags(row, Set.of());
 		try {
 			JsonArray permArray = fetchGarminPermissionsArray(row.accessToken);
 			if (permArray == null) {
 				return;
 			}
-			Set<String> granted = permissionsToSet(permArray);
-			row.historicalDataExport = granted.contains(PERM_HISTORICAL_DATA_EXPORT);
-			row.activityExport = granted.contains(PERM_ACTIVITY_EXPORT);
+			applyGarminPermissionFlags(row, permissionsToSet(permArray));
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			LOG.warn("Garmin user permissions interrupted");
@@ -429,6 +444,11 @@ public class GarminConnectController {
 		return granted;
 	}
 
+	private static void applyGarminPermissionFlags(GarminUserConnection row, Set<String> granted) {
+		row.historicalDataExport = granted.contains(PERM_HISTORICAL_DATA_EXPORT);
+		row.activityExport = granted.contains(PERM_ACTIVITY_EXPORT);
+	}
+
 	private String fetchGarminUserId(String accessToken) throws IOException, InterruptedException {
 		HttpRequest userReq = HttpRequest.newBuilder()
 				.uri(URI.create(USER_ID_URL))
@@ -442,14 +462,15 @@ public class GarminConnectController {
 			return null;
 		}
 		JsonObject userJson = new JsonParser().parse(userRes.body()).getAsJsonObject();
-		return userJson.get(JSON_USER_ID).getAsString();
+		return jsonObjectMemberAsString(userJson, JSON_USER_ID);
 	}
 
 	private void applyTokenResponse(GarminUserConnection row, JsonObject tokenJson) {
-		row.accessToken = tokenJson.get(JSON_ACCESS_TOKEN).getAsString();
-		if (tokenJson.has(JSON_REFRESH_TOKEN) && !tokenJson.get(JSON_REFRESH_TOKEN).isJsonNull()
-				&& !tokenJson.get(JSON_REFRESH_TOKEN).getAsString().isEmpty()) {
-			row.refreshToken = tokenJson.get(JSON_REFRESH_TOKEN).getAsString();
+		String access = jsonObjectMemberAsString(tokenJson, JSON_ACCESS_TOKEN);
+		row.accessToken = access != null ? access : "";
+		String refresh = jsonObjectMemberAsString(tokenJson, JSON_REFRESH_TOKEN);
+		if (refresh != null) {
+			row.refreshToken = refresh;
 		}
 		int expiresIn = tokenJson.has(JSON_EXPIRES_IN) ? tokenJson.get(JSON_EXPIRES_IN).getAsInt() : 86400;
 		row.accessExpiresTime = System.currentTimeMillis() + Math.max(60, expiresIn - 600) * 1000L;
@@ -524,6 +545,38 @@ public class GarminConnectController {
 				LOG.error("Garmin activity ping: processing failed", e);
 			}
 		});
+	}
+
+	private void applyUserPermissionsWebhookPayload(String body) {
+		if (body == null || body.isBlank()) {
+			return;
+		}
+		JsonElement root = new JsonParser().parse(body);
+		if (!root.isJsonObject()) {
+			return;
+		}
+		JsonObject obj = root.getAsJsonObject();
+		JsonElement changes = obj.get(JSON_USER_PERMISSIONS_CHANGE);
+		if (changes == null || !changes.isJsonArray()) {
+			return;
+		}
+		for (JsonElement el : changes.getAsJsonArray()) {
+			if (!el.isJsonObject()) {
+				continue;
+			}
+			JsonObject entry = el.getAsJsonObject();
+			String garminUserId = jsonObjectMemberAsString(entry, JSON_USER_ID);
+			JsonElement perms = entry.get(JSON_PERMISSIONS);
+			if (garminUserId == null || perms == null || !perms.isJsonArray()) {
+				continue;
+			}
+			GarminUserConnection conn = garminUserConnectionRepository.findByGarminUserId(garminUserId);
+			if (conn == null) {
+				continue;
+			}
+			applyGarminPermissionFlags(conn, permissionsToSet(perms.getAsJsonArray()));
+			garminUserConnectionRepository.save(conn);
+		}
 	}
 
 	private void handleActivityBackfill(int userid) {
@@ -608,9 +661,9 @@ public class GarminConnectController {
 	private void processOneActivityFile(JsonObject o, Map<String, GarminUserConnection> connByGarminUserId,
 			Map<String, CloudUserDevice> webDevByGarminUserId) {
 		// Check user
-		String garminUserId = jsonObjectMemberAsString(o, "userId");
+		String garminUserId = jsonObjectMemberAsString(o, JSON_USER_ID);
 		String callbackUrl = jsonObjectMemberAsString(o, "callbackURL");
-		if (callbackUrl == null || callbackUrl.isBlank() || garminUserId == null || garminUserId.isBlank()) {
+		if (callbackUrl == null || garminUserId == null) {
 			LOG.warn("Garmin activityFiles: missing userId or callbackURL");
 			return;
 		}
