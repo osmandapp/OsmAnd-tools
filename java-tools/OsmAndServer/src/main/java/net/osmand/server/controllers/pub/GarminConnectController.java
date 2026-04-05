@@ -77,6 +77,7 @@ public class GarminConnectController {
 	private static final String JSON_PERMISSIONS = "permissions";
 	private static final String JSON_ACTIVITY_FILES = "activityFiles";
 	private static final String JSON_USER_PERMISSIONS_CHANGE = "userPermissionsChange";
+	private static final String JSON_DEREGISTRATIONS = "deregistrations";
 
 	private static final String PERM_HISTORICAL_DATA_EXPORT = "HISTORICAL_DATA_EXPORT";
 	private static final String PERM_ACTIVITY_EXPORT = "ACTIVITY_EXPORT";
@@ -354,6 +355,16 @@ public class GarminConnectController {
 		return ResponseEntity.ok().build();
 	}
 
+	@PostMapping(value = "/garmin/webhook/deregistrations", consumes = "application/json")
+	public ResponseEntity<Void> deregistrationsWebhook(@RequestBody String body) {
+		try {
+			applyDeregistrationsWebhookPayload(body);
+		} catch (Exception e) {
+			LOG.error("Garmin deregistrations webhook: processing failed", e);
+		}
+		return ResponseEntity.ok().build();
+	}
+
 	@GetMapping(value = "/mapapi/garmin/status", produces = "application/json")
 	public ResponseEntity<String> status() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -576,6 +587,35 @@ public class GarminConnectController {
 			}
 			applyGarminPermissionFlags(conn, permissionsToSet(perms.getAsJsonArray()));
 			garminUserConnectionRepository.save(conn);
+		}
+	}
+
+	private void applyDeregistrationsWebhookPayload(String body) {
+		if (body == null || body.isBlank()) {
+			return;
+		}
+		JsonElement root = new JsonParser().parse(body);
+		if (!root.isJsonObject()) {
+			return;
+		}
+		JsonObject obj = root.getAsJsonObject();
+		JsonElement entries = obj.get(JSON_DEREGISTRATIONS);
+		if (entries == null || !entries.isJsonArray()) {
+			return;
+		}
+		for (JsonElement el : entries.getAsJsonArray()) {
+			if (!el.isJsonObject()) {
+				continue;
+			}
+			String garminUserId = jsonObjectMemberAsString(el.getAsJsonObject(), JSON_USER_ID);
+			if (garminUserId == null) {
+				continue;
+			}
+			GarminUserConnection conn = garminUserConnectionRepository.findByGarminUserId(garminUserId);
+			if (conn != null) {
+				garminUserConnectionRepository.delete(conn);
+				LOG.info("Garmin deregistration: removed link userid=" + conn.userid + " garminUserId=" + garminUserId);
+			}
 		}
 	}
 
