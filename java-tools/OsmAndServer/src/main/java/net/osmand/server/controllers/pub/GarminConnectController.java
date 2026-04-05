@@ -1,5 +1,6 @@
 package net.osmand.server.controllers.pub;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -7,17 +8,21 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,6 +38,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -42,11 +48,17 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
+import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.GarminUserConnectionRepository;
 import net.osmand.server.api.repo.GarminUserConnectionRepository.GarminUserConnection;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.StorageService.InternalZipFile;
+import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 
 @RestController
 public class GarminConnectController {
@@ -60,8 +72,10 @@ public class GarminConnectController {
 	private static final String USER_ID_URL = "https://apis.garmin.com/wellness-api/rest/user/id";
 	private static final String USER_PERMISSIONS_URL = "https://apis.garmin.com/wellness-api/rest/user/permissions";
 	private static final String PARTNER_REGISTRATION_URL = "https://apis.garmin.com/wellness-api/rest/user/registration";
+	private static final String BACKFILL_ACTIVITIES_URL = "https://apis.garmin.com/wellness-api/rest/backfill/activities";
 
 	private static final String JSON_PERMISSIONS = "permissions";
+	private static final String JSON_ACTIVITY_FILES = "activityFiles";
 
 	private static final String PERM_HISTORICAL_DATA_EXPORT = "HISTORICAL_DATA_EXPORT";
 	private static final String PERM_ACTIVITY_EXPORT = "ACTIVITY_EXPORT";
@@ -74,6 +88,18 @@ public class GarminConnectController {
 	private static final String REDIS_KEY_PREFIX = "garmin:pkce:";
 	private static final Duration PKCE_TTL = Duration.ofMinutes(10);
 
+	private static final long MAX_BACKFILL_RANGE_SEC = 30L * 24 * 3600;
+	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 180;
+
+	// for tests
+	private static final long SEC_PER_DAY = 24L * 3600;
+	private static final long backfillSummaryEndTimeSec = -1;
+	private static final long backfillSummaryStartTimeSec = backfillSummaryEndTimeSec - 7 * SEC_PER_DAY;
+
+	private static final Pattern SAFE_GARMIN_SUMMARY_ID = Pattern.compile("^[a-zA-Z0-9._-]+$");
+	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
+	private static final String GPX_FOLDER_GARMIN = "Garmin";
+
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
 	private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -83,6 +109,15 @@ public class GarminConnectController {
 
 	@Autowired
 	private OsmAndMapsService osmAndMapsService;
+
+	@Autowired
+	private CloudUserDevicesRepository devicesRepository;
+
+	@Autowired
+	private UserdataService userdataService;
+
+	@Autowired
+	private CloudUserFilesRepository cloudUserFilesRepository;
 
 	@Autowired(required = false)
 	private RedisConnectionFactory redisConnectionFactory;
@@ -253,6 +288,10 @@ public class GarminConnectController {
 
 			LOG.info("Garmin linked for OsmAnd userid=" + pending.userid + " garminUserId=" + garminUserId);
 
+			if (row.historicalDataExport) {
+				handleActivityBackfill(pending.userid);
+			}
+
 			response.sendRedirect(successRedirect + (successRedirect.contains("?") ? "&" : "?") + "garmin=connected");
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -289,6 +328,12 @@ public class GarminConnectController {
 			LOG.error("Garmin disconnect failed", e);
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
 		}
+	}
+
+	@PostMapping(value = "/garmin/webhook/activity-ping", consumes = "application/json")
+	public ResponseEntity<Void> activityPing(@RequestBody String body) {
+		handleActivityPingPayloadAsync(body);
+		return ResponseEntity.ok().build();
 	}
 
 	@GetMapping(value = "/mapapi/garmin/status", produces = "application/json")
@@ -469,6 +514,253 @@ public class GarminConnectController {
 		}
 		garminUserConnectionRepository.delete(row);
 		return DisconnectResult.OK;
+	}
+
+	private void handleActivityPingPayloadAsync(String body) {
+		CompletableFuture.runAsync(() -> {
+			try {
+				processActivityPingBody(body);
+			} catch (Exception e) {
+				LOG.error("Garmin activity ping: processing failed", e);
+			}
+		});
+	}
+
+	private void handleActivityBackfill(int userid) {
+		CompletableFuture.runAsync(() -> {
+			try {
+				runActivityBackfillForUser(userid);
+			} catch (Exception e) {
+				LOG.error("Garmin backfill: failed for userid=" + userid, e);
+			}
+		});
+	}
+
+	/** Processes the JSON body of the Garmin activity ping, which contains an array of recently completed activity files.
+	 * For each file, checks permissions and downloads/uploads if valid. */
+	private void processActivityPingBody(String body) {
+		if (body == null || body.isBlank()) {
+			return;
+		}
+		JsonElement root = new JsonParser().parse(body);
+		if (!root.isJsonObject()) {
+			return;
+		}
+		JsonObject obj = root.getAsJsonObject();
+		if (!obj.has(JSON_ACTIVITY_FILES) || !obj.get(JSON_ACTIVITY_FILES).isJsonArray()) {
+			return;
+		}
+		Map<String, GarminUserConnection> connByGarminUserId = new HashMap<>();
+		Map<String, CloudUserDevice> webDevByGarminUserId = new HashMap<>();
+		for (JsonElement el : obj.getAsJsonArray(JSON_ACTIVITY_FILES)) {
+			if (el.isJsonObject()) {
+				processOneActivityFile(el.getAsJsonObject(), connByGarminUserId, webDevByGarminUserId);
+			}
+		}
+	}
+
+	/** Runs the backfill for one user, splitting into multiple requests if needed. */
+	private void runActivityBackfillForUser(int userid) throws IOException, InterruptedException {
+		GarminUserConnection row = garminUserConnectionRepository.findByUserid(userid);
+		if (row == null || !row.historicalDataExport) {
+			return;
+		}
+		if (isNotConfigured()) {
+			LOG.warn("Garmin backfill: OAuth client not configured");
+			return;
+		}
+		if (!ensureAccessTokenFresh(row)) {
+			LOG.warn("Garmin backfill: cannot refresh access token userid=" + userid);
+			return;
+		}
+		long endSec = backfillSummaryEndTimeSec >= 0L
+				? backfillSummaryEndTimeSec
+				: System.currentTimeMillis() / 1000L;
+		long startSec = backfillSummaryStartTimeSec >= 0L
+				? backfillSummaryStartTimeSec
+				: endSec - ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK * 24L * 3600L;
+		if (startSec > endSec) {
+			LOG.warn("Garmin backfill/activities: summary start after end, skipped userid=" + userid);
+			return;
+		}
+		for (long wStart = startSec; wStart <= endSec; ) {
+			long wEnd = Math.min(wStart + MAX_BACKFILL_RANGE_SEC - 1, endSec);
+			String uri = BACKFILL_ACTIVITIES_URL
+					+ "?summaryStartTimeInSeconds=" + wStart
+					+ "&summaryEndTimeInSeconds=" + wEnd;
+			HttpRequest req = HttpRequest.newBuilder()
+					.uri(URI.create(uri))
+					.timeout(Duration.ofSeconds(60))
+					.header("Authorization", "Bearer " + row.accessToken)
+					.GET()
+					.build();
+			HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+			int code = res.statusCode();
+			if (code == 202 || code == 409) {
+				LOG.info("Garmin backfill/activities: HTTP " + code + " range " + wStart + ".." + wEnd + " userid=" + userid);
+			} else {
+				LOG.warn("Garmin backfill/activities: HTTP " + code + " " + res.body());
+			}
+			wStart = wEnd + 1;
+		}
+	}
+
+	private void processOneActivityFile(JsonObject o, Map<String, GarminUserConnection> connByGarminUserId,
+			Map<String, CloudUserDevice> webDevByGarminUserId) {
+		// Check user
+		String garminUserId = jsonObjectMemberAsString(o, "userId");
+		String callbackUrl = jsonObjectMemberAsString(o, "callbackURL");
+		if (callbackUrl == null || callbackUrl.isBlank() || garminUserId == null || garminUserId.isBlank()) {
+			LOG.warn("Garmin activityFiles: missing userId or callbackURL");
+			return;
+		}
+		GarminUserConnection conn = connByGarminUserId.computeIfAbsent(garminUserId,
+				id -> garminUserConnectionRepository.findByGarminUserId(id));
+		if (conn == null) {
+			LOG.warn("Garmin activityFiles: no linked OsmAnd user for garminUserId=" + garminUserId);
+			return;
+		}
+		// Check permissions
+		if (!conn.activityExport) {
+			LOG.warn("Garmin activityFiles: ACTIVITY_EXPORT not granted, userid=" + conn.userid + " garminUserId=" + garminUserId);
+			return;
+		}
+		CloudUserDevice dev = webDevByGarminUserId.computeIfAbsent(garminUserId,
+				id -> devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(conn.userid,
+						UserdataService.TOKEN_DEVICE_WEB));
+		if (dev == null) {
+			LOG.warn("Garmin activityFiles: no web device for userid=" + conn.userid);
+			return;
+		}
+		// Check file type
+		String fileType = jsonObjectMemberAsString(o, "fileType");
+		boolean isGpx = fileType != null && fileType.equalsIgnoreCase(UserdataService.FILE_TYPE_GPX);
+		boolean isFit = fileType != null && fileType.equalsIgnoreCase("FIT");
+		if (!isGpx && !isFit) {
+			return;
+		}
+		// Check file name and skip if already exists in cloud
+		String baseFileName = buildGarminActivityBaseFileName(o);
+		if (baseFileName == null) {
+			LOG.warn("Garmin activityFiles: missing or invalid summaryId / file base name");
+			return;
+		}
+		String ext = isGpx ? ".gpx" : ".fit";
+		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ext;
+		if (cloudUserFilesRepository.existsByUseridAndNameAndType(conn.userid, cloudName, UserdataService.FILE_TYPE_GPX)) {
+			LOG.info("Garmin activityFiles: skip duplicate " + cloudName + " userid=" + conn.userid);
+			return;
+		}
+		// Check access token and refresh if needed
+		try {
+			if (!ensureAccessTokenFresh(conn)) {
+				LOG.warn("Garmin activityFiles: token refresh failed userid=" + conn.userid);
+				return;
+			}
+		} catch (IOException | InterruptedException e) {
+			reinterruptIfInterrupted(e);
+			LOG.warn("Garmin activityFiles: token refresh error userid=" + conn.userid, e);
+			return;
+		}
+		// Save file to temp, upload to cloud and clean up
+		byte[] raw;
+		try {
+			raw = httpGetCallbackBytes(callbackUrl, conn.accessToken);
+		} catch (IOException | InterruptedException e) {
+			reinterruptIfInterrupted(e);
+			LOG.warn("Garmin activityFiles: download failed baseFileName=" + baseFileName, e);
+			return;
+		}
+		File tmp = null;
+		try {
+			tmp = File.createTempFile("garmin-act-", ".gpx");
+			Files.write(tmp.toPath(), raw);
+			InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp);
+			tmp = null;
+			userdataService.validateUserForUpload(dev, UserdataService.FILE_TYPE_GPX, zip.getSize());
+			userdataService.uploadFile(zip, dev, cloudName, UserdataService.FILE_TYPE_GPX, System.currentTimeMillis());
+			LOG.info("Garmin activityFiles: stored " + (isGpx ? "GPX" : "FIT") + " " + cloudName + " userid=" + conn.userid);
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn("Garmin activityFiles: cloud upload rejected userid=" + conn.userid + " " + e.getMessage());
+		} catch (Exception e) {
+			LOG.warn("Garmin activityFiles: upload failed userid=" + conn.userid, e);
+		} finally {
+			if (tmp != null) {
+				try {
+					Files.deleteIfExists(tmp.toPath());
+				} catch (IOException ignored) {
+					LOG.info("Garmin activityFiles: failed to delete temp file " + tmp.getAbsolutePath());
+				}
+			}
+		}
+	}
+
+	/** Returns null if member is missing, null, not a string or blank */
+	private static String jsonObjectMemberAsString(JsonObject o, String member) {
+		JsonElement el = o.get(member);
+		if (el == null || el.isJsonNull() || !el.isJsonPrimitive()) {
+			return null;
+		}
+		JsonPrimitive p = el.getAsJsonPrimitive();
+		if (!p.isString()) {
+			return null;
+		}
+		String s = p.getAsString();
+		return s.isBlank() ? null : s;
+	}
+
+	private static void reinterruptIfInterrupted(Exception e) {
+		if (e instanceof InterruptedException) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	/** Cloud file basename: {@code summaryId}, or {@code <sanitizedActivityName>-<summaryId>} when the title passes the same safe-character rules. */
+	private static String buildGarminActivityBaseFileName(JsonObject activityFilePingEntry) {
+		String summaryId = jsonObjectMemberAsString(activityFilePingEntry, "summaryId");
+		if (summaryId == null) {
+			return null;
+		}
+		String sid = summaryId.trim();
+		if (sid.length() > 200 || !SAFE_GARMIN_SUMMARY_ID.matcher(sid).matches()) {
+			return null;
+		}
+		String activityName = jsonObjectMemberAsString(activityFilePingEntry, "activityName");
+		String baseName = sid;
+		if (activityName != null && !activityName.isBlank()) {
+			Pattern nonFileSafeActivityName = Pattern.compile("[^a-zA-Z0-9._-]+");
+			String t = nonFileSafeActivityName.matcher(activityName.trim()).replaceAll("_").replaceAll("_+", "_");
+			t = t.replaceAll("^_+|_+$", "");
+			if (!t.isEmpty() && SAFE_GARMIN_SUMMARY_ID.matcher(t).matches()) {
+				if (t.length() > MAX_ACTIVITY_NAME_PREFIX_LEN) {
+					t = t.substring(0, MAX_ACTIVITY_NAME_PREFIX_LEN).replaceAll("_+$", "");
+				}
+				if (!t.isEmpty()) {
+					baseName = t + "-" + sid;
+				}
+			}
+		}
+		return baseName;
+	}
+
+	/** Returns the downloaded bytes. Throws IOException on HTTP errors or if the URL is expired (HTTP 410). */
+	private byte[] httpGetCallbackBytes(String url, String bearerAccessToken) throws IOException, InterruptedException {
+		HttpRequest.Builder rb = HttpRequest.newBuilder()
+				.uri(URI.create(url))
+				.timeout(Duration.ofSeconds(60));
+		if (bearerAccessToken != null && !bearerAccessToken.isBlank()) {
+			rb.header("Authorization", "Bearer " + bearerAccessToken);
+		}
+		HttpRequest req = rb.GET().build();
+		HttpResponse<byte[]> res = httpClient.send(req, HttpResponse.BodyHandlers.ofByteArray());
+		int code = res.statusCode();
+		if (code == 410) {
+			throw new IOException("Garmin callback URL expired (HTTP 410)");
+		}
+		if (code / 100 != 2) {
+			throw new IOException("Garmin callback HTTP " + code);
+		}
+		return res.body();
 	}
 
 	private boolean isNotConfigured() {
