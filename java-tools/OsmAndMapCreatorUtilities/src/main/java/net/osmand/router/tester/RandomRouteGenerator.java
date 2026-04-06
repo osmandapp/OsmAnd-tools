@@ -75,6 +75,13 @@ class RandomRouteGenerator {
 									entry.via.add(new LatLon(lat, lon));
 								}
 							}
+						} else if ("avoid".equals(k) || "avoidRoads".equals(k)) {
+							for (String roadId : v.split("[,;]")) {
+								String trimmedRoadId = roadId.trim();
+								if (!trimmedRoadId.isEmpty()) {
+									entry.avoidRoads.add(Long.parseLong(trimmedRoadId));
+								}
+							}
 						} else if ("params".equals(k)) { // params=string,string...
 							for (String param : v.split(",")) {
 								if (entry.profile.equals(param)) {
@@ -158,9 +165,12 @@ class RandomRouteGenerator {
 	}
 
 	private boolean isPointInsideRegionsPolygons(LatLon point, Set<WorldRegion> regions) {
+		float lat = (float) point.getLatitude();
+		float lon = (float) point.getLongitude();
+
 		for (WorldRegion r : regions) {
-			for (List<LatLon> polygon : r.getPolygons()) {
-				if (Algorithms.isPointInsidePolygon(point, polygon)) {
+			for (float[] polygon : r.getPolygons()) {
+				if (Algorithms.isPointInsidePolygon(lat, lon, polygon)) {
 					return true;
 				}
 			}

@@ -93,8 +93,8 @@ import net.osmand.data.TransportStop;
 import net.osmand.data.TransportStopExit;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorCategories;
-import net.osmand.obf.preparation.IndexPoiCreator.PoiDataBlock;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiCreatorTagGroups;
+import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.MapRenderingTypes.MapRulType;
 import net.osmand.osm.MapRoutingTypes.MapPointName;
 import net.osmand.osm.MapRoutingTypes.MapRouteType;
@@ -118,7 +118,7 @@ public class BinaryMapIndexWriter {
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
-	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE;
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -162,8 +162,8 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
-	
-	
+
+
 	private final static int HH_INDEX_INIT = 17;
 	private final static int HH_BLOCK_SEGMENTS =18;
 
@@ -206,7 +206,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeFixed32NoTag(0);
 		return ref;
 	}
-	
+
 	private BinaryFileReference preserveInt64Size() throws IOException {
 		long filePointer = getFilePointer();
 		BinaryFileReference ref = BinaryFileReference.createLongSizeReference(filePointer);
@@ -256,9 +256,9 @@ public class BinaryMapIndexWriter {
 		long len = writeInt32Size();
 		log.info("MAP INDEX SIZE : " + len);
 	}
-	
-	
-	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable, 
+
+
+	public void startHHRoutingIndex(long edition, String profile, List<String> stringTable,
 			boolean longIndex, String... params) throws IOException {
 		pushState(HH_INDEX_INIT, OSMAND_STRUCTURE_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -403,7 +403,7 @@ public class BinaryMapIndexWriter {
 			codedOutStream.writeMessage(OsmandOdb.OsmAndMapIndex.RULES_FIELD_NUMBER, rulet);
 		}
 	}
-	
+
 	public void writeRouteEncodingRules(List<MapRouteType> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
@@ -534,7 +534,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteTreeElement(int leftX, int rightX, int topY, int bottomY) throws IOException {
 		checkPeekState(ROUTE_TREE, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -556,7 +556,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeSInt32(HHRoutePointsBox.BOTTOM_FIELD_NUMBER, bottomY - bounds.bottomY);
 		stackBounds.push(new Bounds(leftX, rightX, topY, bottomY));
 	}
-	
+
 	public void writeHHRoutePoints(List<NetworkDBPointWrite> l) throws IOException {
 		checkPeekState(ROUTE_TREE);
 		Bounds bounds = stackBounds.peek();
@@ -593,7 +593,7 @@ public class BinaryMapIndexWriter {
 		stackBounds.pop();
 		writeInt32Size();
 	}
-	
+
 	public void startHHRouteBlockSegments(int idRangeStart, int idRangeLength, int profileId) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS, HH_INDEX_INIT);
 		if (state.peek() == HH_INDEX_INIT) {
@@ -607,7 +607,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeInt32(HHRouteBlockSegments.IDRANGELENGTH_FIELD_NUMBER, idRangeLength);
 		codedOutStream.writeInt32(HHRouteBlockSegments.PROFILEID_FIELD_NUMBER, profileId);
 	}
-	
+
 	public void writePointSegments(byte[] segmentsIn, byte[] segmentsOut) throws IOException {
 		checkPeekState(HH_BLOCK_SEGMENTS);
 		HHRoutePointSegments.Builder bld = HHRoutePointSegments.newBuilder();
@@ -616,7 +616,7 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessage(HHRouteBlockSegments.POINTSEGMENTS_FIELD_NUMBER, bld.build());
 	}
 
-	
+
 	public void endHHRouteBlockSegments() throws IOException {
 		popState(HH_BLOCK_SEGMENTS);
 		writeInt32Size();
@@ -867,9 +867,9 @@ public class BinaryMapIndexWriter {
 						delta = skipSomeNodes(innerPolygonTypes, len, i, x, y, true);
 					}
 				}
-			}		
+			}
 		}
-		
+
 		if (labelCoordinates != null && labelCoordinates.length > 0 && sumLabelCount > 0) {
 			mapDataBuf.clear();
 			int LABEL_SHIFT = 31 - LABEL_ZOOM_ENCODE;
@@ -886,7 +886,7 @@ public class BinaryMapIndexWriter {
 						+ CodedOutputStream.computeTagSize(MapData.LABELCOORDINATES_FIELD_NUMBER) + mapDataBuf.size();
 			}
 		}
-		
+
 		mapDataBuf.clear();
 		for (int i = 0; i < typeUse.length; i++) {
 			writeRawVarint32(mapDataBuf, typeUse[i]);
@@ -1103,10 +1103,10 @@ public class BinaryMapIndexWriter {
 			boundarySize = CodedOutputStream.computeRawVarint32Size(mapDataBuf.size())
 					+ CodedOutputStream.computeTagSize(CityIndex.BOUNDARY_FIELD_NUMBER) + mapDataBuf.size();
 		}
-		
+
 		codedOutStream.writeMessageNoTag(cityInd.build());
 		codedOutStream.flush();
-		return BinaryFileReference.createShiftReference(getFilePointer() - 
+		return BinaryFileReference.createShiftReference(getFilePointer() -
 				boundarySize - 4, startMessage);
 
 	}
@@ -1415,7 +1415,7 @@ public class BinaryMapIndexWriter {
 			ptr = getFilePointer();
 			transportRoutesRegistry.put(idRoute, ptr);
 		}
-		
+
 		codedOutStream.writeMessageNoTag(tRoute.build());
 		return ptr;
 	}
@@ -1444,7 +1444,7 @@ public class BinaryMapIndexWriter {
 				pcalcx = pcalcx + tx;
 				pcalcy = pcalcy + ty;
 			}
-			
+
 		}
 	}
 
@@ -1568,7 +1568,7 @@ public class BinaryMapIndexWriter {
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
-	
+
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable, long transportIndexOffset) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
@@ -1583,7 +1583,7 @@ public class BinaryMapIndexWriter {
 		}
 		codedOutStream.writeMessage(OsmAndTransportIndex.INCOMPLETEROUTES_FIELD_NUMBER, irs.build());
 	}
-	
+
 	public void writeTransportStringTable(Map<String, Integer> stringTable) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		// expect linked hash map
@@ -1734,38 +1734,27 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
-	public Map<PoiDataBlock, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiDataBlock>> namesIndex, long startPoiIndex) throws IOException {
+	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiTileBox>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		if (BloomFilter.PUBLISH) { 
-			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.FILTERS_FIELD_NUMBER,
-					OsmandOdb.OsmAndBloomFilterAlgorithm.newBuilder().setVersion(BloomFilter.VERSION).build());
-		}
-
-		Map<PoiDataBlock, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiDataBlock, List<BinaryFileReference>>();
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Map.Entry<String, Set<PoiDataBlock>> e : namesIndex.entrySet()) {
+		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
 			codedOutStream.writeTag(OsmandOdb.OsmAndPoiNameIndex.DATA_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 			BinaryFileReference nameTableRef = indexedTable.get(e.getKey());
 			codedOutStream.flush();
 			nameTableRef.writeReference(raf, getFilePointer());
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
-			List<PoiDataBlock> tileBoxes = new ArrayList<>(e.getValue());
-			for (PoiDataBlock box : tileBoxes) {
+			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
+			for (PoiTileBox box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
 				bs.setShiftTo(0);
-				if (BloomFilter.PUBLISH) {
-					bs.addBloomIndex(ByteString.copyFrom(box.getIndexBloom()));
-				}
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
-				if (atom.getBloomIndexCount() != 1) {
-					throw new IllegalStateException("POI name index atom must reference exactly one physical data block bloom");
-				}
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
@@ -1776,7 +1765,7 @@ public class BinaryMapIndexWriter {
 			// first message
 			int accumulateSize = 4;
 			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
-				PoiDataBlock box = tileBoxes.get(i);
+				PoiTileBox box = tileBoxes.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
