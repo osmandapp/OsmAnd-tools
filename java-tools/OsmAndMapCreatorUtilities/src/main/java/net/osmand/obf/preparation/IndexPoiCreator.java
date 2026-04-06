@@ -18,7 +18,6 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.BloomFilter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
@@ -665,15 +664,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 
 		// 2.5 write names table
-		if (!useInMemoryCreator) {
-			throw new IllegalStateException("POI subblock splitting requires useInMemoryCreator=true");
-		}
-
-		Map<PoiTileBox, List<PoiDataBlock>> poiDataBlocksByTileBox = new LinkedHashMap<>();
-		List<PoiDataBlock> orderedPoiDataBlocks = new ArrayList<>();
-		Map<String, Set<PoiDataBlock>> namesIndexBySubblock = new TreeMap<>();
-		buildPoiDataBlocks(rootZoomsTree, poiDataBlocksByTileBox, orderedPoiDataBlocks, namesIndexBySubblock);
-		Map<PoiDataBlock, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndexBySubblock, startFpPoiIndex);
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -692,35 +683,79 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		// 3.2 write tree using stack
 		for (Tree<PoiTileBox> subs : rootZoomsTree.getSubtrees()) {
-			writePoiBoxes(writer, subs, startFpPoiIndex, fpToWriteSeeks, globalCategories, poiDataBlocksByTileBox);
+			writePoiBoxes(writer, subs, startFpPoiIndex, fpToWriteSeeks, globalCategories);
 		}
 
 		// 4. write poi data
-		for (PoiDataBlock poiDataBlock : orderedPoiDataBlocks) {
-			List<BinaryFileReference> references = fpToWriteSeeks.get(poiDataBlock);
-			if (references == null || references.isEmpty()) {
-				continue;
-			}
-			int z = poiDataBlock.zoom;
-			int x = poiDataBlock.x;
-			int y = poiDataBlock.y;
-			writer.startWritePoiData(z, x, y, references);
-			for (PoiData poi : poiDataBlock.poiData) {
-				int x31 = poi.x;
-				int y31 = poi.y;
-				String type = poi.type;
-				String subtype = poi.subtype;
-				int x24shift = (x31 >> 7) - (x << (24 - z));
-				int y24shift = (y31 >> 7) - (y << (24 - z));
-				int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
-				if (poi.id > ObfConstants.PROPAGATE_NODE_BIT) {
-					continue;
+		// not so effective probably better to load in memory one time
+		PreparedStatement prepareStatement = poiConnection
+				.prepareStatement("SELECT id, x, y, type, subtype, additionalTags, taggroups from poi "
+						+ "where x >= ? AND x < ? AND y >= ? AND y < ?"
+						+ " order by priority ");
+		for (Map.Entry<PoiTileBox, List<BinaryFileReference>> entry : fpToWriteSeeks.entrySet()) {
+			int z = entry.getKey().zoom;
+			int x = entry.getKey().x;
+			int y = entry.getKey().y;
+			writer.startWritePoiData(z, x, y, entry.getValue());
+
+			if (useInMemoryCreator) {
+				List<PoiData> poiData = entry.getKey().poiData;
+				Collections.sort(poiData, new Comparator<PoiData>() {
+
+					@Override
+					public int compare(PoiData o1, PoiData o2) {
+						return -Integer.compare(o1.getRating(), o2.getRating());
+					}
+				});
+
+				for (PoiData poi : poiData) {
+					int x31 = poi.x;
+					int y31 = poi.y;
+					String type = poi.type;
+					String subtype = poi.subtype;
+					int x24shift = (x31 >> 7) - (x << (24 - z));
+					int y24shift = (y31 >> 7) - (y << (24 - z));
+					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
+					if (poi.id > ObfConstants.PROPAGATE_NODE_BIT) {
+						continue;
+					}
+					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
+							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
 				}
-				writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
-						globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
+
+			} else {
+				prepareStatement.setInt(1, x << (31 - z));
+				prepareStatement.setInt(2, (x + 1) << (31 - z));
+				prepareStatement.setInt(3, y << (31 - z));
+				prepareStatement.setInt(4, (y + 1) << (31 - z));
+				ResultSet rset = prepareStatement.executeQuery();
+				Map<PoiAdditionalType, String> mp = new HashMap<PoiAdditionalType, String>();
+				while (rset.next()) {
+					long id = rset.getLong(1);
+					int x31 = rset.getInt(2);
+					int y31 = rset.getInt(3);
+					int x24shift = (x31 >> 7) - (x << (24 - z));
+					int y24shift = (y31 >> 7) - (y << (24 - z));
+					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
+					String type = rset.getString(4);
+					String subtype = rset.getString(5);
+					List<Integer> tagGroupIds = poiTagGroups.get(id);
+					if (Algorithms.isEmpty(tagGroupIds)) {
+						tagGroupIds = parseTaggroups(rset.getString(6));
+					}
+					if (id > ObfConstants.PROPAGATE_NODE_BIT) {
+						continue;
+					}
+					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
+							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
+							settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, tagGroupIds);
+				}
+				rset.close();
 			}
 			writer.endWritePoiData();
 		}
+
+		prepareStatement.close();
 
 		writer.endWritePoiIndex();
 	}
@@ -1011,9 +1046,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			Set<String> bloomTokens = new LinkedHashSet<>();
-			Set<String> indexTokens = addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames, bloomTokens);
+			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
+					namesIndex, otherNames, idNames);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1032,8 +1066,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.id = rs.getLong(5);
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
-				poiData.indexTokens.addAll(indexTokens);
-				poiData.bloomTokens.addAll(bloomTokens);
 				prevTree.getNode().poiData.add(poiData);
 
 			} else {
@@ -1046,100 +1078,73 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 
-	private Set<String> addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names, Set<String> idNames, Set<String> bloomTokens) {
-		Set<String> indexTokens = new LinkedHashSet<>();
+	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
+			Set<String> names, Set<String> idNames) {
 		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex, indexTokens, bloomTokens);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex, indexTokens, bloomTokens);
+					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
 				}
 			}
 		}
-		return indexTokens;
 	}
 
-	private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind,
-			Set<String> indexTokens, Set<String> bloomTokens) {
-		name = Algorithms.normalizeSearchText(name);
-		Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
-		if (ArabicNormalizer.isSpecialArabic(name)) {
+    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
+        name = Algorithms.normalizeSearchText(name);
+        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
+        if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
                 splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
             }
         }
-        for (String str : splitName) {
-	        if (Algorithms.isEmpty(str)) {
+        for (String token : splitName) {
+	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String indexToken = str;
-            if (indexToken.length() > ind) {
-             	indexToken = indexToken.substring(0, ind);
+			String str = token;
+            if (str.length() > ind) {
+                str = str.substring(0, ind);
             }
-			if (bloomTokens != null && str.startsWith(indexToken)) {
-				String continuation = str.substring(indexToken.length());
-				if (continuation.length() >= BloomFilter.MIN_BLOOM_CONTINUATION_PREFIX_LENGTH) {
-					bloomTokens.add(continuation);
-				}
-			}
-			if (!poiData.containsKey(indexToken)) {
-				poiData.put(indexToken, new LinkedHashSet<>());
-			}
-			poiData.get(indexToken).add(data);
-			if (indexTokens != null) {
-				indexTokens.add(indexToken);
-			}
-		}
-	}
+            if (!poiData.containsKey(str)) {
+                poiData.put(str, new LinkedHashSet<>());
+            }
+            poiData.get(str).add(data);
+	        data.addToken(token);
+        }
+    }
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
-			long startFpPoiIndex, Map<PoiDataBlock, List<BinaryFileReference>> fpToWriteSeeks,
-			PoiCreatorCategories globalCategories, Map<PoiTileBox, List<PoiDataBlock>> poiDataBlocksByTileBox) throws IOException, SQLException {
+			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,
+			PoiCreatorCategories globalCategories) throws IOException, SQLException {
 		int x = tree.getNode().x;
 		int y = tree.getNode().y;
 		int zoom = tree.getNode().zoom;
 		boolean end = zoom == ZOOM_TO_SAVE_END;
-		if (end) {
-			List<PoiDataBlock> poiDataBlocks = poiDataBlocksByTileBox.get(tree.getNode());
-			if (Algorithms.isEmpty(poiDataBlocks)) {
-				return;
+		BinaryFileReference fileRef = writer.startWritePoiBox(zoom, x, y, startFpPoiIndex, end);
+		if (fileRef != null) {
+			if (!fpToWriteSeeks.containsKey(tree.getNode())) {
+				fpToWriteSeeks.put(tree.getNode(), new ArrayList<BinaryFileReference>());
 			}
-			for (PoiDataBlock poiDataBlock : poiDataBlocks) {
-				BinaryFileReference fileRef = writer.startWritePoiBox(zoom, x, y, startFpPoiIndex, true);
-				if (fileRef != null) {
-					fpToWriteSeeks.computeIfAbsent(poiDataBlock, k -> new ArrayList<BinaryFileReference>()).add(fileRef);
-				}
-				if (zoom >= ZOOM_TO_WRITE_CATEGORIES_START && zoom <= ZOOM_TO_WRITE_CATEGORIES_END) {
-					PoiCreatorCategories boxCats = tree.getNode().categories;
-					boxCats.buildCategoriesToWrite(globalCategories);
-					writer.writePoiCategories(boxCats);
-				}
-				PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
-				writer.writePoiTagGroups(tagGroups);
-				writer.endWritePoiBox();
-			}
-			return;
+			fpToWriteSeeks.get(tree.getNode()).add(fileRef);
 		}
-
-		writer.startWritePoiBox(zoom, x, y, startFpPoiIndex, false);
 		if (zoom >= ZOOM_TO_WRITE_CATEGORIES_START && zoom <= ZOOM_TO_WRITE_CATEGORIES_END) {
 			PoiCreatorCategories boxCats = tree.getNode().categories;
 			boxCats.buildCategoriesToWrite(globalCategories);
@@ -1148,84 +1153,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		PoiCreatorTagGroups tagGroups = tree.getNode().tagGroups;
 		writer.writePoiTagGroups(tagGroups);
-		for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
-			writePoiBoxes(writer, subTree, startFpPoiIndex, fpToWriteSeeks, globalCategories, poiDataBlocksByTileBox);
+
+		if (!end) {
+			for (Tree<PoiTileBox> subTree : tree.getSubtrees()) {
+				writePoiBoxes(writer, subTree, startFpPoiIndex, fpToWriteSeeks, globalCategories);
+			}
 		}
 		writer.endWritePoiBox();
-	}
-
-	private void buildPoiDataBlocks(Tree<PoiTileBox> tree, Map<PoiTileBox, List<PoiDataBlock>> poiDataBlocksByTileBox,
-			List<PoiDataBlock> orderedPoiDataBlocks, Map<String, Set<PoiDataBlock>> namesIndexBySubblock) {
-		if (tree == null || tree.getNode() == null) {
-			return;
-		}
-		PoiTileBox box = tree.getNode();
-		if (box.zoom == ZOOM_TO_SAVE_END && !Algorithms.isEmpty(box.poiData)) {
-			List<PoiDataBlock> poiDataBlocks = createPoiDataBlocks(box);
-			poiDataBlocksByTileBox.put(box, poiDataBlocks);
-			orderedPoiDataBlocks.addAll(poiDataBlocks);
-			for (PoiDataBlock poiDataBlock : poiDataBlocks) {
-				for (String token : poiDataBlock.indexTokens) {
-					namesIndexBySubblock.computeIfAbsent(token, k -> new LinkedHashSet<>()).add(poiDataBlock);
-				}
-			}
-		}
-		for (Tree<PoiTileBox> subtree : tree.getSubtrees()) {
-			buildPoiDataBlocks(subtree, poiDataBlocksByTileBox, orderedPoiDataBlocks, namesIndexBySubblock);
-		}
-	}
-
-	private List<PoiDataBlock> createPoiDataBlocks(PoiTileBox poiTileBox) {
-		if (Algorithms.isEmpty(poiTileBox.poiData)) {
-			return Collections.emptyList();
-		}
-
-		List<PoiData> sortedPoiData = new ArrayList<>(poiTileBox.poiData);
-		sortedPoiData.sort((o1, o2) -> -Integer.compare(o1.getRating(), o2.getRating()));
-		List<PoiDataBlock> poiDataBlocks = new ArrayList<>();
-		List<PoiData> currentSubblockPoiData = new ArrayList<>();
-		Set<String> currentSubblockBloomTokens = new LinkedHashSet<>();
-		String leafKey4 = resolveLeafKey4(poiTileBox);
-		int subblockId = 1;
-		for (PoiData poiData : sortedPoiData) {
-			Set<String> candidateBloomTokens = new LinkedHashSet<>(currentSubblockBloomTokens);
-			candidateBloomTokens.addAll(poiData.bloomTokens);
-			boolean subblockIsNotEmpty = !currentSubblockPoiData.isEmpty();
-			boolean exceedsBloomSaturation = BloomFilter.getInstance().countExactBits(candidateBloomTokens) > BloomFilter.MAX_SATURATION_BITS;
-			if (subblockIsNotEmpty && exceedsBloomSaturation) {
-				PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId++);
-				poiDataBlocks.add(poiDataBlock);
-				currentSubblockPoiData.clear();
-				currentSubblockBloomTokens.clear();
-				candidateBloomTokens = new LinkedHashSet<>(poiData.bloomTokens);
-			}
-			currentSubblockPoiData.add(poiData);
-			currentSubblockBloomTokens.clear();
-			currentSubblockBloomTokens.addAll(candidateBloomTokens);
-		}
-		if (!currentSubblockPoiData.isEmpty()) {
-			PoiDataBlock poiDataBlock = new PoiDataBlock(poiTileBox, new ArrayList<>(currentSubblockPoiData), leafKey4, subblockId);
-			poiDataBlocks.add(poiDataBlock);
-		}
-		return poiDataBlocks;
-	}
-
-	private String resolveLeafKey4(PoiTileBox poiTileBox) {
-		if (poiTileBox == null || Algorithms.isEmpty(poiTileBox.poiData)) {
-			return "";
-		}
-		String leafKey4 = null;
-		for (PoiData poiData : poiTileBox.poiData) {
-			for (String indexToken : poiData.indexTokens) {
-				if (Algorithms.isEmpty(indexToken)) {
-					continue;
-				}
-				if (leafKey4 == null || indexToken.compareTo(leafKey4) < 0) {
-					leafKey4 = indexToken;
-				}
-			}
-		}
-		return leafKey4 == null ? "" : leafKey4;
 	}
 
 	private static class PoiData {
@@ -1236,7 +1170,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		long id;
 		Map<PoiAdditionalType, String> additionalTags = new HashMap<PoiAdditionalType, String>();
 		List<Integer> tagGroups = new ArrayList<>();
-		Set<String> indexTokens = new LinkedHashSet<>(), bloomTokens = new LinkedHashSet<>();
 
 		public int getRating() {
 			int rt = 0;
@@ -1257,56 +1190,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public static class PoiDataBlock {
-		private static final byte[] EMPTY_BLOOM = new byte[0];
-
-		final PoiTileBox sourceBox;
-		final int x;
-		final int y;
-		final int zoom;
-		final String leafKey4;
-		final int subblockId;
-		final List<PoiData> poiData;
-		final Set<String> indexTokens = new LinkedHashSet<>(), bloomTokens = new LinkedHashSet<>();
-		private byte[] cachedBloom;
-
-		PoiDataBlock(PoiTileBox sourceBox, List<PoiData> poiData, String leafKey4, int subblockId) {
-			this.sourceBox = sourceBox;
-			this.x = sourceBox.x;
-			this.y = sourceBox.y;
-			this.zoom = sourceBox.zoom;
-			this.leafKey4 = leafKey4 == null ? "" : leafKey4;
-			this.subblockId = subblockId;
-			this.poiData = poiData;
-			for (PoiData data : poiData) {
-				indexTokens.addAll(data.indexTokens);
-				bloomTokens.addAll(data.bloomTokens);
-			}
-		}
-
-		public int getX() {
-			return x;
-		}
-
-		public int getY() {
-			return y;
-		}
-
-		public int getZoom() {
-			return zoom;
-		}
-
-		public byte[] getIndexBloom() {
-			if (cachedBloom == null) {
-				cachedBloom = BloomFilter.getInstance().build(bloomTokens);
-				if (cachedBloom == null) {
-					cachedBloom = EMPTY_BLOOM;
-				}
-			}
-			return cachedBloom;
-		}
-	}
-
 	public static class PoiTileBox {
 		int x;
 		int y;
@@ -1314,6 +1197,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
+		final Set<String> boxTokens = new LinkedHashSet<>();
 
 		public int getX() {
 			return x;
@@ -1325,6 +1209,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public int getZoom() {
 			return zoom;
+		}
+
+		public void addToken(String token) {
+			boxTokens.add(token);
 		}
 	}
 

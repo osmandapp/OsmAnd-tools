@@ -44,7 +44,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
-import net.osmand.binary.BloomFilter;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
