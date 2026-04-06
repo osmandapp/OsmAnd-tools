@@ -848,9 +848,10 @@ public class SearchService {
 		}
 		List<Amenity> modifiableFoundedPlaces = new ArrayList<>();
 
+		// searchBbox comes from OsmAndMapsService.points(): left/right/top/bottom are already 31-bit tile coords.
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-				MapUtils.get31TileNumberX(searchBbox.left), MapUtils.get31TileNumberX(searchBbox.right),
-				MapUtils.get31TileNumberY(searchBbox.top), MapUtils.get31TileNumberY(searchBbox.bottom), 15,
+				(int) searchBbox.left, (int) searchBbox.right,
+				(int) searchBbox.top, (int) searchBbox.bottom, 15,
 				new SearchPoiTypeFilter() {
 
 					@Override
@@ -894,9 +895,14 @@ public class SearchService {
 			return modifiableFoundedPlaces.get(0);
 		}
 
-		return null;
-	}
+        return null;
+    }
     
+    /**
+     * Bounding box as {@link QuadRect} in <strong>31-bit tile</strong> coordinates (x=left/right, y=top/bottom),
+     * same convention as {@link OsmAndMapsService#points(List, LatLon, LatLon)}. Do not pass these values to
+     * {@link MapUtils#get31TileNumberX}/{@link MapUtils#get31TileNumberY} — they expect degrees.
+     */
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {
             return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
