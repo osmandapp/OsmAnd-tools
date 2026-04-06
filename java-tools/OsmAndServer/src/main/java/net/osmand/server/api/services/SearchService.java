@@ -897,12 +897,7 @@ public class SearchService {
 
         return null;
     }
-    
-    /**
-     * Bounding box as {@link QuadRect} in <strong>31-bit tile</strong> coordinates (x=left/right, y=top/bottom),
-     * same convention as {@link OsmAndMapsService#points(List, LatLon, LatLon)}. Do not pass these values to
-     * {@link MapUtils#get31TileNumberX}/{@link MapUtils#get31TileNumberY} — they expect degrees.
-     */
+
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {
             return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
