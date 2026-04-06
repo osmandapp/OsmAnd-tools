@@ -356,7 +356,6 @@ public interface DataService extends BaseService {
 					}
 					row.put("stat_results", statResultsCount);
 					row.put("stat_amenity_count", statAmenityCount);
-					row.put("stat_transport_count", statTransportCount);
 					row.put("stat_address_count", statAddressCount);
 
 					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {

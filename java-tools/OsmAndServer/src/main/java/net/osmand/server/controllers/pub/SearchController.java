@@ -33,25 +33,25 @@ import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 @Controller
 @RequestMapping({"/search", "/routing/search"})
 public class SearchController {
-    
+
     protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
     Gson gson = new Gson();
-    
+
     @Autowired
     OsmAndMapsService osmAndMapsService;
-    
+
     @Autowired
     WikiService wikiService;
-    
+
     @Autowired
     SearchService searchService;
 
     @Autowired
     TransportStopsService transportStopsService;
-    
+
     @Autowired
     protected CloudUserDevicesRepository devicesRepository;
-    
+
     private CloudUserDevicesRepository.CloudUserDevice checkToken(int deviceId, String accessToken) {
         CloudUserDevicesRepository.CloudUserDevice d = devicesRepository.findById(deviceId);
         if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
@@ -59,7 +59,7 @@ public class SearchController {
         }
         return null;
     }
-    
+
     @RequestMapping(path = "/search", produces = {MediaType.APPLICATION_JSON_VALUE})
     public ResponseEntity<String> search(@RequestParam double lat,
                                          @RequestParam double lon,
@@ -73,10 +73,10 @@ public class SearchController {
             return osmAndMapsService.errorConfig();
         }
         List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-                baseSearch != null && baseSearch, null, northWest, southEast), timeZone);
+                baseSearch != null && baseSearch, northWest, southEast), timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
-    
+
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
@@ -119,7 +119,7 @@ public class SearchController {
 
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
-    
+
     @GetMapping(path = {"/get-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiCategories(@RequestParam String locale) {
@@ -130,7 +130,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Error get poi categories!");
         }
     }
-    
+
     @GetMapping(path = {"/get-top-filters"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getTopFilters() {
@@ -141,7 +141,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Error get top poi filters!");
         }
     }
-    
+
     @GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
@@ -149,7 +149,7 @@ public class SearchController {
         Map<String, Map<String, String>> res = searchService.searchPoiCategories(search, locale);
         return ResponseEntity.ok(gson.toJson(res));
     }
-    
+
     @GetMapping(path = {"/get-poi-address"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiAddress(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
@@ -168,7 +168,7 @@ public class SearchController {
         FeatureCollection collection = wikiService.getWikidataData(northWest, southEast, lang, filters, zoom);
         return ResponseEntity.ok(gson.toJson(collection));
     }
-    
+
     @GetMapping(path = {"/get-wiki-images"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikiImages(@RequestParam String northWest, @RequestParam String southEast) {
@@ -207,10 +207,10 @@ public class SearchController {
         Map<String, String> info = wikiService.parseImageInfo(data, imageTitle, lang);
         return ResponseEntity.ok(gson.toJson(info));
     }
-    
+
     public record WikiImageInfo(String title, Long pageId, String data) {
     }
-    
+
     @MultiPlatform
     @RequestMapping(path = {"/parse-images-list-info"}, produces = "application/json")
     @ResponseBody
@@ -263,7 +263,7 @@ public class SearchController {
         }
         return false;
     }
-    
+
     @GetMapping(path = {"/get-poi-by-osmid"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
@@ -283,14 +283,14 @@ public class SearchController {
         Feature poi = searchService.searchPoiByEnName(new LatLon(lat, lon), enName);
         return ResponseEntity.ok(gson.toJson(poi));
     }
-    
+
     @GetMapping(path = {"/get-wiki-content"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikipediaContent(@RequestParam String title, @RequestParam String lang) {
         String content = wikiService.getWikipediaContent(title, lang);
         return ResponseEntity.ok(gson.toJson(content));
     }
-    
+
     @GetMapping(path = {"/get-wikivoyage-content"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getWikivoyageContent(@RequestParam String title, @RequestParam String lang) {
@@ -374,10 +374,10 @@ public class SearchController {
         FeatureCollection featureCollection = wikiService.convertToFeatureCollection(wikiImages);
         return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
-    
+
     @GetMapping(path = {"/get-photos"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> gePhotos(@RequestParam(required = false) String wikidataId, 
+    public ResponseEntity<String> gePhotos(@RequestParam(required = false) String wikidataId,
     		@RequestParam(required = false) String wikiCategory, @RequestParam(required = false) String wikiTitle) {
         return getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>());
     }

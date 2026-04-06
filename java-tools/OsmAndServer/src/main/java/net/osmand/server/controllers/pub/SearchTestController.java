@@ -38,6 +38,8 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
 
+	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
+
 	@Autowired
 	private SearchTestRepositoryConfiguration dbCfg;
 	@Autowired
@@ -110,11 +112,15 @@ public class SearchTestController {
 	/**
 	 * The call create Run entity and do other heavy work asynchronously.
 	 */
-	@PostMapping(value = "/cases/{caseId:\\d+}/run", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/cases/{caseId:\\d+}/run", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Run>> runTestCase(@PathVariable Long caseId,
-															  @RequestBody RunParam payload) {
-		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
+															  @RequestBody RunTestCaseRequest request) {
+		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
+		SearchService.SearchOption options = request == null || request.options == null
+				? new SearchService.SearchOption(false, null, null, (net.osmand.search.core.ObjectType[]) null)
+				: request.options;
+		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}
 
 	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -208,14 +214,14 @@ public class SearchTestController {
 
 	@PutMapping(value = "/domains/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<SearchTestDatasetRepository.Domain> updateDomain(@PathVariable("id") Long id,
-																	 @RequestBody Map<String, String> updates) {
+	public ResponseEntity<SearchTestDatasetRepository.Domain> updateDomain(@PathVariable Long id,
+                                                                           @RequestBody Map<String, String> updates) {
 		return ResponseEntity.ok(testSearchService.updateDomain(id, updates));
 	}
 
 	@DeleteMapping(value = "/domains/{id}")
 	@ResponseBody
-	public ResponseEntity<Void> deleteDomain(@PathVariable("id") Long id) {
+	public ResponseEntity<Void> deleteDomain(@PathVariable Long id) {
 		boolean deleted = testSearchService.deleteDomain(id);
 		return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
 	}
@@ -362,28 +368,26 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getSectionSizes(obf, fieldPath));
 	}
 
-	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<OBFService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
-			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestParam(required = false) Boolean unlimited) throws IOException {
+			@RequestBody SearchService.SearchOption options) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
-		return ResponseEntity.ok(testSearchService.getResults(
-				new SearchService.SearchContext(lat, lon, query, lang, false, radius, null, null),
-				new SearchService.SearchOption(unlimited == null || unlimited, null, true)));
+
+        SearchService.SearchContext ctx = new SearchService.SearchContext(lat, lon, query, lang, false, null, null);
+		return ResponseEntity.ok(testSearchService.getResults(ctx, options));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
 	@ResponseBody
 	public void downloadUnitTest(
 			@RequestParam String query,
-			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestBody(required = false) OBFService.UnitTestPayload unitTest,
@@ -394,7 +398,7 @@ public class SearchTestController {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
-				new SearchService.SearchContext(lat, lon, query, null, false, radius, null, null),
+				new SearchService.SearchContext(lat, lon, query, null, false, null, null),
 				response.getOutputStream());
 	}
 

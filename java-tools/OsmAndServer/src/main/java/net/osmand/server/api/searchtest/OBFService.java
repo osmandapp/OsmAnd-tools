@@ -52,7 +52,7 @@ public interface OBFService extends BaseService {
 	}
 
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record Address(String name, LatLon point) {}
+	record Address(String name, String info, LatLon point) {}
 	record StreetAddress(String name, List<Address> houses) {}
 
 	enum ObfLengthType {
@@ -792,24 +792,24 @@ public interface OBFService extends BaseService {
 	}
 
 	static int parseEnvInt(String key, int def) {
-		String v = System.getenv(key);
-		if (v == null || v.trim().isEmpty()) {
+		String raw = System.getenv(key);
+		if (raw == null || raw.trim().isEmpty()) {
 			return def;
 		}
 		try {
-			return Integer.parseInt(v.trim());
-		} catch (Exception e) {
+			return Integer.parseInt(raw.trim());
+		} catch (NumberFormatException e) {
 			return def;
 		}
 	}
 
 	static long parseEnvLong(String key, long def) {
-		String v = System.getenv(key);
-		if (v == null || v.trim().isEmpty()) {
+		String raw = System.getenv(key);
+		if (raw == null || raw.trim().isEmpty()) {
 			return def;
 		}
 		try {
-			return Long.parseLong(v.trim());
+			return Long.parseLong(raw.trim());
 		} catch (Exception e) {
 			return def;
 		}
@@ -1014,6 +1014,38 @@ public interface OBFService extends BaseService {
 		}
 	}
 
+    private static String findPoiAddressName(Amenity amenity, String lang, Pattern poiPattern) {
+        if (amenity == null || poiPattern == null) {
+            return null;
+        }
+        String poiName = amenity.getName(lang);
+        if (poiName != null && poiPattern.matcher(poiName).find()) {
+            return poiName;
+        }
+        String englishName = amenity.getEnName(true);
+        if (englishName != null && poiPattern.matcher(englishName).find()) {
+            return poiName != null ? poiName : englishName;
+        }
+        for (String key : amenity.getAdditionalInfoKeys()) {
+            if (!key.contains("_name") && !key.equals("brand")
+                    && !key.contains("wikidata") && !key.equals("route_id")
+                    && !key.equals("route_members_ids")) {
+                continue;
+            }
+            String additionalInfo = amenity.getAdditionalInfo(key);
+            if (additionalInfo != null && poiPattern.matcher(additionalInfo).find()) {
+                if (poiName != null) {
+                    return poiName;
+                }
+                if (englishName != null) {
+                    return englishName;
+                }
+                return additionalInfo;
+            }
+        }
+        return null;
+    }
+
 	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
 		List<Record> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
@@ -1078,7 +1110,7 @@ public interface OBFService extends BaseService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(new Address(houseName, b.getLocation()));
+												buildings.add(new Address(houseName, null, b.getLocation()));
 										}
 									}
 									if (!buildings.isEmpty()) {
@@ -1095,10 +1127,10 @@ public interface OBFService extends BaseService {
 								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
-							final String poiName = amenity.getName(lang);
-							if (poiName == null || !poiPattern.matcher(poiName).find())
+							String poiName = findPoiAddressName(amenity, lang, poiPattern);
+							if (poiName == null)
 								continue;
-							results.add(new Address(poiName, amenity.getLocation()));
+							results.add(new Address(amenity.getName(), poiName, amenity.getLocation()));
 						}
 					}
 				}
@@ -1136,8 +1168,8 @@ public interface OBFService extends BaseService {
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
-	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
-		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
+	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options) throws IOException {
+		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
@@ -1169,7 +1201,7 @@ public interface OBFService extends BaseService {
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, false), null);
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, null, (net.osmand.search.core.ObjectType[]) null), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
