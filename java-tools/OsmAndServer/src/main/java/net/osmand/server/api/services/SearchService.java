@@ -1218,16 +1218,16 @@ public class SearchService {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
-		String poiName = result.localeName;
+		String poiNameWithAlternateName = result.localeName;
 		if (!Algorithms.isEmpty(result.alternateName)
 				&& !Algorithms.objectEquals(result.localeName, result.alternateName)) {
-			poiName += " (" + result.alternateName + ")";
+			poiNameWithAlternateName += " (" + result.alternateName + ")";
 		}
 
 		feature = new Feature(Geometry.point(amenity.getLocation()))
 				.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
 				.prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
-				.prop(PoiTypeField.POI_NAME.getFieldName(), poiName)
+				.prop(PoiTypeField.POI_NAME.getFieldName(), poiNameWithAlternateName)
 				.prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
 
 				.prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
