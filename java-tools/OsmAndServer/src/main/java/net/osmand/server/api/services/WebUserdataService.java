@@ -24,10 +24,7 @@ import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -152,7 +149,6 @@ public class WebUserdataService {
 		return ResponseEntity.ok(gson.toJson(result));
 	}
 
-	@Nullable
 	private UserFileNoData getUniqueUserFileNoData(CloudUserDevice dev, UserFileUpdate file) {
 		Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
 		UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
@@ -332,25 +328,10 @@ public class WebUserdataService {
 		return analysis;
 	}
 
-
-	@Value("classpath:activities.json")
-	private Resource resource;
-
-	public String readFile() throws Exception {
-		return new String(resource.getInputStream().readAllBytes());
-	}
-
 	private void addMetadata(JsonObject details, GpxFile gpxFile) {
 		Metadata metadata = gpxFile.getMetadata();
 		if (!metadata.isEmpty()) {
 			metadata.setDesc(null);
-
-			try {
-				System.out.println(readFile());
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-
 		}
 		details.add(METADATA, gson.toJsonTree(metadata));
 	}
