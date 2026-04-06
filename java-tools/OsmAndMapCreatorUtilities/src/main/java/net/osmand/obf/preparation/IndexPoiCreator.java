@@ -1197,7 +1197,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
-		final Set<String> boxTokens = new LinkedHashSet<>();
+		final Set<String> tokens = new LinkedHashSet<>();
 
 		public int getX() {
 			return x;
@@ -1212,7 +1212,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 
 		public void addToken(String token) {
-			boxTokens.add(token);
+			tokens.add(token);
 		}
 	}
 

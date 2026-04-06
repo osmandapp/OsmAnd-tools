@@ -109,6 +109,8 @@ import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
 public class BinaryMapIndexWriter {
+	private static final char CLOSEST_TERMINAL_SUFFIX_MARKER = '\u0001';
+	private static final char PREVIOUS_BASED_SUFFIX_MARKER = '\u0002';
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
@@ -1733,6 +1735,80 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
+	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix, String baseSuffix) {}
+
+	private static class PoiNameSuffixDictionaryData {
+		private final List<PoiNameSuffixEntry> dictionaryEntries = new ArrayList<>();
+		private final Map<String, Integer> resolvedSuffixToIndex = new HashMap<>();
+		private final Map<PoiTileBox, int[]> bitsets = new LinkedHashMap<>();
+	}
+
+	private PoiNameSuffixDictionaryData buildSuffixDictionaryData(String prefix, List<PoiTileBox> tileBoxes) {
+		PoiNameSuffixDictionaryData data = new PoiNameSuffixDictionaryData();
+		TreeSet<String> sortedSuffixes = new TreeSet<>();
+		Map<PoiTileBox, Set<String>> suffixesByBox = new LinkedHashMap<>();
+		for (PoiTileBox box : tileBoxes) {
+			Set<String> boxSuffixes = new LinkedHashSet<>();
+			suffixesByBox.put(box, boxSuffixes);
+			for (String token : box.tokens) {
+				if (!token.startsWith(prefix) || token.length() <= prefix.length()) {
+					continue;
+				}
+				String suffix = token.substring(prefix.length());
+                boxSuffixes.add(suffix);
+				sortedSuffixes.add(suffix);
+			}
+		}
+		String previousTerminalSuffix = null;
+		String previousBaseSuffix = null;
+		for (String suffix : sortedSuffixes) {
+			String encodedSuffix = suffix;
+			String baseSuffix = suffix;
+			int bestEncodedLength = suffix.length();
+			if (previousTerminalSuffix != null && suffix.startsWith(previousTerminalSuffix)
+					&& suffix.length() > previousTerminalSuffix.length()) {
+				String candidateEncodedSuffix = CLOSEST_TERMINAL_SUFFIX_MARKER + suffix.substring(previousTerminalSuffix.length());
+				if (candidateEncodedSuffix.length() < bestEncodedLength) {
+					encodedSuffix = candidateEncodedSuffix;
+					baseSuffix = previousTerminalSuffix;
+					bestEncodedLength = candidateEncodedSuffix.length();
+				}
+			}
+			if (previousBaseSuffix != null && suffix.startsWith(previousBaseSuffix)
+					&& suffix.length() > previousBaseSuffix.length()) {
+				String candidateEncodedSuffix = PREVIOUS_BASED_SUFFIX_MARKER + suffix.substring(previousBaseSuffix.length());
+				if (candidateEncodedSuffix.length() < bestEncodedLength) {
+					encodedSuffix = candidateEncodedSuffix;
+					baseSuffix = previousBaseSuffix;
+				}
+			}
+			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix, baseSuffix);
+			data.resolvedSuffixToIndex.put(entry.resolvedSuffix, data.dictionaryEntries.size());
+			data.dictionaryEntries.add(entry);
+			if (!encodedSuffix.isEmpty() && encodedSuffix.charAt(0) != CLOSEST_TERMINAL_SUFFIX_MARKER
+					&& encodedSuffix.charAt(0) != PREVIOUS_BASED_SUFFIX_MARKER) {
+				previousTerminalSuffix = suffix;
+			}
+			previousBaseSuffix = entry.baseSuffix;
+		}
+		int dictionaryWordCount = (data.dictionaryEntries.size() + Integer.SIZE - 1) / Integer.SIZE;
+		if (dictionaryWordCount == 0) {
+			return data;
+		}
+		for (PoiTileBox box : tileBoxes) {
+			int[] bitsetWords = new int[dictionaryWordCount];
+			for (String suffix : suffixesByBox.get(box)) {
+				Integer suffixIndex = data.resolvedSuffixToIndex.get(suffix);
+				if (suffixIndex == null) {
+					continue;
+				}
+				bitsetWords[suffixIndex >> 5] |= 1 << (suffixIndex & 31);
+			}
+			data.bitsets.put(box, bitsetWords);
+		}
+		return data;
+	}
+
 	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiTileBox>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -1747,11 +1823,21 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
+			PoiNameSuffixDictionaryData suffixDictionaryData = buildSuffixDictionaryData(e.getKey(), tileBoxes);
+			for (PoiNameSuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix);
+			}
 			for (PoiTileBox box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
+				int[] bitsetWords = suffixDictionaryData.bitsets.get(box);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						bs.addSuffixesBitset(bitsetWord);
+					}
+				}
 				bs.setShiftTo(0);
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
