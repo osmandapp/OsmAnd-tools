@@ -1755,6 +1755,9 @@ public class BinaryMapIndexWriter {
 					continue;
 				}
 				String suffix = token.substring(prefix.length());
+				if (suffix.isEmpty()) {
+					continue;
+				}
                 boxSuffixes.add(suffix);
 				sortedSuffixes.add(suffix);
 			}
@@ -1843,21 +1846,29 @@ public class BinaryMapIndexWriter {
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-
-			codedOutStream.writeMessageNoTag(msg);
-			long endPointer = getFilePointer();
-
-			// first message
-			int accumulateSize = 4;
-			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
+			byte[] msgBytes = msg.toByteArray();
+			codedOutStream.writeUInt32NoTag(msgBytes.length);
+			codedOutStream.flush();
+			long messageBodyStart = getFilePointer();
+			codedOutStream.writeRawBytes(msgBytes);
+			long currentOffsetInBody = 0;
+			for (String encodedSuffix : msg.getSuffixesDictionaryList()) {
+				currentOffsetInBody += CodedOutputStream.computeStringSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
+			}
+			for (int i = 0; i < tileBoxes.size(); i++) {
 				PoiTileBox box = tileBoxes.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
-				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(endPointer - accumulateSize, startPoiIndex));
-				accumulateSize += CodedOutputStream.computeMessageSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
-						msg.getAtoms(i));
-
+				OsmAndPoiNameIndexDataAtom atom = msg.getAtoms(i);
+				int atomSerializedSize = atom.getSerializedSize();
+				int atomFieldHeaderSize = CodedOutputStream.computeTagSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER)
+						+ CodedOutputStream.computeRawVarint32Size(atomSerializedSize);
+				long shiftPointer = messageBodyStart + currentOffsetInBody + atomFieldHeaderSize + atomSerializedSize - Integer.BYTES;
+				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(shiftPointer, startPoiIndex));
+				currentOffsetInBody += CodedOutputStream.computeMessageSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
 			}
 		}
 
