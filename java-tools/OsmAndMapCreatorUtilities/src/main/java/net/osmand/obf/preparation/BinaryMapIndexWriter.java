@@ -1738,11 +1738,6 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		if (BloomFilter.PUBLISH) { 
-			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.FILTERS_FIELD_NUMBER,
-					OsmandOdb.OsmAndBloomFilterAlgorithm.newBuilder().setVersion(BloomFilter.VERSION).build());
-		}
-
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
 		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
@@ -1759,9 +1754,6 @@ public class BinaryMapIndexWriter {
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
 				bs.setShiftTo(0);
-				if (BloomFilter.PUBLISH) {
-					bs.addBloomIndex(ByteString.copyFrom(box.getIndexBloom()));
-				}
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}

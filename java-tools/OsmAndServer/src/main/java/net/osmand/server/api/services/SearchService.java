@@ -848,9 +848,10 @@ public class SearchService {
 		}
 		List<Amenity> modifiableFoundedPlaces = new ArrayList<>();
 
+		// searchBbox comes from OsmAndMapsService.points(): left/right/top/bottom are already 31-bit tile coords.
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-				MapUtils.get31TileNumberX(searchBbox.left), MapUtils.get31TileNumberX(searchBbox.right),
-				MapUtils.get31TileNumberY(searchBbox.top), MapUtils.get31TileNumberY(searchBbox.bottom), 15,
+				(int) searchBbox.left, (int) searchBbox.right,
+				(int) searchBbox.top, (int) searchBbox.bottom, 15,
 				new SearchPoiTypeFilter() {
 
 					@Override
@@ -894,9 +895,9 @@ public class SearchService {
 			return modifiableFoundedPlaces.get(0);
 		}
 
-		return null;
-	}
-    
+        return null;
+    }
+
     public QuadRect getSearchBbox(List<LatLon> bbox) {
         if (bbox.size() == 2) {
             return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
@@ -1217,10 +1218,16 @@ public class SearchService {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
+		String poiNameWithAlternateName = result.localeName != null ? result.localeName : amenity.getName();
+		if (!Algorithms.isEmpty(result.alternateName)
+				&& !Algorithms.objectEquals(result.localeName, result.alternateName)) {
+			poiNameWithAlternateName += " (" + result.alternateName + ")";
+		}
+
 		feature = new Feature(Geometry.point(amenity.getLocation()))
 				.prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
 				.prop(PoiTypeField.POI_ID.getFieldName(), amenity.getId())
-				.prop(PoiTypeField.POI_NAME.getFieldName(), amenity.getName())
+				.prop(PoiTypeField.POI_NAME.getFieldName(), poiNameWithAlternateName)
 				.prop(PoiTypeField.POI_COLOR.getFieldName(), amenity.getColor())
 
 				.prop(PoiTypeField.POI_TYPE.getFieldName(), amenity.getType().getKeyName())
