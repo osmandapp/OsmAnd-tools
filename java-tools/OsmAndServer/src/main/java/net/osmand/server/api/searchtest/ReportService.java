@@ -344,10 +344,12 @@ public interface ReportService {
 							ssCount == null ? 0 : ssCount.longValue(),
 							ssBytes == null ? 0 : ssBytes.longValue(),
 							ssCalls == null ? 0 : ssCalls.longValue(),
+							0,
 							ssBlocksLoaded == null ? 0 : ssBlocksLoaded.longValue(),
 							ssObjectsLoaded == null ? 0 : ssObjectsLoaded.longValue(),
 							ssMatchedObjects == null ? 0 : ssMatchedObjects.longValue(),
 							ssMaxObjectsPerBlock == null ? 0 : ssMaxObjectsPerBlock.longValue(),
+							0,
 							ssPayloadBytesParsed == null ? 0 : ssPayloadBytesParsed.longValue(),
 							ssDecodeTimeNs == null ? 0 : ssDecodeTimeNs.longValue(),
 							ssMatcherTimeNs == null ? 0 : ssMatcherTimeNs.longValue()
