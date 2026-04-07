@@ -1218,7 +1218,7 @@ public class SearchService {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
-		String poiNameWithAlternateName = result.localeName;
+		String poiNameWithAlternateName = result.localeName != null ? result.localeName : amenity.getName();
 		if (!Algorithms.isEmpty(result.alternateName)
 				&& !Algorithms.objectEquals(result.localeName, result.alternateName)) {
 			poiNameWithAlternateName += " (" + result.alternateName + ")";
