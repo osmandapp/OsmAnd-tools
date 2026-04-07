@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -108,9 +109,10 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
+import static net.osmand.binary.BinaryMapPoiReaderAdapter.*;
+
 public class BinaryMapIndexWriter {
-	private static final char CLOSEST_TERMINAL_SUFFIX_MARKER = '\u0001';
-	private static final char PREVIOUS_BASED_SUFFIX_MARKER = '\u0002';
+	private static final int MARKER_LCP_LENGTH = MARKER_MAX - MARKER_BASE;
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
@@ -1735,12 +1737,69 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
-	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix, String baseSuffix) {}
+	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix) {}
 
 	private static class PoiNameSuffixDictionaryData {
 		private final List<PoiNameSuffixEntry> dictionaryEntries = new ArrayList<>();
 		private final Map<String, Integer> resolvedSuffixToIndex = new HashMap<>();
 		private final Map<PoiTileBox, int[]> bitsets = new LinkedHashMap<>();
+	}
+
+	private static String normalizePoiNameSuffix(String suffix) {
+		return Normalizer.normalize(suffix, Normalizer.Form.NFC);
+	}
+
+	private static boolean startsWithReservedPoiSuffixMarker(String value) {
+		if (value.isEmpty()) {
+			return false;
+		}
+		int markerCodePoint = value.codePointAt(0);
+		return markerCodePoint == MARKER_RAW_ESCAPE
+				|| (markerCodePoint >= MARKER_BASE && markerCodePoint <= MARKER_MAX);
+	}
+
+	private static String encodeRawPoiNameSuffix(String suffix) {
+		return startsWithReservedPoiSuffixMarker(suffix) ? MARKER_RAW_ESCAPE + suffix : suffix;
+	}
+
+	private static int countCodePoints(String value) {
+		return value.codePointCount(0, value.length());
+	}
+
+	private static int offsetByCodePoints(String value, int codePointCount) {
+		return value.offsetByCodePoints(0, codePointCount);
+	}
+
+	private static int commonPrefixCodePointLength(String left, String right) {
+		int leftOffset = 0;
+		int rightOffset = 0;
+		int commonPrefixCodePointLength = 0;
+		while (leftOffset < left.length() && rightOffset < right.length()) {
+			int leftCodePoint = left.codePointAt(leftOffset);
+			int rightCodePoint = right.codePointAt(rightOffset);
+			if (leftCodePoint != rightCodePoint) {
+				break;
+			}
+			leftOffset += Character.charCount(leftCodePoint);
+			rightOffset += Character.charCount(rightCodePoint);
+			commonPrefixCodePointLength++;
+		}
+		return commonPrefixCodePointLength;
+	}
+
+	private static String encodeFrontCodedPoiNameSuffix(String suffix, String previousSuffix, boolean blockStart) {
+		String encodedRawSuffix = encodeRawPoiNameSuffix(suffix);
+		if (blockStart || previousSuffix == null) {
+			return encodedRawSuffix;
+		}
+		int commonPrefixCodePointLength = commonPrefixCodePointLength(previousSuffix, suffix);
+		if (commonPrefixCodePointLength > MARKER_LCP_LENGTH) {
+			return encodedRawSuffix;
+		}
+		String suffixRemainder = suffix.substring(offsetByCodePoints(suffix, commonPrefixCodePointLength));
+		String deltaEncodedSuffix = new String(Character.toChars(MARKER_BASE + commonPrefixCodePointLength))
+				+ suffixRemainder;
+		return countCodePoints(deltaEncodedSuffix) < countCodePoints(encodedRawSuffix) ? deltaEncodedSuffix : encodedRawSuffix;
 	}
 
 	private PoiNameSuffixDictionaryData buildSuffixDictionaryData(String prefix, List<PoiTileBox> tileBoxes) {
@@ -1754,45 +1813,24 @@ public class BinaryMapIndexWriter {
 				if (!token.startsWith(prefix) || token.length() <= prefix.length()) {
 					continue;
 				}
-				String suffix = token.substring(prefix.length());
+				String suffix = normalizePoiNameSuffix(token.substring(prefix.length()));
 				if (suffix.isEmpty()) {
 					continue;
 				}
-                boxSuffixes.add(suffix);
+				boxSuffixes.add(suffix);
 				sortedSuffixes.add(suffix);
 			}
 		}
-		String previousTerminalSuffix = null;
-		String previousBaseSuffix = null;
+		String previousSuffix = null;
+		int dictionaryIndex = 0;
 		for (String suffix : sortedSuffixes) {
-			String encodedSuffix = suffix;
-			String baseSuffix = suffix;
-			int bestEncodedLength = suffix.length();
-			if (previousTerminalSuffix != null && suffix.startsWith(previousTerminalSuffix)
-					&& suffix.length() > previousTerminalSuffix.length()) {
-				String candidateEncodedSuffix = CLOSEST_TERMINAL_SUFFIX_MARKER + suffix.substring(previousTerminalSuffix.length());
-				if (candidateEncodedSuffix.length() < bestEncodedLength) {
-					encodedSuffix = candidateEncodedSuffix;
-					baseSuffix = previousTerminalSuffix;
-					bestEncodedLength = candidateEncodedSuffix.length();
-				}
-			}
-			if (previousBaseSuffix != null && suffix.startsWith(previousBaseSuffix)
-					&& suffix.length() > previousBaseSuffix.length()) {
-				String candidateEncodedSuffix = PREVIOUS_BASED_SUFFIX_MARKER + suffix.substring(previousBaseSuffix.length());
-				if (candidateEncodedSuffix.length() < bestEncodedLength) {
-					encodedSuffix = candidateEncodedSuffix;
-					baseSuffix = previousBaseSuffix;
-				}
-			}
-			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix, baseSuffix);
+			boolean blockStart = dictionaryIndex % MARKER_BLOCK_SIZE == 0;
+			String encodedSuffix = encodeFrontCodedPoiNameSuffix(suffix, previousSuffix, blockStart);
+			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix);
 			data.resolvedSuffixToIndex.put(entry.resolvedSuffix, data.dictionaryEntries.size());
 			data.dictionaryEntries.add(entry);
-			if (!encodedSuffix.isEmpty() && encodedSuffix.charAt(0) != CLOSEST_TERMINAL_SUFFIX_MARKER
-					&& encodedSuffix.charAt(0) != PREVIOUS_BASED_SUFFIX_MARKER) {
-				previousTerminalSuffix = suffix;
-			}
-			previousBaseSuffix = entry.baseSuffix;
+			previousSuffix = suffix;
+			dictionaryIndex++;
 		}
 		int dictionaryWordCount = (data.dictionaryEntries.size() + Integer.SIZE - 1) / Integer.SIZE;
 		if (dictionaryWordCount == 0) {
