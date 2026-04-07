@@ -9,10 +9,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.PlatformUtil;
@@ -515,6 +517,14 @@ public class RandomRouteTester {
 		return params;
 	}
 
+	private void applyImpassableRoads(RoutingContext ctx, RandomRouteEntry entry) {
+		if (entry.avoidRoads.isEmpty() || !(ctx.getRouter() instanceof GeneralRouter router)) {
+			return;
+		}
+		Set<Long> impassableRoads = new HashSet<>(entry.avoidRoads);
+		router.setImpassableRoads(impassableRoads);
+	}
+
 	private RandomRouteResult runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 
@@ -551,6 +561,7 @@ public class RandomRouteTester {
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
 				mode
 		);
+		applyImpassableRoads(ctx, entry);
 
 //		ctx.dijkstraMode = 0; // 0 for bidirectional, +1 for direct search, -1 for reverse search
 //		ctx.config.heuristicCoefficient = 1; // h() *= 1 for A*, 0 for Dijkstra
@@ -609,6 +620,7 @@ public class RandomRouteTester {
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
 		);
+		applyImpassableRoads(ctx, entry);
 
 		fe.setHHRouteCpp(useNative);
 

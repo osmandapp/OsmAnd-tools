@@ -76,9 +76,13 @@ public class DownloadIndexDocument {
 	
 	
 	public void setOutdatedMaps() {
+		addDeletedMap("Turkey_europe_2.obf.zip", DownloadType.MAP, "03.04.2026");
+		addDeletedMap("Us_california_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "03.04.2026");
+
 		addDeletedMap("Us_texas_northamerica_2.obf.zip", DownloadType.ROAD_MAP, "03.11.2025");
 		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
 		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
+
 		addDeletedMap("India_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		/// ..
