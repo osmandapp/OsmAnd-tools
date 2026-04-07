@@ -58,7 +58,12 @@ import net.osmand.server.api.repo.GarminUserConnectionRepository.GarminUserConne
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
+import net.osmand.server.utils.GarminFitToGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.shared.KException;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.io.KFile;
 
 @RestController
 public class GarminConnectController {
@@ -95,8 +100,7 @@ public class GarminConnectController {
 
 	// for tests
 	private static final long SEC_PER_DAY = 24L * 3600;
-	private static final long backfillSummaryEndTimeSec = -1;
-	private static final long backfillSummaryStartTimeSec = backfillSummaryEndTimeSec - 7 * SEC_PER_DAY;
+	private static final long backfillTestSingleDayStartUtcSec = 1775433600L;
 
 	private static final Pattern SAFE_GARMIN_SUMMARY_ID = Pattern.compile("^[a-zA-Z0-9._-]+$");
 	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
@@ -666,15 +670,14 @@ public class GarminConnectController {
 			LOG.warn("Garmin backfill: cannot refresh access token userid=" + userid);
 			return;
 		}
-		long endSec = backfillSummaryEndTimeSec >= 0L
-				? backfillSummaryEndTimeSec
-				: System.currentTimeMillis() / 1000L;
-		long startSec = backfillSummaryStartTimeSec >= 0L
-				? backfillSummaryStartTimeSec
-				: endSec - ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK * 24L * 3600L;
-		if (startSec > endSec) {
-			LOG.warn("Garmin backfill/activities: summary start after end, skipped userid=" + userid);
-			return;
+		long endSec;
+		long startSec;
+		if (backfillTestSingleDayStartUtcSec >= 0L) {
+			startSec = backfillTestSingleDayStartUtcSec;
+			endSec = startSec + SEC_PER_DAY - 1;
+		} else {
+			endSec = System.currentTimeMillis() / 1000L;
+			startSec = endSec - ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK * 24L * 3600L;
 		}
 		for (long wStart = startSec; wStart <= endSec; ) {
 			long wEnd = Math.min(wStart + MAX_BACKFILL_RANGE_SEC - 1, endSec);
@@ -725,11 +728,8 @@ public class GarminConnectController {
 			LOG.warn("Garmin activityFiles: no web device for userid=" + conn.userid);
 			return;
 		}
-		// Check file type
 		String fileType = jsonObjectMemberAsString(o, "fileType");
-		boolean isGpx = fileType != null && fileType.equalsIgnoreCase(UserdataService.FILE_TYPE_GPX);
-		boolean isFit = fileType != null && fileType.equalsIgnoreCase("FIT");
-		if (!isGpx && !isFit) {
+		if (fileType == null || !fileType.equalsIgnoreCase("FIT")) {
 			return;
 		}
 		// Check file name and skip if already exists in cloud
@@ -738,8 +738,7 @@ public class GarminConnectController {
 			LOG.warn("Garmin activityFiles: missing or invalid summaryId / file base name");
 			return;
 		}
-		String ext = isGpx ? ".gpx" : ".fit";
-		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ext;
+		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ".gpx";
 		if (cloudUserFilesRepository.existsByUseridAndNameAndType(conn.userid, cloudName, UserdataService.FILE_TYPE_GPX)) {
 			LOG.info("Garmin activityFiles: skip duplicate " + cloudName + " userid=" + conn.userid);
 			return;
@@ -755,7 +754,6 @@ public class GarminConnectController {
 			LOG.warn("Garmin activityFiles: token refresh error userid=" + conn.userid, e);
 			return;
 		}
-		// Save file to temp, upload to cloud and clean up
 		byte[] raw;
 		try {
 			raw = httpGetCallbackBytes(callbackUrl, conn.accessToken);
@@ -767,12 +765,31 @@ public class GarminConnectController {
 		File tmp = null;
 		try {
 			tmp = File.createTempFile("garmin-act-", ".gpx");
-			Files.write(tmp.toPath(), raw);
+			long creatTime;
+			GpxFile gpx = GarminFitToGpxParser.fromFitBytes(raw, baseFileName);
+			if (gpx == null) {
+				try {
+					Files.deleteIfExists(tmp.toPath());
+				} catch (IOException e) {
+					LOG.warn("Garmin activityFiles: FIT parse failed userid=" + conn.userid);
+				}
+				return;
+			}
+			creatTime = gpx.getMetadata().getTime();
+			KException werr = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmp.getAbsolutePath()), gpx);
+			if (werr != null) {
+				try {
+					Files.deleteIfExists(tmp.toPath());
+				} catch (IOException e) {
+					LOG.warn("Garmin activityFiles: GPX write failed userid=" + conn.userid + " " + werr.getMessage());
+				}
+				return;
+			}
 			InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp);
 			tmp = null;
 			userdataService.validateUserForUpload(dev, UserdataService.FILE_TYPE_GPX, zip.getSize());
-			userdataService.uploadFile(zip, dev, cloudName, UserdataService.FILE_TYPE_GPX, System.currentTimeMillis());
-			LOG.info("Garmin activityFiles: stored " + (isGpx ? "GPX" : "FIT") + " " + cloudName + " userid=" + conn.userid);
+			userdataService.uploadFile(zip, dev, cloudName, UserdataService.FILE_TYPE_GPX, creatTime);
+			LOG.info("Garmin activityFiles: stored FIT as GPX " + cloudName + " userid=" + conn.userid);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn("Garmin activityFiles: cloud upload rejected userid=" + conn.userid + " " + e.getMessage());
 		} catch (Exception e) {
@@ -815,6 +832,9 @@ public class GarminConnectController {
 			return null;
 		}
 		String sid = summaryId.trim();
+		if (sid.endsWith("-file")) {
+			sid = sid.substring(0, sid.length() - 5);
+		}
 		if (sid.length() > 200 || !SAFE_GARMIN_SUMMARY_ID.matcher(sid).matches()) {
 			return null;
 		}

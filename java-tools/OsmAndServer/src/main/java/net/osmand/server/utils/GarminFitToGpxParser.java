@@ -173,7 +173,7 @@ public final class GarminFitToGpxParser {
 		Author author = new Author();
 		author.setLink(new Link("https://osmand.net/", "OsmAnd"));
 		gpx.getMetadata().setAuthor(author);
-		long metaTs = data.sessionStartMs > 0L ? data.sessionStartMs : data.fileCreatedMs;
+		long metaTs = data.fileCreatedMs > 0L ? data.fileCreatedMs : data.sessionStartMs;
 		if (metaTs <= 0L) {
 			metaTs = firstTime;
 		}
