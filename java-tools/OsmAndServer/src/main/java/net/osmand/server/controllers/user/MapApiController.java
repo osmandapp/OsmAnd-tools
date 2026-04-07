@@ -7,6 +7,7 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
+import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -356,15 +357,23 @@ public class MapApiController {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			boolean isGpx = "gpx".equalsIgnoreCase(ext);
+			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
+			boolean isGpx = GPX_FILE_EXT.equalsIgnoreCase(ext);
 
-			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && isGpx;
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && isGpx;
+			boolean isGPZTrack = isGpx && nd.type.equalsIgnoreCase(FILE_TYPE_GPX);
+			boolean isFavorite = isGpx && nd.type.equals(FILE_TYPE_FAVOURITES);
+			boolean isInfoFile = nd.name.endsWith(INFO_FILE_SUFFIX);
 
 			if (isGPZTrack) {
-				JsonObject details = nd.details != null ? nd.details : new JsonObject();
+				JsonObject details = getOrCreateDetails(nd);
 				if (!webUserdataService.detailsPresent(details)) {
+					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
+				}
+				nd.details = details;
+			}
+			if (isInfoFile) {
+				JsonObject details = getOrCreateDetails(nd);
+				if (!webUserdataService.detailsInfoPresent(details, nd.updatetimems)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
 				nd.details = details;
@@ -385,13 +394,18 @@ public class MapApiController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	@GetMapping(value = "/create-smart-folders", produces = "application/json")
-	public ResponseEntity<String> createSmartFolders() {
+	private JsonObject getOrCreateDetails(UserFileNoData nd) {
+		JsonObject details = nd.details != null ? nd.details : new JsonObject();
+		return details;
+	}
+
+	@GetMapping(value = "/get-smart-folders", produces = "application/json")
+	public ResponseEntity<String> getSmartFolders() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFolders(dev.userid);
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFoldersByUserId(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
