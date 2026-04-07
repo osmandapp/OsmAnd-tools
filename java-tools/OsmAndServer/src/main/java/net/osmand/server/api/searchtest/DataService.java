@@ -387,7 +387,7 @@ public interface DataService extends BaseService {
 				error = "Result point location is null";
 			}
 		} else {
-			error = "Search result is missing";
+			error = searchResults.isEmpty() ? "Search result is empty" : "First search result is missing";
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
 

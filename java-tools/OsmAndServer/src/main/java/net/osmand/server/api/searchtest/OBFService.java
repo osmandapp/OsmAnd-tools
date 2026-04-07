@@ -1014,33 +1014,23 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-    private static String findPoiAddressName(Amenity amenity, String lang, Pattern poiPattern) {
+    private static String findPoiName(Amenity amenity, Pattern poiPattern) {
         if (amenity == null || poiPattern == null) {
             return null;
         }
-        String poiName = amenity.getName(lang);
-        if (poiName != null && poiPattern.matcher(poiName).find()) {
-            return poiName;
-        }
-        String englishName = amenity.getEnName(true);
-        if (englishName != null && poiPattern.matcher(englishName).find()) {
-            return poiName != null ? poiName : englishName;
-        }
-        for (String key : amenity.getAdditionalInfoKeys()) {
-            if (!key.contains("_name") && !key.equals("brand")
-                    && !key.contains("wikidata") && !key.equals("route_id")
-                    && !key.equals("route_members_ids")) {
-                continue;
-            }
-            String additionalInfo = amenity.getAdditionalInfo(key);
-            if (additionalInfo != null && poiPattern.matcher(additionalInfo).find()) {
-                if (poiName != null) {
-                    return poiName;
-                }
-                if (englishName != null) {
-                    return englishName;
-                }
-                return additionalInfo;
+		LinkedHashSet<String> candidateNames = new LinkedHashSet<>();
+		candidateNames.add(amenity.getName());
+		candidateNames.addAll(amenity.getNamesMap(true).values());
+		candidateNames.addAll(amenity.getOtherNames());
+		for (String name : candidateNames) {
+			if (name != null && poiPattern.matcher(name).find()) {
+				return name;
+			}
+		}
+
+        for (String info : amenity.getAdditionalInfoValues(false)) {
+            if (info != null && poiPattern.matcher(info).find()) {
+                return info;
             }
         }
         return null;
@@ -1124,10 +1114,10 @@ public interface OBFService extends BaseService {
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
 						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
+								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), -1,
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
-							String poiName = findPoiAddressName(amenity, lang, poiPattern);
+							String poiName = findPoiName(amenity, poiPattern);
 							if (poiName == null)
 								continue;
 							results.add(new Address(amenity.getName(), poiName, amenity.getLocation()));
