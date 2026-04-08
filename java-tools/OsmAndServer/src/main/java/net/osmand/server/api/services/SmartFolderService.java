@@ -54,8 +54,7 @@ public class SmartFolderService {
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
 				dataItem.readGpxParams(gpxFile);
 				dataItem.setAnalysis(webUserdataService.getAnalysisFromJson(uf.details));
-				dataItem.setParameter(GpxParameter.ACTIVITY_TYPE, gpxFile.getMetadata().getExtensionsToRead()
-						.get(ACTIVITY_TYPE));
+				dataItem.setParameter(GpxParameter.ACTIVITY_TYPE, getActivityType(uf.details));
 				TrackItem trackItem = new TrackItem(gpxFile);
 				trackItem.setDataItem(dataItem);
 				trackItems.add(trackItem);
@@ -67,6 +66,19 @@ public class SmartFolderService {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 		}
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
+	}
+
+	private String getActivityType(JsonObject details) {
+		if (details != null) {
+			JsonObject metadata = details.getAsJsonObject(METADATA);
+			if (metadata != null) {
+				JsonObject extensions = metadata.getAsJsonObject(EXTENSIONS_JSON);
+				if (extensions != null && extensions.has(ACTIVITY_TYPE)) {
+					return extensions.get(ACTIVITY_TYPE).getAsString();
+				}
+			}
+		}
+		return null;
 	}
 
 	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
@@ -103,14 +115,6 @@ public class SmartFolderService {
 				JsonElement time = metadata.get("time");
 				if (time != null) {
 					gpxFile.getMetadata().setTime(time.getAsLong());
-				}
-				JsonObject extensions = metadata.getAsJsonObject(EXTENSIONS_JSON);
-				if (extensions != null) {
-					JsonElement activityType = extensions.get(ACTIVITY_TYPE);
-					if (activityType != null) {
-						Map<String, String> extensionsToWrite = gpxFile.getMetadata().getExtensionsToWrite();
-						extensionsToWrite.put(ACTIVITY_TYPE, activityType.getAsString());
-					}
 				}
 			}
 		}
