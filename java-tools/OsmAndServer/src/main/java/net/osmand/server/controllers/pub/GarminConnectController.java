@@ -856,10 +856,39 @@ public class GarminConnectController {
 		return baseName;
 	}
 
+	private static void assertTrustedGarminActivityCallbackUrl(String url) throws IOException {
+		if (url == null || url.isBlank()) {
+			throw new IOException("Garmin callback URL empty");
+		}
+		final URI uri;
+		try {
+			uri = URI.create(url.trim()).normalize();
+		} catch (IllegalArgumentException e) {
+			throw new IOException("Garmin callback URL invalid", e);
+		}
+		String host = uri.getHost();
+		if (host != null && host.endsWith(".")) {
+			host = host.substring(0, host.length() - 1);
+		}
+		int port = uri.getPort();
+		String path = uri.getPath();
+		if (!"https".equalsIgnoreCase(uri.getScheme())
+				|| uri.getUserInfo() != null
+				|| uri.getFragment() != null
+				|| host == null
+				|| !host.equalsIgnoreCase("apis.garmin.com")
+				|| (port != -1 && port != 443)
+				|| path == null
+				|| !path.startsWith("/wellness-api/")) {
+			throw new IOException("Garmin callback URL not allowed");
+		}
+	}
+
 	/** Returns the downloaded bytes. Throws IOException on HTTP errors or if the URL is expired (HTTP 410). */
 	private byte[] httpGetCallbackBytes(String url, String bearerAccessToken) throws IOException, InterruptedException {
+		assertTrustedGarminActivityCallbackUrl(url);
 		HttpRequest.Builder rb = HttpRequest.newBuilder()
-				.uri(URI.create(url))
+				.uri(URI.create(url.trim()).normalize())
 				.timeout(Duration.ofSeconds(60));
 		if (bearerAccessToken != null && !bearerAccessToken.isBlank()) {
 			rb.header("Authorization", "Bearer " + bearerAccessToken);
