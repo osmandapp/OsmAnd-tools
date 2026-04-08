@@ -23,6 +23,7 @@ import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GLOBAL;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.server.api.services.WebUserdataService.*;
+import static net.osmand.server.api.services.WebUserdataService.ACTIVITY_TYPE;
 import static net.osmand.shared.gpx.GpxUtilities.*;
 import static net.osmand.shared.gpx.SmartFolderHelper.TRACK_FILTERS_SETTINGS_PREF;
 
@@ -32,7 +33,6 @@ public class SmartFolderService {
 	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
-	public static final String EXTENSIONS_JSON = "extensions";
 
 	@Autowired
 	private UserdataService userDataService;
@@ -71,11 +71,8 @@ public class SmartFolderService {
 	private String getActivityType(JsonObject details) {
 		if (details != null) {
 			JsonObject metadata = details.getAsJsonObject(METADATA);
-			if (metadata != null) {
-				JsonObject extensions = metadata.getAsJsonObject(EXTENSIONS_JSON);
-				if (extensions != null && extensions.has(ACTIVITY_TYPE)) {
-					return extensions.get(ACTIVITY_TYPE).getAsString();
-				}
+			if (metadata != null && metadata.has(ACTIVITY_TYPE)) {
+				return metadata.get(ACTIVITY_TYPE).getAsString();
 			}
 		}
 		return null;
