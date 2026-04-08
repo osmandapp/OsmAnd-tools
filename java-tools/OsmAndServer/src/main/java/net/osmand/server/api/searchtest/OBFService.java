@@ -1024,11 +1024,12 @@ public interface OBFService extends BaseService {
 			return new Address(name, "name-> " + name, amenity.getLocation());
 		}
 
-		name = amenity.getEnName(false);
-		if (name != null && poiPattern.matcher(name).find()) {
-			return new Address(name, "name:en-> " + name, amenity.getLocation());
+		String enName = amenity.getEnName(false);
+		if (enName != null && poiPattern.matcher(enName).find()) {
+			return new Address(enName, "name:en-> " + enName, amenity.getLocation());
 		}
-
+		
+		name = name == null ? enName : name;
 		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
 			if (e.getValue() != null && poiPattern.matcher(e.getValue()).find()) {
 				return new Address(name, e.getKey() + "-> " + e.getValue(), amenity.getLocation());
