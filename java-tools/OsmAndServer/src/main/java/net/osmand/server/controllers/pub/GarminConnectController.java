@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
@@ -358,28 +359,40 @@ public class GarminConnectController {
 	}
 
 	@PostMapping(value = "/garmin/webhook/activity-ping", consumes = "application/json")
-	public ResponseEntity<Void> activityPing(@RequestBody String body) {
-		handleActivityPingPayloadAsync(body);
-		return ResponseEntity.ok().build();
+	public ResponseEntity<Void> activityPing(@RequestBody String body, HttpServletRequest request) {
+		return runGarminWebhook(request, () -> handleActivityPingPayloadAsync(body));
 	}
 
 	@PostMapping(value = "/garmin/webhook/user-permissions", consumes = "application/json")
-	public ResponseEntity<Void> userPermissionsWebhook(@RequestBody String body) {
-		try {
-			applyUserPermissionsWebhookPayload(body);
-		} catch (Exception e) {
-			LOG.error("Garmin user permissions webhook: processing failed", e);
-		}
-		return ResponseEntity.ok().build();
+	public ResponseEntity<Void> userPermissionsWebhook(@RequestBody String body, HttpServletRequest request) {
+		return runGarminWebhook(request, () -> {
+			try {
+				applyUserPermissionsWebhookPayload(body);
+			} catch (Exception e) {
+				LOG.error("Garmin user permissions webhook: processing failed", e);
+			}
+		});
 	}
 
 	@PostMapping(value = "/garmin/webhook/deregistrations", consumes = "application/json")
-	public ResponseEntity<Void> deregistrationsWebhook(@RequestBody String body) {
-		try {
-			applyDeregistrationsWebhookPayload(body);
-		} catch (Exception e) {
-			LOG.error("Garmin deregistrations webhook: processing failed", e);
+	public ResponseEntity<Void> deregistrationsWebhook(@RequestBody String body, HttpServletRequest request) {
+		return runGarminWebhook(request, () -> {
+			try {
+				applyDeregistrationsWebhookPayload(body);
+			} catch (Exception e) {
+				LOG.error("Garmin deregistrations webhook: processing failed", e);
+			}
+		});
+	}
+
+	private ResponseEntity<Void> runGarminWebhook(HttpServletRequest request, Runnable action) {
+		if (clientId == null || clientId.isBlank()) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
 		}
+		if (!clientId.equals(request.getHeader("garmin-client-id"))) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		}
+		action.run();
 		return ResponseEntity.ok().build();
 	}
 
