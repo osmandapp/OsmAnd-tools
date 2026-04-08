@@ -52,7 +52,7 @@ public interface OBFService extends BaseService {
 	}
 
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record Address(String name, String info, LatLon point) {}
+	record Address(String name, String value, LatLon point) {}
 	record StreetAddress(String name, List<Address> houses) {}
 
 	enum ObfLengthType {
@@ -1014,23 +1014,31 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-    private static String findPoiName(Amenity amenity, Pattern poiPattern) {
+    private static String findValue(Amenity amenity, Pattern poiPattern) {
         if (amenity == null || poiPattern == null) {
             return null;
         }
-		LinkedHashSet<String> candidateNames = new LinkedHashSet<>();
-		candidateNames.add(amenity.getName());
-		candidateNames.addAll(amenity.getNamesMap(true).values());
-		candidateNames.addAll(amenity.getOtherNames());
-		for (String name : candidateNames) {
-			if (name != null && poiPattern.matcher(name).find()) {
-				return name;
-			}
+		
+		String name = amenity.getName();
+		if (name != null && poiPattern.matcher(name).find()) {
+			return "name-> " + name;
 		}
 
-        for (String info : amenity.getAdditionalInfoValues(false)) {
+		name = amenity.getEnName(false);
+		if (name != null && poiPattern.matcher(name).find()) {
+			return "en_name-> " + name;
+		}
+
+		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
+			if (e.getValue() != null && poiPattern.matcher(e.getValue()).find()) {
+				return e.getKey() + "-> " + e.getValue();
+			}
+		}
+		
+        for (String key : amenity.getAdditionalInfoKeys()) {
+			String info = amenity.getAdditionalInfo(key);
             if (info != null && poiPattern.matcher(info).find()) {
-                return info;
+                return key + "-> " + info;
             }
         }
         return null;
@@ -1117,10 +1125,10 @@ public interface OBFService extends BaseService {
 								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), -1,
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
-							String poiName = findPoiName(amenity, poiPattern);
-							if (poiName == null)
+							String value = findValue(amenity, poiPattern);
+							if (value == null)
 								continue;
-							results.add(new Address(amenity.getName(), poiName, amenity.getLocation()));
+							results.add(new Address(amenity.getName(), value, amenity.getLocation()));
 						}
 					}
 				}
