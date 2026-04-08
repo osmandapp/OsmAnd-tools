@@ -1014,31 +1014,31 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-    private static String findValue(Amenity amenity, Pattern poiPattern) {
+    private static Address findValue(Amenity amenity, Pattern poiPattern) {
         if (amenity == null || poiPattern == null) {
             return null;
         }
 		
 		String name = amenity.getName();
 		if (name != null && poiPattern.matcher(name).find()) {
-			return "name-> " + name;
+			return new Address(name, "name-> " + name, amenity.getLocation());
 		}
 
 		name = amenity.getEnName(false);
 		if (name != null && poiPattern.matcher(name).find()) {
-			return "en_name-> " + name;
+			return new Address(name, "name:en-> " + name, amenity.getLocation());
 		}
 
 		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
 			if (e.getValue() != null && poiPattern.matcher(e.getValue()).find()) {
-				return e.getKey() + "-> " + e.getValue();
+				return new Address(name, e.getKey() + "-> " + e.getValue(), amenity.getLocation());
 			}
 		}
 		
         for (String key : amenity.getAdditionalInfoKeys()) {
 			String info = amenity.getAdditionalInfo(key);
             if (info != null && poiPattern.matcher(info).find()) {
-                return key + "-> " + info;
+                return new Address(name, key + "-> " + info, amenity.getLocation());
             }
         }
         return null;
@@ -1125,10 +1125,10 @@ public interface OBFService extends BaseService {
 								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), -1,
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
-							String value = findValue(amenity, poiPattern);
+							Address value = findValue(amenity, poiPattern);
 							if (value == null)
 								continue;
-							results.add(new Address(amenity.getName(), value, amenity.getLocation()));
+							results.add(value);
 						}
 					}
 				}
