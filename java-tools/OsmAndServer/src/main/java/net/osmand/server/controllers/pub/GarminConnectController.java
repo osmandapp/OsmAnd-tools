@@ -108,28 +108,15 @@ public class GarminConnectController {
 
 	private static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
 			"RUNNING",
-			"OBSTACLE_RUN",
-			"STREET_RUNNING",
-			"TRACK_RUNNING",
-			"TRAIL_RUNNING",
-			"ULTRA_RUN",
+			"RUN",
+			"TRACK",
 			"CYCLING",
-			"ROAD_BIKING",
-			"MOUNTAIN_BIKING",
-			"GRAVEL_CYCLING",
+			"BIKING",
 			"CYCLOCROSS",
 			"BMX",
-			"DOWNHILL_BIKING",
-			"TRACK_CYCLING",
-			"RECUMBENT_CYCLING",
-			"E_BIKE_FITNESS",
-			"E_BIKE_MOUNTAIN",
-			"ENDURO_MTB",
-			"E_ENDURO_MTB",
-			"HANDCYCLING",
+			"E_BIKE",
+			"MTB",
 			"WALKING",
-			"CASUAL_WALKING",
-			"SPEED_WALKING",
 			"HIKING",
 			"RUCKING");
 
@@ -732,7 +719,7 @@ public class GarminConnectController {
 			Map<String, CloudUserDevice> webDevByGarminUserId) {
 		// Check activity type and skip if not supported
 		String activityType = jsonObjectMemberAsString(o, "activityType");
-		if (activityType != null && GARMIN_TRACK_ACTIVITY_TYPES.stream().noneMatch(activityType::startsWith)) {
+		if (activityType != null && GARMIN_TRACK_ACTIVITY_TYPES.stream().noneMatch(activityType::contains)) {
 			return;
 		}
 		// Check user
