@@ -106,6 +106,33 @@ public class GarminConnectController {
 	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
 	private static final String GPX_FOLDER_GARMIN = "Garmin";
 
+	private static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
+			"RUNNING",
+			"OBSTACLE_RUN",
+			"STREET_RUNNING",
+			"TRACK_RUNNING",
+			"TRAIL_RUNNING",
+			"ULTRA_RUN",
+			"CYCLING",
+			"ROAD_BIKING",
+			"MOUNTAIN_BIKING",
+			"GRAVEL_CYCLING",
+			"CYCLOCROSS",
+			"BMX",
+			"DOWNHILL_BIKING",
+			"TRACK_CYCLING",
+			"RECUMBENT_CYCLING",
+			"E_BIKE_FITNESS",
+			"E_BIKE_MOUNTAIN",
+			"ENDURO_MTB",
+			"E_ENDURO_MTB",
+			"HANDCYCLING",
+			"WALKING",
+			"CASUAL_WALKING",
+			"SPEED_WALKING",
+			"HIKING",
+			"RUCKING");
+
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
 	private final HttpClient httpClient = HttpClient.newHttpClient();
@@ -703,6 +730,11 @@ public class GarminConnectController {
 
 	private void processOneActivityFile(JsonObject o, Map<String, GarminUserConnection> connByGarminUserId,
 			Map<String, CloudUserDevice> webDevByGarminUserId) {
+		// Check activity type and skip if not supported
+		String activityType = jsonObjectMemberAsString(o, "activityType");
+		if (activityType != null && GARMIN_TRACK_ACTIVITY_TYPES.stream().noneMatch(activityType::startsWith)) {
+			return;
+		}
 		// Check user
 		String garminUserId = jsonObjectMemberAsString(o, JSON_USER_ID);
 		String callbackUrl = jsonObjectMemberAsString(o, "callbackURL");
