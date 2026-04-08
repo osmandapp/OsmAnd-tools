@@ -104,6 +104,7 @@ public class GarminConnectController {
 	private static final long backfillTestSingleDayStartUtcSec = 1775433600L;
 
 	private static final Pattern SAFE_GARMIN_SUMMARY_ID = Pattern.compile("^[a-zA-Z0-9._-]+$");
+	private static final Pattern NON_FILE_SAFE_ACTIVITY_NAME = Pattern.compile("[^a-zA-Z0-9._-]+");
 	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
 	private static final String GPX_FOLDER_GARMIN = "Garmin";
 
@@ -873,8 +874,7 @@ public class GarminConnectController {
 		String activityName = jsonObjectMemberAsString(activityFilePingEntry, "activityName");
 		String baseName = sid;
 		if (activityName != null && !activityName.isBlank()) {
-			Pattern nonFileSafeActivityName = Pattern.compile("[^a-zA-Z0-9._-]+");
-			String t = nonFileSafeActivityName.matcher(activityName.trim()).replaceAll("_").replaceAll("_+", "_");
+			String t = NON_FILE_SAFE_ACTIVITY_NAME.matcher(activityName.trim()).replaceAll("_").replaceAll("_+", "_");
 			t = t.replaceAll("^_+|_+$", "");
 			if (!t.isEmpty() && SAFE_GARMIN_SUMMARY_ID.matcher(t).matches()) {
 				if (t.length() > MAX_ACTIVITY_NAME_PREFIX_LEN) {
