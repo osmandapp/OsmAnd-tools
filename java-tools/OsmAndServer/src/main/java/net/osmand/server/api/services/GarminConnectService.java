@@ -180,7 +180,9 @@ public class GarminConnectService {
 			row = new GarminUserConnectionRepository.GarminUserConnection();
 			row.userid = userid;
 		}
-		applyTokenResponse(row, tokenJson);
+		if (!applyTokenResponse(row, tokenJson)) {
+			return new GarminLinkResult(GarminLinkStatus.TOKEN_EXCHANGE_FAILED, false);
+		}
 
 		String garminUserId = fetchGarminUserId(row.accessToken);
 		if (garminUserId == null) {
@@ -227,7 +229,9 @@ public class GarminConnectService {
 			return false;
 		}
 		JsonObject tokenJson = new JsonParser().parse(res.body()).getAsJsonObject();
-		applyTokenResponse(row, tokenJson);
+		if (!applyTokenResponse(row, tokenJson)) {
+			return false;
+		}
 		garminUserConnectionRepository.save(row);
 		return true;
 	}
@@ -752,9 +756,13 @@ public class GarminConnectService {
 		row.activityExport = granted.contains(PERM_ACTIVITY_EXPORT);
 	}
 
-	private void applyTokenResponse(GarminUserConnectionRepository.GarminUserConnection row, JsonObject tokenJson) {
+	private boolean applyTokenResponse(GarminUserConnectionRepository.GarminUserConnection row, JsonObject tokenJson) {
 		String access = jsonObjectMemberAsString(tokenJson, JSON_ACCESS_TOKEN);
-		row.accessToken = access != null ? access : "";
+		if (access == null || access.isBlank()) {
+			LOG.warn("Garmin token response: missing or blank access_token userid=" + row.userid);
+			return false;
+		}
+		row.accessToken = access;
 		String refresh = jsonObjectMemberAsString(tokenJson, JSON_REFRESH_TOKEN);
 		if (refresh != null) {
 			row.refreshToken = refresh;
@@ -763,5 +771,6 @@ public class GarminConnectService {
 		// Garmin OAuth doc: subtract 600+ s from expires_in before refresh to cover network/clock skew.
 		// Floor at 60 s so a short or odd expires_in never makes accessExpiresTime immediate/nonpositive effective TTL.
 		row.accessExpiresTime = System.currentTimeMillis() + Math.max(60, expiresIn - 600) * 1000L;
+		return true;
 	}
 }
