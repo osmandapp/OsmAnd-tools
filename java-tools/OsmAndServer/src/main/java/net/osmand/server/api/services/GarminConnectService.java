@@ -749,6 +749,8 @@ public class GarminConnectService {
 			row.refreshToken = refresh;
 		}
 		int expiresIn = tokenJson.has(JSON_EXPIRES_IN) ? tokenJson.get(JSON_EXPIRES_IN).getAsInt() : 86400;
+		// Garmin OAuth doc: subtract 600+ s from expires_in before refresh to cover network/clock skew.
+		// Floor at 60 s so a short or odd expires_in never makes accessExpiresTime immediate/nonpositive effective TTL.
 		row.accessExpiresTime = System.currentTimeMillis() + Math.max(60, expiresIn - 600) * 1000L;
 	}
 }
