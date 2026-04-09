@@ -67,6 +67,7 @@ public class WebUserdataService {
 	UserSessionResources sessionResources;
 
 	public static final String METADATA = "metadata";
+	public static final String TIME = "time";
 	public static final String ACTIVITY_TYPE = "activity";
 	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
@@ -337,7 +338,7 @@ public class WebUserdataService {
 		Metadata metadata = gpxFile.getMetadata();
 		JsonObject metadataJson = new JsonObject();
 		if (metadata.getTime() != 0) {
-			metadataJson.addProperty("time", metadata.getTime());
+			metadataJson.addProperty(TIME, metadata.getTime());
 		}
 		String activity = metadata.getExtensionsToWrite().get(GpxUtilities.ACTIVITY_TYPE);
 		if (activity != null && !activity.isBlank()) {

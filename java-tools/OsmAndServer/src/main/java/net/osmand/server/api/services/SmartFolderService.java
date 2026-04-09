@@ -69,13 +69,11 @@ public class SmartFolderService {
 	}
 
 	private String getActivityType(JsonObject details) {
-		if (details != null) {
-			JsonObject metadata = details.getAsJsonObject(METADATA);
-			if (metadata != null && metadata.has(ACTIVITY_TYPE)) {
-				return metadata.get(ACTIVITY_TYPE).getAsString();
-			}
-		}
-		return null;
+		return Optional.ofNullable(details)
+				.map(d -> d.getAsJsonObject(METADATA))
+				.map(m -> m.get(ACTIVITY_TYPE))
+				.map(JsonElement::getAsString)
+				.orElse(null);
 	}
 
 	private List<SmartFolderWeb> toSmartFolderWebList(List<SmartFolder> smartFolders) {
@@ -109,7 +107,7 @@ public class SmartFolderService {
 		if (details != null) {
 			JsonObject metadata = details.getAsJsonObject(METADATA);
 			if (metadata != null) {
-				JsonElement time = metadata.get("time");
+				JsonElement time = metadata.get(TIME);
 				if (time != null) {
 					gpxFile.getMetadata().setTime(time.getAsLong());
 				}
