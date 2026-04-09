@@ -501,6 +501,11 @@ public class GarminConnectService {
 		}
 	}
 
+	/**
+	 * Garmin Activity Files may be FIT, TCX, or GPX per the API. Modern devices record natively in FIT;
+	 * TCX is a legacy Training Center XML interchange format and is no longer the primary path.
+	 * We only accept FIT and GPX since TCX is not widely used.
+	 */
 	private static boolean isGarminActivityFileTypeSupported(String fileType) {
 		return GARMIN_ACTIVITY_FILE_TYPE_FIT.equals(fileType) || GARMIN_ACTIVITY_FILE_TYPE_GPX.equals(fileType);
 	}
