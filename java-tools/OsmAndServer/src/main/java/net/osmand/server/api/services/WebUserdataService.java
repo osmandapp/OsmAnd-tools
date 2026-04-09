@@ -85,7 +85,7 @@ public class WebUserdataService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
+	private static final long ANALYSIS_RERUN = 1775661710000L; // 10-12-2025
 
 	Gson gson = new Gson();
 
@@ -581,8 +581,25 @@ public class WebUserdataService {
 		private long startTime;
 		private long endTime;
 		private long timeMoving;
+		private long timeSpan;
 		private int points;
 		private int wptPoints;
+		private float averageSpeed;
+		private float maxSpeed;
+		private float averageSensorSpeed;
+		private float maxSensorSpeed;
+		private float averageSensorHeartRate;
+		private int maxSensorHeartRate;
+		private float averageSensorCadence;
+		private float maxSensorCadence;
+		private float averageSensorPower;
+		private int maxSensorPower;
+		private float averageSensorTemperature;
+		private int maxSensorTemperature;
+		private double diffElevationUp;
+		private double diffElevationDown;
+		private double averageElevation;
+		private double maxElevation;
 
 		public AnalysisDetails() {}
 
@@ -592,8 +609,25 @@ public class WebUserdataService {
 				this.startTime = analysis.getStartTime();
 				this.endTime = analysis.getEndTime();
 				this.timeMoving = analysis.getTimeMoving();
+				this.timeSpan = analysis.getTimeSpan();
 				this.points = analysis.getPoints();
 				this.wptPoints = analysis.getWptPoints();
+				this.averageSpeed = analysis.getAvgSpeed();
+				this.maxSpeed = analysis.getMaxSpeed();
+				this.averageSensorSpeed = analysis.getAvgSensorSpeed();
+				this.maxSensorSpeed = analysis.getMaxSensorSpeed();
+				this.averageSensorHeartRate = analysis.getAvgSensorHr();
+				this.maxSensorHeartRate = analysis.getMaxSensorHr();
+				this.averageSensorCadence = analysis.getAvgSensorCadence();
+				this.maxSensorCadence = analysis.getMaxSensorCadence();
+				this.averageSensorPower = analysis.getAvgSensorPower();
+				this.maxSensorPower = analysis.getMaxSensorPower();
+				this.averageSensorTemperature = analysis.getAvgSensorTemperature();
+				this.maxSensorTemperature = analysis.getMaxSensorTemperature();
+				this.diffElevationUp = analysis.getDiffElevationUp();
+				this.diffElevationDown = analysis.getDiffElevationDown();
+				this.averageElevation = analysis.getAvgElevation();
+				this.maxElevation = analysis.getMaxElevation();
 			}
 		}
 
@@ -603,8 +637,25 @@ public class WebUserdataService {
 				analysis.setStartTime(this.startTime);
 				analysis.setEndTime(this.endTime);
 				analysis.setTimeMoving(this.timeMoving);
+				analysis.setTimeSpan(this.timeSpan);
 				analysis.setPoints(this.points);
 				analysis.setWptPoints(this.wptPoints);
+				analysis.setAvgSpeed(this.averageSpeed);
+				analysis.setMaxSpeed(this.maxSpeed);
+				analysis.setAvgSensorSpeed(this.averageSensorSpeed);
+				analysis.setMaxSensorSpeed(this.maxSensorSpeed);
+				analysis.setAvgSensorHr(this.averageSensorHeartRate);
+				analysis.setMaxSensorHr(this.maxSensorHeartRate);
+				analysis.setAvgSensorCadence(this.averageSensorCadence);
+				analysis.setMaxSensorCadence(this.maxSensorCadence);
+				analysis.setAvgSensorPower(this.averageSensorPower);
+				analysis.setMaxSensorPower(this.maxSensorPower);
+				analysis.setAvgSensorTemperature(this.averageSensorTemperature);
+				analysis.setMaxSensorTemperature(this.maxSensorTemperature);
+				analysis.setDiffElevationUp(this.diffElevationUp);
+				analysis.setDiffElevationDown(this.diffElevationDown);
+				analysis.setAvgElevation(this.averageElevation);
+				analysis.setMaxElevation(this.maxElevation);
 			}
 		}
 	}
