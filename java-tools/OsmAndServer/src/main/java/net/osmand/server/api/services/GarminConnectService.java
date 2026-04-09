@@ -307,6 +307,7 @@ public class GarminConnectService {
 				.build();
 		HttpResponse<String> res = httpClient.send(del, HttpResponse.BodyHandlers.ofString());
 		int code = res.statusCode();
+		// 404: registration already gone on Garmin (user revoked, duplicate disconnect) — desired end state.
 		if (code / 100 != 2 && code != 404) {
 			LOG.warn("Garmin DELETE user/registration failed: HTTP " + code + " " + res.body());
 		}
@@ -352,6 +353,7 @@ public class GarminConnectService {
 					.build();
 			HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
 			int code = res.statusCode();
+			// 202 accepted (async); 409 duplicate backfill for this range (Garmin API) — both OK to continue.
 			if (code == 202 || code == 409) {
 				LOG.info("Garmin backfill/activities: HTTP " + code + " range " + wStart + ".." + wEnd + " userid=" + userid);
 			} else {
