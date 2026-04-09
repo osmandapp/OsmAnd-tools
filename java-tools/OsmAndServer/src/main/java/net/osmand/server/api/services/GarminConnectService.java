@@ -511,6 +511,7 @@ public class GarminConnectService {
 					Files.deleteIfExists(tmp.toPath());
 				} catch (IOException ignored) {
 					LOG.info("Garmin activityFiles: failed to delete temp file " + tmp.getAbsolutePath());
+					tmp.deleteOnExit();
 				}
 			}
 		}
@@ -541,7 +542,8 @@ public class GarminConnectService {
 			try (Source source = Okio.source(new ByteArrayInputStream(raw))) {
 				GpxFile gpx = GpxUtilities.INSTANCE.loadGpxFile(source);
 				if (gpx.getError() != null) {
-					LOG.warn("Garmin activityFiles: GPX invalid userid=" + userid + " " + gpx.getError().getMessage());
+					LOG.warn("Garmin activityFiles: GPX invalid userid=" + userid + " baseFileName=" + baseFileName + " "
+							+ gpx.getError().getMessage());
 					return null;
 				}
 				gpx.getMetadata().setName(baseFileName);
@@ -578,10 +580,16 @@ public class GarminConnectService {
 		String activityName = jsonObjectMemberAsString(activityFilePingEntry, "activityName");
 		String baseName = sid;
 		if (activityName != null && !activityName.isBlank()) {
-			String t = NON_FILE_SAFE_ACTIVITY_NAME.matcher(activityName.trim()).replaceAll("_").replaceAll("_+", "_");
+			String t = activityName.trim();
+			// File-name safety: anything not [a-zA-Z0-9._-] becomes '_'
+			t = NON_FILE_SAFE_ACTIVITY_NAME.matcher(t).replaceAll("_");
+			// Collapse runs of '_' so we do not get long underscore sequences
+			t = t.replaceAll("_+", "_");
+			// Remove '_' at the start/end of the prefix (e.g. from leading punctuation replaced above)
 			t = t.replaceAll("^_+|_+$", "");
 			if (!t.isEmpty() && SAFE_GARMIN_SUMMARY_ID.matcher(t).matches()) {
 				if (t.length() > MAX_ACTIVITY_NAME_PREFIX_LEN) {
+					// After hard trim, drop '_' glued to the cut edge
 					t = t.substring(0, MAX_ACTIVITY_NAME_PREFIX_LEN).replaceAll("_+$", "");
 				}
 				if (!t.isEmpty()) {
