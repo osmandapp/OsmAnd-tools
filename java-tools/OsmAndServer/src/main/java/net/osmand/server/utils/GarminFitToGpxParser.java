@@ -23,6 +23,8 @@ import com.garmin.fit.RecordMesgListener;
 import com.garmin.fit.SessionMesg;
 import com.garmin.fit.Sport;
 
+import jakarta.annotation.Nullable;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -59,7 +61,7 @@ public final class GarminFitToGpxParser {
 	}
 
 	/** Converts raw FIT binary data to a GpxFile. Returns null if input is empty or corrupted. */
-	public static GpxFile fromFitBytes(byte[] fitBytes, String preferredName) {
+	public static GpxFile fromFitBytes(@Nullable byte[] fitBytes, String preferredName) {
 		if (fitBytes == null || fitBytes.length == 0) {
 			return null;
 		}
@@ -148,13 +150,13 @@ public final class GarminFitToGpxParser {
 		}
 
 		// 2. Collect time range and elevation presence
-		boolean anyEle = false;
+		boolean anyEleFound = false;
 		long firstTime = 0L;
 		long lastTime = 0L;
 		for (TrkSegment seg : data.segments) {
 			for (WptPt p : seg.getPoints()) {
 				if (!Double.isNaN(p.getEle())) {
-					anyEle = true;
+					anyEleFound = true;
 				}
 				if (p.getTime() > 0L) {
 					if (firstTime == 0L) {
@@ -169,7 +171,7 @@ public final class GarminFitToGpxParser {
 
 		// 3. Fill GPX metadata (author, time, name, activity)
 		GpxFile gpx = new GpxFile(OSMAND_FIT_TO_GPX_V1);
-		gpx.setHasAltitude(anyEle);
+		gpx.setHasAltitude(anyEleFound);
 		Author author = new Author();
 		author.setLink(new Link("https://osmand.net/", "OsmAnd"));
 		gpx.getMetadata().setAuthor(author);
