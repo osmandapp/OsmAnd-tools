@@ -2,6 +2,7 @@ package net.osmand.server.controllers.user;
 
 import java.io.*;
 
+import com.google.gson.JsonElement;
 import jakarta.servlet.http.HttpSession;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -369,7 +370,7 @@ public class MapApiController {
 				if (!webUserdataService.detailsPresent(details)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
-				nd.details = details;
+				nd.details = WebUserdataService.AnalysisDetails.filterAnalysis(details);
 			}
 			if (isInfoFile) {
 				JsonObject details = getOrCreateDetails(nd);
@@ -495,7 +496,8 @@ public class MapApiController {
 		try {
 			UserFile userFile = userdataService.getUserFile(name, type, updatetime, dev);
 			if (webUserdataService.analysisPresent(ANALYSIS, userFile)) {
-				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, userFile.details.get(ANALYSIS))));
+				JsonElement analysis = WebUserdataService.AnalysisDetails.filterAnalysis(userFile.details).get(ANALYSIS);
+				return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, analysis)));
 			}
 			in = userdataService.getInputStream(dev, userFile);
 			GpxFile gpxFile;

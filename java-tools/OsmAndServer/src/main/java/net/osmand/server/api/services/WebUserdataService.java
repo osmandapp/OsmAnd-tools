@@ -85,7 +85,7 @@ public class WebUserdataService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1775661710000L; // 10-12-2025
+	private static final long ANALYSIS_RERUN = 1775742653000L; // 09-04-2026
 
 	Gson gson = new Gson();
 
@@ -138,7 +138,7 @@ public class WebUserdataService {
 					boolean isSharedFile = isShared(nd, sharedFilesMap);
 					JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf, points);
-					nd.details = uf.details;
+					nd.details = AnalysisDetails.filterAnalysis(uf.details);
 					result.add(nd);
 				} catch (IOException e) {
 					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
@@ -656,6 +656,30 @@ public class WebUserdataService {
 				analysis.setDiffElevationDown(this.diffElevationDown);
 				analysis.setAvgElevation(this.averageElevation);
 				analysis.setMaxElevation(this.maxElevation);
+			}
+		}
+
+		public static JsonObject filterAnalysis(JsonObject details) {
+			if (details == null) {
+				return null;
+			}
+			JsonObject filteredDetails = details.deepCopy();
+			JsonElement analysisEl = filteredDetails.get(ANALYSIS);
+			if (analysisEl != null && analysisEl.isJsonObject()) {
+				JsonObject source = analysisEl.getAsJsonObject();
+				JsonObject filtered = new JsonObject();
+				String[] includedFields = {"totalDistance", "startTime", "endTime", "timeMoving", "points", "wptPoints"};
+				for (String field : includedFields) {
+					copyIfPresent(source, filtered, field);
+				}
+				filteredDetails.add(ANALYSIS, filtered);
+			}
+			return filteredDetails;
+		}
+
+		private static void copyIfPresent(JsonObject from, JsonObject to, String key) {
+			if (from.has(key)) {
+				to.add(key, from.get(key));
 			}
 		}
 	}
