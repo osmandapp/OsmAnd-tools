@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import com.google.gson.*;
+import jakarta.annotation.Nullable;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.GarminUserConnectionRepository;
@@ -602,9 +603,6 @@ public class GarminConnectService {
 		HttpRequest req = rb.GET().build();
 		HttpResponse<byte[]> res = httpClient.send(req, HttpResponse.BodyHandlers.ofByteArray());
 		int code = res.statusCode();
-		if (code == 410) {
-			throw new IOException("Garmin callback URL expired (HTTP 410)");
-		}
 		if (code / 100 != 2) {
 			throw new IOException("Garmin callback HTTP " + code);
 		}
@@ -621,25 +619,30 @@ public class GarminConnectService {
 		} catch (IllegalArgumentException e) {
 			throw new IOException("Garmin callback URL invalid", e);
 		}
+		if (!isAllowedGarminPullUri(uri)) {
+			throw new IOException("Garmin callback URL not allowed");
+		}
+	}
+
+	// SSRF allowlist before outbound GET to callbackURL from ping JSON
+	private static boolean isAllowedGarminPullUri(URI uri) {
 		String host = uri.getHost();
 		if (host != null && host.endsWith(".")) {
 			host = host.substring(0, host.length() - 1);
 		}
 		int port = uri.getPort();
 		String path = uri.getPath();
-		if (!"https".equalsIgnoreCase(uri.getScheme())
-				|| uri.getUserInfo() != null
-				|| uri.getFragment() != null
-				|| host == null
-				|| !host.equalsIgnoreCase("apis.garmin.com")
-				|| (port != -1 && port != 443)
-				|| path == null
-				|| !path.startsWith("/wellness-api/")) {
-			throw new IOException("Garmin callback URL not allowed");
-		}
+		return "https".equalsIgnoreCase(uri.getScheme())
+				&& uri.getUserInfo() == null
+				&& uri.getFragment() == null
+				&& host != null
+				&& host.equalsIgnoreCase("apis.garmin.com")
+				&& (port == -1 || port == 443)
+				&& path != null
+				&& path.startsWith("/wellness-api/");
 	}
 
-	public static String urlEncode(String v) {
+	private static String urlEncode(@Nullable String v) {
 		return URLEncoder.encode(Objects.toString(v, ""), StandardCharsets.UTF_8);
 	}
 
