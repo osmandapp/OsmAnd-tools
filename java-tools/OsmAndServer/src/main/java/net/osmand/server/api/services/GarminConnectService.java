@@ -140,6 +140,8 @@ public class GarminConnectService {
 	private static final long MAX_BACKFILL_RANGE_SEC = 30L * 24 * 3600;
 	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 180;
 
+	private static final Duration GARMIN_HTTP_TIMEOUT = Duration.ofSeconds(30);
+
 	// for tests
 	private static final long SEC_PER_DAY = 24L * 3600;
 	private static final long backfillTestSingleDayStartUtcSec = 1775433600L;
@@ -213,7 +215,7 @@ public class GarminConnectService {
 				+ "&refresh_token=" + urlEncode(row.refreshToken);
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(TOKEN_URL))
-				.timeout(Duration.ofSeconds(30))
+				.timeout(GARMIN_HTTP_TIMEOUT)
 				.header("Content-Type", "application/x-www-form-urlencoded")
 				.POST(HttpRequest.BodyPublishers.ofString(form))
 				.build();
@@ -299,7 +301,7 @@ public class GarminConnectService {
 		}
 		HttpRequest del = HttpRequest.newBuilder()
 				.uri(URI.create(PARTNER_REGISTRATION_URL))
-				.timeout(Duration.ofSeconds(30))
+				.timeout(GARMIN_HTTP_TIMEOUT)
 				.header("Authorization", "Bearer " + row.accessToken)
 				.DELETE()
 				.build();
@@ -662,7 +664,7 @@ public class GarminConnectService {
 				+ "&redirect_uri=" + urlEncode(redirectUriParam);
 		HttpRequest tokenReq = HttpRequest.newBuilder()
 				.uri(URI.create(TOKEN_URL))
-				.timeout(Duration.ofSeconds(30))
+				.timeout(GARMIN_HTTP_TIMEOUT)
 				.header("Content-Type", "application/x-www-form-urlencoded")
 				.POST(HttpRequest.BodyPublishers.ofString(form))
 				.build();
