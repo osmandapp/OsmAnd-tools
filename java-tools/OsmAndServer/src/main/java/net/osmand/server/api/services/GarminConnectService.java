@@ -115,18 +115,27 @@ public class GarminConnectService {
 	private static final String GARMIN_ACTIVITY_FILE_TYPE_GPX = "GPX";
 
 	private static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
-			"RUNNING",
-			"RUN",
-			"TRACK",
-			"CYCLING",
+			"BMX",
+			"BOARD",
 			"BIKING",
 			"CYCLOCROSS",
-			"BMX",
+			"CYCLING",
 			"E_BIKE",
-			"MTB",
-			"WALKING",
 			"HIKING",
-			"RUCKING");
+			"KAYAK",
+			"MTB",
+			"MULTI",
+			"RIDE",
+			"ROWING",
+			"RUNNING",
+			"RUN",
+			"RUCKING",
+			"SKATING",
+			"SKIING",
+			"SNOW",
+			"SWIMMING",
+			"TRACK",
+			"WALKING");
 
 	private static final long MAX_BACKFILL_RANGE_SEC = 30L * 24 * 3600;
 	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 180;
