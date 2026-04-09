@@ -196,7 +196,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             for (RelationMember entry : e.getMembers()) {
                 String role = entry.getRole();
                 Entity entity = entry.getEntity();
-                if (entity != null && Algorithms.isEmpty(role)) {
+                if (entity != null && !Algorithms.isEmpty(role)) {
                     PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
                     if (buildingOutlineType != null && YES.equals(entity.getTag(BUILDING_PART))) {
                         // converted to building:part by entity_convert (putThroughTags does not overwrite)
