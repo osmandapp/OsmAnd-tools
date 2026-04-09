@@ -141,6 +141,7 @@ public class GarminConnectService {
 	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 180;
 
 	private static final Duration GARMIN_HTTP_TIMEOUT = Duration.ofSeconds(30);
+	private static final Duration GARMIN_HTTP_LONG_TIMEOUT = Duration.ofSeconds(60);
 
 	// for tests
 	private static final long SEC_PER_DAY = 24L * 3600;
@@ -347,7 +348,7 @@ public class GarminConnectService {
 					+ "&summaryEndTimeInSeconds=" + wEnd;
 			HttpRequest req = HttpRequest.newBuilder()
 					.uri(URI.create(uri))
-					.timeout(Duration.ofSeconds(60))
+					.timeout(GARMIN_HTTP_LONG_TIMEOUT)
 					.header("Authorization", "Bearer " + row.accessToken)
 					.GET()
 					.build();
@@ -594,7 +595,7 @@ public class GarminConnectService {
 		assertTrustedGarminActivityCallbackUrl(url);
 		HttpRequest.Builder rb = HttpRequest.newBuilder()
 				.uri(URI.create(url.trim()).normalize())
-				.timeout(Duration.ofSeconds(60));
+				.timeout(GARMIN_HTTP_LONG_TIMEOUT);
 		if (bearerAccessToken != null && !bearerAccessToken.isBlank()) {
 			rb.header("Authorization", "Bearer " + bearerAccessToken);
 		}
@@ -681,7 +682,7 @@ public class GarminConnectService {
 	private String fetchGarminUserId(String accessToken) throws IOException, InterruptedException {
 		HttpRequest userReq = HttpRequest.newBuilder()
 				.uri(URI.create(USER_ID_URL))
-				.timeout(Duration.ofSeconds(15))
+				.timeout(GARMIN_HTTP_TIMEOUT)
 				.header("Authorization", "Bearer " + accessToken)
 				.GET()
 				.build();
@@ -713,7 +714,7 @@ public class GarminConnectService {
 	private JsonArray fetchGarminPermissionsArray(String accessToken) throws IOException, InterruptedException {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(USER_PERMISSIONS_URL))
-				.timeout(Duration.ofSeconds(15))
+				.timeout(GARMIN_HTTP_TIMEOUT)
 				.header("Authorization", "Bearer " + accessToken)
 				.GET()
 				.build();
