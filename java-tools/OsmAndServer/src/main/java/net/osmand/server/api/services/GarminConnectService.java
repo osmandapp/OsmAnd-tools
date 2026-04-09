@@ -9,13 +9,17 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.KException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.io.KFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import okio.Okio;
+import okio.Source;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +36,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 
 @Service
 public class GarminConnectService {
@@ -104,6 +110,9 @@ public class GarminConnectService {
 	private static final Pattern NON_FILE_SAFE_ACTIVITY_NAME = Pattern.compile("[^a-zA-Z0-9._-]+");
 	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
 	private static final String GPX_FOLDER_GARMIN = "Garmin";
+
+	private static final String GARMIN_ACTIVITY_FILE_TYPE_FIT = "FIT";
+	private static final String GARMIN_ACTIVITY_FILE_TYPE_GPX = "GPX";
 
 	private static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
 			"RUNNING",
@@ -343,7 +352,7 @@ public class GarminConnectService {
 
 	// Process activity file ping from Garmin webhook.
 	// The body contains an array of new or updated activity files with metadata and callback URLs to download the files.
-	// We check permissions, skip unsupported activity types and already existing files, download FIT files, convert to GPX and upload to user cloud storage.
+	// We check permissions, skip unsupported activity types and already existing files, download FIT or GPX files, convert FIT to GPX (GPX is stored as-is), upload to user cloud storage.
 	public void processActivityPingBody(String body) {
 		if (body == null || body.isBlank()) {
 			return;
@@ -422,7 +431,7 @@ public class GarminConnectService {
 			return;
 		}
 		String fileType = jsonObjectMemberAsString(o, "fileType");
-		if (fileType == null || !fileType.equalsIgnoreCase("FIT")) {
+		if (!isGarminActivityFileTypeSupported(fileType)) {
 			return;
 		}
 		// Check file name and skip if already exists in cloud
@@ -432,7 +441,7 @@ public class GarminConnectService {
 			return;
 		}
 		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ".gpx";
-		if (cloudUserFilesRepository.existsByUseridAndNameAndType(conn.userid, cloudName, UserdataService.FILE_TYPE_GPX)) {
+		if (cloudUserFilesRepository.existsByUseridAndNameAndType(conn.userid, cloudName, FILE_TYPE_GPX)) {
 			LOG.info("Garmin activityFiles: skip duplicate " + cloudName + " userid=" + conn.userid);
 			return;
 		}
@@ -455,34 +464,28 @@ public class GarminConnectService {
 			LOG.warn("Garmin activityFiles: download failed baseFileName=" + baseFileName, e);
 			return;
 		}
+		GpxFile gpx = gpxFileFromGarminActivityFile(raw, fileType, baseFileName, conn.userid);
+		if (gpx == null) {
+			LOG.warn("Garmin activityFiles: cannot parse activity file as " + fileType + " baseFileName=" + baseFileName + " userid=" + conn.userid);
+			return;
+		}
 		File tmp = null;
 		try {
 			tmp = File.createTempFile("garmin-act-", ".gpx");
-			long creatTime;
-			GpxFile gpx = GarminFitToGpxParser.fromFitBytes(raw, baseFileName);
-			if (gpx == null) {
-				try {
-					Files.deleteIfExists(tmp.toPath());
-				} catch (IOException e) {
-					LOG.warn("Garmin activityFiles: FIT parse failed userid=" + conn.userid);
-				}
-				return;
-			}
-			creatTime = gpx.getMetadata().getTime();
 			KException werr = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmp.getAbsolutePath()), gpx);
 			if (werr != null) {
-				try {
-					Files.deleteIfExists(tmp.toPath());
-				} catch (IOException e) {
-					LOG.warn("Garmin activityFiles: GPX write failed userid=" + conn.userid + " " + werr.getMessage());
-				}
+				LOG.warn("Garmin activityFiles: GPX write failed userid=" + conn.userid + " " + werr.getMessage());
 				return;
+			}
+			long clientTimeMs = gpx.getMetadata().getTime();
+			if (clientTimeMs <= 0L) {
+				clientTimeMs = System.currentTimeMillis();
 			}
 			StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
 			tmp = null;
-			userdataService.validateUserForUpload(dev, UserdataService.FILE_TYPE_GPX, zip.getSize());
-			userdataService.uploadFile(zip, dev, cloudName, UserdataService.FILE_TYPE_GPX, creatTime);
-			LOG.info("Garmin activityFiles: stored FIT as GPX " + cloudName + " userid=" + conn.userid);
+			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
+			userdataService.uploadFile(zip, dev, cloudName, FILE_TYPE_GPX, clientTimeMs);
+			LOG.info("Garmin activityFiles: stored " + fileType + " as GPX " + cloudName + " userid=" + conn.userid);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn("Garmin activityFiles: cloud upload rejected userid=" + conn.userid + " " + e.getMessage());
 		} catch (Exception e) {
@@ -496,6 +499,42 @@ public class GarminConnectService {
 				}
 			}
 		}
+	}
+
+	private static boolean isGarminActivityFileTypeSupported(String fileType) {
+		return GARMIN_ACTIVITY_FILE_TYPE_FIT.equals(fileType) || GARMIN_ACTIVITY_FILE_TYPE_GPX.equals(fileType);
+	}
+
+	private GpxFile gpxFileFromGarminActivityFile(byte[] raw, String fileType, String baseFileName, int userid) {
+		if (raw == null || raw.length == 0) {
+			LOG.warn("Garmin activityFiles: empty download userid=" + userid);
+			return null;
+		}
+		if (GARMIN_ACTIVITY_FILE_TYPE_FIT.equals(fileType)) {
+			GpxFile gpx = GarminFitToGpxParser.fromFitBytes(raw, baseFileName);
+			if (gpx == null) {
+				LOG.warn("Garmin activityFiles: FIT decode failed userid=" + userid);
+			}
+			return gpx;
+		}
+		if (GARMIN_ACTIVITY_FILE_TYPE_GPX.equals(fileType)) {
+			try (Source source = Okio.source(new ByteArrayInputStream(raw))) {
+				GpxFile gpx = GpxUtilities.INSTANCE.loadGpxFile(source);
+				if (gpx.getError() != null) {
+					LOG.warn("Garmin activityFiles: GPX invalid userid=" + userid + " " + gpx.getError().getMessage());
+					return null;
+				}
+				gpx.getMetadata().setName(baseFileName);
+				for (Track t : gpx.getTracks()) {
+					t.setName(baseFileName);
+				}
+				return gpx;
+			} catch (IOException e) {
+				LOG.warn("Garmin activityFiles: GPX load IO userid=" + userid, e);
+				return null;
+			}
+		}
+		return null;
 	}
 
 	private static void reinterruptIfInterrupted(Exception e) {
