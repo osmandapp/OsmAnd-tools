@@ -316,6 +316,8 @@ public final class GarminFitToGpxParser {
 			p.setEle(ele.doubleValue());
 		}
 		if (usableUint8Short(mesg.getGpsAccuracy())) {
+			// FIT gps_accuracy is horizontal accuracy in metres; GPX <hdop> is unitless HDOP. Approximate HDOP ≈ metres / UERE
+			// using a typical consumer-GPS ~6 m effective UERE (error ≈ HDOP × UERE); not an exact chipset mapping.
 			p.setHdop(mesg.getGpsAccuracy().floatValue() / 6.0f);
 		}
 		return p;
