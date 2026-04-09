@@ -639,9 +639,6 @@ public class GarminConnectService {
 	// SSRF allowlist before outbound GET to callbackURL from ping JSON
 	private static boolean isAllowedGarminPullUri(URI uri) {
 		String host = uri.getHost();
-		if (host != null && host.endsWith(".")) {
-			host = host.substring(0, host.length() - 1);
-		}
 		int port = uri.getPort();
 		String path = uri.getPath();
 		return "https".equalsIgnoreCase(uri.getScheme())
