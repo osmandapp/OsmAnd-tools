@@ -1738,6 +1738,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix) {}
+	private static final String EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL = "";
 
 	private static class PoiNameSuffixDictionaryData {
 		private final List<PoiNameSuffixEntry> dictionaryEntries = new ArrayList<>();
@@ -1865,8 +1866,12 @@ public class BinaryMapIndexWriter {
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
 			PoiNameSuffixDictionaryData suffixDictionaryData = buildSuffixDictionaryData(e.getKey(), tileBoxes);
-			for (PoiNameSuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
-				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix);
+			if (suffixDictionaryData.dictionaryEntries.isEmpty()) {
+				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
+			} else {
+				for (PoiNameSuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix);
+				}
 			}
 			for (PoiTileBox box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
