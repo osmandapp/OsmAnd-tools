@@ -115,7 +115,7 @@ public class GarminConnectController {
 	                     HttpServletResponse response) throws IOException {
 		if (error != null) {
 			LOG.warn("Garmin OAuth error: " + error);
-			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Garmin error: " + error);
+			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Garmin authorization failed");
 			return;
 		}
 		if (code == null || code.isBlank() || state == null || state.isBlank()) {
@@ -156,7 +156,7 @@ public class GarminConnectController {
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Interrupted");
 		} catch (Exception e) {
 			LOG.error("Garmin callback failed", e);
-			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Garmin link failed");
 		}
 	}
 
@@ -185,7 +185,7 @@ public class GarminConnectController {
 			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Interrupted");
 		} catch (Exception e) {
 			LOG.error("Garmin disconnect failed", e);
-			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Garmin disconnect failed");
 		}
 	}
 
