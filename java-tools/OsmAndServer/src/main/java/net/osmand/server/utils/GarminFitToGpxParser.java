@@ -214,7 +214,7 @@ public final class GarminFitToGpxParser {
 	}
 
 	private static final String DEFAULT_TEST_FIT =
-			System.getProperty("user.home") + "/osmand/garmin/Kyiv_Walking-22305192056.fit";
+			System.getProperty("user.home") + "track_name.fit";
 
 	public static void main(String[] args) throws Exception {
 		String fitPath = args.length > 0 && args[0] != null && !args[0].isBlank()
