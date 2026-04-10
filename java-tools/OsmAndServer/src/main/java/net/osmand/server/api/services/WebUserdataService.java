@@ -173,7 +173,8 @@ public class WebUserdataService {
 				error, uf.name, uf.id, uf.userid);
 		LOG.error(errorMessage);
 		saveError(uf.details, errorMessage, uf);
-		nd.details = uf.details;
+		nd.details = uf.details.deepCopy();
+		nd.details.remove(ANALYSIS_ADDITIONAL);
 		result.add(nd);
 	}
 
@@ -705,16 +706,16 @@ public class WebUserdataService {
 
 		public static AnalysisDetails fromSplitJson(JsonObject analysis, JsonObject analysisAdditional) {
 			AnalysisDetails ad = new AnalysisDetails();
-			if (analysis != null) {
+			if (analysis != null && !analysis.isJsonNull()) {
 				ad.totalDistance = getFloatOrDefault(analysis, "totalDistance");
-				ad.startTime = getLongOrDefault(analysis, "startTime", Long.MAX_VALUE);
-				ad.endTime = getLongOrDefault(analysis, "endTime", Long.MIN_VALUE);
-				ad.timeMoving = getLongOrDefault(analysis, "timeMoving", 0L);
+				ad.startTime = getLongOrDefault(analysis, "startTime");
+				ad.endTime = getLongOrDefault(analysis, "endTime");
+				ad.timeMoving = getLongOrDefault(analysis, "timeMoving");
 				ad.points = getIntOrDefault(analysis, "points");
 				ad.wptPoints = getIntOrDefault(analysis, "wptPoints");
 			}
-			if (analysisAdditional != null) {
-				ad.timeSpan = getLongOrDefault(analysisAdditional, "timeSpan", 0L);
+			if (analysisAdditional != null && !analysisAdditional.isJsonNull()) {
+				ad.timeSpan = getLongOrDefault(analysisAdditional, "timeSpan");
 				ad.averageSpeed = getFloatOrDefault(analysisAdditional, "averageSpeed");
 				ad.maxSpeed = getFloatOrDefault(analysisAdditional, "maxSpeed");
 				ad.averageSensorSpeed = getFloatOrDefault(analysisAdditional, "averageSensorSpeed");
@@ -747,8 +748,8 @@ public class WebUserdataService {
 			return jsonObject.has(key) ? jsonObject.get(key).getAsDouble() : 0.0;
 		}
 
-		private static long getLongOrDefault(JsonObject jsonObject, String key, long defaultValue) {
-			return jsonObject.has(key) ? jsonObject.get(key).getAsLong() : defaultValue;
+		private static long getLongOrDefault(JsonObject jsonObject, String key) {
+			return jsonObject.has(key) ? jsonObject.get(key).getAsLong() : 0L;
 		}
 	}
 }
