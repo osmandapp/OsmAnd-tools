@@ -139,14 +139,14 @@ public class GarminConnectService {
 			"WALKING");
 
 	private static final long MAX_BACKFILL_RANGE_SEC = 30L * 24 * 3600;
-	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 180;
+	private static final int ACTIVITY_BACKFILL_DEFAULT_DAYS_BACK = 60;
 
 	private static final Duration GARMIN_HTTP_TIMEOUT = Duration.ofSeconds(30);
 	private static final Duration GARMIN_HTTP_LONG_TIMEOUT = Duration.ofSeconds(60);
 
 	// for tests
 	private static final long SEC_PER_DAY = 24L * 3600;
-	private static final long backfillTestSingleDayStartUtcSec = 1775433600L;
+	private static final long backfillTestSingleDayStartUtcSec = -1L;
 
 	private final HttpClient httpClient = HttpClient.newHttpClient();
 
