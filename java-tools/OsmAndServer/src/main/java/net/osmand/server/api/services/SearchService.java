@@ -16,6 +16,7 @@ import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
+import net.osmand.util.UnicodeDiacritics;
 
 import net.osmand.util.TextDirectionUtil;
 import org.apache.commons.logging.Log;
@@ -257,34 +258,42 @@ public class SearchService {
             if (usedMapList.isEmpty()) {
                 return new SearchResults(Collections.emptyList());
             }
-            SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
+            UnicodeDiacritics.beginStripDiacriticsSearchTiming();
+            try {
+                SearchSettings settings = searchUICore.getPhrase().getSettings();
+                settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
 
-	        settings.setOfflineIndexes(usedMapList);
-            settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
-			settings.setExportSettings(option.exportedSettings);
-            searchUICore.updateSettings(settings);
-            
-            searchUICore.init();
-            searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
-            
-            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(ctx.text + DELIMITER,
-		            new LatLon(ctx.lat, ctx.lon));
-            resultCollection = addPoiCategoriesToSearchResult(resultCollection, ctx.text, ctx.locale, searchUICore);
+                settings.setOfflineIndexes(usedMapList);
+                settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
+                settings.setExportSettings(option.exportedSettings);
+                searchUICore.updateSettings(settings);
 
-	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
-	        res = filterBrandsOutsideBBox(res, ctx.northWest, ctx.southEast, ctx.locale, ctx.lat, ctx.lon, ctx.baseSearch);
-	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
-			if (consumerInContext != null) {
-				consumerInContext.accept(res);
-			}
+                searchUICore.init();
+                searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
 
-	        String unitTestJson = null;
-			if (option.exportedSettings != null) {
-				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
-				unitTestJson = json == null ? null : json.toString();
-			}
-			return new SearchResults(res, settings, unitTestJson);
+                SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(ctx.text + DELIMITER,
+                        new LatLon(ctx.lat, ctx.lon));
+                resultCollection = addPoiCategoriesToSearchResult(resultCollection, ctx.text, ctx.locale, searchUICore);
+
+                List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
+                res = filterBrandsOutsideBBox(res, ctx.northWest, ctx.southEast, ctx.locale, ctx.lat, ctx.lon, ctx.baseSearch);
+                res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
+                if (consumerInContext != null) {
+                    consumerInContext.accept(res);
+                }
+
+                String unitTestJson = null;
+                if (option.exportedSettings != null) {
+                    JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
+                    unitTestJson = json == null ? null : json.toString();
+                }
+                return new SearchResults(res, settings, unitTestJson);
+            } finally {
+                UnicodeDiacritics.StripDiacriticsSearchTiming st = UnicodeDiacritics.endStripDiacriticsSearchTiming();
+                if (st != null && st.getInvocationCount() > 0) {
+                    LOGGER.info(st.formatLogLine());
+                }
+            }
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }
