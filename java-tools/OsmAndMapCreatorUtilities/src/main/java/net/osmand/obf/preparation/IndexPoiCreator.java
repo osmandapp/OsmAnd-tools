@@ -48,6 +48,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
+import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
@@ -1108,11 +1109,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
         name = Algorithms.normalizeSearchText(name);
-        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
+        Set<String> splitName = new HashSet<>(SearchCoreFactory.splitSearchNames(name));
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
-                splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
+                splitName.addAll(SearchCoreFactory.splitSearchNames(arabic));
             }
         }
         for (String token : splitName) {

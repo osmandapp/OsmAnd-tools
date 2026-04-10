@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserSessionResources;
-import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
@@ -66,6 +67,7 @@ public class WebUserdataService {
 	UserSessionResources sessionResources;
 
 	public static final String METADATA = "metadata";
+	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
 	public static final String SHARE = "share";
@@ -78,6 +80,7 @@ public class WebUserdataService {
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
 	public static final String INFO_FILE_EXT = ".info";
+	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
 
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
@@ -91,99 +94,126 @@ public class WebUserdataService {
 	public record UserFileUpdate(String name, String type, boolean isError, String time) {
 	}
 
-
-	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files,
+	                                               CloudUserDevicesRepository.CloudUserDevice dev) {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 		List<CloudUserFilesRepository.UserFileNoData> result = new ArrayList<>();
 		for (UserFileUpdate file : files) {
-			if (file.isError) {
-				if (file.time == null) {
-					LOG.warn(String.format("Skipping file %s: isError=true and time is null", file.name));
-					continue;
-				}
-				long time = Long.parseLong(file.time);
-				if (System.currentTimeMillis() - time > ERROR_LIFETIME) {
-					LOG.warn(String.format("Skipping file %s: isError=true and time exceeded ERROR_LIFETIME", file.name));
-					continue;
-				}
-			}
-			Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
-			UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
-			if (res.uniqueFiles.isEmpty()) {
-				LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
+			if (skipByTimeOrError(file)) {
 				continue;
 			}
-			if (res.uniqueFiles.size() > 1) {
-				LOG.error(String.format("refreshListFiles error: expected a single file, but got %d files", res.uniqueFiles.size()));
+			CloudUserFilesRepository.UserFileNoData nd = getUniqueUserFileNoData(dev, file);
+			if (nd == null) {
 				continue;
 			}
-			CloudUserFilesRepository.UserFileNoData nd = res.uniqueFiles.get(0);
 			Optional<CloudUserFilesRepository.UserFile> of = userFilesRepository.findById(nd.id);
-			boolean isTrack = file.type.equals(FILE_TYPE_GPX);
+			boolean isTrack = FILE_TYPE_GPX.equals(file.type);
 			if (of.isPresent()) {
 				GpxTrackAnalysis analysis = null;
 				GpxFile gpxFile;
 				List<WptPt> points = null;
 				CloudUserFilesRepository.UserFile uf = of.get();
-				JsonObject details = uf.details;
-				InputStream in;
-				try {
-					in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
-				} catch (Exception e) {
-					String isError = String.format(
-							"refreshListFiles error: input-stream-error %s id=%d userid=%d error (%s)",
-							uf.name, uf.id, uf.userid, e.getMessage());
-					LOG.error(isError);
-					saveError(details, isError, uf);
-					nd.details = uf.details;
-					result.add(nd);
-					continue;
-				}
-				if (in != null) {
-					in = new GZIPInputStream(in);
-					try (Source source = new Buffer().readFrom(in)) {
+				try (InputStream in = uf.data != null
+						? new ByteArrayInputStream(uf.data)
+						: userdataService.getInputStream(uf)) {
+					if (uf.name.endsWith(INFO_FILE_SUFFIX)) {
+						processInfoFile(in, uf, nd, result);
+						continue;
+					}
+					try (GZIPInputStream gzipIn = new GZIPInputStream(in);
+					     Source source = new Buffer().readFrom(gzipIn)) {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 					} catch (IOException e) {
-						String loadError = String.format(
-								"refreshListFiles error: load-gpx-error %s id=%d userid=%d error (%s)",
-								uf.name, uf.id, uf.userid, e.getMessage());
-						LOG.error(loadError);
-						saveError(details, loadError, uf);
-						nd.details = uf.details;
-						result.add(nd);
+						logAndSaveError("load-gpx-error " + e.getMessage(), uf, nd, result);
 						continue;
 					}
 					if (gpxFile.getError() != null) {
-						String corruptedError = String.format(
-								"refreshListFiles error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
-								uf.name, uf.id, uf.userid, gpxFile.getError().getMessage());
-						LOG.error(corruptedError);
-						saveError(details, corruptedError, uf);
-						nd.details = uf.details;
-						result.add(nd);
+						logAndSaveError("corrupted-gpx-file " + gpxFile.getError().getMessage(), uf, nd, result);
 						continue;
 					}
 					if (isTrack) {
 						analysis = getAnalysis(uf, gpxFile);
 						points = gpxFile.getAllSegmentsPoints();
 					}
-				} else {
-					String noIsError = String.format(
-							"refreshListFiles error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid);
-					LOG.error(noIsError);
-					saveError(details, noIsError, uf);
+					boolean isSharedFile = isShared(nd, sharedFilesMap);
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
+					saveDetails(newDetails, ANALYSIS, uf, points);
 					nd.details = uf.details;
 					result.add(nd);
-					continue;
+				} catch (IOException e) {
+					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
 				}
-				boolean isSharedFile = isShared(nd, sharedFilesMap);
-				JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
-				saveDetails(newDetails, ANALYSIS, uf, points);
-				nd.details = uf.details;
-				result.add(nd);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(result));
+	}
+
+	private CloudUserFilesRepository.UserFileNoData getUniqueUserFileNoData(
+			CloudUserDevicesRepository.CloudUserDevice dev, UserFileUpdate file) {
+		Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
+		UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
+		if (res.uniqueFiles.isEmpty()) {
+			LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
+			return null;
+		}
+		if (res.uniqueFiles.size() > 1) {
+			LOG.error(String.format("refreshListFiles error: expected a single file, but got %d files",
+					res.uniqueFiles.size()));
+			return null;
+		}
+		return res.uniqueFiles.get(0);
+	}
+
+	private void logAndSaveError(String error, CloudUserFilesRepository.UserFile uf,
+	                             CloudUserFilesRepository.UserFileNoData nd,
+	                             List<CloudUserFilesRepository.UserFileNoData> result) {
+		String errorMessage = String.format("refreshListFiles error: %s %s id=%d userid=%d",
+				error, uf.name, uf.id, uf.userid);
+		LOG.error(errorMessage);
+		saveError(uf.details, errorMessage, uf);
+		nd.details = uf.details;
+		result.add(nd);
+	}
+
+	private void processInfoFile(InputStream in, CloudUserFilesRepository.UserFile uf,
+	                             CloudUserFilesRepository.UserFileNoData nd,
+	                             List<CloudUserFilesRepository.UserFileNoData> result) {
+		JsonElement infoDetails = getInfoDetails(in);
+		if (infoDetails != null) {
+			if (uf.details == null) {
+				uf.details = new JsonObject();
+			}
+			uf.details.addProperty(UPDATETIME, nd.updatetimems);
+			uf.details.add(INFO_DATA_JSON, infoDetails);
+			userFilesRepository.save(uf);
+			nd.details = uf.details;
+			result.add(nd);
+		}
+	}
+
+	private boolean skipByTimeOrError(UserFileUpdate file) {
+		if (file.isError) {
+			if (file.time == null) {
+				LOG.warn(String.format("Skipping file %s: isError=true and time is null", file.name));
+				return true;
+			}
+			long time = Long.parseLong(file.time);
+			if (System.currentTimeMillis() - time > ERROR_LIFETIME) {
+				LOG.warn(String.format("Skipping file %s: isError=true and time exceeded ERROR_LIFETIME", file.name));
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public JsonElement getInfoDetails(InputStream inputStream) {
+		try (InputStream is = new GZIPInputStream(inputStream);
+		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			return gson.fromJson(reader, JsonElement.class);
+		} catch (Exception e) {
+			LOG.warn("Failed to parse .info details JSON", e);
+			return null;
+		}
 	}
 
 	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isShared) {
@@ -222,6 +252,13 @@ public class WebUserdataService {
 				&& details.has(ERROR_DETAILS)
 				&& details.has(UPDATETIME)
 				&& System.currentTimeMillis() - details.get(UPDATETIME).getAsLong() < ERROR_LIFETIME;
+	}
+
+	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
+		return details != null
+				&& details.has(UPDATETIME)
+				&& details.has(INFO_DATA_JSON)
+				&& details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {

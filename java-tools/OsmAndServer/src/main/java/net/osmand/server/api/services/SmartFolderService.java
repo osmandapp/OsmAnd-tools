@@ -1,8 +1,5 @@
 package net.osmand.server.api.services;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.osmand.shared.gpx.*;
@@ -43,7 +40,7 @@ public class SmartFolderService {
 	@Autowired
 	private WebUserdataService webUserdataService;
 
-	public List<SmartFolderWeb> getSmartFolders(int userId) {
+	public List<SmartFolderWeb> getSmartFoldersByUserId(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
 			return new ArrayList<>();
@@ -107,7 +104,10 @@ public class SmartFolderService {
 				}
 			}
 		}
-		setAppearance(gpxFile, uf.name, userId);
+		UserFile infoFile = userDataService.getLastFileVersion(userId, uf.name + INFO_FILE_EXT, FILE_TYPE_GPX);
+		if (infoFile != null && infoFile.details != null && infoFile.details.has(INFO_DATA_JSON)) {
+			setAppearanceFromJson(gpxFile, infoFile.details.getAsJsonObject(INFO_DATA_JSON));
+		}
 		return gpxFile;
 	}
 
@@ -117,34 +117,19 @@ public class SmartFolderService {
 			return null;
 		}
 		JSONObject obj = new JSONObject(generalSettings);
-		return obj.optString(TRACK_FILTERS_SETTINGS_PREF, null);
+		return obj.has(TRACK_FILTERS_SETTINGS_PREF)
+				? obj.optString(TRACK_FILTERS_SETTINGS_PREF, null)
+				: null;
 	}
 
-	void setAppearance(GpxFile gpxFile, String name, int userId) {
-		UserFile file = userDataService.getLastFileVersion(userId, name + INFO_FILE_EXT, FILE_TYPE_GPX);
-		if (file == null || file.filesize == -1) {
-			return;
+	private void setAppearanceFromJson(GpxFile gpxFile, JsonObject details) {
+		JsonElement color = details.get(COLOR_NAME_EXTENSION);
+		if (color != null) {
+			gpxFile.setColor(color.getAsString());
 		}
-		try (InputStream in = getInputStreamFromFile(file)) {
-			if (in == null) {
-				return;
-			}
-			try (GZIPInputStream gis = new GZIPInputStream(in)) {
-				ObjectMapper mapper = new ObjectMapper();
-				ObjectNode json = (ObjectNode) mapper.readTree(gis);
-				JsonNode color = json.get(COLOR_NAME_EXTENSION);
-				if (color != null) {
-					gpxFile.setColor(color.asText());
-				}
-				JsonNode width = json.get(LINE_WIDTH_EXTENSION);
-				if (width != null) {
-					gpxFile.setWidth(width.asText());
-				}
-			}
-		} catch (Exception e) {
-			String isError = String.format("ReadInfoFile error: input-stream-error %s id=%d userid=%d error (%s)",
-					file.name, file.id, file.userid, e.getMessage());
-			LOG.error(isError);
+		JsonElement width = details.get(LINE_WIDTH_EXTENSION);
+		if (width != null) {
+			gpxFile.setWidth(width.getAsString());
 		}
 	}
 

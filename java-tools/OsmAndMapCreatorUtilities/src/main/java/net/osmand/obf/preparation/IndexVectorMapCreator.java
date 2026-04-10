@@ -181,9 +181,8 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
 
     private void processBuildingRelationRole(Relation e, OsmDbAccessorContext ctx) throws SQLException {
         boolean hasTypeBuilding = BUILDING.equals(e.getTag(OSMTagKey.TYPE));
-        boolean hasMultipolygonBuilding = MULTIPOLYGON.equals(e.getTag(OSMTagKey.TYPE))
-                && (e.getTag(BUILDING) != null || e.getTag(BUILDING_PART) != null);
-        if (hasTypeBuilding || hasMultipolygonBuilding) {
+        boolean hasTypeMultipolygon = MULTIPOLYGON.equals(e.getTag(OSMTagKey.TYPE));
+        if (hasTypeBuilding || hasTypeMultipolygon) {
             ctx.loadEntityRelation(e);
             String buildingOutlineType = null;
             for (RelationMember entry : e.getMembers()) {
@@ -196,7 +195,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             for (RelationMember entry : e.getMembers()) {
                 String role = entry.getRole();
                 Entity entity = entry.getEntity();
-                if (entity != null && Algorithms.isEmpty(role)) {
+                if (entity == null || Algorithms.isEmpty(role)) {
+                    continue;
+                }
+                boolean relationHasBuilding = e.getTag(BUILDING_PART) != null || e.getTag(BUILDING) != null;
+                boolean entityIsBuilding = entity.getTag(BUILDING_PART) != null || entity.getTag(BUILDING) != null;
+                if (hasTypeBuilding || relationHasBuilding || entityIsBuilding) {
                     PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
                     if (buildingOutlineType != null && YES.equals(entity.getTag(BUILDING_PART))) {
                         // converted to building:part by entity_convert (putThroughTags does not overwrite)
