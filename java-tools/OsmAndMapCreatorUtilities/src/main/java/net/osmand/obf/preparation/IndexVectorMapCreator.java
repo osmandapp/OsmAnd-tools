@@ -195,8 +195,12 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             for (RelationMember entry : e.getMembers()) {
                 String role = entry.getRole();
                 Entity entity = entry.getEntity();
-                if (entity != null && !Algorithms.isEmpty(role)
-                        && (entity.getTag(BUILDING_PART) != null || entity.getTag(BUILDING) != null)) {
+                if (entity == null || Algorithms.isEmpty(role)) {
+                    continue;
+                }
+                boolean relationHasBuilding = e.getTag(BUILDING_PART) != null || e.getTag(BUILDING) != null;
+                boolean entityIsBuilding = entity.getTag(BUILDING_PART) != null || entity.getTag(BUILDING) != null;
+                if (hasTypeBuilding || relationHasBuilding || entityIsBuilding) {
                     PropagateEntityTags p = tagsTransformer.getPropogateTagForEntity(entry.getEntityId());
                     if (buildingOutlineType != null && YES.equals(entity.getTag(BUILDING_PART))) {
                         // converted to building:part by entity_convert (putThroughTags does not overwrite)
