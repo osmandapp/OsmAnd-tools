@@ -82,7 +82,6 @@ CREATE UNIQUE INDEX user_share_files_ownerid_filepath_idx ON user_share_files(ow
 CREATE INDEX user_share_files_access_userid_idx ON user_share_files_access(user_id);
 CREATE INDEX user_share_files_access_file_id_idx ON user_share_files_access(file_id);
 
--- Garmin Connect OAuth linkage (see GarminUserConnectionRepository)
 CREATE TABLE garmin_user_connection (
     userid integer NOT NULL PRIMARY KEY,
     garmin_user_id varchar(128) NOT NULL,
