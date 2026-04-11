@@ -118,7 +118,7 @@ public class SearchTestController {
 															  @RequestBody RunTestCaseRequest request) {
 		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
 		SearchService.SearchOption options = request == null || request.options == null
-				? new SearchService.SearchOption(false, null, null, (net.osmand.search.core.ObjectType[]) null)
+				? new SearchService.SearchOption(false, null, null, false,(net.osmand.search.core.ObjectType[]) null)
 				: request.options;
 		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}

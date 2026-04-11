@@ -1200,7 +1200,8 @@ public interface OBFService extends BaseService {
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, null, (net.osmand.search.core.ObjectType[]) null), null);
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, 
+						null, true, (net.osmand.search.core.ObjectType[]) null), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
