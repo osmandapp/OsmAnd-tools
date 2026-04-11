@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +45,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
-import net.osmand.binary.BloomFilter;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
@@ -109,7 +109,10 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
+import static net.osmand.binary.BinaryMapPoiReaderAdapter.*;
+
 public class BinaryMapIndexWriter {
+	private static final int MARKER_LCP_LENGTH = MARKER_MAX - MARKER_BASE;
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
@@ -118,7 +121,7 @@ public class BinaryMapIndexWriter {
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
-	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE;
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -1734,6 +1737,120 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
+	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix) {}
+	private static final String EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL = "";
+
+	private static class PoiNameSuffixDictionaryData {
+		private final List<PoiNameSuffixEntry> dictionaryEntries = new ArrayList<>();
+		private final Map<String, Integer> resolvedSuffixToIndex = new HashMap<>();
+		private final Map<PoiTileBox, int[]> bitsets = new LinkedHashMap<>();
+	}
+
+	private static String normalizePoiNameSuffix(String suffix) {
+		return Normalizer.normalize(suffix, Normalizer.Form.NFC);
+	}
+
+	private static boolean startsWithReservedPoiSuffixMarker(String value) {
+		if (value.isEmpty()) {
+			return false;
+		}
+		int markerCodePoint = value.codePointAt(0);
+		return markerCodePoint == MARKER_RAW_ESCAPE
+				|| (markerCodePoint >= MARKER_BASE && markerCodePoint <= MARKER_MAX);
+	}
+
+	private static String encodeRawPoiNameSuffix(String suffix) {
+		return startsWithReservedPoiSuffixMarker(suffix) ? MARKER_RAW_ESCAPE + suffix : suffix;
+	}
+
+	private static int countCodePoints(String value) {
+		return value.codePointCount(0, value.length());
+	}
+
+	private static int offsetByCodePoints(String value, int codePointCount) {
+		return value.offsetByCodePoints(0, codePointCount);
+	}
+
+	private static int commonPrefixCodePointLength(String left, String right) {
+		int leftOffset = 0;
+		int rightOffset = 0;
+		int commonPrefixCodePointLength = 0;
+		while (leftOffset < left.length() && rightOffset < right.length()) {
+			int leftCodePoint = left.codePointAt(leftOffset);
+			int rightCodePoint = right.codePointAt(rightOffset);
+			if (leftCodePoint != rightCodePoint) {
+				break;
+			}
+			leftOffset += Character.charCount(leftCodePoint);
+			rightOffset += Character.charCount(rightCodePoint);
+			commonPrefixCodePointLength++;
+		}
+		return commonPrefixCodePointLength;
+	}
+
+	private static String encodeFrontCodedPoiNameSuffix(String suffix, String previousSuffix, boolean blockStart) {
+		String encodedRawSuffix = encodeRawPoiNameSuffix(suffix);
+		if (blockStart || previousSuffix == null) {
+			return encodedRawSuffix;
+		}
+		int commonPrefixCodePointLength = commonPrefixCodePointLength(previousSuffix, suffix);
+		if (commonPrefixCodePointLength > MARKER_LCP_LENGTH) {
+			return encodedRawSuffix;
+		}
+		String suffixRemainder = suffix.substring(offsetByCodePoints(suffix, commonPrefixCodePointLength));
+		String deltaEncodedSuffix = new String(Character.toChars(MARKER_BASE + commonPrefixCodePointLength))
+				+ suffixRemainder;
+		return countCodePoints(deltaEncodedSuffix) < countCodePoints(encodedRawSuffix) ? deltaEncodedSuffix : encodedRawSuffix;
+	}
+
+	private PoiNameSuffixDictionaryData buildSuffixDictionaryData(String prefix, List<PoiTileBox> tileBoxes) {
+		PoiNameSuffixDictionaryData data = new PoiNameSuffixDictionaryData();
+		TreeSet<String> sortedSuffixes = new TreeSet<>();
+		Map<PoiTileBox, Set<String>> suffixesByBox = new LinkedHashMap<>();
+		for (PoiTileBox box : tileBoxes) {
+			Set<String> boxSuffixes = new LinkedHashSet<>();
+			suffixesByBox.put(box, boxSuffixes);
+			for (String token : box.tokens) {
+				if (!token.startsWith(prefix) || token.length() <= prefix.length()) {
+					continue;
+				}
+				String suffix = normalizePoiNameSuffix(token.substring(prefix.length()));
+				if (suffix.isEmpty()) {
+					continue;
+				}
+				boxSuffixes.add(suffix);
+				sortedSuffixes.add(suffix);
+			}
+		}
+		String previousSuffix = null;
+		int dictionaryIndex = 0;
+		for (String suffix : sortedSuffixes) {
+			boolean blockStart = dictionaryIndex % MARKER_BLOCK_SIZE == 0;
+			String encodedSuffix = encodeFrontCodedPoiNameSuffix(suffix, previousSuffix, blockStart);
+			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix);
+			data.resolvedSuffixToIndex.put(entry.resolvedSuffix, data.dictionaryEntries.size());
+			data.dictionaryEntries.add(entry);
+			previousSuffix = suffix;
+			dictionaryIndex++;
+		}
+		int dictionaryWordCount = (data.dictionaryEntries.size() + Integer.SIZE - 1) / Integer.SIZE;
+		if (dictionaryWordCount == 0) {
+			return data;
+		}
+		for (PoiTileBox box : tileBoxes) {
+			int[] bitsetWords = new int[dictionaryWordCount];
+			for (String suffix : suffixesByBox.get(box)) {
+				Integer suffixIndex = data.resolvedSuffixToIndex.get(suffix);
+				if (suffixIndex == null) {
+					continue;
+				}
+				bitsetWords[suffixIndex >> 5] |= 1 << (suffixIndex & 31);
+			}
+			data.bitsets.put(box, bitsetWords);
+		}
+		return data;
+	}
+
 	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiTileBox>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -1748,31 +1865,53 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
+			PoiNameSuffixDictionaryData suffixDictionaryData = buildSuffixDictionaryData(e.getKey(), tileBoxes);
+			if (suffixDictionaryData.dictionaryEntries.isEmpty()) {
+				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
+			} else {
+				for (PoiNameSuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix);
+				}
+			}
 			for (PoiTileBox box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
+				int[] bitsetWords = suffixDictionaryData.bitsets.get(box);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						bs.addSuffixesBitset(bitsetWord);
+					}
+				}
 				bs.setShiftTo(0);
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-
-			codedOutStream.writeMessageNoTag(msg);
-			long endPointer = getFilePointer();
-
-			// first message
-			int accumulateSize = 4;
-			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
+			byte[] msgBytes = msg.toByteArray();
+			codedOutStream.writeUInt32NoTag(msgBytes.length);
+			codedOutStream.flush();
+			long messageBodyStart = getFilePointer();
+			codedOutStream.writeRawBytes(msgBytes);
+			long currentOffsetInBody = 0;
+			for (String encodedSuffix : msg.getSuffixesDictionaryList()) {
+				currentOffsetInBody += CodedOutputStream.computeStringSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
+			}
+			for (int i = 0; i < tileBoxes.size(); i++) {
 				PoiTileBox box = tileBoxes.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
-				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(endPointer - accumulateSize, startPoiIndex));
-				accumulateSize += CodedOutputStream.computeMessageSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
-						msg.getAtoms(i));
-
+				OsmAndPoiNameIndexDataAtom atom = msg.getAtoms(i);
+				int atomSerializedSize = atom.getSerializedSize();
+				int atomFieldHeaderSize = CodedOutputStream.computeTagSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER)
+						+ CodedOutputStream.computeRawVarint32Size(atomSerializedSize);
+				long shiftPointer = messageBodyStart + currentOffsetInBody + atomFieldHeaderSize + atomSerializedSize - Integer.BYTES;
+				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(shiftPointer, startPoiIndex));
+				currentOffsetInBody += CodedOutputStream.computeMessageSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
 			}
 		}
 

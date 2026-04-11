@@ -2,7 +2,6 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import net.osmand.binary.BloomFilter;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -38,6 +37,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
@@ -50,7 +50,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
                                 long total, long failed, long duration) {}
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-    private static volatile ExecutorService EXECUTOR;
+    private static volatile ExecutorService EXECUTOR, SAVE_EXECUTOR;
     private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
 
     // Batch insert support for run_result
@@ -58,11 +58,12 @@ public class SearchTestService implements ReportService, DataService, OBFService
 
     private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+    private final Set<Long> loggedStoppedRuns = ConcurrentHashMap.newKeySet();
 
-	@Autowired
-	private ObjectMapper objectMapper;
-	@Autowired
-	private WebClient.Builder webClientBuilder;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private WebClient.Builder webClientBuilder;
 	private WebClient webClient;
 
 	@Autowired
@@ -92,6 +93,15 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
+        // Cleanup in-memory status flag
+        runStatusFlags.clear();
+
+        EXECUTOR = createExecutor();
+        SAVE_EXECUTOR = createBatchSaveExecutor();
+
+        if (System.getenv("SKIP_DB_INTEGRITY") != null)
+            return;
+
 		// Ensure DB integrity
 		try {
 			jdbcTemplate.execute("DELETE FROM test_case WHERE dataset_id NOT IN (SELECT id FROM dataset)");
@@ -104,13 +114,10 @@ public class SearchTestService implements ReportService, DataService, OBFService
 					"(SELECT MIN(id) FROM run_result WHERE gen_id IS NOT NULL GROUP BY run_id, gen_id)");
 			jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_run_result_run_gen ON run_result(run_id, gen_id)");
 			jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS gen_result_index on gen_result(case_id, ds_result_id, id)");
+			jdbcTemplate.execute("VACUUM");
 		} catch (Exception e) {
 			LOGGER.warn("Could not ensure DB integrity.", e);
 		}
-		// Cleanup in-memory status flag
-		runStatusFlags.clear();
-
-		EXECUTOR = createExecutor();
 	}
 
 	private ExecutorService createExecutor() {
@@ -123,9 +130,22 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			return t;
 		};
 		LOGGER.info("Global search-test executor created with pool size = {}", maxCount);
-		return new ThreadPoolExecutor(maxCount, maxCount,60L, TimeUnit.SECONDS,
-					new LinkedBlockingQueue<>(), tf);
+		return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), tf);
 	}
+
+    private ExecutorService createBatchSaveExecutor() {
+        int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_BATCH_SAVE_THREAD_NUMBER"), 1);
+        maxCount = Math.max(1, maxCount);
+        ThreadFactory tf = r -> {
+            Thread t = new Thread(r);
+            t.setName("search-test-batch-save-" + t.getId());
+            t.setDaemon(true);
+            return t;
+        };
+        LOGGER.info("Search-test batch-save executor created with pool size = {}", maxCount);
+        return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(), tf);
+    }
 
 	@Override
 	public OsmAndMapsService getMapsService() {
@@ -202,22 +222,22 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				dataset.testRow = test.testRow;
 				test.allCols = dataset.allCols;
 
+				test.updated = LocalDateTime.now();
 				test = testCaseRepo.save(test);
 				datasetRepo.saveAndFlush(dataset);
 
-				test = generate(dataset, test);
+				return generate(dataset, test);
 			} catch (Exception e) {
 				LOGGER.error("Generation of test-case failed for on dataset {}", datasetId, e);
 				test.setError(e.getMessage());
 				test.status = TestCase.Status.FAILED;
-			} finally {
 				test.updated = LocalDateTime.now();
+				return testCaseRepo.save(test);
 			}
-			return testCaseRepo.save(test);
-		});
+		}, EXECUTOR);
 	}
 
-	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload) {
+	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, SearchService.SearchOption options) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
@@ -272,35 +292,23 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.threadsCount == null ? 1 : payload.threadsCount));
+		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.threadsCount == null ? 1 : payload.threadsCount, options));
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
 	private static final int CHUNK_SIZE = 100;
 
-	private void doMainRun(Run run, int threadsCount) {
+	private void doMainRun(Run run, int threadsCount, SearchService.SearchOption options) {
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
-		// Local per-run limited executor built on top of the global EXECUTOR
 		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
-		final Semaphore permits = new Semaphore(maxParallel);
-		final Executor localExecutor = command -> EXECUTOR.execute(() -> {
-			permits.acquireUninterruptibly();
-			try {
-				command.run();
-			} finally {
-				permits.release();
-			}
-		});
 
-		BloomFilter.resetStats();
 		try {
 			if (threadsCount > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
 				if (run.rerunId != null) {
-					// Re-run uses items from a previous run's results by joining gen_result with run_result
 					if (run.skipFound == null || !run.skipFound) {
 						sql = "SELECT count(*) FROM gen_result g " +
 								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
@@ -309,18 +317,27 @@ public class SearchTestService implements ReportService, DataService, OBFService
 								"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
 					}
 					count = jdbcTemplate.queryForObject(sql, Long.class, run.rerunId);
-				} else
+				} else {
 					count = jdbcTemplate.queryForObject(sql, Long.class, run.caseId);
+				}
 
 				final int chunkSize = Math.min((int) (count / maxParallel) + 1, CHUNK_SIZE);
-				for (int offset = 0; offset < count; offset += chunkSize) {
-					final int offsetLength = offset;
-					runTasks.add(CompletableFuture.runAsync(() ->
-							runChunk(run, chunkSize, offsetLength, statusRef), localExecutor));
+				final AtomicInteger nextOffset = new AtomicInteger(0);
+				for (int workerIndex = 0; workerIndex < maxParallel; workerIndex++) {
+					runTasks.add(CompletableFuture.runAsync(() -> {
+						while (statusRef.get() == Run.Status.RUNNING) {
+							int currentOffset = nextOffset.getAndAdd(chunkSize);
+							if (currentOffset >= count) {
+								break;
+							}
+							runChunk(run, chunkSize, currentOffset, statusRef, options);
+						}
+					}, EXECUTOR));
 				}
-			} else
+			} else {
 				runTasks.add(CompletableFuture.runAsync(() ->
-						runChunk(run, -1, 0, statusRef), localExecutor));
+						runChunk(run, -1, 0, statusRef, options), EXECUTOR));
+			}
 
 			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
 			List<Object[]> remainingBatches = runResultBatches.remove(run.id);
@@ -344,14 +361,13 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			runRepo.save(run);
  			// Cleanup in-memory status flag
  			runStatusFlags.remove(run.id);
+			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
-
-			LOGGER.info("Skip POI box ratio: ", BloomFilter.getInstance().logSkipRatio());
 		}
 	}
 
-	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef) {
+	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef, SearchService.SearchOption options) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
@@ -380,17 +396,19 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			if (srcPoint != null) {
 				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
 						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
-						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
-								srcPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
-						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
-								srcPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() + options.getRadius(),
+								srcPoint.getLongitude() - options.getRadius()),
+						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() - options.getRadius(),
+								srcPoint.getLongitude() + options.getRadius())};
 			}
 
 			for (Map<String, Object> row : rows) {
 				Run.Status current = statusRef.get();
 				if (current != Run.Status.RUNNING) {
 					run.status = current;
-					LOGGER.info("Run {} was stopped with status {}. Stopping execution.", run.id, current);
+					if (loggedStoppedRuns.add(run.id)) {
+						LOGGER.info("Run {} was stopped with status {}. Stopping execution.", run.id, current);
+					}
 					break;
 				}
 
@@ -410,10 +428,10 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
 				String[] bbox = srcBbox != null ? srcBbox : new String[]{
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + SearchService.SEARCH_RADIUS_DEGREE,
-								searchPoint.getLongitude() - SearchService.SEARCH_RADIUS_DEGREE),
-						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - SearchService.SEARCH_RADIUS_DEGREE,
-								searchPoint.getLongitude() + SearchService.SEARCH_RADIUS_DEGREE)};
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + options.getRadius(),
+								searchPoint.getLongitude() - options.getRadius()),
+						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - options.getRadius(),
+								searchPoint.getLongitude() + options.getRadius())};
 
 				Map<String, Object> newRow = new LinkedHashMap<>();
 				long datasetId;
@@ -430,8 +448,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
 					if (query != null && !query.trim().isEmpty()) {
 						searchResult = searchService.getImmediateSearchResults(
 								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, SearchService.SEARCH_RADIUS_DEGREE, bbox[0], bbox[1]),
-								new SearchService.SearchOption(true, null), finder);
+								query, run.locale, false, bbox[0], bbox[1]),
+								options, finder);
 					}
 
 					args = collectRunResults(finder, genId, count, run, query, searchResult,
@@ -466,20 +484,20 @@ public class SearchTestService implements ReportService, DataService, OBFService
  		}
  	}
 
- 	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
-	    String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
-			    "duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
-			    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
+		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
+				"duration, res_count, res_distance, res_lat_lon, res_place, lat, lon, bbox, timestamp, found, stat_bytes, stat_time) " +
+				"VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
- 		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
- 			try {
- 				jdbcTemplate.batchUpdate(sql, batchArgs);
- 			} catch (Exception ex) {
- 				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
- 			}
- 		}, EXECUTOR);
- 		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
- 	}
+		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+			try {
+				jdbcTemplate.batchUpdate(sql, batchArgs);
+			} catch (Exception ex) {
+				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
+			}
+		}, SAVE_EXECUTOR);
+		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
+	}
 
 	@Async
 	public CompletableFuture<Run> cancelRun(Long runId) {
@@ -621,9 +639,19 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		String fieldPathEnv = System.getenv("FIELD_PATH");
 		String fieldName = System.getenv("FIELD_NAME");
 		String filter = System.getenv("MAP_FILTER");
+        if (filter != null)
+            filter = filter.toLowerCase(Locale.ROOT);
 		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
+		String statsFieldPath;
+		if (fieldPath == null) {
+			statsFieldPath = fieldName == null || fieldName.trim().isEmpty() ? null : fieldName.trim();
+		} else if (fieldName == null || fieldName.trim().isEmpty()) {
+			statsFieldPath = fieldPath;
+		} else {
+			statsFieldPath = fieldPath + "." + fieldName.trim();
+		}
 		String jsonFieldPath;
-		if (fieldPath == null || fieldPath.isEmpty()) {
+		if (fieldPath == null) {
 			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
 		} else if (fieldName == null || fieldName.trim().isEmpty()) {
 			jsonFieldPath = fieldPath;
@@ -653,24 +681,25 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
 		System.out.println("MAP_DIR=" + root.toAbsolutePath());
 		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
-		System.out.println("FIELD_PATH=" + (fieldPath == null ? "" : fieldPath + "." + fieldName));
+		System.out.println("FIELD_PATH=" + (statsFieldPath == null ? "" : statsFieldPath));
+        System.out.println("OBFs count:" + obfFiles.size());
 
 		long totalSize = 0;
 		for (Path p : obfFiles) {
-			String obfName = p.getFileName().toString();
+			String obfName = p.getFileName().toString().toLowerCase(Locale.ROOT);
 			if (filter != null && !obfName.startsWith(filter))
 				continue;
 
 			try {
 				String obf = p.toAbsolutePath().toString();
-				Map<String, long[]> m = svc.getSectionSizes(obf, fieldPath);
-				long[] s = m.get(fieldName);
+				Map<String, long[]> m = svc.getSectionSizes(obf, statsFieldPath);
+				long[] s = m == null || statsFieldPath == null ? null : m.get(statsFieldPath);
 				long sum = s == null ? 0 : s[0];
 				totalSize += sum;
 				System.out.println(obf + ", " + sum);
 
 				String json = svc.getSectionJson(obf, jsonFieldPath);
-				String obfBaseName = obfName.toLowerCase(Locale.ROOT).endsWith(".obf")
+				String obfBaseName = obfName.endsWith(".obf")
 						? obfName.substring(0, obfName.length() - 4)
 						: obfName;
 

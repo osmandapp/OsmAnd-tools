@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
+import static net.osmand.search.core.ObjectType.POI_TYPE;
+
 public interface DataService extends BaseService {
 
 	SearchTestDatasetRepository getDatasetRepo();
@@ -273,16 +275,24 @@ public interface DataService extends BaseService {
 	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null) {
-			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, "", error, duration,
+			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, null, error, duration,
 					0, null, null, null, searchPoint.getLatitude(), searchPoint.getLongitude(), bbox,
 					new Timestamp(System.currentTimeMillis()), false, null, null};
 		}
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
+        for (SearchResult sr : searchResults) {
+            if (sr.location == null && sr.objectType == POI_TYPE) {
+                sr.location = targetPoint;
+            }
+        }
 
 		Map<String, Object> row = finder.getRow();
 		Result firstResult = finder.getFirstResult();
 		Result actualResult = finder.getActualResult();
+		BinaryMapIndexReaderStats.SearchStat stat = searchResult != null && searchResult.settings() != null
+				? searchResult.settings().getStat()
+				: null;
 
 		int resultsCount = searchResults.size();
 		Integer distance = null, resPlace = null;
@@ -316,8 +326,7 @@ public interface DataService extends BaseService {
 				if (dupCount > 0) {
 					row.put("dup_count", dupCount);
 				}
-				if (searchResult != null && searchResult.settings().getStat() != null) {
-					BinaryMapIndexReaderStats.SearchStat stat = searchResult.settings().getStat();
+				if (stat != null) {
 					row.put("stat_bytes", stat.totalBytes);
 					row.put("stat_time", stat.totalTime);
 					int statResultsCount = 0;
@@ -347,7 +356,6 @@ public interface DataService extends BaseService {
 					}
 					row.put("stat_results", statResultsCount);
 					row.put("stat_amenity_count", statAmenityCount);
-					row.put("stat_transport_count", statTransportCount);
 					row.put("stat_address_count", statAddressCount);
 
 					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
@@ -379,7 +387,7 @@ public interface DataService extends BaseService {
 				error = "Result point location is null";
 			}
 		} else {
-			error = "Search result is missing";
+			error = searchResults.isEmpty() ? "Search result is empty" : "First search result is missing";
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
 
@@ -389,8 +397,7 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalBytes : null,
-				searchResult != null && searchResult.settings().getStat() != null ? searchResult.settings().getStat().totalTime : null
+                stat != null ? stat.totalBytes : null, stat != null ? stat.totalTime : null
 		};
 	}
 

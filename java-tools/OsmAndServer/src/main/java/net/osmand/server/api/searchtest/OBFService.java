@@ -52,141 +52,147 @@ public interface OBFService extends BaseService {
 	}
 
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
-	record Address(String name, LatLon point) {}
+	record Address(String name, String value, LatLon point) {}
 	record StreetAddress(String name, List<Address> houses) {}
 
 	enum ObfLengthType {
-		VARINT,
+        VAR_INT,
 		FIXED32
 	}
 
-	record ObfFieldSpec(String fieldName, String childMessageType, ObfLengthType lengthType, boolean packedVarint) {}
+	record ObfFieldSpec(String fieldName, String childMessageType, ObfLengthType lengthType, boolean packedVarInt, boolean repeated) {}
 
 	static Map<String, Map<Integer, ObfFieldSpec>> buildObfMessageSchema() {
 		Map<String, Map<Integer, ObfFieldSpec>> schema = new HashMap<>();
-		addObfSpec(schema, "OsmAndStructure", 7, "addressIndex", "OsmAndAddressIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndStructure", 4, "transportIndex", "OsmAndTransportIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndStructure", 8, "poiIndex", "OsmAndPoiIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndStructure", 6, "mapIndex", "OsmAndMapIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndStructure", 9, "routingIndex", "OsmAndRoutingIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndStructure", 10, "hhRoutingIndex", "OsmAndHHRoutingIndex", ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndStructure", 7, "addressIndex", "OsmAndAddressIndex", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 4, "transportIndex", "OsmAndTransportIndex", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 8, "poiIndex", "OsmAndPoiIndex", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 6, "mapIndex", "OsmAndMapIndex", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 9, "routingIndex", "OsmAndRoutingIndex", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 10, "hhRoutingIndex", "OsmAndHHRoutingIndex", ObfLengthType.FIXED32, false, true);
 
-		addObfSpec(schema, "OsmAndTileBox", 1, "left", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndTileBox", 2, "right", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndTileBox", 3, "top", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndTileBox", 4, "bottom", null, ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndTileBox", 1, "left", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 2, "right", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 3, "top", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 4, "bottom", null, ObfLengthType.VAR_INT);
 
-		addObfSpec(schema, "OsmAndPoiIndex", 1, "name", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiIndex", 2, "boundaries", "OsmAndTileBox", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiIndex", 3, "categoriesTable", "OsmAndCategoryTable", ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndPoiIndex", 1, "name", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 2, "boundaries", "OsmAndTileBox", ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 3, "categoriesTable", "OsmAndCategoryTable", ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiIndex", 4, "nameIndex", "OsmAndPoiNameIndex", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndPoiIndex", 5, "subtypesTable", "OsmAndSubtypesTable", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiIndex", 6, "boxes", "OsmAndPoiBox", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndPoiIndex", 9, "poiData", "OsmAndPoiBoxData", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndSubtypesTable", 4, "subtypes", "OsmAndPoiSubtype", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndCategoryTable", 1, "category", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndCategoryTable", 3, "subcategories", null, ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndPoiIndex", 5, "subtypesTable", "OsmAndSubtypesTable", ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 6, "boxes", "OsmAndPoiBox", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndPoiIndex", 9, "poiData", "OsmAndPoiBoxData", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndSubtypesTable", 4, "subtypes", "OsmAndPoiSubtype", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndCategoryTable", 1, "category", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndCategoryTable", 3, "subcategories", null, ObfLengthType.VAR_INT);
 
 		addObfSpec(schema, "OsmAndPoiNameIndex", 3, "table", "IndexedStringTable", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "bloomIndex", null, ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "bloomIndex", null, ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 14, "shiftTo", null, ObfLengthType.FIXED32);
 
-		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "IndexedStringTable", 3, "key", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "IndexedStringTable", 4, "val", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "IndexedStringTable", 5, "subtables", "IndexedStringTable", ObfLengthType.VARINT);
+		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 3, "key", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 4, "val", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 5, "subtables", "IndexedStringTable", ObfLengthType.VAR_INT, false, true);
 
-		addObfSpec(schema, "OsmAndPoiBox", 1, "zoom", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBox", 2, "left", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBox", 3, "top", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBox", 4, "categories", "OsmAndPoiCategories", ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndPoiBox", 1, "zoom", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 2, "left", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 3, "top", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 4, "categories", "OsmAndPoiCategories", ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiBox", 8, "tagGroups", "OsmAndPoiTagGroups", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndPoiBox", 10, "subBoxes", "OsmAndPoiBox", ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndPoiBox", 10, "subBoxes", "OsmAndPoiBox", ObfLengthType.FIXED32, false, true);
 		addObfSpec(schema, "OsmAndPoiBox", 14, "shiftToData", null, ObfLengthType.FIXED32);
-		addObfPackedVarintSpec(schema, "OsmAndPoiCategories", 3, "categories");
-		addObfPackedVarintSpec(schema, "OsmAndPoiCategories", 5, "subcategories");
-		addObfPackedVarintSpec(schema, "OsmAndPoiTagGroups", 2, "ids");
-		addObfSpec(schema, "OsmAndPoiTagGroups", 5, "groups", "OsmAndPoiTagGroup", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxData", 5, "poiData", "OsmAndPoiBoxDataAtom", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiTagGroup", 1, "id", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiTagGroup", 5, "tagValues", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 1, "name", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 2, "tagname", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 3, "isText", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 5, "frequency", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 6, "subtypeValuesSize", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiSubtype", 8, "subtypeValue", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxData", 1, "zoom", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxData", 2, "x", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxData", 3, "y", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 2, "dx", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 3, "dy", null, ObfLengthType.VARINT);
-		addObfPackedVarintSpec(schema, "OsmAndPoiBoxDataAtom", 4, "categories");
-		addObfPackedVarintSpec(schema, "OsmAndPoiBoxDataAtom", 5, "subcategories");
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 6, "name", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 7, "nameEn", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 8, "id", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 10, "openingHours", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 11, "site", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 12, "phone", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 13, "note", null, ObfLengthType.VARINT);
-		addObfPackedVarintSpec(schema, "OsmAndPoiBoxDataAtom", 14, "textCategories");
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 15, "textValues", null, ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 16, "precisionXY", null, ObfLengthType.VARINT);
-		addObfPackedVarintSpec(schema, "OsmAndPoiBoxDataAtom", 17, "tagGroups");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiCategories", 3, "categories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiCategories", 5, "subcategories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiTagGroups", 2, "ids");
+		addObfSpec(schema, "OsmAndPoiTagGroups", 5, "groups", "OsmAndPoiTagGroup", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiBoxData", 5, "poiData", "OsmAndPoiBoxDataAtom", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiTagGroup", 1, "id", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiTagGroup", 5, "tagValues", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 1, "name", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 2, "tagname", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 3, "isText", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 5, "frequency", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 6, "subtypeValuesSize", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 8, "subtypeValue", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 1, "zoom", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 2, "x", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 3, "y", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 2, "dx", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 3, "dy", null, ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 4, "categories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 5, "subcategories");
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 6, "name", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 7, "nameEn", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 8, "id", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 10, "openingHours", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 11, "site", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 12, "phone", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 13, "note", null, ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 14, "textCategories");
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 15, "textValues", null, ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 16, "precisionXY", null, ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 17, "tagGroups");
 
-		addObfSpec(schema, "OsmAndAddressIndex", 3, "boundaries", "OsmAndTileBox", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndAddressIndex", 4, "attributeTagsTable", "StringTable", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndAddressIndex", 6, "cities", "CitiesIndex", ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndAddressIndex", 3, "boundaries", "OsmAndTileBox", ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndAddressIndex", 4, "attributeTagsTable", "StringTable", ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndAddressIndex", 6, "cities", "CitiesIndex", ObfLengthType.FIXED32, false, true);
 		addObfSpec(schema, "OsmAndAddressIndex", 7, "nameIndex", "OsmAndAddressNameIndexData", ObfLengthType.FIXED32);
 
-		addObfSpec(schema, "CitiesIndex", 5, "cities", "CityIndex", ObfLengthType.VARINT);
-		addObfSpec(schema, "CitiesIndex", 7, "blocks", "CityBlockIndex", ObfLengthType.VARINT);
-		addObfSpec(schema, "CityBlockIndex", 10, "buildings", "BuildingIndex", ObfLengthType.VARINT);
-		addObfSpec(schema, "CityBlockIndex", 12, "streets", "StreetIndex", ObfLengthType.VARINT);
-		addObfSpec(schema, "StreetIndex", 5, "intersections", "StreetIntersection", ObfLengthType.VARINT);
-		addObfSpec(schema, "StreetIndex", 12, "buildings", "BuildingIndex", ObfLengthType.VARINT);
+		addObfSpec(schema, "CitiesIndex", 5, "cities", "CityIndex", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CitiesIndex", 7, "blocks", "CityBlockIndex", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CityBlockIndex", 10, "buildings", "BuildingIndex", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CityBlockIndex", 12, "streets", "StreetIndex", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "StreetIndex", 5, "intersections", "StreetIntersection", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "StreetIndex", 12, "buildings", "BuildingIndex", ObfLengthType.VAR_INT, false, true);
 
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", ObfLengthType.VARINT);
-		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", ObfLengthType.VAR_INT, false, true);
 
-		addObfSpec(schema, "OsmAndMapIndex", 4, "rules", "OsmAndMapIndex.MapEncodingRule", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndMapIndex", 5, "levels", "OsmAndMapIndex.MapRootLevel", ObfLengthType.FIXED32);
-		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 7, "boxes", "OsmAndMapIndex.MapDataBox", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 15, "blocks", "MapDataBlock", ObfLengthType.VARINT);
-		addObfSpec(schema, "OsmAndMapIndex.MapDataBox", 7, "boxes", "OsmAndMapIndex.MapDataBox", ObfLengthType.VARINT);
-		addObfSpec(schema, "MapDataBlock", 12, "dataObjects", "MapData", ObfLengthType.VARINT);
-		addObfSpec(schema, "MapDataBlock", 15, "stringTable", "StringTable", ObfLengthType.VARINT);
+		addObfSpec(schema, "OsmAndMapIndex", 4, "rules", "OsmAndMapIndex.MapEncodingRule", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex", 5, "levels", "OsmAndMapIndex.MapRootLevel", ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 7, "boxes", "OsmAndMapIndex.MapDataBox", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 15, "blocks", "MapDataBlock", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapDataBox", 7, "boxes", "OsmAndMapIndex.MapDataBox", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "MapDataBlock", 12, "dataObjects", "MapData", ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "MapDataBlock", 15, "stringTable", "StringTable", ObfLengthType.VAR_INT);
 
 		return schema;
 	}
 
-	static void addObfPackedVarintSpec(Map<String, Map<Integer, ObfFieldSpec>> schema, String messageType,
-	                                   int fieldNumber, String fieldName) {
-		addObfSpec(schema, messageType, fieldNumber, fieldName, null, ObfLengthType.VARINT, true);
+	static void addObfPackedVarIntSpec(Map<String, Map<Integer, ObfFieldSpec>> schema, String messageType,
+                                       int fieldNumber, String fieldName) {
+		addObfSpec(schema, messageType, fieldNumber, fieldName, null, ObfLengthType.VAR_INT, true, false);
 	}
 
 	static void addObfSpec(Map<String, Map<Integer, ObfFieldSpec>> schema, String messageType,
 	                       int fieldNumber, String fieldName, String childMessageType, ObfLengthType lengthType) {
-		addObfSpec(schema, messageType, fieldNumber, fieldName, childMessageType, lengthType, false);
+		addObfSpec(schema, messageType, fieldNumber, fieldName, childMessageType, lengthType, false, false);
 	}
 
 	static void addObfSpec(Map<String, Map<Integer, ObfFieldSpec>> schema, String messageType,
 	                       int fieldNumber, String fieldName, String childMessageType, ObfLengthType lengthType,
-	                       boolean packedVarint) {
+	                       boolean packedVarInt, boolean repeated) {
 		Map<Integer, ObfFieldSpec> byField = schema.computeIfAbsent(messageType, k -> new HashMap<>());
-		byField.put(fieldNumber, new ObfFieldSpec(fieldName, childMessageType, lengthType, packedVarint));
+		byField.put(fieldNumber, new ObfFieldSpec(fieldName, childMessageType, lengthType, packedVarInt, repeated));
 	}
 
 	Map<String, Map<Integer, ObfFieldSpec>> OBF_MESSAGE_SCHEMA = buildObfMessageSchema();
 
 	Map<Integer, String> OBF_STRUCTURE_FIELD_NAMES = buildObfStructureFieldNames();
+
+	static boolean isRepeatedMessageField(String messageType, int fieldNumber) {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		ObfFieldSpec fieldSpec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+		return fieldSpec != null && fieldSpec.repeated();
+	}
 
 	static Map<Integer, String> buildObfStructureFieldNames() {
 		Map<Integer, String> out = new HashMap<>();
@@ -233,39 +239,131 @@ public interface OBFService extends BaseService {
 	}
 
 	static long[] getOrCreateSectionStats(Map<String, long[]> out, String key) {
-		return out.computeIfAbsent(key, k -> new long[]{0L, 0L});
+		return out.computeIfAbsent(key, k -> new long[]{0L, 0L, 0L});
 	}
 
-	static long countExpandableChildren(String messageType) {
-		if (messageType == null) {
-			return 0;
-		}
+	static boolean messageHasNestedElements(CodedInputStream codedIS, String messageType) throws IOException {
 		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
-		if (specByFieldNumber == null || specByFieldNumber.isEmpty()) {
-			return 0;
-		}
-		long count = 0;
-		for (ObfFieldSpec spec : specByFieldNumber.values()) {
-			if (spec == null) {
-				continue;
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return false;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				if (spec.childMessageType() == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				if (payloadLength > 0) {
+					return true;
+				}
 			}
-			if (spec.childMessageType() != null) {
-				count++;
-			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+			return false;
 		}
-		return count;
 	}
 
-	static void addSectionSize(Map<String, long[]> out, String key, long value, long expandableChildrenCount) {
-		if (key == null || key.isEmpty()) {
-			return;
+	static void collectImmediateChildStats(CodedInputStream codedIS, String messageType, Map<String, long[]> sizes) throws IOException {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		if (specByFieldNumber != null) {
+			for (ObfFieldSpec spec : specByFieldNumber.values()) {
+				if (spec == null || spec.childMessageType() == null || spec.fieldName() == null) {
+					continue;
+				}
+				getOrCreateSectionStats(sizes, spec.fieldName());
+			}
 		}
-		long[] stats = getOrCreateSectionStats(out, key);
-		if (value > 0) {
-			stats[0] += value;
-		}
-		if (expandableChildrenCount > stats[1]) {
-			stats[1] = expandableChildrenCount;
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null || spec.childMessageType() == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long[] stats = getOrCreateSectionStats(sizes, spec.fieldName());
+				if (payloadLength > 0) {
+					stats[0] += payloadLength;
+				}
+				if (spec.repeated()) {
+					stats[2]++;
+				}
+				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				try {
+					if (messageHasNestedElements(codedIS, spec.childMessageType())) {
+						stats[1] = 1;
+					}
+				} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+					long remainingInLimit = codedIS.getBytesUntilLimit();
+					if (remainingInLimit > 0) {
+						skipRawBytesLong(codedIS, remainingInLimit);
+					}
+				} finally {
+					consumeRemainingInLimit(codedIS);
+					codedIS.popLimit(oldLimit);
+				}
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException ignored) {
+        }
+	}
+
+	static boolean collectChildStatsAtPath(CodedInputStream codedIS, String messageType, String[] path,
+	                                      int pathIndex, Map<String, long[]> sizes) throws IOException {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		String expectedFieldName = path[pathIndex];
+		boolean found = false;
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return found;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null || spec.childMessageType() == null || !expectedFieldName.equalsIgnoreCase(spec.fieldName())) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				found = true;
+				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				try {
+					if (pathIndex == path.length - 1) {
+						collectImmediateChildStats(codedIS, spec.childMessageType(), sizes);
+					} else {
+                        collectChildStatsAtPath(codedIS, spec.childMessageType(), path, pathIndex + 1, sizes);
+                    }
+				} finally {
+					consumeRemainingInLimit(codedIS);
+					codedIS.popLimit(oldLimit);
+				}
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+			return found;
 		}
 	}
 
@@ -379,17 +477,6 @@ public interface OBFService extends BaseService {
 		return out;
 	}
 
-	static void normalizeExpandableCounts(Map<String, long[]> out) {
-		for (long[] stats : out.values()) {
-			if (stats == null) {
-				continue;
-			}
-			if (stats[0] <= 0) {
-				stats[1] = 0;
-			}
-		}
-	}
-
 	static long readFixed32Length(CodedInputStream codedIS) throws IOException {
 		long l = readUnsignedByte(codedIS);
 		boolean eightBytes = l > 0x7f;
@@ -424,6 +511,13 @@ public interface OBFService extends BaseService {
 		}
 	}
 
+	static void consumeRemainingInLimit(CodedInputStream codedIS) throws IOException {
+		long remainingInLimit = codedIS.getBytesUntilLimit();
+		if (remainingInLimit > 0) {
+			skipRawBytesLong(codedIS, remainingInLimit);
+		}
+	}
+
 	record RootSpec(int rootFieldNumber, String rootMessageType) {}
 
 	static RootSpec resolveRootSpec(String rootSegment) {
@@ -447,23 +541,30 @@ public interface OBFService extends BaseService {
 	}
 
 	static void skipUnknownField(CodedInputStream codedIS, int tag) throws IOException {
-		int wireType = WireFormat.getTagWireType(tag);
-		if (wireType == WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED) {
-			long length = readFixed32Length(codedIS);
-			long remainingInLimit = codedIS.getBytesUntilLimit();
-			if (remainingInLimit >= 0 && length > remainingInLimit) {
-				length = remainingInLimit;
+		try {
+			int wireType = WireFormat.getTagWireType(tag);
+			if (wireType == WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED) {
+				long length = readFixed32Length(codedIS);
+				long remainingInLimit = codedIS.getBytesUntilLimit();
+				if (remainingInLimit >= 0 && length > remainingInLimit) {
+					length = remainingInLimit;
+				}
+				skipRawBytesLong(codedIS, length);
+			} else if (wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
+				long length = codedIS.readRawVarint32();
+				long remainingInLimit = codedIS.getBytesUntilLimit();
+				if (remainingInLimit >= 0 && length > remainingInLimit) {
+					length = remainingInLimit;
+				}
+				skipRawBytesLong(codedIS, length);
+			} else {
+				codedIS.skipField(tag);
 			}
-			skipRawBytesLong(codedIS, length);
-		} else if (wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
-			long length = codedIS.readRawVarint32();
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
 			long remainingInLimit = codedIS.getBytesUntilLimit();
-			if (remainingInLimit >= 0 && length > remainingInLimit) {
-				length = remainingInLimit;
+			if (remainingInLimit > 0) {
+				skipRawBytesLong(codedIS, remainingInLimit);
 			}
-			skipRawBytesLong(codedIS, length);
-		} else {
-			codedIS.skipField(tag);
 		}
 	}
 
@@ -477,69 +578,16 @@ public interface OBFService extends BaseService {
 		return -1;
 	}
 
-	static void readMessageAndCollectImmediateChildSizes(CodedInputStream codedIS, String messageType,
-	                                                     Map<String, long[]> outSizes) throws IOException {
-		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
-		while (true) {
-			int t = codedIS.readTag();
-			int fieldNumber = WireFormat.getTagFieldNumber(t);
-			if (fieldNumber == 0)
-				return;
-
-			ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
-			if (spec == null) {
-				skipUnknownField(codedIS, t);
-				continue;
+	static long readPayloadLength(CodedInputStream codedIS, int tag, ObfFieldSpec spec) throws IOException {
+		if (spec != null && spec.lengthType() != null) {
+			if (spec.lengthType() == ObfLengthType.FIXED32) {
+				return readFixed32Length(codedIS);
 			}
-			if (spec.childMessageType() == null) {
-				skipUnknownField(codedIS, t);
-				continue;
-			}
-			long payloadLength = readPayloadLengthByWireType(codedIS, t);
-			if (payloadLength < 0) {
-				skipUnknownField(codedIS, t);
-				continue;
-			}
-			addSectionSize(outSizes, spec.fieldName(), payloadLength, countExpandableChildren(spec.childMessageType()));
-			skipRawBytesLong(codedIS, payloadLength);
-		}
-	}
-
-	static void readMessageAndCollectAtPath(CodedInputStream codedIS, String messageType, String[] path,
-	                                        int pathIndex, Map<String, long[]> outSizes) throws IOException {
-		if (pathIndex >= path.length) {
-			readMessageAndCollectImmediateChildSizes(codedIS, messageType, outSizes);
-			return;
-		}
-		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
-		String next = path[pathIndex];
-		while (true) {
-			int t = codedIS.readTag();
-			int fieldNumber = WireFormat.getTagFieldNumber(t);
-			if (fieldNumber == 0)
-				return;
-
-			ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
-			if (spec == null) {
-				skipUnknownField(codedIS, t);
-				continue;
-			}
-			if (!next.equalsIgnoreCase(spec.fieldName()) || spec.childMessageType() == null) {
-				skipUnknownField(codedIS, t);
-				continue;
-			}
-			long payloadLength = readPayloadLengthByWireType(codedIS, t);
-			if (payloadLength < 0) {
-				skipUnknownField(codedIS, t);
-				continue;
-			}
-			long oldLimit = codedIS.pushLimitLong(payloadLength);
-			try {
-				readMessageAndCollectAtPath(codedIS, spec.childMessageType(), path, pathIndex + 1, outSizes);
-			} finally {
-				codedIS.popLimit(oldLimit);
+			if (spec.lengthType() == ObfLengthType.VAR_INT) {
+				return codedIS.readRawVarint32();
 			}
 		}
+		return readPayloadLengthByWireType(codedIS, tag);
 	}
 
 	// return JSON representation of section by using field path from OBF file
@@ -572,7 +620,8 @@ public interface OBFService extends BaseService {
 						skipUnknownField(codedIS, t);
 						continue;
 					}
-					long payloadLength = readPayloadLengthByWireType(codedIS, t);
+					ObfFieldSpec rootFieldSpec = OBF_MESSAGE_SCHEMA.get("OsmAndStructure").get(rootFieldNumber);
+					long payloadLength = readPayloadLength(codedIS, t, rootFieldSpec);
 					if (payloadLength < 0) {
 						skipUnknownField(codedIS, t);
 						continue;
@@ -633,7 +682,7 @@ public interface OBFService extends BaseService {
 				skipUnknownField(codedIS, t);
 				continue;
 			}
-			long payloadLength = readPayloadLengthByWireType(codedIS, t);
+			long payloadLength = readPayloadLength(codedIS, t, spec);
 			if (payloadLength < 0) {
 				skipUnknownField(codedIS, t);
 				continue;
@@ -687,7 +736,7 @@ public interface OBFService extends BaseService {
 			String fieldName = (spec != null && spec.fieldName() != null) ? spec.fieldName() : ("#" + fieldNumber);
 
 			if (spec != null && spec.childMessageType() != null) {
-				long payloadLength = readPayloadLengthByWireType(codedIS, t);
+				long payloadLength = readPayloadLength(codedIS, t, spec);
 				if (payloadLength < 0) {
 					skipUnknownField(codedIS, t);
 					continue;
@@ -702,7 +751,7 @@ public interface OBFService extends BaseService {
 				continue;
 			}
 
-			if (spec != null && spec.packedVarint() && WireFormat.getTagWireType(t) == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
+			if (spec != null && spec.packedVarInt() && WireFormat.getTagWireType(t) == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
 				JSONArray arr = readPackedVarintArray(codedIS, t);
 				addJsonValue(out, fieldName, arr);
 				continue;
@@ -712,9 +761,9 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	static final ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
+	ThreadLocal<JsonDumpState> JSON_DUMP_STATE = new ThreadLocal<>();
 
-	static final class JsonDumpState {
+	final class JsonDumpState {
 		final int maxDepth;
 		final long maxFields;
 		final int maxArrayLength;
@@ -743,24 +792,24 @@ public interface OBFService extends BaseService {
 	}
 
 	static int parseEnvInt(String key, int def) {
-		String v = System.getenv(key);
-		if (v == null || v.trim().isEmpty()) {
+		String raw = System.getenv(key);
+		if (raw == null || raw.trim().isEmpty()) {
 			return def;
 		}
 		try {
-			return Integer.parseInt(v.trim());
-		} catch (Exception e) {
+			return Integer.parseInt(raw.trim());
+		} catch (NumberFormatException e) {
 			return def;
 		}
 	}
 
 	static long parseEnvLong(String key, long def) {
-		String v = System.getenv(key);
-		if (v == null || v.trim().isEmpty()) {
+		String raw = System.getenv(key);
+		if (raw == null || raw.trim().isEmpty()) {
 			return def;
 		}
 		try {
-			return Long.parseLong(v.trim());
+			return Long.parseLong(raw.trim());
 		} catch (Exception e) {
 			return def;
 		}
@@ -882,89 +931,119 @@ public interface OBFService extends BaseService {
 
 	// fieldPath is null or empty string for root, otherwise dot separated path like 'poiIndex.nameIndex' or 'addressIndex.cities'
 	default Map<String, long[]> getSectionSizes(String obf, String fieldPath) {
-		Map<String, long[]> sizes = new HashMap<>();
 		String normalizedFieldPath = fieldPath == null ? "" : fieldPath.trim();
 		String[] path = normalizedFieldPath.isEmpty() ? new String[0] : normalizedFieldPath.split("\\.");
 		File file = new File(obf);
-		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			CodedInputStream codedIS = CodedInputStream.newInstance(r);
-			codedIS.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+		try (RandomAccessFile indexFile = new RandomAccessFile(file.getAbsolutePath(), "r");
+		     RandomAccessFile dataFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(indexFile, file);
 			if (path.length == 0) {
+				Map<String, long[]> sizes = new HashMap<>();
 				Map<Integer, ObfFieldSpec> rootSpecs = OBF_MESSAGE_SCHEMA.get("OsmAndStructure");
 				if (rootSpecs != null) {
-					for (ObfFieldSpec s : rootSpecs.values()) {
-						if (s == null || s.childMessageType == null || s.fieldName == null) {
+					for (ObfFieldSpec rootSpec : rootSpecs.values()) {
+						if (rootSpec == null || rootSpec.childMessageType() == null || rootSpec.fieldName() == null) {
 							continue;
 						}
-						long[] stats = getOrCreateSectionStats(sizes, s.fieldName);
-						stats[1] = Math.max(stats[1], countExpandableChildren(s.childMessageType));
+						getOrCreateSectionStats(sizes, rootSpec.fieldName());
 					}
 				}
-				while (true) {
-					int t = codedIS.readTag();
-					int fieldNumber = WireFormat.getTagFieldNumber(t);
-					if (fieldNumber == 0) {
-						normalizeExpandableCounts(sizes);
-						return sizes;
-					}
-
-					long payloadLength = readPayloadLengthByWireType(codedIS, t);
-					if (payloadLength < 0) {
-						skipUnknownField(codedIS, t);
+				for (BinaryIndexPart indexPart : indexReader.getIndexes()) {
+					if (indexPart == null) {
 						continue;
 					}
-					String fieldName;
+					int fieldNumber = indexPart.getFieldNumber();
 					ObfFieldSpec rootSpec = rootSpecs == null ? null : rootSpecs.get(fieldNumber);
-					if (rootSpec != null && rootSpec.fieldName() != null) {
-						fieldName = rootSpec.fieldName();
-					} else {
-						fieldName = OBF_STRUCTURE_FIELD_NAMES.get(fieldNumber);
+					if (rootSpec == null || rootSpec.childMessageType() == null) {
+						continue;
 					}
+					String fieldName = rootSpec.fieldName() != null ? rootSpec.fieldName() : OBF_STRUCTURE_FIELD_NAMES.get(fieldNumber);
 					if (fieldName == null) {
 						fieldName = "field_" + fieldNumber;
 					}
-					long expandableChildren = 0;
-					if (rootSpec != null) {
-						expandableChildren = countExpandableChildren(rootSpec.childMessageType());
+					long[] stats = getOrCreateSectionStats(sizes, fieldName);
+					long payloadLength = indexPart.getLength();
+					if (payloadLength > 0) {
+						stats[0] += payloadLength;
 					}
-					addSectionSize(sizes, fieldName, payloadLength, expandableChildren);
-					skipRawBytesLong(codedIS, payloadLength);
+					stats[1] = 1;
+					if (isRepeatedMessageField("OsmAndStructure", fieldNumber)) {
+						stats[2]++;
+					}
 				}
+				return sizes;
 			}
 
 			RootSpec rootSpec = resolveRootSpec(path[0]);
 			int rootFieldNumber = rootSpec.rootFieldNumber;
 			String rootMessageType = rootSpec.rootMessageType;
+			Map<String, long[]> sizes = new HashMap<>();
+			boolean foundPath = false;
 
-			while (true) {
-				int t = codedIS.readTag();
-				int fieldNumber = WireFormat.getTagFieldNumber(t);
-				if (fieldNumber == 0) {
-					normalizeExpandableCounts(sizes);
-					return sizes;
-				}
-
-				if (fieldNumber != rootFieldNumber) {
-					skipUnknownField(codedIS, t);
+			for (BinaryIndexPart indexPart : indexReader.getIndexes()) {
+				if (indexPart == null || indexPart.getFieldNumber() != rootFieldNumber) {
 					continue;
 				}
-				long payloadLength = readPayloadLengthByWireType(codedIS, t);
-				if (payloadLength < 0) {
-					skipUnknownField(codedIS, t);
+				long payloadLength = indexPart.getLength();
+				if (payloadLength <= 0) {
 					continue;
 				}
-				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				CodedInputStream partInput = CodedInputStream.newInstance(dataFile);
+				partInput.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+				partInput.seek(indexPart.getFilePointer());
+				long oldLimit = partInput.pushLimitLong(payloadLength);
 				try {
-					readMessageAndCollectAtPath(codedIS, rootMessageType, path, 1, sizes);
+					if (path.length == 1) {
+						foundPath = true;
+						collectImmediateChildStats(partInput, rootMessageType, sizes);
+					} else {
+						foundPath = collectChildStatsAtPath(partInput, rootMessageType, path, 1, sizes) || foundPath;
+					}
 				} finally {
-					codedIS.popLimit(oldLimit);
+					consumeRemainingInLimit(partInput);
+					partInput.popLimit(oldLimit);
 				}
 			}
+			if (!foundPath) {
+				return null;
+			}
+			return sizes;
 		} catch (IOException e) {
 			getLogger().error("Failed to read OBF file: {}", file, e);
 			throw new RuntimeException("Failed to read OBF file: " + e.getMessage(), e);
 		}
 	}
+
+    private static Address findValue(Amenity amenity, Pattern poiPattern) {
+        if (amenity == null || poiPattern == null) {
+            return null;
+        }
+		
+		String name = amenity.getName();
+		if (name != null && poiPattern.matcher(name).find()) {
+			return new Address(name, "name-> " + name, amenity.getLocation());
+		}
+
+		String enName = amenity.getEnName(false);
+		if (enName != null && poiPattern.matcher(enName).find()) {
+			return new Address(enName, "name:en-> " + enName, amenity.getLocation());
+		}
+		
+		name = name == null ? enName : name;
+		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
+			if (e.getValue() != null && poiPattern.matcher(e.getValue()).find()) {
+				return new Address(name, e.getKey() + "-> " + e.getValue(), amenity.getLocation());
+			}
+		}
+		
+        for (String key : amenity.getAdditionalInfoKeys()) {
+			String info = amenity.getAdditionalInfo(key);
+            if (info != null && poiPattern.matcher(info).find()) {
+                return new Address(name, key + "-> " + info, amenity.getLocation());
+            }
+        }
+        return null;
+    }
 
 	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
 		List<Record> results = new ArrayList<>();
@@ -1030,7 +1109,7 @@ public interface OBFService extends BaseService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(new Address(houseName, b.getLocation()));
+												buildings.add(new Address(houseName, null, b.getLocation()));
 										}
 									}
 									if (!buildings.isEmpty()) {
@@ -1044,13 +1123,13 @@ public interface OBFService extends BaseService {
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
 						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), 15,
+								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), -1,
 								null, null);
 						for (Amenity amenity : index.searchPoi(req, poi)) {
-							final String poiName = amenity.getName(lang);
-							if (poiName == null || !poiPattern.matcher(poiName).find())
+							Address value = findValue(amenity, poiPattern);
+							if (value == null)
 								continue;
-							results.add(new Address(poiName, amenity.getLocation()));
+							results.add(value);
 						}
 					}
 				}
@@ -1088,14 +1167,16 @@ public interface OBFService extends BaseService {
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
 
-	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption option) throws IOException {
-		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, option, null);
+	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options) throws IOException {
+		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
 			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
+		getLogger().info(result.settings().getStat().toDetailedString());
+
 		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
 	}
 
@@ -1119,7 +1200,8 @@ public interface OBFService extends BaseService {
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings), null);
+				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, 
+						null, true, (net.osmand.search.core.ObjectType[]) null), null);
 
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");

@@ -73,7 +73,7 @@ public class SearchController {
             return osmAndMapsService.errorConfig();
         }
         List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-                baseSearch != null && baseSearch, null, northWest, southEast), timeZone);
+                baseSearch != null && baseSearch, northWest, southEast), timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
