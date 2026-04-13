@@ -53,6 +53,8 @@ import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import static net.osmand.search.core.SearchCoreFactory.splitAndNormalize;
+
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
 
@@ -1387,14 +1389,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
-        name = Algorithms.normalizeSearchText(name);
-		Set<String> splitNames = splitNames(name);
-        if (ArabicNormalizer.isSpecialArabic(name)) {
-            String arabic = ArabicNormalizer.normalize(name);
-            if (arabic != null && !arabic.equals(name)) {
-                splitNames.addAll(splitNames(arabic));
-            }
-        }
+		Collection<String> splitNames = splitAndNormalize(name);
         List<String> namesToAdd = new ArrayList<>(splitNames);
 		// remove all common words (most common delete first) but leave at least 1
 		int pos = 0;
@@ -1434,11 +1429,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 	}
-
-    private static Set<String> splitNames(String name) {
-    	return SearchCoreFactory.splitSearchNames(name);
-    }
-
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
 			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
