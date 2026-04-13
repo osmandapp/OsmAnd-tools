@@ -313,7 +313,7 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private JsonObject detailsForResponse(JsonObject details) {
+	public JsonObject detailsForResponse(JsonObject details) {
 		JsonObject response = new JsonObject();
 		for (String key : details.keySet()) {
 			if (!ANALYSIS_ADDITIONAL.equals(key)) {

@@ -369,8 +369,7 @@ public class MapApiController {
 				if (!webUserdataService.detailsPresent(details)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
-				details.remove(ANALYSIS_ADDITIONAL);
-				nd.details = details;
+				nd.details = webUserdataService.detailsForResponse(details);
 			}
 			if (isInfoFile) {
 				JsonObject details = getOrCreateDetails(nd);
