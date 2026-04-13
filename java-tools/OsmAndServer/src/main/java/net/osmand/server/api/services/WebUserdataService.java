@@ -88,7 +88,7 @@ public class WebUserdataService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1775742653000L; // 09-04-2026
+	private static final long ANALYSIS_RERUN = 1776076777000L; // 13-04-2026
 
 	Gson gson = new Gson();
 
