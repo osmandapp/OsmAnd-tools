@@ -6,6 +6,8 @@ import com.google.protobuf.WireFormat;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiCategory;
 import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
@@ -21,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -28,6 +31,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public interface OBFService extends BaseService {
+	int BASE_POI_SHIFT = BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY;
+	int FINAL_POI_SHIFT = BinaryMapIndexReader.SHIFT_COORDINATES;
+	int BASE_POI_ZOOM = 31 - BASE_POI_SHIFT;
+	int FINAL_POI_ZOOM = 31 - FINAL_POI_SHIFT;
+	int CATEGORY_MASK = (1 << BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY) - 1;
+
 	OsmAndMapsService getMapsService();
 
 	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
@@ -54,6 +63,26 @@ public interface OBFService extends BaseService {
 	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
 	record Address(String name, String value, LatLon point) {}
 	record StreetAddress(String name, List<Address> houses) {}
+
+	final class RawPoiObject {
+		String name = "";
+		String nameEn = "";
+		final LinkedHashMap<String, List<String>> decodedTextTags = new LinkedHashMap<>();
+		double lat;
+		double lon;
+
+		void addDecodedTextTag(String tag, String value) {
+			if (Algorithms.isEmpty(tag) || Algorithms.isEmpty(value)) {
+				return;
+			}
+			decodedTextTags.computeIfAbsent(tag, ignored -> new ArrayList<>()).add(value);
+			if (Amenity.NAME.equals(tag) && Algorithms.isEmpty(name)) {
+				name = value;
+			} else if (("name:en".equals(tag) || "name_en".equals(tag)) && Algorithms.isEmpty(nameEn)) {
+				nameEn = value;
+			}
+		}
+	}
 
 	enum ObfLengthType {
         VAR_INT,
@@ -1014,31 +1043,272 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-    private static Address findValue(Amenity amenity, Pattern poiPattern) {
+	private static Address findRawValue(RawPoiObject objectRecord, Pattern poiPattern, Pattern normalizedPoiPattern) {
+		if (objectRecord == null || poiPattern == null) {
+			return null;
+		}
+		LatLon location = new LatLon(objectRecord.lat, objectRecord.lon);
+		String displayName = Algorithms.isEmpty(objectRecord.name) ? objectRecord.nameEn : objectRecord.name;
+		if (matchesPattern(objectRecord.name, poiPattern, normalizedPoiPattern)) {
+			return new Address(objectRecord.name, "name-> " + objectRecord.name, location);
+		}
+		if (matchesPattern(objectRecord.nameEn, poiPattern, normalizedPoiPattern)) {
+			return new Address(objectRecord.nameEn, "name:en-> " + objectRecord.nameEn, location);
+		}
+		for (Map.Entry<String, List<String>> entry : objectRecord.decodedTextTags.entrySet()) {
+			for (String value : entry.getValue()) {
+				if (matchesPattern(value, poiPattern, normalizedPoiPattern)) {
+					return new Address(displayName, entry.getKey() + "-> " + value, location);
+				}
+			}
+		}
+		return null;
+	}
+
+	private static List<Address> findPoiAddressesRaw(RandomAccessFile randomAccessFile,
+			BinaryMapIndexReader index,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion,
+			Pattern poiPattern,
+			Pattern normalizedPoiPattern) throws IOException {
+		List<Address> results = new ArrayList<>();
+		index.initCategories(poiRegion);
+		CodedInputStream codedIS = CodedInputStream.newInstance(randomAccessFile);
+		codedIS.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+		codedIS.seek(poiRegion.getFilePointer());
+		long oldLimit = codedIS.pushLimitLong(poiRegion.getLength());
+		try {
+			while (true) {
+				int tagValue = codedIS.readTag();
+				int tag = WireFormat.getTagFieldNumber(tagValue);
+				switch (tag) {
+					case 0:
+						return results;
+					case OsmandOdb.OsmAndPoiIndex.POIDATA_FIELD_NUMBER: {
+						long length = readFixed32Length(codedIS);
+						long innerOldLimit = codedIS.pushLimitLong(length);
+						findPoiAddressesInBoxData(codedIS, poiRegion, poiPattern, normalizedPoiPattern, results);
+						codedIS.popLimit(innerOldLimit);
+						break;
+					}
+					default:
+						skipUnknownField(codedIS, tagValue);
+						break;
+				}
+			}
+		} finally {
+			codedIS.popLimit(oldLimit);
+		}
+	}
+
+	private static void findPoiAddressesInBoxData(CodedInputStream codedIS,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion,
+			Pattern poiPattern,
+			Pattern normalizedPoiPattern,
+			List<Address> results) throws IOException {
+		int x = 0;
+		int y = 0;
+		int zoom = 0;
+		while (true) {
+			int tagValue = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagValue);
+			switch (tag) {
+				case 0:
+					return;
+				case OsmandOdb.OsmAndPoiBoxData.X_FIELD_NUMBER:
+					x = codedIS.readUInt32();
+					break;
+				case OsmandOdb.OsmAndPoiBoxData.Y_FIELD_NUMBER:
+					y = codedIS.readUInt32();
+					break;
+				case OsmandOdb.OsmAndPoiBoxData.ZOOM_FIELD_NUMBER:
+					zoom = codedIS.readUInt32();
+					break;
+				case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER: {
+					int len = codedIS.readRawVarint32();
+					long oldLimit = codedIS.pushLimitLong(len);
+					RawPoiObject objectRecord = readRawPoiObject(codedIS, x, y, zoom, poiRegion);
+					if (objectRecord != null) {
+						Address value = findRawValue(objectRecord, poiPattern, normalizedPoiPattern);
+						if (value != null) {
+							results.add(value);
+						}
+					}
+					codedIS.popLimit(oldLimit);
+					break;
+				}
+				default:
+					codedIS.skipField(tagValue);
+					break;
+			}
+		}
+	}
+
+	private static RawPoiObject readRawPoiObject(CodedInputStream codedIS,
+			int parentX,
+			int parentY,
+			int parentZoom,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion) throws IOException {
+		RawPoiObject record = new RawPoiObject();
+		List<String> textTags = new ArrayList<>();
+		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+		int x = 0;
+		int y = 0;
+		int precisionXY = 0;
+		boolean hasLocation = false;
+		PoiCategory amenityType = null;
+		while (true) {
+			int tagValue = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagValue);
+			if (amenityType == null && (tag > OsmandOdb.OsmAndPoiBoxDataAtom.CATEGORIES_FIELD_NUMBER || tag == 0)) {
+				consumeRemainingInLimit(codedIS);
+				return null;
+			}
+			switch (tag) {
+				case 0:
+					if (!hasLocation) {
+						return null;
+					}
+					if (precisionXY != 0) {
+						int[] xy = MapUtils.calculateFinalXYFromBaseAndPrecisionXY(BASE_POI_ZOOM, FINAL_POI_ZOOM,
+								precisionXY, x >> BASE_POI_SHIFT, y >> BASE_POI_SHIFT, true);
+						int x31 = xy[0] << FINAL_POI_SHIFT;
+						int y31 = xy[1] << FINAL_POI_SHIFT;
+						record.lat = MapUtils.get31LatitudeY(y31);
+						record.lon = MapUtils.get31LongitudeX(x31);
+					} else {
+						record.lat = MapUtils.get31LatitudeY(y);
+						record.lon = MapUtils.get31LongitudeX(x);
+					}
+					return record;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.DX_FIELD_NUMBER:
+					x = (codedIS.readSInt32() + (parentX << (BASE_POI_ZOOM - parentZoom))) << BASE_POI_SHIFT;
+					hasLocation = true;
+					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.DY_FIELD_NUMBER:
+					y = (codedIS.readSInt32() + (parentY << (BASE_POI_ZOOM - parentZoom))) << BASE_POI_SHIFT;
+					hasLocation = true;
+					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.CATEGORIES_FIELD_NUMBER: {
+					int categoryValue = codedIS.readUInt32();
+					int subcategoryId = categoryValue >> BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY;
+					int categoryId = categoryValue & CATEGORY_MASK;
+					PoiCategory categoryType = poiTypes.getOtherPoiCategory();
+					String subtype = "";
+					if (categoryId < poiRegion.getSubcategories().size() && categoryId < poiRegion.getCategories().size()) {
+						String categoryName = poiRegion.getCategories().get(categoryId);
+						List<String> subcategories = poiRegion.getSubcategories().get(categoryId);
+						if (categoryName != null) {
+							categoryType = poiTypes.getPoiCategoryByName(categoryName.toLowerCase(Locale.ROOT), true);
+						}
+						if (subcategoryId < subcategories.size()) {
+							subtype = subcategories.get(subcategoryId);
+						}
+					}
+					subtype = poiTypes.replaceDeprecatedSubtype(categoryType, subtype);
+					if (!poiTypes.isTypeForbidden(subtype) && amenityType == null) {
+						amenityType = categoryType;
+					}
+					break;
+				}
+				case OsmandOdb.OsmAndPoiBoxDataAtom.NAME_FIELD_NUMBER:
+					record.name = safeString(codedIS.readString());
+					record.addDecodedTextTag(Amenity.NAME, record.name);
+					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.NAMEEN_FIELD_NUMBER:
+					record.nameEn = safeString(codedIS.readString());
+					record.addDecodedTextTag("name:en", record.nameEn);
+					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.TEXTCATEGORIES_FIELD_NUMBER: {
+					String tagName = getPoiSubtypeTagName(codedIS.readUInt32(), poiRegion);
+					if (!tagName.isEmpty()) {
+						textTags.add(tagName);
+					}
+					break;
+				}
+				case OsmandOdb.OsmAndPoiBoxDataAtom.TEXTVALUES_FIELD_NUMBER: {
+					String textValue = safeString(codedIS.readString());
+					String textTag = textTags.isEmpty() ? "" : textTags.remove(0);
+					record.addDecodedTextTag(textTag, textValue);
+					break;
+				}
+				case OsmandOdb.OsmAndPoiBoxDataAtom.PRECISIONXY_FIELD_NUMBER:
+					if (hasLocation) {
+						precisionXY = codedIS.readInt32();
+					} else {
+						codedIS.readInt32();
+					}
+					break;
+				default:
+					codedIS.skipField(tagValue);
+					break;
+			}
+		}
+	}
+
+	private static String getPoiSubtypeTagName(int subtypeId, BinaryMapPoiReaderAdapter.PoiRegion poiRegion) {
+		StringBuilder valueBuilder = new StringBuilder();
+		BinaryMapPoiReaderAdapter.PoiSubType poiSubtype = poiRegion.getSubtypeFromId(subtypeId, valueBuilder);
+		if (poiSubtype != null && poiSubtype.text && poiSubtype.name != null) {
+			return poiSubtype.name;
+		}
+		return "";
+	}
+
+	private static String safeString(String value) {
+		return value == null ? "" : value;
+	}
+
+	private static Pattern compileNormalizedPattern(String regex) {
+		if (regex == null) {
+			return null;
+		}
+		String normalizedRegex = normalizeCaseInsensitiveText(regex);
+		return Pattern.compile(normalizedRegex, Pattern.CASE_INSENSITIVE);
+	}
+
+	private static boolean matchesPattern(String value, Pattern pattern, Pattern normalizedPattern) {
+		if (value == null || pattern == null) {
+			return false;
+		}
+		if (pattern.matcher(value).find()) {
+			return true;
+		}
+		return normalizedPattern != null && normalizedPattern.matcher(normalizeCaseInsensitiveText(value)).find();
+	}
+
+	private static String normalizeCaseInsensitiveText(String value) {
+		if (value == null) {
+			return "";
+		}
+		String normalizedValue = Normalizer.normalize(value, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+		return normalizedValue.replace("\u0307", "");
+	}
+
+	private static Address findValue(Amenity amenity, Pattern poiPattern, Pattern normalizedPoiPattern) {
         if (amenity == null || poiPattern == null) {
             return null;
         }
 		
 		String name = amenity.getName();
-		if (name != null && poiPattern.matcher(name).find()) {
+		if (matchesPattern(name, poiPattern, normalizedPoiPattern)) {
 			return new Address(name, "name-> " + name, amenity.getLocation());
 		}
 
 		String enName = amenity.getEnName(false);
-		if (enName != null && poiPattern.matcher(enName).find()) {
+		if (matchesPattern(enName, poiPattern, normalizedPoiPattern)) {
 			return new Address(enName, "name:en-> " + enName, amenity.getLocation());
 		}
 		
 		name = name == null ? enName : name;
 		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
-			if (e.getValue() != null && poiPattern.matcher(e.getValue()).find()) {
+			if (matchesPattern(e.getValue(), poiPattern, normalizedPoiPattern)) {
 				return new Address(name, e.getKey() + "-> " + e.getValue(), amenity.getLocation());
 			}
 		}
 		
         for (String key : amenity.getAdditionalInfoKeys()) {
 			String info = amenity.getAdditionalInfo(key);
-            if (info != null && poiPattern.matcher(info).find()) {
+			if (matchesPattern(info, poiPattern, normalizedPoiPattern)) {
                 return new Address(name, key + "-> " + info, amenity.getLocation());
             }
         }
@@ -1055,13 +1325,15 @@ public interface OBFService extends BaseService {
 			return results;
 
 		File file = new File(obf);
-		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			final Pattern cityPattern, streetPattern, housePattern, poiPattern;
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
+			 RandomAccessFile poiRawFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			final Pattern cityPattern, streetPattern, housePattern, poiPattern, normalizedPoiPattern;
 			try {
 				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
 				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
 				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
 				poiPattern = !(isCityEmpty || isStreetEmpty) || !isHouseEmpty || isPoiEmpty ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
+				normalizedPoiPattern = poiPattern == null ? null : compileNormalizedPattern(poiRegExp);
 			} catch (PatternSyntaxException e) {
 				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
 			}
@@ -1122,15 +1394,7 @@ public interface OBFService extends BaseService {
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
-						BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
-								poi.getLeft31(), poi.getRight31(), poi.getTop31(), poi.getBottom31(), -1,
-								null, null);
-						for (Amenity amenity : index.searchPoi(req, poi)) {
-							Address value = findValue(amenity, poiPattern);
-							if (value == null)
-								continue;
-							results.add(value);
-						}
+						results.addAll(findPoiAddressesRaw(poiRawFile, index, poi, poiPattern, normalizedPoiPattern));
 					}
 				}
 			} finally {
