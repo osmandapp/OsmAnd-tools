@@ -139,8 +139,7 @@ public class WebUserdataService {
 					boolean isSharedFile = isShared(nd, sharedFilesMap);
 					JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf, points);
-					nd.details = uf.details.deepCopy();
-					nd.details.remove(ANALYSIS_ADDITIONAL);
+					nd.details = detailsForResponse(uf.details);
 					result.add(nd);
 				} catch (IOException e) {
 					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
@@ -173,8 +172,7 @@ public class WebUserdataService {
 				error, uf.name, uf.id, uf.userid);
 		LOG.error(errorMessage);
 		saveError(uf.details, errorMessage, uf);
-		nd.details = uf.details.deepCopy();
-		nd.details.remove(ANALYSIS_ADDITIONAL);
+		nd.details = detailsForResponse(uf.details);
 		result.add(nd);
 	}
 
@@ -207,6 +205,16 @@ public class WebUserdataService {
 			}
 		}
 		return false;
+	}
+
+	private JsonObject detailsForResponse(JsonObject details) {
+		JsonObject response = new JsonObject();
+		for (String key : details.keySet()) {
+			if (!ANALYSIS_ADDITIONAL.equals(key)) {
+				response.add(key, details.get(key));
+			}
+		}
+		return response;
 	}
 
 	public JsonElement getInfoDetails(InputStream inputStream) {
@@ -583,6 +591,30 @@ public class WebUserdataService {
 	}
 
 	public static class AnalysisDetails {
+		private static final String TOTAL_DISTANCE = "totalDistance";
+		private static final String START_TIME = "startTime";
+		private static final String END_TIME = "endTime";
+		private static final String TIME_MOVING = "timeMoving";
+		private static final String TIME_SPAN = "timeSpan";
+		private static final String POINTS = "points";
+		private static final String WPT_POINTS = "wptPoints";
+		private static final String AVERAGE_SPEED = "averageSpeed";
+		private static final String MAX_SPEED = "maxSpeed";
+		private static final String AVERAGE_SENSOR_SPEED = "averageSensorSpeed";
+		private static final String MAX_SENSOR_SPEED = "maxSensorSpeed";
+		private static final String AVERAGE_SENSOR_HEART_RATE = "averageSensorHeartRate";
+		private static final String MAX_SENSOR_HEART_RATE = "maxSensorHeartRate";
+		private static final String AVERAGE_SENSOR_CADENCE = "averageSensorCadence";
+		private static final String MAX_SENSOR_CADENCE = "maxSensorCadence";
+		private static final String AVERAGE_SENSOR_POWER = "averageSensorPower";
+		private static final String MAX_SENSOR_POWER = "maxSensorPower";
+		private static final String AVERAGE_SENSOR_TEMPERATURE = "averageSensorTemperature";
+		private static final String MAX_SENSOR_TEMPERATURE = "maxSensorTemperature";
+		private static final String DIFF_ELEVATION_UP = "diffElevationUp";
+		private static final String DIFF_ELEVATION_DOWN = "diffElevationDown";
+		private static final String AVERAGE_ELEVATION = "averageElevation";
+		private static final String MAX_ELEVATION = "maxElevation";
+
 		private float totalDistance;
 		private long startTime;
 		private long endTime;
@@ -607,7 +639,8 @@ public class WebUserdataService {
 		private double averageElevation;
 		private double maxElevation;
 
-		public AnalysisDetails() {}
+		public AnalysisDetails() {
+		}
 
 		public AnalysisDetails(GpxTrackAnalysis analysis) {
 			if (analysis != null) {
@@ -665,73 +698,67 @@ public class WebUserdataService {
 			}
 		}
 
-		public JsonObject toJson(boolean additional) {
+		public JsonObject toAnalysisJson() {
 			JsonObject out = new JsonObject();
-			if (!additional) {
-				out.addProperty("totalDistance", totalDistance);
-				out.addProperty("startTime", startTime);
-				out.addProperty("endTime", endTime);
-				out.addProperty("timeMoving", timeMoving);
-				out.addProperty("points", points);
-				out.addProperty("wptPoints", wptPoints);
-			} else {
-				out.addProperty("timeSpan", timeSpan);
-				out.addProperty("averageSpeed", averageSpeed);
-				out.addProperty("maxSpeed", maxSpeed);
-				out.addProperty("averageSensorSpeed", averageSensorSpeed);
-				out.addProperty("maxSensorSpeed", maxSensorSpeed);
-				out.addProperty("averageSensorHeartRate", averageSensorHeartRate);
-				out.addProperty("maxSensorHeartRate", maxSensorHeartRate);
-				out.addProperty("averageSensorCadence", averageSensorCadence);
-				out.addProperty("maxSensorCadence", maxSensorCadence);
-				out.addProperty("averageSensorPower", averageSensorPower);
-				out.addProperty("maxSensorPower", maxSensorPower);
-				out.addProperty("averageSensorTemperature", averageSensorTemperature);
-				out.addProperty("maxSensorTemperature", maxSensorTemperature);
-				out.addProperty("diffElevationUp", diffElevationUp);
-				out.addProperty("diffElevationDown", diffElevationDown);
-				out.addProperty("averageElevation", averageElevation);
-				out.addProperty("maxElevation", maxElevation);
-			}
+			out.addProperty(TOTAL_DISTANCE, totalDistance);
+			out.addProperty(START_TIME, startTime);
+			out.addProperty(END_TIME, endTime);
+			out.addProperty(TIME_MOVING, timeMoving);
+			out.addProperty(POINTS, points);
+			out.addProperty(WPT_POINTS, wptPoints);
 			return out;
 		}
 
-		public JsonObject toAnalysisJson() {
-			return toJson(false);
-		}
-
 		public JsonObject toAnalysisAdditionalJson() {
-			return toJson(true);
+			JsonObject out = new JsonObject();
+			out.addProperty(TIME_SPAN, timeSpan);
+			out.addProperty(AVERAGE_SPEED, averageSpeed);
+			out.addProperty(MAX_SPEED, maxSpeed);
+			out.addProperty(AVERAGE_SENSOR_SPEED, averageSensorSpeed);
+			out.addProperty(MAX_SENSOR_SPEED, maxSensorSpeed);
+			out.addProperty(AVERAGE_SENSOR_HEART_RATE, averageSensorHeartRate);
+			out.addProperty(MAX_SENSOR_HEART_RATE, maxSensorHeartRate);
+			out.addProperty(AVERAGE_SENSOR_CADENCE, averageSensorCadence);
+			out.addProperty(MAX_SENSOR_CADENCE, maxSensorCadence);
+			out.addProperty(AVERAGE_SENSOR_POWER, averageSensorPower);
+			out.addProperty(MAX_SENSOR_POWER, maxSensorPower);
+			out.addProperty(AVERAGE_SENSOR_TEMPERATURE, averageSensorTemperature);
+			out.addProperty(MAX_SENSOR_TEMPERATURE, maxSensorTemperature);
+			out.addProperty(DIFF_ELEVATION_UP, diffElevationUp);
+			out.addProperty(DIFF_ELEVATION_DOWN, diffElevationDown);
+			out.addProperty(AVERAGE_ELEVATION, averageElevation);
+			out.addProperty(MAX_ELEVATION, maxElevation);
+			return out;
 		}
 
 		public static AnalysisDetails fromSplitJson(JsonObject analysis, JsonObject analysisAdditional) {
 			AnalysisDetails ad = new AnalysisDetails();
 			if (analysis != null && !analysis.isJsonNull()) {
-				ad.totalDistance = getFloatOrDefault(analysis, "totalDistance");
-				ad.startTime = getLongOrDefault(analysis, "startTime");
-				ad.endTime = getLongOrDefault(analysis, "endTime");
-				ad.timeMoving = getLongOrDefault(analysis, "timeMoving");
-				ad.points = getIntOrDefault(analysis, "points");
-				ad.wptPoints = getIntOrDefault(analysis, "wptPoints");
+				ad.totalDistance = getFloatOrDefault(analysis, TOTAL_DISTANCE);
+				ad.startTime = getLongOrDefault(analysis, START_TIME);
+				ad.endTime = getLongOrDefault(analysis, END_TIME);
+				ad.timeMoving = getLongOrDefault(analysis, TIME_MOVING);
+				ad.points = getIntOrDefault(analysis, POINTS);
+				ad.wptPoints = getIntOrDefault(analysis, WPT_POINTS);
 			}
 			if (analysisAdditional != null && !analysisAdditional.isJsonNull()) {
-				ad.timeSpan = getLongOrDefault(analysisAdditional, "timeSpan");
-				ad.averageSpeed = getFloatOrDefault(analysisAdditional, "averageSpeed");
-				ad.maxSpeed = getFloatOrDefault(analysisAdditional, "maxSpeed");
-				ad.averageSensorSpeed = getFloatOrDefault(analysisAdditional, "averageSensorSpeed");
-				ad.maxSensorSpeed = getFloatOrDefault(analysisAdditional, "maxSensorSpeed");
-				ad.averageSensorHeartRate = getFloatOrDefault(analysisAdditional, "averageSensorHeartRate");
-				ad.maxSensorHeartRate = getIntOrDefault(analysisAdditional, "maxSensorHeartRate");
-				ad.averageSensorCadence = getFloatOrDefault(analysisAdditional, "averageSensorCadence");
-				ad.maxSensorCadence = getFloatOrDefault(analysisAdditional, "maxSensorCadence");
-				ad.averageSensorPower = getFloatOrDefault(analysisAdditional, "averageSensorPower");
-				ad.maxSensorPower = getIntOrDefault(analysisAdditional, "maxSensorPower");
-				ad.averageSensorTemperature = getFloatOrDefault(analysisAdditional, "averageSensorTemperature");
-				ad.maxSensorTemperature = getIntOrDefault(analysisAdditional, "maxSensorTemperature");
-				ad.diffElevationUp = getDoubleOrDefault(analysisAdditional, "diffElevationUp");
-				ad.diffElevationDown = getDoubleOrDefault(analysisAdditional, "diffElevationDown");
-				ad.averageElevation = getDoubleOrDefault(analysisAdditional, "averageElevation");
-				ad.maxElevation = getDoubleOrDefault(analysisAdditional, "maxElevation");
+				ad.timeSpan = getLongOrDefault(analysisAdditional, TIME_SPAN);
+				ad.averageSpeed = getFloatOrDefault(analysisAdditional, AVERAGE_SPEED);
+				ad.maxSpeed = getFloatOrDefault(analysisAdditional, MAX_SPEED);
+				ad.averageSensorSpeed = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_SPEED);
+				ad.maxSensorSpeed = getFloatOrDefault(analysisAdditional, MAX_SENSOR_SPEED);
+				ad.averageSensorHeartRate = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_HEART_RATE);
+				ad.maxSensorHeartRate = getIntOrDefault(analysisAdditional, MAX_SENSOR_HEART_RATE);
+				ad.averageSensorCadence = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_CADENCE);
+				ad.maxSensorCadence = getFloatOrDefault(analysisAdditional, MAX_SENSOR_CADENCE);
+				ad.averageSensorPower = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_POWER);
+				ad.maxSensorPower = getIntOrDefault(analysisAdditional, MAX_SENSOR_POWER);
+				ad.averageSensorTemperature = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_TEMPERATURE);
+				ad.maxSensorTemperature = getIntOrDefault(analysisAdditional, MAX_SENSOR_TEMPERATURE);
+				ad.diffElevationUp = getDoubleOrDefault(analysisAdditional, DIFF_ELEVATION_UP);
+				ad.diffElevationDown = getDoubleOrDefault(analysisAdditional, DIFF_ELEVATION_DOWN);
+				ad.averageElevation = getDoubleOrDefault(analysisAdditional, AVERAGE_ELEVATION);
+				ad.maxElevation = getDoubleOrDefault(analysisAdditional, MAX_ELEVATION);
 			}
 			return ad;
 		}
