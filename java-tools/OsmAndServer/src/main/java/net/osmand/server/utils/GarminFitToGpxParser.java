@@ -9,14 +9,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import com.garmin.fit.ActivityMesg;
 import com.garmin.fit.DateTime;
 import com.garmin.fit.Decode;
 import com.garmin.fit.Event;
-import com.garmin.fit.EventMesg;
 import com.garmin.fit.EventType;
 import com.garmin.fit.FileIdMesg;
 import com.garmin.fit.Fit;
-import com.garmin.fit.LapMesgListener;
 import com.garmin.fit.MesgBroadcaster;
 import com.garmin.fit.RecordMesg;
 import com.garmin.fit.RecordMesgListener;
@@ -78,7 +77,6 @@ public final class GarminFitToGpxParser {
 		List<WptPt> current = new ArrayList<>();
 		List<RecordMesg> fitRecords = new ArrayList<>();
 		List<WptPt> allPoints = new ArrayList<>();
-		final int[] lapSeq = { 0 };
 		final Sport[] sessionSport = { null };
 		final long[] sessionStartMs = { 0L };
 		final long[] fileCreatedMs = { 0L };
@@ -105,22 +103,17 @@ public final class GarminFitToGpxParser {
 			if (profile != null && !profile.isBlank()) {
 				sportProfileName[0] = profile.trim();
 			}
-		});
-		broadcaster.addListener((LapMesgListener) m -> {
-			if (!current.isEmpty()) {
-				lapSeq[0]++;
-				flushCurrent(segments, current, "Lap " + lapSeq[0]);
-			}
-		});
-		broadcaster.addListener((EventMesg em) -> {
-			if (em.getEvent() != Event.TIMER) {
-				return;
-			}
-			EventType et = em.getEventType();
-			if (et == EventType.STOP || et == EventType.STOP_ALL || et == EventType.STOP_DISABLE_ALL) {
+			if (m.getEvent() == Event.SESSION && isStopLikeEventType(m.getEventType())) {
 				flushCurrent(segments, current, null);
 			}
 		});
+		broadcaster.addListener((ActivityMesg m) -> {
+			if (m.getEvent() == Event.ACTIVITY && isStopLikeEventType(m.getEventType())) {
+				flushCurrent(segments, current, null);
+			}
+		});
+		// Splits on FIT session/activity end only (Garmin Connect–style single trkseg per activity).
+		// No TIMER stop / lap splits — see Garmin GPX export behavior.
 		broadcaster.addListener((RecordMesgListener) mesg -> {
 			WptPt p = recordToWpt(mesg);
 			if (p != null) {
@@ -279,6 +272,10 @@ public final class GarminFitToGpxParser {
 
 	private static boolean usableUInt16(Integer v) {
 		return v != null && !v.equals(Fit.UINT16_INVALID);
+	}
+
+	private static boolean isStopLikeEventType(@Nullable EventType et) {
+		return et == EventType.STOP || et == EventType.STOP_ALL || et == EventType.STOP_DISABLE_ALL;
 	}
 
 	private static void flushCurrent(List<TrkSegment> out, List<WptPt> cur, String segmentName) {
