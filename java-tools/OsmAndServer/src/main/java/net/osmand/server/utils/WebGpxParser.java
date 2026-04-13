@@ -52,7 +52,7 @@ public class WebGpxParser {
     	public String name;
     	public String desc;
         public Link link;
-        public Metadata ext;
+        public transient Metadata ext;
     
         public WebMetaData(Metadata data) {
             if (data != null) {
@@ -96,7 +96,7 @@ public class WebGpxParser {
         public double lat;
         public double lon;
         public String category;
-        public WptPt ext;
+        public transient WptPt ext;
         
         public Wpt(WptPt point) {
             if (point != null) {
@@ -160,7 +160,7 @@ public class WebGpxParser {
         public Boolean pinned;
         public Boolean hidden;
         public final List<Wpt> points = new ArrayList<>();
-        public GpxUtilities.PointsGroup ext;
+        public transient GpxUtilities.PointsGroup ext;
 
         public WebPointsGroup(GpxUtilities.PointsGroup group) {
             if (group != null) {
@@ -196,7 +196,7 @@ public class WebGpxParser {
         private List<Point> points;
 
         private List<List<Point>> segments = new ArrayList<>();
-        private Track ext;
+        private transient Track ext;
         
         public WebTrack(Track track, List<GpxUtilities.RouteType> routeTypes) {
             points = new ArrayList<>();
@@ -253,7 +253,7 @@ public class WebGpxParser {
         public List<Point> geometry;
         public transient int geometrySize;
         public RouteSegment segment; // on each turn point
-        public WptPt ext;
+        public transient WptPt ext;
     
         public Point(){}
         
@@ -302,7 +302,7 @@ public class WebGpxParser {
     }
 
     public static class RouteSegment {
-    	public GpxUtilities.RouteSegment ext;
+        public transient GpxUtilities.RouteSegment ext;
         public List<GpxUtilities.RouteType> routeTypes;
     }
 
