@@ -95,6 +95,112 @@ public class WebUserdataService {
 	public record UserFileUpdate(String name, String type, boolean isError, String time) {
 	}
 
+	public record TrackAnalysisJson(
+			float totalDistance,
+			long startTime,
+			long endTime,
+			long timeMoving,
+			int points,
+			int wptPoints
+	) {
+		public static TrackAnalysisJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisJson(
+					analysis.getTotalDistance(),
+					analysis.getStartTime(),
+					analysis.getEndTime(),
+					analysis.getTimeMoving(),
+					analysis.getPoints(),
+					analysis.getWptPoints());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTotalDistance(totalDistance);
+			analysis.setStartTime(startTime);
+			analysis.setEndTime(endTime);
+			analysis.setTimeMoving(timeMoving);
+			analysis.setPoints(points);
+			analysis.setWptPoints(wptPoints);
+		}
+	}
+
+	public record TrackAnalysisAdditionalJson(
+			long timeSpan,
+			float averageSpeed,
+			float maxSpeed,
+			float averageSensorSpeed,
+			float maxSensorSpeed,
+			float averageSensorHeartRate,
+			int maxSensorHeartRate,
+			float averageSensorCadence,
+			float maxSensorCadence,
+			float averageSensorPower,
+			int maxSensorPower,
+			float averageSensorTemperature,
+			int maxSensorTemperature,
+			double diffElevationUp,
+			double diffElevationDown,
+			double averageElevation,
+			double maxElevation
+	) {
+		public static TrackAnalysisAdditionalJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisAdditionalJson(
+					analysis.getTimeSpan(),
+					analysis.getAvgSpeed(),
+					analysis.getMaxSpeed(),
+					analysis.getAvgSensorSpeed(),
+					analysis.getMaxSensorSpeed(),
+					analysis.getAvgSensorHr(),
+					analysis.getMaxSensorHr(),
+					analysis.getAvgSensorCadence(),
+					analysis.getMaxSensorCadence(),
+					analysis.getAvgSensorPower(),
+					analysis.getMaxSensorPower(),
+					analysis.getAvgSensorTemperature(),
+					analysis.getMaxSensorTemperature(),
+					analysis.getDiffElevationUp(),
+					analysis.getDiffElevationDown(),
+					analysis.getAvgElevation(),
+					analysis.getMaxElevation());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTimeSpan(timeSpan);
+			analysis.setAvgSpeed(averageSpeed);
+			analysis.setMaxSpeed(maxSpeed);
+			analysis.setAvgSensorSpeed(averageSensorSpeed);
+			analysis.setMaxSensorSpeed(maxSensorSpeed);
+			analysis.setAvgSensorHr(averageSensorHeartRate);
+			analysis.setMaxSensorHr(maxSensorHeartRate);
+			analysis.setAvgSensorCadence(averageSensorCadence);
+			analysis.setMaxSensorCadence(maxSensorCadence);
+			analysis.setAvgSensorPower(averageSensorPower);
+			analysis.setMaxSensorPower(maxSensorPower);
+			analysis.setAvgSensorTemperature(averageSensorTemperature);
+			analysis.setMaxSensorTemperature(maxSensorTemperature);
+			analysis.setDiffElevationUp(diffElevationUp);
+			analysis.setDiffElevationDown(diffElevationDown);
+			analysis.setAvgElevation(averageElevation);
+			analysis.setMaxElevation(maxElevation);
+		}
+	}
+
+	private record TrackAnalysisSplit(TrackAnalysisJson core, TrackAnalysisAdditionalJson additional) {
+	}
+
+	private static TrackAnalysisSplit getAnalysisFromGpx(GpxTrackAnalysis analysis) {
+		if (analysis == null) {
+			return null;
+		}
+		analysis.getPointAttributes().clear();
+		return new TrackAnalysisSplit(TrackAnalysisJson.from(analysis), TrackAnalysisAdditionalJson.from(analysis));
+	}
+
 	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files,
 	                                               CloudUserDevicesRepository.CloudUserDevice dev) {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
@@ -316,12 +422,10 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
-			if (analysisDetails != null) {
-				file.details.add(tag, gsonWithNans.toJsonTree(analysisDetails.toAnalysisJson()));
-				if (ANALYSIS.equals(tag)) {
-					file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(analysisDetails.toAnalysisAdditionalJson()));
-				}
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			file.details.add(tag, gsonWithNans.toJsonTree(split.core()));
+			if (ANALYSIS.equals(tag)) {
+				file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -372,11 +476,9 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
-			if (analysisDetails != null) {
-				details.add(ANALYSIS, gsonWithNans.toJsonTree(analysisDetails.toAnalysisJson()));
-				details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(analysisDetails.toAnalysisAdditionalJson()));
-			}
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			details.add(ANALYSIS, gsonWithNans.toJsonTree(split.core()));
+			details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
 		}
 	}
 
@@ -403,24 +505,20 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private AnalysisDetails getAnalysisFromGpx(GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			analysis.getPointAttributes().clear();
-			return new AnalysisDetails(analysis);
-		}
-		return null;
-	}
-
 	GpxTrackAnalysis getAnalysisFromJson(JsonObject details) {
 		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
 		if (details == null || !analysisPresent(ANALYSIS, details)) {
 			return analysis;
 		}
-		JsonObject analysisJson = details.getAsJsonObject(ANALYSIS);
-		if (analysisJson != null && !analysisJson.isJsonNull()) {
-			AnalysisDetails analysisDetails = AnalysisDetails
-					.fromSplitJson(analysisJson, details.getAsJsonObject(ANALYSIS_ADDITIONAL));
-			analysisDetails.applyToAnalysis(analysis);
+		JsonElement analysisElem = details.get(ANALYSIS);
+		if (analysisElem != null && analysisElem.isJsonObject()) {
+			TrackAnalysisJson core = gsonWithNans.fromJson(analysisElem, TrackAnalysisJson.class);
+			core.applyTo(analysis);
+			JsonElement additionalElem = details.get(ANALYSIS_ADDITIONAL);
+			if (additionalElem != null && additionalElem.isJsonObject()) {
+				TrackAnalysisAdditionalJson additional = gsonWithNans.fromJson(additionalElem, TrackAnalysisAdditionalJson.class);
+				additional.applyTo(analysis);
+			}
 		}
 		return analysis;
 	}
@@ -588,195 +686,5 @@ public class WebUserdataService {
 			}
 		}
 		return false;
-	}
-
-	public static class AnalysisDetails {
-		private static final String TOTAL_DISTANCE = "totalDistance";
-		private static final String START_TIME = "startTime";
-		private static final String END_TIME = "endTime";
-		private static final String TIME_MOVING = "timeMoving";
-		private static final String TIME_SPAN = "timeSpan";
-		private static final String POINTS = "points";
-		private static final String WPT_POINTS = "wptPoints";
-		private static final String AVERAGE_SPEED = "averageSpeed";
-		private static final String MAX_SPEED = "maxSpeed";
-		private static final String AVERAGE_SENSOR_SPEED = "averageSensorSpeed";
-		private static final String MAX_SENSOR_SPEED = "maxSensorSpeed";
-		private static final String AVERAGE_SENSOR_HEART_RATE = "averageSensorHeartRate";
-		private static final String MAX_SENSOR_HEART_RATE = "maxSensorHeartRate";
-		private static final String AVERAGE_SENSOR_CADENCE = "averageSensorCadence";
-		private static final String MAX_SENSOR_CADENCE = "maxSensorCadence";
-		private static final String AVERAGE_SENSOR_POWER = "averageSensorPower";
-		private static final String MAX_SENSOR_POWER = "maxSensorPower";
-		private static final String AVERAGE_SENSOR_TEMPERATURE = "averageSensorTemperature";
-		private static final String MAX_SENSOR_TEMPERATURE = "maxSensorTemperature";
-		private static final String DIFF_ELEVATION_UP = "diffElevationUp";
-		private static final String DIFF_ELEVATION_DOWN = "diffElevationDown";
-		private static final String AVERAGE_ELEVATION = "averageElevation";
-		private static final String MAX_ELEVATION = "maxElevation";
-
-		private float totalDistance;
-		private long startTime;
-		private long endTime;
-		private long timeMoving;
-		private long timeSpan;
-		private int points;
-		private int wptPoints;
-		private float averageSpeed;
-		private float maxSpeed;
-		private float averageSensorSpeed;
-		private float maxSensorSpeed;
-		private float averageSensorHeartRate;
-		private int maxSensorHeartRate;
-		private float averageSensorCadence;
-		private float maxSensorCadence;
-		private float averageSensorPower;
-		private int maxSensorPower;
-		private float averageSensorTemperature;
-		private int maxSensorTemperature;
-		private double diffElevationUp;
-		private double diffElevationDown;
-		private double averageElevation;
-		private double maxElevation;
-
-		public AnalysisDetails() {
-		}
-
-		public AnalysisDetails(GpxTrackAnalysis analysis) {
-			if (analysis != null) {
-				this.totalDistance = analysis.getTotalDistance();
-				this.startTime = analysis.getStartTime();
-				this.endTime = analysis.getEndTime();
-				this.timeMoving = analysis.getTimeMoving();
-				this.timeSpan = analysis.getTimeSpan();
-				this.points = analysis.getPoints();
-				this.wptPoints = analysis.getWptPoints();
-				this.averageSpeed = analysis.getAvgSpeed();
-				this.maxSpeed = analysis.getMaxSpeed();
-				this.averageSensorSpeed = analysis.getAvgSensorSpeed();
-				this.maxSensorSpeed = analysis.getMaxSensorSpeed();
-				this.averageSensorHeartRate = analysis.getAvgSensorHr();
-				this.maxSensorHeartRate = analysis.getMaxSensorHr();
-				this.averageSensorCadence = analysis.getAvgSensorCadence();
-				this.maxSensorCadence = analysis.getMaxSensorCadence();
-				this.averageSensorPower = analysis.getAvgSensorPower();
-				this.maxSensorPower = analysis.getMaxSensorPower();
-				this.averageSensorTemperature = analysis.getAvgSensorTemperature();
-				this.maxSensorTemperature = analysis.getMaxSensorTemperature();
-				this.diffElevationUp = analysis.getDiffElevationUp();
-				this.diffElevationDown = analysis.getDiffElevationDown();
-				this.averageElevation = analysis.getAvgElevation();
-				this.maxElevation = analysis.getMaxElevation();
-			}
-		}
-
-		public void applyToAnalysis(GpxTrackAnalysis analysis) {
-			if (analysis != null) {
-				analysis.setTotalDistance(this.totalDistance);
-				analysis.setStartTime(this.startTime);
-				analysis.setEndTime(this.endTime);
-				analysis.setTimeMoving(this.timeMoving);
-				analysis.setTimeSpan(this.timeSpan);
-				analysis.setPoints(this.points);
-				analysis.setWptPoints(this.wptPoints);
-				analysis.setAvgSpeed(this.averageSpeed);
-				analysis.setMaxSpeed(this.maxSpeed);
-				analysis.setAvgSensorSpeed(this.averageSensorSpeed);
-				analysis.setMaxSensorSpeed(this.maxSensorSpeed);
-				analysis.setAvgSensorHr(this.averageSensorHeartRate);
-				analysis.setMaxSensorHr(this.maxSensorHeartRate);
-				analysis.setAvgSensorCadence(this.averageSensorCadence);
-				analysis.setMaxSensorCadence(this.maxSensorCadence);
-				analysis.setAvgSensorPower(this.averageSensorPower);
-				analysis.setMaxSensorPower(this.maxSensorPower);
-				analysis.setAvgSensorTemperature(this.averageSensorTemperature);
-				analysis.setMaxSensorTemperature(this.maxSensorTemperature);
-				analysis.setDiffElevationUp(this.diffElevationUp);
-				analysis.setDiffElevationDown(this.diffElevationDown);
-				analysis.setAvgElevation(this.averageElevation);
-				analysis.setMaxElevation(this.maxElevation);
-			}
-		}
-
-		public JsonObject toAnalysisJson() {
-			JsonObject out = new JsonObject();
-			out.addProperty(TOTAL_DISTANCE, totalDistance);
-			out.addProperty(START_TIME, startTime);
-			out.addProperty(END_TIME, endTime);
-			out.addProperty(TIME_MOVING, timeMoving);
-			out.addProperty(POINTS, points);
-			out.addProperty(WPT_POINTS, wptPoints);
-			return out;
-		}
-
-		public JsonObject toAnalysisAdditionalJson() {
-			JsonObject out = new JsonObject();
-			out.addProperty(TIME_SPAN, timeSpan);
-			out.addProperty(AVERAGE_SPEED, averageSpeed);
-			out.addProperty(MAX_SPEED, maxSpeed);
-			out.addProperty(AVERAGE_SENSOR_SPEED, averageSensorSpeed);
-			out.addProperty(MAX_SENSOR_SPEED, maxSensorSpeed);
-			out.addProperty(AVERAGE_SENSOR_HEART_RATE, averageSensorHeartRate);
-			out.addProperty(MAX_SENSOR_HEART_RATE, maxSensorHeartRate);
-			out.addProperty(AVERAGE_SENSOR_CADENCE, averageSensorCadence);
-			out.addProperty(MAX_SENSOR_CADENCE, maxSensorCadence);
-			out.addProperty(AVERAGE_SENSOR_POWER, averageSensorPower);
-			out.addProperty(MAX_SENSOR_POWER, maxSensorPower);
-			out.addProperty(AVERAGE_SENSOR_TEMPERATURE, averageSensorTemperature);
-			out.addProperty(MAX_SENSOR_TEMPERATURE, maxSensorTemperature);
-			out.addProperty(DIFF_ELEVATION_UP, diffElevationUp);
-			out.addProperty(DIFF_ELEVATION_DOWN, diffElevationDown);
-			out.addProperty(AVERAGE_ELEVATION, averageElevation);
-			out.addProperty(MAX_ELEVATION, maxElevation);
-			return out;
-		}
-
-		public static AnalysisDetails fromSplitJson(JsonObject analysis, JsonObject analysisAdditional) {
-			AnalysisDetails ad = new AnalysisDetails();
-			if (analysis != null && !analysis.isJsonNull()) {
-				ad.totalDistance = getFloatOrDefault(analysis, TOTAL_DISTANCE);
-				ad.startTime = getLongOrDefault(analysis, START_TIME);
-				ad.endTime = getLongOrDefault(analysis, END_TIME);
-				ad.timeMoving = getLongOrDefault(analysis, TIME_MOVING);
-				ad.points = getIntOrDefault(analysis, POINTS);
-				ad.wptPoints = getIntOrDefault(analysis, WPT_POINTS);
-			}
-			if (analysisAdditional != null && !analysisAdditional.isJsonNull()) {
-				ad.timeSpan = getLongOrDefault(analysisAdditional, TIME_SPAN);
-				ad.averageSpeed = getFloatOrDefault(analysisAdditional, AVERAGE_SPEED);
-				ad.maxSpeed = getFloatOrDefault(analysisAdditional, MAX_SPEED);
-				ad.averageSensorSpeed = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_SPEED);
-				ad.maxSensorSpeed = getFloatOrDefault(analysisAdditional, MAX_SENSOR_SPEED);
-				ad.averageSensorHeartRate = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_HEART_RATE);
-				ad.maxSensorHeartRate = getIntOrDefault(analysisAdditional, MAX_SENSOR_HEART_RATE);
-				ad.averageSensorCadence = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_CADENCE);
-				ad.maxSensorCadence = getFloatOrDefault(analysisAdditional, MAX_SENSOR_CADENCE);
-				ad.averageSensorPower = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_POWER);
-				ad.maxSensorPower = getIntOrDefault(analysisAdditional, MAX_SENSOR_POWER);
-				ad.averageSensorTemperature = getFloatOrDefault(analysisAdditional, AVERAGE_SENSOR_TEMPERATURE);
-				ad.maxSensorTemperature = getIntOrDefault(analysisAdditional, MAX_SENSOR_TEMPERATURE);
-				ad.diffElevationUp = getDoubleOrDefault(analysisAdditional, DIFF_ELEVATION_UP);
-				ad.diffElevationDown = getDoubleOrDefault(analysisAdditional, DIFF_ELEVATION_DOWN);
-				ad.averageElevation = getDoubleOrDefault(analysisAdditional, AVERAGE_ELEVATION);
-				ad.maxElevation = getDoubleOrDefault(analysisAdditional, MAX_ELEVATION);
-			}
-			return ad;
-		}
-
-		private static float getFloatOrDefault(JsonObject jsonObject, String key) {
-			return jsonObject.has(key) ? jsonObject.get(key).getAsFloat() : 0.0f;
-		}
-
-		private static int getIntOrDefault(JsonObject jsonObject, String key) {
-			return jsonObject.has(key) ? jsonObject.get(key).getAsInt() : 0;
-		}
-
-		private static double getDoubleOrDefault(JsonObject jsonObject, String key) {
-			return jsonObject.has(key) ? jsonObject.get(key).getAsDouble() : 0.0;
-		}
-
-		private static long getLongOrDefault(JsonObject jsonObject, String key) {
-			return jsonObject.has(key) ? jsonObject.get(key).getAsLong() : 0L;
-		}
 	}
 }
