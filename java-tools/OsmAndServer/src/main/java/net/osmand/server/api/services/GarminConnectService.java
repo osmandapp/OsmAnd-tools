@@ -4,6 +4,7 @@ import com.google.gson.*;
 import jakarta.annotation.Nullable;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.GarminUserConnectionRepository;
 import net.osmand.server.utils.GarminFitToGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
@@ -460,7 +461,9 @@ public class GarminConnectService {
 			return;
 		}
 		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ".gpx";
-		if (cloudUserFilesRepository.existsByUseridAndNameAndType(conn.userid, cloudName, FILE_TYPE_GPX)) {
+		UserFile latestCloud = cloudUserFilesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(
+				conn.userid, cloudName, FILE_TYPE_GPX);
+		if (isNonDeletedCloudFile(latestCloud)) {
 			LOG.info("Garmin activityFiles: skip duplicate " + cloudName + " userid=" + conn.userid);
 			return;
 		}
@@ -519,6 +522,10 @@ public class GarminConnectService {
 				}
 			}
 		}
+	}
+
+	private static boolean isNonDeletedCloudFile(@Nullable UserFile latest) {
+		return latest != null && latest.filesize != null && latest.filesize != -1L;
 	}
 
 	/**
