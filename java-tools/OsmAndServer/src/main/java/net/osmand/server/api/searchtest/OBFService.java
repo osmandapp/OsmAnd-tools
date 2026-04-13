@@ -1211,11 +1211,11 @@ public interface OBFService extends BaseService {
 					break;
 				}
 				case OsmandOdb.OsmAndPoiBoxDataAtom.NAME_FIELD_NUMBER:
-					record.name = safeString(codedIS.readString());
+					record.name = decodePoiString(codedIS.readString());
 					record.addDecodedTextTag(Amenity.NAME, record.name);
 					break;
 				case OsmandOdb.OsmAndPoiBoxDataAtom.NAMEEN_FIELD_NUMBER:
-					record.nameEn = safeString(codedIS.readString());
+					record.nameEn = decodePoiString(codedIS.readString());
 					record.addDecodedTextTag("name:en", record.nameEn);
 					break;
 				case OsmandOdb.OsmAndPoiBoxDataAtom.TEXTCATEGORIES_FIELD_NUMBER: {
@@ -1226,7 +1226,7 @@ public interface OBFService extends BaseService {
 					break;
 				}
 				case OsmandOdb.OsmAndPoiBoxDataAtom.TEXTVALUES_FIELD_NUMBER: {
-					String textValue = safeString(codedIS.readString());
+					String textValue = decodePoiString(codedIS.readString());
 					String textTag = textTags.isEmpty() ? "" : textTags.remove(0);
 					record.addDecodedTextTag(textTag, textValue);
 					break;
@@ -1252,6 +1252,10 @@ public interface OBFService extends BaseService {
 			return poiSubtype.name;
 		}
 		return "";
+	}
+
+	private static String decodePoiString(String value) {
+		return MapObject.unzipContent(safeString(value));
 	}
 
 	private static String safeString(String value) {
