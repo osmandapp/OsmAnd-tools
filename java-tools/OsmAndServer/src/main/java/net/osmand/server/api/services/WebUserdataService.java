@@ -97,14 +97,24 @@ public class WebUserdataService {
 	public record UserFileUpdate(String name, String type, boolean isError, String time) {
 	}
 
-	public record TrackAnalysisJson(
-			float totalDistance,
-			long startTime,
-			long endTime,
-			long timeMoving,
-			int points,
-			int wptPoints
-	) {
+	public static final class TrackAnalysisJson {
+		private final float totalDistance;
+		private final long startTime;
+		private final long endTime;
+		private final long timeMoving;
+		private final int points;
+		private final int wptPoints;
+
+		public TrackAnalysisJson(float totalDistance, long startTime, long endTime, long timeMoving, int points,
+		                         int wptPoints) {
+			this.totalDistance = totalDistance;
+			this.startTime = startTime;
+			this.endTime = endTime;
+			this.timeMoving = timeMoving;
+			this.points = points;
+			this.wptPoints = wptPoints;
+		}
+
 		public static TrackAnalysisJson from(GpxTrackAnalysis analysis) {
 			return new TrackAnalysisJson(
 					analysis.getTotalDistance(),
@@ -128,25 +138,50 @@ public class WebUserdataService {
 		}
 	}
 
-	public record TrackAnalysisAdditionalJson(
-			long timeSpan,
-			float averageSpeed,
-			float maxSpeed,
-			float averageSensorSpeed,
-			float maxSensorSpeed,
-			float averageSensorHeartRate,
-			int maxSensorHeartRate,
-			float averageSensorCadence,
-			float maxSensorCadence,
-			float averageSensorPower,
-			int maxSensorPower,
-			float averageSensorTemperature,
-			int maxSensorTemperature,
-			double diffElevationUp,
-			double diffElevationDown,
-			double averageElevation,
-			double maxElevation
-	) {
+	public static final class TrackAnalysisAdditionalJson {
+		private final long timeSpan;
+		private final float averageSpeed;
+		private final float maxSpeed;
+		private final float averageSensorSpeed;
+		private final float maxSensorSpeed;
+		private final float averageSensorHeartRate;
+		private final int maxSensorHeartRate;
+		private final float averageSensorCadence;
+		private final float maxSensorCadence;
+		private final float averageSensorPower;
+		private final int maxSensorPower;
+		private final float averageSensorTemperature;
+		private final int maxSensorTemperature;
+		private final double diffElevationUp;
+		private final double diffElevationDown;
+		private final double averageElevation;
+		private final double maxElevation;
+
+		public TrackAnalysisAdditionalJson(long timeSpan, float averageSpeed, float maxSpeed, float averageSensorSpeed,
+		                                   float maxSensorSpeed, float averageSensorHeartRate, int maxSensorHeartRate,
+		                                   float averageSensorCadence, float maxSensorCadence, float averageSensorPower,
+		                                   int maxSensorPower, float averageSensorTemperature, int maxSensorTemperature,
+		                                   double diffElevationUp, double diffElevationDown, double averageElevation,
+		                                   double maxElevation) {
+			this.timeSpan = timeSpan;
+			this.averageSpeed = averageSpeed;
+			this.maxSpeed = maxSpeed;
+			this.averageSensorSpeed = averageSensorSpeed;
+			this.maxSensorSpeed = maxSensorSpeed;
+			this.averageSensorHeartRate = averageSensorHeartRate;
+			this.maxSensorHeartRate = maxSensorHeartRate;
+			this.averageSensorCadence = averageSensorCadence;
+			this.maxSensorCadence = maxSensorCadence;
+			this.averageSensorPower = averageSensorPower;
+			this.maxSensorPower = maxSensorPower;
+			this.averageSensorTemperature = averageSensorTemperature;
+			this.maxSensorTemperature = maxSensorTemperature;
+			this.diffElevationUp = diffElevationUp;
+			this.diffElevationDown = diffElevationDown;
+			this.averageElevation = averageElevation;
+			this.maxElevation = maxElevation;
+		}
+
 		public static TrackAnalysisAdditionalJson from(GpxTrackAnalysis analysis) {
 			return new TrackAnalysisAdditionalJson(
 					analysis.getTimeSpan(),
@@ -192,7 +227,14 @@ public class WebUserdataService {
 		}
 	}
 
-	private record TrackAnalysisSplit(TrackAnalysisJson core, TrackAnalysisAdditionalJson additional) {
+	private static final class TrackAnalysisSplit {
+		TrackAnalysisJson core;
+		TrackAnalysisAdditionalJson additional;
+
+		private TrackAnalysisSplit(TrackAnalysisJson core, TrackAnalysisAdditionalJson additional) {
+			this.core = core;
+			this.additional = additional;
+		}
 	}
 
 	private static TrackAnalysisSplit getAnalysisFromGpx(GpxTrackAnalysis analysis) {
@@ -425,9 +467,9 @@ public class WebUserdataService {
 				file.details = new JsonObject();
 			}
 			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
-			file.details.add(tag, gsonWithNans.toJsonTree(split.core()));
+			file.details.add(tag, gsonWithNans.toJsonTree(split.core));
 			if (ANALYSIS.equals(tag)) {
-				file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
+				file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -484,8 +526,8 @@ public class WebUserdataService {
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
 			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
-			details.add(ANALYSIS, gsonWithNans.toJsonTree(split.core()));
-			details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
+			details.add(ANALYSIS, gsonWithNans.toJsonTree(split.core));
+			details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional));
 		}
 	}
 
