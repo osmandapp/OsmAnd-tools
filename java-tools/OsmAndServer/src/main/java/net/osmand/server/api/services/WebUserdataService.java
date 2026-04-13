@@ -72,6 +72,7 @@ public class WebUserdataService {
 	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
+	public static final String ANALYSIS_ADDITIONAL = "analysisAdditional";
 	public static final String SHARE = "share";
 	private static final String AUTHOR = "author";
 	private static final String HAS_ADVANCED_ROUTE = "hasAdvancedRoute";
@@ -87,13 +88,119 @@ public class WebUserdataService {
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
+	private static final long ANALYSIS_RERUN = 1776076777000L; // 13-04-2026
 
 	Gson gson = new Gson();
 
 	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
 	public record UserFileUpdate(String name, String type, boolean isError, String time) {
+	}
+
+	public record TrackAnalysisJson(
+			float totalDistance,
+			long startTime,
+			long endTime,
+			long timeMoving,
+			int points,
+			int wptPoints
+	) {
+		public static TrackAnalysisJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisJson(
+					analysis.getTotalDistance(),
+					analysis.getStartTime(),
+					analysis.getEndTime(),
+					analysis.getTimeMoving(),
+					analysis.getPoints(),
+					analysis.getWptPoints());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTotalDistance(totalDistance);
+			analysis.setStartTime(startTime);
+			analysis.setEndTime(endTime);
+			analysis.setTimeMoving(timeMoving);
+			analysis.setPoints(points);
+			analysis.setWptPoints(wptPoints);
+		}
+	}
+
+	public record TrackAnalysisAdditionalJson(
+			long timeSpan,
+			float averageSpeed,
+			float maxSpeed,
+			float averageSensorSpeed,
+			float maxSensorSpeed,
+			float averageSensorHeartRate,
+			int maxSensorHeartRate,
+			float averageSensorCadence,
+			float maxSensorCadence,
+			float averageSensorPower,
+			int maxSensorPower,
+			float averageSensorTemperature,
+			int maxSensorTemperature,
+			double diffElevationUp,
+			double diffElevationDown,
+			double averageElevation,
+			double maxElevation
+	) {
+		public static TrackAnalysisAdditionalJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisAdditionalJson(
+					analysis.getTimeSpan(),
+					analysis.getAvgSpeed(),
+					analysis.getMaxSpeed(),
+					analysis.getAvgSensorSpeed(),
+					analysis.getMaxSensorSpeed(),
+					analysis.getAvgSensorHr(),
+					analysis.getMaxSensorHr(),
+					analysis.getAvgSensorCadence(),
+					analysis.getMaxSensorCadence(),
+					analysis.getAvgSensorPower(),
+					analysis.getMaxSensorPower(),
+					analysis.getAvgSensorTemperature(),
+					analysis.getMaxSensorTemperature(),
+					analysis.getDiffElevationUp(),
+					analysis.getDiffElevationDown(),
+					analysis.getAvgElevation(),
+					analysis.getMaxElevation());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTimeSpan(timeSpan);
+			analysis.setAvgSpeed(averageSpeed);
+			analysis.setMaxSpeed(maxSpeed);
+			analysis.setAvgSensorSpeed(averageSensorSpeed);
+			analysis.setMaxSensorSpeed(maxSensorSpeed);
+			analysis.setAvgSensorHr(averageSensorHeartRate);
+			analysis.setMaxSensorHr(maxSensorHeartRate);
+			analysis.setAvgSensorCadence(averageSensorCadence);
+			analysis.setMaxSensorCadence(maxSensorCadence);
+			analysis.setAvgSensorPower(averageSensorPower);
+			analysis.setMaxSensorPower(maxSensorPower);
+			analysis.setAvgSensorTemperature(averageSensorTemperature);
+			analysis.setMaxSensorTemperature(maxSensorTemperature);
+			analysis.setDiffElevationUp(diffElevationUp);
+			analysis.setDiffElevationDown(diffElevationDown);
+			analysis.setAvgElevation(averageElevation);
+			analysis.setMaxElevation(maxElevation);
+		}
+	}
+
+	private record TrackAnalysisSplit(TrackAnalysisJson core, TrackAnalysisAdditionalJson additional) {
+	}
+
+	private static TrackAnalysisSplit getAnalysisFromGpx(GpxTrackAnalysis analysis) {
+		if (analysis == null) {
+			return null;
+		}
+		analysis.getPointAttributes().clear();
+		return new TrackAnalysisSplit(TrackAnalysisJson.from(analysis), TrackAnalysisAdditionalJson.from(analysis));
 	}
 
 	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files,
@@ -140,7 +247,7 @@ public class WebUserdataService {
 					boolean isSharedFile = isShared(nd, sharedFilesMap);
 					JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
 					saveDetails(newDetails, ANALYSIS, uf, points);
-					nd.details = uf.details;
+					nd.details = detailsForResponse(uf.details);
 					result.add(nd);
 				} catch (IOException e) {
 					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
@@ -173,7 +280,7 @@ public class WebUserdataService {
 				error, uf.name, uf.id, uf.userid);
 		LOG.error(errorMessage);
 		saveError(uf.details, errorMessage, uf);
-		nd.details = uf.details;
+		nd.details = detailsForResponse(uf.details);
 		result.add(nd);
 	}
 
@@ -206,6 +313,16 @@ public class WebUserdataService {
 			}
 		}
 		return false;
+	}
+
+	public JsonObject detailsForResponse(JsonObject details) {
+		JsonObject response = new JsonObject();
+		for (String key : details.keySet()) {
+			if (!ANALYSIS_ADDITIONAL.equals(key)) {
+				response.add(key, details.get(key));
+			}
+		}
+		return response;
 	}
 
 	public JsonElement getInfoDetails(InputStream inputStream) {
@@ -307,9 +424,10 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
-			if (analysisDetails != null) {
-				file.details.add(tag, gsonWithNans.toJsonTree(analysisDetails));
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			file.details.add(tag, gsonWithNans.toJsonTree(split.core()));
+			if (ANALYSIS.equals(tag)) {
+				file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -365,10 +483,9 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			AnalysisDetails analysisDetails = getAnalysisFromGpx(analysis);
-			if (analysisDetails != null) {
-				details.add(ANALYSIS, gsonWithNans.toJsonTree(analysisDetails));
-			}
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			details.add(ANALYSIS, gsonWithNans.toJsonTree(split.core()));
+			details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional()));
 		}
 	}
 
@@ -395,24 +512,19 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private AnalysisDetails getAnalysisFromGpx(GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			analysis.getPointAttributes().clear();
-			return new AnalysisDetails(analysis);
-		}
-		return null;
-	}
-
 	GpxTrackAnalysis getAnalysisFromJson(JsonObject details) {
 		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
 		if (details == null || !analysisPresent(ANALYSIS, details)) {
 			return analysis;
 		}
-		JsonElement analysisElement = details.get(ANALYSIS);
-		if (analysisElement != null && !analysisElement.isJsonNull()) {
-			AnalysisDetails analysisDetails = gson.fromJson(analysisElement, AnalysisDetails.class);
-			if (analysisDetails != null) {
-				analysisDetails.applyToAnalysis(analysis);
+		JsonElement analysisElem = details.get(ANALYSIS);
+		if (analysisElem != null && analysisElem.isJsonObject()) {
+			TrackAnalysisJson core = gsonWithNans.fromJson(analysisElem, TrackAnalysisJson.class);
+			core.applyTo(analysis);
+			JsonElement additionalElem = details.get(ANALYSIS_ADDITIONAL);
+			if (additionalElem != null && additionalElem.isJsonObject()) {
+				TrackAnalysisAdditionalJson additional = gsonWithNans.fromJson(additionalElem, TrackAnalysisAdditionalJson.class);
+				additional.applyTo(analysis);
 			}
 		}
 		return analysis;
@@ -581,38 +693,5 @@ public class WebUserdataService {
 			}
 		}
 		return false;
-	}
-
-	public static class AnalysisDetails {
-		private float totalDistance;
-		private long startTime;
-		private long endTime;
-		private long timeMoving;
-		private int points;
-		private int wptPoints;
-
-		public AnalysisDetails() {}
-
-		public AnalysisDetails(GpxTrackAnalysis analysis) {
-			if (analysis != null) {
-				this.totalDistance = analysis.getTotalDistance();
-				this.startTime = analysis.getStartTime();
-				this.endTime = analysis.getEndTime();
-				this.timeMoving = analysis.getTimeMoving();
-				this.points = analysis.getPoints();
-				this.wptPoints = analysis.getWptPoints();
-			}
-		}
-
-		public void applyToAnalysis(GpxTrackAnalysis analysis) {
-			if (analysis != null) {
-				analysis.setTotalDistance(this.totalDistance);
-				analysis.setStartTime(this.startTime);
-				analysis.setEndTime(this.endTime);
-				analysis.setTimeMoving(this.timeMoving);
-				analysis.setPoints(this.points);
-				analysis.setWptPoints(this.wptPoints);
-			}
-		}
 	}
 }
