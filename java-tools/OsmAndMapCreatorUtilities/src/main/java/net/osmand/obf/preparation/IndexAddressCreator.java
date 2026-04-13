@@ -45,6 +45,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
 import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
@@ -1391,7 +1392,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
         if (ArabicNormalizer.isSpecialArabic(name)) {
             String arabic = ArabicNormalizer.normalize(name);
             if (arabic != null && !arabic.equals(name)) {
-                splitNames.addAll(Algorithms.splitByWordsLowercase(arabic));
+                splitNames.addAll(splitNames(arabic));
             }
         }
         List<String> namesToAdd = new ArrayList<>(splitNames);
@@ -1435,28 +1436,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
     private static Set<String> splitNames(String name) {
-//    	return SearchCoreFactory.splitAddressSearchNames(name);
-        int prev = -1;
-        Set<String> namesToAdd = new HashSet<>();
-
-        for (int i = 0; i <= name.length(); i++) {
-            boolean isHyphenNearNumber = i != name.length() && name.charAt(i) == '-'
-                    && ((i + 1 < name.length() && Character.isDigit(name.charAt(i + 1)))
-                    || (i - 1 >= 0 && Character.isDigit(name.charAt(i - 1))));
-            if (i == name.length() || (!Character.isLetter(name.charAt(i)) && !Character.isDigit(name.charAt(i)) &&
-                    name.charAt(i) != '\'' && !isHyphenNearNumber)) {
-                if (prev != -1) {
-                    String substr = name.substring(prev, i);
-                    namesToAdd.add(substr.toLowerCase());
-                    prev = -1;
-                }
-            } else {
-                if (prev == -1) {
-                    prev = i;
-                }
-            }
-        }
-        return namesToAdd;
+    	return SearchCoreFactory.splitSearchNames(name);
     }
 
 
