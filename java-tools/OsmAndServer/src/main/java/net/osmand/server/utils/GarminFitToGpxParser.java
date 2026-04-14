@@ -165,9 +165,6 @@ public final class GarminFitToGpxParser {
 		// 3. Fill GPX metadata (author, time, name, activity)
 		GpxFile gpx = new GpxFile(OSMAND_FIT_TO_GPX_V1);
 		gpx.setHasAltitude(anyEleFound);
-		Author author = new Author();
-		author.setLink(new Link("https://osmand.net/", "OsmAnd"));
-		gpx.getMetadata().setAuthor(author);
 		long metaTs = data.fileCreatedMs > 0L ? data.fileCreatedMs : data.sessionStartMs;
 		if (metaTs <= 0L) {
 			metaTs = firstTime;
