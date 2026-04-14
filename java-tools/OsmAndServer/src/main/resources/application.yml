@@ -77,6 +77,10 @@ management:
 
 spring.mvc.async.request-timeout: 600000
 spring:
+  data:
+    redis:
+      repositories:
+        enabled: false
   session:
     redisPort: ${REDIS_PORT:}
     redisHost: ${REDIS_HOST:}
