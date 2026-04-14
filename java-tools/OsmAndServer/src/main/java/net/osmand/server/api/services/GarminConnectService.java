@@ -731,18 +731,24 @@ public class GarminConnectService {
 	}
 
 	private JsonArray fetchGarminPermissionsArray(String accessToken) throws IOException, InterruptedException {
-		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(USER_PERMISSIONS_URL))
-				.timeout(GARMIN_HTTP_TIMEOUT)
-				.header("Authorization", "Bearer " + accessToken)
-				.GET()
-				.build();
-		HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-		if (res.statusCode() / 100 != 2) {
-			LOG.warn("Garmin user permissions failed: HTTP " + res.statusCode() + " " + res.body());
-			return null;
+		for (int attempt = 0; attempt < 3; attempt++) {
+			HttpRequest req = HttpRequest.newBuilder()
+					.uri(URI.create(USER_PERMISSIONS_URL))
+					.timeout(GARMIN_HTTP_TIMEOUT)
+					.header("Authorization", "Bearer " + accessToken)
+					.GET()
+					.build();
+			HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+			if (res.statusCode() / 100 == 2) {
+				return extractPermissionsArray(res.body());
+			}
+			if (attempt < 2) {
+				Thread.sleep(2000);
+			} else {
+				LOG.warn("Garmin user permissions failed: HTTP " + res.statusCode() + " " + res.body());
+			}
 		}
-		return extractPermissionsArray(res.body());
+		return null;
 	}
 
 	private static Set<String> permissionsToSet(JsonArray permArray) {
