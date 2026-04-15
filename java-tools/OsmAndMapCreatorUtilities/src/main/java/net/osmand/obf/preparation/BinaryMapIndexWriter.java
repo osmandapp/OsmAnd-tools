@@ -1788,9 +1788,9 @@ public class BinaryMapIndexWriter {
 		return commonPrefixCodePointLength;
 	}
 
-	private static String encodeFrontCodedPoiNameSuffix(String suffix, String previousSuffix, boolean blockStart) {
+	private static String encodeFrontCodedPoiNameSuffix(String suffix, String previousSuffix) {
 		String encodedRawSuffix = encodeRawPoiNameSuffix(suffix);
-		if (blockStart || previousSuffix == null) {
+		if (previousSuffix == null) {
 			return encodedRawSuffix;
 		}
 		int commonPrefixCodePointLength = commonPrefixCodePointLength(previousSuffix, suffix);
@@ -1823,15 +1823,12 @@ public class BinaryMapIndexWriter {
 			}
 		}
 		String previousSuffix = null;
-		int dictionaryIndex = 0;
 		for (String suffix : sortedSuffixes) {
-			boolean blockStart = dictionaryIndex % MARKER_BLOCK_SIZE == 0;
-			String encodedSuffix = encodeFrontCodedPoiNameSuffix(suffix, previousSuffix, blockStart);
+			String encodedSuffix = encodeFrontCodedPoiNameSuffix(suffix, previousSuffix);
 			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix);
 			data.resolvedSuffixToIndex.put(entry.resolvedSuffix, data.dictionaryEntries.size());
 			data.dictionaryEntries.add(entry);
 			previousSuffix = suffix;
-			dictionaryIndex++;
 		}
 		int dictionaryWordCount = (data.dictionaryEntries.size() + Integer.SIZE - 1) / Integer.SIZE;
 		if (dictionaryWordCount == 0) {
