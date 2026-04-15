@@ -187,4 +187,19 @@ public class OrderManagementController {
 
 		return ResponseEntity.ok().build();
 	}
+
+	@PostMapping("/orders/valid")
+	@ResponseBody
+	public ResponseEntity<String> updateOrderValid(
+			@RequestParam String sku,
+			@RequestParam String orderId,
+			@RequestParam boolean valid) {
+		if (StringUtils.isBlank(sku) || StringUtils.isBlank(orderId)) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("sku and orderId are required");
+		}
+		if (!orderManagementService.updatePurchaseValid(orderId.trim(), sku.trim(), valid)) {
+			return ResponseEntity.notFound().build();
+		}
+		return ResponseEntity.ok().build();
+	}
 }

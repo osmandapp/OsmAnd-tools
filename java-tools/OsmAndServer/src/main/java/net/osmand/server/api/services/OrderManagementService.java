@@ -488,5 +488,46 @@ public class OrderManagementService {
 		}
 		return (System.currentTimeMillis() - checkTime.getTime()) <= MINIMUM_WAIT_TO_REVALIDATE;
 	}
+
+	@Transactional
+	public boolean updatePurchaseValid(String orderId, String sku, boolean valid) {
+		if (orderId == null || orderId.isBlank() || sku == null || sku.isBlank()) {
+			return false;
+		}
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
+				subscriptionsRepository.findByOrderIdAndSku(orderId, sku);
+		int n = subs == null ? 0 : subs.size();
+		if (n > 0) {
+			if (n != 1) {
+				return false;
+			}
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subs.get(0);
+			sub.valid = valid;
+			subscriptionsRepository.saveAndFlush(sub);
+			if (sub.userId != null) {
+				CloudUsersRepository.CloudUser pu = usersRepository.findById(sub.userId);
+				if (pu != null) {
+					userSubService.verifyAndRefreshProOrderId(pu);
+				}
+			}
+			return true;
+		}
+		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
+				deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
+		n = iaps == null ? 0 : iaps.size();
+		if (n != 1) {
+			return false;
+		}
+		DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = iaps.get(0);
+		iap.valid = valid;
+		deviceInAppPurchasesRepository.saveAndFlush(iap);
+		if (iap.userId != null) {
+			CloudUsersRepository.CloudUser pu = usersRepository.findById(iap.userId);
+			if (pu != null) {
+				userSubService.verifyAndRefreshProOrderId(pu);
+			}
+		}
+		return true;
+	}
 }
 
