@@ -10,6 +10,7 @@ import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -189,6 +190,7 @@ public class OrderManagementController {
 	}
 
 	@PostMapping("/orders/valid")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	@ResponseBody
 	public ResponseEntity<String> updateOrderValid(
 			@RequestParam String sku,
