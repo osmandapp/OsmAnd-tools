@@ -17,7 +17,9 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -490,7 +492,7 @@ public class OrderManagementService {
 	}
 
 	@Transactional
-	public boolean updatePurchaseValid(String orderId, String sku, boolean valid) {
+	public boolean updatePurchaseValidation(String orderId, String sku, boolean valid, int userId) {
 		if (orderId == null || orderId.isBlank() || sku == null || sku.isBlank()) {
 			return false;
 		}
@@ -502,14 +504,10 @@ public class OrderManagementService {
 				return false;
 			}
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subs.get(0);
+			validateOwner(userId, sub.userId);
 			sub.valid = valid;
 			subscriptionsRepository.saveAndFlush(sub);
-			if (sub.userId != null) {
-				CloudUsersRepository.CloudUser pu = usersRepository.findById(sub.userId);
-				if (pu != null) {
-					userSubService.verifyAndRefreshProOrderId(pu);
-				}
-			}
+			verifyAndRefreshProForUserId(userId);
 			return true;
 		}
 		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
@@ -519,15 +517,24 @@ public class OrderManagementService {
 			return false;
 		}
 		DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = iaps.get(0);
+		validateOwner(userId, iap.userId);
 		iap.valid = valid;
 		deviceInAppPurchasesRepository.saveAndFlush(iap);
-		if (iap.userId != null) {
-			CloudUsersRepository.CloudUser pu = usersRepository.findById(iap.userId);
-			if (pu != null) {
-				userSubService.verifyAndRefreshProOrderId(pu);
-			}
-		}
+		verifyAndRefreshProForUserId(iap.userId);
 		return true;
+	}
+
+	private void validateOwner(int cloudUserId, int userId) {
+		if (!Objects.equals(userId, cloudUserId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+		}
+	}
+
+	private void verifyAndRefreshProForUserId(int userId) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+		if (pu != null) {
+			userSubService.verifyAndRefreshProOrderId(pu);
+		}
 	}
 }
 

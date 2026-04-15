@@ -7,10 +7,12 @@ import net.osmand.server.api.repo.OrderInfoRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.AdminService;
 import net.osmand.server.api.services.AdminService.Purchase;
+import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -192,14 +194,18 @@ public class OrderManagementController {
 	@PostMapping("/orders/valid")
 	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	@ResponseBody
-	public ResponseEntity<String> updateOrderValid(
-			@RequestParam String sku,
-			@RequestParam String orderId,
-			@RequestParam boolean valid) {
+	public ResponseEntity<String> updatePurchaseValidStatus(Authentication auth,
+	                                                        @RequestParam String sku,
+	                                                        @RequestParam String orderId,
+	                                                        @RequestParam boolean valid) {
 		if (StringUtils.isBlank(sku) || StringUtils.isBlank(orderId)) {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("sku and orderId are required");
 		}
-		if (!orderManagementService.updatePurchaseValid(orderId.trim(), sku.trim(), valid)) {
+		if (!(auth.getPrincipal() instanceof WebSecurityConfiguration.OsmAndProUser user)) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		}
+		int cloudUserId = user.getUserDevice().userid;
+		if (!orderManagementService.updatePurchaseValidation(orderId.trim(), sku.trim(), valid, cloudUserId)) {
 			return ResponseEntity.notFound().build();
 		}
 		return ResponseEntity.ok().build();
