@@ -45,15 +45,13 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
-import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
-import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import static net.osmand.search.core.SearchCoreFactory.splitAndNormalize;
+import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {

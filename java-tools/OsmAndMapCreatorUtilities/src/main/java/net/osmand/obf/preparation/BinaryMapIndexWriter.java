@@ -109,10 +109,10 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
-import static net.osmand.binary.BinaryMapPoiReaderAdapter.*;
+import static net.osmand.util.SearchAlgorithms.*;
 
 public class BinaryMapIndexWriter {
-	private static final int MARKER_LCP_LENGTH = MARKER_MAX - MARKER_BASE;
+	private static final int MARKER_LCP_LENGTH = SUFFIX_DICT_MARKER_MAX - SUFFIX_DICT_MARKER_BASE;
 
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
@@ -1755,12 +1755,12 @@ public class BinaryMapIndexWriter {
 			return false;
 		}
 		int markerCodePoint = value.codePointAt(0);
-		return markerCodePoint == MARKER_RAW_ESCAPE
-				|| (markerCodePoint >= MARKER_BASE && markerCodePoint <= MARKER_MAX);
+		return markerCodePoint == SUFFIX_DICT_MARKER_RAW_ESCAPE
+				|| (markerCodePoint >= SUFFIX_DICT_MARKER_BASE && markerCodePoint <= SUFFIX_DICT_MARKER_MAX);
 	}
 
 	private static String encodeRawPoiNameSuffix(String suffix) {
-		return startsWithReservedPoiSuffixMarker(suffix) ? MARKER_RAW_ESCAPE + suffix : suffix;
+		return startsWithReservedPoiSuffixMarker(suffix) ? SUFFIX_DICT_MARKER_RAW_ESCAPE + suffix : suffix;
 	}
 
 	private static int countCodePoints(String value) {
@@ -1798,7 +1798,7 @@ public class BinaryMapIndexWriter {
 			return encodedRawSuffix;
 		}
 		String suffixRemainder = suffix.substring(offsetByCodePoints(suffix, commonPrefixCodePointLength));
-		String deltaEncodedSuffix = new String(Character.toChars(MARKER_BASE + commonPrefixCodePointLength))
+		String deltaEncodedSuffix = new String(Character.toChars(SUFFIX_DICT_MARKER_BASE + commonPrefixCodePointLength))
 				+ suffixRemainder;
 		return countCodePoints(deltaEncodedSuffix) < countCodePoints(encodedRawSuffix) ? deltaEncodedSuffix : encodedRawSuffix;
 	}

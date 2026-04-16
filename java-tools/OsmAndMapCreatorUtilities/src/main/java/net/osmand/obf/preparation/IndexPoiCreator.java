@@ -54,6 +54,8 @@ import net.osmand.util.MapUtils;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
+import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
+
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
 
@@ -1108,7 +1110,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
         name = Algorithms.normalizeSearchText(name);
-        Collection<String> splitName = SearchCoreFactory.splitAndNormalize(name);
+        Collection<String> splitName = splitAndNormalize(name);
         for (String token : splitName) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
