@@ -274,17 +274,22 @@ public interface DataService extends BaseService {
 	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
-		if (error != null) {
+		if (error != null || targetPoint == null) {
 			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, null, error, duration,
 					0, null, null, null, searchPoint.getLatitude(), searchPoint.getLongitude(), bbox,
 					new Timestamp(System.currentTimeMillis()), false, null, null};
 		}
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
+		boolean isZeroDist = false;
         for (SearchResult sr : searchResults) {
             if (sr.location == null && sr.objectType == POI_TYPE) {
                 sr.location = targetPoint;
             }
+			if (sr.location != null) {
+				double dist = MapUtils.getDistance(targetPoint, sr.location);
+				isZeroDist = isZeroDist || dist > 10.0;
+			}
         }
 
 		Map<String, Object> row = finder.getRow();
@@ -327,6 +332,7 @@ public interface DataService extends BaseService {
 					row.put("dup_count", dupCount);
 				}
 				if (stat != null) {
+					row.put("zero_dist", isZeroDist);
 					row.put("stat_bytes", stat.totalBytes);
 					row.put("stat_time", stat.totalTime);
 					int statResultsCount = 0;
@@ -357,6 +363,7 @@ public interface DataService extends BaseService {
 					row.put("stat_results", statResultsCount);
 					row.put("stat_amenity_count", statAmenityCount);
 					row.put("stat_address_count", statAddressCount);
+					row.put("stat_transport_count", statTransportCount);
 
 					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
 						row.put("stat_time_" + e.getKey().name(), e.getValue().time);
