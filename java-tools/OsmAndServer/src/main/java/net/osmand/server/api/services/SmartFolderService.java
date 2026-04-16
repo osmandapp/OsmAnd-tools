@@ -53,6 +53,7 @@ public class SmartFolderService {
 				GpxDataItem dataItem = new GpxDataItem(new KFile(""));
 				GpxFile gpxFile = createGpxFileWithAppearance(userId, uf);
 				dataItem.readGpxParams(gpxFile);
+				dataItem.setParameter(GpxParameter.FILE_DIR, getFileDir(uf.name));
 				dataItem.setAnalysis(webUserdataService.getAnalysisFromJson(uf.details));
 				dataItem.setParameter(GpxParameter.ACTIVITY_TYPE, getActivityType(uf.details));
 				TrackItem trackItem = new TrackItem(gpxFile);
@@ -66,6 +67,11 @@ public class SmartFolderService {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 		}
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
+	}
+
+	private String getFileDir(String name) {
+		int index = name.lastIndexOf('/');
+		return index > 0 ? name.substring(0, index) : "";
 	}
 
 	private String getActivityType(JsonObject details) {
