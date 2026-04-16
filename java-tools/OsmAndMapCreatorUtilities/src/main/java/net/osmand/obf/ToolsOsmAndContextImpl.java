@@ -1,5 +1,6 @@
 package net.osmand.obf;
 
+import net.osmand.CollatorStringMatcher;
 import net.osmand.shared.api.KStringMatcherMode;
 import net.osmand.shared.api.OsmAndContext;
 import net.osmand.shared.api.SettingsAPI;
@@ -148,7 +149,28 @@ public class ToolsOsmAndContextImpl implements OsmAndContext {
 
     @Override
     public KStringMatcher getNameStringMatcher(String name, KStringMatcherMode mode) {
-        throw new UnsupportedOperationException("Not yet implemented");
+		return new KStringMatcher() {
+			private final CollatorStringMatcher sm = new CollatorStringMatcher(name, getStringMatcherMode(mode));
+
+			private CollatorStringMatcher.StringMatcherMode getStringMatcherMode(KStringMatcherMode mode) {
+				switch (mode) {
+					case CHECK_ONLY_STARTS_WITH:
+					case CHECK_STARTS_FROM_SPACE:
+					case CHECK_STARTS_FROM_SPACE_NOT_BEGINNING:
+					case CHECK_EQUALS_FROM_SPACE:
+					case CHECK_CONTAINS:
+					case CHECK_EQUALS:
+						return CollatorStringMatcher.StringMatcherMode.valueOf(mode.name());
+					default:
+						throw new IllegalArgumentException("Unsupported KStringMatcherMode: " + mode);
+				}
+			}
+
+			@Override
+			public boolean matches(String input) {
+				return sm.matches(input);
+			}
+		};
     }
 
     @Override

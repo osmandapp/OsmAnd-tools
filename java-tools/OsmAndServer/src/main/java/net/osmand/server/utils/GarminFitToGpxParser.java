@@ -27,7 +27,6 @@ import jakarta.annotation.Nullable;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.KException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.io.KFile;
@@ -36,7 +35,6 @@ import net.osmand.shared.gpx.PointAttributes;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.Author;
 import net.osmand.shared.gpx.primitives.Link;
-import net.osmand.shared.util.PlatformUtil;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
@@ -47,10 +45,6 @@ public final class GarminFitToGpxParser {
 	private static final Log LOG = LogFactory.getLog(GarminFitToGpxParser.class);
 
 	private static final String OSMAND_FIT_TO_GPX_V1 = "OsmAndFitToGpxV1";
-
-	static {
-		PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
-	}
 
 	private GarminFitToGpxParser() {
 	}
