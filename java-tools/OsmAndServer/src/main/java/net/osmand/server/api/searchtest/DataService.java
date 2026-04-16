@@ -286,9 +286,9 @@ public interface DataService extends BaseService {
             if (sr.location == null && sr.objectType == POI_TYPE) {
                 sr.location = targetPoint;
             }
-			if (sr.location != null) {
+			if (sr.location != null && !isZeroDist) {
 				double dist = MapUtils.getDistance(targetPoint, sr.location);
-				isZeroDist = isZeroDist || dist > 10.0;
+				isZeroDist = dist > 10.0;
 			}
         }
 
