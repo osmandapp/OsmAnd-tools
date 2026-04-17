@@ -507,6 +507,8 @@ public class GarminConnectService {
 			tmp = null;
 			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
 			userdataService.uploadFile(zip, dev, cloudName, FILE_TYPE_GPX, clientTimeMs);
+			conn.lastGarminImportAt = System.currentTimeMillis();
+			garminUserConnectionRepository.save(conn);
 			LOG.info("Garmin activityFiles: stored " + fileType + " as GPX " + cloudName + " userid=" + conn.userid);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn("Garmin activityFiles: cloud upload rejected userid=" + conn.userid + " " + e.getMessage());

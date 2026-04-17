@@ -90,6 +90,7 @@ CREATE TABLE garmin_user_connection (
     access_expires_time bigint NOT NULL,
     historical_data_export boolean NOT NULL,
     activity_export boolean NOT NULL,
+    last_garmin_import_at bigint,
     CONSTRAINT uk_garmin_connection_garmin_user UNIQUE (garmin_user_id)
 );
 
