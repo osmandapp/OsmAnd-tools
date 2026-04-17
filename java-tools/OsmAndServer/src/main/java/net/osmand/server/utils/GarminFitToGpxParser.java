@@ -208,7 +208,7 @@ public final class GarminFitToGpxParser {
 		return gpx;
 	}
 
-	private static final String DEFAULT_TEST_FIT = "/Users/plotva/osmand/garmin/Дима/22405605292_ACTIVITY.fit";
+	private static final String DEFAULT_TEST_FIT = "/.../18872521110_ACTIVITY.fit";
 
 	public static void main(String[] args) throws Exception {
 		String fitPath = args.length > 0 && args[0] != null && !args[0].isBlank()
