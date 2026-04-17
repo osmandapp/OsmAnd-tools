@@ -1,0 +1,166 @@
+package net.osmand.reviews.mangrove;
+
+import com.google.common.base.Preconditions;
+import net.osmand.PlatformUtil;
+import net.osmand.binary.MapZooms;
+import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.WorldRegion;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.reviews.ReviewJsonCodec;
+import net.osmand.reviews.ReviewedPlace;
+import net.osmand.reviews.Tags;
+import org.apache.commons.logging.Log;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlSerializer;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
+
+import static net.osmand.reviews.mangrove.ReviewEdits.applyEdits;
+
+/**
+ * Tools for working with reviews from <a href="https://mangrove.reviews">mangrove.reviews</a>.
+ */
+public final class MangroveReviews {
+    private static final Log log = PlatformUtil.getLog(MangroveReviews.class);
+
+    public static void main(String[] args) throws Exception {
+        File inputFile = null;
+        File outputDir = null;
+        for (String arg : args) {
+            String val = arg.substring(arg.indexOf("=") + 1);
+            if (arg.startsWith("--input=")) {
+                inputFile = new File(val);
+            } else if (arg.startsWith("--dir=")) {
+                outputDir = new File(val);
+            } else {
+                throw new IllegalArgumentException(String.format("unexpected argument: '%s'. args: %s", arg, Arrays.toString(args)));
+            }
+        }
+        if (inputFile == null) {
+            throw new IllegalArgumentException("--input=<input-file> argument must be specified");
+        }
+        if (outputDir == null) {
+            throw new IllegalArgumentException("--dir=<output-dir> argument must be specified");
+        }
+        generateWorldFile(inputFile, outputDir);
+    }
+
+    private static void generateWorldFile(File inputFile, File outputDir) throws IOException, SQLException, XmlPullParserException, InterruptedException {
+        Set<ReviewedPlace> testReviews = parseInputFile(inputFile);
+        File osmGz = new File(outputDir, WorldRegion.WORLD + ".reviews.osm.gz");
+        File obf = new File(outputDir, WorldRegion.WORLD + ".reviews.obf");
+        generateOsmFile(testReviews, osmGz);
+        generateObf(osmGz, obf);
+    }
+
+    private static Set<ReviewedPlace> parseInputFile(File inputFile) throws IOException {
+        ReviewsParser parser = new ReviewsParser();
+        Set<Review> parsedReviews = parser.parse(inputFile).collect(Collectors.toSet());
+        log.info(String.format("%d reviews parsed from %s", parsedReviews.size(), inputFile));
+        Set<Review> edited = applyEdits(parsedReviews);
+        log.info(String.format("%d reviews remaining after edits were applied", edited.size()));
+        Set<Review> withRatings = edited.stream().filter(r -> r.payload().rating() != null).collect(Collectors.toSet());
+        log.info(String.format("%d reviews remaining after filtering out null ratings", withRatings.size()));
+        Map<Review, OsmCoding.OsmPoi> pois = OsmCoding.resolveOsmPois(withRatings);
+        log.info(String.format("%d reviews successfully mapped to OSM POIs", pois.size()));
+        Set<ReviewedPlace> places = toReviewedPlaces(pois);
+        log.info(String.format("%d reviewed places constructed", places.size()));
+        return places;
+    }
+
+    private static Set<ReviewedPlace> toReviewedPlaces(Map<Review, OsmCoding.OsmPoi> pois) {
+        Map<OsmCoding.OsmPoi, ReviewedPlace> result = new HashMap<>();
+        for (Map.Entry<Review, OsmCoding.OsmPoi> entry : pois.entrySet()) {
+            Review mangroveReview = entry.getKey();
+            OsmCoding.OsmPoi poi = entry.getValue();
+
+            if (!result.containsKey(poi)) {
+                result.put(poi, emptyReviewedPlace(poi));
+            }
+            ReviewedPlace place = result.get(poi);
+            place.reviews().add(mangroveReview.asOsmAndReview());
+        }
+        // sort reviews newest first
+        for (ReviewedPlace place : result.values()) {
+            place.reviews().sort(Comparator.comparing(net.osmand.reviews.Review::date).reversed());
+        }
+        return result.values().stream().map(MangroveReviews::calculateAggregateStats).collect(Collectors.toSet());
+    }
+
+    private static ReviewedPlace calculateAggregateStats(ReviewedPlace place) {
+        Preconditions.checkArgument(!place.reviews().isEmpty());
+        @SuppressWarnings("OptionalGetWithoutIsPresent") int averageRating = (int) Math.round(place.reviews().stream().mapToInt(net.osmand.reviews.Review::rating).average().getAsDouble());
+        return place.withAggregateRating(averageRating);
+    }
+
+    private static ReviewedPlace emptyReviewedPlace(OsmCoding.OsmPoi poi) {
+        return new ReviewedPlace(poi.location(), poi.elementType(), poi.osmId(), poi.name(), ReviewedPlace.AGGREGATE_RATING_UNDEFINED, new ArrayList<>());
+    }
+
+    private static void generateOsmFile(Set<ReviewedPlace> places, File outputFile) throws IOException {
+        // TODO: factor out the common bits from Wikipedia and Reviews
+        FileOutputStream out = new FileOutputStream(outputFile);
+        GZIPOutputStream gzStream = new GZIPOutputStream(out);
+        XmlSerializer serializer = new org.kxml2.io.KXmlSerializer();
+        serializer.setOutput(gzStream, "UTF-8");
+        serializer.startDocument("UTF-8", true);
+        serializer.startTag(null, "osm");
+        serializer.attribute(null, "version", "0.6");
+        serializer.attribute(null, "generator", "OsmAnd");
+        serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
+        ReviewJsonCodec reviewCodec = new ReviewJsonCodec();
+
+        for (ReviewedPlace place : places) {
+            serializer.startTag(null, "node");
+            serializer.attribute(null, "visible", "true");
+            serializer.attribute(null, "id", String.valueOf(place.osmId()));
+            serializer.attribute(null, "lat", String.valueOf(place.location().getLatitude()));
+            serializer.attribute(null, "lon", String.valueOf(place.location().getLongitude()));
+            addTag(serializer, Tags.REVIEWS_MARKER_TAG, Tags.REVIEWS_MARKER_VALUE);
+            if (place.name() != null) {
+                addTag(serializer, Tags.NAME_TAG, place.name());
+            }
+            addTag(serializer, Tags.REVIEWS_KEY, reviewCodec.toJson(place.reviews()));
+            addTag(serializer, Tags.REVIEWS_AGGREGATE_RATING_KEY, String.valueOf(place.aggregateRating()));
+            serializer.endTag(null, "node");
+        }
+        serializer.endDocument();
+        serializer.flush();
+        gzStream.close();
+    }
+
+    private static void addTag(XmlSerializer serializer, String key, String value) throws IOException {
+        serializer.startTag(null, "tag");
+        serializer.attribute(null, "k", key);
+        serializer.attribute(null, "v", value);
+        serializer.endTag(null, "tag");
+    }
+
+    private static void generateObf(File osmGz, File obf) throws IOException, SQLException, InterruptedException, XmlPullParserException {
+        IndexCreatorSettings settings = new IndexCreatorSettings();
+        settings.indexMap = false;
+        settings.indexAddress = false;
+        settings.indexPOI = true;
+        settings.indexTransport = false;
+        settings.indexRouting = false;
+
+        IndexCreator creator = new IndexCreator(obf.getParentFile(), settings);
+        //noinspection ResultOfMethodCallIgnored
+        new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
+        creator.setMapFileName(obf.getName());
+        creator.generateIndexes(osmGz,
+                new ConsoleProgressImplementation(1), null, MapZooms.getDefault(),
+                new MapRenderingTypesEncoder(obf.getName()), log);
+    }
+
+    private MangroveReviews() {
+    }
+}
