@@ -16,6 +16,8 @@ import com.garmin.fit.Event;
 import com.garmin.fit.EventType;
 import com.garmin.fit.FileIdMesg;
 import com.garmin.fit.Fit;
+import com.garmin.fit.GarminProduct;
+import com.garmin.fit.Manufacturer;
 import com.garmin.fit.MesgBroadcaster;
 import com.garmin.fit.RecordMesg;
 import com.garmin.fit.RecordMesgListener;
@@ -34,7 +36,6 @@ import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.PointAttributes;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.Author;
-import net.osmand.shared.gpx.primitives.Link;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
@@ -45,12 +46,14 @@ public final class GarminFitToGpxParser {
 	private static final Log LOG = LogFactory.getLog(GarminFitToGpxParser.class);
 
 	private static final String OSMAND_FIT_TO_GPX_V1 = "OsmAndFitToGpxV1";
+	private static final String GPX_AUTHOR_BRAND_GARMIN = "Garmin";
 
 	private GarminFitToGpxParser() {
 	}
 
 	private record FitData(List<TrkSegment> segments, List<WptPt> allPoints, List<RecordMesg> fitRecords,
-	                       Sport sport, long sessionStartMs, long fileCreatedMs, String sportProfileName) {
+	                       Sport sport, long sessionStartMs, long fileCreatedMs, String sportProfileName,
+	                       @Nullable Integer fileIdGarminProduct) {
 	}
 
 	/** Converts raw FIT binary data to a GpxFile. Returns null if input is empty or corrupted. */
@@ -75,6 +78,7 @@ public final class GarminFitToGpxParser {
 		final long[] sessionStartMs = { 0L };
 		final long[] fileCreatedMs = { 0L };
 		final String[] sportProfileName = { null };
+		final Integer[] fileIdGarminProduct = { null };
 
 		Decode decode = new Decode();
 		MesgBroadcaster broadcaster = new MesgBroadcaster(decode);
@@ -82,6 +86,10 @@ public final class GarminFitToGpxParser {
 			DateTime tc = m.getTimeCreated();
 			if (tc != null) {
 				fileCreatedMs[0] = tc.getDate().getTime();
+			}
+			Integer gp = garminProductFromFileId(m);
+			if (gp != null) {
+				fileIdGarminProduct[0] = gp;
 			}
 		});
 		broadcaster.addListener((SessionMesg m) -> {
@@ -126,7 +134,7 @@ public final class GarminFitToGpxParser {
 		flushCurrent(segments, current, null);
 
 		return new FitData(segments, allPoints, fitRecords,
-				sessionSport[0], sessionStartMs[0], fileCreatedMs[0], sportProfileName[0]);
+				sessionSport[0], sessionStartMs[0], fileCreatedMs[0], sportProfileName[0], fileIdGarminProduct[0]);
 	}
 
 	/** Builds GpxFile from decoded FIT data: applies sensors, sets metadata, assembles track. */
@@ -167,6 +175,9 @@ public final class GarminFitToGpxParser {
 			metaTs = System.currentTimeMillis();
 		}
 		gpx.getMetadata().setTime(metaTs);
+		Author author = new Author();
+		author.setName(gpxAuthorDeviceName(data.fileIdGarminProduct));
+		gpx.getMetadata().setAuthor(author);
 		String name = preferredName != null && !preferredName.isBlank() ? preferredName.trim() : null;
 		if (name == null && data.sportProfileName != null) {
 			name = data.sportProfileName;
@@ -197,8 +208,7 @@ public final class GarminFitToGpxParser {
 		return gpx;
 	}
 
-	private static final String DEFAULT_TEST_FIT =
-			System.getProperty("user.home") + "track_name.fit";
+	private static final String DEFAULT_TEST_FIT = "/Users/plotva/osmand/garmin/Дима/22405605292_ACTIVITY.fit";
 
 	public static void main(String[] args) throws Exception {
 		String fitPath = args.length > 0 && args[0] != null && !args[0].isBlank()
@@ -335,6 +345,82 @@ public final class GarminFitToGpxParser {
 
 	private static String formatCadence(float cadence) {
 		return String.format(Locale.ROOT, "%.2f", (double) cadence);
+	}
+
+	private static String gpxAuthorDeviceName(@Nullable Integer garminProductId) {
+		if (!usableUInt16(garminProductId)) {
+			return GPX_AUTHOR_BRAND_GARMIN;
+		}
+		String code = GarminProduct.getStringFromValue(garminProductId);
+		if (code == null || code.isBlank()) {
+			return GPX_AUTHOR_BRAND_GARMIN;
+		}
+		String label = humanizeGarminProductCode(code);
+		return GPX_AUTHOR_BRAND_GARMIN + " " + label;
+	}
+
+	private static String humanizeGarminProductCode(String code) {
+		String s = code.trim().replace('_', ' ');
+		String[] tokens = s.split("\\s+");
+		StringBuilder sb = new StringBuilder();
+		for (String token : tokens) {
+			if (token.isEmpty()) {
+				continue;
+			}
+			String part = splitLettersFromTrailingDigits(token);
+			if (!sb.isEmpty()) {
+				sb.append(' ');
+			}
+			sb.append(titleCaseGarminToken(part));
+		}
+		return sb.toString();
+	}
+
+	private static String titleCaseGarminToken(String token) {
+		if (token.isEmpty()) {
+			return token;
+		}
+		if (token.chars().allMatch(Character::isDigit)) {
+			return token;
+		}
+		if (token.length() == 1) {
+			return token.toUpperCase(Locale.ROOT);
+		}
+		return Character.toUpperCase(token.charAt(0)) + token.substring(1).toLowerCase(Locale.ROOT);
+	}
+
+	private static @Nullable Integer garminProductFromFileId(FileIdMesg m) {
+		Integer man = m.getManufacturer();
+		if (!usableUInt16(man) || !isGarminManufacturer(man)) {
+			return null;
+		}
+		Integer gp = resolveGarminProductField(m.getGarminProduct(), m.getProduct());
+		return usableUInt16(gp) ? gp : null;
+	}
+
+	private static boolean isGarminManufacturer(@Nullable Integer manufacturer) {
+		return manufacturer != null && manufacturer == Manufacturer.GARMIN;
+	}
+
+	private static @Nullable Integer resolveGarminProductField(@Nullable Integer garminProduct, @Nullable Integer product) {
+		if (usableUInt16(garminProduct)) {
+			return garminProduct;
+		}
+		if (usableUInt16(product)) {
+			return product;
+		}
+		return null;
+	}
+
+	private static String splitLettersFromTrailingDigits(String token) {
+		int i = 0;
+		while (i < token.length() && Character.isLetter(token.charAt(i))) {
+			i++;
+		}
+		if (i > 0 && i < token.length() && Character.isDigit(token.charAt(i))) {
+			return token.substring(0, i) + " " + token.substring(i);
+		}
+		return token;
 	}
 
 	private static RouteActivity routeActivityFromFitSport(Sport sport) {
