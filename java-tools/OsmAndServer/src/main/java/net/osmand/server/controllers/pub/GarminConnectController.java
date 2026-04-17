@@ -6,7 +6,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -49,6 +48,9 @@ public class GarminConnectController {
 
 	private static final String REDIS_KEY_PREFIX = "garmin:pkce:";
 	private static final java.time.Duration PKCE_TTL = java.time.Duration.ofMinutes(10);
+
+	private static final String GARMIN_STATUS_LINKED_KEY = "linked";
+	private static final String GARMIN_STATUS_SYNC_TIME_MS_KEY = "syncTimeMs";
 
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -221,16 +223,14 @@ public class GarminConnectController {
 	public ResponseEntity<String> status() {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(GSON.toJson(Map.of("linked", false)));
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, false)));
 		}
 		GarminUserConnection row = garminConnectService.getConnectionOrNull(dev.userid);
 		if (row == null) {
-			return ResponseEntity.ok(GSON.toJson(Map.of("linked", false)));
+			return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, false)));
 		}
-		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("linked", true);
-		body.put("lastGarminImportAt", row.lastGarminImportAt);
-		return ResponseEntity.ok(GSON.toJson(body));
+		return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, true,
+				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt)));
 	}
 
 	private void handleActivityBackfill(int userid) {
