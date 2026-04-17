@@ -230,7 +230,7 @@ public class GarminConnectController {
 			return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, false)));
 		}
 		return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, true,
-				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt)));
+				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt != null ? row.lastGarminImportAt : 0L)));
 	}
 
 	private void handleActivityBackfill(int userid) {
