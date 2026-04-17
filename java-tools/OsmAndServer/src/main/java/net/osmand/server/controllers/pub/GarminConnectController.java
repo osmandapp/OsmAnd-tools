@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -226,7 +227,10 @@ public class GarminConnectController {
 		if (row == null) {
 			return ResponseEntity.ok(GSON.toJson(Map.of("linked", false)));
 		}
-		return ResponseEntity.ok(GSON.toJson(Map.of("linked", true, "garminUserId", row.garminUserId)));
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("linked", true);
+		body.put("lastGarminImportAt", row.lastGarminImportAt);
+		return ResponseEntity.ok(GSON.toJson(body));
 	}
 
 	private void handleActivityBackfill(int userid) {
