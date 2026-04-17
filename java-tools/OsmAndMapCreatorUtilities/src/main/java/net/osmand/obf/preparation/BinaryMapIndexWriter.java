@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -165,7 +166,6 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
-	
 	
 	private final static int HH_INDEX_INIT = 17;
 	private final static int HH_BLOCK_SEGMENTS =18;
@@ -587,7 +587,7 @@ public class BinaryMapIndexWriter {
 					builder.addTagValueIds(tgv);
 				}
 			}
-			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox.POINTS_FIELD_NUMBER, builder.build());
+			codedOutStream.writeMessage(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, builder.build());
 		}
 	}
 
@@ -998,7 +998,28 @@ public class BinaryMapIndexWriter {
 		log.info("ADDRESS INDEX SIZE : " + len);
 	}
 
+	private void addAddressSearchTokens(Set<String> tokens, String value) {
+		if (Algorithms.isEmpty(value)) {
+			return;
+		}
+		for (String token : splitSearchNames(value)) {
+			String normalizedToken = normalizeIndexedStringTableKey(token);
+			if (!Algorithms.isEmpty(normalizedToken)) {
+				tokens.add(normalizedToken);
+			}
+		}
+	}
 
+	private Collection<String> collectAddressSearchTokens(MapObject mapObject) {
+		LinkedHashSet<String> tokens = new LinkedHashSet<>();
+		addAddressSearchTokens(tokens, mapObject.getName());
+		addAddressSearchTokens(tokens, mapObject.getEnName(false));
+		for (String otherName : mapObject.getOtherNames(false)) {
+			addAddressSearchTokens(tokens, otherName);
+		}
+		return tokens;
+	}
+	
 	public void writeAddressNameIndex(Map<String, List<MapObject>> namesIndex) throws IOException {
 		checkPeekState(ADDRESS_INDEX_INIT);
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -1016,7 +1037,11 @@ public class BinaryMapIndexWriter {
 				ref.writeReference(raf, getFilePointer());
 			}
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
-			// collapse same name ?
+			SuffixDictionaryData<MapObject> suffixDictionaryData = buildSuffixDictionaryData(entry.getKey(), entry.getValue(),
+					this::collectAddressSearchTokens);
+			for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+			}
 			for (MapObject o : entry.getValue()) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				// this is optional
@@ -1045,6 +1070,12 @@ public class BinaryMapIndexWriter {
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
+				}
+				int[] bitsetWords = suffixDictionaryData.bitsets.get(o);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						atom.addSuffixesBitset(bitsetWord);
+					}
 				}
 				builder.addAtom(atom.build());
 			}
@@ -1737,17 +1768,13 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
-	private record PoiNameSuffixEntry(String resolvedSuffix, String encodedSuffix) {}
+	private record SuffixEntry(String resolvedSuffix, String encodedSuffix) {}
 	private static final String EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL = "";
 
-	private static class PoiNameSuffixDictionaryData {
-		private final List<PoiNameSuffixEntry> dictionaryEntries = new ArrayList<>();
+	private static class SuffixDictionaryData<T> {
+		private final List<SuffixEntry> dictionaryEntries = new ArrayList<>();
 		private final Map<String, Integer> resolvedSuffixToIndex = new HashMap<>();
-		private final Map<PoiTileBox, int[]> bitsets = new LinkedHashMap<>();
-	}
-
-	private static String normalizePoiNameSuffix(String suffix) {
-		return Normalizer.normalize(suffix, Normalizer.Form.NFC);
+		private final Map<T, int[]> bitsets = new LinkedHashMap<>();
 	}
 
 	private static boolean startsWithReservedPoiSuffixMarker(String value) {
@@ -1788,7 +1815,7 @@ public class BinaryMapIndexWriter {
 		return commonPrefixCodePointLength;
 	}
 
-	private static String encodeFrontCodedPoiNameSuffix(String suffix, String previousSuffix) {
+	private static String encodeFrontCodedSuffix(String suffix, String previousSuffix) {
 		String encodedRawSuffix = encodeRawPoiNameSuffix(suffix);
 		if (previousSuffix == null) {
 			return encodedRawSuffix;
@@ -1803,30 +1830,31 @@ public class BinaryMapIndexWriter {
 		return countCodePoints(deltaEncodedSuffix) < countCodePoints(encodedRawSuffix) ? deltaEncodedSuffix : encodedRawSuffix;
 	}
 
-	private PoiNameSuffixDictionaryData buildSuffixDictionaryData(String prefix, List<PoiTileBox> tileBoxes) {
-		PoiNameSuffixDictionaryData data = new PoiNameSuffixDictionaryData();
+	private <T> SuffixDictionaryData<T> buildSuffixDictionaryData(String prefix, List<T> objects,
+			Function<T, Collection<String>> tokenSupplier) {
+		SuffixDictionaryData<T> data = new SuffixDictionaryData<>();
 		TreeSet<String> sortedSuffixes = new TreeSet<>();
-		Map<PoiTileBox, Set<String>> suffixesByBox = new LinkedHashMap<>();
-		for (PoiTileBox box : tileBoxes) {
-			Set<String> boxSuffixes = new LinkedHashSet<>();
-			suffixesByBox.put(box, boxSuffixes);
-			for (String token : box.tokens) {
+		Map<T, Set<String>> suffixesByObject = new LinkedHashMap<>();
+		for (T object : objects) {
+			Set<String> objectSuffixes = new LinkedHashSet<>();
+			suffixesByObject.put(object, objectSuffixes);
+			for (String token : tokenSupplier.apply(object)) {
 				if (!token.startsWith(prefix) || token.length() <= prefix.length()) {
 					continue;
 				}
-				String suffix = normalizePoiNameSuffix(token.substring(prefix.length()));
+				String suffix = Normalizer.normalize(token.substring(prefix.length()), Normalizer.Form.NFC);
 				if (suffix.isEmpty()) {
 					continue;
 				}
-				boxSuffixes.add(suffix);
+				objectSuffixes.add(suffix);
 				sortedSuffixes.add(suffix);
 			}
 		}
 		String previousSuffix = null;
 		for (String suffix : sortedSuffixes) {
-			String encodedSuffix = encodeFrontCodedPoiNameSuffix(suffix, previousSuffix);
-			PoiNameSuffixEntry entry = new PoiNameSuffixEntry(suffix, encodedSuffix);
-			data.resolvedSuffixToIndex.put(entry.resolvedSuffix, data.dictionaryEntries.size());
+			String encodedSuffix = encodeFrontCodedSuffix(suffix, previousSuffix);
+			SuffixEntry entry = new SuffixEntry(suffix, encodedSuffix);
+			data.resolvedSuffixToIndex.put(entry.resolvedSuffix(), data.dictionaryEntries.size());
 			data.dictionaryEntries.add(entry);
 			previousSuffix = suffix;
 		}
@@ -1834,16 +1862,19 @@ public class BinaryMapIndexWriter {
 		if (dictionaryWordCount == 0) {
 			return data;
 		}
-		for (PoiTileBox box : tileBoxes) {
+		for (T object : objects) {
 			int[] bitsetWords = new int[dictionaryWordCount];
-			for (String suffix : suffixesByBox.get(box)) {
-				Integer suffixIndex = data.resolvedSuffixToIndex.get(suffix);
-				if (suffixIndex == null) {
-					continue;
+			Set<String> objectSuffixes = suffixesByObject.get(object);
+			if (objectSuffixes != null) {
+				for (String suffix : objectSuffixes) {
+					Integer suffixIndex = data.resolvedSuffixToIndex.get(suffix);
+					if (suffixIndex == null) {
+						continue;
+					}
+					bitsetWords[suffixIndex >> 5] |= 1 << (suffixIndex & 31);
 				}
-				bitsetWords[suffixIndex >> 5] |= 1 << (suffixIndex & 31);
 			}
-			data.bitsets.put(box, bitsetWords);
+			data.bitsets.put(object, bitsetWords);
 		}
 		return data;
 	}
@@ -1862,12 +1893,13 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
-			PoiNameSuffixDictionaryData suffixDictionaryData = buildSuffixDictionaryData(e.getKey(), tileBoxes);
+			SuffixDictionaryData<PoiTileBox> suffixDictionaryData = buildSuffixDictionaryData(e.getKey(), tileBoxes,
+					box -> box.tokens);
 			if (suffixDictionaryData.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
-				for (PoiNameSuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
-					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix);
+				for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
 				}
 			}
 			for (PoiTileBox box : tileBoxes) {
