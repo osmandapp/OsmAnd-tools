@@ -51,6 +51,6 @@ public interface GarminUserConnectionRepository extends JpaRepository<GarminUser
 		public boolean activityExport;
 
 		@Column(name = "last_garmin_import_at")
-		public long lastGarminImportAt;
+		public Long lastGarminImportAt;
 	}
 }
