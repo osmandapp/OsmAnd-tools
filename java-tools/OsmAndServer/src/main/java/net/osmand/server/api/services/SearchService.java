@@ -65,7 +65,6 @@ public class SearchService {
     private ConcurrentHashMap<String, Map<String, String>> translationsCache;
     
     private static final int SEARCH_RADIUS_LEVEL = 1;
-    public static final double SEARCH_RADIUS_DEGREE = 1.5;
     private static final int TOTAL_LIMIT_POI = 2000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
     private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
@@ -200,16 +199,17 @@ public class SearchService {
         return bbox;
     }
 
-    public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
-                                Double radiusToLoadMaps, String northWest, String southEast) {
+    public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) {
+    }
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps, boolean queryIsCompleted, ObjectType... searchTypes) {
+        private static final double SEARCH_RADIUS_DEGREE = 1.5;
+
         public double getRadius() {
             return radiusToLoadMaps == null ? SEARCH_RADIUS_DEGREE : radiusToLoadMaps;
         }
     }
-    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings) {}
-    public record SearchResults(List<SearchResult> results,
-                                SearchSettings settings,
-                                String unitTestJson) {
+
+    public record SearchResults(List<SearchResult> results, SearchSettings settings, String unitTestJson) {
         public SearchResults(List<SearchResult> results) {
             this(results, null, null);
         }
@@ -217,11 +217,11 @@ public class SearchService {
 
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, null, true, (ObjectType[]) null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
             BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
-			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s",ctx. text,
+			LOGGER.info(String.format("Search %s results %d took %.2f sec - %s", ctx.text,
 					searchResults.results() == null ? 0 : searchResults.results().size(),
 					(System.currentTimeMillis() - tm) / 1000.0, stat));
 		}
@@ -239,14 +239,17 @@ public class SearchService {
             return new SearchResults(Collections.emptyList());
         }
         SearchUICore searchUICore = new SearchUICore(getMapPoiTypes(ctx.locale), ctx.locale, false);
+        if (option.searchTypes != null) {
+            searchUICore.getPhrase().getSettings().updateSearchTypes(option.searchTypes);
+        }
         if (!option.unlimited) {
             searchUICore.setTotalLimit(TOTAL_LIMIT_SEARCH_RESULTS);
         }
         searchUICore.getSearchSettings().setRegions(osmandRegions);
 
         QuadRect points = osmAndMapsService.points(null,
-		        new LatLon(ctx.lat + ctx.getRadius(), ctx.lon - ctx.getRadius()),
-                new LatLon(ctx.lat - ctx.getRadius(), ctx.lon + ctx.getRadius()));
+		        new LatLon(ctx.lat + option.getRadius(), ctx.lon - option.getRadius()),
+                new LatLon(ctx.lat - option.getRadius(), ctx.lon + option.getRadius()));
         List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
         try {
             List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
@@ -268,7 +271,8 @@ public class SearchService {
             searchUICore.init();
             searchUICore.registerAPI(new SearchCoreFactory.SearchRegionByNameAPI());
             
-            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(ctx.text + DELIMITER,
+            SearchUICore.SearchResultCollection resultCollection = searchUICore.immediateSearch(ctx.text + 
+                            (option.queryIsCompleted ? DELIMITER : ""),
 		            new LatLon(ctx.lat, ctx.lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, ctx.text, ctx.locale, searchUICore);
 
