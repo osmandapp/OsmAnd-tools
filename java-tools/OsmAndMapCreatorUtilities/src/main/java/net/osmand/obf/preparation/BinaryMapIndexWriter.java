@@ -1798,29 +1798,12 @@ public class BinaryMapIndexWriter {
 		return value.offsetByCodePoints(0, codePointCount);
 	}
 
-	private static int commonPrefixCodePointLength(String left, String right) {
-		int leftOffset = 0;
-		int rightOffset = 0;
-		int commonPrefixCodePointLength = 0;
-		while (leftOffset < left.length() && rightOffset < right.length()) {
-			int leftCodePoint = left.codePointAt(leftOffset);
-			int rightCodePoint = right.codePointAt(rightOffset);
-			if (leftCodePoint != rightCodePoint) {
-				break;
-			}
-			leftOffset += Character.charCount(leftCodePoint);
-			rightOffset += Character.charCount(rightCodePoint);
-			commonPrefixCodePointLength++;
-		}
-		return commonPrefixCodePointLength;
-	}
-
 	private static String encodeFrontCodedSuffix(String suffix, String previousSuffix) {
 		String encodedRawSuffix = encodeRawPoiNameSuffix(suffix);
 		if (previousSuffix == null) {
 			return encodedRawSuffix;
 		}
-		int commonPrefixCodePointLength = commonPrefixCodePointLength(previousSuffix, suffix);
+		int commonPrefixCodePointLength = commonPrefixLength(previousSuffix, suffix);
 		if (commonPrefixCodePointLength > MARKER_LCP_LENGTH) {
 			return encodedRawSuffix;
 		}
@@ -1839,10 +1822,11 @@ public class BinaryMapIndexWriter {
 			Set<String> objectSuffixes = new LinkedHashSet<>();
 			suffixesByObject.put(object, objectSuffixes);
 			for (String token : tokenSupplier.apply(object)) {
-				if (!token.startsWith(prefix) || token.length() <= prefix.length()) {
+				int suffixOffset = suffixOffsetAfterPrefix(token, prefix);
+				if (suffixOffset < 0) {
 					continue;
 				}
-				String suffix = Normalizer.normalize(token.substring(prefix.length()), Normalizer.Form.NFC);
+				String suffix = Normalizer.normalize(token.substring(suffixOffset), Normalizer.Form.NFC);
 				if (suffix.isEmpty()) {
 					continue;
 				}
