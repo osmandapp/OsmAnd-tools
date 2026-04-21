@@ -36,6 +36,8 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 	
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 
+	boolean existsByUseridAndNameAndType(int userid, String name, String type);
+
 	Iterable<UserFile> findAllByUserid(int userid);
 
     @Query("SELECT uf FROM UserFile uf "

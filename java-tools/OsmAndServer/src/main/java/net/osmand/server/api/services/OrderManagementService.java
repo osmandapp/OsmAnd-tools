@@ -17,7 +17,9 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
@@ -487,6 +489,52 @@ public class OrderManagementService {
 			return false;
 		}
 		return (System.currentTimeMillis() - checkTime.getTime()) <= MINIMUM_WAIT_TO_REVALIDATE;
+	}
+
+	@Transactional
+	public boolean updatePurchaseValidation(String orderId, String sku, boolean valid, int userId) {
+		if (orderId == null || orderId.isBlank() || sku == null || sku.isBlank()) {
+			return false;
+		}
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
+				subscriptionsRepository.findByOrderIdAndSku(orderId, sku);
+		int n = subs == null ? 0 : subs.size();
+		if (n > 0) {
+			if (n != 1) {
+				return false;
+			}
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subs.get(0);
+			validateOwner(userId, sub.userId);
+			sub.valid = valid;
+			subscriptionsRepository.saveAndFlush(sub);
+			verifyAndRefreshProForUserId(userId);
+			return true;
+		}
+		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
+				deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
+		n = iaps == null ? 0 : iaps.size();
+		if (n != 1) {
+			return false;
+		}
+		DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = iaps.get(0);
+		validateOwner(userId, iap.userId);
+		iap.valid = valid;
+		deviceInAppPurchasesRepository.saveAndFlush(iap);
+		verifyAndRefreshProForUserId(iap.userId);
+		return true;
+	}
+
+	private void validateOwner(int cloudUserId, int userId) {
+		if (!Objects.equals(userId, cloudUserId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+		}
+	}
+
+	private void verifyAndRefreshProForUserId(int userId) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+		if (pu != null) {
+			userSubService.verifyAndRefreshProOrderId(pu);
+		}
 	}
 }
 
