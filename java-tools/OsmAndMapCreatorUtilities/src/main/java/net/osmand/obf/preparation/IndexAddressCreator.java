@@ -59,6 +59,23 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexAddressCreator.class);
 	private final Log logMapDataWarn;
 
+	public static class MapObjectIndex {
+		private final Map<MapObject, LinkedHashSet<String>> objectTokens = new LinkedHashMap<>();
+
+		public void addToken(MapObject object, String token) {
+			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
+		public Set<MapObject> getObjects() {
+			return objectTokens.keySet();
+		}
+
+		public Set<String> getTokens(MapObject object) {
+			LinkedHashSet<String> tokens = objectTokens.get(object);
+			return tokens == null ? Collections.emptySet() : tokens;
+		}
+	}
+
 	private PreparedStatement addressCityStat;
 
 	// MEMORY address : choose what to use ?
@@ -1203,7 +1220,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 
-		Map<String, List<MapObject>> namesIndex = new TreeMap<String, List<MapObject>>(Collator.getInstance());
+		Map<String, MapObjectIndex> namesIndex = new TreeMap<String, MapObjectIndex>(Collator.getInstance());
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
@@ -1355,8 +1372,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public static void putNamedMapObject(Map<String, List<MapObject>> namesIndex, MapObject o, long fileOffset,
-			IndexCreatorSettings settings) {
+	public static void putNamedMapObject(Map<String, MapObjectIndex> namesIndex, MapObject o, long fileOffset,
+										 IndexCreatorSettings settings) {
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex, settings);
 		for (String nm : o.getNamesMap(true).values()) {
@@ -1384,7 +1401,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return retName;
 	}
 
-    private static void parsePrefix(String name, MapObject data, Map<String, List<MapObject>> namesIndex,
+    private static void parsePrefix(String name, MapObject data, Map<String, MapObjectIndex> namesIndex,
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
 		Collection<String> splitNames = splitAndNormalize(name);
@@ -1411,25 +1428,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 
 		// add to the map
-		for (String substr : namesToAdd) {
-			if (substr.length() > settings.charsToBuildAddressNameIndex) {
-				substr = substr.substring(0, settings.charsToBuildAddressNameIndex);
+		for (String token : namesToAdd) {
+			String prefixKey = token;
+			if (prefixKey.length() > settings.charsToBuildAddressNameIndex) {
+				prefixKey = prefixKey.substring(0, settings.charsToBuildAddressNameIndex);
 			}
-			String val = substr.toLowerCase();
-			List<MapObject> list = namesIndex.get(val);
-			if (list == null) {
-				list = new ArrayList<MapObject>();
-				namesIndex.put(val, list);
+			String val = prefixKey.toLowerCase(Locale.ROOT);
+			MapObjectIndex entry = namesIndex.get(val);
+			if (entry == null) {
+				entry = new MapObjectIndex();
+				namesIndex.put(val, entry);
 			}
-			if (!list.contains(data)) {
-				list.add(data);
-			}
+			entry.addToken(data, token);
 		}
 
 	}
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
-			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, Map<String, List<MapObject>> namesIndex,
+			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, Map<String, MapObjectIndex> namesIndex,
 			Map<String, Integer> tagRules, IProgress progress)
 			throws IOException, SQLException {
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();

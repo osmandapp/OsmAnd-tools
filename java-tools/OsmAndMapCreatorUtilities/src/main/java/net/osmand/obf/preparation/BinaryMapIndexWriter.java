@@ -15,12 +15,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -104,7 +102,6 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
-import net.osmand.CollatorStringMatcher;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
@@ -995,36 +992,13 @@ public class BinaryMapIndexWriter {
 		log.info("ADDRESS INDEX SIZE : " + len);
 	}
 
-	private void addAddressSearchTokens(Set<String> tokens, String value) {
-		if (Algorithms.isEmpty(value)) {
-			return;
-		}
-		for (String token : splitSearchNames(value)) {
-			String normalizedToken = normalizeIndexedStringTableKey(token);
-			if (!Algorithms.isEmpty(normalizedToken)) {
-				tokens.add(normalizedToken);
-			}
-		}
-	}
-
-	private Collection<String> collectAddressSearchTokens(MapObject mapObject) {
-		LinkedHashSet<String> tokens = new LinkedHashSet<>();
-		addAddressSearchTokens(tokens, mapObject.getName());
-		addAddressSearchTokens(tokens, mapObject.getEnName(false));
-		for (String otherName : mapObject.getOtherNames(false)) {
-			addAddressSearchTokens(tokens, otherName);
-		}
-		return tokens;
-	}
-	
-	public void writeAddressNameIndex(Map<String, List<MapObject>> namesIndex) throws IOException {
+	public void writeAddressNameIndex(Map<String, IndexAddressCreator.MapObjectIndex> namesIndex) throws IOException {
 		checkPeekState(ADDRESS_INDEX_INIT);
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 
-		Map<String, List<MapObject>> normalizedNamesIndex = normalizeIndex(namesIndex);
-		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, normalizedNamesIndex.keySet());
-		for (Entry<String, List<MapObject>> entry : normalizedNamesIndex.entrySet()) {
+		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
+		for (Entry<String, IndexAddressCreator.MapObjectIndex> entry : namesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
 
 			codedOutStream.writeTag(OsmAndAddressNameIndexData.ATOM_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
@@ -1034,12 +1008,14 @@ public class BinaryMapIndexWriter {
 				ref.writeReference(raf, getFilePointer());
 			}
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
-			SuffixDictionaryData<MapObject> suffixDictionaryData = SearchAlgorithms.buildSuffixDictionary(entry.getKey(), entry.getValue(),
-					this::collectAddressSearchTokens);
+			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
+			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
+			SuffixDictionaryData<MapObject> suffixDictionaryData = SearchAlgorithms.buildSuffixDictionary(entry.getKey(), objects,
+					indexEntry::getTokens);
 			for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
 				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
 			}
-			for (MapObject o : entry.getValue()) {
+			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				// this is optional
 //				atom.setName(o.getName());
@@ -1832,32 +1808,6 @@ public class BinaryMapIndexWriter {
 
 
 		return fpToWriteSeeks;
-	}
-
-	private static String normalizeIndexedStringTableKey(String key) {
-		if (key == null) {
-			return null;
-		}
-		String normalized = CollatorStringMatcher.alignChars(key);
-		normalized = normalized.toLowerCase(Locale.ROOT);
-		return normalized;
-	}
-
-	private static <V extends Collection> Map<String, V> normalizeIndex(Map<String, V> namesIndex) {
-		Map<String, V> normalized = new TreeMap<>();
-		for (Entry<String, V> e : namesIndex.entrySet()) {
-			String normalizedKey = normalizeIndexedStringTableKey(e.getKey());
-			if (normalizedKey == null || normalizedKey.isEmpty()) {
-				continue;
-			}
-			V existing = normalized.get(normalizedKey);
-			if (existing == null) {
-				normalized.put(normalizedKey, e.getValue());
-			} else {
-				existing.addAll(e.getValue());
-			}
-		}
-		return normalized;
 	}
 
 	private Map<String, BinaryFileReference> writeIndexedTable(int tag, Collection<String> indexedTable) throws IOException {
