@@ -111,7 +111,7 @@ public class GarminConnectService {
 	private static final Pattern SAFE_GARMIN_SUMMARY_ID = Pattern.compile("^[a-zA-Z0-9._-]+$");
 	private static final Pattern NON_FILE_SAFE_ACTIVITY_NAME = Pattern.compile("[^a-zA-Z0-9._-]+");
 	private static final int MAX_ACTIVITY_NAME_PREFIX_LEN = 100;
-	private static final String GPX_FOLDER_GARMIN = "Garmin";
+	private static final String GPX_FOLDER_GARMIN = "Garmin Connect";
 
 	private static final String GARMIN_ACTIVITY_FILE_TYPE_FIT = "FIT";
 	private static final String GARMIN_ACTIVITY_FILE_TYPE_GPX = "GPX";
