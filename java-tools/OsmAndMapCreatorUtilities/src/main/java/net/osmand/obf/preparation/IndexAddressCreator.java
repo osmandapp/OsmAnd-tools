@@ -47,6 +47,7 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -1429,11 +1430,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		// add to the map
 		for (String token : namesToAdd) {
-			String prefixKey = token;
-			if (prefixKey.length() > settings.charsToBuildAddressNameIndex) {
-				prefixKey = prefixKey.substring(0, settings.charsToBuildAddressNameIndex);
+			String val = SearchAlgorithms.buildIndexedPrefix(token, settings.charsToBuildAddressNameIndex);
+			if (val.isEmpty()) {
+				continue;
 			}
-			String val = prefixKey.toLowerCase(Locale.ROOT);
 			MapObjectIndex entry = namesIndex.get(val);
 			if (entry == null) {
 				entry = new MapObjectIndex();

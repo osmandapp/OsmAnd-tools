@@ -51,6 +51,7 @@ import net.osmand.router.RoutingContext;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -1109,20 +1110,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
-        name = Algorithms.normalizeSearchText(name);
-        Collection<String> splitName = splitAndNormalize(name);
+        Collection<String> splitName = SearchAlgorithms.splitAndNormalize(name);
         for (String token : splitName) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String str = token;
-            if (str.length() > ind) {
-                str = str.substring(0, ind);
-            }
-            if (!poiData.containsKey(str)) {
-                poiData.put(str, new LinkedHashSet<>());
-            }
-            poiData.get(str).add(data);
+			String str = SearchAlgorithms.buildIndexedPrefix(token, ind);
+			if (Algorithms.isEmpty(str)) {
+				continue;
+			}
+		    if (!poiData.containsKey(str)) {
+		        poiData.put(str, new LinkedHashSet<>());
+		    }
+		    poiData.get(str).add(data);
 	        data.addToken(token);
         }
     }
