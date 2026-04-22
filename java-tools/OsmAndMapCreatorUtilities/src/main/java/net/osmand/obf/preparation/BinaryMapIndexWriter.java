@@ -582,7 +582,7 @@ public class BinaryMapIndexWriter {
 					builder.addTagValueIds(tgv);
 				}
 			}
-			codedOutStream.writeMessage(OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER, builder.build());
+			codedOutStream.writeMessage(OsmandOdb.OsmAndHHRoutingIndex.HHRoutePointsBox.POINTS_FIELD_NUMBER, builder.build());
 		}
 	}
 
