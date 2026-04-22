@@ -281,14 +281,17 @@ public interface DataService extends BaseService {
 		}
 
 		List<SearchResult> searchResults = searchResult == null ? Collections.emptyList() : searchResult.results();
-		boolean isZeroDist = false;
+		int minDist = Integer.MAX_VALUE;
         for (SearchResult sr : searchResults) {
             if (sr.location == null && sr.objectType == POI_TYPE) {
                 sr.location = targetPoint;
             }
-			if (sr.location != null && !isZeroDist) {
-				double dist = MapUtils.getDistance(targetPoint, sr.location);
-				isZeroDist = dist < 500.0;
+			if (sr.location == null) {
+				continue;
+			}
+			double dist = MapUtils.getDistance(targetPoint, sr.location);
+			if (minDist > dist) {
+				minDist = (int) dist;
 			}
         }
 
@@ -332,7 +335,7 @@ public interface DataService extends BaseService {
 					row.put("dup_count", dupCount);
 				}
 				if (stat != null) {
-					row.put("zero_dist", isZeroDist);
+					row.put("min_dist", minDist);
 					row.put("stat_bytes", stat.totalBytes);
 					row.put("stat_time", stat.totalTime);
 					int statResultsCount = 0;
