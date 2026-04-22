@@ -22,7 +22,6 @@ import java.util.Stack;
 import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
-import net.osmand.util.SearchAlgorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -109,6 +108,7 @@ import net.sf.junidecode.Junidecode;
 import static net.osmand.util.SearchAlgorithms.*;
 
 public class BinaryMapIndexWriter {
+
 	private RandomAccessFile raf;
 	private CodedOutputStream codedOutStream;
 
@@ -116,7 +116,7 @@ public class BinaryMapIndexWriter {
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
 	private static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
-	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE;
+	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
 
 	private static class Bounds {
@@ -160,6 +160,7 @@ public class BinaryMapIndexWriter {
 
 	private final static int ROUTE_INDEX_INIT = 15;
 	private final static int ROUTE_TREE = 16;
+	
 	
 	private final static int HH_INDEX_INIT = 17;
 	private final static int HH_BLOCK_SEGMENTS =18;
@@ -1010,7 +1011,7 @@ public class BinaryMapIndexWriter {
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
 			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
 			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
-			SuffixDictionaryData<MapObject> suffixDictionaryData = SearchAlgorithms.buildSuffixDictionary(entry.getKey(), objects,
+			SuffixDictionaryData<MapObject> suffixDictionaryData = buildSuffixDictionary(entry.getKey(), objects,
 					indexEntry::getTokens);
 			for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
 				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
@@ -1180,7 +1181,9 @@ public class BinaryMapIndexWriter {
 			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes,
 			Map<String, Integer> tagRules) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
-
+		if (street.getName().startsWith("Burnhamthorpe")) {
+			System.out.println("--- ");
+		}
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
 		streetBuilder.setName(street.getName());
 		if (checkEnNameToWrite(street)) {
@@ -1753,7 +1756,7 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
-			SuffixDictionaryData<PoiTileBox> suffixDictionaryData = SearchAlgorithms.buildSuffixDictionary(e.getKey(), tileBoxes,
+			SuffixDictionaryData<PoiTileBox> suffixDictionaryData = buildSuffixDictionary(e.getKey(), tileBoxes,
 					box -> box.tokens);
 			if (suffixDictionaryData.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
