@@ -267,7 +267,9 @@ public class GarminConnectController {
 
 	private PendingEntry removePending(String state) {
 		if (redisTemplate != null) {
-			String json = redisTemplate.opsForValue().getAndDelete(REDIS_KEY_PREFIX + state);
+			String key = REDIS_KEY_PREFIX + state;
+			String json = redisTemplate.opsForValue().get(key);
+			redisTemplate.delete(key);
 			if (json == null) {
 				return null;
 			}
