@@ -210,7 +210,7 @@ public class GarminConnectService {
 
 	private void createGarminFolderIfAbsent(int userid) {
 		List<UserFile> existingFiles = cloudUserFilesRepository.findLatestFilesByFolderName(
-				userid, GPX_FOLDER_GARMIN, FILE_TYPE_GPX);
+				userid, GPX_FOLDER_GARMIN + "/", FILE_TYPE_GPX);
 		boolean hasNonDeleted = existingFiles.stream().anyMatch(GarminConnectService::isNonDeletedCloudFile);
 		if (hasNonDeleted) {
 			return;
@@ -223,12 +223,15 @@ public class GarminConnectService {
 		}
 		File tmp = null;
 		try {
-			tmp = File.createTempFile("garmin-folder-", ".info");
+			tmp = File.createTempFile("garmin-folder-", ".gpx");
 			String folderMarker = GPX_FOLDER_GARMIN + "/" + EMPTY_FILE_NAME;
 			StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
 			tmp = null;
+			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
 			userdataService.uploadFile(zip, dev, folderMarker, FILE_TYPE_GPX, System.currentTimeMillis());
 			LOG.info("Garmin: created empty folder marker '" + folderMarker + "' for userid=" + userid);
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn("Garmin: skipped empty folder marker creation for userid=" + userid + " due to upload validation failure: " + e.getMessage());
 		} catch (Exception e) {
 			LOG.warn("Garmin: failed to create empty folder marker for userid=" + userid, e);
 		} finally {
