@@ -34,12 +34,14 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.server.api.services.UserdataService.EMPTY_FILE_NAME;
 
 @Service
 public class GarminConnectService {
@@ -200,8 +202,47 @@ public class GarminConnectService {
 		applyUserPermissionsFromGarmin(row);
 		garminUserConnectionRepository.save(row);
 
+		createGarminFolderIfAbsent(userid);
+
 		LOG.info("Garmin linked for OsmAnd userid=" + userid);
 		return new GarminLinkResult(GarminLinkStatus.OK, row.historicalDataExport);
+	}
+
+	private void createGarminFolderIfAbsent(int userid) {
+		List<UserFile> existingFiles = cloudUserFilesRepository.findLatestFilesByFolderName(
+				userid, GPX_FOLDER_GARMIN + "/", FILE_TYPE_GPX);
+		boolean hasNonDeleted = existingFiles.stream().anyMatch(GarminConnectService::isNonDeletedCloudFile);
+		if (hasNonDeleted) {
+			return;
+		}
+		CloudUserDevicesRepository.CloudUserDevice dev =
+				devicesRepository.findTopByUseridAndDeviceidOrderByUdpatetimeDesc(userid, UserdataService.TOKEN_DEVICE_WEB);
+		if (dev == null) {
+			LOG.warn("Garmin: no web device for userid=" + userid + ", skipping empty folder creation");
+			return;
+		}
+		File tmp = null;
+		try {
+			tmp = File.createTempFile("garmin-folder-", ".gpx");
+			String folderMarker = GPX_FOLDER_GARMIN + "/" + EMPTY_FILE_NAME;
+			StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
+			tmp = null;
+			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
+			userdataService.uploadFile(zip, dev, folderMarker, FILE_TYPE_GPX, System.currentTimeMillis());
+			LOG.info("Garmin: created empty folder marker '" + folderMarker + "' for userid=" + userid);
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn("Garmin: skipped empty folder marker creation for userid=" + userid + " due to upload validation failure: " + e.getMessage());
+		} catch (Exception e) {
+			LOG.warn("Garmin: failed to create empty folder marker for userid=" + userid, e);
+		} finally {
+			if (tmp != null) {
+				try {
+					Files.deleteIfExists(tmp.toPath());
+				} catch (IOException ignored) {
+					tmp.deleteOnExit();
+				}
+			}
+		}
 	}
 
 	// Refresh token lives 3 months and is reissued on every token response
