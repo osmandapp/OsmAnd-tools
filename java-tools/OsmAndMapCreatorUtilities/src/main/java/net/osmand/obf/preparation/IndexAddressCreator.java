@@ -1430,7 +1430,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		// add to the map
 		for (String token : namesToAdd) {
-			String val = SearchAlgorithms.buildIndexedPrefix(token, settings.charsToBuildAddressNameIndex);
+			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
 			if (val.isEmpty()) {
 				continue;
 			}

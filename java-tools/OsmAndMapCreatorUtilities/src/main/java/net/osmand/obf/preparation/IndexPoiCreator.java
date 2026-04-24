@@ -48,14 +48,11 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
-import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
-
-import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
@@ -1115,7 +1112,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String str = SearchAlgorithms.buildIndexedPrefix(token, ind);
+			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
 			if (Algorithms.isEmpty(str)) {
 				continue;
 			}

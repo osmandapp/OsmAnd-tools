@@ -1011,9 +1011,9 @@ public class BinaryMapIndexWriter {
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
 			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
 			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
-			SuffixDictionaryData<MapObject> suffixDictionaryData = buildSuffixDictionary(entry.getKey(), objects,
+			SuffixDictionary<MapObject> suffixDictionary = nameIndexBuildSuffixDictionary(entry.getKey(), objects,
 					indexEntry::getTokens);
-			for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+			for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
 			}
 			for (MapObject o : objects) {
@@ -1045,7 +1045,7 @@ public class BinaryMapIndexWriter {
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
 				}
-				int[] bitsetWords = suffixDictionaryData.bitsets.get(o);
+				int[] bitsetWords = suffixDictionary.bitsets.get(o);
 				if (bitsetWords != null) {
 					for (int bitsetWord : bitsetWords) {
 						atom.addSuffixesBitset(bitsetWord);
@@ -1756,12 +1756,12 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
-			SuffixDictionaryData<PoiTileBox> suffixDictionaryData = buildSuffixDictionary(e.getKey(), tileBoxes,
+			SuffixDictionary<PoiTileBox> suffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes,
 					box -> box.tokens);
-			if (suffixDictionaryData.dictionaryEntries.isEmpty()) {
+			if (suffixDictionary.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
-				for (SuffixEntry dictionaryEntry : suffixDictionaryData.dictionaryEntries) {
+				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
 				}
 			}
@@ -1770,7 +1770,7 @@ public class BinaryMapIndexWriter {
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
-				int[] bitsetWords = suffixDictionaryData.bitsets.get(box);
+				int[] bitsetWords = suffixDictionary.bitsets.get(box);
 				if (bitsetWords != null) {
 					for (int bitsetWord : bitsetWords) {
 						bs.addSuffixesBitset(bitsetWord);
