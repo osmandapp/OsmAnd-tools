@@ -6,21 +6,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URL;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,7 +18,6 @@ import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.BloomFilter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
@@ -62,10 +48,9 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
-import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.util.Algorithms;
-import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -1122,26 +1107,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
-        name = Algorithms.normalizeSearchText(name);
-        Set<String> splitName = new HashSet<>(SearchCoreFactory.splitSearchNames(name));
-        if (ArabicNormalizer.isSpecialArabic(name)) {
-            String arabic = ArabicNormalizer.normalize(name);
-            if (arabic != null && !arabic.equals(name)) {
-                splitName.addAll(SearchCoreFactory.splitSearchNames(arabic));
-            }
-        }
+        Collection<String> splitName = SearchAlgorithms.splitAndNormalize(name);
         for (String token : splitName) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String str = token;
-            if (str.length() > ind) {
-                str = str.substring(0, ind);
-            }
-            if (!poiData.containsKey(str)) {
-                poiData.put(str, new LinkedHashSet<>());
-            }
-            poiData.get(str).add(data);
+			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
+			if (Algorithms.isEmpty(str)) {
+				continue;
+			}
+		    if (!poiData.containsKey(str)) {
+		        poiData.put(str, new LinkedHashSet<>());
+		    }
+		    poiData.get(str).add(data);
 	        data.addToken(token);
         }
     }
@@ -1212,8 +1190,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
-		final Set<String> boxTokens = new LinkedHashSet<>();
-		private byte[] cachedBloom = null;
+		final Set<String> tokens = new LinkedHashSet<>();
 
 		public int getX() {
 			return x;
@@ -1227,17 +1204,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-		public byte[] getIndexBloom() {
-			if (cachedBloom == null) {
-				cachedBloom = BloomFilter.getInstance().build(boxTokens);
-			}
-			return cachedBloom;
-		}
-
 		public void addToken(String token) {
-			if (boxTokens.add(token)) {
-				cachedBloom = null;
-			}
+			tokens.add(token);
 		}
 	}
 
