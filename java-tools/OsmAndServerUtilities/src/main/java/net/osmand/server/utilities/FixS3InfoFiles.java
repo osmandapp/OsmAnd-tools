@@ -5,15 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.*;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -28,39 +31,57 @@ public class FixS3InfoFiles {
 
 	public static void main(String[] args) throws Exception {
 
-		try (S3Client s3 = S3Client.create()) {
+		try (S3Client s3 = S3Client.builder()
+				.endpointOverride(URI.create("https://s3.nl-ams.scw.cloud"))
+				.region(Region.of("nl-ams"))
+				.build()) {
 			ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL);
-
-			for (CommonPrefix userPrefix : getUsers(s3, BUCKET)) {
+			AtomicInteger infoSubmitted = new AtomicInteger(0);
+			AtomicInteger infoFixed = new AtomicInteger(0);
+			AtomicInteger processed = new AtomicInteger(0);
+			AtomicInteger lastPrinted = new AtomicInteger(0);
+			List<CommonPrefix> users = getUsers(s3, BUCKET);
+			int totalUsers = users.size();
+			for (CommonPrefix userPrefix : users) {
 				String gpxPrefix = userPrefix.prefix() + "GPX/";
-				System.out.println("Listing: s3://" + BUCKET + "/" + gpxPrefix);
 
 				for (S3Object obj : getFiles(s3, BUCKET, gpxPrefix)) {
 					String key = obj.key();
 					if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
 						continue;
 					}
-					System.out.println(key);
+					infoSubmitted.incrementAndGet();
 					pool.submit(() -> {
-//						try {
-//							processOne(s3, BUCKET, key);
-//						} catch (Exception e) {
-//							System.err.println("FAILED: " + key + " -> " + e.getMessage());
-//						}
+						try {
+							boolean fixed = processOne(s3, BUCKET, key);
+							if (fixed) {
+								infoFixed.incrementAndGet();
+							}
+						} catch (Exception e) {
+							System.err.println("FAILED: " + key + " -> " + e.getMessage());
+						} finally {
+							int done = processed.incrementAndGet();
+							int infoProcessed = infoSubmitted.get();
+							int milestone = (done * 100 / totalUsers);
+							int lastMilestone = lastPrinted.get();
+							if (milestone > lastMilestone && lastPrinted.compareAndSet(lastMilestone, milestone)) {
+								System.out.printf("Progress: %d%% (%d/%d users) %d info files %d fixed info files\n",
+										milestone, done, totalUsers, infoProcessed, infoFixed.get());
+							}
+						}
 					});
 				}
 			}
 
 			pool.shutdown();
 			pool.awaitTermination(1, TimeUnit.DAYS);
-			System.out.println("All done.");
+			System.out.printf("\nDone! Processed %d users %d info files %d fixed files.\n",
+					totalUsers, infoSubmitted.get(), infoFixed.get());
 		}
 	}
 
-	static void processOne(S3Client s3, String bucket, String key) throws Exception {
+	static boolean processOne(S3Client s3, String bucket, String key) throws Exception {
 		String baseName = baseNameFromKey(key);
-		System.out.println("Processing: s3://" + bucket + "/" + key + " -> file=" + baseName);
-
 		File tmpIn = Files.createTempFile("gpx-in-", ".gz").toFile();
 		File tmpOut = Files.createTempFile("gpx-out-", ".gz").toFile();
 
@@ -77,16 +98,15 @@ public class FixS3InfoFiles {
 				root = MAPPER.readTree(gin);
 			}
 
-			TransformResult tr = fixIfBroken(root, baseName);
-			if (!tr.changed) {
-				System.out.println("OK (not broken): s3://" + bucket + "/" + key + " (skip)");
-				return;
+			ProcessedFile processedFile = fixIfBroken(root, baseName);
+			if (!processedFile.changed) {
+				return false;
 			}
 
 			try (OutputStream fout = new BufferedOutputStream(new FileOutputStream(tmpOut));
 			     GZIPOutputStream gzOut = new GZIPOutputStream(fout);
 			     Writer w = new OutputStreamWriter(gzOut, StandardCharsets.UTF_8)) {
-				MAPPER.writeValue(w, tr.node);
+				MAPPER.writeValue(w, processedFile.node);
 			}
 
 			if (TEST_RUN) {
@@ -94,19 +114,19 @@ public class FixS3InfoFiles {
 				System.out.println("FILE: " + tmpOut.getAbsolutePath());
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (would upload)");
 			} else {
-				//	upload(s3, bucket, key, tmpOut);
+				//	upload(s3, bucket, key, tmpOut); comment for test!!!
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (uploaded)");
 			}
-
+			return true;
 		} finally {
 			tmpIn.delete();
 			tmpOut.delete();
 		}
 	}
 
-	static TransformResult fixIfBroken(JsonNode node, String baseName) {
+	static ProcessedFile fixIfBroken(JsonNode node, String baseName) {
 		if (node == null || !node.isObject()) {
-			return new TransformResult(node, false);
+			return new ProcessedFile(node, false);
 		}
 
 		ObjectNode obj = (ObjectNode) node;
@@ -116,12 +136,12 @@ public class FixS3InfoFiles {
 			out.put("file", "/tracks/" + baseName);
 			out.put("subtype", "gpx");
 			out.setAll(obj);
-			return new TransformResult(out, true);
+			return new ProcessedFile(out, true);
 		}
-		return new TransformResult(node, false);
+		return new ProcessedFile(node, false);
 	}
 
-	record TransformResult(JsonNode node, boolean changed) {
+	record ProcessedFile(JsonNode node, boolean changed) {
 	}
 
 	static void upload(S3Client s3, String bucket, String key, File file) {
@@ -148,12 +168,11 @@ public class FixS3InfoFiles {
 				result.addAll(prefixes);
 				totalUser += prefixes.size();
 			}
-			if (pageCount % 1000 == 0) {
+			if (pageCount % 20 == 0) {
 				System.out.printf("Pages: %d, Users: %d%n", pageCount, totalUser);
 			}
 		}
-		System.out.println("Total users" + result.size());
-
+		System.out.printf("Total pages: %d, total users: %d\n", pageCount, result.size());
 		return result;
 	}
 
