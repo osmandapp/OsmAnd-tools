@@ -3,6 +3,8 @@ package net.osmand.server.utilities;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
@@ -21,6 +23,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class FixS3InfoFiles {
+	static final Log LOG = LogFactory.getLog(FixS3InfoFiles.class);
 
 	static final ObjectMapper MAPPER = new ObjectMapper();
 	static final boolean TEST_RUN = true; // set false to enable real upload
@@ -35,48 +38,46 @@ public class FixS3InfoFiles {
 				.endpointOverride(URI.create("https://s3.nl-ams.scw.cloud"))
 				.region(Region.of("nl-ams"))
 				.build()) {
+			LOG.info("Start processing ...");
 			ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL);
-			AtomicInteger infoSubmitted = new AtomicInteger(0);
-			AtomicInteger infoFixed = new AtomicInteger(0);
-			AtomicInteger processed = new AtomicInteger(0);
+			AtomicInteger submittedFiles = new AtomicInteger(0);
+			AtomicInteger fixedFiles = new AtomicInteger(0);
+			AtomicInteger processedUsers = new AtomicInteger(0);
 			AtomicInteger lastPrinted = new AtomicInteger(0);
 			List<CommonPrefix> users = getUsers(s3, BUCKET);
 			int totalUsers = users.size();
 			for (CommonPrefix userPrefix : users) {
 				String gpxPrefix = userPrefix.prefix() + "GPX/";
-
+				int done = processedUsers.incrementAndGet();
 				for (S3Object obj : getFiles(s3, BUCKET, gpxPrefix)) {
 					String key = obj.key();
 					if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
 						continue;
 					}
-					infoSubmitted.incrementAndGet();
+					submittedFiles.incrementAndGet();
 					pool.submit(() -> {
 						try {
 							boolean fixed = processOne(s3, BUCKET, key);
 							if (fixed) {
-								infoFixed.incrementAndGet();
+								fixedFiles.incrementAndGet();
 							}
 						} catch (Exception e) {
 							System.err.println("FAILED: " + key + " -> " + e.getMessage());
-						} finally {
-							int done = processed.incrementAndGet();
-							int infoProcessed = infoSubmitted.get();
-							int milestone = (done * 100 / totalUsers);
-							int lastMilestone = lastPrinted.get();
-							if (milestone > lastMilestone && lastPrinted.compareAndSet(lastMilestone, milestone)) {
-								System.out.printf("Progress: %d%% (%d/%d users) %d info files %d fixed info files\n",
-										milestone, done, totalUsers, infoProcessed, infoFixed.get());
-							}
 						}
 					});
+				}
+				int milestone = done * 100 / totalUsers;
+				int last = lastPrinted.get();
+				if (milestone > last && lastPrinted.compareAndSet(last, milestone)) {
+					LOG.info(String.format("Progress: %d%% (%d/%d users) %d info files %d fixed\n",
+							milestone, done, totalUsers, submittedFiles.get(), fixedFiles.get()));
 				}
 			}
 
 			pool.shutdown();
 			pool.awaitTermination(1, TimeUnit.DAYS);
 			System.out.printf("\nDone! Processed %d users %d info files %d fixed files.\n",
-					totalUsers, infoSubmitted.get(), infoFixed.get());
+					totalUsers, submittedFiles.get(), fixedFiles.get());
 		}
 	}
 
@@ -155,6 +156,7 @@ public class FixS3InfoFiles {
 		ListObjectsV2Request req = ListObjectsV2Request.builder()
 				.bucket(bucket)
 				.delimiter("/")
+				.encodingType("url")
 				.build();
 
 		List<CommonPrefix> result = new ArrayList<>();
@@ -180,6 +182,7 @@ public class FixS3InfoFiles {
 		ListObjectsV2Request req = ListObjectsV2Request.builder()
 				.bucket(bucket)
 				.prefix(prefix)
+				.encodingType("url")
 				.build();
 		return () -> s3.listObjectsV2Paginator(req).contents().iterator();
 	}
