@@ -34,22 +34,30 @@ public class FixS3InfoFiles {
 
 	public static void main(String[] args) throws Exception {
 
-		try (S3Client s3 = S3Client.builder()
+		S3Client s3 = S3Client.builder()
 				.endpointOverride(URI.create("https://s3.nl-ams.scw.cloud"))
 				.region(Region.of("nl-ams"))
-				.build()) {
-			LOG.info("Start processing ...");
-			ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL);
-			AtomicInteger submittedFiles = new AtomicInteger(0);
-			AtomicInteger fixedFiles = new AtomicInteger(0);
-			AtomicInteger processedUsers = new AtomicInteger(0);
-			AtomicInteger lastPrinted = new AtomicInteger(0);
+				.build();
+		LOG.info("Start processing ...");
+		ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL);
+		AtomicInteger submittedFiles = new AtomicInteger(0);
+		AtomicInteger fixedFiles = new AtomicInteger(0);
+		AtomicInteger processedUsers = new AtomicInteger(0);
+		AtomicInteger lastPrinted = new AtomicInteger(0);
+		try {
 			List<CommonPrefix> users = getUsers(s3, BUCKET);
 			int totalUsers = users.size();
 			for (CommonPrefix userPrefix : users) {
 				String gpxPrefix = userPrefix.prefix() + "GPX/";
 				int done = processedUsers.incrementAndGet();
-				for (S3Object obj : getFiles(s3, BUCKET, gpxPrefix)) {
+				List<S3Object> files;
+				try {
+					files = getFiles(s3, BUCKET, gpxPrefix);
+				} catch (Exception e) {
+					LOG.error(String.format("SKIP prefix %s -> %s", gpxPrefix, e.getMessage()));
+					continue;
+				}
+				for (S3Object obj : files) {
 					String key = obj.key();
 					if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
 						continue;
@@ -73,11 +81,12 @@ public class FixS3InfoFiles {
 							milestone, done, totalUsers, submittedFiles.get(), fixedFiles.get()));
 				}
 			}
-
+		} finally {
 			pool.shutdown();
 			pool.awaitTermination(1, TimeUnit.DAYS);
-			System.out.printf("\nDone! Processed %d users %d info files %d fixed files.\n",
-					totalUsers, submittedFiles.get(), fixedFiles.get());
+			s3.close();
+			LOG.info(String.format("\nDone! Processed %d users %d info files %d fixed files.\n",
+					processedUsers.get(), submittedFiles.get(), fixedFiles.get()));
 		}
 	}
 
@@ -115,7 +124,7 @@ public class FixS3InfoFiles {
 				System.out.println("FILE: " + tmpOut.getAbsolutePath());
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (would upload)");
 			} else {
-				//	upload(s3, bucket, key, tmpOut); comment for test!!!
+				//	upload(s3, bucket, key, tmpOut); commented for test!!!
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (uploaded)");
 			}
 			return true;
@@ -158,11 +167,9 @@ public class FixS3InfoFiles {
 				.delimiter("/")
 				.encodingType("url")
 				.build();
-
 		List<CommonPrefix> result = new ArrayList<>();
 		int pageCount = 0;
 		int totalUser = 0;
-
 		for (ListObjectsV2Response page : s3.listObjectsV2Paginator(req)) {
 			pageCount++;
 			List<CommonPrefix> prefixes = page.commonPrefixes();
@@ -178,13 +185,17 @@ public class FixS3InfoFiles {
 		return result;
 	}
 
-	static Iterable<S3Object> getFiles(S3Client s3, String bucket, String prefix) {
+	static List<S3Object> getFiles(S3Client s3, String bucket, String prefix) {
 		ListObjectsV2Request req = ListObjectsV2Request.builder()
 				.bucket(bucket)
 				.prefix(prefix)
 				.encodingType("url")
 				.build();
-		return () -> s3.listObjectsV2Paginator(req).contents().iterator();
+		List<S3Object> files = new ArrayList<>();
+		for (ListObjectsV2Response page : s3.listObjectsV2Paginator(req)) {
+			files.addAll(page.contents());
+		}
+		return files;
 	}
 
 	static String baseNameFromKey(String key) {
