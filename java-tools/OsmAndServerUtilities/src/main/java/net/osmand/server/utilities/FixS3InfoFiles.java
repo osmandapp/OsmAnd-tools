@@ -27,6 +27,7 @@ public class FixS3InfoFiles {
 
 	static final ObjectMapper MAPPER = new ObjectMapper();
 	static final boolean TEST_RUN = true; // set false to enable real upload
+	static final int TEST_USER_ID = -1; // set user-id or use -1 to all user from S3
 	public static final int THREAD_POOL = 8;
 	public static final String INFO_GZ_SUFFIX = ".info.gz";
 	public static final String GPX_INFO_GZ_SUFFIX = ".gpx.info.gz";
@@ -50,51 +51,17 @@ public class FixS3InfoFiles {
 		AtomicInteger processedUsers = new AtomicInteger(0);
 		AtomicInteger lastPrinted = new AtomicInteger(0);
 		try {
-			List<CommonPrefix> users = getUsers(s3, BUCKET);
-			int totalUsers = users.size();
-			for (CommonPrefix userPrefix : users) {
-				String gpxPrefix = userPrefix.prefix() + "GPX/";
-				List<S3Object> files;
-				try {
-					files = getFiles(s3, BUCKET, gpxPrefix);
-				} catch (Exception e) {
-					LOG.error(String.format("SKIP prefix %s -> %s", gpxPrefix, e.getMessage()));
-					continue;
+			if (TEST_USER_ID < 0) {
+				List<CommonPrefix> users = getUsers(s3, BUCKET);
+				int totalUsers = users.size();
+				for (CommonPrefix userPrefix : users) {
+					processUser(userPrefix.prefix(), s3, submittedFiles, pool, fixedFiles, processedUsers, totalUsers,
+							lastPrinted);
 				}
-				List<Future<?>> userFutures = new ArrayList<>();
-				for (S3Object obj : files) {
-					String key = obj.key();
-					if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
-						continue;
-					}
-					submittedFiles.incrementAndGet();
-					userFutures.add(pool.submit(() -> {
-						try {
-							boolean fixed = processFile(s3, BUCKET, key);
-							if (fixed) {
-								fixedFiles.incrementAndGet();
-							}
-						} catch (Exception e) {
-							System.err.println("FAILED: " + key + " -> " + e.getMessage());
-						}
-					}));
-				}
-				// Wait for ALL this user's file tasks to finish
-				for (Future<?> f : userFutures) {
-					try {
-						f.get();
-					} catch (ExecutionException e) {
-						LOG.error("Task error: " + e.getCause());
-					}
-				}
-
-				int done = processedUsers.incrementAndGet();
-				int milestone = done * 100 / totalUsers;
-				int lastMilestone = lastPrinted.get();
-				if (milestone > lastMilestone && lastPrinted.compareAndSet(lastMilestone, milestone)) {
-					LOG.info(String.format("Progress: %d%% (%d/%d users) %d info files %d fixed.",
-							milestone, done, totalUsers, submittedFiles.get(), fixedFiles.get()));
-				}
+			} else {
+				String userPrefix = "user-" + TEST_USER_ID + "/";
+				processUser(userPrefix, s3, submittedFiles, pool, fixedFiles, processedUsers, 1,
+						lastPrinted);
 			}
 		} finally {
 			pool.shutdown();
@@ -102,6 +69,53 @@ public class FixS3InfoFiles {
 			s3.close();
 			LOG.info(String.format("\nDone! Processed %d users %d info files %d fixed files.",
 					processedUsers.get(), submittedFiles.get(), fixedFiles.get()));
+		}
+	}
+
+	private static void processUser(String userPrefix, S3Client s3, AtomicInteger submittedFiles, 
+	                                   ExecutorService pool, AtomicInteger fixedFiles, AtomicInteger processedUsers, 
+	                                   int totalUsers, AtomicInteger lastPrinted) throws InterruptedException {
+		String gpxPrefix = userPrefix + "GPX/";
+		List<S3Object> files;
+		try {
+			files = getFiles(s3, BUCKET, gpxPrefix);
+		} catch (Exception e) {
+			LOG.error(String.format("SKIP prefix %s -> %s", gpxPrefix, e.getMessage()));
+			return;
+		}
+		List<Future<?>> userFutures = new ArrayList<>();
+		for (S3Object obj : files) {
+			String key = obj.key();
+			if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
+				continue;
+			}
+			submittedFiles.incrementAndGet();
+			userFutures.add(pool.submit(() -> {
+				try {
+					boolean fixed = processFile(s3, BUCKET, key);
+					if (fixed) {
+						fixedFiles.incrementAndGet();
+					}
+				} catch (Exception e) {
+					System.err.println("FAILED: " + key + " -> " + e.getMessage());
+				}
+			}));
+		}
+		// Wait for ALL this user's file tasks to finish
+		for (Future<?> f : userFutures) {
+			try {
+				f.get();
+			} catch (ExecutionException e) {
+				LOG.error("Task error: " + e.getCause());
+			}
+		}
+
+		int done = processedUsers.incrementAndGet();
+		int milestone = done * 100 / totalUsers;
+		int lastMilestone = lastPrinted.get();
+		if (milestone > lastMilestone && lastPrinted.compareAndSet(lastMilestone, milestone)) {
+			LOG.info(String.format("Progress: %d%% (%d/%d users) %d info files %d fixed.",
+					milestone, done, totalUsers, submittedFiles.get(), fixedFiles.get()));
 		}
 	}
 
@@ -137,7 +151,7 @@ public class FixS3InfoFiles {
 			if (TEST_RUN) {
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (would upload)");
 			} else {
-				//	upload(s3, bucket, key, tmpOut); commented for test!!!
+				upload(s3, bucket, key, tmpOut);
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (uploaded)");
 			}
 			return true;
