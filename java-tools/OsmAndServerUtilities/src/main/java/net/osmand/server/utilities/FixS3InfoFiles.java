@@ -67,14 +67,14 @@ public class FixS3InfoFiles {
 			pool.shutdown();
 			pool.awaitTermination(1, TimeUnit.DAYS);
 			s3.close();
-			LOG.info(String.format("\nDone! Processed %d users %d info files %d fixed files.",
+			LOG.info(String.format("Done! Processed %d users %d info files %d fixed files.",
 					processedUsers.get(), submittedFiles.get(), fixedFiles.get()));
 		}
 	}
 
-	private static void processUser(String userPrefix, S3Client s3, AtomicInteger submittedFiles, 
-	                                   ExecutorService pool, AtomicInteger fixedFiles, AtomicInteger processedUsers, 
-	                                   int totalUsers, AtomicInteger lastPrinted) throws InterruptedException {
+	private static void processUser(String userPrefix, S3Client s3, AtomicInteger submittedFiles,
+	                                ExecutorService pool, AtomicInteger fixedFiles, AtomicInteger processedUsers,
+	                                int totalUsers, AtomicInteger lastPrinted) throws InterruptedException {
 		String gpxPrefix = userPrefix + "GPX/";
 		List<S3Object> files;
 		try {
@@ -97,7 +97,7 @@ public class FixS3InfoFiles {
 						fixedFiles.incrementAndGet();
 					}
 				} catch (Exception e) {
-					System.err.println("FAILED: " + key + " -> " + e.getMessage());
+					LOG.info("FAILED: " + key + " -> " + e.getMessage());
 				}
 			}));
 		}
@@ -149,10 +149,10 @@ public class FixS3InfoFiles {
 			}
 
 			if (TEST_RUN) {
-				System.out.println("Updated: s3://" + bucket + "/" + key + " (would upload)");
+				LOG.info("Updated: s3://" + bucket + "/" + key + " (would upload)");
 			} else {
 				upload(s3, bucket, key, tmpOut);
-				System.out.println("Updated: s3://" + bucket + "/" + key + " (uploaded)");
+				LOG.info("Updated: s3://" + bucket + "/" + key + " (uploaded)");
 			}
 			return true;
 		} finally {
@@ -205,10 +205,10 @@ public class FixS3InfoFiles {
 				totalUser += prefixes.size();
 			}
 			if (pageCount % 20 == 0) {
-				System.out.printf("Pages: %d, Users: %d%n", pageCount, totalUser);
+				LOG.info(String.format("Pages: %d, Users: %d", pageCount, totalUser));
 			}
 		}
-		System.out.printf("Total pages: %d, total users: %d\n", pageCount, result.size());
+		LOG.info(String.format("Total pages: %d, total users: %d", pageCount, result.size()));
 		return result;
 	}
 
@@ -226,8 +226,8 @@ public class FixS3InfoFiles {
 	}
 
 	static String baseNameFromKey(String key) {
-		String name = key.substring(key.lastIndexOf('/') + 1);
-		name = name.substring(0, name.length() - INFO_GZ_SUFFIX.length());
-		return name.replaceFirst("^\\d+-", "");
+		String gpxName = key.substring(key.lastIndexOf('/') + 1);
+		gpxName = gpxName.substring(0, gpxName.length() - INFO_GZ_SUFFIX.length());
+		return gpxName.replaceFirst("^\\d+-", "");
 	}
 }
