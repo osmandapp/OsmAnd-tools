@@ -34,9 +34,14 @@ public class FixS3InfoFiles {
 
 	public static void main(String[] args) throws Exception {
 
+		String endpoint = System.getenv("S3_ENDPOINT_URL");
+		String region = System.getenv("S3_REGION");
+		if (endpoint == null || region == null) {
+			throw new IllegalStateException("Missing S3_ENDPOINT_URL or S3_REGION env vars");
+		}
 		S3Client s3 = S3Client.builder()
-				.endpointOverride(URI.create("https://s3.nl-ams.scw.cloud"))
-				.region(Region.of("nl-ams"))
+				.endpointOverride(URI.create(endpoint))
+				.region(Region.of(region))
 				.build();
 		LOG.info("Start processing ...");
 		ExecutorService pool = Executors.newFixedThreadPool(THREAD_POOL);
@@ -120,8 +125,6 @@ public class FixS3InfoFiles {
 			}
 
 			if (TEST_RUN) {
-				System.out.println("DEST: s3://" + bucket + "/" + key);
-				System.out.println("FILE: " + tmpOut.getAbsolutePath());
 				System.out.println("Updated: s3://" + bucket + "/" + key + " (would upload)");
 			} else {
 				//	upload(s3, bucket, key, tmpOut); commented for test!!!
