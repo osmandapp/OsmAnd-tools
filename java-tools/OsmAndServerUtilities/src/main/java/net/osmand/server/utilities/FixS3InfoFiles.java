@@ -54,7 +54,6 @@ public class FixS3InfoFiles {
 			int totalUsers = users.size();
 			for (CommonPrefix userPrefix : users) {
 				String gpxPrefix = userPrefix.prefix() + "GPX/";
-				int done = processedUsers.incrementAndGet();
 				List<S3Object> files;
 				try {
 					files = getFiles(s3, BUCKET, gpxPrefix);
@@ -62,27 +61,38 @@ public class FixS3InfoFiles {
 					LOG.error(String.format("SKIP prefix %s -> %s", gpxPrefix, e.getMessage()));
 					continue;
 				}
+				List<Future<?>> userFutures = new ArrayList<>();
 				for (S3Object obj : files) {
 					String key = obj.key();
 					if (!key.endsWith(GPX_INFO_GZ_SUFFIX)) {
 						continue;
 					}
 					submittedFiles.incrementAndGet();
-					pool.submit(() -> {
+					userFutures.add(pool.submit(() -> {
 						try {
-							boolean fixed = processOne(s3, BUCKET, key);
+							boolean fixed = processFile(s3, BUCKET, key);
 							if (fixed) {
 								fixedFiles.incrementAndGet();
 							}
 						} catch (Exception e) {
 							System.err.println("FAILED: " + key + " -> " + e.getMessage());
 						}
-					});
+					}));
 				}
+				// Wait for ALL this user's file tasks to finish
+				for (Future<?> f : userFutures) {
+					try {
+						f.get();
+					} catch (ExecutionException e) {
+						LOG.error("Task error: " + e.getCause());
+					}
+				}
+
+				int done = processedUsers.incrementAndGet();
 				int milestone = done * 100 / totalUsers;
-				int last = lastPrinted.get();
-				if (milestone > last && lastPrinted.compareAndSet(last, milestone)) {
-					LOG.info(String.format("Progress: %d%% (%d/%d users) %d info files %d fixed\n",
+				int lastMilestone = lastPrinted.get();
+				if (milestone > lastMilestone && lastPrinted.compareAndSet(lastMilestone, milestone)) {
+					LOG.info(String.format("Progress: %d%% (%d/%d users) %d info files %d fixed.",
 							milestone, done, totalUsers, submittedFiles.get(), fixedFiles.get()));
 				}
 			}
@@ -90,15 +100,15 @@ public class FixS3InfoFiles {
 			pool.shutdown();
 			pool.awaitTermination(1, TimeUnit.DAYS);
 			s3.close();
-			LOG.info(String.format("\nDone! Processed %d users %d info files %d fixed files.\n",
+			LOG.info(String.format("\nDone! Processed %d users %d info files %d fixed files.",
 					processedUsers.get(), submittedFiles.get(), fixedFiles.get()));
 		}
 	}
 
-	static boolean processOne(S3Client s3, String bucket, String key) throws Exception {
+	static boolean processFile(S3Client s3, String bucket, String key) throws Exception {
 		String baseName = baseNameFromKey(key);
-		File tmpIn = Files.createTempFile("gpx-in-", ".gz").toFile();
-		File tmpOut = Files.createTempFile("gpx-out-", ".gz").toFile();
+		File tmpIn = Files.createTempFile("info-json-in-", ".gz").toFile();
+		File tmpOut = Files.createTempFile("info-json-out-", ".gz").toFile();
 
 		try {
 			try (ResponseInputStream<GetObjectResponse> in = s3.getObject(
