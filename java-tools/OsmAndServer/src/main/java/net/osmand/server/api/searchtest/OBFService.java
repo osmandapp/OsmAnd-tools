@@ -60,7 +60,7 @@ public interface OBFService extends BaseService {
 		return obfList;
 	}
 
-	record CityAddress(String name, List<StreetAddress> streets, int streetsCount, LatLon point, boolean boundary) {}
+	record CityAddress(String name, List<StreetAddress> streets, int streetsCount, LatLon point, String type) {}
 	record Address(String name, String value, LatLon point) {}
 	record StreetAddress(String name, List<Address> houses, int houseCount, LatLon point) {}
 
@@ -1364,7 +1364,7 @@ public interface OBFService extends BaseService {
 								
 								index.preloadStreets(c, null, null);
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType() == City.CityType.BOUNDARY));
+									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType().name().toLowerCase()));
 									continue;
 								}
 
@@ -1394,7 +1394,7 @@ public interface OBFService extends BaseService {
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType() == City.CityType.BOUNDARY));
+									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType().name().toLowerCase()));
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
