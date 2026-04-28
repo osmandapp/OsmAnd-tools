@@ -225,6 +225,7 @@ public class FixS3InfoFiles {
 		return files;
 	}
 
+	// user-0001/GPX/1755163505312-123-track.gpx.info.gz -> 123-track.gpx
 	static String baseNameFromKey(String key) {
 		String gpxName = key.substring(key.lastIndexOf('/') + 1);
 		gpxName = gpxName.substring(0, gpxName.length() - INFO_GZ_SUFFIX.length());
