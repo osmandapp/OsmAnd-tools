@@ -15,6 +15,7 @@ import net.osmand.render.OsmAndTestStyleRenderer;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.render.RenderingRulesStoragePrinter;
 import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.reviews.mangrove.MangroveReviews;
 import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.routes.RouteRelationExtractor;
@@ -87,6 +88,8 @@ public class MainUtilities {
 				RenderingRulesStoragePrinter.main(subArgsArray);
 			} else if (utl.equals("explain-rendering-style")) {
 				RenderingRulesStorage.main(subArgsArray);
+            } else if (utl.equals("generate-reviews-obf")) {
+                MangroveReviews.main(subArgsArray);
 			} else if (utl.equals("collect-weather-sqlitedb-into-regions")) {
 				WeatherPrepareRasterSqliteRegions.main(subArgsArray);
             } else if (utl.equals("generate-maplegend-svg")) {
