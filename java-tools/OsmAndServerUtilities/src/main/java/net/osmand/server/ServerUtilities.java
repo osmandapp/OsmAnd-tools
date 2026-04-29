@@ -11,6 +11,7 @@ import net.osmand.purchases.UpdateInAppPurchase;
 import net.osmand.purchases.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
+import net.osmand.server.utilities.FixS3InfoFiles;
 import net.osmand.server.utilities.GenerateWebTranslations;
 import net.osmand.server.utilities.StyleDataExtractor;
 import net.osmand.server.utilities.WikidataUtilities;
@@ -47,6 +48,8 @@ public class ServerUtilities {
 			WikidataUtilities.parseWikidataLicenses(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
+		} else if (utl.equals("fix-info-file")) {
+			FixS3InfoFiles.main(subArgsArray);
 		} else {
 			System.err.println("Unknown command");
 			System.exit(1);
