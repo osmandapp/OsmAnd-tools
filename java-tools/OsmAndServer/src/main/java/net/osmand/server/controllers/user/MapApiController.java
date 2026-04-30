@@ -444,6 +444,22 @@ public class MapApiController {
 		}
 	}
 
+	@GetMapping(value = "/get-color-palette")
+	public ResponseEntity<String> getColorPalette() throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(
+				"color-palette/user_palette_default.txt", "FILE", null, dev);
+		if (userFile == null) {
+			return ResponseEntity.ok("");
+		}
+		try (InputStream bin = new GZIPInputStream(userdataService.getInputStream(dev, userFile))) {
+			return ResponseEntity.ok(new String(bin.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+		}
+	}
+
 	@GetMapping(value = "/download-file-from-prev-version")
 	public void getFilePrevVersion(HttpServletResponse response, HttpServletRequest request,
 	                               @RequestParam String name,
