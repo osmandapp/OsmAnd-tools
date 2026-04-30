@@ -60,9 +60,9 @@ public interface OBFService extends BaseService {
 		return obfList;
 	}
 
-	record CityAddress(String name, List<StreetAddress> streets, boolean boundary) {}
+	record CityAddress(String name, List<StreetAddress> streets, int streetsCount, LatLon point, String type) {}
 	record Address(String name, String value, LatLon point) {}
-	record StreetAddress(String name, List<Address> houses) {}
+	record StreetAddress(String name, List<Address> houses, int houseCount, LatLon point) {}
 
 	final class RawPoiObject {
 		String name = "";
@@ -1361,25 +1361,25 @@ public interface OBFService extends BaseService {
 								List<StreetAddress> streets = new ArrayList<>();
 								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
 									continue;
-
+								
+								index.preloadStreets(c, null, null);
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
+									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType().name().toLowerCase()));
 									continue;
 								}
 
-								index.preloadStreets(c, null, null);
 								for (Street s : new ArrayList<>(c.getStreets())) {
 									List<Address> buildings = new ArrayList<>();
 									final String streetName = s.getName(lang);
 									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
 										continue;
 
+									index.preloadBuildings(s, null, null);
 									if (isHouseEmpty) {
-										streets.add(new StreetAddress(streetName, buildings));
+										streets.add(new StreetAddress(streetName, buildings, s.getBuildings().size(), s.getLocation()));
 										continue;
 									}
 
-									index.preloadBuildings(s, null, null);
 									final List<Building> bs = s.getBuildings();
 									if (bs != null && !bs.isEmpty()) {
 										for (Building b : bs) {
@@ -1389,12 +1389,12 @@ public interface OBFService extends BaseService {
 										}
 									}
 									if (!buildings.isEmpty()) {
-										StreetAddress street = new StreetAddress(streetName, buildings);
+										StreetAddress street = new StreetAddress(streetName, buildings, s.getBuildings().size(), s.getLocation());
 										streets.add(street);
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, streets, c.getType() == City.CityType.BOUNDARY));
+									results.add(new CityAddress(cityName, streets, c.getStreets().size(), c.getLocation(), c.getType().name().toLowerCase()));
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
