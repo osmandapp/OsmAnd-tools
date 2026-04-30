@@ -100,8 +100,14 @@ public class IndexCreationContext {
 		is.close();
 
 		File regionsFinalFile = new File(REGIONS_OCBF);
-		if (!regionsFinalFile.exists())
+		try {
 			Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+		} catch (IOException e) {
+			log.error("Unable to refresh " + regionsTmpFile.getName() + ", now using previous " + REGIONS_OCBF);
+			if (!regionsTmpFile.delete()) {
+				regionsTmpFile.deleteOnExit();
+			}
+		}
 
 		return regionsFinalFile;
 	}
