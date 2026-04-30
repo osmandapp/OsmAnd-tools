@@ -1013,8 +1013,12 @@ public class BinaryMapIndexWriter {
 			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
 			SuffixDictionary<MapObject> suffixDictionary = nameIndexBuildSuffixDictionary(entry.getKey(), objects,
 					indexEntry::getTokens);
-			for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
-				builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+			if (suffixDictionary.dictionaryEntries.isEmpty()) {
+				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+			} else {
+				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+				}
 			}
 			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
@@ -1759,7 +1763,7 @@ public class BinaryMapIndexWriter {
 			SuffixDictionary<PoiTileBox> suffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes,
 					box -> box.tokens);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
-				builder.addSuffixesDictionary(EMPTY_POI_SUFFIX_DICTIONARY_SENTINEL);
+				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
