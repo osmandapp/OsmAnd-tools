@@ -704,7 +704,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		Set<Long> values = new TreeSet<Long>();
 		for (City city : result) {
 			String nameInCity = name;
-            if (city.getName().equals(nameInCity)) {
+            if (nameInCity == null || city.getName().equals(nameInCity)) {
                 nameInCity = null;
                 if (names != null && !city.getName().equals(names.get(OSMTagKey.NAME.getValue()))) {
                     nameInCity = names.get(OSMTagKey.NAME.getValue());
