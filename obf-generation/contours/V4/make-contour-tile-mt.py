@@ -47,6 +47,14 @@ def run_qgis_algorithm(alg, params):
     return processing.run(alg, params, context=context)
 
 
+def save_debug_file(src_path, stage_num, stage_name, debug_dir):
+    """Save intermediate file with stage number"""
+    if not debug_dir or not Path(src_path).exists():
+        return
+    dst_name = f"{stage_num:02d}_{stage_name}{Path(src_path).suffix}"
+    shutil.copy2(src_path, debug_dir / dst_name)
+    print(f"   [DEBUG] Saved: {dst_name}")
+
 def parse_tile_range(range_str):
     """Parse tile range like N30-56E003-025 or N40-41W108-E001"""
     if not range_str:
@@ -90,18 +98,6 @@ def in_range(filename, rng):
     return (rng['lat_min'] <= lat <= rng['lat_max'] and
             rng['lon_min'] <= lon <= rng['lon_max'])
 
-
-def get_neighbor_filename(base_dir, highres_dir, lat_p, lat, lon_p, lon, lat_digits, lon_digits):
-    """Generate neighbor tile filename and check existence"""
-    fname = f"{lat_p}{lat:0{lat_digits}d}{lon_p}{lon:0{lon_digits}d}.tif"
-    for d in [highres_dir, base_dir]:
-        if d and Path(d).exists():
-            p = Path(d) / fname
-            if p.exists():
-                return str(p)
-    return None
-
-
 def process_tile(tiff_path, args_dict):
     """Process single tile"""
     filename = Path(tiff_path).stem
@@ -127,22 +123,26 @@ def process_tile(tiff_path, args_dict):
     num_lat = int(lat) if lat_p == 'N' else -int(lat)
     num_lon = int(lon) if lon_p == 'E' else -int(lon)
 
-    # Find neighbors
+    # Debug directory
+    debug_dir = None
+    if args_dict.get('debug'):
+        debug_dir = Path(args_dict['outdir']) / f"debug_{filename}"
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[DEBUG] Debug files will be saved to: {debug_dir}")
+
+    # Find neighbors (with highres priority for center too)
     neighbors = []
     indir = Path(tiff_path).parent
     highres_dir = indir.parent / f"{indir.name}_highres" if indir.parent else None
     neighbors_dir = Path(args_dict.get('neighbors_dir', args_dict['indir']))
     neighbors_highres_dir = neighbors_dir.parent / f"{neighbors_dir.name}_highres"
 
-    # Track which neighbors exist for bounds calculation
     neighbor_exists = {'left': False, 'right': False, 'top': False, 'bottom': False}
+    center_path = None
+    center_is_highres = False
 
     for dlat in [-1, 0, 1]:
         for dlon in [-1, 0, 1]:
-            if dlat == 0 and dlon == 0:
-                neighbors.append(str(tiff_path))
-                continue
-
             new_lat = int(lat) + dlat
             new_lon = int(lon) + dlon
             new_lat_p, new_lon_p = lat_p, lon_p
@@ -152,22 +152,26 @@ def process_tile(tiff_path, args_dict):
                 new_lat_p, new_lat = 'S', 1
             elif lat_p == 'S' and new_lat == 0:
                 new_lat_p, new_lat = 'N', 0
-
             if lon_p == 'E' and new_lon == -1:
                 new_lon_p, new_lon = 'W', 1
             elif lon_p == 'W' and new_lon == 0:
                 new_lon_p, new_lon = 'E', 0
 
-            # Check all possible locations
+            expected_name = f"{new_lat_p}{new_lat:0{lat_digits}d}{new_lon_p}{new_lon:0{lon_digits}d}"
+
             nf = None
             for check_dir in [highres_dir, indir, neighbors_highres_dir, neighbors_dir]:
-                nf = get_neighbor_filename(check_dir, None, new_lat_p, new_lat,
-                                           new_lon_p, new_lon, lat_digits, lon_digits)
-                if nf:
+                if not check_dir or not check_dir.exists():
+                    continue
+                candidate = check_dir / f"{expected_name}.tif"
+                if candidate.exists():
+                    nf = str(candidate)
                     break
 
             if nf:
                 neighbors.append(nf)
+
+                # Mark boundary neighbors for expansion
                 if dlat == 0 and dlon == -1:
                     neighbor_exists['left' if lon_p == 'E' else 'right'] = True
                 elif dlat == 0 and dlon == 1:
@@ -176,19 +180,38 @@ def process_tile(tiff_path, args_dict):
                     neighbor_exists['bottom' if lat_p == 'N' else 'top'] = True
                 elif dlat == 1 and dlon == 0:
                     neighbor_exists['top' if lat_p == 'N' else 'bottom'] = True
+            elif dlat == 0 and dlon == 0:
+                neighbors.append(str(tiff_path))
+                print(f"   ✓ Центр        : {filename} → normal (fallback)")
 
     print(f"Found {len(neighbors)} neighbors")
 
     # Process with GDAL
-    with tempfile.TemporaryDirectory(dir=args_dict['tmp_dir']) as tmp:
-        merged = f"{tmp}/merged_{filename}.tif"
-        xres = 0.0002776235424764020234
+    with tempfile.TemporaryDirectory(dir=args_dict['tmp_dir']) as tmp_dir:
+        tmp = Path(tmp_dir)
+
+        merged = tmp / f"merged_{filename}.tif"
+
+        if center_path and center_is_highres:
+            info = subprocess.check_output(['gdalinfo', center_path]).decode()
+            match = re.search(r'Pixel Size = \(([\d\.-]+),', info)
+            if match:
+                xres = abs(float(match.group(1)))
+                print(f"   [Highres] Using native resolution: {xres:.10f}")
+            else:
+                xres = 0.00009259259  # fallback ≈ 1/3 arc-second
+                print(f"   [Highres] Warning: could not detect resolution, using fallback")
+        else:
+            xres = 0.0002776235424764020234  # standard SRTM 1 arcsec
+            print(f"   Using standard resolution: {xres:.10f}")
 
         # Merge neighbors
         subprocess.run(['gdalwarp', '-overwrite', '-t_srs', 'EPSG:4326',
                         '-tr', str(xres), str(xres), '-tap', '-ot', 'Int16',
-                        '-of', 'GTiff', '-co', 'COMPRESS=LZW'] + neighbors + [merged],
+                        '-of', 'GTiff', '-co', 'COMPRESS=LZW'] + neighbors + [str(merged)],
                        check=True, capture_output=True)
+        if args_dict.get('debug'):
+            save_debug_file(merged, 1, "merged", debug_dir)
 
         # Get bounds from original tile
         info = subprocess.check_output(['gdalinfo', tiff_path]).decode()
@@ -199,134 +222,145 @@ def process_tile(tiff_path, args_dict):
 
         # Calculate expanded bounds
         delta = 0.03 * 0.5
-
         new_xmin = ulx - delta if neighbor_exists['left'] else ulx
         new_xmax = ulx + 1 + (delta if neighbor_exists['right'] else 0)
         new_ymax = uly + (delta if neighbor_exists['top'] else 0)
         new_ymin = uly - 1 - (delta if neighbor_exists['bottom'] else 0)
 
         # Clip to expanded bounds
-        clipped = f"{tmp}/{filename}.tif"
+        clipped = tmp / f"{filename}.tif"
         subprocess.run(['gdalwarp', '-overwrite', '-t_srs', 'EPSG:4326',
                         '-tr', str(xres), str(xres), '-tap', '-ot', 'Int16',
                         '-of', 'GTiff', '-co', 'COMPRESS=LZW',
                         '-te', str(new_xmin), str(new_ymin), str(new_xmax), str(new_ymax),
-                        merged, clipped], check=True, capture_output=True)
+                        str(merged), str(clipped)], check=True, capture_output=True)
+        if args_dict.get('debug'):
+            save_debug_file(clipped, 2, "clipped_expanded", debug_dir)
 
         # Convert to feet if needed
         src = clipped
         if args_dict.get('feet'):
-            feet_tif = f"{tmp}/{filename}_ft.tif"
-            subprocess.run(['gdal_calc.py', '-A', src, '--outfile', feet_tif,
+            feet_tif = tmp / f"{filename}_ft.tif"
+            subprocess.run(['gdal_calc.py', '-A', str(src), '--outfile', str(feet_tif),
                             '--calc=A/0.3048', '--quiet'], check=True)
             src = feet_tif
+            if args_dict.get('debug'):
+                save_debug_file(src, 3, "feet", debug_dir)
 
         # Smooth if enabled
         if args_dict.get('smooth'):
             no_smooth = False
             ini_path = Path(args_dict['working_dir']) / 'no_smoothing.ini'
-            if ini_path.exists():
-                with open(ini_path) as f:
-                    if filename in f.read():
-                        no_smooth = True
-                        print("No smoothing applied (in no_smoothing.ini)")
+            if ini_path.exists() and filename in ini_path.read_text():
+                no_smooth = True
+                print("No smoothing applied (in no_smoothing.ini)")
 
             if not no_smooth:
-                smooth_tif = f"{tmp}/{filename}_smooth.tif"
+                smooth_tif = tmp / f"{filename}_smooth.tif"
                 if int(lat) >= 65:
-                    info = subprocess.check_output(['gdalinfo', src]).decode()
+                    info = subprocess.check_output(['gdalinfo', str(src)]).decode()
                     size_match = re.search(r'Size is (\d+), (\d+)', info)
                     if size_match:
-                        width, height = int(size_match.group(1)), int(size_match.group(2))
-                        temp_smooth = f"{tmp}/temp_smooth.tif"
-                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(width // 2), str(height // 2),
+                        w, h = int(size_match.group(1)), int(size_match.group(2))
+                        temp = tmp / "temp_smooth.tif"
+                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(w // 2), str(h // 2),
                                         '-r', 'cubicspline', '-co', 'COMPRESS=LZW', '-ot', 'Float32',
-                                        '-wo', 'NUM_THREADS=4', '-multi', src, temp_smooth], check=True)
-                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(width), str(height),
-                                        '-of', 'GTiff', '-r', 'cubicspline', '-co', 'COMPRESS=LZW',
-                                        '-ot', 'Float32', '-wo', 'NUM_THREADS=4', '-multi',
-                                        temp_smooth, smooth_tif], check=True)
+                                        '-wo', 'NUM_THREADS=4', '-multi', str(src), str(temp)], check=True)
+                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(w), str(h),
+                                        '-r', 'cubicspline', '-co', 'COMPRESS=LZW', '-ot', 'Float32',
+                                        '-wo', 'NUM_THREADS=4', '-multi', str(temp), str(smooth_tif)], check=True)
                 else:
                     subprocess.run(['gdalwarp', '-overwrite', '-r', 'cubicspline',
                                     '-co', 'COMPRESS=LZW', '-ot', 'Float32',
-                                    '-wo', 'NUM_THREADS=4', '-multi', src, smooth_tif], check=True)
+                                    '-wo', 'NUM_THREADS=4', '-multi', str(src), str(smooth_tif)], check=True)
                 src = smooth_tif
                 print("Smoothing applied")
+                if args_dict.get('debug'):
+                    save_debug_file(src, 4, "smoothed", debug_dir)
 
         # Generate contours
         step = 40 if args_dict.get('feet') else 10
-        info = subprocess.check_output(['gdalinfo', src]).decode()
+        info = subprocess.check_output(['gdalinfo', str(src)]).decode()
         size_match = re.search(r'Size is (\d+), (\d+)', info)
         if size_match and int(size_match.group(1)) >= 30000:
             step = 20 if args_dict.get('feet') else 5
 
         print(f"Using isolines_step={step}")
-        shp = f"{tmp}/{filename}.shp"
-        subprocess.run(['gdal_contour', '-i', str(step), '-a', 'height', src, shp],
+        shp = tmp / f"{filename}.shp"
+        subprocess.run(['gdal_contour', '-i', str(step), '-a', 'height', str(src), str(shp)],
                        check=True, capture_output=True)
+        if args_dict.get('debug'):
+            save_debug_file(shp, 5, "contours_raw", debug_dir)
 
         # Simplify geometries
         if args_dict.get('simplify'):
             print("Simplifying lines...")
-            shp_simp = f"{tmp}/{filename}_simplified.shp"
+            shp_simp = tmp / f"{filename}_simplified.shp"
             run_qgis_algorithm('native:simplifygeometries', {
-                'INPUT': shp,
+                'INPUT': str(shp),
                 'METHOD': 0,
                 'TOLERANCE': 1e-05,
-                'OUTPUT': shp_simp
+                'OUTPUT': str(shp_simp)
             })
             for ext in ['.shp', '.dbf', '.prj', '.shx']:
-                src_file = Path(str(shp_simp).replace('.shp', ext))
-                dst_file = Path(shp).with_suffix(ext)
+                src_file = shp_simp.with_suffix(ext)
+                dst_file = shp.with_suffix(ext)
                 if src_file.exists():
                     shutil.move(str(src_file), str(dst_file))
+            if args_dict.get('debug'):
+                save_debug_file(shp, 6, "contours_simplified", debug_dir)
 
         # Split lines
         if args_dict.get('split'):
             print("Splitting lines by length...")
-            shp_split = f"{tmp}/{filename}_split.shp"
+            shp_split = tmp / f"{filename}_split.shp"
             run_qgis_algorithm('native:splitlinesbylength', {
-                'INPUT': shp,
+                'INPUT': str(shp),
                 'LENGTH': 0.05,
-                'OUTPUT': shp_split
+                'OUTPUT': str(shp_split)
             })
             for ext in ['.shp', '.dbf', '.prj', '.shx']:
-                src_file = Path(str(shp_split).replace('.shp', ext))
-                dst_file = Path(shp).with_suffix(ext)
+                src_file = shp_split.with_suffix(ext)
+                dst_file = shp.with_suffix(ext)
                 if src_file.exists():
                     shutil.move(str(src_file), str(dst_file))
+            if args_dict.get('debug'):
+                save_debug_file(shp, 7, "contours_split", debug_dir)
 
         # Clip to exact tile bounds
         print("Cropping by cutline...")
-        geojson = f"{tmp}/bbox.geojson"
+        geojson = tmp / "bbox.geojson"
         lat_min, lat_max = num_lat, num_lat + 1
         lon_min, lon_max = num_lon, num_lon + 1
         with open(geojson, 'w') as f:
             f.write(
                 f'''{{"type":"FeatureCollection","crs":{{"type":"name","properties":{{"name":"EPSG:4326"}}}},"features":[{{"type":"Feature","geometry":{{"type":"Polygon","coordinates":[[[{lon_min},{lat_min}],[{lon_max},{lat_min}],[{lon_max},{lat_max}],[{lon_min},{lat_max}],[{lon_min},{lat_min}]]]}}}}]}}''')
 
-        shp_cut = f"{tmp}/{filename}_cut.shp"
+        shp_cut = tmp / f"{filename}_cut.shp"
         run_qgis_algorithm('native:clip', {
-            'INPUT': shp,
-            'OVERLAY': geojson,
-            'OUTPUT': shp_cut
+            'INPUT': str(shp),
+            'OVERLAY': str(geojson),
+            'OUTPUT': str(shp_cut)
         })
         for ext in ['.shp', '.dbf', '.prj', '.shx']:
-            src_file = Path(str(shp_cut).replace('.shp', ext))
-            dst_file = Path(shp).with_suffix(ext)
+            src_file = shp_cut.with_suffix(ext)
+            dst_file = shp.with_suffix(ext)
             if src_file.exists():
                 shutil.move(str(src_file), str(dst_file))
 
+        if args_dict.get('debug'):
+            save_debug_file(shp, 8, "contours_final", debug_dir)
+
         # Convert to OSM
         print("Building osm file...")
-        osm = f"{args_dict['outdir']}/{filename}.osm"
+        osm = Path(args_dict['outdir']) / f"{filename}.osm"
         script = 'contours_feet.py' if args_dict.get('feet') else 'contours.py'
-        subprocess.run([f"{args_dict['working_dir']}/ogr2osm.py", shp, '-o', osm,
+        subprocess.run([f"{args_dict['working_dir']}/ogr2osm.py", str(shp), '-o', str(osm),
                         '-e', '4326', '-t', script], check=True)
 
         # Compress
         print("Compressing to osm.bz2...")
-        subprocess.run(['lbzip2', '-f', osm], check=True)
+        subprocess.run(['lbzip2', '-f', str(osm)], check=True)
 
         print(f"Successfully processed {filename}")
 
@@ -347,6 +381,7 @@ def main():
     parser.add_argument('-n', '--neighbors-dir')
     parser.add_argument('-r', '--reprocess', action='store_true')
     parser.add_argument('-R', '--range')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode - save all intermediate files')
 
     args = parser.parse_args()
 
@@ -357,6 +392,7 @@ def main():
     print(f"Split lines: {args.split}")
     print(f"Feet: {args.feet}")
     print(f"Reprocess: {args.reprocess}")
+    print(f"Debug mode: {args.debug}")
     if args.range:
         print(f"Tile range: {args.range}")
 
@@ -364,13 +400,11 @@ def main():
     Path(args.outdir).mkdir(parents=True, exist_ok=True)
     Path(args.tmp_dir).mkdir(parents=True, exist_ok=True)
 
-    # Parse range
     tile_range = parse_tile_range(args.range) if args.range else None
     if tile_range:
         print(f"Range: lat {tile_range['lat_min']}..{tile_range['lat_max']}, "
               f"lon {tile_range['lon_min']}..{tile_range['lon_max']}")
 
-    # Find tiff files
     tiffs = list(Path(args.indir).glob("*.tif"))
     if tile_range:
         tiffs = [t for t in tiffs if in_range(t.stem, tile_range)]
@@ -393,7 +427,8 @@ def main():
         'reprocess': args.reprocess,
         'indir': args.indir,
         'neighbors_dir': args.neighbors_dir or args.indir,
-        'working_dir': os.getcwd()
+        'working_dir': os.getcwd(),
+        'debug': args.debug
     }
 
     processed = 0
