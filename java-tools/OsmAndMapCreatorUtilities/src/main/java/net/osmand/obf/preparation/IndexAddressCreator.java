@@ -704,7 +704,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		Set<Long> values = new TreeSet<Long>();
 		for (City city : result) {
 			String nameInCity = name;
-			if (nameInCity == null) {
+			if (nameInCity == null || city.getName().equals(nameInCity)) {
 				nameInCity = "<" + city.getName() + ">";
 				names = new HashMap<String, String>();
 				Iterator<Entry<String, String>> it = city.getNamesMap(true).entrySet().iterator();
