@@ -704,13 +704,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		Set<Long> values = new TreeSet<Long>();
 		for (City city : result) {
 			String nameInCity = name;
-            if (nameInCity == null || city.getName().equals(nameInCity)) {
-                nameInCity = null;
-                if (names != null && !city.getName().equals(names.get(OSMTagKey.NAME.getValue()))) {
-                    nameInCity = names.get(OSMTagKey.NAME.getValue());
-                }
-            }
-			if (nameInCity == null) {
+			if (nameInCity == null || city.getName().equals(nameInCity)) {
 				nameInCity = "<" + city.getName() + ">";
 				names = new HashMap<String, String>();
 				Iterator<Entry<String, String>> it = city.getNamesMap(true).entrySet().iterator();
@@ -942,13 +936,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-                String originalName = e.getTag(OSMTagKey.NAME);
-                Map<String, String> names = null;
-                if (originalName != null) {
-                    names = new HashMap<>();
-                    names.put("name", originalName);
-                }
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), streetOrPlace, place, names, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), streetOrPlace, place, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = null;
