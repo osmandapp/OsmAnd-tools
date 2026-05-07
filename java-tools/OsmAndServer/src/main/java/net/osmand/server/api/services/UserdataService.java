@@ -930,7 +930,7 @@ public class UserdataService {
         } else {
             InputStream in = file.data != null ? new ByteArrayInputStream(file.data) : getInputStream(file);
             if (in != null) {
-	            GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false, true);
+	            GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(in)), null, false);
 				if (gpxFile.getError() != null) {
 					return null;
 				}
@@ -1421,7 +1421,7 @@ public class UserdataService {
 	private void processGpxFile(CloudUserDevicesRepository.CloudUserDevice dev, UserFile userFile,
 	                            Map<String, GpxFile> files) throws IOException {
 		try (InputStream is = getInputStream(dev, userFile)) {
-			GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false, true);
+			GpxFile file = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(is)), null, false);
 			if (file.getError() == null) {
 				file.setModifiedTime(userFile.updatetime.getTime());
 				files.put(userFile.name, file);

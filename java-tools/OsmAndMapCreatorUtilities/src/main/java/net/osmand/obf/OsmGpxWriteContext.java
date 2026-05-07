@@ -583,7 +583,7 @@ public class OsmGpxWriteContext {
 				}
 				if (gf.name().endsWith(".gz")) {
 					InputStream fis = new FileInputStream(gf.absolutePath());
-					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(fis)), null, false, true);
+					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(null, new GzipSource(Okio.source(fis)), null, false);
 					writeFile(gpxFile, gf.name());
 				} else if (gf.name().endsWith(".gpx")) {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(gf, null, false);
