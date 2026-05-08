@@ -276,10 +276,18 @@ public class GarminConnectController {
 			}
 			types = new HashSet<>();
 			for (JsonElement item : el.getAsJsonArray()) {
-				if (item.isJsonPrimitive() && item.getAsJsonPrimitive().isString()) {
-					types.add(item.getAsString());
+				if (!item.isJsonPrimitive() || !item.getAsJsonPrimitive().isString()) {
+					return ResponseEntity.badRequest().body(GSON.toJson(Map.of("error", "Expected JSON array of activity type strings")));
 				}
+				types.add(item.getAsString());
 			}
+			Set<String> valid = types.stream()
+					.filter(GarminConnectService.GARMIN_TRACK_ACTIVITY_TYPES::contains)
+					.collect(java.util.stream.Collectors.toSet());
+			if (!types.isEmpty() && valid.isEmpty()) {
+				return ResponseEntity.badRequest().body(GSON.toJson(Map.of("error", "No valid activity types provided")));
+			}
+			types = valid;
 		} catch (Exception e) {
 			return ResponseEntity.badRequest().body(GSON.toJson(Map.of("error", "Invalid JSON")));
 		}
