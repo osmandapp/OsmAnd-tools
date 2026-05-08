@@ -5,8 +5,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +55,8 @@ public class GarminConnectController {
 
 	private static final String GARMIN_STATUS_LINKED_KEY = "linked";
 	private static final String GARMIN_STATUS_SYNC_TIME_MS_KEY = "syncTimeMs";
+	private static final String GARMIN_SELECTED_TYPES_KEY = "selectedTypes";
+	private static final String GARMIN_TYPES_VERSION_KEY = "typesVersion";
 
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -229,8 +235,59 @@ public class GarminConnectController {
 		if (row == null) {
 			return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, false)));
 		}
-		return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, true,
-				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt != null ? row.lastGarminImportAt : 0L)));
+		// null = old record before migration — backfill all types and persist
+		if (row.activityTypes == null) {
+			garminConnectService.saveSelectedActivityTypes(row.userid, null);
+			row.activityTypes = GarminConnectService.allTypesJoined();
+		}
+		// "" = user explicitly deselected everything → return empty list
+		// "A,B,..." = return the stored selection
+		List<String> selectedTypes = row.activityTypes.isEmpty()
+				? List.of()
+				: Arrays.stream(row.activityTypes.split(",")).filter(s -> !s.isBlank()).sorted().toList();
+		return ResponseEntity.ok(GSON.toJson(Map.of(
+				GARMIN_STATUS_LINKED_KEY, true,
+				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt != null ? row.lastGarminImportAt : 0L,
+				GARMIN_SELECTED_TYPES_KEY, selectedTypes,
+				GARMIN_TYPES_VERSION_KEY, GarminConnectService.GARMIN_ACTIVITY_TYPES_VERSION)));
+	}
+
+	@GetMapping(value = "/mapapi/garmin/get-activity-types", produces = "application/json")
+	public ResponseEntity<String> getAllActivityTypes() {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(GSON.toJson(Map.of("error", "Login required")));
+		}
+		List<String> allTypes = GarminConnectService.GARMIN_TRACK_ACTIVITY_TYPES.stream().sorted().toList();
+		return ResponseEntity.ok(GSON.toJson(allTypes));
+	}
+
+	@PostMapping(value = "/mapapi/garmin/save-activity-types", consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> saveActivityTypes(@RequestBody String body) {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(GSON.toJson(Map.of("error", "Login required")));
+		}
+		Set<String> types;
+		try {
+			JsonElement el = new JsonParser().parse(body);
+			if (!el.isJsonArray()) {
+				return ResponseEntity.badRequest().body(GSON.toJson(Map.of("error", "Expected JSON array of activity type strings")));
+			}
+			types = new HashSet<>();
+			for (JsonElement item : el.getAsJsonArray()) {
+				if (item.isJsonPrimitive() && item.getAsJsonPrimitive().isString()) {
+					types.add(item.getAsString());
+				}
+			}
+		} catch (Exception e) {
+			return ResponseEntity.badRequest().body(GSON.toJson(Map.of("error", "Invalid JSON")));
+		}
+		boolean saved = garminConnectService.saveSelectedActivityTypes(dev.userid, types);
+		if (!saved) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(GSON.toJson(Map.of("error", "No Garmin connection found")));
+		}
+		return ResponseEntity.ok(GSON.toJson(Map.of("ok", true)));
 	}
 
 	private void handleActivityBackfill(int userid) {

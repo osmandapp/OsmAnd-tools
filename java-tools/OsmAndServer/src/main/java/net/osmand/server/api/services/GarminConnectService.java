@@ -118,7 +118,9 @@ public class GarminConnectService {
 	private static final String GARMIN_ACTIVITY_FILE_TYPE_FIT = "FIT";
 	private static final String GARMIN_ACTIVITY_FILE_TYPE_GPX = "GPX";
 
-	private static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
+	public static final int GARMIN_ACTIVITY_TYPES_VERSION = 1;
+
+	public static final Set<String> GARMIN_TRACK_ACTIVITY_TYPES = Set.of(
 			"BMX",
 			"BOARD",
 			"BIKING",
@@ -157,6 +159,30 @@ public class GarminConnectService {
 		return garminUserConnectionRepository.findByUserid(userid);
 	}
 
+	public boolean saveSelectedActivityTypes(int userid, @Nullable Set<String> selectedTypes) {
+		GarminUserConnectionRepository.GarminUserConnection row = garminUserConnectionRepository.findByUserid(userid);
+		if (row == null) {
+			return false;
+		}
+		if (selectedTypes == null) {
+			row.activityTypes = allTypesJoined();
+		} else if (selectedTypes.isEmpty()) {
+			// User explicitly deselected everything — store empty string (not null)
+			row.activityTypes = "";
+		} else {
+			row.activityTypes = selectedTypes.stream()
+					.filter(GARMIN_TRACK_ACTIVITY_TYPES::contains)
+					.sorted()
+					.collect(java.util.stream.Collectors.joining(","));
+		}
+		garminUserConnectionRepository.save(row);
+		return true;
+	}
+
+	public static String allTypesJoined() {
+		return GARMIN_TRACK_ACTIVITY_TYPES.stream().sorted().collect(java.util.stream.Collectors.joining(","));
+	}
+
 	public enum PartnerDisconnectResult {
 		OK,
 		NOT_LINKED
@@ -182,6 +208,7 @@ public class GarminConnectService {
 		if (row == null) {
 			row = new GarminUserConnectionRepository.GarminUserConnection();
 			row.userid = userid;
+			row.activityTypes = allTypesJoined();
 		}
 		if (!applyTokenResponse(row, tokenJson)) {
 			return new GarminLinkResult(GarminLinkStatus.TOKEN_EXCHANGE_FAILED, false);
@@ -478,6 +505,15 @@ public class GarminConnectService {
 		if (conn == null) {
 			LOG.warn("Garmin activityFiles: no linked OsmAnd user for garminUserId=" + garminUserId);
 			return;
+		}
+		if (activityType != null && conn.activityTypes != null) {
+			if (conn.activityTypes.isEmpty()) {
+				return;
+			}
+			Set<String> allowed = new HashSet<>(List.of(conn.activityTypes.split(",")));
+			if (allowed.stream().noneMatch(activityType::contains)) {
+				return;
+			}
 		}
 		// Check permissions
 		if (!conn.activityExport) {
