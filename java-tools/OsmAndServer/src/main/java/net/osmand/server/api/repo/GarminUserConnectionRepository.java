@@ -52,5 +52,8 @@ public interface GarminUserConnectionRepository extends JpaRepository<GarminUser
 
 		@Column(name = "last_garmin_import_at")
 		public Long lastGarminImportAt;
+
+		@Column(name = "garmin_activity_types", columnDefinition = "TEXT")
+		public String garminActivityTypes;
 	}
 }
