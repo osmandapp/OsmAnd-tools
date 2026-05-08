@@ -67,6 +67,7 @@ tile-server:
   cache:
     location: ${TILE_SERVER_CACHE_LOCATION:tiles}
     heightmap-location: ${TILE_SERVER_CACHE_LOCATION:heightmaps}/heightmaps
+    mvts-location: ${TILE_SERVER_CACHE_LOCATION:mvts}/mvts
     max-zoom: 16
 
 management:

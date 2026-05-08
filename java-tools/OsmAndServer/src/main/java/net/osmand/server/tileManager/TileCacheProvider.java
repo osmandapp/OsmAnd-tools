@@ -53,11 +53,11 @@ public interface TileCacheProvider {
 		return new File(cacheLocation, loc.toString());
 	}
 
-	void saveImageToCache(Object tile, File cacheFile) throws IOException;
+	void saveTileToCache(Object tile, File cacheFile) throws IOException;
 
 	String getTileId();
 
-	BufferedImage getImg();
+	Object getTile();
 
-	void setImg(BufferedImage img);
+	void setTile(Object tile);
 }
