@@ -206,7 +206,7 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 				this.setInfo(result.getGenerationResult().getInfo());
 				File cacheFile = this.getCacheFile(".png");
 				if (cacheFile != null) {
-					this.saveImageToCache(this, cacheFile);
+					this.saveTileToCache(this, cacheFile);
 				}
 			}
 			String msg = String.format("Rendered %d %d at %d (%s %s): %dx%d - %d ms", this.left, this.top, this.z,
@@ -218,7 +218,7 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 	}
 
 	@Override
-	public void saveImageToCache(Object tile, File cacheFile) throws IOException {
+	public void saveTileToCache(Object tile, File cacheFile) throws IOException {
 		if (tile instanceof VectorMetatile vm) {
 			if (vm.runtimeImage != null) {
 				cacheFile.getParentFile().mkdirs();
@@ -236,12 +236,12 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 	}
 
 	@Override
-	public BufferedImage getImg() {
+	public BufferedImage getTile() {
 		return runtimeImage;
 	}
 
 	@Override
-	public void setImg(BufferedImage img) {
-		runtimeImage = img;
+	public void setTile(Object tile) {
+		runtimeImage = (BufferedImage) tile;
 	}
 }

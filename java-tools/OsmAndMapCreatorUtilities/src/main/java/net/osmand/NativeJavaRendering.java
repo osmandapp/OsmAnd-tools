@@ -1,10 +1,7 @@
 package net.osmand;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,6 +14,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.zip.GZIPOutputStream;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -55,30 +53,30 @@ import resources._R;
 public class NativeJavaRendering extends NativeLibrary {
 
 	private static final String INDEXES_CACHE = "indexes.cache";
-	
+
 	public static Boolean loaded = null;
 
 	private final Map<String, Object> tilePathLocks = new ConcurrentHashMap<>();
-	
+
 	private static NativeJavaRendering defaultLoadedLibrary;
-	
+
 	private static final Log log = LogFactory.getLog(NativeJavaRendering.class);
-	
+
 	private RenderingRulesStorage storage;
-	
+
 	private Map<String, String> renderingProps;
-	
+
 	private Map<String, MapDiff> diffs = new LinkedHashMap<String, MapDiff>();
-	
+
 	public static class MapDiff {
 		public String baseName;
 		public File baseFile;
 		public QuadRect bounds;
 		public Map<String, File> diffs = new TreeMap<String, File>();
 		public Set<String> disabled = new TreeSet<String>();
-		public boolean enableBaseMap = true; 
+		public boolean enableBaseMap = true;
 		public String selected;
-		public long timestamp; 
+		public long timestamp;
 	}
 
 	private static void loadRenderingAttributes(InputStream is, final Map<String, String> renderingConstants) throws SAXException, IOException{
@@ -101,7 +99,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			is.close();
 		}
 	}
-	
+
 	public void closeAllFiles() {
 		for (String s : diffs.keySet()) {
 			MapDiff md = diffs.get(s);
@@ -124,7 +122,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		initRenderingRulesStorage(storage);
 	}
 
-	public static RenderingRulesStorage parseStorage(String path) throws SAXException, IOException, XmlPullParserException{ 
+	public static RenderingRulesStorage parseStorage(String path) throws SAXException, IOException, XmlPullParserException{
 		RenderingRulesStorage storage;
 		final LinkedHashMap<String, String> renderingConstants = new LinkedHashMap<String, String>();
 
@@ -260,7 +258,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			this.stop = MapUtils.get31TileNumberY(ll.top);
 		}
 	}
-	
+
 	public RenderingRulesStorage getRenderingRuleStorage() {
 		return storage;
 	}
@@ -275,9 +273,9 @@ public class NativeJavaRendering extends NativeLibrary {
 		};
 		renderingContext.preferredLocale = renderingProps.get("lang") != null ? renderingProps.get("lang") : "";
 		renderingContext.nightMode = "true".equals(renderingProps.get("nightMode"));
-		
+
 		RenderingRuleSearchRequest request = new RenderingRuleSearchRequest(storage);
-		
+
 		request.setBooleanFilter(request.ALL.R_NIGHT_MODE, renderingContext.nightMode);
 		for (RenderingRuleProperty customProp : storage.PROPS.getCustomRules()) {
 			String res = renderingProps.get(customProp.getAttrName());
@@ -306,25 +304,25 @@ public class NativeJavaRendering extends NativeLibrary {
 			}
 		}
 		request.setIntFilter(request.ALL.R_MINZOOM, renderingImageContext.zoom);
-		
+
 		Map<String, Boolean> parentsStates = new HashMap<>();
 		Map<String, RenderingClass> renderingClasses = storage.getRenderingClasses();
-		
+
 		for (Map.Entry<String, RenderingClass> entry : renderingClasses.entrySet()) {
 			String name = entry.getKey();
 			RenderingClass renderingClass = entry.getValue();
 
 			boolean enabled = renderingClass.isEnabledByDefault();
-			
+
 			String parentName = renderingClass.getParentName();
 			if (parentName != null && parentsStates.containsKey(parentName) && !parentsStates.get(parentName)) {
 				enabled = false;
 			}
-			
+
 			request.setClassProperty(name, String.valueOf(enabled));
 			parentsStates.put(name, enabled);
 		}
-		
+
 		request.saveState();
 		NativeSearchResult res = searchObjectsForRendering(renderingImageContext.sleft, renderingImageContext.sright, renderingImageContext.stop, renderingImageContext.sbottom, renderingImageContext.zoom, request, true,
 					renderingContext, "Nothing found");
@@ -365,42 +363,42 @@ public class NativeJavaRendering extends NativeLibrary {
 		renderingContext.tileDivisor = tileDivisor;
 		renderingContext.saveTextTile = renderingImageContext.saveTextTile;
 		long search = time + System.currentTimeMillis();
-		
+
 		RenderingGenerationResult generationResult = NativeLibrary.generateRenderingIndirect(renderingContext, res.nativeHandler,
 				false, request, true);
 		List<RenderableObject> renderableObjects = new Gson().fromJson(renderingContext.textTile,  new TypeToken<List<RenderableObject>>(){}.getType());
 		if (renderingContext.saveTextTile) {
 			generationResult.setInfo(RenderableObject.createGeoJson(renderableObjects));
 		}
-		
+
 		long rendering = time + System.currentTimeMillis() - search;
 		renderingImageContext.searchTime = search;
 		renderingImageContext.renderingTime = rendering;
 		renderingImageContext.context = renderingContext;
 		res.deleteNativeResult();
-		
+
 		return generationResult;
 	}
-	
+
 	public static class RenderingImageResult {
 		private final BufferedImage img;
 		private final RenderingGenerationResult generationResult;
-		
+
 		RenderingImageResult(BufferedImage img, RenderingGenerationResult result) {
 			this.img = img;
 			this.generationResult = result;
 		}
-		
+
 		public BufferedImage getImage() {
 			return img;
 		}
-		
+
 		public RenderingGenerationResult getGenerationResult() {
 			return generationResult;
 		}
-		
+
 	}
-	
+
 	public RenderingImageResult renderImage(RenderingImageContext renderingImageContext) throws IOException {
 		RenderingGenerationResult generationResult = render(renderingImageContext);
 		InputStream inputStream = new InputStream() {
@@ -423,7 +421,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		reader.setInput(new MemoryCacheImageInputStream(inputStream), true);
 		BufferedImage img = reader.read(0);
 		AllocationUtil.freeDirectBuffer(generationResult.bitmapBuffer);
-		
+
 		return new RenderingImageResult(img, generationResult);
 	}
 
@@ -432,7 +430,7 @@ public class NativeJavaRendering extends NativeLibrary {
 		Map<String, FileIndex> mp = initIndexesCache(filesDir, obfFiles, false);
 		initFilesInDir(obfFiles, mp);
 	}
-	
+
 	private void initFilesInDir(List<File> obfFiles, Map<String, FileIndex> boundaries) {
 		for (File f : obfFiles) {
 			// "_16_05_06.obf"
@@ -479,7 +477,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			dd.selected = iterator.next();
 		}
 	}
-	
+
 	public void enableBaseFile(MapDiff m, boolean enable) {
 		if (enable) {
 			if (!m.enableBaseMap) {
@@ -493,7 +491,7 @@ public class NativeJavaRendering extends NativeLibrary {
 			}
 		}
 	}
-	
+
 	public void enableMapFile(MapDiff md, String df) {
 		closeBinaryMapFile(md.baseFile.getAbsolutePath());
 		Set<String> ks = md.diffs.keySet();
@@ -528,17 +526,17 @@ public class NativeJavaRendering extends NativeLibrary {
 			initBinaryMapFile(md.baseFile.getAbsolutePath(), true, false);
 		}
 	}
-	
+
 	public MapDiff getMapDiffs(double lat, double lon) {
 		for(MapDiff md : diffs.values()) {
-			if(md.bounds != null && md.bounds.top > lat && md.bounds.bottom < lat && 
+			if(md.bounds != null && md.bounds.top > lat && md.bounds.bottom < lat &&
 					md.bounds.left < lon && md.bounds.right > lon) {
 				return md;
 			}
 		}
 		return null;
 	}
-	
+
 	public Map<String, FileIndex> initIndexesCache(File dir, List<File> filesToUse, boolean filterDuplicates) throws IOException {
 		Map<String, FileIndex> map = new TreeMap<>();
 		File cacheFile = new File(dir, INDEXES_CACHE);
@@ -634,5 +632,13 @@ public class NativeJavaRendering extends NativeLibrary {
 
 			return img;
 		}
+	}
+
+	public byte[] getMapboxVectorTileFile(int zoom, int x, int y) throws IOException {
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
+            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y));
+        }
+    	return byteStream.toByteArray();
 	}
 }

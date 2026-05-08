@@ -1,27 +1,24 @@
 package net.osmand.server.tileManager;
 
-import net.osmand.server.controllers.pub.GeotiffTileController;
+import net.osmand.server.controllers.pub.MapboxVectorTileController;
 import org.jetbrains.annotations.NotNull;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
-public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
-	private BufferedImage runtimeImage;
+public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVectorTile> {
+	private byte[] runtimeTile;
 	private long lastAccess;
 	private String tileId;
 	private final TileServerConfig cfg;
-	private final GeotiffTileController.TileType tileType;
 	public final int x;
 	public final int y;
 	public final int z;
 	private static final long THREE_HOURS_IN_MILLIS = 3 * 60 * 60 * 1000L;
 
-	public GeotiffTile(TileServerConfig cfg, GeotiffTileController.TileType tileType, int x, int y, int z) {
+	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z) {
 		this.cfg = cfg;
-		this.tileType = tileType;
 		this.x = x;
 		this.y = y;
 		this.z = z;
@@ -29,13 +26,13 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 		touch();
 	}
 
-	public synchronized void setRuntimeImage(BufferedImage runtimeImage) {
-		this.runtimeImage = runtimeImage;
+	public synchronized void setRuntimeTile(byte[] runtimeTile) {
+		this.runtimeTile = runtimeTile;
 	}
 
 	public synchronized void touch() {
 		lastAccess = System.currentTimeMillis();
-		File cacheFile = getCacheFile(".png");
+		File cacheFile = getCacheFile(".mvt");
 		if (cacheFile != null && cacheFile.exists()) {
 			long lastModifiedTime = cacheFile.lastModified();
 			if (lastAccess > lastModifiedTime + THREE_HOURS_IN_MILLIS) {
@@ -47,44 +44,38 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 		}
 	}
 
-	public GeotiffTileController.TileType getTileType() {
-		return tileType;
-	}
-
 	public void setTileId() {
-		this.tileId = this.cfg.createTileId(tileType.getType(), x, y, z, -1, -1);
+		this.tileId = this.cfg.createTileId("vector", x, y, z, -1, -1);
 	}
 
-	public synchronized BufferedImage getCacheRuntimeImage() throws IOException {
-		BufferedImage img = runtimeImage;
-		if (img != null) {
-			return img;
+	public synchronized byte[] getCacheRuntimeTile() throws IOException {
+        byte[] tile = runtimeTile;
+		if (tile != null) {
+			return tile;
 		}
-		File cf = getCacheFile(".png");
+		File cf = getCacheFile(".mvt");
 		if (cf != null && cf.exists() && cf.length() > 0) {
-			runtimeImage = ImageIO.read(cf);
-			if (runtimeImage != null) {
-				return runtimeImage;
-			}
+			runtimeTile = Files.readAllBytes(cf.toPath());
+    		return runtimeTile;
 		}
 		return null;
 	}
 
 	public File getCacheFile(String ext) {
 		return TileCacheProvider.super.getCacheFile(
-				cfg.heightmapLocation, ext, z, x, y,
+				cfg.mvtsLocation, ext, z, x, y,
 				-1, -1,
-				tileType.getType(), null, 15
+				"vector", null, 22
 		);
 	}
 
 	@Override
 	public void saveTileToCache(Object tile, File cacheFile) throws IOException {
-		if (tile instanceof GeotiffTile gt) {
-			if (gt.runtimeImage != null) {
+		if (tile instanceof MapboxVectorTile mvt) {
+			if (mvt.runtimeTile != null) {
 				cacheFile.getParentFile().mkdirs();
 				if (cacheFile.getParentFile().exists()) {
-					ImageIO.write(gt.runtimeImage, "png", cacheFile);
+                    Files.write(cacheFile.toPath(), mvt.runtimeTile);
 				}
 			}
 		}
@@ -97,16 +88,16 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 
 	@Override
 	public Object getTile() {
-		return runtimeImage;
+		return runtimeTile;
 	}
 
 	@Override
 	public void setTile(Object tile) {
-		runtimeImage = (BufferedImage) tile;
+		runtimeTile = (byte[]) tile;
 	}
 
 	@Override
-	public int compareTo(@NotNull GeotiffTile o) {
+	public int compareTo(@NotNull MapboxVectorTile o) {
 		return Long.compare(lastAccess, o.lastAccess);
 	}
 }

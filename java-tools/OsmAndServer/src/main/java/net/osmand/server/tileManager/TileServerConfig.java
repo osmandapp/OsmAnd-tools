@@ -31,7 +31,10 @@ public class TileServerConfig {
 	@Value("${tile-server.cache.heightmap-location}")
 	public String heightmapLocation;
 
-	@Value("${tile-server.cache.max-zoom}")
+    @Value("${tile-server.cache.mvts-location}")
+    public String mvtsLocation;
+
+    @Value("${tile-server.cache.max-zoom}")
 	int maxZoomCache = 16;
 
 	@Value("${tile-server.metatile-size}")

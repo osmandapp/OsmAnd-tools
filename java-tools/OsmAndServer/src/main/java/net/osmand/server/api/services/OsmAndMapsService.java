@@ -119,7 +119,7 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
-	
+
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
@@ -131,16 +131,16 @@ public class OsmAndMapsService {
 //		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}"); // test
 //		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_4wd_only=true, avoid_motorway=true, prefer_unpaved=true}"); // test
 //		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}"); // test
-		
+
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 	}
-	
-	
-	
+
+
+
 	private static final long MAX_PROFILE_WAIT_MS = 6000;
 
 
@@ -667,6 +667,14 @@ public class OsmAndMapsService {
 		return image;
 	}
 
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y) throws IOException {
+		byte[] tile = null;
+		if (nativelib != null) {
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y);
+		}
+		return tile;
+	}
+
 	public List<GeocodingResult> geocoding(double lat, double lon) throws IOException, InterruptedException {
 		QuadRect points = points(null, new LatLon(lat, lon), new LatLon(lat, lon));
 		List<GeocodingResult> complete;
@@ -1000,14 +1008,14 @@ public class OsmAndMapsService {
 		LOGGER.error("Empty GPX from Rescuetrack: " + url);
 		return new ArrayList<>();
 	}
-	
+
 	private static class DebugInfo {
 		String routingCacheInfo = "";
 		String selectedCache = "SEPARATE";
 		String routeParametersStr = "";
 		public long waitTime;
 	}
-	
+
 
 	@Nullable
 	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
@@ -1023,7 +1031,7 @@ public class OsmAndMapsService {
 			RouteParameters rp = parseRouteParameters(routeMode);
 			DebugInfo di = new DebugInfo();
 			ctx = lockCacheRoutingContext(router, rp, di);
-			LOGGER.info(String.format("REQ routing %s (%s - %.1f sec, %s): %s -> %s - cache %s", profile, 
+			LOGGER.info(String.format("REQ routing %s (%s - %.1f sec, %s): %s -> %s - cache %s", profile,
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
@@ -1126,7 +1134,7 @@ public class OsmAndMapsService {
 			if (best != null) {
 				best.rCtx.unloadAllData();
 				if (!best.routeParamsStr.equals(rParamsStr)) {
-					// this is not used any more cause we always match exactly route params 
+					// this is not used any more cause we always match exactly route params
 					best.routeParamsStr = rParamsStr;
 					GeneralRouter oldRouter = best.rCtx.config.router;
 					oldRouter.clearCaches();
