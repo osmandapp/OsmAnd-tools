@@ -236,15 +236,15 @@ public class GarminConnectController {
 			return ResponseEntity.ok(GSON.toJson(Map.of(GARMIN_STATUS_LINKED_KEY, false)));
 		}
 		// null = old record before migration — backfill all types and persist
-		if (row.activityTypes == null) {
+		if (row.garminActivityTypes == null) {
 			garminConnectService.saveSelectedActivityTypes(row.userid, null);
-			row.activityTypes = GarminConnectService.allTypesJoined();
+			row.garminActivityTypes = GarminConnectService.allTypesJoined();
 		}
 		// "" = user explicitly deselected everything → return empty list
 		// "A,B,..." = return the stored selection
-		List<String> selectedTypes = row.activityTypes.isEmpty()
+		List<String> selectedTypes = row.garminActivityTypes.isEmpty()
 				? List.of()
-				: Arrays.stream(row.activityTypes.split(",")).filter(s -> !s.isBlank()).sorted().toList();
+				: Arrays.stream(row.garminActivityTypes.split(",")).filter(s -> !s.isBlank()).sorted().toList();
 		return ResponseEntity.ok(GSON.toJson(Map.of(
 				GARMIN_STATUS_LINKED_KEY, true,
 				GARMIN_STATUS_SYNC_TIME_MS_KEY, row.lastGarminImportAt != null ? row.lastGarminImportAt : 0L,

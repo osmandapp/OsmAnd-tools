@@ -165,12 +165,12 @@ public class GarminConnectService {
 			return false;
 		}
 		if (selectedTypes == null) {
-			row.activityTypes = allTypesJoined();
+			row.garminActivityTypes = allTypesJoined();
 		} else if (selectedTypes.isEmpty()) {
 			// User explicitly deselected everything — store empty string (not null)
-			row.activityTypes = "";
+			row.garminActivityTypes = "";
 		} else {
-			row.activityTypes = selectedTypes.stream()
+			row.garminActivityTypes = selectedTypes.stream()
 					.filter(GARMIN_TRACK_ACTIVITY_TYPES::contains)
 					.sorted()
 					.collect(java.util.stream.Collectors.joining(","));
@@ -208,7 +208,7 @@ public class GarminConnectService {
 		if (row == null) {
 			row = new GarminUserConnectionRepository.GarminUserConnection();
 			row.userid = userid;
-			row.activityTypes = allTypesJoined();
+			row.garminActivityTypes = allTypesJoined();
 		}
 		if (!applyTokenResponse(row, tokenJson)) {
 			return new GarminLinkResult(GarminLinkStatus.TOKEN_EXCHANGE_FAILED, false);
@@ -489,8 +489,8 @@ public class GarminConnectService {
 	private void processOneActivityFile(JsonObject o, Map<String, GarminUserConnectionRepository.GarminUserConnection> connByGarminUserId,
 	                                    Map<String, CloudUserDevicesRepository.CloudUserDevice> webDevByGarminUserId) {
 		// Check activity type and skip if not supported
-		String activityType = jsonObjectMemberAsString(o, "activityType");
-		if (activityType != null && GARMIN_TRACK_ACTIVITY_TYPES.stream().noneMatch(activityType::contains)) {
+		String garminActivityType = jsonObjectMemberAsString(o, "activityType");
+		if (garminActivityType != null && GARMIN_TRACK_ACTIVITY_TYPES.stream().noneMatch(garminActivityType::contains)) {
 			return;
 		}
 		// Check user
@@ -506,12 +506,12 @@ public class GarminConnectService {
 			LOG.warn("Garmin activityFiles: no linked OsmAnd user for garminUserId=" + garminUserId);
 			return;
 		}
-		if (activityType != null && conn.activityTypes != null) {
-			if (conn.activityTypes.isEmpty()) {
+		if (garminActivityType != null && conn.garminActivityTypes != null) {
+			if (conn.garminActivityTypes.isEmpty()) {
 				return;
 			}
-			Set<String> allowed = new HashSet<>(List.of(conn.activityTypes.split(",")));
-			if (allowed.stream().noneMatch(activityType::contains)) {
+			Set<String> allowed = new HashSet<>(List.of(conn.garminActivityTypes.split(",")));
+			if (allowed.stream().noneMatch(garminActivityType::contains)) {
 				return;
 			}
 		}
