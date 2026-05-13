@@ -456,7 +456,7 @@ def monitoring_thread() -> None:
             print(f"{now} nothing happened ({nothing_counter})")
             if nothing_counter >= MAX_TRIES:
                 print(f"Nothing terminates downloading :)")
-                os.kill(os.getpid(), signal.SIGTERM)
+                os._exit(0)
 
         with monitoring_counter_lock:
             if errors > 0 and (monitoring_success_count > 0 or monitoring_error_count > MIN_ERRORS_TO_TERMINATE):
@@ -465,7 +465,7 @@ def monitoring_thread() -> None:
                     print(f"ERROR_LIMIT_PERCENT terminates downloading")
                     print(f"Total success {monitoring_success_count}, errors {monitoring_error_count}")
                     print(f"Interval success {success}, errors {errors} ({current_errors_percent}%)")
-                    os.kill(os.getpid(), signal.SIGTERM)
+                    os._exit(1)
 
 
 if __name__ == "__main__":
