@@ -209,9 +209,9 @@ public class SearchService {
         }
     }
 
-    public record SearchResults(List<SearchResult> results, SearchSettings settings, String unitTestJson) {
+    public record SearchResults(List<SearchResult> results, SearchSettings settings, String unitTestJson, SearchPhrase phrase) {
         public SearchResults(List<SearchResult> results) {
-            this(results, null, null);
+            this(results, null, null, null);
         }
     }
 
@@ -288,7 +288,7 @@ public class SearchService {
 				JSONObject json = SearchUICore.createTestJSON(resultCollection, settings.getExportedObjects(), settings.getExportedCities());
 				unitTestJson = json == null ? null : json.toString();
 			}
-			return new SearchResults(res, settings, unitTestJson);
+			return new SearchResults(res, settings, unitTestJson, resultCollection == null ? null : resultCollection.getPhrase());
         } finally {
             osmAndMapsService.unlockReaders(usedMapList);
         }

@@ -8,7 +8,9 @@ import net.osmand.data.*;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
+import net.osmand.search.SearchUICore;
 import net.osmand.search.core.SearchExportSettings;
+import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -36,6 +38,7 @@ public interface OBFService extends BaseService {
 	int BASE_POI_ZOOM = 31 - BASE_POI_SHIFT;
 	int FINAL_POI_ZOOM = 31 - FINAL_POI_SHIFT;
 	int CATEGORY_MASK = (1 << BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY) - 1;
+	int UNIT_TEST_RESULTS_LIMIT = 10;
 
 	OsmAndMapsService getMapsService();
 
@@ -1487,10 +1490,15 @@ public interface OBFService extends BaseService {
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
 			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
 			JSONObject settingsJson = settings.toJSON();
+			List<List<String>> formattedResults = buildUnitTestResults(unitTest.queries(), ctx);
+			JSONArray formattedResultsJson = new JSONArray();
+			for (List<String> phraseResults : formattedResults) {
+				formattedResultsJson.put(new JSONArray(phraseResults));
+			}
 			Map<String, Object> rootJson = new LinkedHashMap<>();
 			rootJson.put("settings", settingsJson);
 			rootJson.put("phrases", unitTest.queries);
-			rootJson.put("results", Arrays.stream(unitTest.queries()).map(x -> "").toArray());
+			rootJson.put("results", formattedResultsJson);
 
 			unitTestJson = new JSONObject(rootJson).toString(4);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
@@ -1529,5 +1537,40 @@ public interface OBFService extends BaseService {
 						});
 			}
 		}
+	}
+
+	private List<List<String>> emptyUnitTestResults(String[] phrases) {
+		List<List<String>> results = new ArrayList<>();
+		String[] phraseArray = phrases == null ? new String[0] : phrases;
+		for (int i = 0; i < phraseArray.length; i++) {
+			results.add(new ArrayList<>());
+		}
+		return results;
+	}
+
+	private List<List<String>> buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx) throws IOException {
+		List<List<String>> results = emptyUnitTestResults(phrases);
+		String[] phraseArray = phrases == null ? new String[0] : phrases;
+		for (int phraseIndex = 0; phraseIndex < phraseArray.length; phraseIndex++) {
+			String query = phraseArray[phraseIndex];
+			SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
+					baseCtx.lat(), baseCtx.lon(), query == null ? "" : query, baseCtx.locale(),
+					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+			SearchService.SearchResults searchResult = getSearchService().getImmediateSearchResults(
+					phraseCtx,
+					new SearchService.SearchOption(true, null, null, true, (net.osmand.search.core.ObjectType[]) null),
+					null);
+			SearchPhrase phrase = searchResult.phrase();
+			List<SearchResult> searchResults = searchResult.results();
+			if (phrase == null || searchResults == null) {
+				continue;
+			}
+
+			List<String> phraseResults = results.get(phraseIndex);
+			for (int i = 0; i < Math.min(UNIT_TEST_RESULTS_LIMIT, searchResults.size()); i++) {
+				phraseResults.add(SearchUICore.formatSearchResultForTest(false, searchResults.get(i), phrase));
+			}
+		}
+		return results;
 	}
 }
