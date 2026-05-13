@@ -1292,37 +1292,6 @@ public interface OBFService extends BaseService {
 		return normalizedValue.replace("\u0307", "");
 	}
 
-	private static Address findValue(Amenity amenity, Pattern poiPattern, Pattern normalizedPoiPattern) {
-        if (amenity == null || poiPattern == null) {
-            return null;
-        }
-		
-		String name = amenity.getName();
-		if (matchesPattern(name, poiPattern, normalizedPoiPattern)) {
-			return new Address(name, "name-> " + name, amenity.getLocation());
-		}
-
-		String enName = amenity.getEnName(false);
-		if (matchesPattern(enName, poiPattern, normalizedPoiPattern)) {
-			return new Address(enName, "name:en-> " + enName, amenity.getLocation());
-		}
-		
-		name = name == null ? enName : name;
-		for (Map.Entry<String, String> e : amenity.getNamesMap(true).entrySet()) {
-			if (matchesPattern(e.getValue(), poiPattern, normalizedPoiPattern)) {
-				return new Address(name, e.getKey() + "-> " + e.getValue(), amenity.getLocation());
-			}
-		}
-		
-        for (String key : amenity.getAdditionalInfoKeys()) {
-			String info = amenity.getAdditionalInfo(key);
-			if (matchesPattern(info, poiPattern, normalizedPoiPattern)) {
-                return new Address(name, key + "-> " + info, amenity.getLocation());
-            }
-        }
-        return null;
-    }
-
 	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
 		List<Record> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
@@ -1677,17 +1646,6 @@ public interface OBFService extends BaseService {
 			return arr;
 		}
 		for (int value : values) {
-			arr.put(value);
-		}
-		return arr;
-	}
-
-	private JSONArray toJsonArray(String[] values) {
-		JSONArray arr = new JSONArray();
-		if (values == null) {
-			return arr;
-		}
-		for (String value : values) {
 			arr.put(value);
 		}
 		return arr;
