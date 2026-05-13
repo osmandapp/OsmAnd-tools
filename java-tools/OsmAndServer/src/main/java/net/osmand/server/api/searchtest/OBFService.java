@@ -1469,7 +1469,8 @@ public interface OBFService extends BaseService {
 	record UnitTestPayload(
 			@JsonProperty("name") String name,
 			@JsonProperty("queries") String[] queries,
-			@JsonProperty("resultsLimit") Integer resultsLimit) {}
+			@JsonProperty("resultsLimit") Integer resultsLimit,
+			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
@@ -1494,7 +1495,8 @@ public interface OBFService extends BaseService {
 			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
 			JSONObject settingsJson = settings.toJSON();
 			int limit = unitTest.resultsLimit();
-			List<List<String>> formattedResults = buildUnitTestResults(unitTest.queries(), ctx, limit);
+			int geocodingLimit = unitTest.geocodingLimit();
+			List<List<String>> formattedResults = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
 			JSONArray formattedResultsJson = new JSONArray();
 			for (List<String> phraseResults : formattedResults) {
 				formattedResultsJson.put(new JSONArray(phraseResults));
@@ -1552,7 +1554,7 @@ public interface OBFService extends BaseService {
 		return results;
 	}
 
-	private List<List<String>> buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit) throws IOException {
+	private List<List<String>> buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit, int geocodingLimit) throws IOException {
 		List<List<String>> results = emptyUnitTestResults(phrases);
 		String[] phraseArray = phrases == null ? new String[0] : phrases;
 		for (int phraseIndex = 0; phraseIndex < phraseArray.length; phraseIndex++) {
@@ -1572,7 +1574,8 @@ public interface OBFService extends BaseService {
 
 			List<String> phraseResults = results.get(phraseIndex);
 			for (int i = 0; i < Math.min(limit, searchResults.size()); i++) {
-				phraseResults.add(SearchUICore.formatSearchResultForTest(false, searchResults.get(i), phrase));
+				String formatted = SearchUICore.formatSearchResultForTest(false, searchResults.get(i), phrase);
+				phraseResults.add(i < geocodingLimit ? "@" + formatted : formatted);
 			}
 		}
 		return results;
