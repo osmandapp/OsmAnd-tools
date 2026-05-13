@@ -1,5 +1,6 @@
 package net.osmand.server.api.searchtest;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.amazonaws.util.StringInputStream;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
@@ -38,7 +39,6 @@ public interface OBFService extends BaseService {
 	int BASE_POI_ZOOM = 31 - BASE_POI_SHIFT;
 	int FINAL_POI_ZOOM = 31 - FINAL_POI_SHIFT;
 	int CATEGORY_MASK = (1 << BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY) - 1;
-	int UNIT_TEST_RESULTS_LIMIT = 10;
 
 	OsmAndMapsService getMapsService();
 
@@ -1466,7 +1466,10 @@ public interface OBFService extends BaseService {
 		return new AddressResult(r.toString(), type, r.addressName, parent, metric);
 	}
 
-	record UnitTestPayload(String name, String[] queries) {}
+	record UnitTestPayload(
+			@JsonProperty("name") String name,
+			@JsonProperty("queries") String[] queries,
+			@JsonProperty("resultsLimit") Integer resultsLimit) {}
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
@@ -1490,7 +1493,8 @@ public interface OBFService extends BaseService {
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
 			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
 			JSONObject settingsJson = settings.toJSON();
-			List<List<String>> formattedResults = buildUnitTestResults(unitTest.queries(), ctx);
+			int limit = unitTest.resultsLimit();
+			List<List<String>> formattedResults = buildUnitTestResults(unitTest.queries(), ctx, limit);
 			JSONArray formattedResultsJson = new JSONArray();
 			for (List<String> phraseResults : formattedResults) {
 				formattedResultsJson.put(new JSONArray(phraseResults));
@@ -1548,7 +1552,7 @@ public interface OBFService extends BaseService {
 		return results;
 	}
 
-	private List<List<String>> buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx) throws IOException {
+	private List<List<String>> buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit) throws IOException {
 		List<List<String>> results = emptyUnitTestResults(phrases);
 		String[] phraseArray = phrases == null ? new String[0] : phrases;
 		for (int phraseIndex = 0; phraseIndex < phraseArray.length; phraseIndex++) {
@@ -1567,7 +1571,7 @@ public interface OBFService extends BaseService {
 			}
 
 			List<String> phraseResults = results.get(phraseIndex);
-			for (int i = 0; i < Math.min(UNIT_TEST_RESULTS_LIMIT, searchResults.size()); i++) {
+			for (int i = 0; i < Math.min(limit, searchResults.size()); i++) {
 				phraseResults.add(SearchUICore.formatSearchResultForTest(false, searchResults.get(i), phrase));
 			}
 		}
