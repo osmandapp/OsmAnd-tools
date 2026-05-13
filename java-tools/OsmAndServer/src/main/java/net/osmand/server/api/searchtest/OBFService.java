@@ -1512,7 +1512,7 @@ public interface OBFService extends BaseService {
 			rootJson.put("settings", settingsJson);
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
-			unitTestJson = new JSONObject(rootJson).toString(4);
+			unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
 				if (jsonFile.exists()) {
