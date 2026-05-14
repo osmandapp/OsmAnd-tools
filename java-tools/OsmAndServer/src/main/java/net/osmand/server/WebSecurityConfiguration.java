@@ -307,15 +307,23 @@ public class WebSecurityConfiguration {
 
 	@Bean
 	CorsConfigurationSource corsConfigurationSource() {
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+		CorsConfiguration vectorTilesConfiguration = new CorsConfiguration();
+		vectorTilesConfiguration.setAllowedOrigins(Arrays.asList(CorsConfiguration.ALL));
+		vectorTilesConfiguration.setAllowCredentials(false);
+		vectorTilesConfiguration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
+		vectorTilesConfiguration.setAllowedHeaders(Arrays.asList(CorsConfiguration.ALL));
+		source.registerCorsConfiguration("/vector/**", vectorTilesConfiguration);
+
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
-				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net", 
+				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net",
 				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000"));
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));
-		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**",  configuration);
+		source.registerCorsConfiguration("/**", configuration);
 		return source;
 	}
 
