@@ -131,7 +131,7 @@ public class MapboxVectorTileController {
 		return name.endsWith(".mvt") && name.contains("mvts");
 	}
 
-	private byte[] getTileFromService(MapboxVectorTile tile) throws IOException {
+	synchronized private byte[] getTileFromService(MapboxVectorTile tile) throws IOException {
 		long startTime = DEBUG ? System.currentTimeMillis() : 0;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		if (DEBUG) {
