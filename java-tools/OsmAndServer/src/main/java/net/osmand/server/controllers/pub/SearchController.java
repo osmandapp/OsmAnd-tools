@@ -72,8 +72,10 @@ public class SearchController {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
+        CloudUserDevicesRepository.CloudUserDevice dev = osmAndMapsService.checkUser();
+        int userId = dev != null ? dev.userid : 0;
         List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-                baseSearch != null && baseSearch, northWest, southEast), timeZone);
+                baseSearch != null && baseSearch, northWest, southEast), userId, timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
