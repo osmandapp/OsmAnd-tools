@@ -631,6 +631,15 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	}
 
 	public static void main(String[] args) {
+		OBFService svc = new SearchTestService(null);
+
+		String obfPath = "D:\\Projects\\git\\Osmand\\map\\Germany_bremen-city_europe_2.obf";
+		List<IndexToken> index = svc.getIndex(obfPath, "bremen");
+		List<ObjectAddress> objects = svc.getObjects(obfPath, "en", index.get(0), null, null, null);
+		for (ObjectAddress object : objects) {
+			System.out.println(object.name() + " " + object.point() + " " + object.values() + " " + object.isPoi() + " " + object.type());
+		}
+		
 		String mapDir = System.getenv("MAP_DIR");
 		if (mapDir == null || mapDir.trim().isEmpty()) {
 			System.err.println("MAP_DIR env is required");
@@ -658,9 +667,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		} else {
 			jsonFieldPath = fieldPath + "." + fieldName.trim();
 		}
-
-		OBFService svc = new SearchTestService(null);
-
+		
 		Path root = Path.of(mapDir);
 		if (!Files.exists(root)) {
 			System.err.println("MAP_DIR doesn't exist: " + root);
