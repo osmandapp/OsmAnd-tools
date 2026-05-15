@@ -402,4 +402,21 @@ public class SearchTestController {
 				response.getOutputStream());
 	}
 
+	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.IndexToken>> getIndex(@RequestParam String obf,
+															  @RequestParam(required = false) String prefix) {
+		return ResponseEntity.ok(testSearchService.getIndex(obf, prefix));
+	}
+
+	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam String obf,
+																 @RequestParam(required = false) String lang,
+																 @RequestParam(required = false) String regExp,
+																 @RequestParam(defaultValue = "0") int page,
+																 @RequestParam(defaultValue = "1000") int size,
+																 @RequestBody OBFService.IndexToken token) {
+		return ResponseEntity.ok(testSearchService.getObjectsPage(obf, lang == null ? "en" : lang, token, regExp, page, size));
+	}
 }
