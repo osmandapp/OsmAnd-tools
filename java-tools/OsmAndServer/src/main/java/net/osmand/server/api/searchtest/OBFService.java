@@ -1481,6 +1481,9 @@ public interface OBFService extends BaseService {
 			rootJson.put("description", String.format(Locale.US,
 					"Created with Search Tool - Detector - Unit-Test (%d results, %d geocoding, routing %b)",
 					limit, geocodingLimit, geocodingLimit > 0));
+			if (geocodingLimit > 0) {
+				rootJson.put("note", "@ prefix means reverse geocoding test for that result");
+			}
 			rootJson.put("settings", settingsJson);
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
