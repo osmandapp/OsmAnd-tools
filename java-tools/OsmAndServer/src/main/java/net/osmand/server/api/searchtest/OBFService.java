@@ -1751,7 +1751,7 @@ public interface OBFService extends BaseService {
 
 	private List<IndexToken> loadIndexTokens(File file) throws IOException {
 		try (RandomAccessFile randomAccessFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			BinaryMapIndexReader index = new BinaryMapIndexReader(randomAccessFile, file);
+			BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
 			try {
 				Map<String, IndexToken> tokens = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
 				for (BinaryIndexPart part : index.getIndexes()) {
@@ -1783,7 +1783,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void collectAddressIndexTokens(BinaryMapIndexReader index, BinaryMapAddressReaderAdapter.AddressRegion region,
+	private void collectAddressIndexTokens(BinaryMapIndexReaderExt index, BinaryMapAddressReaderAdapter.AddressRegion region,
 			Map<String, IndexToken> tokens) throws IOException {
 		index.getInputStream().seek(region.getFilePointer());
 		long oldLimit = index.getInputStream().pushLimitLong(region.getLength());
@@ -1813,7 +1813,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void collectPoiIndexTokens(BinaryMapIndexReader index, BinaryMapPoiReaderAdapter.PoiRegion region,
+	private void collectPoiIndexTokens(BinaryMapIndexReaderExt index, BinaryMapPoiReaderAdapter.PoiRegion region,
 			Map<String, IndexToken> tokens) throws IOException {
 		index.getInputStream().seek(region.getFilePointer());
 		long oldLimit = index.getInputStream().pushLimitLong(region.getLength());
@@ -1843,7 +1843,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readAddressNameIndexTokens(BinaryMapIndexReader index, Map<String, IndexToken> tokens) throws IOException {
+	private void readAddressNameIndexTokens(BinaryMapIndexReaderExt index, Map<String, IndexToken> tokens) throws IOException {
 		while (true) {
 			int tagWithType = index.getInputStream().readTag();
 			int tag = WireFormat.getTagFieldNumber(tagWithType);
@@ -1860,7 +1860,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readPoiNameIndexTokens(BinaryMapIndexReader index, Map<String, IndexToken> tokens) throws IOException {
+	private void readPoiNameIndexTokens(BinaryMapIndexReaderExt index, Map<String, IndexToken> tokens) throws IOException {
 		while (true) {
 			int tagWithType = index.getInputStream().readTag();
 			int tag = WireFormat.getTagFieldNumber(tagWithType);
@@ -1877,7 +1877,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readNameIndexTableTokens(BinaryMapIndexReader index, Map<String, IndexToken> tokens, boolean poi) throws IOException {
+	private void readNameIndexTableTokens(BinaryMapIndexReaderExt index, Map<String, IndexToken> tokens, boolean poi) throws IOException {
 		long tableLength = index.readInt();
 		long tableContentStart = index.getInputStream().getTotalBytesRead();
 		Map<String, Integer> prefixOffsets = new TreeMap<>();
@@ -1896,7 +1896,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readIndexedStringTableOffsets(BinaryMapIndexReader index, String prefix,
+	private void readIndexedStringTableOffsets(BinaryMapIndexReaderExt index, String prefix,
 			Map<String, Integer> prefixOffsets) throws IOException {
 		String currentKey = null;
 		while (true) {
@@ -1930,7 +1930,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private List<String> readSuffixDictionaryAtOffset(BinaryMapIndexReader index, long absoluteOffset, boolean poi) throws IOException {
+	private List<String> readSuffixDictionaryAtOffset(BinaryMapIndexReaderExt index, long absoluteOffset, boolean poi) throws IOException {
 		index.getInputStream().seek(absoluteOffset);
 		long length = index.getInputStream().readRawVarint32();
 		long oldLimit = index.getInputStream().pushLimitLong(length);
@@ -1994,7 +1994,7 @@ public interface OBFService extends BaseService {
 		return mergedOffsets;
 	}
 
-	private void collectAddressObjects(BinaryMapIndexReader index,
+	private void collectAddressObjects(BinaryMapIndexReaderExt index,
 			BinaryMapAddressReaderAdapter.AddressRegion region,
 			IndexToken token,
 			int tokenOffset,
@@ -2024,7 +2024,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private AddressTokenRefs readAddressTokenRefs(BinaryMapIndexReader index, String tokenName, int tokenOffset) throws IOException {
+	private AddressTokenRefs readAddressTokenRefs(BinaryMapIndexReaderExt index, String tokenName, int tokenOffset) throws IOException {
 		AddressTokenRefs refs = new AddressTokenRefs();
 		index.getInputStream().seek(tokenOffset);
 		long length = index.getInputStream().readRawVarint32();
@@ -2069,7 +2069,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readAddressTokenAtom(BinaryMapIndexReader index,
+	private void readAddressTokenAtom(BinaryMapIndexReaderExt index,
 			int tokenOffset,
 			List<Integer> matchedSuffixIndexes,
 			AddressTokenRefs refs) throws IOException {
@@ -2124,7 +2124,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private City loadCity(BinaryMapIndexReader index,
+	private City loadCity(BinaryMapIndexReaderExt index,
 			BinaryMapAddressReaderAdapter.AddressRegion region,
 			int offset) throws IOException {
 		index.getInputStream().seek(offset);
@@ -2137,7 +2137,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private ObjectAddress loadCityObjectAddress(BinaryMapIndexReader index,
+	private ObjectAddress loadCityObjectAddress(BinaryMapIndexReaderExt index,
 			BinaryMapAddressReaderAdapter.AddressRegion region,
 			int offset,
 			String lang) throws IOException {
@@ -2150,7 +2150,7 @@ public interface OBFService extends BaseService {
 		return new ObjectAddress(city.getName(lang), city.getLocation(), values, false, type);
 	}
 
-	private ObjectAddress loadStreetObjectAddress(BinaryMapIndexReader index,
+	private ObjectAddress loadStreetObjectAddress(BinaryMapIndexReaderExt index,
 			BinaryMapAddressReaderAdapter.AddressRegion region,
 			int offset,
 			City city,
@@ -2317,7 +2317,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void collectPoiObjects(BinaryMapIndexReader index,
+	private void collectPoiObjects(BinaryMapIndexReaderExt index,
 			BinaryMapPoiReaderAdapter.PoiRegion region,
 			IndexToken token,
 			int tokenOffset,
@@ -2331,7 +2331,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private Set<Integer> readPoiTokenOffsets(BinaryMapIndexReader index, String tokenName, int tokenOffset) throws IOException {
+	private Set<Integer> readPoiTokenOffsets(BinaryMapIndexReaderExt index, String tokenName, int tokenOffset) throws IOException {
 		Set<Integer> offsets = new LinkedHashSet<>();
 		index.getInputStream().seek(tokenOffset);
 		long length = index.getInputStream().readRawVarint32();
@@ -2376,7 +2376,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readPoiTokenAtom(BinaryMapIndexReader index,
+	private void readPoiTokenAtom(BinaryMapIndexReaderExt index,
 			List<Integer> matchedSuffixIndexes,
 			Set<Integer> offsets) throws IOException {
 		int shift = Integer.MIN_VALUE;
@@ -2417,7 +2417,7 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private void readPoiObjectsAtShift(BinaryMapIndexReader index,
+	private void readPoiObjectsAtShift(BinaryMapIndexReaderExt index,
 			BinaryMapPoiReaderAdapter.PoiRegion region,
 			int relativeOffset,
 			List<ObjectAddress> results,
@@ -2649,6 +2649,16 @@ public interface OBFService extends BaseService {
 		return getObjectsPage(obf, lang, token, regExp, 0, Integer.MAX_VALUE).content();
 	}
 
+	class BinaryMapIndexReaderExt extends BinaryMapIndexReader {
+		BinaryMapIndexReaderExt(final RandomAccessFile raf, File file) throws IOException {
+			super(raf, file);
+		}
+
+		CodedInputStream getInputStream() {
+			return codedIS;
+		}
+	}
+	
 	default ObjectAddressPage getObjectsPage(String obf, String lang, IndexToken token, String regExp, int page, int size) {
 		List<ObjectAddress> results = new ArrayList<>();
 		if (token == null) {
@@ -2668,7 +2678,7 @@ public interface OBFService extends BaseService {
 		}
 		File file = new File(obf);
 		try (RandomAccessFile randomAccessFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
-			BinaryMapIndexReader index = new BinaryMapIndexReader(randomAccessFile, file);
+			BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
 			try {
 				Set<String> dedupKeys = new LinkedHashSet<>();
 				int[] addressOffsets = token.addressOffsets();
