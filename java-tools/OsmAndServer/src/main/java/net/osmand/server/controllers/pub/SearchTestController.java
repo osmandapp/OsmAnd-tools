@@ -411,14 +411,12 @@ public class SearchTestController {
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.ObjectAddress>> getObjects(@RequestParam String obf,
-	                                                                         @RequestParam(required = false) String lang,
-	                                                                         @RequestParam(required = false) String cityRegExp,
-	                                                                         @RequestParam(required = false) String streetRegExp,
-	                                                                         @RequestParam(required = false) String houseRegExp,
-	                                                                         @RequestParam(required = false) String poiRegExp,
-																					 @RequestBody OBFService.IndexToken token) {
-		return ResponseEntity.ok(testSearchService.getObjects(obf, lang == null ? "en" : lang, token,
-				cityRegExp, streetRegExp, poiRegExp));
+	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam String obf,
+																 @RequestParam(required = false) String lang,
+																 @RequestParam(required = false) String regExp,
+																 @RequestParam(defaultValue = "0") int page,
+																 @RequestParam(defaultValue = "1000") int size,
+																 @RequestBody OBFService.IndexToken token) {
+		return ResponseEntity.ok(testSearchService.getObjectsPage(obf, lang == null ? "en" : lang, token, regExp, page, size));
 	}
 }

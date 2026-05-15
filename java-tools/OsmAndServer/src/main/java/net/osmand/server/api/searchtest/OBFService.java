@@ -77,6 +77,7 @@ public interface OBFService extends BaseService {
 	}
 
 	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, String type) {}
+	record ObjectAddressPage(List<ObjectAddress> content, int page, int size, long totalElements, int totalPages) {}
 	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
 	record PoiAddress(String name, LatLon point, String value) {}
 	record HouseAddress(String name, LatLon point) {}
@@ -2529,7 +2530,7 @@ public interface OBFService extends BaseService {
 		String subtype = values.get(Amenity.SUBTYPE);
 		String type = values.get(Amenity.TYPE);
 		if (!Algorithms.isEmpty(type) && !Algorithms.isEmpty(subtype)) {
-			return type + subtype;
+			return type + ": " + subtype;
 		}
 		if (!Algorithms.isEmpty(type)) {
 			return type;
@@ -2613,20 +2614,9 @@ public interface OBFService extends BaseService {
 	}
 
 	private boolean matchesObjectAddressFilter(ObjectAddress objectAddress,
-			Pattern cityPattern,
-			Pattern streetPattern,
-			Pattern poiPattern,
-			Pattern normalizedPoiPattern) {
-		if (objectAddress == null) {
-			return false;
-		}
-		if (objectAddress.isPoi()) {
-			return poiPattern != null && matchesObjectAddressText(objectAddress, poiPattern, normalizedPoiPattern);
-		}
-		if ("Street".equals(objectAddress.type())) {
-			return streetPattern != null && matchesObjectAddressText(objectAddress, streetPattern, null);
-		}
-		return cityPattern != null && matchesObjectAddressText(objectAddress, cityPattern, null);
+			Pattern pattern,
+			Pattern normalizedPattern) {
+		return matchesObjectAddressText(objectAddress, pattern, normalizedPattern);
 	}
 
 	private boolean matchesObjectAddressText(ObjectAddress objectAddress, Pattern pattern, Pattern normalizedPattern) {
@@ -2655,23 +2645,24 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-default List<ObjectAddress> getObjects(String obf, String lang, IndexToken token,
-									   String cityRegExp, String streetRegExp, String poiRegExp) {
+	default List<ObjectAddress> getObjects(String obf, String lang, IndexToken token, String regExp) {
+		return getObjectsPage(obf, lang, token, regExp, 0, Integer.MAX_VALUE).content();
+	}
+
+	default ObjectAddressPage getObjectsPage(String obf, String lang, IndexToken token, String regExp, int page, int size) {
 		List<ObjectAddress> results = new ArrayList<>();
 		if (token == null) {
-			return results;
+			return new ObjectAddressPage(List.of(), Math.max(page, 0), Math.max(size, 1), 0, 0);
 		}
-		final Pattern cityPattern;
-		final Pattern streetPattern;
-		final Pattern poiPattern;
-		final Pattern normalizedPoiPattern;
+		final Pattern objectPattern;
+		final Pattern normalizedObjectPattern;
 		final boolean hasAnyFilter;
+		final int safePage = Math.max(page, 0);
+		final int safeSize = Math.max(size, 1);
 		try {
-			cityPattern = Algorithms.isEmpty(cityRegExp) ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
-			streetPattern = Algorithms.isEmpty(streetRegExp) ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
-			poiPattern = Algorithms.isEmpty(poiRegExp) ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
-			normalizedPoiPattern = poiPattern == null ? null : compileNormalizedPattern(poiRegExp);
-			hasAnyFilter = cityPattern != null || streetPattern != null || poiPattern != null;
+			objectPattern = Algorithms.isEmpty(regExp) ? null : Pattern.compile(regExp, Pattern.CASE_INSENSITIVE);
+			normalizedObjectPattern = objectPattern == null ? null : compileNormalizedPattern(regExp);
+			hasAnyFilter = objectPattern != null;
 		} catch (PatternSyntaxException e) {
 			throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
 		}
@@ -2685,7 +2676,7 @@ default List<ObjectAddress> getObjects(String obf, String lang, IndexToken token
 				boolean hasAddressOffsets = addressOffsets != null && addressOffsets.length > 0;
 				boolean hasPoiOffsets = poiOffsets != null && poiOffsets.length > 0;
 				if (!hasAddressOffsets && !hasPoiOffsets) {
-					return results;
+					return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0);
 				}
 				if (hasAddressOffsets) {
 					for (int tokenOffset : addressOffsets) {
@@ -2711,13 +2702,18 @@ default List<ObjectAddress> getObjects(String obf, String lang, IndexToken token
 				}
 				if (hasAnyFilter) {
 					results.removeIf(objectAddress -> !matchesObjectAddressFilter(objectAddress,
-							cityPattern,
-							streetPattern,
-							poiPattern,
-							normalizedPoiPattern));
+							objectPattern,
+							normalizedObjectPattern));
 				}
 				results.sort(Comparator.comparing(ObjectAddress::name, String.CASE_INSENSITIVE_ORDER));
-				return results;
+				long totalElements = results.size();
+				int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+				int fromIndex = Math.min(safePage * safeSize, results.size());
+				int toIndex = Math.min(fromIndex + safeSize, results.size());
+				List<ObjectAddress> pageContent = fromIndex >= toIndex
+						? List.of()
+						: new ArrayList<>(results.subList(fromIndex, toIndex));
+				return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages);
 			} finally {
 				index.close();
 			}
