@@ -76,17 +76,32 @@ public interface OBFService extends BaseService {
 		return obfList;
 	}
 
-	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, String type) {}
+	record IndexToken(String name, int[] addressOffsets, int[] poiOffsets, long addressSize, long poiSize, int addressCount, int poiCount) {
+		Boolean isPoi() {
+			boolean hasAddressOffsets = addressOffsets != null && addressOffsets.length > 0;
+			boolean hasPoiOffsets = poiOffsets != null && poiOffsets.length > 0;
+			if (hasPoiOffsets && !hasAddressOffsets) {
+				return true;
+			}
+			if (hasAddressOffsets && !hasPoiOffsets) {
+				return false;
+			}
+			return null;
+		}
+	}
+	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
+
+	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, String type, Long osmId, String osmType) {}
 	record ObjectAddressPage(List<ObjectAddress> content, int page, int size, long totalElements, int totalPages) {}
 	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
 	record PoiAddress(String name, LatLon point, String value) {}
 	record HouseAddress(String name, LatLon point) {}
 	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {}
-	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
 	final class RawPoiObject {
 		String name = "";
 		String nameEn = "";
+		long id;
 		String type = "";
 		String subType = "";
 		String openingHours = "";
@@ -1249,6 +1264,9 @@ public interface OBFService extends BaseService {
 					record.nameEn = decodePoiString(codedIS.readString());
 					record.addDecodedTextTag("name:en", record.nameEn);
 					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.ID_FIELD_NUMBER:
+					record.id = codedIS.readUInt64();
+					break;
 				case OsmandOdb.OsmAndPoiBoxDataAtom.OPENINGHOURS_FIELD_NUMBER:
 					record.openingHours = decodePoiString(codedIS.readString());
 					break;
@@ -1695,20 +1713,6 @@ public interface OBFService extends BaseService {
 		return arr;
 	}
 
-	record IndexToken(String name, int[] addressOffsets, int[] poiOffsets) {
-		Boolean isPoi() {
-			boolean hasAddressOffsets = addressOffsets != null && addressOffsets.length > 0;
-			boolean hasPoiOffsets = poiOffsets != null && poiOffsets.length > 0;
-			if (hasPoiOffsets && !hasAddressOffsets) {
-				return true;
-			}
-			if (hasAddressOffsets && !hasPoiOffsets) {
-				return false;
-			}
-			return null;
-		}
-	}
-
 	default List<IndexToken> getIndex(String obf, String prefix) {
 		File file = new File(obf);
 		Pattern prefixPattern = compileIndexPrefixPattern(prefix);
@@ -1754,14 +1758,18 @@ public interface OBFService extends BaseService {
 			BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
 			try {
 				Map<String, IndexToken> tokens = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+				List<BinaryMapAddressReaderAdapter.AddressRegion> addressRegions = new ArrayList<>();
+				List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions = new ArrayList<>();
 				for (BinaryIndexPart part : index.getIndexes()) {
 					if (part instanceof BinaryMapAddressReaderAdapter.AddressRegion addressRegion) {
+						addressRegions.add(addressRegion);
 						collectAddressIndexTokens(index, addressRegion, tokens);
 					} else if (part instanceof BinaryMapPoiReaderAdapter.PoiRegion poiRegion) {
+						poiRegions.add(poiRegion);
 						collectPoiIndexTokens(index, poiRegion, tokens);
 					}
 				}
-				return new ArrayList<>(tokens.values());
+				return buildIndexTokensWithSizes(index, tokens, addressRegions, poiRegions);
 			} finally {
 				index.close();
 			}
@@ -1971,13 +1979,169 @@ public interface OBFService extends BaseService {
 		IndexToken existing = tokens.get(name);
 		if (existing == null) {
 			tokens.put(name, poi
-					? new IndexToken(name, new int[0], new int[] {offset})
-					: new IndexToken(name, new int[] {offset}, new int[0]));
+					? new IndexToken(name, new int[0], new int[] {offset}, 0L, 0L, 0, 0)
+					: new IndexToken(name, new int[] {offset}, new int[0], 0L, 0L, 0, 0));
 			return;
 		}
 		int[] mergedAddressOffsets = poi ? existing.addressOffsets() : appendDistinctOffset(existing.addressOffsets(), offset);
 		int[] mergedPoiOffsets = poi ? appendDistinctOffset(existing.poiOffsets(), offset) : existing.poiOffsets();
-		tokens.put(name, new IndexToken(name, mergedAddressOffsets, mergedPoiOffsets));
+		tokens.put(name, new IndexToken(name, mergedAddressOffsets, mergedPoiOffsets,
+				existing.addressSize(), existing.poiSize(), existing.addressCount(), existing.poiCount()));
+	}
+
+	private List<IndexToken> buildIndexTokensWithSizes(BinaryMapIndexReaderExt index,
+			Map<String, IndexToken> tokens,
+			List<BinaryMapAddressReaderAdapter.AddressRegion> addressRegions,
+			List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions) throws IOException {
+		List<IndexToken> sizedTokens = new ArrayList<>(tokens.size());
+		for (IndexToken token : tokens.values()) {
+			Set<Integer> uniqueAddressOffsets = collectUniqueAddressObjectOffsets(index, token);
+			Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> uniquePoiOffsets = collectUniquePoiObjectOffsets(index, token, poiRegions);
+			long addressSize = calculateAddressTokenSize(index, uniqueAddressOffsets);
+			long poiSize = calculatePoiTokenSize(index, uniquePoiOffsets);
+			int addressCount = countAddressObjects(index, token, addressRegions, "en");
+			int poiCount = countPoiObjects(index, token, poiRegions, "en");
+			sizedTokens.add(new IndexToken(token.name(), token.addressOffsets(), token.poiOffsets(),
+					addressSize, poiSize, addressCount, poiCount));
+		}
+		return sizedTokens;
+	}
+
+	private Set<Integer> collectUniqueAddressObjectOffsets(BinaryMapIndexReaderExt index, IndexToken token) throws IOException {
+		Set<Integer> uniqueObjectOffsets = new LinkedHashSet<>();
+		int[] addressOffsets = token.addressOffsets();
+		if (addressOffsets == null) {
+			return uniqueObjectOffsets;
+		}
+		for (int tokenOffset : addressOffsets) {
+			AddressTokenRefs refs = readAddressTokenRefs(index, token.name(), tokenOffset);
+			uniqueObjectOffsets.addAll(refs.cityOffsets);
+			uniqueObjectOffsets.addAll(refs.streetOffsets);
+		}
+		return uniqueObjectOffsets;
+	}
+
+	private long calculateAddressTokenSize(BinaryMapIndexReaderExt index, Set<Integer> uniqueObjectOffsets) throws IOException {
+		long totalSize = 0L;
+		for (Integer objectOffset : uniqueObjectOffsets) {
+			totalSize += getLengthDelimitedMessageSizeAtOffset(index, objectOffset);
+		}
+		return totalSize;
+	}
+
+	private Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> collectUniquePoiObjectOffsets(BinaryMapIndexReaderExt index,
+			IndexToken token,
+			List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions) throws IOException {
+		Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> uniqueOffsetsByRegion = new LinkedHashMap<>();
+		int[] poiOffsets = token.poiOffsets();
+		if (poiOffsets == null || poiRegions == null || poiRegions.isEmpty()) {
+			return uniqueOffsetsByRegion;
+		}
+		for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : poiRegions) {
+			Set<Integer> uniqueRelativeOffsets = new LinkedHashSet<>();
+			for (int tokenOffset : poiOffsets) {
+				if (!isOffsetWithinPart(tokenOffset, poiRegion)) {
+					continue;
+				}
+				uniqueRelativeOffsets.addAll(readPoiTokenOffsets(index, token.name(), tokenOffset));
+			}
+			if (!uniqueRelativeOffsets.isEmpty()) {
+				uniqueOffsetsByRegion.put(poiRegion, uniqueRelativeOffsets);
+			}
+		}
+		return uniqueOffsetsByRegion;
+	}
+
+	private long calculatePoiTokenSize(BinaryMapIndexReaderExt index,
+			Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> uniqueOffsetsByRegion) throws IOException {
+		long totalSize = 0L;
+		for (Map.Entry<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> entry : uniqueOffsetsByRegion.entrySet()) {
+			for (Integer relativeOffset : entry.getValue()) {
+				totalSize += getPoiDataBoxSizeAtRelativeOffset(index, entry.getKey(), relativeOffset);
+			}
+		}
+		return totalSize;
+	}
+
+	private int countAddressObjects(BinaryMapIndexReaderExt index,
+			IndexToken token,
+			List<BinaryMapAddressReaderAdapter.AddressRegion> addressRegions,
+			String lang) throws IOException {
+		List<ObjectAddress> results = new ArrayList<>();
+		Set<String> dedupKeys = new LinkedHashSet<>();
+		int[] addressOffsets = token.addressOffsets();
+		if (addressOffsets == null || addressRegions == null || addressRegions.isEmpty()) {
+			return 0;
+		}
+		for (int tokenOffset : addressOffsets) {
+			for (BinaryMapAddressReaderAdapter.AddressRegion addressRegion : addressRegions) {
+				if (isOffsetWithinPart(tokenOffset, addressRegion)) {
+					collectAddressObjects(index, addressRegion, token, tokenOffset, results, dedupKeys, lang);
+				}
+			}
+		}
+		return results.size();
+	}
+
+	private int countPoiObjects(BinaryMapIndexReaderExt index,
+			IndexToken token,
+			List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions,
+			String lang) throws IOException {
+		List<ObjectAddress> results = new ArrayList<>();
+		Set<String> dedupKeys = new LinkedHashSet<>();
+		int[] poiOffsets = token.poiOffsets();
+		if (poiOffsets == null || poiRegions == null || poiRegions.isEmpty()) {
+			return 0;
+		}
+		for (int tokenOffset : poiOffsets) {
+			for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : poiRegions) {
+				if (isOffsetWithinPart(tokenOffset, poiRegion)) {
+					collectPoiObjects(index, poiRegion, token, tokenOffset, results, dedupKeys, lang);
+				}
+			}
+		}
+		return results.size();
+	}
+
+	private long getLengthDelimitedMessageSizeAtOffset(BinaryMapIndexReaderExt index, int absoluteOffset) throws IOException {
+		if (absoluteOffset <= 0) {
+			return 0L;
+		}
+		index.getInputStream().seek(absoluteOffset);
+		long contentLength = index.getInputStream().readRawVarint32();
+		return contentLength + computeVarint32Size(contentLength);
+	}
+
+	private long getPoiDataBoxSizeAtRelativeOffset(BinaryMapIndexReaderExt index,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion,
+			int relativeOffset) throws IOException {
+		if (relativeOffset < 0) {
+			return 0L;
+		}
+		long absoluteOffset = poiRegion.getFilePointer() + relativeOffset;
+		index.getInputStream().seek(absoluteOffset);
+		long contentLength = readInt(index.getInputStream());
+		return contentLength + computeSmartLengthPrefixSize(contentLength);
+	}
+
+	private boolean isOffsetWithinPart(int offset, BinaryIndexPart part) {
+		long partStart = part.getFilePointer();
+		long partEnd = partStart + part.getLength();
+		return offset >= partStart && offset < partEnd;
+	}
+
+	private int computeVarint32Size(long value) {
+		int size = 1;
+		long normalizedValue = value;
+		while ((normalizedValue & ~0x7FL) != 0L) {
+			size++;
+			normalizedValue >>>= 7;
+		}
+		return size;
+	}
+
+	private int computeSmartLengthPrefixSize(long value) {
+		return value > 0x7f ? 8 : 1;
 	}
 
 	private int[] appendDistinctOffset(int[] offsets, int offset) {
@@ -2147,7 +2311,7 @@ public interface OBFService extends BaseService {
 		}
 		Map<String, String> values = buildMapObjectValues(city, lang);
 		String type = city.getType() == null ? null : city.getType().name();
-		return new ObjectAddress(city.getName(lang), city.getLocation(), values, false, type);
+		return new ObjectAddress(city.getName(lang), city.getLocation(), values, false, type, city.getId(), null);
 	}
 
 	private ObjectAddress loadStreetObjectAddress(BinaryMapIndexReaderExt index,
@@ -2165,8 +2329,8 @@ public interface OBFService extends BaseService {
 		long oldLimit = index.getInputStream().pushLimitLong(length);
 		try {
 			Street street = readStreetAtOffset(index.getInputStream(), city, cityX, cityY, region.getAttributeTagsTable());
-            Map<String, String> values = buildMapObjectValues(street, lang);
-			return new ObjectAddress(street.getName(lang), street.getLocation(), values, false, "Street");
+			Map<String, String> values = buildMapObjectValues(street, lang);
+			return new ObjectAddress(street.getName(lang), street.getLocation(), values, false, "Street", street.getId(), null);
 		} finally {
 			index.getInputStream().popLimit(oldLimit);
 		}
@@ -2235,8 +2399,8 @@ public interface OBFService extends BaseService {
 					if (city == null) {
 						city = City.createPostcode(name);
 					}
-                    city.setName(name);
-                    break;
+					city.setName(name);
+					break;
 				case OsmandOdb.CityIndex.X_FIELD_NUMBER:
 					x = codedIS.readUInt32();
 					break;
@@ -2499,15 +2663,27 @@ public interface OBFService extends BaseService {
 		if (!Algorithms.isEmpty(rawPoiObject.description)) {
 			values.put(Amenity.DESCRIPTION, rawPoiObject.description);
 		}
-		for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
-			if (!Algorithms.isEmpty(entry.getKey()) && entry.getValue() != null && !entry.getValue().isEmpty()) {
-				values.put(entry.getKey(), String.join("; ", entry.getValue()));
-			}
-		}
-		String displayName = selectPoiDisplayName(rawPoiObject, lang);
-		String type = buildPoiType(values);
-		return new ObjectAddress(displayName, location, values, true, type);
+ 		for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
+ 			if (!Algorithms.isEmpty(entry.getKey()) && entry.getValue() != null && !entry.getValue().isEmpty()) {
+ 				values.put(entry.getKey(), String.join("; ", entry.getValue()));
+ 			}
+ 		}
+ 		String displayName = selectPoiDisplayName(rawPoiObject, lang);
+ 		String type = buildPoiType(values);
+		Long osmId = rawPoiObject.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(rawPoiObject.id) : null;
+		String osmType = decodePoiOsmType(rawPoiObject.id);
+		return new ObjectAddress(displayName, location, values, true, type, osmId, osmType);
 	}
+
+ 	private String decodePoiOsmType(long rawPoiObjectId) {
+ 		if (rawPoiObjectId <= 0) {
+ 			return null;
+ 		}
+ 		Amenity amenity = new Amenity();
+ 		amenity.setId(rawPoiObjectId);
+		net.osmand.osm.edit.Entity.EntityType entityType = ObfConstants.getOsmEntityType(amenity);
+ 		return entityType == null ? null : entityType.name().toLowerCase(Locale.US);
+ 	}
 
 	private String selectPoiDisplayName(RawPoiObject rawPoiObject, String lang) {
 		if ("en".equalsIgnoreCase(lang) && !Algorithms.isEmpty(rawPoiObject.nameEn)) {
