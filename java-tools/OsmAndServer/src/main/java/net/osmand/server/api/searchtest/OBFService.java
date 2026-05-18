@@ -1443,32 +1443,25 @@ public interface OBFService extends BaseService {
 			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
 
 	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
+	record UnitTestSourceData(String jsonFilePath, SearchService.SearchResults settingsResult) {}
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
-		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResults result = getSearchService()
-				.getImmediateSearchResults(ctx, new SearchService.SearchOption(true, exportSettings, 
-						null, true, (net.osmand.search.core.ObjectType[]) null), null);
-
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
 		try {
-			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
-			String unitTestJson = result.unitTestJson();
-			if (unitTestJson == null)
-				return;
-			JSONObject sourceJson = new JSONObject(unitTestJson);
 			int limit = unitTest.resultsLimit();
 			int geocodingLimit = unitTest.geocodingLimit();
 			UnitTestResultsData unitTestData = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
-			if (unitTestData.routing().length() > 0) {
-				sourceJson.put("routing", unitTestData.routing());
+			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing());
+			SearchService.SearchResults result = sourceData.settingsResult();
+			if (result == null) {
+				return;
 			}
-			Files.writeString(jsonFile.toPath(), sourceJson.toString(), StandardCharsets.UTF_8);
+			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
 
 			OBFDataCreator creator = new OBFDataCreator();
 			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
-					new String[] {jsonFile.getAbsolutePath()});
+					new String[] {sourceData.jsonFilePath()});
 
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
 			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
@@ -1487,7 +1480,8 @@ public interface OBFService extends BaseService {
 			rootJson.put("settings", settingsJson);
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
-			unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
+			String unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
+			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
 				if (jsonFile.exists()) {
@@ -1533,6 +1527,91 @@ public interface OBFService extends BaseService {
 			results.add(new ArrayList<>());
 		}
 		return results;
+	}
+
+	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
+			Path dirPath, JSONArray routing) throws IOException {
+		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
+		SearchService.SearchResults settingsResult = null;
+		String[] sourceQueries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
+		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
+		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
+		for (int i = 0; i < sourceQueries.length; i++) {
+			SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
+					baseCtx.lat(), baseCtx.lon(), sourceQueries[i], baseCtx.locale(),
+					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+			SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
+					phraseCtx, new SearchService.SearchOption(true, exportSettings,
+							null, true, (net.osmand.search.core.ObjectType[]) null), null);
+			if (settingsResult == null) {
+				settingsResult = queryResult;
+			}
+			String queryUnitTestJson = queryResult == null ? null : queryResult.unitTestJson();
+			if (queryUnitTestJson == null) {
+				continue;
+			}
+			collectUnitTestSourceData(queryUnitTestJson, amenities, cities);
+		}
+		File sourceJsonFile = dirPath.resolve(unitTest.name + ".source.json").toFile();
+		JSONObject sourceJson = new JSONObject();
+		if (!amenities.isEmpty()) {
+			JSONArray amenitiesJson = new JSONArray();
+			for (Amenity amenity : amenities.values()) {
+				amenitiesJson.put(amenity.toJSON());
+			}
+			sourceJson.put("amenities", amenitiesJson);
+		}
+		if (!cities.isEmpty()) {
+			JSONArray citiesJson = new JSONArray();
+			for (City city : cities.values()) {
+				citiesJson.put(city.toJSON(true));
+			}
+			sourceJson.put("cities", citiesJson);
+		}
+		if (routing.length() > 0) {
+			sourceJson.put("routing", routing);
+		}
+		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(), StandardCharsets.UTF_8);
+		return new UnitTestSourceData(sourceJsonFile.getAbsolutePath(), settingsResult);
+	}
+
+	private String[] normalizedUnitTestQueries(String[] queries, String fallbackQuery) {
+		List<String> normalized = new ArrayList<>();
+		if (queries != null) {
+			for (String query : queries) {
+				if (!Algorithms.isEmpty(query)) {
+					normalized.add(query);
+				}
+			}
+		}
+		if (normalized.isEmpty() && !Algorithms.isEmpty(fallbackQuery)) {
+			normalized.add(fallbackQuery);
+		}
+		return normalized.toArray(new String[0]);
+	}
+
+	private void collectUnitTestSourceData(String unitTestJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
+		JSONObject sourceJson = new JSONObject(unitTestJson);
+		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
+		if (amenitiesJson != null) {
+			for (int i = 0; i < amenitiesJson.length(); i++) {
+				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
+				String amenityKey = amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+				amenities.putIfAbsent(amenityKey, amenity);
+			}
+		}
+		JSONArray citiesJson = sourceJson.optJSONArray("cities");
+		if (citiesJson != null) {
+			for (int i = 0; i < citiesJson.length(); i++) {
+				City city = City.parseJSON(citiesJson.getJSONObject(i));
+				City existing = cities.get(city.getId());
+				if (existing == null) {
+					cities.put(city.getId(), city);
+				} else {
+					existing.mergeWith(city);
+				}
+			}
+		}
 	}
 
 	private UnitTestResultsData buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit, int geocodingLimit) throws IOException {
