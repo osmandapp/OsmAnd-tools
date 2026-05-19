@@ -129,12 +129,12 @@ public interface OBFService extends BaseService {
 	}
 	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomSizes) {
+	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 	}
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] poiRefs, int[] poiAtomSizes) {}
+	record IndexTokenBuilder(String name, int[] addressOffsets, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
-	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
+	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, boolean isInvalidAtom, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
 	record ObjectAddressPage(List<ObjectAddress> content, int page, int size, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
@@ -2038,14 +2038,15 @@ public interface OBFService extends BaseService {
 		IndexTokenBuilder existing = tokens.get(name);
 		if (existing == null) {
 			tokens.put(name, poi
-					? new IndexTokenBuilder(name, new int[0], poiRefs == null ? new int[0] : poiRefs, poiAtomSizes == null ? new int[0] : poiAtomSizes)
-					: new IndexTokenBuilder(name, new int[] {offset}, new int[0], new int[0]));
+					? new IndexTokenBuilder(name, new int[0], poiRefs == null ? new int[0] : distinctOffsets(poiRefs), poiRefs == null ? new int[0] : poiRefs, poiAtomSizes == null ? new int[0] : poiAtomSizes)
+					: new IndexTokenBuilder(name, new int[] {offset}, new int[0], new int[0], new int[0]));
 			return;
 		}
 		int[] mergedAddressOffsets = poi ? existing.addressOffsets() : appendDistinctOffset(existing.addressOffsets(), offset);
 		int[] mergedPoiRefs = poi ? appendDistinctOffsets(existing.poiRefs(), poiRefs) : existing.poiRefs();
+		int[] mergedPoiAtomRefs = poi ? appendOffsets(existing.poiAtomRefs(), poiRefs) : existing.poiAtomRefs();
 		int[] mergedPoiAtomSizes = poi ? appendOffsets(existing.poiAtomSizes(), poiAtomSizes) : existing.poiAtomSizes();
-		tokens.put(name, new IndexTokenBuilder(name, mergedAddressOffsets, mergedPoiRefs, mergedPoiAtomSizes));
+		tokens.put(name, new IndexTokenBuilder(name, mergedAddressOffsets, mergedPoiRefs, mergedPoiAtomRefs, mergedPoiAtomSizes));
 	}
 
 	private List<IndexToken> buildIndexTokensWithRefs(BinaryMapIndexReaderExt index,
@@ -2053,7 +2054,9 @@ public interface OBFService extends BaseService {
 		List<IndexToken> tokensWithRefs = new ArrayList<>(tokens.size());
 		for (IndexTokenBuilder token : tokens.values()) {
 			AddressRef[] tokenAddressRefs = collectAddressRefs(index, token);
-			tokensWithRefs.add(new IndexToken(token.name(), tokenAddressRefs, token.poiRefs(), token.poiAtomSizes()));
+			tokensWithRefs.add(new IndexToken(token.name(), tokenAddressRefs, token.poiRefs(), token.poiAtomRefs(),
+					token.poiAtomSizes(), CommonWords.getCommon(token.name()) != -1,
+					CommonWords.getFrequentlyUsed(token.name()) != -1));
 		}
 		return tokensWithRefs;
 	}
@@ -2191,12 +2194,13 @@ public interface OBFService extends BaseService {
 			}
 		}
 		long totalSize = 0L;
-		for (int i = 0; i < token.poiRefs().length; i++) {
+		int[] poiAtomRefs = token.poiAtomRefs() == null ? token.poiRefs() : token.poiAtomRefs();
+		for (int i = 0; i < poiAtomRefs.length; i++) {
 			int atomSize = i < token.poiAtomSizes().length ? token.poiAtomSizes()[i] : 0;
 			if (atomSize <= 0) {
 				continue;
 			}
-			int poiRef = token.poiRefs()[i];
+			int poiRef = poiAtomRefs[i];
 			for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : poiRegions) {
 				if (exactSourceOffsets.contains((int) (poiRegion.getFilePointer() + poiRef))) {
 					totalSize += atomSize;
@@ -2298,6 +2302,10 @@ public interface OBFService extends BaseService {
 			mergedOffsets = appendDistinctOffset(mergedOffsets, value);
 		}
 		return mergedOffsets;
+	}
+
+	private int[] distinctOffsets(int[] values) {
+		return appendDistinctOffsets(new int[0], values);
 	}
 
 	private int[] appendOffsets(int[] offsets, int[] values) {
@@ -2544,7 +2552,7 @@ public interface OBFService extends BaseService {
 		int payloadSize = safeMetricInt(length + computeVarint32Size(length));
 		String name = city.getName(lang);
 		boolean isMatched = matchesLegacyCity(city, matcher);
-		return new ObjectAddress(name, city.getLocation(), arrangeObjectAddressValues(values), false, isMatched, type, city.getId(), null, offset, payloadSize, offset);
+		return new ObjectAddress(name, city.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, type, city.getId(), null, offset, payloadSize, offset);
 	}
 
 	private ObjectAddress loadStreetObjectAddress(BinaryMapIndexReaderExt index,
@@ -2567,7 +2575,7 @@ public interface OBFService extends BaseService {
 			int payloadSize = safeMetricInt(length + computeVarint32Size(length));
 			String name = street.getName(lang);
 			boolean isMatched = matchesLegacyStreet(street, matcher);
-			return new ObjectAddress(name, street.getLocation(), arrangeObjectAddressValues(values), false, isMatched, "Street", street.getId(), null, offset, payloadSize, offset);
+			return new ObjectAddress(name, street.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, "Street", street.getId(), null, offset, payloadSize, offset);
 		} finally {
 			index.getInputStream().popLimit(oldLimit);
 		}
@@ -2919,7 +2927,7 @@ public interface OBFService extends BaseService {
 									int payloadSize = poiLength + computeVarint32Size(poiLength);
 									int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
 									boolean isMatched = matchesLegacyPoi(rawPoiObject, matcher);
-									results.add(new ObjectAddress(objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
+									results.add(new ObjectAddress(objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
 								}
 							}
 						} finally {
@@ -2976,7 +2984,7 @@ public interface OBFService extends BaseService {
  		String type = buildPoiType(values);
 		Long osmId = rawPoiObject.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(rawPoiObject.id) : null;
 		String osmType = decodePoiOsmType(rawPoiObject.id);
-		return new ObjectAddress(displayName, location, arrangeObjectAddressValues(values), true, false, type, osmId, osmType, 0, 0, 0);
+		return new ObjectAddress(displayName, location, arrangeObjectAddressValues(values), true, false, false, type, osmId, osmType, 0, 0, 0);
 	}
 
 	private boolean matchesLegacyPoi(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
@@ -3183,6 +3191,54 @@ public interface OBFService extends BaseService {
 		return matchedResults;
 	}
 
+	private List<ObjectAddress> markInvalidPoiAtoms(List<ObjectAddress> results) {
+		if (results == null || results.isEmpty()) {
+			return new ArrayList<>();
+		}
+		Map<Integer, int[]> poiAtomStats = new HashMap<>();
+		for (ObjectAddress objectAddress : results) {
+			if (objectAddress != null && objectAddress.isPoi()) {
+				int[] stats = poiAtomStats.computeIfAbsent(objectAddress.sourceOffset(), ignored -> new int[2]);
+				stats[0]++;
+				if (objectAddress.isMatched()) {
+					stats[1]++;
+				}
+			}
+		}
+		Set<Integer> invalidPoiAtomOffsets = new HashSet<>();
+		for (Map.Entry<Integer, int[]> entry : poiAtomStats.entrySet()) {
+			int[] stats = entry.getValue();
+			if (stats[0] > 0 && stats[1] == 0) {
+				invalidPoiAtomOffsets.add(entry.getKey());
+			}
+		}
+		List<ObjectAddress> markedResults = new ArrayList<>(results.size());
+		for (ObjectAddress objectAddress : results) {
+			if (objectAddress == null) {
+				continue;
+			}
+			boolean isInvalidAtom = objectAddress.isPoi() && invalidPoiAtomOffsets.contains(objectAddress.sourceOffset());
+			markedResults.add(new ObjectAddress(objectAddress.name(), objectAddress.point(), objectAddress.values(),
+					objectAddress.isPoi(), objectAddress.isMatched(), isInvalidAtom, objectAddress.type(),
+					objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
+					objectAddress.payloadSize(), objectAddress.sourceOffset()));
+		}
+		return markedResults;
+	}
+
+	private int countInvalidPoiAtoms(List<ObjectAddress> results) {
+		if (results == null || results.isEmpty()) {
+			return 0;
+		}
+		Set<Integer> invalidPoiAtomOffsets = new HashSet<>();
+		for (ObjectAddress objectAddress : results) {
+			if (objectAddress != null && objectAddress.isInvalidAtom()) {
+				invalidPoiAtomOffsets.add(objectAddress.sourceOffset());
+			}
+		}
+		return invalidPoiAtomOffsets.size();
+	}
+
 	record AddressTokenRefs(List<Integer> cityOffsets, List<Integer> streetOffsets, List<Integer> streetCityOffsets, List<AddressRef> addressRefs) {
 		AddressTokenRefs() {
 			this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
@@ -3205,10 +3261,11 @@ public interface OBFService extends BaseService {
 			String regExp,
 			int page,
 			int sizeLimit,
-		boolean isFiltered) {
+		boolean isFiltered,
+			boolean invalidOnly) {
 		List<ObjectAddress> results = new ArrayList<>();
 		if (token == null) {
-			return new ObjectAddressPage(List.of(), Math.max(page, 0), Math.max(sizeLimit, 1), 0, 0, new int[6], new int[12]);
+			return new ObjectAddressPage(List.of(), Math.max(page, 0), Math.max(sizeLimit, 1), 0, 0, new int[7], new int[12]);
 		}
 		final Pattern objectPattern;
 		final Pattern normalizedObjectPattern;
@@ -3240,7 +3297,7 @@ public interface OBFService extends BaseService {
 				boolean hasAddressRefs = addressRefs != null && addressRefs.length > 0;
 				boolean hasPoiRefs = poiRefs != null && poiRefs.length > 0;
 				if (!hasAddressRefs && !hasPoiRefs) {
-					return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0, new int[6], new int[12]);
+					return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0, new int[7], new int[12]);
 				}
 				int allPoiAtomsSize = sumIntValues(token.poiAtomSizes());
 				int allAddressAtomsSize = sumAddressAtomSizes(addressRefs);
@@ -3256,6 +3313,7 @@ public interface OBFService extends BaseService {
 				if (hasPoiRefs) {
 					collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, poiRegions, results, lang, matcher);
 				}
+				results = markInvalidPoiAtoms(results);
 				ObjectAddressStats allStats = calculateObjectAddressStats(index, results, poiRegions, null);
 				ObjectAddressStats allPoiStats = calculateObjectAddressStats(index, results, poiRegions, true);
 				ObjectAddressStats allAddressStats = calculateObjectAddressStats(index, results, poiRegions, false);
@@ -3266,7 +3324,11 @@ public interface OBFService extends BaseService {
 				ObjectAddressStats exactStats = calculateObjectAddressStats(index, matchedResults, poiRegions, null);
 				ObjectAddressStats exactPoiStats = calculateObjectAddressStats(index, matchedResults, poiRegions, true);
 				ObjectAddressStats exactAddressStats = calculateObjectAddressStats(index, matchedResults, poiRegions, false);
-				List<ObjectAddress> displayResults = isFiltered ? matchedResults : new ArrayList<>(results);
+				int invalidPoiAtomsCount = countInvalidPoiAtoms(results);
+				List<ObjectAddress> displayResults = invalidOnly ? new ArrayList<>(results) : isFiltered ? matchedResults : new ArrayList<>(results);
+				if (invalidOnly) {
+					displayResults.removeIf(objectAddress -> objectAddress == null || !objectAddress.isInvalidAtom());
+				}
 				if (hasAnyFilter) {
 					displayResults.removeIf(objectAddress -> !matchesObjectAddressFilter(objectAddress,
 							objectPattern,
@@ -3286,7 +3348,8 @@ public interface OBFService extends BaseService {
 						allPoiStats.count(),
 						exactPoiStats.count(),
 						allAddressStats.count(),
-						exactAddressStats.count()
+						exactAddressStats.count(),
+						invalidPoiAtomsCount
 				};
 				int[] sizeMetrics = new int[] {
 						allAtomsSize,

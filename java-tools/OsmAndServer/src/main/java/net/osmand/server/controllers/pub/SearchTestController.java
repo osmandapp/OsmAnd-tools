@@ -417,8 +417,9 @@ public class SearchTestController {
 																 @RequestParam(defaultValue = "0") int page,
 																 @RequestParam(defaultValue = "1000") int size,
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
+																 @RequestParam(defaultValue = "false") boolean invalidOnly,
 																 @RequestBody OBFService.IndexToken token) {
-		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, page, size, isFiltered);
+		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, page, size, isFiltered, invalidOnly);
 		return ResponseEntity.ok(objects);
 	}
 }
