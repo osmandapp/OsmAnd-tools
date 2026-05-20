@@ -315,33 +315,20 @@ public class StyleDataExtractor {
 
         saxParser.parse(xmlFile, handler);
 
-        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n");
-        sb.append("  \"categories\" : {\n");
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
 
-        List<Map.Entry<String, List<String>>> entries = categoryIcons.entrySet().stream()
+        Map<String, Object> categoriesMap = new LinkedHashMap<>();
+        categoryIcons.entrySet().stream()
                 .filter(e -> !e.getValue().isEmpty())
-                .toList();
+                .forEach(e -> {
+                    Map<String, Object> iconsObj = new LinkedHashMap<>();
+                    iconsObj.put("icons", e.getValue());
+                    categoriesMap.put(e.getKey(), iconsObj);
+                });
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("categories", categoriesMap);
 
-        for (int i = 0; i < entries.size(); i++) {
-            Map.Entry<String, List<String>> entry = entries.get(i);
-            String iconsLine = entry.getValue().stream()
-                    .map(gson::toJson)
-                    .collect(java.util.stream.Collectors.joining(", "));
-            sb.append("    ").append(gson.toJson(entry.getKey())).append(" : {\n");
-            sb.append("      \"icons\" : [\n");
-            sb.append("        ").append(iconsLine).append("\n");
-            sb.append("      ]\n");
-            sb.append("    }");
-            if (i < entries.size() - 1) sb.append(",");
-            sb.append("\n");
-        }
-
-        sb.append("  }\n");
-        sb.append("}");
-
-        Files.write(Paths.get(jsonPath), sb.toString().getBytes());
+        Files.write(Paths.get(jsonPath), gson.toJson(root).getBytes());
     }
 
     public static void parsePoiStylesXml(String xmlPath, String jsonPath) throws IOException, SAXException, ParserConfigurationException {
