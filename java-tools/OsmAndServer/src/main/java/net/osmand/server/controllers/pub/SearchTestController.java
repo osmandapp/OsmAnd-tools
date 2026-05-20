@@ -50,6 +50,11 @@ public class SearchTestController {
 		return "admin/search-test";
 	}
 
+	@GetMapping("/tag_values_classification")
+	public String tagValuesClassification(Model model) {
+		return "admin/tag_values_classification";
+	}
+	
 	@GetMapping(value = "/initialized", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Boolean> isInitialized() {
