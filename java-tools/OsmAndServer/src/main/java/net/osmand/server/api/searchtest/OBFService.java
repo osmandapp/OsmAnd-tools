@@ -131,11 +131,13 @@ public interface OBFService extends BaseService {
 
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 	}
+	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
+	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, boolean isInvalidAtom, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
-	record ObjectAddressPage(List<ObjectAddress> content, int page, int size, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics) {}
+	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
 	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
@@ -1757,25 +1759,79 @@ public interface OBFService extends BaseService {
 		return arr;
 	}
 
-	default List<IndexToken> getIndex(String obf, String prefix) {
+	default IndexTokenPage getIndex(String obf, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) {
 		File file = new File(obf);
 		Pattern prefixPattern = compileIndexPrefixPattern(prefix);
+		final int safePage = Math.max(pageToShow, 0);
+		final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
 		try {
 			List<IndexToken> allTokens = getCachedOrLoadIndexTokens(file);
-			if (prefixPattern == null) {
-				return new ArrayList<>(allTokens);
-			}
 			List<IndexToken> results = new ArrayList<>();
-			for (IndexToken token : allTokens) {
-				if (prefixPattern.matcher(token.name()).find()) {
-					results.add(token);
+			if (prefixPattern == null) {
+				results.addAll(allTokens);
+			} else {
+				for (IndexToken token : allTokens) {
+					if (prefixPattern.matcher(token.name()).find()) {
+						results.add(token);
+					}
 				}
 			}
-			return results;
+			IndexTokenSummary summary = buildIndexTokenSummary(results);
+			results.sort(buildIndexTokenComparator(sortBy, sortOrder));
+			long totalElements = results.size();
+			int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+			int fromIndex = Math.min(safePage * safeSize, results.size());
+			int toIndex = Math.min(fromIndex + safeSize, results.size());
+			List<IndexToken> pageContent = fromIndex >= toIndex
+					? List.of()
+					: new ArrayList<>(results.subList(fromIndex, toIndex));
+			return new IndexTokenPage(pageContent, safePage, safeSize, totalElements, totalPages, summary);
 		} catch (Exception e) {
 			getLogger().error("Failed to read OBF index {}", file, e);
 			throw new RuntimeException("Failed to read OBF index: " + e.getMessage(), e);
 		}
+	}
+
+	private Comparator<IndexToken> buildIndexTokenComparator(String sortBy, String sortOrder) {
+		String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
+		Comparator<IndexToken> comparator = switch (normalizedSortBy) {
+			case "poi" -> Comparator.comparingInt(this::getIndexTokenPoiCount);
+			case "address" -> Comparator.comparingInt(this::getIndexTokenAddressCount);
+			case "common" -> Comparator.comparingInt(token -> token != null && token.isCommon() ? 1 : 0);
+			case "frequent" -> Comparator.comparingInt(token -> token != null && token.isFrequent() ? 1 : 0);
+			case "count" -> Comparator.comparingInt(token -> getIndexTokenPoiCount(token) + getIndexTokenAddressCount(token));
+			default -> Comparator.comparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
+		};
+		comparator = comparator.thenComparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
+		return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
+	}
+
+	private IndexTokenSummary buildIndexTokenSummary(List<IndexToken> tokens) {
+		int poiSum = 0;
+		int addressSum = 0;
+		int commonSum = 0;
+		int frequentSum = 0;
+		int poiMax = 0;
+		int addressMax = 0;
+		for (IndexToken token : tokens) {
+			int poiCount = getIndexTokenPoiCount(token);
+			int addressCount = getIndexTokenAddressCount(token);
+			poiSum += poiCount;
+			addressSum += addressCount;
+			commonSum += token != null && token.isCommon() ? 1 : 0;
+			frequentSum += token != null && token.isFrequent() ? 1 : 0;
+			poiMax = Math.max(poiMax, poiCount);
+			addressMax = Math.max(addressMax, addressCount);
+		}
+		return new IndexTokenSummary(poiSum, addressSum, commonSum, frequentSum, poiMax, addressMax);
+	}
+
+	private int getIndexTokenPoiCount(IndexToken token) {
+		return token == null || token.poiRefs() == null ? 0 : token.poiRefs().length;
+	}
+
+	private int getIndexTokenAddressCount(IndexToken token) {
+		return token == null || token.addressRefs() == null ? 0 : token.addressRefs().length;
 	}
 
 	private List<IndexToken> getCachedOrLoadIndexTokens(File file) throws IOException {
@@ -3259,19 +3315,21 @@ public interface OBFService extends BaseService {
 			String lang,
 			IndexToken token,
 			String regExp,
-			int page,
-			int sizeLimit,
-		boolean isFiltered,
+			int pageToShow,
+			int pageSizeLimit,
+			String sortBy,
+			String sortOrder,
+			boolean isFiltered,
 			boolean invalidOnly) {
 		List<ObjectAddress> results = new ArrayList<>();
 		if (token == null) {
-			return new ObjectAddressPage(List.of(), Math.max(page, 0), Math.max(sizeLimit, 1), 0, 0, new int[7], new int[12]);
+			return new ObjectAddressPage(List.of(), Math.max(pageToShow, 0), Math.max(pageSizeLimit, 1), 0, 0, new int[7], new int[12]);
 		}
 		final Pattern objectPattern;
 		final Pattern normalizedObjectPattern;
 		final boolean hasAnyFilter;
-		final int safePage = Math.max(page, 0);
-		final int safeSize = Math.max(sizeLimit, 1);
+		final int safePage = Math.max(pageToShow, 0);
+		final int safeSize = Math.max(pageSizeLimit, 1);
 		try {
 			objectPattern = Algorithms.isEmpty(regExp) ? null : Pattern.compile(regExp, Pattern.CASE_INSENSITIVE);
 			normalizedObjectPattern = objectPattern == null ? null : compileNormalizedPattern(regExp);
@@ -3304,7 +3362,7 @@ public interface OBFService extends BaseService {
 				int allAtomsSize = safeMetricInt((long) allPoiAtomsSize + allAddressAtomsSize);
 				Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> storedPoiOffsets = mapPoiRefs(poiRefs, poiRegions);
 				CollatorStringMatcher matcher = new CollatorStringMatcher(token.name(),
-						CollatorStringMatcher.StringMatcherMode.CHECK_STARTS_FROM_SPACE);
+						CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE);
 				if (hasAddressRefs) {
 					for (BinaryMapAddressReaderAdapter.AddressRegion addressRegion : addressRegions) {
 						collectAddressObjects(index, addressRegion, addressRefs, results, lang, matcher);
@@ -3334,7 +3392,7 @@ public interface OBFService extends BaseService {
 							objectPattern,
 							normalizedObjectPattern));
 				}
-				displayResults.sort(Comparator.comparing(ObjectAddress::name, String.CASE_INSENSITIVE_ORDER));
+				displayResults.sort(buildObjectAddressComparator(sortBy, sortOrder));
 				long totalElements = displayResults.size();
 				int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
 				int fromIndex = Math.min(safePage * safeSize, displayResults.size());
@@ -3379,5 +3437,16 @@ public interface OBFService extends BaseService {
 			getLogger().error("Failed to read OBF objects {} for token {}", file, token, e);
 			throw new RuntimeException("Failed to read OBF objects: " + e.getMessage(), e);
 		}
+	}
+
+	private Comparator<ObjectAddress> buildObjectAddressComparator(String sortBy, String sortOrder) {
+		String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
+		Comparator<ObjectAddress> comparator = switch (normalizedSortBy) {
+			case "type" -> Comparator.comparing(object -> object == null || object.type() == null ? "" : object.type(), String.CASE_INSENSITIVE_ORDER);
+			case "matched" -> Comparator.comparingInt(object -> object != null && object.isMatched() ? 1 : 0);
+			default -> Comparator.comparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
+		};
+		comparator = comparator.thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
+		return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
 	}
 }

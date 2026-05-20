@@ -404,9 +404,13 @@ public class SearchTestController {
 
 	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.IndexToken>> getIndex(@RequestParam String obf,
-															  @RequestParam(required = false) String prefix) {
-		return ResponseEntity.ok(testSearchService.getIndex(obf, prefix));
+	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestParam String obf,
+															  @RequestParam(required = false) String prefix,
+															  @RequestParam(defaultValue = "0") int pageToShow,
+															  @RequestParam(defaultValue = "100") int pageSizeLimit,
+															  @RequestParam(required = false) String sortBy,
+															  @RequestParam(required = false) String sortOrder) {
+		return ResponseEntity.ok(testSearchService.getIndex(obf, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -414,12 +418,14 @@ public class SearchTestController {
 	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam String obf,
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
-																 @RequestParam(defaultValue = "0") int page,
-																 @RequestParam(defaultValue = "1000") int size,
+																 @RequestParam(defaultValue = "0") int pageToShow,
+																 @RequestParam(defaultValue = "100") int pageSizeLimit,
+																 @RequestParam(required = false) String sortBy,
+																 @RequestParam(required = false) String sortOrder,
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(defaultValue = "false") boolean invalidOnly,
 																 @RequestBody OBFService.IndexToken token) {
-		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, page, size, isFiltered, invalidOnly);
+		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly);
 		return ResponseEntity.ok(objects);
 	}
 }
