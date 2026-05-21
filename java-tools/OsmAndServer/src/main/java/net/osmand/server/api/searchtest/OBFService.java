@@ -21,6 +21,7 @@ import net.osmand.server.api.services.SearchService;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.TransliterationHelper;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -136,7 +137,7 @@ public interface OBFService extends BaseService {
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
-	record ObjectAddress(String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, boolean isInvalidAtom, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
+	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, boolean isInvalidAtom, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
@@ -1509,7 +1510,7 @@ public interface OBFService extends BaseService {
 	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric) {}
+	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric, LatLon location) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options) throws IOException {
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
@@ -1532,10 +1533,10 @@ public interface OBFService extends BaseService {
 
 		// If we've already visited this node, break the cycle by not traversing further
 		if (!seen.add(r))
-			return new AddressResult(r.toString(), type, r.addressName, null, metric);
+			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location);
 
 		AddressResult parent = toResult(r.parentSearchResult, seen);
-		return new AddressResult(r.toString(), type, r.addressName, parent, metric);
+		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location);
 	}
 
 	record UnitTestPayload(
@@ -2687,7 +2688,7 @@ public interface OBFService extends BaseService {
 		int payloadSize = safeMetricInt(length + computeVarint32Size(length));
 		String name = city.getName(lang);
 		boolean isMatched = matchesLegacyCity(city, matcher);
-		return new ObjectAddress(name, city.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, type, city.getId(), null, offset, payloadSize, offset);
+		return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, type, city.getId(), null, offset, payloadSize, offset);
 	}
 
 	private ObjectAddress loadStreetObjectAddress(BinaryMapIndexReaderExt index,
@@ -2710,7 +2711,7 @@ public interface OBFService extends BaseService {
 			int payloadSize = safeMetricInt(length + computeVarint32Size(length));
 			String name = street.getName(lang);
 			boolean isMatched = matchesLegacyStreet(street, matcher);
-			return new ObjectAddress(name, street.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, "Street", street.getId(), null, offset, payloadSize, offset);
+			return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values), false, isMatched, false, "Street", street.getId(), null, offset, payloadSize, offset);
 		} finally {
 			index.getInputStream().popLimit(oldLimit);
 		}
@@ -3062,7 +3063,7 @@ public interface OBFService extends BaseService {
 									int payloadSize = poiLength + computeVarint32Size(poiLength);
 									int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
 									boolean isMatched = matchesLegacyPoi(rawPoiObject, matcher);
-									results.add(new ObjectAddress(objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
+									results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
 								}
 							}
 						} finally {
@@ -3116,10 +3117,9 @@ public interface OBFService extends BaseService {
  			}
  		}
 		String displayName = selectPoiDisplayName(rawPoiObject, lang);
- 		String type = buildPoiType(values);
 		Long osmId = rawPoiObject.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(rawPoiObject.id) : null;
 		String osmType = decodePoiOsmType(rawPoiObject.id);
-		return new ObjectAddress(displayName, location, arrangeObjectAddressValues(values), true, false, false, type, osmId, osmType, 0, 0, 0);
+		return new ObjectAddress(0, displayName, location, arrangeObjectAddressValues(values), true, false, false, "POI", osmId, osmType, 0, 0, 0);
 	}
 
 	private boolean matchesLegacyPoi(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
@@ -3127,7 +3127,7 @@ public interface OBFService extends BaseService {
 			return false;
 		}
 		boolean matches = matcher.matches(safeLowerCase(rawPoiObject.name))
-				|| matcher.matches(safeLowerCase(rawPoiObject.nameEn));
+				|| matcher.matches(safeLowerCase(getLegacyPoiEnName(rawPoiObject, true)));
 		if (!matches) {
 			for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
 				String key = entry.getKey();
@@ -3163,6 +3163,15 @@ public interface OBFService extends BaseService {
 			}
 		}
 		return matches;
+	}
+
+	private String getLegacyPoiEnName(RawPoiObject rawPoiObject, boolean transliterate) {
+		if (!Algorithms.isEmpty(rawPoiObject.nameEn)) {
+			return rawPoiObject.nameEn;
+		} else if (!Algorithms.isEmpty(rawPoiObject.name) && transliterate) {
+			return TransliterationHelper.transliterate(rawPoiObject.name);
+		}
+		return "";
 	}
 
 	private String safeLowerCase(String value) {
@@ -3353,12 +3362,34 @@ public interface OBFService extends BaseService {
 				continue;
 			}
 			boolean isInvalidAtom = objectAddress.isPoi() && invalidPoiAtomOffsets.contains(objectAddress.sourceOffset());
-			markedResults.add(new ObjectAddress(objectAddress.name(), objectAddress.point(), objectAddress.values(),
+			markedResults.add(new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(), objectAddress.values(),
 					objectAddress.isPoi(), objectAddress.isMatched(), isInvalidAtom, objectAddress.type(),
 					objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
 					objectAddress.payloadSize(), objectAddress.sourceOffset()));
 		}
 		return markedResults;
+	}
+
+	private List<ObjectAddress> assignObjectSequenceIds(List<ObjectAddress> results) {
+		if (results == null || results.isEmpty()) {
+			return List.of();
+		}
+		List<ObjectAddress> orderedResults = new ArrayList<>(results);
+		orderedResults.sort(Comparator
+				.comparingInt((ObjectAddress object) -> object == null ? Integer.MAX_VALUE : object.sourceOffset())
+				.thenComparingInt(object -> object == null ? Integer.MAX_VALUE : object.payloadOffset()));
+		List<ObjectAddress> numberedResults = new ArrayList<>(orderedResults.size());
+		int sequenceId = 1;
+		for (ObjectAddress objectAddress : orderedResults) {
+			if (objectAddress == null) {
+				continue;
+			}
+			numberedResults.add(new ObjectAddress(sequenceId++, objectAddress.name(), objectAddress.point(), objectAddress.values(),
+					objectAddress.isPoi(), objectAddress.isMatched(), objectAddress.isInvalidAtom(), objectAddress.type(),
+					objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
+					objectAddress.payloadSize(), objectAddress.sourceOffset()));
+		}
+		return numberedResults;
 	}
 
 	private int countInvalidPoiAtoms(List<ObjectAddress> results) {
@@ -3450,6 +3481,7 @@ public interface OBFService extends BaseService {
 				if (hasPoiRefs) {
 					collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, poiRegions, results, lang, matcher);
 				}
+				results = assignObjectSequenceIds(results);
 				results = markInvalidPoiAtoms(results);
 				ObjectAddressStats allStats = calculateObjectAddressStats(index, results, poiRegions, null);
 				ObjectAddressStats allPoiStats = calculateObjectAddressStats(index, results, poiRegions, true);
@@ -3519,13 +3551,15 @@ public interface OBFService extends BaseService {
 	}
 
 	private Comparator<ObjectAddress> buildObjectAddressComparator(String sortBy, String sortOrder) {
-		String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
+		String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.trim().toLowerCase(Locale.ROOT);
 		Comparator<ObjectAddress> comparator = switch (normalizedSortBy) {
+			case "#", "sequence", "sequenceid" -> Comparator.comparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId());
 			case "type" -> Comparator.comparing(object -> object == null || object.type() == null ? "" : object.type(), String.CASE_INSENSITIVE_ORDER);
 			case "matched" -> Comparator.comparingInt(object -> object != null && object.isMatched() ? 1 : 0);
 			default -> Comparator.comparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
 		};
-		comparator = comparator.thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
+		comparator = comparator.thenComparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId())
+				.thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
 		return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
 	}
 }
