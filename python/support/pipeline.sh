@@ -3,15 +3,8 @@ export KNOWLEDGE_SIZE=32768
 export MODEL_TEMPERATURE=0.0
 
 export MODEL_NAME=$MODEL
-if [[ "$MODEL" == "gemini2flash-\$" ]]; then
-	MODEL="or@google/gemini-2.0-flash-001"
-elif [[ "$MODEL" == "qwen-plus-\$" ]]; then
-	MODEL="or@qwen/qwen-plus"
-elif [[ "$MODEL" != *"@"* ]]; then
+if [[ "$MODEL" != *"@"* ]]; then
 	MODEL="ollama@$MODEL"
-	if [[ "$MODEL" != *"-32k" ]]; then
-		MODEL="$MODEL-32k"
-	fi
 fi
 export MODEL_FULL_NAME=$MODEL
 
