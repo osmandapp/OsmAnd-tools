@@ -631,6 +631,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	}
 
 	public static void main(String[] args) {
+		OBFService svc = new SearchTestService(null);
+		
 		String mapDir = System.getenv("MAP_DIR");
 		if (mapDir == null || mapDir.trim().isEmpty()) {
 			System.err.println("MAP_DIR env is required");
@@ -658,9 +660,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		} else {
 			jsonFieldPath = fieldPath + "." + fieldName.trim();
 		}
-
-		OBFService svc = new SearchTestService(null);
-
+		
 		Path root = Path.of(mapDir);
 		if (!Files.exists(root)) {
 			System.err.println("MAP_DIR doesn't exist: " + root);
