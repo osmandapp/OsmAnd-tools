@@ -429,8 +429,9 @@ public class SearchTestController {
 																 @RequestParam(required = false) String sortOrder,
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(defaultValue = "false") boolean invalidOnly,
+																 @RequestParam(required = false) String objectType,
 																 @RequestBody OBFService.IndexToken token) {
-		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly);
+		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
 		return ResponseEntity.ok(objects);
 	}
 }
