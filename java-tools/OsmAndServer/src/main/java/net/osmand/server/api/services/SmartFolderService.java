@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
@@ -171,6 +172,20 @@ public class SmartFolderService {
 			return null;
 		}
 		return file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
+	}
+
+	public List<UserFile> getSmartFolderFiles(String folderName, CloudUserDevicesRepository.CloudUserDevice dev) {
+		List<SmartFolderService.SmartFolderWeb> smartFoldersByUserId = getSmartFoldersByUserId(dev.userid);
+		Optional<SmartFolderWeb> smartFolder = smartFoldersByUserId.stream()
+				.filter(sfw -> folderName.equals(sfw.name()))
+				.findFirst();
+		List<UserFile> files = smartFolder
+				.map(folder -> folder.userFilePaths.stream()
+						.map(name -> userDataService.getUserFile(name, FILE_TYPE_GPX, null, dev))
+						.filter(Objects::nonNull)
+						.toList())
+				.orElse(List.of());
+		return files;
 	}
 
 	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long creationTime) {

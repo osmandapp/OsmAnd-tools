@@ -593,6 +593,7 @@ public class MapApiController {
 	                               @RequestParam String type,
 	                               @RequestParam(required = false) String folderName,
 								   @RequestParam(required = false) Boolean shared,
+								   @RequestParam(required = false) Boolean smart,
 	                               HttpServletResponse response) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
@@ -603,10 +604,16 @@ public class MapApiController {
 			}
 			return;
 		}
+		List<CloudUserFilesRepository.UserFile> files;
 		if (folderName != null) {
-			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
-		} else if (shared != null && shared) {
-			List<CloudUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			if (Boolean.TRUE.equals(smart)) {
+				files = smartFolderService.getSmartFolderFiles(folderName, dev);
+				userdataService.getBackupFolder(response, dev, null, format, type, files);
+			} else {
+				userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+			}
+		} else if (Boolean.TRUE.equals(shared)) {
+			files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
 			userdataService.getBackupFolder(response, dev, null, format, type, files);
 		}
 	}
