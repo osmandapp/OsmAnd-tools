@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
@@ -617,9 +618,26 @@ public class OsmGpxWriteContext {
 			File obfInTmpFolder = new File(tmpFolder, ic.getMapFileName()); // might need to move between two fs
 			Files.move(obfInTmpFolder.toPath(), targetObf.toPath(), StandardCopyOption.REPLACE_EXISTING);
 		} finally {
-			Algorithms.removeAllFiles(tmpFolder);
+			if (!Algorithms.removeAllFiles(tmpFolder)) {
+				deleteOnExit(tmpFolder);
+			}
 		}
 		return targetObf;
+	}
+
+	private static void deleteOnExit(File file) {
+		if (file == null || !file.exists()) {
+			return;
+		}
+		file.deleteOnExit();
+		if (file.isDirectory()) {
+			File[] files = file.listFiles();
+			if (files != null) {
+				for (File child : files) {
+					deleteOnExit(child);
+				}
+			}
+		}
 	}
 
 	private void writeFile(GpxFile gpxFile, String fileName) throws SQLException, IOException {
