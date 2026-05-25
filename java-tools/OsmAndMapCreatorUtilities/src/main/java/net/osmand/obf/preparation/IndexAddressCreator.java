@@ -1,9 +1,7 @@
 package net.osmand.obf.preparation;
 
 
-import gnu.trove.iterator.TLongObjectIterator;
-import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
+import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -12,17 +10,33 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Collator;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import gnu.trove.iterator.TLongObjectIterator;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
-import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
-import net.osmand.binary.CommonWords;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
@@ -48,11 +62,6 @@ import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
@@ -1405,31 +1414,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
     private static void parsePrefix(String name, MapObject data, Map<String, MapObjectIndex> namesIndex,
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
-		Collection<String> splitNames = splitAndNormalize(name);
-        List<String> namesToAdd = new ArrayList<>(splitNames);
-		// remove all common words (most common delete first) but leave at least 1
-		int pos = 0;
-		while (namesToAdd.size() > 1 && pos != -1) {
-			int prioP = Integer.MAX_VALUE;
-			pos = -1;
-			for (int k = 0; k < namesToAdd.size(); k++) {
-				String word = namesToAdd.get(k);
-				int prio = CommonWords.getCommon(word);
-				if (Abbreviations.isConjunction(word)) {
-					prio = 0;
-				}
-				if (prio != -1 && prio < prioP) {
-					pos = k;
-					prioP = prio;
-				}
-			}
-			if (pos != -1) {
-				namesToAdd.remove(pos);
-			}
-		}
-
+		List<String> splitNames = splitAndNormalize(name);
+        SearchAlgorithms.removeCommonWords(splitNames);
 		// add to the map
-		for (String token : namesToAdd) {
+		for (String token : splitNames) {
 			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
 			if (val.isEmpty()) {
 				continue;

@@ -1107,7 +1107,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
-        Collection<String> splitName = SearchAlgorithms.splitAndNormalize(name);
+        List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
+        SearchAlgorithms.removeCommonWords(splitName);
         for (String token : splitName) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
