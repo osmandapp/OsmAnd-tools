@@ -2,25 +2,32 @@ package net.osmand.server.api.services;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import jakarta.servlet.http.HttpSession;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.shared.gpx.*;
 import net.osmand.shared.gpx.data.SmartFolder;
 import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
+import static net.osmand.server.api.services.StorageService.InternalZipFile;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GLOBAL;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.server.api.services.WebUserdataService.*;
@@ -34,12 +41,18 @@ public class SmartFolderService {
 	private static final Log LOG = LogFactory.getLog(SmartFolderService.class);
 
 	public static final String GENERAL_SETTINGS_JSON_FILE = "general_settings.json";
+	public static final String FOLDER_NAME_KEY = "folderName";
+	public static final String GENERAL_SETTINGS_PREFIX = "general_settings-";
+	public static final String JSON_FILE_EXT = ".json";
 
 	@Autowired
 	private UserdataService userDataService;
 
 	@Autowired
 	private WebUserdataService webUserdataService;
+
+	@Autowired
+	UserSessionResources sessionResources;
 
 	public List<SmartFolderWeb> getSmartFoldersByUserId(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
@@ -68,6 +81,39 @@ public class SmartFolderService {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 		}
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
+	}
+
+	public ResponseEntity<String> renameSmartFolderByUserId(String oldName, String newName,
+	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                        HttpSession session)
+			throws IOException {
+		String trackFiltersSettings = getFiltersSettings(dev.userid);
+		if (trackFiltersSettings == null) {
+			return ResponseEntity.badRequest().body("Smart folders not found");
+		}
+		JSONArray foldersArray = new JSONArray(trackFiltersSettings);
+		JSONObject targetFolder = null;
+
+		for (int i = 0; i < foldersArray.length(); i++) {
+			JSONObject folder = foldersArray.getJSONObject(i);
+			String folderName = folder.getString(FOLDER_NAME_KEY);
+			if (folderName.equals(oldName)) {
+				targetFolder = folder;
+			}
+		}
+		if (targetFolder == null) {
+			return ResponseEntity.badRequest().body("Smart folder '" + oldName + "' not found");
+		}
+		targetFolder.put(FOLDER_NAME_KEY, newName);
+		String generalSettings = getGeneralSettings(dev.userid);
+		JSONObject settingsObj = new JSONObject(generalSettings);
+		settingsObj.put(TRACK_FILTERS_SETTINGS_PREF, foldersArray.toString());
+
+		File tmp = File.createTempFile(GENERAL_SETTINGS_PREFIX, JSON_FILE_EXT);
+		sessionResources.addGpxTempFilesToSession(session, tmp);
+		Files.writeString(tmp.toPath(), settingsObj.toString(), StandardCharsets.UTF_8);
+		InternalZipFile zipFile = InternalZipFile.buildFromFileAndDelete(tmp);
+		return userDataService.uploadFile(zipFile, dev, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL, System.currentTimeMillis());
 	}
 
 	private String getFileDir(String name) {

@@ -325,12 +325,20 @@ public class MapApiController {
 	@GetMapping(value = "/rename-folder")
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
-	                                           @RequestParam String newFolderName) throws IOException {
+	                                           @RequestParam String newFolderName,
+	                                           @RequestParam(required = false) Boolean smart, 
+	                                           HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		if (!folderName.equals(newFolderName)) {
+			if (Boolean.TRUE.equals(smart)) {
+				return smartFolderService.renameSmartFolderByUserId(folderName, newFolderName, dev, session);
+			}
+			return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		}
+		return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
 	}
 
 	@GetMapping(value = "/delete-folder")
