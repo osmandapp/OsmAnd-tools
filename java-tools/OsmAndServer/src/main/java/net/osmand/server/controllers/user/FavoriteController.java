@@ -198,10 +198,11 @@ public class FavoriteController {
                                               @RequestParam String fileName,
                                               @RequestParam String groupName,
                                               @RequestParam Long updatetime,
+                                              @RequestParam(required = false) Long clienttime,
                                               HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         WebGpxParser.TrackData groupData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
-        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime, session);
+        return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime, clienttime, session);
     }
     
     @GetMapping(value = "/rename-fav-group")
