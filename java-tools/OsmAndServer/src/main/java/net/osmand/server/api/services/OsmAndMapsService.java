@@ -612,8 +612,7 @@ public class OsmAndMapsService {
 	public synchronized boolean validateAndInitConfig() throws IOException {
 		if (nativelib == null && tileConfig.initErrorMessage == null) {
 			if (osmandRegions == null) {
-				osmandRegions = new OsmandRegions();
-				osmandRegions.prepareFile();
+				osmandRegions = new OsmandRegions(null);
 			}
 			if (tileConfig.obfLocation == null || tileConfig.obfLocation.isEmpty()) {
 				tileConfig.initErrorMessage = "Files location is not specified";
@@ -1364,8 +1363,7 @@ public class OsmAndMapsService {
 	// World_seamarks is skipped as an optimization since it match every bbox.
 	private List<File> getMaps(QuadRect quadRect) throws IOException {
 		if (osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+			osmandRegions = new OsmandRegions(null);
 		}
 
 		List<File> files = new ArrayList<>();
@@ -1413,8 +1411,7 @@ public class OsmAndMapsService {
 	private List<File> filterMap(List<File> files) throws IOException {
 		List<File> res = new ArrayList<>();
 		if (osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+			osmandRegions = new OsmandRegions(null);
 		}
 		for (File file : files) {
 			String obfFileName = file.getName().replaceFirst(".zip", "");

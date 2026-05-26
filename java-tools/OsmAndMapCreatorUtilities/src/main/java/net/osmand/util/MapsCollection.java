@@ -23,8 +23,7 @@ public class MapsCollection {
 	public MapsCollection(boolean filterDuplicates) throws IOException {
 		this.filterDuplicates = filterDuplicates;
 		if (filterDuplicates) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+			osmandRegions = new OsmandRegions(null);
 		} else {
 			osmandRegions = null;
 		}

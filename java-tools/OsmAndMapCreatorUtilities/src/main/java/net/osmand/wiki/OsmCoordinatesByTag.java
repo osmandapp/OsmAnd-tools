@@ -131,8 +131,7 @@ public class OsmCoordinatesByTag {
 			System.out.println(e.getValue().toString(e.getKey()) + " " + e.getValue().lat + " " + e.getValue().lon);
 		}
 		File wikidataDb = new File(osmGz, "wikidata_osm.sqlitedb");
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		WikiDataHandler wdh = new WikiDataHandler(null, null, wikidataDb, otag, or, 0);
 		long testwid = 2051638;
 		StringBuilder sb;
