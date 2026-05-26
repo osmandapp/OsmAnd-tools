@@ -66,19 +66,31 @@ public class FavoriteService {
         return userdataService.ok();
     }
     
+    private static final long WEB_VERSION_INTERVAL_MS = 10 * 60 * 1000L; // 10 minutes
+
     public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime) throws IOException {
-        uploadFavoriteFile(tmpFile, dev, name, updatetime, null);
+        Date clienttime = (updatetime != null) ? getPreviousUpdatetime(dev.userid, name) : null;
+        uploadFavoriteFile(tmpFile, dev, name, updatetime, clienttime);
     }
-    
+
     public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
         StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile);
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
         userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
         if (updatetime != null) {
-            userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_FAVOURITES, null);
+            boolean isWebDevice = UserdataService.TOKEN_DEVICE_WEB.equals(dev.deviceid);
+            boolean isRecentWebEdit = System.currentTimeMillis() - updatetime < WEB_VERSION_INTERVAL_MS;
+            if (isWebDevice && isRecentWebEdit) {
+                userdataService.deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_FAVOURITES, null);
+            }
         }
     }
-    
+
+    private Date getPreviousUpdatetime(int userid, String name) {
+        CloudUserFilesRepository.UserFile existing = userdataService.getLastFileVersion(userid, name, FILE_TYPE_FAVOURITES);
+        return existing != null ? existing.updatetime : null;
+    }
+
     public ResponseEntity<String> updateFavoriteFile(String fileName, CloudUserDevicesRepository.CloudUserDevice dev,
                                                      Long updatetime, GpxFile file, @Nullable HttpSession session) throws IOException {
         File tmpGpx = gpxService.createTmpFileByGpxFile(file, fileName);
