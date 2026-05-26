@@ -55,9 +55,14 @@ public class SmartFolderService {
 	UserSessionResources sessionResources;
 
 	public List<SmartFolderWeb> getSmartFoldersByUserId(int userId) {
+		SmartFolderHelper smartFolderHelper = initSmartFolderHelper(userId);
+		return smartFolderHelper != null ? toSmartFolderWebList(smartFolderHelper.getSmartFolders()) : new ArrayList<>();
+	}
+
+	SmartFolderHelper initSmartFolderHelper(int userId) {
 		String trackFiltersSettings = getFiltersSettings(userId);
 		if (trackFiltersSettings == null) {
-			return new ArrayList<>();
+			return null;
 		}
 		List<UserFileNoData> uniqueFiles = userDataService
 				.generateFiles(userId, null, false, true, Set.of(FILE_TYPE_GPX)).uniqueFiles;
@@ -80,7 +85,7 @@ public class SmartFolderService {
 		for (TrackItem trackItem : trackItems) {
 			smartFolderHelper.addTrackItemToSmartFolder(trackItem);
 		}
-		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
+		return smartFolderHelper;
 	}
 
 	public ResponseEntity<String> renameSmartFolder(String oldName, String newName,
@@ -96,7 +101,7 @@ public class SmartFolderService {
 		}
 
 		folders.getJSONObject(index).put(FOLDER_NAME_KEY, newName);
-		return saveSmartFolder(dev, session, folders);
+		return uploadGeneralSettingsWithSmartFolders(dev, session, folders);
 	}
 
 	public ResponseEntity<String> deleteSmartFolder(String folderName,
@@ -112,7 +117,7 @@ public class SmartFolderService {
 		}
 
 		folders.remove(index);
-		return saveSmartFolder(dev, session, folders);
+		return uploadGeneralSettingsWithSmartFolders(dev, session, folders);
 	}
 
 	private JSONArray loadAndParseSmartFolders(int userId) {
@@ -132,7 +137,7 @@ public class SmartFolderService {
 		return -1;
 	}
 
-	private ResponseEntity<String> saveSmartFolder(CloudUserDevicesRepository.CloudUserDevice dev,
+	private ResponseEntity<String> uploadGeneralSettingsWithSmartFolders(CloudUserDevicesRepository.CloudUserDevice dev,
 	                                               HttpSession session, JSONArray foldersArray) throws IOException {
 		String generalSettings = getGeneralSettings(dev.userid);
 		JSONObject settingsObj = new JSONObject(generalSettings);
@@ -249,18 +254,16 @@ public class SmartFolderService {
 		return file.data != null ? new ByteArrayInputStream(file.data) : userDataService.getInputStream(file);
 	}
 
-	public List<UserFile> getSmartFolderFiles(String folderName, CloudUserDevicesRepository.CloudUserDevice dev) {
-		List<SmartFolderService.SmartFolderWeb> smartFoldersByUserId = getSmartFoldersByUserId(dev.userid);
-		Optional<SmartFolderWeb> smartFolder = smartFoldersByUserId.stream()
-				.filter(sfw -> folderName.equals(sfw.name()))
-				.findFirst();
-		List<UserFile> files = smartFolder
-				.map(folder -> folder.userFilePaths.stream()
-						.map(name -> userDataService.getUserFile(name, FILE_TYPE_GPX, null, dev))
-						.filter(Objects::nonNull)
-						.toList())
-				.orElse(List.of());
-		return files;
+	public List<UserFile> findSmartFolderFilesByName(String folderName, CloudUserDevicesRepository.CloudUserDevice dev) {
+		SmartFolderHelper smartFolderHelper = initSmartFolderHelper(dev.userid);
+		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(folderName);
+		if (smartFolder == null) {
+			return List.of();
+		}
+		return smartFolder.getTrackItems().stream()
+				.map(trackItem -> userDataService.getUserFile(trackItem.getName(), FILE_TYPE_GPX, null, dev))
+				.filter(Objects::nonNull)
+				.toList();
 	}
 
 	public record SmartFolderWeb(String name, String organizeBy, List<String> userFilePaths, long creationTime) {

@@ -620,7 +620,7 @@ public class MapApiController {
 		List<CloudUserFilesRepository.UserFile> files;
 		if (folderName != null) {
 			if (Boolean.TRUE.equals(smart)) {
-				files = smartFolderService.getSmartFolderFiles(folderName, dev);
+				files = smartFolderService.findSmartFolderFilesByName(folderName, dev);
 				userdataService.getBackupFolder(response, dev, null, format, type, files);
 			} else {
 				userdataService.getBackupFolder(response, dev, folderName, format, type, null);

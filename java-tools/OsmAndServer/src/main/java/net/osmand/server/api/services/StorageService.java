@@ -44,6 +44,7 @@ public class StorageService {
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
 	protected static final String LOCAL_STORAGE = "local";
+	public static final String GZ_FILE_EXT = ".gz";
 
 	@Value("${storage.default}")
 	private String defaultStorage;
@@ -342,7 +343,7 @@ public class StorageService {
 			if (path.endsWith(GPX_FILE_EXT)) {
 				return new File(path.substring(0, path.lastIndexOf(GPX_FILE_EXT)) + GPX_GZ);
 			}
-			return new File(path + ".gz");
+			return new File(path + GZ_FILE_EXT);
 		}
 		
 		public static InternalZipFile buildFromFileAndDelete(File file) throws IOException {
