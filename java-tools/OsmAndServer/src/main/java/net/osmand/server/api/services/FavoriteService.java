@@ -164,6 +164,7 @@ public class FavoriteService {
     
     public ResponseEntity<String> updateGroup(String fileName, WebGpxParser.TrackData updateGroupData, String groupName,
                                               CloudUserDevicesRepository.CloudUserDevice dev, Long updatetime,
+                                              @Nullable Long clienttime,
                                               @Nullable HttpSession session) throws IOException {
         GpxFile gpxFile = createGpxFile(fileName, dev, updatetime, session);
         GpxFile gpxUpdateGroupData = webGpxParser.createGpxFileFromTrackData(updateGroupData);
@@ -174,7 +175,8 @@ public class FavoriteService {
         gpxFile.updatePointsGroup(groupName, gpxUpdateGroupData.getPointsGroups().get(groupName));
         File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fileName);
         sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-        uploadFavoriteFile(tmpGpx, dev, fileName, updatetime);
+        Date clienttimeDate = clienttime != null ? new Date(clienttime) : null;
+        uploadFavoriteFile(tmpGpx, dev, fileName, updatetime, clienttimeDate);
         UserdataService.ResponseFileStatus resp = createResponse(dev, fileName, gpxFile, tmpGpx);
         return ResponseEntity.ok(gson.toJson(resp));
     }
