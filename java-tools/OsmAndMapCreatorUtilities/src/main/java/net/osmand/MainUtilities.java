@@ -381,6 +381,7 @@ public class MainUtilities {
 
 	public static void generateObf(List<String> subArgs, MapZooms zooms, IndexCreatorSettings settings) throws IOException, SQLException,
 			InterruptedException, XmlPullParserException {
+		PlatformUtil.initOsmandRegionsAsTempFile();
 		String fl = subArgs.get(0);
 		File fileToGen = new File(fl);
 		if (fl.startsWith("http://") || fl.startsWith("https://")) {
