@@ -83,28 +83,57 @@ public class SmartFolderService {
 		return toSmartFolderWebList(smartFolderHelper.getSmartFolders());
 	}
 
-	public ResponseEntity<String> renameSmartFolderByUserId(String oldName, String newName,
-	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
-	                                                        HttpSession session)
-			throws IOException {
-		String trackFiltersSettings = getFiltersSettings(dev.userid);
-		if (trackFiltersSettings == null) {
+	public ResponseEntity<String> renameSmartFolder(String oldName, String newName,
+	                                                CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                HttpSession session) throws IOException {
+		JSONArray folders = loadAndParseSmartFolders(dev.userid);
+		if (folders == null) {
 			return ResponseEntity.badRequest().body("Smart folders not found");
 		}
-		JSONArray foldersArray = new JSONArray(trackFiltersSettings);
-		JSONObject targetFolder = null;
-
-		for (int i = 0; i < foldersArray.length(); i++) {
-			JSONObject folder = foldersArray.getJSONObject(i);
-			String folderName = folder.getString(FOLDER_NAME_KEY);
-			if (folderName.equals(oldName)) {
-				targetFolder = folder;
-			}
-		}
-		if (targetFolder == null) {
+		int index = findFolderIndex(folders, oldName);
+		if (index < 0) {
 			return ResponseEntity.badRequest().body("Smart folder '" + oldName + "' not found");
 		}
-		targetFolder.put(FOLDER_NAME_KEY, newName);
+
+		folders.getJSONObject(index).put(FOLDER_NAME_KEY, newName);
+		return saveSmartFolder(dev, session, folders);
+	}
+
+	public ResponseEntity<String> deleteSmartFolder(String folderName,
+	                                                CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                HttpSession session) throws IOException {
+		JSONArray folders = loadAndParseSmartFolders(dev.userid);
+		if (folders == null) {
+			return ResponseEntity.badRequest().body("Smart folders not found");
+		}
+		int index = findFolderIndex(folders, folderName);
+		if (index < 0) {
+			return ResponseEntity.badRequest().body("Smart folder '" + folderName + "' not found");
+		}
+
+		folders.remove(index);
+		return saveSmartFolder(dev, session, folders);
+	}
+
+	private JSONArray loadAndParseSmartFolders(int userId) {
+		String trackFiltersSettings = getFiltersSettings(userId);
+		if (trackFiltersSettings == null) {
+			return null;
+		}
+		return new JSONArray(trackFiltersSettings);
+	}
+
+	private int findFolderIndex(JSONArray folders, String folderName) {
+		for (int i = 0; i < folders.length(); i++) {
+			if (folderName.equals(folders.getJSONObject(i).getString(FOLDER_NAME_KEY))) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private ResponseEntity<String> saveSmartFolder(CloudUserDevicesRepository.CloudUserDevice dev,
+	                                               HttpSession session, JSONArray foldersArray) throws IOException {
 		String generalSettings = getGeneralSettings(dev.userid);
 		JSONObject settingsObj = new JSONObject(generalSettings);
 		settingsObj.put(TRACK_FILTERS_SETTINGS_PREF, foldersArray.toString());

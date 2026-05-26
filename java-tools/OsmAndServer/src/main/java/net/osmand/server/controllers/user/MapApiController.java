@@ -334,7 +334,7 @@ public class MapApiController {
 		}
 		if (!folderName.equals(newFolderName)) {
 			if (Boolean.TRUE.equals(smart)) {
-				return smartFolderService.renameSmartFolderByUserId(folderName, newFolderName, dev, session);
+				return smartFolderService.renameSmartFolder(folderName, newFolderName, dev, session);
 			}
 			return userdataService.renameFolder(folderName, newFolderName, type, dev);
 		}
@@ -343,10 +343,15 @@ public class MapApiController {
 
 	@GetMapping(value = "/delete-folder")
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
-	                                           @RequestParam String type) {
+	                                           @RequestParam String type,
+	                                           @RequestParam(required = false) Boolean smart,
+	                                           HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
+		}
+		if (Boolean.TRUE.equals(smart)) {
+			return smartFolderService.deleteSmartFolder(folderName, dev, session);
 		}
 		return userdataService.deleteFolder(folderName, type, dev);
 	}
