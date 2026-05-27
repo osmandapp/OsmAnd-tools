@@ -11,7 +11,6 @@ import net.osmand.shared.gpx.organization.OrganizeByParams;
 import net.osmand.shared.io.KFile;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +25,7 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
+import static kotlinx.serialization.builtins.BuiltinSerializersKt.ListSerializer;
 import static net.osmand.server.api.repo.CloudUserFilesRepository.*;
 import static net.osmand.server.api.services.StorageService.InternalZipFile;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GLOBAL;
@@ -60,7 +60,8 @@ public class SmartFolderService {
 	}
 
 	SmartFolderHelper initSmartFolderHelper(int userId) {
-		String trackFiltersSettings = getFiltersSettings(userId);
+		String generalSettings = getGeneralSettings(userId);
+		String trackFiltersSettings = getFiltersSettings(generalSettings);
 		if (trackFiltersSettings == null) {
 			return null;
 		}
@@ -91,44 +92,31 @@ public class SmartFolderService {
 	public ResponseEntity<String> updateSmartFolderByUserId(String oldName, String newName,
 	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                        HttpSession session) throws IOException {
-		JSONArray folders = null;
-		String trackFiltersSettings = getFiltersSettings(dev.userid);
-		if (trackFiltersSettings != null) {
-			folders = new JSONArray(trackFiltersSettings);
-		}
-		if (folders == null) {
-			return ResponseEntity.badRequest().body("Smart folders not found");
-		}
-		int index = findFolderIndex(folders, oldName);
-		if (index < 0) {
+		String generalSettings = getGeneralSettings(dev.userid);
+		String trackFiltersSettings = getFiltersSettings(generalSettings);
+		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
+		smartFolderHelper.readJson(trackFiltersSettings);
+		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(oldName);
+		if (smartFolder == null) {
 			return ResponseEntity.badRequest().body("Smart folder '" + oldName + "' not found");
 		}
 		if (newName == null) {
-			folders.remove(index);
+			smartFolderHelper.deleteSmartFolder(smartFolder);
 		} else {
-			folders.getJSONObject(index).put(FOLDER_NAME_KEY, newName);
+			smartFolderHelper.renameSmartFolder(smartFolder, newName);
 		}
-		return uploadGeneralSettingsWithSmartFolders(dev, session, folders);
-	}
-
-	private int findFolderIndex(JSONArray folders, String folderName) {
-		for (int i = 0; i < folders.length(); i++) {
-			if (folderName.equals(folders.getJSONObject(i).getString(FOLDER_NAME_KEY))) {
-				return i;
-			}
-		}
-		return -1;
+		String smartFoldersJsonStr = SmartFolderHelper.Companion.getJson().encodeToString(
+				ListSerializer(SmartFolder.Companion.serializer()), smartFolderHelper.getSmartFolders());
+		JSONObject generalSettingsJson = new JSONObject(generalSettings);
+		generalSettingsJson.put(TRACK_FILTERS_SETTINGS_PREF, smartFoldersJsonStr);
+		return uploadGeneralSettingsWithSmartFolders(dev, session, generalSettingsJson);
 	}
 
 	private ResponseEntity<String> uploadGeneralSettingsWithSmartFolders(CloudUserDevicesRepository.CloudUserDevice dev,
-	                                               HttpSession session, JSONArray foldersArray) throws IOException {
-		String generalSettings = getGeneralSettings(dev.userid);
-		JSONObject settingsObj = new JSONObject(generalSettings);
-		settingsObj.put(TRACK_FILTERS_SETTINGS_PREF, foldersArray.toString());
-
+	                                                                     HttpSession session, JSONObject settingsJson) throws IOException {
 		File tmp = File.createTempFile(GENERAL_SETTINGS_PREFIX, JSON_FILE_EXT);
 		sessionResources.addGpxTempFilesToSession(session, tmp);
-		Files.writeString(tmp.toPath(), settingsObj.toString(), StandardCharsets.UTF_8);
+		Files.writeString(tmp.toPath(), settingsJson.toString(2), StandardCharsets.UTF_8);
 		InternalZipFile zipFile = InternalZipFile.buildFromFileAndDelete(tmp);
 		return userDataService.uploadFile(zipFile, dev, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL, System.currentTimeMillis());
 	}
@@ -190,8 +178,7 @@ public class SmartFolderService {
 		return gpxFile;
 	}
 
-	private String getFiltersSettings(int userId) {
-		String generalSettings = getGeneralSettings(userId);
+	private String getFiltersSettings(String generalSettings) {
 		if (generalSettings == null) {
 			return null;
 		}

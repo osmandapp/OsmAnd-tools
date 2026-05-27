@@ -324,7 +324,7 @@ public class MapApiController {
 
 	@GetMapping(value = "/update-smart-folder")
 	public ResponseEntity<String> updateSmartFolder(@RequestParam String folderName,
-	                                                @RequestParam String newFolderName,
+	                                                @RequestParam(required = false) String newFolderName,
 	                                                HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
