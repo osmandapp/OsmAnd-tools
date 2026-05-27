@@ -28,17 +28,44 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
 
 	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
+	public record GenerateDbJobResponse(String jobId) {}
+	public record GenerateDbJobStatus(String jobId, String status, String obfName, int obfIndex, int totalObfs,
+									  int processedTokens, int totalTokens, long elapsedMs, long estimatedMs,
+									  boolean downloadReady, String error, List<OBFService.GenerateDbObfProgress> obfs) {}
+
+	private static final ConcurrentHashMap<String, GenerateDbJob> GENERATE_DB_JOBS = new ConcurrentHashMap<>();
+
+	private static class GenerateDbJob {
+		volatile String status = "PENDING";
+		volatile String obfName = "";
+		volatile int obfIndex = 0;
+		volatile int totalObfs = 0;
+		volatile int processedTokens = 0;
+		volatile int totalTokens = 0;
+		volatile long elapsedMs = 0;
+		volatile long estimatedMs = -1;
+		volatile String error = null;
+		volatile List<OBFService.GenerateDbObfProgress> obfs = Collections.emptyList();
+		volatile Path zipFile = null;
+		volatile boolean cancelRequested = false;
+		volatile CompletableFuture<Void> future = null;
+	}
 
 	@Autowired
 	private SearchTestRepositoryConfiguration dbCfg;
@@ -452,5 +479,119 @@ public class SearchTestController {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"db.zip\"");
 		testSearchService.generateDb(OBFs, response.getOutputStream());
+	}
+
+	@PostMapping(value = "/generate/start", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobResponse> startGenerateDb(@RequestBody(required = false) List<String> OBFs) {
+		if (OBFs == null || OBFs.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		String jobId = UUID.randomUUID().toString();
+		GenerateDbJob job = new GenerateDbJob();
+		job.totalObfs = OBFs.size();
+		GENERATE_DB_JOBS.put(jobId, job);
+		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+			try {
+				Path zipFile = Files.createTempFile("search-test-db-", ".zip");
+				job.zipFile = zipFile;
+				job.status = "RUNNING";
+				try (java.io.OutputStream outputStream = Files.newOutputStream(zipFile)) {
+					testSearchService.generateDb(OBFs, outputStream, progress -> {
+						if (job.cancelRequested) {
+							throw new CancellationException("Generate DB job was canceled");
+						}
+						job.status = progress.status();
+						job.obfName = progress.obfName();
+						job.obfIndex = progress.obfIndex();
+						job.totalObfs = progress.totalObfs();
+						job.processedTokens = progress.processedTokens();
+						job.totalTokens = progress.totalTokens();
+						job.elapsedMs = progress.elapsedMs();
+						job.estimatedMs = progress.estimatedMs();
+						job.error = progress.error();
+						job.obfs = progress.obfs() == null ? Collections.emptyList() : progress.obfs();
+					});
+				}
+				if (job.cancelRequested) {
+					job.status = "CANCELED";
+				} else {
+					job.status = "DONE";
+					job.estimatedMs = 0;
+				}
+			} catch (CancellationException e) {
+				job.status = "CANCELED";
+				job.error = null;
+			} catch (Exception e) {
+				if (job.cancelRequested) {
+					job.status = "CANCELED";
+					job.error = null;
+				} else {
+					job.status = "FAILED";
+					job.error = e.getMessage();
+				}
+			} finally {
+				if ("CANCELED".equals(job.status) && job.zipFile != null) {
+					try {
+						Files.deleteIfExists(job.zipFile);
+						job.zipFile = null;
+					} catch (IOException ignored) {
+					}
+				}
+			}
+		});
+		job.future = future;
+		return ResponseEntity.ok(new GenerateDbJobResponse(jobId));
+	}
+
+	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobStatus> getGenerateDbProgress(@PathVariable String jobId) {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		return ResponseEntity.ok(new GenerateDbJobStatus(jobId, job.status, job.obfName, job.obfIndex, job.totalObfs,
+				job.processedTokens, job.totalTokens, job.elapsedMs, job.estimatedMs,
+				"DONE".equals(job.status) && job.zipFile != null, job.error, job.obfs));
+	}
+
+	@PostMapping(value = "/generate/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobStatus> cancelGenerateDb(@PathVariable String jobId) throws IOException {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		if (!"DONE".equals(job.status) && !"FAILED".equals(job.status) && !"CANCELED".equals(job.status)) {
+			job.cancelRequested = true;
+			job.status = "CANCELED";
+		}
+		if (job.zipFile != null && !"DONE".equals(job.status) && (job.future == null || job.future.isDone())) {
+			Files.deleteIfExists(job.zipFile);
+			job.zipFile = null;
+		}
+		return ResponseEntity.ok(new GenerateDbJobStatus(jobId, job.status, job.obfName, job.obfIndex, job.totalObfs,
+				job.processedTokens, job.totalTokens, job.elapsedMs, job.estimatedMs, false, job.error, job.obfs));
+	}
+
+	@GetMapping(value = "/generate/{jobId}/download", produces = "application/zip")
+	@ResponseBody
+	public void downloadGeneratedDb(@PathVariable String jobId, HttpServletResponse response) throws IOException {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		if (!"DONE".equals(job.status) || job.zipFile == null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Generate DB job is not ready");
+		}
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"db.zip\"");
+		try {
+			Files.copy(job.zipFile, response.getOutputStream());
+		} finally {
+			GENERATE_DB_JOBS.remove(jobId);
+			Files.deleteIfExists(job.zipFile);
+		}
 	}
 }

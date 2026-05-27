@@ -36,6 +36,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.zip.ZipEntry;
@@ -110,7 +112,7 @@ public interface OBFService extends BaseService {
 				continue;
 			}
 			Integer cityOffset = ref.cityOffset();
-			if (cityOffset == null || streetCities.containsKey(cityOffset)) {
+			if (streetCities.containsKey(cityOffset)) {
 				continue;
 			}
 			City city = loadCity(index, region, cityOffset);
@@ -146,7 +148,7 @@ public interface OBFService extends BaseService {
 
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 	}
-	record ObfFileInfo(String path, String name, String continent, String country, String region) {}
+	record ObfFileInfo(String path, String name, String continent, String country, String region, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
@@ -156,6 +158,18 @@ public interface OBFService extends BaseService {
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
+	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
+	                          int totalTokens, long elapsedMs, long estimatedMs, String error,
+	                          List<GenerateDbObfProgress> obfs) {}
+	record GenerateDbObfProgress(String obfName, int obfIndex, int totalTokens, int processedTokens,
+	                             long elapsedMs, long estimatedMs, String status) {}
+	record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
+	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
+	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
+	@FunctionalInterface
+	interface GenerateDbProgressListener {
+		void onProgress(GenerateDbProgress progress);
+	}
 	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
 	record PoiAddress(String name, LatLon point, String value) {}
 	record HouseAddress(String name, LatLon point) {}
@@ -203,7 +217,8 @@ public interface OBFService extends BaseService {
 		} else if (continentIndex < 0 && parts.size() > 1) {
 			region = String.join("_", parts.subList(1, parts.size()));
 		}
-		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region));
+		long size = new File(obf).length();
+		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region), size);
 	}
 
 	static String getObfFileName(String obf) {
@@ -1735,22 +1750,22 @@ public interface OBFService extends BaseService {
 		String[] sourceQueries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-		for (int i = 0; i < sourceQueries.length; i++) {
-			SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
-					baseCtx.lat(), baseCtx.lon(), sourceQueries[i], baseCtx.locale(),
-					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
-			SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
-					phraseCtx, new SearchService.SearchOption(true, exportSettings,
-							null, true, (net.osmand.search.core.ObjectType[]) null), null);
-			if (settingsResult == null) {
-				settingsResult = queryResult;
-			}
-			String queryUnitTestJson = queryResult == null ? null : queryResult.unitTestJson();
-			if (queryUnitTestJson == null) {
-				continue;
-			}
-			collectUnitTestSourceData(queryUnitTestJson, amenities, cities);
-		}
+        for (String sourceQuery : sourceQueries) {
+            SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
+                    baseCtx.lat(), baseCtx.lon(), sourceQuery, baseCtx.locale(),
+                    baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+            SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
+                    phraseCtx, new SearchService.SearchOption(true, exportSettings,
+                            null, true, (net.osmand.search.core.ObjectType[]) null), null);
+            if (settingsResult == null) {
+                settingsResult = queryResult;
+            }
+            String queryUnitTestJson = queryResult == null ? null : queryResult.unitTestJson();
+            if (queryUnitTestJson == null) {
+                continue;
+            }
+            collectUnitTestSourceData(queryUnitTestJson, amenities, cities);
+        }
 		File sourceJsonFile = dirPath.resolve(unitTest.name + ".source.json").toFile();
 		JSONObject sourceJson = new JSONObject();
 		if (!amenities.isEmpty()) {
@@ -1767,7 +1782,7 @@ public interface OBFService extends BaseService {
 			}
 			sourceJson.put("cities", citiesJson);
 		}
-		if (routing.length() > 0) {
+		if (!routing.isEmpty()) {
 			sourceJson.put("routing", routing);
 		}
 		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(), StandardCharsets.UTF_8);
@@ -2079,35 +2094,6 @@ public interface OBFService extends BaseService {
 		}
 	}
 
-	private long calculatePoiObjectSizeAtShift(BinaryMapIndexReaderExt index,
-			BinaryMapPoiReaderAdapter.PoiRegion region,
-			int relativeOffset) throws IOException {
-		index.getInputStream().seek(region.getFilePointer() + relativeOffset);
-		long length = readInt(index.getInputStream());
-		long oldLimit = index.getInputStream().pushLimitLong(length);
-		try {
-			long totalSize = 0L;
-			while (true) {
-				int tagWithType = index.getInputStream().readTag();
-				int tag = WireFormat.getTagFieldNumber(tagWithType);
-				switch (tag) {
-					case 0:
-						return totalSize;
-					case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER:
-						int poiLength = index.getInputStream().readRawVarint32();
-						totalSize += poiLength + computeVarint32Size(poiLength);
-						index.getInputStream().skipRawBytes(poiLength);
-						break;
-					default:
-						skipUnknownField(index.getInputStream(), tagWithType);
-						break;
-				}
-			}
-		} finally {
-			index.getInputStream().popLimit(oldLimit);
-		}
-	}
-
 	private void collectPoiIndexTokens(BinaryMapIndexReaderExt index, BinaryMapPoiReaderAdapter.PoiRegion region,
 			Map<String, IndexTokenBuilder> tokens) throws IOException {
 		index.getInputStream().seek(region.getFilePointer());
@@ -2327,28 +2313,6 @@ public interface OBFService extends BaseService {
 		return refs.toArray(new AddressRef[0]);
 	}
 
-	private Set<Integer> collectUniqueAddressObjectOffsets(IndexToken token) {
-		Set<Integer> uniqueObjectOffsets = new LinkedHashSet<>();
-		AddressRef[] addressRefs = token.addressRefs();
-		if (addressRefs == null) {
-			return uniqueObjectOffsets;
-		}
-		for (AddressRef ref : addressRefs) {
-			if (ref != null && ref.objectOffset() != 0) {
-				uniqueObjectOffsets.add(ref.objectOffset());
-			}
-		}
-		return uniqueObjectOffsets;
-	}
-
-	private long calculateAddressTokenSize(BinaryMapIndexReaderExt index, Set<Integer> uniqueObjectOffsets) throws IOException {
-		long totalSize = 0L;
-		for (Integer objectOffset : uniqueObjectOffsets) {
-			totalSize += getLengthDelimitedMessageSizeAtOffset(index, objectOffset);
-		}
-		return totalSize;
-	}
-
 	private long calculateObjectAddressesSize(BinaryMapIndexReaderExt index,
 			List<ObjectAddress> objects,
 			List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions) throws IOException {
@@ -2471,20 +2435,6 @@ public interface OBFService extends BaseService {
 		return safeMetricInt(total);
 	}
 
-	private long calculatePoiObjectSizeByStoredOffsets(BinaryMapIndexReaderExt index,
-			Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> storedPoiOffsets) throws IOException {
-		if (storedPoiOffsets.isEmpty()) {
-			return 0L;
-		}
-		long totalSize = 0L;
-		for (Map.Entry<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> entry : storedPoiOffsets.entrySet()) {
-			for (Integer relativeOffset : entry.getValue()) {
-				totalSize += calculatePoiObjectSizeAtShift(index, entry.getKey(), relativeOffset);
-			}
-		}
-		return totalSize;
-	}
-
 	private int[] toIntArray(Collection<Integer> offsets) {
 		if (offsets == null || offsets.isEmpty()) {
 			return new int[0];
@@ -2605,49 +2555,6 @@ public interface OBFService extends BaseService {
 			}
 		}
 		return 0L;
-	}
-
-	private int countPoiObjectsByStoredOffsets(BinaryMapIndexReaderExt index,
-			Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> storedPoiOffsets) throws IOException {
-		if (storedPoiOffsets.isEmpty()) {
-			return 0;
-		}
-		int totalCount = 0;
-		for (Map.Entry<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> entry : storedPoiOffsets.entrySet()) {
-			for (Integer relativeOffset : entry.getValue()) {
-				totalCount += countPoiObjectsAtShift(index, entry.getKey(), relativeOffset);
-			}
-		}
-		return totalCount;
-	}
-
-	private int countPoiObjectsAtShift(BinaryMapIndexReaderExt index,
-			BinaryMapPoiReaderAdapter.PoiRegion region,
-			int relativeOffset) throws IOException {
-		index.getInputStream().seek(region.getFilePointer() + relativeOffset);
-		long length = readInt(index.getInputStream());
-		long oldLimit = index.getInputStream().pushLimitLong(length);
-		try {
-			int count = 0;
-			while (true) {
-				int tagWithType = index.getInputStream().readTag();
-				int tag = WireFormat.getTagFieldNumber(tagWithType);
-				switch (tag) {
-					case 0:
-						return count;
-					case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER:
-						int poiLength = index.getInputStream().readRawVarint32();
-						index.getInputStream().skipRawBytes(poiLength);
-						count++;
-						break;
-					default:
-						skipUnknownField(index.getInputStream(), tagWithType);
-						break;
-				}
-			}
-		} finally {
-			index.getInputStream().popLimit(oldLimit);
-		}
 	}
 
 	private AddressTokenRefs readAddressTokenRefs(BinaryMapIndexReaderExt index,
@@ -3170,13 +3077,11 @@ public interface OBFService extends BaseService {
 							RawPoiObject rawPoiObject = readRawPoiObject(index.getInputStream(), x, y, zoom, region);
 							if (rawPoiObject != null) {
 								ObjectAddress objectAddress = toPoiObjectAddress(rawPoiObject, lang);
-								if (objectAddress != null) {
-									int payloadSize = poiLength + computeVarint32Size(poiLength);
-									int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
-									boolean isMatched = matchesLegacyPoi(rawPoiObject, matcher);
-									results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
-								}
-							}
+                                int payloadSize = poiLength + computeVarint32Size(poiLength);
+                                int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
+                                boolean isMatched = matchesLegacyPoi(rawPoiObject, matcher);
+                                results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.values(), objectAddress.isPoi(), isMatched, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
+                            }
 						} finally {
 							index.getInputStream().popLimit(poiOldLimit);
 						}
@@ -3691,6 +3596,10 @@ public interface OBFService extends BaseService {
 	}
 	
 	default void generateDb(List<String> obfs, OutputStream out) throws IOException, SQLException {
+		generateDb(obfs, out, null);
+	}
+
+	default void generateDb(List<String> obfs, OutputStream out, GenerateDbProgressListener progressListener) throws IOException, SQLException {
 		if (obfs == null || obfs.isEmpty()) {
 			throw new IllegalArgumentException("OBF file list is required");
 		}
@@ -3700,10 +3609,13 @@ public interface OBFService extends BaseService {
 				createGenerateDbSchema(conn);
 				conn.setAutoCommit(false);
 				try {
-					populateDb(conn, obfs);
+					populateDb(conn, obfs, progressListener);
 					conn.commit();
 				} catch (Exception e) {
 					conn.rollback();
+					if (e instanceof CancellationException cancellationException) {
+						throw cancellationException;
+					}
 					if (e instanceof SQLException sqlException) {
 						throw sqlException;
 					}
@@ -3734,13 +3646,13 @@ public interface OBFService extends BaseService {
 			stmt.execute("PRAGMA journal_mode = OFF");
 			stmt.execute("PRAGMA synchronous = OFF");
 			stmt.execute("""
-					CREATE TABLE OBF (
+					CREATE TABLE obf (
 						id INTEGER PRIMARY KEY AUTOINCREMENT,
 						name TEXT NOT NULL
 					)
 					""");
 			stmt.execute("""
-					CREATE TABLE Token (
+					CREATE TABLE token (
 						id INTEGER PRIMARY KEY AUTOINCREMENT,
 						name TEXT NOT NULL UNIQUE,
 						isCommon INTEGER NOT NULL,
@@ -3748,92 +3660,310 @@ public interface OBFService extends BaseService {
 						poiSize INTEGER NOT NULL DEFAULT 0,
 						poiCount INTEGER NOT NULL DEFAULT 0,
 						addressSize INTEGER NOT NULL DEFAULT 0,
-						addressCount INTEGER NOT NULL DEFAULT 0
+						addressCount INTEGER NOT NULL DEFAULT 0,
+						poiRefs INTEGER NOT NULL DEFAULT 0,
+						addressRefs INTEGER NOT NULL DEFAULT 0
 					)
 					""");
 			stmt.execute("""
-					CREATE TABLE "Object" (
-						obf_id INTEGER NOT NULL,
-						id INTEGER NOT NULL,
+					CREATE TABLE "object" (
+						id INTEGER PRIMARY KEY,
 						name TEXT,
 						lat REAL,
 						lon REAL,
 						"values" TEXT,
 						type TEXT,
-						osmId INTEGER,
-						osmType TEXT,
-						PRIMARY KEY (obf_id, id),
-						FOREIGN KEY (obf_id) REFERENCES OBF(id)
+						osmType TEXT
 					)
 					""");
 			stmt.execute("""
-					CREATE TABLE Posting (
-						obf_id INTEGER NOT NULL,
+					CREATE TABLE posting (
 						object_id INTEGER NOT NULL,
 						token_id INTEGER NOT NULL,
-						payloadOffset INTEGER NOT NULL,
-						sourceOffset INTEGER NOT NULL,
-						PRIMARY KEY (obf_id, token_id, object_id),
-						FOREIGN KEY (obf_id, object_id) REFERENCES "Object"(obf_id, id),
+						PRIMARY KEY (token_id, object_id),
+						FOREIGN KEY (object_id) REFERENCES "Object"(id),
 						FOREIGN KEY (token_id) REFERENCES Token(id)
 					)
 					""");
-			stmt.execute("CREATE INDEX idx_posting_object ON Posting(obf_id, object_id)");
-			stmt.execute("CREATE INDEX idx_posting_token ON Posting(token_id)");
+			stmt.execute("""
+					CREATE TABLE obf_posting (
+						obf_id INTEGER NOT NULL,
+						token_id INTEGER NOT NULL,
+						object_id INTEGER NOT NULL,
+						sequenceId INTEGER NOT NULL,
+						payloadOffset INTEGER NOT NULL,
+						sourceOffset INTEGER NOT NULL,
+						PRIMARY KEY (obf_id, token_id, object_id),
+						FOREIGN KEY (obf_id) REFERENCES OBF(id),
+						FOREIGN KEY (token_id, object_id) REFERENCES posting(token_id, object_id)
+					)
+					""");
+			stmt.execute("CREATE INDEX idx_posting_object ON posting(object_id)");
+			stmt.execute("CREATE INDEX idx_posting_token ON posting(token_id)");
+			stmt.execute("CREATE INDEX idx_obf_posting_object ON obf_posting(object_id)");
 		}
 	}
 
-	private void populateDb(Connection conn, List<String> obfs) throws SQLException, IOException {
+	private void populateDb(Connection conn, List<String> obfs, GenerateDbProgressListener progressListener) throws SQLException, IOException {
 		Map<String, Long> tokenIds = new HashMap<>();
 		try (PreparedStatement insertObf = conn.prepareStatement("INSERT INTO OBF(name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
 		     PreparedStatement insertToken = conn.prepareStatement("""
-				     INSERT INTO Token(name, isCommon, isFrequent, poiSize, poiCount, addressSize, addressCount)
-				     VALUES (?, ?, ?, ?, ?, ?, ?)
+				     INSERT INTO token(name, isCommon, isFrequent, poiSize, poiCount, addressSize, addressCount, poiRefs, addressRefs)
+				     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 				     ON CONFLICT(name) DO UPDATE SET
 				     	isCommon = CASE WHEN excluded.isCommon = 1 THEN 1 ELSE Token.isCommon END,
 				     	isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END,
 				     	poiSize = Token.poiSize + excluded.poiSize,
 				     	poiCount = Token.poiCount + excluded.poiCount,
 				     	addressSize = Token.addressSize + excluded.addressSize,
-				     	addressCount = Token.addressCount + excluded.addressCount
+				     	addressCount = Token.addressCount + excluded.addressCount,
+				     	poiRefs = Token.poiRefs + excluded.poiRefs,
+				     	addressRefs = Token.addressRefs + excluded.addressRefs
 				     """);
-		     PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM Token WHERE name = ?");
+		     PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM token WHERE name = ?");
 		     PreparedStatement insertObject = conn.prepareStatement("""
-				     INSERT OR IGNORE INTO "Object"(obf_id, id, name, lat, lon, "values", type, osmId, osmType)
-				     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				     INSERT OR IGNORE INTO "object"(id, name, lat, lon, "values", type, osmType)
+				     VALUES (?, ?, ?, ?, ?, ?, ?)
 				     """);
 		     PreparedStatement insertPosting = conn.prepareStatement("""
-				     INSERT OR IGNORE INTO Posting(obf_id, object_id, token_id, payloadOffset, sourceOffset)
-				     VALUES (?, ?, ?, ?, ?)
+				     INSERT OR IGNORE INTO posting(token_id, object_id)
+				     VALUES (?, ?)
+				     """);
+		     PreparedStatement insertObfPosting = conn.prepareStatement("""
+				     INSERT OR IGNORE INTO obf_posting(obf_id, token_id, object_id, sequenceId, payloadOffset, sourceOffset)
+				     VALUES (?, ?, ?, ?, ?, ?)
 				     """)) {
-			for (String obf : obfs) {
+			int totalObfs = obfs.size();
+			Map<Integer, GenerateDbObfState> progressStates = new LinkedHashMap<>();
+			Map<Integer, Long> obfIds = new HashMap<>();
+			Map<Integer, AtomicInteger> objectCounts = new HashMap<>();
+			Map<Integer, AtomicInteger> skippedWithoutOsmIds = new HashMap<>();
+			for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
+				String obf = obfs.get(obfIndex);
 				if (Algorithms.isEmpty(obf)) {
 					continue;
 				}
-				long obfId = insertObfRow(insertObf, getObfFileName(obf));
-				Map<String, Integer> objectIds = new HashMap<>();
-				Set<Integer> usedObjectIds = new HashSet<>();
-				int[] nextObjectId = new int[] {1};
-				for (IndexToken token : loadAllGenerateDbTokens(obf)) {
-					if (token == null || Algorithms.isEmpty(token.name())) {
+				String obfName = getObfFileName(obf);
+				long obfId = insertObfRow(insertObf, obfName);
+				int displayIndex = obfIndex + 1;
+				obfIds.put(displayIndex, obfId);
+				objectCounts.put(displayIndex, new AtomicInteger());
+				skippedWithoutOsmIds.put(displayIndex, new AtomicInteger());
+				progressStates.put(displayIndex, new GenerateDbObfState(obfName, displayIndex, System.currentTimeMillis()));
+			}
+			ExecutorService executor = createGenerateDbExecutor();
+			try {
+				List<Future<GenerateDbObfTokens>> tokenFutures = new ArrayList<>();
+				for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
+					String obf = obfs.get(obfIndex);
+					if (Algorithms.isEmpty(obf)) {
 						continue;
 					}
-					ObjectAddressPage objectsPage = getObjects(obf, "en", token, null, 0, Integer.MAX_VALUE, null, null, true, false, null);
-					long tokenId = upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token, objectsPage);
-					for (ObjectAddress objectAddress : objectsPage.content()) {
-						if (objectAddress == null || !objectAddress.isMatched()) {
-							continue;
+					int displayIndex = obfIndex + 1;
+					String obfName = getObfFileName(obf);
+					tokenFutures.add(executor.submit(() -> {
+						long startMs = System.currentTimeMillis();
+						List<IndexToken> tokens = loadAllGenerateDbTokens(obf);
+						getLogger().info("generateDb: loaded {} tokens for OBF {}", tokens.size(), obfName);
+						return new GenerateDbObfTokens(obf, obfName, displayIndex, startMs, tokens);
+					}));
+				}
+
+				CompletionService<GenerateDbTokenChunk> chunkService = new ExecutorCompletionService<>(executor);
+				int submittedChunks = 0;
+				for (Future<GenerateDbObfTokens> tokenFuture : tokenFutures) {
+					GenerateDbObfTokens obfTokens = getGenerateDbFuture(tokenFuture);
+					GenerateDbObfState state = progressStates.get(obfTokens.obfIndex());
+					if (state != null) {
+						state.startMs = obfTokens.startMs();
+						state.totalTokens = obfTokens.tokens().size();
+						state.status = "RUNNING";
+					}
+					notifyGenerateDbProgress(progressListener, "RUNNING", obfTokens.obfName(), obfTokens.obfIndex(), totalObfs,
+							0, obfTokens.tokens().size(), obfTokens.startMs(), null, progressStates);
+					for (int start = 0; start < obfTokens.tokens().size(); start += 10) {
+						int from = start;
+						int to = Math.min(start + 10, obfTokens.tokens().size());
+						List<IndexToken> tokenChunk = obfTokens.tokens().subList(from, to);
+						chunkService.submit(() -> loadGenerateDbTokenChunk(obfTokens, tokenChunk));
+						submittedChunks++;
+					}
+					if (obfTokens.tokens().isEmpty()) {
+						if (state != null) {
+							state.markDone();
 						}
-						int objectId = resolveGenerateDbObjectId(objectIds, usedObjectIds, nextObjectId, objectAddress);
-						if (!usedObjectIds.contains(objectId)) {
-							usedObjectIds.add(objectId);
-							insertGenerateDbObject(insertObject, obfId, objectId, objectAddress);
-						}
-						insertGenerateDbPosting(insertPosting, obfId, objectId, tokenId, objectAddress);
+						notifyGenerateDbProgress(progressListener, "RUNNING", obfTokens.obfName(), obfTokens.obfIndex(), totalObfs,
+								0, 0, obfTokens.startMs(), null, progressStates);
 					}
 				}
+
+				for (int completedChunks = 0; completedChunks < submittedChunks; completedChunks++) {
+					GenerateDbTokenChunk chunk = getGenerateDbFuture(chunkService.take());
+					long obfId = obfIds.get(chunk.obfIndex());
+					GenerateDbObfState state = progressStates.get(chunk.obfIndex());
+					for (GenerateDbTokenObjects tokenObjects : chunk.tokens()) {
+						IndexToken token = tokenObjects.token();
+						if (token == null || Algorithms.isEmpty(token.name())) {
+							incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
+							continue;
+						}
+						ObjectAddressPage objectsPage = tokenObjects.objectsPage();
+						long tokenId = upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token, objectsPage);
+						for (ObjectAddress objectAddress : objectsPage.content()) {
+							if (objectAddress == null || !objectAddress.isMatched()) {
+								continue;
+							}
+							if (objectAddress.osmId() == null) {
+								skippedWithoutOsmIds.get(chunk.obfIndex()).incrementAndGet();
+								continue;
+							}
+							insertGenerateDbObject(insertObject, objectAddress);
+							objectCounts.get(chunk.obfIndex()).incrementAndGet();
+							insertGenerateDbPosting(insertPosting, tokenId, objectAddress);
+							insertGenerateDbObfPosting(insertObfPosting, obfId, tokenId, objectAddress);
+						}
+						incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
+					}
+				}
+				for (GenerateDbObfState state : progressStates.values()) {
+					state.markDone();
+					notifyGenerateDbProgress(progressListener, "RUNNING", state.obfName, state.obfIndex, totalObfs,
+							state.processedTokens, state.totalTokens, state.startMs, null, progressStates);
+					getLogger().info("generateDb: completed {} objects for OBF {}", objectCounts.get(state.obfIndex).get(), state.obfName);
+					int skipped = skippedWithoutOsmIds.get(state.obfIndex).get();
+					if (skipped > 0) {
+						getLogger().info("generateDb: skipped {} matched objects without OSM ID for OBF {}", skipped, state.obfName);
+					}
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IOException("Interrupted while generating SQLite DB", e);
+			} finally {
+				executor.shutdownNow();
 			}
 		}
+	}
+
+	private ExecutorService createGenerateDbExecutor() {
+		int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_THREAD_NUMBER"),
+				Math.max(1, Runtime.getRuntime().availableProcessors()));
+		maxCount = Math.max(1, maxCount);
+		ThreadFactory tf = r -> {
+			Thread t = new Thread(r);
+			t.setName("search-test-generate-db-" + t.getId());
+			t.setDaemon(true);
+			return t;
+		};
+		return Executors.newFixedThreadPool(maxCount, tf);
+	}
+
+	private GenerateDbTokenChunk loadGenerateDbTokenChunk(GenerateDbObfTokens obfTokens, List<IndexToken> tokens) {
+		List<GenerateDbTokenObjects> result = new ArrayList<>(tokens.size());
+		for (IndexToken token : tokens) {
+			if (token == null || Algorithms.isEmpty(token.name())) {
+				result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token,
+						new ObjectAddressPage(Collections.emptyList(), 0, 0, 0, 0, new int[0], new int[0])));
+				continue;
+			}
+			ObjectAddressPage objectsPage = getObjects(obfTokens.obf(), "en", token, null, 0, Integer.MAX_VALUE, null, null, true, false, null);
+			result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token, objectsPage));
+		}
+		return new GenerateDbTokenChunk(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), result);
+	}
+
+	private <T> T getGenerateDbFuture(Future<T> future) throws IOException {
+		try {
+			return future.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while generating SQLite DB", e);
+		} catch (ExecutionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof RuntimeException runtimeException) {
+				throw runtimeException;
+			}
+			if (cause instanceof IOException ioException) {
+				throw ioException;
+			}
+			throw new IOException("Failed to generate SQLite DB: " + cause.getMessage(), cause);
+		}
+	}
+
+	private void incrementGenerateDbProgress(GenerateDbObfState state,
+			GenerateDbProgressListener progressListener,
+			GenerateDbTokenChunk chunk,
+			int totalObfs,
+			Map<Integer, GenerateDbObfState> progressStates) {
+		if (state == null) {
+			return;
+		}
+		state.processedTokens++;
+		if (state.processedTokens >= state.totalTokens) {
+			state.markDone();
+		}
+		notifyGenerateDbProgress(progressListener, "RUNNING", chunk.obfName(), chunk.obfIndex(), totalObfs,
+				state.processedTokens, state.totalTokens, state.startMs, null, progressStates);
+		if (state.processedTokens % 1000 == 0 || state.processedTokens == state.totalTokens) {
+			getLogger().info("generateDb: processed {} of {} tokens for OBF {}", state.processedTokens, state.totalTokens, state.obfName);
+		}
+	}
+
+	class GenerateDbObfState {
+		final String obfName;
+		final int obfIndex;
+		long startMs;
+		long completedElapsedMs = -1;
+		int totalTokens;
+		int processedTokens;
+		String status = "PENDING";
+
+		GenerateDbObfState(String obfName, int obfIndex, long startMs) {
+			this.obfName = obfName;
+			this.obfIndex = obfIndex;
+			this.startMs = startMs;
+		}
+
+		void markDone() {
+			if (!"DONE".equals(status)) {
+				completedElapsedMs = Math.max(0, System.currentTimeMillis() - startMs);
+			}
+			status = "DONE";
+		}
+	}
+
+	private void notifyGenerateDbProgress(GenerateDbProgressListener progressListener,
+			String status,
+			String obfName,
+			int obfIndex,
+			int totalObfs,
+			int processedTokens,
+			int totalTokens,
+			long startMs,
+			String error,
+			Map<Integer, GenerateDbObfState> progressStates) {
+		if (progressListener == null) {
+			return;
+		}
+		long elapsedMs = Math.max(0, System.currentTimeMillis() - startMs);
+		long estimatedMs = processedTokens > 0 && totalTokens > 0
+				? Math.max(0, (elapsedMs * totalTokens / processedTokens) - elapsedMs)
+				: -1;
+		List<GenerateDbObfProgress> obfProgress = new ArrayList<>();
+		if (progressStates != null) {
+			long now = System.currentTimeMillis();
+			for (GenerateDbObfState state : progressStates.values()) {
+				long stateElapsedMs = "DONE".equals(state.status) && state.completedElapsedMs >= 0
+						? state.completedElapsedMs
+						: Math.max(0, now - state.startMs);
+				long stateEstimatedMs = state.processedTokens > 0 && state.totalTokens > 0 && !"DONE".equals(state.status)
+						? Math.max(0, (stateElapsedMs * state.totalTokens / state.processedTokens) - stateElapsedMs)
+						: ("DONE".equals(state.status) ? 0 : -1);
+				obfProgress.add(new GenerateDbObfProgress(state.obfName, state.obfIndex, state.totalTokens,
+						state.processedTokens, stateElapsedMs, stateEstimatedMs, state.status));
+			}
+		}
+		progressListener.onProgress(new GenerateDbProgress(status, obfName, obfIndex, totalObfs,
+				processedTokens, totalTokens, elapsedMs, estimatedMs, error, obfProgress));
 	}
 
 	private long insertObfRow(PreparedStatement insertObf, String name) throws SQLException {
@@ -3876,6 +4006,8 @@ public interface OBFService extends BaseService {
 		insertToken.setInt(5, metricValue(countMetrics, 3));
 		insertToken.setInt(6, metricValue(sizeMetrics, 8));
 		insertToken.setInt(7, metricValue(countMetrics, 5));
+		insertToken.setInt(8, token.poiRefs() == null ? 0 : token.poiRefs().length);
+		insertToken.setInt(9, token.addressRefs() == null ? 0 : token.addressRefs().length);
 		insertToken.executeUpdate();
 		Long cachedId = tokenIds.get(token.name());
 		if (cachedId != null) {
@@ -3896,70 +4028,41 @@ public interface OBFService extends BaseService {
 		return metrics == null || index < 0 || index >= metrics.length ? 0 : metrics[index];
 	}
 
-	private int resolveGenerateDbObjectId(Map<String, Integer> objectIds,
-			Set<Integer> usedObjectIds,
-			int[] nextObjectId,
-			ObjectAddress objectAddress) {
-		String key = generateDbObjectKey(objectAddress);
-		Integer id = objectIds.get(key);
-		if (id != null) {
-			return id;
-		}
-		int sequenceId = objectAddress.sequenceId();
-		if (usedObjectIds.contains(sequenceId)) {
-			while (usedObjectIds.contains(nextObjectId[0])) {
-				nextObjectId[0]++;
-			}
-			sequenceId = nextObjectId[0]++;
-		}
-		objectIds.put(key, sequenceId);
-		return sequenceId;
-	}
-
-	private String generateDbObjectKey(ObjectAddress objectAddress) {
-		if (objectAddress.osmId() != null && !Algorithms.isEmpty(objectAddress.osmType())) {
-			return "osm:" + objectAddress.osmType() + ":" + objectAddress.osmId();
-		}
-		return "raw:" + objectAddress.sourceOffset() + ":" + objectAddress.payloadOffset() + ":"
-				+ objectAddress.type() + ":" + objectAddress.name();
-	}
-
-	private void insertGenerateDbObject(PreparedStatement insertObject,
-			long obfId,
-			int objectId,
-			ObjectAddress objectAddress) throws SQLException, IOException {
+	private void insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress) throws SQLException, IOException {
 		LatLon point = objectAddress.point();
-		insertObject.setLong(1, obfId);
-		insertObject.setInt(2, objectId);
-		insertObject.setString(3, objectAddress.name());
+		insertObject.setLong(1, objectAddress.osmId());
+		insertObject.setString(2, objectAddress.name());
 		if (point == null) {
+			insertObject.setNull(3, java.sql.Types.REAL);
 			insertObject.setNull(4, java.sql.Types.REAL);
-			insertObject.setNull(5, java.sql.Types.REAL);
 		} else {
-			insertObject.setDouble(4, point.getLatitude());
-			insertObject.setDouble(5, point.getLongitude());
+			insertObject.setDouble(3, point.getLatitude());
+			insertObject.setDouble(4, point.getLongitude());
 		}
-		insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.values()));
-		insertObject.setString(7, objectAddress.type());
-		if (objectAddress.osmId() == null) {
-			insertObject.setNull(8, java.sql.Types.BIGINT);
-		} else {
-			insertObject.setLong(8, objectAddress.osmId());
-		}
-		insertObject.setString(9, objectAddress.osmType());
+		insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.values()));
+		insertObject.setString(6, objectAddress.type());
+		insertObject.setString(7, objectAddress.osmType());
 		insertObject.executeUpdate();
 	}
 
 	private void insertGenerateDbPosting(PreparedStatement insertPosting,
-			long obfId,
-			int objectId,
 			long tokenId,
 			ObjectAddress objectAddress) throws SQLException {
-		insertPosting.setLong(1, obfId);
-		insertPosting.setInt(2, objectId);
-		insertPosting.setLong(3, tokenId);
-		insertPosting.setInt(4, objectAddress.payloadOffset());
-		insertPosting.setInt(5, objectAddress.sourceOffset());
+		insertPosting.setLong(1, tokenId);
+		insertPosting.setLong(2, objectAddress.osmId());
 		insertPosting.executeUpdate();
+	}
+
+	private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
+			long obfId,
+			long tokenId,
+			ObjectAddress objectAddress) throws SQLException {
+		insertObfPosting.setLong(1, obfId);
+		insertObfPosting.setLong(2, tokenId);
+		insertObfPosting.setLong(3, objectAddress.osmId());
+		insertObfPosting.setInt(4, objectAddress.sequenceId());
+		insertObfPosting.setInt(5, objectAddress.payloadOffset());
+		insertObfPosting.setInt(6, objectAddress.sourceOffset());
+		insertObfPosting.executeUpdate();
 	}
 }
