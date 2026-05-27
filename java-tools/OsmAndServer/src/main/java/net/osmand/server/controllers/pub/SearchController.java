@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.util.*;
 
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
@@ -13,7 +14,6 @@ import net.osmand.shared.wiki.WikiMetadata;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +29,7 @@ import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
+
 @Controller
 @RequestMapping({"/search", "/routing/search"})
 public class SearchController {
@@ -44,6 +45,9 @@ public class SearchController {
     
     @Autowired
     SearchService searchService;
+
+    @Autowired
+    TransportStopsService transportStopsService;
     
     @Autowired
     protected CloudUserDevicesRepository devicesRepository;
@@ -64,14 +68,12 @@ public class SearchController {
                                          @RequestParam (required = false) String northWest,
                                          @RequestParam (required = false) String southEast,
                                          @RequestParam(required = false) Boolean baseSearch,
-                                         @RequestParam(defaultValue = "0") long clientTime,
                                          @RequestParam(required = false) String timeZone) throws IOException {
-        Calendar clientTimeC = getClientTime(clientTime, timeZone);
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
         List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-                baseSearch != null && baseSearch, null, northWest, southEast), clientTimeC);
+                baseSearch != null && baseSearch, northWest, southEast), timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
@@ -82,21 +84,9 @@ public class SearchController {
                                             @RequestParam double lat,
                                             @RequestParam double lon,
                                             @RequestParam(required = false) Boolean baseSearch,
-                                            @RequestParam(defaultValue = "0") long clientTime,
                                             @RequestParam(required = false) String timeZone) throws IOException {
-        Calendar clientTimeC = getClientTime(clientTime, timeZone);
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, clientTimeC);
+        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, timeZone);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
-    }
-
-    @Nullable
-    private static Calendar getClientTime(long clientTime, String timeZone) {
-        Calendar calendar = null;
-        if (clientTime > 0 && !Algorithms.isBlank(timeZone)) {
-            calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
-            calendar.setTimeInMillis(clientTime);
-        }
-        return calendar;
     }
 
     @RequestMapping(path = {"/get-poi"}, produces = "application/json")
@@ -106,7 +96,6 @@ public class SearchController {
                                          @RequestParam (required = false) String name,
                                          @RequestParam (required = false) Long osmId,
                                          @RequestParam (required = false) Long wikidataId,
-                                         @RequestParam(defaultValue = "0") long clientTime,
                                          @RequestParam(required = false) String timeZone) throws IOException {
         Feature poiSearchResult;
 
@@ -126,10 +115,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
         }
 
-        Calendar clientTimeC = getClientTime(clientTime, timeZone);
-
-        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId,
-                clientTimeC);
+        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId, timeZone);
 
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
@@ -284,10 +270,8 @@ public class SearchController {
                                                 @RequestParam double lon,
                                                 @RequestParam long osmid,
                                                 @RequestParam String type,
-                                                @RequestParam(defaultValue = "0") long clientTime,
                                                 @RequestParam(required = false) String timeZone) throws IOException {
-        Calendar clientTimeC = getClientTime(clientTime, timeZone);
-        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, clientTimeC);
+        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
         return ResponseEntity.ok(gson.toJson(poi));
     }
 
@@ -318,7 +302,7 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchTransportStops(@RequestParam String northWest,
                                                        @RequestParam String southEast) throws IOException {
-        SearchService.TransportStopsSearchResult result = searchService.searchTransportStops(northWest, southEast);
+        TransportStopsService.TransportStopsSearchResult result = transportStopsService.searchTransportStops(northWest, southEast);
         return ResponseEntity.ok(gson.toJson(result));
     }
 
@@ -329,7 +313,7 @@ public class SearchController {
                                                     @RequestParam long stopId,
                                                     @RequestParam long routeId) throws IOException {
         LatLon transportStopCoords = new LatLon(lat, lon);
-        SearchService.TransportRouteFeature result = searchService.getTransportRoute(transportStopCoords, stopId, routeId);
+        TransportStopsService.TransportRouteFeature result = transportStopsService.getTransportRoute(transportStopCoords, stopId, routeId);
         if (result == null) {
             return ResponseEntity.badRequest().body("Error getting transport route!");
         }
@@ -342,10 +326,20 @@ public class SearchController {
                                                     @RequestParam double lon,
                                                     @RequestParam long stopId) throws IOException {
         LatLon transportStopCoords = new LatLon(lat, lon);
-        Feature result = searchService.getTransportStop(transportStopCoords, stopId);
+        Feature result = transportStopsService.getTransportStop(transportStopCoords, stopId);
         if (result == null) {
             return ResponseEntity.badRequest().body("Error getting transport stop!");
         }
+        return ResponseEntity.ok(gson.toJson(result));
+    }
+
+    @GetMapping(path = {"/get-nearby-transport-stops"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getNearbyTransportStops(@RequestParam double lat,
+                                                         @RequestParam double lon,
+                                                         @RequestParam long stopId) throws IOException {
+        LatLon stopCoords = new LatLon(lat, lon);
+        Map<String, Object> result = transportStopsService.getNearbyTransportStops(stopCoords, stopId);
         return ResponseEntity.ok(gson.toJson(result));
     }
 

@@ -4,13 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import jakarta.servlet.http.HttpSession;
 import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserSessionResources;
-import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -33,6 +34,7 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
@@ -64,9 +66,13 @@ public class WebUserdataService {
 	@Autowired
 	UserSessionResources sessionResources;
 
-	private static final String METADATA = "metadata";
+	public static final String METADATA = "metadata";
+	public static final String TIME = "time";
+	public static final String ACTIVITY_TYPE = "activity";
+	public static final String INFO_DATA_JSON = "data";
 	private static final String FAV_POINT_GROUPS = "pointGroups";
 	public static final String ANALYSIS = "analysis";
+	public static final String ANALYSIS_ADDITIONAL = "analysisAdditional";
 	public static final String SHARE = "share";
 	private static final String AUTHOR = "author";
 	private static final String HAS_ADVANCED_ROUTE = "hasAdvancedRoute";
@@ -77,12 +83,12 @@ public class WebUserdataService {
 	public static final String UPDATETIME = "updatetime";
 	public static final String UPDATE_DETAILS = "update";
 	public static final String INFO_FILE_EXT = ".info";
+	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
 
 	private static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
 
-	private static final long ANALYSIS_RERUN = 1765443600000L; // 10-12-2025
-
+	private static final long ANALYSIS_RERUN = 1776076777000L; // 13-04-2026
 
 	Gson gson = new Gson();
 
@@ -91,99 +97,284 @@ public class WebUserdataService {
 	public record UserFileUpdate(String name, String type, boolean isError, String time) {
 	}
 
+	public static final class TrackAnalysisJson {
+		private final float totalDistance;
+		private final long startTime;
+		private final long endTime;
+		private final long timeMoving;
+		private final int points;
+		private final int wptPoints;
 
-	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+		public TrackAnalysisJson(float totalDistance, long startTime, long endTime, long timeMoving, int points,
+		                         int wptPoints) {
+			this.totalDistance = totalDistance;
+			this.startTime = startTime;
+			this.endTime = endTime;
+			this.timeMoving = timeMoving;
+			this.points = points;
+			this.wptPoints = wptPoints;
+		}
+
+		public static TrackAnalysisJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisJson(
+					analysis.getTotalDistance(),
+					analysis.getStartTime(),
+					analysis.getEndTime(),
+					analysis.getTimeMoving(),
+					analysis.getPoints(),
+					analysis.getWptPoints());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTotalDistance(totalDistance);
+			analysis.setStartTime(startTime);
+			analysis.setEndTime(endTime);
+			analysis.setTimeMoving(timeMoving);
+			analysis.setPoints(points);
+			analysis.setWptPoints(wptPoints);
+		}
+	}
+
+	public static final class TrackAnalysisAdditionalJson {
+		private final long timeSpan;
+		private final float averageSpeed;
+		private final float maxSpeed;
+		private final float averageSensorSpeed;
+		private final float maxSensorSpeed;
+		private final float averageSensorHeartRate;
+		private final int maxSensorHeartRate;
+		private final float averageSensorCadence;
+		private final float maxSensorCadence;
+		private final float averageSensorPower;
+		private final int maxSensorPower;
+		private final float averageSensorTemperature;
+		private final int maxSensorTemperature;
+		private final double diffElevationUp;
+		private final double diffElevationDown;
+		private final double averageElevation;
+		private final double maxElevation;
+
+		public TrackAnalysisAdditionalJson(long timeSpan, float averageSpeed, float maxSpeed, float averageSensorSpeed,
+		                                   float maxSensorSpeed, float averageSensorHeartRate, int maxSensorHeartRate,
+		                                   float averageSensorCadence, float maxSensorCadence, float averageSensorPower,
+		                                   int maxSensorPower, float averageSensorTemperature, int maxSensorTemperature,
+		                                   double diffElevationUp, double diffElevationDown, double averageElevation,
+		                                   double maxElevation) {
+			this.timeSpan = timeSpan;
+			this.averageSpeed = averageSpeed;
+			this.maxSpeed = maxSpeed;
+			this.averageSensorSpeed = averageSensorSpeed;
+			this.maxSensorSpeed = maxSensorSpeed;
+			this.averageSensorHeartRate = averageSensorHeartRate;
+			this.maxSensorHeartRate = maxSensorHeartRate;
+			this.averageSensorCadence = averageSensorCadence;
+			this.maxSensorCadence = maxSensorCadence;
+			this.averageSensorPower = averageSensorPower;
+			this.maxSensorPower = maxSensorPower;
+			this.averageSensorTemperature = averageSensorTemperature;
+			this.maxSensorTemperature = maxSensorTemperature;
+			this.diffElevationUp = diffElevationUp;
+			this.diffElevationDown = diffElevationDown;
+			this.averageElevation = averageElevation;
+			this.maxElevation = maxElevation;
+		}
+
+		public static TrackAnalysisAdditionalJson from(GpxTrackAnalysis analysis) {
+			return new TrackAnalysisAdditionalJson(
+					analysis.getTimeSpan(),
+					analysis.getAvgSpeed(),
+					analysis.getMaxSpeed(),
+					analysis.getAvgSensorSpeed(),
+					analysis.getMaxSensorSpeed(),
+					analysis.getAvgSensorHr(),
+					analysis.getMaxSensorHr(),
+					analysis.getAvgSensorCadence(),
+					analysis.getMaxSensorCadence(),
+					analysis.getAvgSensorPower(),
+					analysis.getMaxSensorPower(),
+					analysis.getAvgSensorTemperature(),
+					analysis.getMaxSensorTemperature(),
+					analysis.getDiffElevationUp(),
+					analysis.getDiffElevationDown(),
+					analysis.getAvgElevation(),
+					analysis.getMaxElevation());
+		}
+
+		public void applyTo(GpxTrackAnalysis analysis) {
+			if (analysis == null) {
+				return;
+			}
+			analysis.setTimeSpan(timeSpan);
+			analysis.setAvgSpeed(averageSpeed);
+			analysis.setMaxSpeed(maxSpeed);
+			analysis.setAvgSensorSpeed(averageSensorSpeed);
+			analysis.setMaxSensorSpeed(maxSensorSpeed);
+			analysis.setAvgSensorHr(averageSensorHeartRate);
+			analysis.setMaxSensorHr(maxSensorHeartRate);
+			analysis.setAvgSensorCadence(averageSensorCadence);
+			analysis.setMaxSensorCadence(maxSensorCadence);
+			analysis.setAvgSensorPower(averageSensorPower);
+			analysis.setMaxSensorPower(maxSensorPower);
+			analysis.setAvgSensorTemperature(averageSensorTemperature);
+			analysis.setMaxSensorTemperature(maxSensorTemperature);
+			analysis.setDiffElevationUp(diffElevationUp);
+			analysis.setDiffElevationDown(diffElevationDown);
+			analysis.setAvgElevation(averageElevation);
+			analysis.setMaxElevation(maxElevation);
+		}
+	}
+
+	private static final class TrackAnalysisSplit {
+		TrackAnalysisJson core;
+		TrackAnalysisAdditionalJson additional;
+
+		private TrackAnalysisSplit(TrackAnalysisJson core, TrackAnalysisAdditionalJson additional) {
+			this.core = core;
+			this.additional = additional;
+		}
+	}
+
+	private static TrackAnalysisSplit getAnalysisFromGpx(GpxTrackAnalysis analysis) {
+		if (analysis == null) {
+			return null;
+		}
+		analysis.getPointAttributes().clear();
+		return new TrackAnalysisSplit(TrackAnalysisJson.from(analysis), TrackAnalysisAdditionalJson.from(analysis));
+	}
+
+	public ResponseEntity<String> refreshListFiles(List<UserFileUpdate> files,
+	                                               CloudUserDevicesRepository.CloudUserDevice dev) {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 		List<CloudUserFilesRepository.UserFileNoData> result = new ArrayList<>();
 		for (UserFileUpdate file : files) {
-			if (file.isError) {
-				if (file.time == null) {
-					LOG.warn(String.format("Skipping file %s: isError=true and time is null", file.name));
-					continue;
-				}
-				long time = Long.parseLong(file.time);
-				if (System.currentTimeMillis() - time > ERROR_LIFETIME) {
-					LOG.warn(String.format("Skipping file %s: isError=true and time exceeded ERROR_LIFETIME", file.name));
-					continue;
-				}
-			}
-			Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
-			UserdataController.UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
-			if (res.uniqueFiles.isEmpty()) {
-				LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
+			if (skipByTimeOrError(file)) {
 				continue;
 			}
-			if (res.uniqueFiles.size() > 1) {
-				LOG.error(String.format("refreshListFiles error: expected a single file, but got %d files", res.uniqueFiles.size()));
+			CloudUserFilesRepository.UserFileNoData nd = getUniqueUserFileNoData(dev, file);
+			if (nd == null) {
 				continue;
 			}
-			CloudUserFilesRepository.UserFileNoData nd = res.uniqueFiles.get(0);
 			Optional<CloudUserFilesRepository.UserFile> of = userFilesRepository.findById(nd.id);
-			boolean isTrack = file.type.equals(FILE_TYPE_GPX);
+			boolean isTrack = FILE_TYPE_GPX.equals(file.type);
 			if (of.isPresent()) {
 				GpxTrackAnalysis analysis = null;
 				GpxFile gpxFile;
 				List<WptPt> points = null;
 				CloudUserFilesRepository.UserFile uf = of.get();
-				JsonObject details = uf.details;
-				InputStream in;
-				try {
-					in = uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
-				} catch (Exception e) {
-					String isError = String.format(
-							"refreshListFiles error: input-stream-error %s id=%d userid=%d error (%s)",
-							uf.name, uf.id, uf.userid, e.getMessage());
-					LOG.error(isError);
-					saveError(details, isError, uf);
-					nd.details = uf.details;
-					result.add(nd);
-					continue;
-				}
-				if (in != null) {
-					in = new GZIPInputStream(in);
-					try (Source source = new Buffer().readFrom(in)) {
+				try (InputStream in = uf.data != null
+						? new ByteArrayInputStream(uf.data)
+						: userdataService.getInputStream(uf)) {
+					if (uf.name.endsWith(INFO_FILE_SUFFIX)) {
+						processInfoFile(in, uf, nd, result);
+						continue;
+					}
+					try (GZIPInputStream gzipIn = new GZIPInputStream(in);
+					     Source source = new Buffer().readFrom(gzipIn)) {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 					} catch (IOException e) {
-						String loadError = String.format(
-								"refreshListFiles error: load-gpx-error %s id=%d userid=%d error (%s)",
-								uf.name, uf.id, uf.userid, e.getMessage());
-						LOG.error(loadError);
-						saveError(details, loadError, uf);
-						nd.details = uf.details;
-						result.add(nd);
+						logAndSaveError("load-gpx-error " + e.getMessage(), uf, nd, result);
 						continue;
 					}
 					if (gpxFile.getError() != null) {
-						String corruptedError = String.format(
-								"refreshListFiles error: corrupted-gpx-file %s id=%d userid=%d error (%s)",
-								uf.name, uf.id, uf.userid, gpxFile.getError().getMessage());
-						LOG.error(corruptedError);
-						saveError(details, corruptedError, uf);
-						nd.details = uf.details;
-						result.add(nd);
+						logAndSaveError("corrupted-gpx-file " + gpxFile.getError().getMessage(), uf, nd, result);
 						continue;
 					}
 					if (isTrack) {
 						analysis = getAnalysis(uf, gpxFile);
 						points = gpxFile.getAllSegmentsPoints();
 					}
-				} else {
-					String noIsError = String.format(
-							"refreshListFiles error: no-input-stream %s id=%d userid=%d", uf.name, uf.id, uf.userid);
-					LOG.error(noIsError);
-					saveError(details, noIsError, uf);
-					nd.details = uf.details;
+					boolean isSharedFile = isShared(nd, sharedFilesMap);
+					JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
+					saveDetails(newDetails, ANALYSIS, uf, points);
+					nd.details = detailsForResponse(uf.details);
 					result.add(nd);
-					continue;
+				} catch (IOException e) {
+					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
 				}
-				boolean isSharedFile = isShared(nd, sharedFilesMap);
-				JsonObject newDetails = preparedDetails(gpxFile, analysis, isTrack, isSharedFile);
-				saveDetails(newDetails, ANALYSIS, uf, points);
-				nd.details = uf.details;
-				result.add(nd);
 			}
 		}
 		return ResponseEntity.ok(gson.toJson(result));
+	}
+
+	private CloudUserFilesRepository.UserFileNoData getUniqueUserFileNoData(
+			CloudUserDevicesRepository.CloudUserDevice dev, UserFileUpdate file) {
+		Set<String> types = file.type != null ? Set.of(file.type) : Collections.emptySet();
+		UserFilesResults res = userdataService.generateFiles(dev.userid, file.name, false, true, types);
+		if (res.uniqueFiles.isEmpty()) {
+			LOG.error(String.format("refreshListFiles error: no files found for %s", file.name));
+			return null;
+		}
+		if (res.uniqueFiles.size() > 1) {
+			LOG.error(String.format("refreshListFiles error: expected a single file, but got %d files",
+					res.uniqueFiles.size()));
+			return null;
+		}
+		return res.uniqueFiles.get(0);
+	}
+
+	private void logAndSaveError(String error, CloudUserFilesRepository.UserFile uf,
+	                             CloudUserFilesRepository.UserFileNoData nd,
+	                             List<CloudUserFilesRepository.UserFileNoData> result) {
+		String errorMessage = String.format("refreshListFiles error: %s %s id=%d userid=%d",
+				error, uf.name, uf.id, uf.userid);
+		LOG.error(errorMessage);
+		saveError(uf.details, errorMessage, uf);
+		nd.details = detailsForResponse(uf.details);
+		result.add(nd);
+	}
+
+	private void processInfoFile(InputStream in, CloudUserFilesRepository.UserFile uf,
+	                             CloudUserFilesRepository.UserFileNoData nd,
+	                             List<CloudUserFilesRepository.UserFileNoData> result) {
+		JsonElement infoDetails = getInfoDetails(in);
+		if (infoDetails != null) {
+			if (uf.details == null) {
+				uf.details = new JsonObject();
+			}
+			uf.details.addProperty(UPDATETIME, nd.updatetimems);
+			uf.details.add(INFO_DATA_JSON, infoDetails);
+			userFilesRepository.save(uf);
+			nd.details = uf.details;
+			result.add(nd);
+		}
+	}
+
+	private boolean skipByTimeOrError(UserFileUpdate file) {
+		if (file.isError) {
+			if (file.time == null) {
+				LOG.warn(String.format("Skipping file %s: isError=true and time is null", file.name));
+				return true;
+			}
+			long time = Long.parseLong(file.time);
+			if (System.currentTimeMillis() - time > ERROR_LIFETIME) {
+				LOG.warn(String.format("Skipping file %s: isError=true and time exceeded ERROR_LIFETIME", file.name));
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public JsonObject detailsForResponse(JsonObject details) {
+		JsonObject response = new JsonObject();
+		for (String key : details.keySet()) {
+			if (!ANALYSIS_ADDITIONAL.equals(key)) {
+				response.add(key, details.get(key));
+			}
+		}
+		return response;
+	}
+
+	public JsonElement getInfoDetails(InputStream inputStream) {
+		try (InputStream is = new GZIPInputStream(inputStream);
+		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			return gson.fromJson(reader, JsonElement.class);
+		} catch (Exception e) {
+			LOG.warn("Failed to parse .info details JSON", e);
+			return null;
+		}
 	}
 
 	public JsonObject preparedDetails(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean isTrack, boolean isShared) {
@@ -222,6 +413,13 @@ public class WebUserdataService {
 				&& details.has(ERROR_DETAILS)
 				&& details.has(UPDATETIME)
 				&& System.currentTimeMillis() - details.get(UPDATETIME).getAsLong() < ERROR_LIFETIME;
+	}
+
+	public boolean detailsInfoPresent(JsonObject details, long updatetimems) {
+		return details != null
+				&& details.has(UPDATETIME)
+				&& details.has(INFO_DATA_JSON)
+				&& details.get(UPDATETIME).getAsLong() == updatetimems;
 	}
 
 	public boolean analysisPresent(String tag, JsonObject details) {
@@ -268,9 +466,10 @@ public class WebUserdataService {
 			if (file.details == null) {
 				file.details = new JsonObject();
 			}
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				file.details.add(tag, gsonWithNans.toJsonTree(res));
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			file.details.add(tag, gsonWithNans.toJsonTree(split.core));
+			if (ANALYSIS.equals(tag)) {
+				file.details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional));
 			}
 		}
 		saveDetails(file.details, tag, file, null);
@@ -297,10 +496,15 @@ public class WebUserdataService {
 
 	private void addMetadata(JsonObject details, GpxFile gpxFile) {
 		Metadata metadata = gpxFile.getMetadata();
-		if (!metadata.isEmpty()) {
-			metadata.setDesc(null);
+		JsonObject metadataJson = new JsonObject();
+		if (metadata.getTime() != 0) {
+			metadataJson.addProperty(TIME, metadata.getTime());
 		}
-		details.add(METADATA, gson.toJsonTree(metadata));
+		String activity = metadata.getExtensionsToWrite().get(GpxUtilities.ACTIVITY_TYPE);
+		if (activity != null && !activity.isBlank()) {
+			metadataJson.addProperty(ACTIVITY_TYPE, activity);
+		}
+		details.add(METADATA, metadataJson);
 	}
 
 	private void addFavData(JsonObject details, GpxFile gpxFile) {
@@ -321,10 +525,9 @@ public class WebUserdataService {
 
 	private void addTrackData(JsonObject details, GpxTrackAnalysis analysis) {
 		if (analysis != null) {
-			Map<String, Object> res = getDetails(analysis);
-			if (!res.isEmpty()) {
-				details.add(ANALYSIS, gsonWithNans.toJsonTree(res));
-			}
+			TrackAnalysisSplit split = getAnalysisFromGpx(analysis);
+			details.add(ANALYSIS, gsonWithNans.toJsonTree(split.core));
+			details.add(ANALYSIS_ADDITIONAL, gsonWithNans.toJsonTree(split.additional));
 		}
 	}
 
@@ -340,6 +543,9 @@ public class WebUserdataService {
 	}
 
 	private boolean isHidden(WebGpxParser.WebPointsGroup group) {
+		if (group.hidden != null) {
+			return group.hidden;
+		}
 		for (WebGpxParser.Wpt wpt : group.points) {
 			if (wpt.hidden != null && wpt.hidden.equals("true")) {
 				return true;
@@ -348,20 +554,22 @@ public class WebUserdataService {
 		return false;
 	}
 
-	private Map<String, Object> getDetails(GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			Map<String, Object> res = new HashMap<>();
-			analysis.getPointAttributes().clear();
-			res.put("totalDistance", analysis.getTotalDistance());
-			res.put("startTime", analysis.getStartTime());
-			res.put("endTime", analysis.getEndTime());
-			res.put("timeMoving", analysis.getTimeMoving());
-			res.put("points", analysis.getPoints());
-			res.put("wptPoints", analysis.getWptPoints());
-
-			return res;
+	GpxTrackAnalysis getAnalysisFromJson(JsonObject details) {
+		GpxTrackAnalysis analysis = new GpxTrackAnalysis();
+		if (details == null || !analysisPresent(ANALYSIS, details)) {
+			return analysis;
 		}
-		return Collections.emptyMap();
+		JsonElement analysisElem = details.get(ANALYSIS);
+		if (analysisElem != null && analysisElem.isJsonObject()) {
+			TrackAnalysisJson core = gsonWithNans.fromJson(analysisElem, TrackAnalysisJson.class);
+			core.applyTo(analysis);
+			JsonElement additionalElem = details.get(ANALYSIS_ADDITIONAL);
+			if (additionalElem != null && additionalElem.isJsonObject()) {
+				TrackAnalysisAdditionalJson additional = gsonWithNans.fromJson(additionalElem, TrackAnalysisAdditionalJson.class);
+				additional.applyTo(analysis);
+			}
+		}
+		return analysis;
 	}
 
 	@Transactional

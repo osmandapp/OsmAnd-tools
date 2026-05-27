@@ -15,7 +15,7 @@ import argparse
 from collections import defaultdict
 
 class FranceDEMProcessor:
-    def __init__(self, debug_mode=False, working_dir=None, existing_tileset_dir=None, max_jobs=None):
+    def __init__(self, debug_mode=False, working_dir=None, existing_tileset_dir=None, max_jobs=None, use_cache_for_existing=False):
         # Directory structure configuration
         self.working_dir = working_dir or os.getcwd()
         self.download_dir = os.path.join(self.working_dir, "data")
@@ -30,11 +30,14 @@ class FranceDEMProcessor:
         # External data sources
         self.existing_tileset_dir = existing_tileset_dir
         self.existing_tileset_highres_dir = existing_tileset_dir + "_highres" if existing_tileset_dir else None
-
+        self.use_cache_for_existing = use_cache_for_existing
+        self.existing_tileset_cache_dir = os.path.join(self.working_dir,
+                                                       "existing_tileset_cache") if use_cache_for_existing else None
         # Processing parameters
         self.max_jobs = max_jobs if max_jobs is not None else 18
         self.highres_tile_size = 16384
         self.lowres_tile_size = 3600
+        self.low_threshold = -50
         self.debug_mode = debug_mode
 
         # File paths
@@ -44,6 +47,8 @@ class FranceDEMProcessor:
         self.tiles_ignore_coastline_mask_file = os.path.join(self.working_dir, "tiles_ignore_coastline_mask.csv")
         self.tiles_ignore_clip_by_land_file = os.path.join(self.working_dir, "tiles_ignore_clip_by_land.csv")
         self.tiles_ignore_enhance_file = os.path.join(self.working_dir, "tiles_ignore_enhance.csv")
+        self.tiles_ignore_global_file = os.path.join(self.working_dir, "tiles_ignore_global.csv")
+        self.merged_dem_file = os.path.join(self.working_dir, "dem_merged.tif")
 
         # Data source URLs
         self.url = "https://geoservices.ign.fr/rgealti"
@@ -57,6 +62,7 @@ class FranceDEMProcessor:
         self.tiles_ignore_coastline_mask = set()
         self.tiles_ignore_clip_by_land = set()
         self.tiles_ignore_enhance = set()
+        self.tiles_ignore_global = set()
         self.land_polygons_path = None
         self.coastline_path = None
 
@@ -74,13 +80,16 @@ class FranceDEMProcessor:
             self.lowres_dir
         ]
 
+        if self.existing_tileset_cache_dir:
+            directories.append(self.existing_tileset_cache_dir)
+
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
 
     def print_help(self):
         """Print help information about script usage and processing stages"""
         help_text = """
-    FranceDEM Processor - Processes French DEM data into high and low resolution tiles
+    FranceDEM Processor - Processes French DEM (and any other region) data into high and low resolution tiles
 
     USAGE:
         python process_france_dem.py --working-dir DIR --existing-tileset-dir DIR [OPTIONS]
@@ -88,24 +97,44 @@ class FranceDEMProcessor:
     REQUIRED PARAMETERS:
         --working-dir DIR          Working directory for all output files and temporary data
         --existing-tileset-dir DIR  Directory containing existing lowres tileset (highres will be DIR_highres)
-
+    
+    ========================================================================================
+    To process source (is they are TIFF files) place them to working-dir/processed_source
+    and use run parameters like
+    --skip-download --skip-extract --skip-convert --skip-enhance --skip-postprocessing --skip-coastline-mask
+    --skip-clip-by-land --use-cache-for-existing-tileset-dir
+    --working-dir="/mnt/data/USGS" --existing-tileset-dir="/home/xmd5a/sshfs-links/root@data.osmand.net/mnt/hdd2/data/relief-data/srtm"
+    ========================================================================================
+    How to make a clean pass:
+    1.Remove dem_merged.tif
+    2.Remove tiles (and tiles_highres) dirs
+    3.Remove empty_tiles_cache.json
+    4.Run
+    ========================================================================================
+    
     OPTIONAL PARAMETERS:
         --max-jobs N               Number of parallel threads for processing (default: 18)
         --debug                    Enable debug mode with verbose output
+        --use-cache-for-existing-tileset-dir   Cache existing tiles locally
         --skip-download, -s        Skip downloading source files
+        
         --skip-empty-check, -e     Skip empty tiles check
         --skip-enhance             Skip tile enhancement stage
         --skip-clip-by-land        Skip land clipping stage (also skips land data download)
         --skip-coastline-mask      Skip coastline mask stage (also skips coastline data download)
         --skip-process-archives    Skip archive processing stage
+           --skip-extract          Skip extraction (ASC) files stage
+           --skip-convert          Skip convertion to GeoTIFF
+           --skip-reproject        Skip reproject to EPSG:4326
         --skip-postprocessing      Skip postprocessing stage (NoData replacement and compression)
 
     PROCESSING STAGES:
         1. DOWNLOAD SOURCE FILES    [--skip-download]
             - Downloads DEM archives from IGN France
         2. PROCESS ARCHIVES         [--skip-process-archives]
-            - Extracts and converts ASC files to GeoTIFF
-            - Reprojects to EPSG:4326
+            - Extracts ASC files    [--skip-extract]
+            - Converts them to GeoTIFF [--skip-convert]
+            - Reprojects to EPSG:4326  [--skip-reproject]
         3. MERGE TIFF FILES
             - Combines all processed TIFF files into single mosaic
         4. CHECK EMPTY TILES        [--skip-empty-check]
@@ -139,17 +168,28 @@ class FranceDEMProcessor:
                     - Final compression and optimization of tiles
                 
     CONFIGURATION FILES:
+        tiles_ignore_global.csv    List of tiles to skip globally (applied after merging)
         tiles_enhance.csv          List of tiles to enhance (all tiles if file missing)
         tiles_ignore_enhance.csv   List of tiles to skip enhancement
         tiles_clip_by_land.csv     List of tiles to clip by land (all tiles if file missing)
         tiles_ignore_clip_by_land.csv List of tiles to skip land clipping
         tiles_ignore_coastline_mask.csv List of tiles to skip coastline masking
+        
+        To add tiles to list from QGIS open OsmAnd-tools/obf-generation/contours/V4/auxiliary_scripts/grid_polygon_buffered.geojson,
+         select necessary tiles and run from QGIS:
+            from qgis import processing
+            import os
+            processing.run("native:saveselectedfeatures", {'INPUT':'/OsmAnd-tools/obf-generation/contours/V4/auxiliary_scripts/grid_polygon_buffered.geojson','OUTPUT':'/home/xmd5a/tmp/1.csv'})
 
     EXAMPLES:
         python process_france_dem.py --working-dir /data/france_dem --existing-tileset-dir /data/srtm
         python process_france_dem.py --working-dir /data/france_dem --existing-tileset-dir /data/srtm --skip-download --skip-enhance --max-jobs 8
             """
         print(help_text)
+
+    def load_tiles_ignore_global(self):
+        """Load list of tiles to ignore globally from file"""
+        return self._load_tile_list_from_csv(self.tiles_ignore_global_file)
 
     def load_empty_tiles_cache(self):
         """Load empty tiles cache from file"""
@@ -176,6 +216,98 @@ class FranceDEMProcessor:
         except Exception as e:
             print(f"Error loading empty tiles cache: {e}")
             return set()
+
+    def cache_existing_tiles(self, tile_names):
+        """Cache existing tiles in parallel (prefer highres if available)"""
+        if not self.use_cache_for_existing or not self.existing_tileset_dir:
+            return
+
+        print(f"Caching existing tiles to {self.existing_tileset_cache_dir}...")
+
+        def cache_worker(tile_queue):
+            while True:
+                tile_name = tile_queue.get()
+                if tile_name is None:
+                    break
+
+                cached_path = os.path.join(self.existing_tileset_cache_dir, tile_name)
+                if os.path.exists(cached_path):
+                    tile_queue.task_done()
+                    continue
+
+                # Check highres first (if exists)
+                existing_path = None
+                if self.existing_tileset_highres_dir:
+                    highres_path = os.path.join(self.existing_tileset_highres_dir, tile_name)
+                    if os.path.exists(highres_path):
+                        existing_path = highres_path
+                        if self.debug_mode:
+                            print(f"Found highres tile: {tile_name}")
+
+                # Then check lowres if not found
+                if not existing_path and self.existing_tileset_dir:
+                    lowres_path = os.path.join(self.existing_tileset_dir, tile_name)
+                    if os.path.exists(lowres_path):
+                        existing_path = lowres_path
+                        if self.debug_mode:
+                            print(f"Found lowres tile: {tile_name}")
+
+                if existing_path:
+                    try:
+                        shutil.copy2(existing_path, cached_path)
+                        if self.debug_mode:
+                            print(f"Cached: {tile_name}")
+                    except Exception as e:
+                        if self.debug_mode:
+                            print(f"Failed to cache {tile_name}: {e}")
+
+                tile_queue.task_done()
+
+        queue = Queue()
+        threads = []
+
+        for _ in range(min(5, self.max_jobs)):
+            thread = threading.Thread(target=cache_worker, args=(queue,))
+            thread.start()
+            threads.append(thread)
+
+        for tile_name in tile_names:
+            queue.put(tile_name)
+
+        queue.join()
+
+        for _ in range(len(threads)):
+            queue.put(None)
+
+        for thread in threads:
+            thread.join()
+
+        print(f"Caching completed for {len(tile_names)} tiles")
+
+    def find_existing_tile(self, tile_name):
+        """Find existing tile in old datasets (check cache first, prefer highres)"""
+        # Check cache first if enabled
+        if self.use_cache_for_existing and self.existing_tileset_cache_dir:
+            cached_path = os.path.join(self.existing_tileset_cache_dir, tile_name)
+            if os.path.exists(cached_path):
+                if self.debug_mode:
+                    print(f"Using cached tile: {tile_name}")
+                return cached_path
+
+        # If cache not used or file not in cache, check original locations
+        # First check highres
+        if self.existing_tileset_highres_dir:
+            highres_path = os.path.join(self.existing_tileset_highres_dir, tile_name)
+            if os.path.exists(highres_path):
+                return highres_path
+
+        # Then check lowres
+        if self.existing_tileset_dir:
+            lowres_path = os.path.join(self.existing_tileset_dir, tile_name)
+            if os.path.exists(lowres_path):
+                return lowres_path
+
+        return None
 
     def save_empty_tiles_cache(self, empty_tiles):
         """Save empty tiles cache to file"""
@@ -230,22 +362,6 @@ class FranceDEMProcessor:
         except Exception as e:
             print(f"Error getting tile bounds: {e}")
             return 0, 0, 0, 0
-
-    def find_existing_tile(self, tile_name):
-        """Find existing tile in old datasets"""
-        # First check highres
-        if self.existing_tileset_highres_dir:
-            highres_path = os.path.join(self.existing_tileset_highres_dir, tile_name)
-            if os.path.exists(highres_path):
-                return highres_path
-
-        # Then check lowres
-        if self.existing_tileset_dir:
-            lowres_path = os.path.join(self.existing_tileset_dir, tile_name)
-            if os.path.exists(lowres_path):
-                return lowres_path
-
-        return None
 
     def crop_tile_to_boundaries(self, tile_path, tile_name, tile_size=None):
         """Crop tile to 1x1 degree grid according to its name with 1-pixel extension"""
@@ -448,81 +564,110 @@ class FranceDEMProcessor:
                 self.cleanup_temp_files([cropped_existing_tile])
 
     def _check_tile_has_data(self, input_tiff, lon, lat, tile_name):
-        """Simplified check if tile area contains meaningful data using only STATISTICS_MAXIMUM with 1-pixel extension"""
-        # Calculate approximate tile size for extension calculation
-        # Use standard tile sizes: 16384 for highres, 3600 for lowres, or fallback to 2000 for check
+        """Check tile: first quick max via gdalinfo, then morphological area/perimeter ratio"""
+        # Определяем размер тайла для расчёта 1px расширения
         if 'highres' in self.highres_dir and os.path.basename(self.highres_dir) in tile_name:
             tile_size = self.highres_tile_size
         elif 'lowres' in self.lowres_dir and os.path.basename(self.lowres_dir) in tile_name:
             tile_size = self.lowres_tile_size
         else:
-            tile_size = 2000  # Fallback for general check
+            tile_size = 2000
 
-        # Calculate 1-pixel extension in degrees
-        pixel_size_x = 1.0 / tile_size
-        pixel_size_y = 1.0 / tile_size
+        px = 1.0 / tile_size
+        xmin = lon - px
+        xmax = lon + 1 + px
+        ymin = lat - px
+        ymax = lat + 1 + px
 
-        # Extend by 1 pixel on each side
-        extension_x = pixel_size_x
-        extension_y = pixel_size_y
+        temp_check = os.path.join(self.temp_dir, f"check_{tile_name}")
 
-        # Tile area with 1-pixel extension
-        xmin = lon - extension_x
-        xmax = lon + 1 + extension_x
-        ymin = lat - extension_y
-        ymax = lat + 1 + extension_y
 
+            # продолжаем, если статистика не получилась
+
+        # ───────────────────────────────────────────────
+        # 2. Морфологический анализ (если быстрый чек прошёл)
+        # ───────────────────────────────────────────────
         try:
-            # Create temporary file for detailed statistics check
-            temp_check_file = os.path.join(self.temp_dir, f"check_{tile_name}")
+            # Вырезаем кусок в нативном разрешении (nearest neighbor → сохраняем полосы 1px)
+            subprocess.run([
+                'gdalwarp', '-te', str(xmin), str(ymin), str(xmax), str(ymax),
+                '-te_srs', 'EPSG:4326', '-r', 'near',
+                '-ot', 'Int16', '-dstnodata', '-9999', '-overwrite',
+                input_tiff, temp_check
+            ], check=True, capture_output=True)
 
-            # Use larger size for more accurate sampling (with extended bounds)
-            warp_cmd = [
-                'gdalwarp',
-                '-te', str(xmin), str(ymin), str(xmax), str(ymax),
-                '-ts', '2000', '2000',  # Increased size for better sampling
-                '-r', 'cubicspline',
-                '-ot', 'Int16',
-                '-dstnodata', '-9999',
-                '-overwrite',
-                input_tiff, temp_check_file
-            ]
+            # ───────────────────────────────────────────────
+            # 1. Быстрая проверка через статистику (gdalinfo -stats)
+            # ───────────────────────────────────────────────
+            try:
+                stats_result = subprocess.run(
+                    ['gdalinfo', '-stats', temp_check],
+                    capture_output=True, text=True, check=True
+                )
+                max_val = None
+                for line in stats_result.stdout.splitlines():
+                    if 'STATISTICS_MAXIMUM=' in line:
+                        max_val = float(line.split('=')[1].strip())
+                        break
 
-            subprocess.run(warp_cmd, check=True, capture_output=True)
+                if max_val is None or max_val <= 0:
+                    if self.debug_mode:
+                        print(f"Tile {tile_name}: STATISTICS_MAXIMUM={max_val} → EMPTY (quick check)")
+                    return False
 
-            # Get detailed statistics using gdalinfo
-            stats_result = subprocess.run([
-                'gdalinfo', '-stats', temp_check_file
-            ], capture_output=True, text=True, check=True)
+                if self.debug_mode:
+                    print(f"Tile {tile_name}: STATISTICS_MAXIMUM={max_val} → proceeding to morphology")
 
-            # Parse only maximum value
-            max_value = None
-            for line in stats_result.stdout.split('\n'):
-                if 'STATISTICS_MAXIMUM=' in line:
-                    max_value = float(line.split('=')[1])
-                    break
+            except Exception as e:
+                if self.debug_mode:
+                    print(f"Tile {tile_name}: gdalinfo -stats failed → fallback to morphology")
 
-            # Simple validation: tile has data if maximum value is greater than -9998
-            # (allowing for small rounding errors near NoData value)
-            has_data = max_value is not None and max_value > 0
+            import rasterio
+            import numpy as np
 
+            with rasterio.open(temp_check) as src:
+                data = src.read(1)
+                nodata = src.nodata if src.nodata is not None else -9999
+
+                # Маска значимых значений (обычно > -500 или > 0 — под твои данные)
+                mask = (data != nodata) & (data > self.low_threshold)
+                area = float(np.sum(mask))
+
+                if area == 0:
+                    if self.debug_mode:
+                        print(f"Tile {tile_name}: area=0 → EMPTY")
+                    return False
+
+                # Периметр через 4-связность (горизонтальные + вертикальные переходы)
+                dv = np.sum(mask[1:,:] != mask[:-1,:])   # вертикальные границы
+                dh = np.sum(mask[:,1:] != mask[:,:-1])   # горизонтальные границы
+                perim = float(dv + dh)
+
+                if perim == 0:
+                    ratio = 999999.0  # почти квадрат/прямоугольник без дыр
+                else:
+                    ratio = area / perim
+
+                # Пороги (примерные, можно подтюнить):
+                #   ratio ≈ 0.25–0.35  — типичная 1-пиксельная полоса
+                #   ratio > 1.0        — уже достаточно "толстая" область
+                has_data = ratio > 10   # можно сделать 0.9–1.2 в зависимости от желаемой строгости
+
+                if self.debug_mode:
+                    status = "VALID" if has_data else f"EMPTY"
+                    print(f"Tile {tile_name}: area={area:>6.0f}, perim={perim:>5.0f}, "
+                          f"ratio={ratio:>5.2f} → {status}")
+
+                return has_data
+
+        except Exception as e:
             if self.debug_mode:
-                print(f"Tile {tile_name}: STATISTICS_MAXIMUM={max_value} -> {has_data}")
-
-            # Delete temporary check file only in non-debug mode
-            if not self.debug_mode:
-                self.cleanup_temp_files([temp_check_file])
-
-            return has_data
-
-        except subprocess.CalledProcessError as e:
-            # If statistics check fails, consider tile empty
-            if self.debug_mode:
-                print(f"Error checking tile {tile_name}: {e}")
-                print(f"Debug mode: temporary check file preserved: {temp_check_file}")
-            else:
-                self.cleanup_temp_files([temp_check_file])
+                print(f"Tile {tile_name}: morphology check failed → assume NO data")
             return False
+
+        finally:
+            if not self.debug_mode:
+                self.cleanup_temp_files([temp_check])
 
     def precheck_empty_tiles(self, input_tiff, min_lon, max_lon, min_lat, max_lat):
         """Multi-threaded pre-check of empty tiles using cache"""
@@ -535,32 +680,36 @@ class FranceDEMProcessor:
 
         total_tiles = (max_lon - min_lon) * (max_lat - max_lat)
 
-        # Determine tiles to check (excluding already cached empty ones)
+        # Determine tiles to check (excluding already cached empty ones and globally ignored)
         tiles_to_check = []
         for lon in range(min_lon, max_lon):
             for lat in range(min_lat, max_lat):
                 # Convert coordinates to tile name for cache comparison
                 ns = 'N' if lat >= 0 else 'S'
                 ew = 'E' if lon >= 0 else 'W'
-                tile_name = f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}"
+                tile_name_without_ext = f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}"
 
-                if tile_name not in cached_empty_tiles:
+                # Skip globally ignored tiles
+                if tile_name_without_ext in self.tiles_ignore_global:
+                    continue
+
+                if tile_name_without_ext not in cached_empty_tiles:
                     tiles_to_check.append((lon, lat))
                 else:
-                    # Add cached empty tiles to result
-                    empty_tiles.add(tile_name)
+                    # Add cached empty tiles to result (if not ignored)
+                    empty_tiles.add(tile_name_without_ext)
 
         print(f"Performing multi-threaded data presence check in tiles...")
 
         # If all tiles already in cache, return result
         if not tiles_to_check:
-            # Determine valid tiles (all others except empty)
+            # Determine valid tiles (all others except empty and ignored)
             for lon in range(min_lon, max_lon):
                 for lat in range(min_lat, max_lat):
                     ns = 'N' if lat >= 0 else 'S'
                     ew = 'E' if lon >= 0 else 'W'
-                    tile_name = f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}"
-                    if tile_name not in empty_tiles:
+                    tile_name_without_ext = f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}"
+                    if tile_name_without_ext not in self.tiles_ignore_global and tile_name_without_ext not in empty_tiles:
                         valid_tiles.add((lon, lat))
 
             print(f"Pre-check completed (cache used): {len(valid_tiles)} valid, {len(empty_tiles)} empty tiles")
@@ -1216,22 +1365,47 @@ class FranceDEMProcessor:
                 nodata_replaced_path = os.path.join(input_dir, f"{base_name}_nodata_replaced521.tif")
 
             # Replace NoData -9999 with 0 and set new NoData value -9999
-            subprocess.run([
-                'gdalwarp',
-                '-srcnodata', '-9999',
-                '-dstnodata', '0',
-                '-co', 'COMPRESS=LZW',
-                '-co', 'PREDICTOR=2',
-                '-co', 'ZLEVEL=6',
-                input_path, temp_tile
-            ], check=True, capture_output=True)
+            try:
+                result = subprocess.run([
+                    'gdalwarp',
+                    '-srcnodata', '-9999',
+                    '-dstnodata', '0',
+                    '-co', 'COMPRESS=LZW',
+                    '-co', 'PREDICTOR=2',
+                    '-co', 'ZLEVEL=6',
+                    input_path, temp_tile
+                ], check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print(f"  Command: {' '.join(e.cmd)}")
+                if e.stdout:
+                    print(f"  stdout: {e.stdout}")
+                if e.stderr:
+                    print(f"  stderr: {e.stderr}")
+                try:
+                    info_result = subprocess.run(['gdalinfo', input_path], capture_output=True, text=True)
+                    print(f"  Input file info: {info_result.stdout[:500]}...")
+                except:
+                    pass
+                self.cleanup_temp_files([temp_tile])
+                return False
 
             # Set new NoData value to -9999
-            subprocess.run([
-                'gdal_edit.py',
-                '-a_nodata', '-9999',
-                temp_tile
-            ], check=True, capture_output=True)
+            try:
+                subprocess.run([
+                    'gdal_edit.py',
+                    '-a_nodata', '-9999',
+                    temp_tile
+                ], check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error in gdal_edit.py for tile {tile_name}:")
+                print(f"  Command: {' '.join(e.cmd)}")
+                print(f"  Return code: {e.returncode}")
+                if e.stdout:
+                    print(f"  stdout: {e.stdout}")
+                if e.stderr:
+                    print(f"  stderr: {e.stderr}")
+                self.cleanup_temp_files([temp_tile])
+                return False
 
             # In debug mode save intermediate result
             if self.debug_mode:
@@ -1494,6 +1668,17 @@ class FranceDEMProcessor:
         print(f"Found already downloaded archives: {len(archives)}")
         return archives
 
+    def get_existing_tiffs(self):
+        """Check if there are existing TIFF files in processed_source directory"""
+        processed_tiffs = []
+
+        if os.path.exists(self.processed_source_dir):
+            for file in os.listdir(self.processed_source_dir):
+                if file.endswith('.tif'):
+                    processed_tiffs.append(os.path.join(self.processed_source_dir, file))
+
+        return processed_tiffs
+
     def extract_projection(self, archive_name):
         """Extract projection from archive name"""
         match = re.search(r'_ASC_([^_]+)_D', archive_name)
@@ -1530,8 +1715,52 @@ class FranceDEMProcessor:
         output_tiff = os.path.join(self.processed_source_dir, f"{archive_name}.tif")
         return os.path.exists(output_tiff)
 
-    def process_archive(self, archive_path):
-        """Process archive: extract, merge, convert"""
+    def extract_projection_from_tiff(self, tiff_path):
+        """Extract projection from TIFF file using gdalsrsinfo"""
+        try:
+            # Use gdalsrsinfo to get PROJ.4 string
+            result = subprocess.run([
+                'gdalsrsinfo', '-o', 'proj4', tiff_path
+            ], capture_output=True, text=True, check=True)
+
+            proj4 = result.stdout.strip()
+            if proj4 and proj4 != 'LOCAL_CS["Unknown"]':
+                return proj4
+
+            # If PROJ.4 not available, try to get EPSG code
+            result = subprocess.run([
+                'gdalsrsinfo', '-o', 'epsg', tiff_path
+            ], capture_output=True, text=True, check=True)
+
+            epsg = result.stdout.strip()
+            if epsg and epsg.startswith('EPSG:'):
+                return epsg
+
+            # If EPSG not available, try to get WKT and extract AUTHORITY
+            result = subprocess.run([
+                'gdalsrsinfo', '-o', 'wkt', tiff_path
+            ], capture_output=True, text=True, check=True)
+
+            wkt = result.stdout
+            match = re.search(r'AUTHORITY\["([^"]+)","([^"]+)"\]', wkt)
+            if match:
+                authority, code = match.groups()
+                return f"{authority}:{code}"
+
+            # If all else fails, return None
+            return None
+
+        except subprocess.CalledProcessError as e:
+            if self.debug_mode:
+                print(f"Error running gdalsrsinfo on {tiff_path}: {e}")
+        except Exception as e:
+            if self.debug_mode:
+                print(f"Error extracting projection from {tiff_path}: {e}")
+
+        return None
+
+    def process_archive(self, archive_path, skip_extract=False, skip_convert=False, skip_reproject=False):
+        """Process archive: extract, convert, reproject with skip options"""
         archive_basename = os.path.basename(archive_path)
         match = re.match(r'(.*?)\.7z(?:\.(\d{3}))?$', archive_basename)
         if match:
@@ -1539,47 +1768,121 @@ class FranceDEMProcessor:
         else:
             archive_name = os.path.splitext(archive_basename)[0]
 
-        # Skip if already processed
-        if self.is_already_processed(archive_name):
-            return
+        # Final TIFF path
+        output_tiff = os.path.join(self.processed_source_dir, f"{archive_name}.tif")
 
         temp_asc_dir = os.path.join(self.temp_dir, archive_name)
         os.makedirs(temp_asc_dir, exist_ok=True)
 
-        print(f"Extracting: {archive_name}")
-
-        # Extract ASC files
-        if not self.extract_asc_files(archive_path, temp_asc_dir):
-            print(f"Error extracting {archive_name}")
-            return
-
-        # Find ASC files
         asc_files = []
-        for root, dirs, files in os.walk(temp_asc_dir):
-            for file in files:
-                if file.lower().endswith('.asc'):
-                    asc_files.append(os.path.abspath(os.path.join(root, file)))  # Absolute paths
+        tiff_exists = os.path.exists(output_tiff)
 
-        if not asc_files:
-            print(f"No ASC files found in {archive_name}")
-            return
+        # Step 2.1: Extract ASC files (if not skipped and TIFF doesn't exist)
+        if not tiff_exists and not skip_extract:
+            print(f"Extracting: {archive_name}")
+            if not self.extract_asc_files(archive_path, temp_asc_dir):
+                print(f"Error extracting {archive_name}")
+                return
 
-        # Create VRT
-        output_vrt = os.path.join(self.temp_dir, f"{archive_name}.vrt")
-        try:
-            subprocess.run(['gdalbuildvrt', output_vrt] + asc_files, check=True)
-        except subprocess.CalledProcessError:
-            print(f"Error creating VRT for {archive_name}")
-            return
+            # Find ASC files
+            for root, dirs, files in os.walk(temp_asc_dir):
+                for file in files:
+                    if file.lower().endswith('.asc'):
+                        asc_files.append(os.path.abspath(os.path.join(root, file)))
+        elif not tiff_exists:
+            # Use existing extracted files
+            for root, dirs, files in os.walk(temp_asc_dir):
+                for file in files:
+                    if file.lower().endswith('.asc'):
+                        asc_files.append(os.path.abspath(os.path.join(root, file)))
 
-        # Determine projection
-        projection = self.extract_projection(archive_name)
+        # Step 2.2: Convert to GeoTIFF (if not skipped and TIFF doesn't exist)
+        if not tiff_exists and not skip_convert:
+            if not asc_files:
+                print(f"No ASC files found for {archive_name}")
+                return
 
-        # Create TIFF in EPSG:4326
-        output_tiff = os.path.join(self.processed_source_dir, f"{archive_name}.tif")
+            print(f"Converting to GeoTIFF: {archive_name}")
 
-        if projection:
-            # Create TIFF with correct projection and immediately reproject to EPSG:4326
+            # Create VRT
+            output_vrt = os.path.join(self.temp_dir, f"{archive_name}.vrt")
+            try:
+                subprocess.run(['gdalbuildvrt', output_vrt] + asc_files, check=True)
+            except subprocess.CalledProcessError:
+                print(f"Error creating VRT for {archive_name}")
+                return
+
+            # Convert to GeoTIFF (keep original projection)
+            try:
+                subprocess.run([
+                    'gdal_translate',
+                    '-co', 'COMPRESS=LZW',
+                    '-co', 'PREDICTOR=2',
+                    '-co', 'ZLEVEL=9',
+                    '-co', 'BIGTIFF=YES',
+                    '-co', 'NUM_THREADS=2',
+                    '-ot', 'Int16',
+                    '-a_nodata', '-32767',
+                    output_vrt, output_tiff
+                ], check=True, capture_output=True)
+                tiff_exists = True
+            except subprocess.CalledProcessError as e:
+                print(f"Error converting to GeoTIFF for {archive_name}: {e}")
+                return
+            finally:
+                try:
+                    os.remove(output_vrt)
+                except:
+                    pass
+
+        # Step 2.3: Reproject to EPSG:4326 (if not skipped)
+        if not skip_reproject:
+            if not tiff_exists and not os.path.exists(output_tiff):
+                print(f"TIFF not found for {archive_name}, cannot reproject")
+                return
+
+            # Check if already in EPSG:4326
+            current_proj = self.extract_projection_from_tiff(output_tiff)
+
+            # Check various forms of WGS84/EPSG:4326
+            if current_proj and (
+                    current_proj == 'EPSG:4326' or
+                    'EPSG","4326' in current_proj or
+                    'WGS 84' in current_proj or
+                    '+proj=longlat +datum=WGS84' in current_proj or
+                    '+proj=longlat +ellps=WGS84' in current_proj
+            ):
+                if self.debug_mode:
+                    print(f"TIFF already in EPSG:4326 for {archive_name}, skipping reprojection")
+                # Clean up and return
+                if os.path.exists(temp_asc_dir) and not self.debug_mode:
+                    try:
+                        shutil.rmtree(temp_asc_dir)
+                    except:
+                        pass
+                return
+
+            print(f"Reprojecting to EPSG:4326: {archive_name}")
+
+            # Try to get projection from filename first (for IGN data)
+            projection = self.extract_projection(archive_name)
+
+            # If not found in filename, use projection from TIFF
+            if not projection:
+                projection = current_proj
+                if projection:
+                    print(f"Using projection from TIFF: {projection}")
+                else:
+                    print(f"Could not determine projection for {archive_name}, skipping reprojection")
+                    # Clean up and return
+                    if os.path.exists(temp_asc_dir) and not self.debug_mode:
+                        try:
+                            shutil.rmtree(temp_asc_dir)
+                        except:
+                            pass
+                    return
+
+            temp_reprojected = os.path.join(self.temp_dir, f"{archive_name}_reprojected.tif")
             try:
                 subprocess.run([
                     'gdalwarp',
@@ -1596,43 +1899,59 @@ class FranceDEMProcessor:
                     '-ot', 'Int16',
                     '-dstnodata', '-32767',
                     '-r', 'cubicspline',
-                    output_vrt, output_tiff
+                    output_tiff, temp_reprojected
                 ], check=True, capture_output=True)
-            except subprocess.CalledProcessError:
-                print(f"Error reprojecting for {archive_name}")
-        else:
-            # If projection not defined, create TIFF without reprojection
+
+                # Replace original with reprojected
+                os.remove(output_tiff)
+                shutil.move(temp_reprojected, output_tiff)
+                print(f"Successfully reprojected {archive_name} to EPSG:4326")
+
+            except subprocess.CalledProcessError as e:
+                print(f"Error reprojecting for {archive_name}: {e}")
+                if os.path.exists(temp_reprojected):
+                    os.remove(temp_reprojected)
+
+        # Clean up temporary ASC files after all processing
+        if os.path.exists(temp_asc_dir) and not self.debug_mode:
             try:
-                subprocess.run([
-                    'gdal_translate',
-                    '-co', 'COMPRESS=LZW',
-                    '-co', 'PREDICTOR=2',
-                    '-co', 'ZLEVEL=9',
-                    '-co', 'BIGTIFF=YES',
-                    '-co', 'NUM_THREADS=2',
-                    output_vrt, output_tiff
-                ], check=True, capture_output=True)
-            except subprocess.CalledProcessError:
-                print(f"Error converting for {archive_name}")
+                shutil.rmtree(temp_asc_dir)
+            except:
+                pass
 
-        # Clean up temporary files
-        try:
-            os.remove(output_vrt)
-            shutil.rmtree(temp_asc_dir)
-        except:
-            pass
-
-    def process_archive_worker(self, queue):
-        """Worker for processing archives"""
+    def process_archive_worker(self, queue, skip_extract=False, skip_convert=False, skip_reproject=False):
+        """Worker for processing archives with skip options"""
         while True:
             archive_path = queue.get()
             if archive_path is None:
                 break
-            self.process_archive(archive_path)
+            self.process_archive(archive_path, skip_extract, skip_convert, skip_reproject)
             queue.task_done()
 
-    def process_all_archives(self, archive_paths):
-        """Process all archives in parallel"""
+    def process_all_archives(self, archive_paths, skip_extract=False, skip_convert=False, skip_reproject=False):
+        """Process all archives in parallel with skip options"""
+        # If we're skipping extraction and conversion, and there are no archives,
+        # check if we have existing TIFFs to reproject
+        if not archive_paths and skip_extract and skip_convert and not skip_reproject:
+            print("No archives found, checking for existing TIFF files...")
+            existing_tiffs = self.get_existing_tiffs()
+
+            if existing_tiffs:
+                print(f"Found {len(existing_tiffs)} existing TIFF files for reprojection")
+                # Create dummy archive paths from TIFF filenames
+                archive_paths = []
+                for tiff_path in existing_tiffs:
+                    tiff_name = os.path.basename(tiff_path)
+                    archive_name = os.path.splitext(tiff_name)[0]
+                    if archive_name.endswith('_intermediate'):
+                        continue  # Skip intermediate files
+                    # Create a dummy path for processing
+                    dummy_path = os.path.join(self.processed_source_dir, tiff_name)
+                    archive_paths.append(dummy_path)
+            else:
+                print("No existing TIFF files found in processed_source_dir")
+                return
+
         # Group archives by base name
         groups = defaultdict(list)
         for path in archive_paths:
@@ -1641,43 +1960,45 @@ class FranceDEMProcessor:
             if match:
                 base, part = match.groups()
                 groups[base].append((part, path))
+            else:
+                # Handle TIFF files (no archive parts)
+                base = os.path.splitext(basename)[0]
+                groups[base].append((None, path))
 
         main_archives = []
         for base, parts_list in groups.items():
-            if not parts_list[0][0]:  # Single volume
+            if not parts_list[0][0]:  # Single volume or TIFF
                 main_archives.append(parts_list[0][1])
             else:
-                # Sort by part number
                 parts_list.sort(key=lambda x: int(x[0]) if x[0] else 0)
-                # Take first part (001)
                 if parts_list[0][0] == '001':
                     main_archives.append(parts_list[0][1])
                 else:
                     print(f"Missing first part for {base}")
 
-        # In debug mode take only first 5 main archives
         if self.debug_mode:
             main_archives = main_archives[:5]
 
-        print(f"Processing archives ({self.max_jobs} threads, found {len(main_archives)} main archives)...")
+        if not main_archives:
+            print("No files to process")
+            return
+
+        print(f"Processing {len(main_archives)} items with {self.max_jobs} threads...")
 
         queue = Queue()
         threads = []
 
-        # Start workers
         for _ in range(self.max_jobs):
-            thread = threading.Thread(target=self.process_archive_worker, args=(queue,))
+            thread = threading.Thread(target=self.process_archive_worker,
+                                      args=(queue, skip_extract, skip_convert, skip_reproject))
             thread.start()
             threads.append(thread)
 
-        # Add archives to queue
         for archive_path in main_archives:
             queue.put(archive_path)
 
-        # Wait for processing completion
         queue.join()
 
-        # Stop workers
         for _ in range(self.max_jobs):
             queue.put(None)
 
@@ -1739,6 +2060,65 @@ class FranceDEMProcessor:
         except Exception as e:
             print(f"Error processing land polygons: {e}")
             return None
+
+    def preprocess_tiff_nodata(self, tiff_path):
+        """Заменяет значения < -500 на NoData только если минимум < -500"""
+        import rasterio
+        import numpy as np
+
+        try:
+            with rasterio.open(tiff_path) as src:
+                stats_list = src.stats()
+                # Get stats for the first band (index 0)
+                if stats_list and len(stats_list) > 0:
+                    min_val = stats_list[0].min
+                else:
+                    min_val = None
+                nodata = src.nodata if src.nodata is not None else -32767
+
+                if min_val is None or min_val >= self.low_threshold:
+                    # print(f"Skip {os.path.basename(tiff_path)} — min = {min_val}")
+                    return
+
+                print(f"Processing {os.path.basename(tiff_path)}: min={min_val} → replacing < {self.low_threshold} with {nodata}")
+
+                data = src.read(1)
+                profile = src.profile.copy()
+
+                # Замена
+                data = np.where(data < self.low_threshold, nodata, data).astype('int16')
+
+                profile.update(
+                    nodata=nodata,
+                    dtype='int16'
+                )
+
+            # Перезапись файла
+            with rasterio.open(tiff_path, 'w', **profile) as dst:
+                dst.write(data, 1)
+
+            print(f"Done: {os.path.basename(tiff_path)}")
+
+        except Exception as e:
+            print(f"Error in {os.path.basename(tiff_path)}: {e}")
+
+    def preprocess_all_tiffs(self):
+        """Preprocess all TIFF files in processed_source_dir for extra NoData"""
+        tiff_files = []
+        for file in os.listdir(self.processed_source_dir):
+            if file.endswith('.tif') and not file.endswith('_intermediate.tif'):
+                tiff_files.append(os.path.join(self.processed_source_dir, file))
+
+        if not tiff_files:
+            print("No TIFF files found for preprocessing")
+            return
+
+        print(f"Preprocessing {len(tiff_files)} TIFF files for values below {self.low_threshold}...")
+
+        for tiff_path in tiff_files:
+            self.preprocess_tiff_nodata(tiff_path)
+
+        print("Preprocessing completed")
 
     def clip_tile_to_land(self, tile_path, lon, lat):
         """Clip tile to land polygons preserving 1x1 degree size with 1-pixel extension"""
@@ -1958,48 +2338,35 @@ class FranceDEMProcessor:
 
     def merge_all_tiffs(self):
         """Merge all TIFF files into single one"""
-        merged_tiff = os.path.join(self.working_dir, "france_dem_merged.tif")
+        merged_tiff = self.merged_dem_file
 
-        # Skip if file already exists
         if os.path.exists(merged_tiff):
             print(f"Merged file already exists: {merged_tiff}")
             return merged_tiff
 
-        # In debug mode merge only processed files (first 5)
-        if self.debug_mode:
-            tiff_files = []
-            for root, dirs, files in os.walk(self.processed_source_dir):
-                for file in files:
-                    if file.endswith('.tif'):
-                        tiff_files.append(os.path.abspath(os.path.join(root, file)))  # Absolute paths
-
-            # Take only first 5 TIFF files in debug mode
-            if len(tiff_files) > 5:
-                tiff_files = tiff_files[:5]
-                for i, tiff_file in enumerate(tiff_files, 1):
-                    print(f"  {i}. {os.path.basename(tiff_file)}")
-        else:
-            # Normal mode - all files
-            tiff_files = []
-            for root, dirs, files in os.walk(self.processed_source_dir):
-                for file in files:
-                    if file.endswith('.tif'):
-                        tiff_files.append(os.path.abspath(os.path.join(root, file)))  # Absolute paths
+        # Use reprojected TIFFs from processed_source_dir (skip intermediate files)
+        tiff_files = []
+        for root, dirs, files in os.walk(self.processed_source_dir):
+            for file in files:
+                if file.endswith('.tif') and not file.endswith('_intermediate.tif'):
+                    tiff_files.append(os.path.abspath(os.path.join(root, file)))
 
         if not tiff_files:
-            print("No TIFF files found for merging")
+            print("No reprojected TIFF files found for merging")
             return None
 
-        print(f"Merging {len(tiff_files)} TIFF files...")
+        if self.debug_mode and len(tiff_files) > 5:
+            tiff_files = tiff_files[:5]
+            for i, tiff_file in enumerate(tiff_files, 1):
+                print(f"  {i}. {os.path.basename(tiff_file)}")
 
-        # Create VRT from all TIFF files
+        print(f"Merging {len(tiff_files)} reprojected TIFF files...")
+
         merged_vrt = os.path.join(self.working_dir, "merged_dem.vrt")
 
         try:
-            # Create VRT with absolute paths
             subprocess.run(['gdalbuildvrt', merged_vrt] + tiff_files, check=True)
 
-            # Convert VRT to TIFF (without replacing negative values)
             subprocess.run([
                 'gdal_translate',
                 '-co', 'COMPRESS=LZW',
@@ -2017,13 +2384,10 @@ class FranceDEMProcessor:
             ], check=True, capture_output=True)
 
             print(f"Merged file created: {merged_tiff}")
-
-            # Delete temporary VRT
             os.remove(merged_vrt)
-
             return merged_tiff
 
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             print(f"Error merging TIFF files: {e}")
             try:
                 if os.path.exists(merged_vrt):
@@ -2031,57 +2395,91 @@ class FranceDEMProcessor:
             except:
                 pass
             return None
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
 
-    def run(self, skip_download=False, skip_empty_check=False, skip_enhance=False, skip_clip_by_land=False,
-            skip_coastline_mask=False, skip_process_archives=False, skip_postprocessing=False):
-        """Main method"""
+    def run(self, skip_download=False, skip_empty_check=False, skip_enhance=False,
+            skip_clip_by_land=False, skip_coastline_mask=False,
+            skip_process_archives=False, skip_extract=False, skip_convert=False, skip_reproject=False,
+            skip_postprocessing=False, skip_highres=False):
+        """Main method with separated archive processing stages"""
         try:
-            # Load tile enhancement list...
-            print("Loading tile enhancement list...")
-            self.tiles_to_enhance = self.load_tiles_to_enhance()
-            if self.tiles_to_enhance is None:
-                print("Tile enhancement list not found - will enhance ALL tiles")
-            elif self.tiles_to_enhance:
-                print(f"Will enhance {len(self.tiles_to_enhance)} tiles")
-            else:
-                print("Tile enhancement list empty - enhancement skipped")
+            if os.path.exists(self.temp_dir):
+                print(f"Cleaning temporary directory: {self.temp_dir}")
+                try:
+                    shutil.rmtree(self.temp_dir)
+                except Exception as e:
+                    print(f"Warning: Could not fully clean temp_dir: {e}")
+            os.makedirs(self.temp_dir, exist_ok=True)
 
-            # Load tile enhancement ignore list...
-            print("Loading tile enhancement ignore list...")
-            self.tiles_ignore_enhance = self.load_tiles_ignore_enhance()
-            if self.tiles_ignore_enhance:
-                print(f"Will ignore enhancement for {len(self.tiles_ignore_enhance)} tiles")
-            else:
-                print("Tile enhancement ignore list empty - enhancement will be applied to all tiles")
+            # Recreate coastline temp dir
+            if os.path.exists(self.coastline_temp_dir):
+                try:
+                    shutil.rmtree(self.coastline_temp_dir)
+                except:
+                    pass
+            os.makedirs(self.coastline_temp_dir, exist_ok=True)
 
-            # Load tile land clipping list...
-            print("Loading tile land clipping list...")
-            self.tiles_to_clip_by_land = self.load_tiles_to_clip_by_land()
-            if self.tiles_to_clip_by_land is None:
-                print("Tile land clipping list not found - will clip by land ALL tiles")
-            elif self.tiles_to_clip_by_land:
-                print(f"Will clip by land {len(self.tiles_to_clip_by_land)} tiles")
+            # Load lists only if needed
+            if not skip_enhance:
+                print("Loading tile enhancement list...")
+                self.tiles_to_enhance = self.load_tiles_to_enhance()
+                if self.tiles_to_enhance is None:
+                    print("Tile enhancement list not found - will enhance ALL tiles")
+                elif self.tiles_to_enhance:
+                    print(f"Will enhance {len(self.tiles_to_enhance)} tiles")
+                else:
+                    print("Tile enhancement list empty - enhancement skipped")
             else:
-                print("Tile land clipping list empty - land clipping skipped")
+                print("Skipping enhancement (--skip-enhance)")
 
-            # Load tile coastline mask ignore list...
-            self.tiles_ignore_coastline_mask = self.load_tiles_ignore_coastline_mask()
-            if self.tiles_ignore_coastline_mask:
-                print(f"Will ignore coastline mask for {len(self.tiles_ignore_coastline_mask)} tiles")
+            if not skip_enhance:
+                print("Loading tile enhancement ignore list...")
+                self.tiles_ignore_enhance = self.load_tiles_ignore_enhance()
+                if self.tiles_ignore_enhance:
+                    print(f"Will ignore enhancement for {len(self.tiles_ignore_enhance)} tiles")
+                else:
+                    print("Tile enhancement ignore list empty - enhancement will be applied to all tiles")
             else:
-                print("Tile coastline mask ignore list empty - mask will be applied to all tiles")
+                # Still need empty sets for checks
+                self.tiles_ignore_enhance = set()
 
-            # Load tile land clipping ignore list...
-            self.tiles_ignore_clip_by_land = self.load_tiles_ignore_clip_by_land()
-            if self.tiles_ignore_clip_by_land:
-                print(f"Will ignore land clipping for {len(self.tiles_ignore_clip_by_land)} tiles")
+            if not skip_clip_by_land:
+                print("Loading tile land clipping list...")
+                self.tiles_to_clip_by_land = self.load_tiles_to_clip_by_land()
+                if self.tiles_to_clip_by_land is None:
+                    print("Tile land clipping list not found - will clip by land ALL tiles")
+                elif self.tiles_to_clip_by_land:
+                    print(f"Will clip by land {len(self.tiles_to_clip_by_land)} tiles")
+                else:
+                    print("Tile land clipping list empty - land clipping skipped")
             else:
-                print("Tile land clipping ignore list empty - clipping will be applied to all tiles")
+                print("Skipping land clipping (--skip-clip-by-land)")
 
-            # Load land polygons once at the beginning (unless skipped)
+            if not skip_coastline_mask:
+                self.tiles_ignore_coastline_mask = self.load_tiles_ignore_coastline_mask()
+                if self.tiles_ignore_coastline_mask:
+                    print(f"Will ignore coastline mask for {len(self.tiles_ignore_coastline_mask)} tiles")
+                else:
+                    print("Tile coastline mask ignore list empty - mask will be applied to all tiles")
+            else:
+                self.tiles_ignore_coastline_mask = set()
+                print("Skipping coastline mask (--skip-coastline-mask)")
+
+            if not skip_clip_by_land:
+                self.tiles_ignore_clip_by_land = self.load_tiles_ignore_clip_by_land()
+                if self.tiles_ignore_clip_by_land:
+                    print(f"Will ignore land clipping for {len(self.tiles_ignore_clip_by_land)} tiles")
+                else:
+                    print("Tile land clipping ignore list empty - clipping will be applied to all tiles")
+            else:
+                self.tiles_ignore_clip_by_land = set()
+
+            print("Loading global ignore tiles list...")
+            self.tiles_ignore_global = self.load_tiles_ignore_global()
+            if self.tiles_ignore_global:
+                print(f"Will ignore {len(self.tiles_ignore_global)} tiles globally")
+            else:
+                print("Global ignore list empty or not found - no tiles ignored globally")
+
             if not skip_clip_by_land:
                 print("Loading land polygons...")
                 self.land_polygons_path = self.download_land_polygons()
@@ -2092,7 +2490,6 @@ class FranceDEMProcessor:
             else:
                 print("Skipping land polygons download (--skip-clip-by-land)")
 
-            # Load coastline (unless skipped)
             if not skip_coastline_mask:
                 print("Loading coastline...")
                 coastline_result = self.download_coastline()
@@ -2105,7 +2502,6 @@ class FranceDEMProcessor:
             else:
                 print("Skipping coastline download (--skip-coastline-mask)")
 
-            # Rest of the code without changes...
             if skip_download:
                 print("Skipping file download, using already downloaded...")
                 archive_paths = self.get_existing_archives()
@@ -2116,15 +2512,49 @@ class FranceDEMProcessor:
                     return
                 archive_paths = self.download_files_parallel(links)
 
-            if not archive_paths:
-                print("No archives to process")
-                return
-
-            # Archive processing (unless skipped)
+            # Archive processing with separated stages
             if not skip_process_archives:
-                self.process_all_archives(archive_paths)
+                # Stage 2.1: Extract ASC files
+                if not skip_extract:
+                    print("\n=== Stage 2.1: Extracting ASC files ===")
+                    if archive_paths:
+                        self.process_all_archives(archive_paths, skip_extract=False, skip_convert=True,
+                                                  skip_reproject=True)
+                    else:
+                        print("No archives to extract")
+                else:
+                    print("Skipping extraction (--skip-extract)")
+
+                # Stage 2.2: Convert to GeoTIFF
+                if not skip_convert:
+                    print("=== Stage 2.2: Converting ASC to GeoTIFF ===")
+                    if archive_paths:
+                        self.process_all_archives(archive_paths, skip_extract=True, skip_convert=False,
+                                                  skip_reproject=True)
+                    else:
+                        print("No archives to convert")
+                else:
+                    print("Skipping conversion (--skip-convert)")
+
+                # Stage 2.3: Reproject to EPSG:4326
+                if not skip_reproject:
+                    print("=== Stage 2.3: Reprojecting to EPSG:4326 ===")
+                    print(f"Reprojected TIFFs will be saved to: {self.processed_source_dir}")
+
+                    # Always try to reproject, even if no archives (use existing TIFFs)
+                    self.process_all_archives(archive_paths if archive_paths else [],
+                                              skip_extract=True, skip_convert=True, skip_reproject=False)
+                else:
+                    print("Skipping reprojection (--skip-reproject)")
             else:
-                print("Skipping archive processing (--skip-process-archives)")
+                print("Skipping all archive processing (--skip-process-archives)")
+
+            # Preprocess TIFFs for extra NoData before merging
+            if not os.path.exists(self.merged_dem_file):
+                print("Preprocessing TIFFs for extra nodata...")
+                self.preprocess_all_tiffs()
+            else:
+                print(f"Merged DEM file already exists: {self.merged_dem_file}, skipping preprocessing")
 
             # TIFF file merging...
             merged_tiff = self.merge_all_tiffs()
@@ -2132,6 +2562,10 @@ class FranceDEMProcessor:
             # Tile creation...
             if merged_tiff and os.path.exists(merged_tiff):
                 min_lon, max_lon, min_lat, max_lat = self.get_tile_bounds(merged_tiff)
+
+                if min_lon == max_lon or min_lat == max_lat:
+                    print("Failed to determine tile bounds")
+                    return
 
                 if skip_empty_check:
                     print("Skipping empty tiles check...")
@@ -2145,13 +2579,25 @@ class FranceDEMProcessor:
                     valid_tiles, empty_tiles = self.precheck_empty_tiles(merged_tiff, min_lon, max_lon, min_lat,
                                                                          max_lat)
 
+                if self.use_cache_for_existing and valid_tiles:
+                    tile_names = []
+                    for lon, lat in valid_tiles:
+                        ns = 'N' if lat >= 0 else 'S'
+                        ew = 'E' if lon >= 0 else 'W'
+                        tile_names.append(f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}.tif")
+                    self.cache_existing_tiles(tile_names)
+
                 # High resolution tiles
-                print(
-                    f"Processing highres tiles ({self.highres_tile_size}x{self.highres_tile_size}) in {self.highres_dir}...")
-                self.process_all_tiles(merged_tiff, self.highres_dir, tile_size=self.highres_tile_size,
-                                       process_type="highres", prechecked_tiles=(valid_tiles, empty_tiles),
-                                       skip_enhance=skip_enhance, skip_clip_by_land=skip_clip_by_land,
-                                       skip_coastline_mask=skip_coastline_mask, skip_postprocessing=skip_postprocessing)
+                if not skip_highres:
+                    print(
+                        f"Processing highres tiles ({self.highres_tile_size}x{self.highres_tile_size}) in {self.highres_dir}...")
+                    self.process_all_tiles(merged_tiff, self.highres_dir, tile_size=self.highres_tile_size,
+                                           process_type="highres", prechecked_tiles=(valid_tiles, empty_tiles),
+                                           skip_enhance=skip_enhance, skip_clip_by_land=skip_clip_by_land,
+                                           skip_coastline_mask=skip_coastline_mask,
+                                           skip_postprocessing=skip_postprocessing)
+                else:
+                    print("Skipping high resolution tiles processing (--skip-highres)")
 
                 # Low resolution tiles
                 print(
@@ -2178,15 +2624,20 @@ def main():
     # Optional parameters
     parser.add_argument('--max-jobs', type=int, default=None, help='Number of parallel threads (default: 8)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--use-cache-for-existing-tileset-dir', action='store_true', help='Cache existing tiles locally')
 
     # Skip parameters
     parser.add_argument('--skip-download', '-s', action='store_true', help='Skip downloading source files')
-    parser.add_argument('--skip-process-archives', action='store_true', help='Skip archive processing stage')
+    parser.add_argument('--skip-process-archives', action='store_true', help='Skip all archive processing stages')
+    parser.add_argument('--skip-extract', action='store_true', help='Skip extraction of ASC files (use existing)')
+    parser.add_argument('--skip-convert', action='store_true', help='Skip conversion to GeoTIFF (use existing extracted TIFFs)')
+    parser.add_argument('--skip-reproject', action='store_true', help='Skip reprojection to EPSG:4326 (use existing converted TIFFs)')
     parser.add_argument('--skip-empty-check', '-e', action='store_true', help='Skip empty tiles check')
     parser.add_argument('--skip-enhance', action='store_true', help='Skip tile enhancement stage')
     parser.add_argument('--skip-coastline-mask', action='store_true', help='Skip coastline mask stage')
     parser.add_argument('--skip-clip-by-land', action='store_true', help='Skip land clipping stage')
     parser.add_argument('--skip-postprocessing', action='store_true', help='Skip postprocessing stage')
+    parser.add_argument('--skip-highres', action='store_true', help='Skip high resolution tiles processing completely')
 
     # Help
     parser.add_argument('--help', '-h', action='store_true', help='Show this help message')
@@ -2210,7 +2661,8 @@ def main():
         debug_mode=args.debug,
         working_dir=args.working_dir,
         existing_tileset_dir=args.existing_tileset_dir,
-        max_jobs=args.max_jobs
+        max_jobs=args.max_jobs,
+        use_cache_for_existing=args.use_cache_for_existing_tileset_dir
     )
 
     # Run processing
@@ -2221,7 +2673,11 @@ def main():
         skip_clip_by_land=args.skip_clip_by_land,
         skip_coastline_mask=args.skip_coastline_mask,
         skip_process_archives=args.skip_process_archives,
-        skip_postprocessing=args.skip_postprocessing
+        skip_extract=args.skip_extract,
+        skip_convert=args.skip_convert,
+        skip_reproject=args.skip_reproject,
+        skip_postprocessing=args.skip_postprocessing,
+        skip_highres=args.skip_highres  # Добавить эту строку
     )
 
 if __name__ == "__main__":

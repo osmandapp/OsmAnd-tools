@@ -158,6 +158,7 @@ public class WebGpxParser {
         public String iconName;
         public String backgroundType;
         public Boolean pinned;
+        public Boolean hidden;
         public final List<Wpt> points = new ArrayList<>();
         public GpxUtilities.PointsGroup ext;
 
@@ -171,6 +172,7 @@ public class WebGpxParser {
                     name = group.getName();
                 }
                 pinned = group.getPinned();
+                hidden = group.getHidden();
                 if (group.getIconName() != null) {
                     iconName = group.getIconName();
                     group.setIconName(null);
@@ -273,7 +275,7 @@ public class WebGpxParser {
     
             if (!Double.isNaN(point.getSpeed())) {
                 speed = point.getSpeed();
-                point.setSpeed(Double.NaN);
+                point.setSpeed(Float.NaN);
             }
             
             Iterator<Map.Entry<String, String>> it = point.getExtensionsToWrite().entrySet().iterator();
@@ -595,6 +597,7 @@ public class WebGpxParser {
                     group.setColor(parsedColor);
                 }
                 group.setPinned(dataGroup.pinned);
+                group.setHidden(Boolean.TRUE.equals(dataGroup.hidden));
                 res.put(key, group);
             }
             gpxFile.setPointsGroups(res);
@@ -721,14 +724,14 @@ public class WebGpxParser {
                 filePoint = new WptPt();
             }
             if (filePoint.getHdop() == -1) {
-                filePoint.setHdop(Double.NaN);
+                filePoint.setHdop(Float.NaN);
             }
             if (filePoint.getHeading() == 0) {
                 filePoint.setHeading(Float.NaN);
             }
             filePoint.setLat(point.lat);
             filePoint.setLon(point.lng);
-            filePoint.setSpeed(point.speed);
+            filePoint.setSpeed((float) point.speed);
             filePoint.setEle((!isNanEle && point.ele != NAN_MARKER) ? point.ele : Double.NaN);
 
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {

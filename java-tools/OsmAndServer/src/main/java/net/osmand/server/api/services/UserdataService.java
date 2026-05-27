@@ -71,7 +71,7 @@ import net.osmand.util.Algorithms;
 @Service
 public class UserdataService {
 
-    @Autowired
+	@Autowired
     protected UserSubscriptionService userSubService;
 
     @Autowired
@@ -146,7 +146,7 @@ public class UserdataService {
 
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
-    private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 1 * MB;
+    private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
@@ -208,7 +208,9 @@ public class UserdataService {
 						String.format("Free account can upload files with types: %s. This file type is %s!", ArrayUtils.toString(FREE_TYPES) , type));
 			}
 			if (fileSize > MAXIMUM_FREE_ACCOUNT_FILE_SIZE) {
-                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("File size exceeded, %d > %d!", fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
+		                String.format("Free account file size exceeded, %d MB > %d MB!",
+				                fileSize / MB, MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
             }
 		}
 
@@ -323,7 +325,7 @@ public class UserdataService {
         return res;
     }
 
-    public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
+	public ServerCommonFile checkThatObfFileisOnServer(String name, String type) throws IOException {
         boolean checkExistingServerMap = type.equalsIgnoreCase("file") && (
                 name.endsWith(".obf") || name.endsWith(".sqlitedb") || name.endsWith(".tif"));
         if (checkExistingServerMap) {
@@ -393,6 +395,18 @@ public class UserdataService {
 
 	private boolean isKmlKmzFileByName(String originalFilename) {
 		return originalFilename.toLowerCase().endsWith(".kml") || originalFilename.toLowerCase().endsWith(".kmz");
+	}
+
+	@Transactional
+	public ResponseEntity<String> updateGpxInfoFile(MultipartFile file, String name,
+	                                                CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                Long updatetime) throws IOException {
+		InternalZipFile zipfile = InternalZipFile.buildFromMultipartFile(file);
+		ResponseEntity<String> res = uploadFile(zipfile, dev, name, FILE_TYPE_GPX, System.currentTimeMillis());
+		if (updatetime != null) {
+			deleteFileVersion(updatetime, dev.userid, name, FILE_TYPE_GPX, null);
+		}
+		return res;
 	}
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,

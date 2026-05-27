@@ -17,6 +17,7 @@ class RandomRouteEntry {
 	LatLon start;
 	LatLon finish;
 	List<LatLon> via = new ArrayList<>(); // inter points
+	List<Long> avoidRoads = new ArrayList<>(); // setImpassableRoads
 
 	String profile = "car";
 	List<String> params = new ArrayList<>();
@@ -63,10 +64,14 @@ class RandomRouteEntry {
 		);
 
 		String hasVia = !via.isEmpty() ? "&via=" : "";
+		String hasAvoid = !avoidRoads.isEmpty() ? "&avoid=" : "";
 
 		List<String> viaList = new ArrayList<>();
 		via.forEach(ll -> viaList.add(String.format("%f,%f", ll.getLatitude(), ll.getLongitude())));
 		String VIA = String.join(";", viaList);
+		List<String> avoidList = new ArrayList<>();
+		avoidRoads.forEach(roadId -> avoidList.add(String.valueOf(roadId)));
+		String AVOID = String.join(",", avoidList);
 
 		// convert type->params to make navigation href
 		List<String> typeParams = new ArrayList<>(params);
@@ -94,8 +99,8 @@ class RandomRouteEntry {
 				(domain.contains("localhost") ? "http://" : "https://") + domain);
 
 		return String.format(
-				"%s/map/navigate/?start=%s&finish=%s%s%s&profile=%s%s%s#%s",
-				protoDomain, START, FINISH, hasVia, VIA, PROFILE, hasParams, PARAMS, GO
+				"%s/map/navigate/?start=%s&finish=%s%s%s%s%s&profile=%s%s%s#%s",
+				protoDomain, START, FINISH, hasVia, VIA, hasAvoid, AVOID, PROFILE, hasParams, PARAMS, GO
 		);
 	}
 }

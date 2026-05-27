@@ -449,6 +449,8 @@ public class IndexUploader {
 			skip = true;
 		} else if (fileName.contains(".depth") != this.depthProcess) {
 			skip = true;
+		} else if (fileName.startsWith(".")) {
+			skip = true; // do not interfere with rsync
 		}
 		if (skip) {
 			log.info("Skip file: " + f.getName());

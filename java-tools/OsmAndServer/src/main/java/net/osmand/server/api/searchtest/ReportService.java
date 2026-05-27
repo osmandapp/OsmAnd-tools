@@ -3,6 +3,7 @@ package net.osmand.server.api.searchtest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletOutputStream;
+import net.osmand.binary.BinaryMapIndexReaderStats;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
@@ -31,18 +32,24 @@ public interface ReportService {
 			long duration) {
 	}
 
+	private static String jsonExtractSafe(String path) {
+		return "CASE WHEN json_valid(row) THEN json_extract(row, '" + path + "') END";
+	}
+
 	record RunStatus(
 			SearchTestRunRepository.Run.Status status,
 			long total,
 			long processed,
 			long failed,
 			long duration,
-			long searchDuration,
 			int threadsCount,
 			long found,
 			long partial,
 			long totalBytes,
 			long totalTime,
+			long[] statsCounts,
+			Map<String, long[]> mainStats,
+			Map<String, long[]> subStats,
 			Map<String, Number> distanceHistogram,
 			TestCaseStatus generatedChart) {
 	}
@@ -52,7 +59,7 @@ public interface ReportService {
 	String GEN_SQL = """
 			WITH gen AS (
 				SELECT DENSE_RANK() OVER (ORDER BY ds_result_id) AS ds_id, ROW_NUMBER() OVER (PARTITION BY ds_result_id ORDER BY id) AS tc_id,
-					id, gen_count, lat || ', ' || lon as lat_lon, query, row AS in_row, 
+					id, gen_count, lat || ', ' || lon as lat_lon, query, row AS in_row,
 					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) AS obj_id, error
 				FROM gen_result AS g WHERE case_id = ? ORDER BY g.id
 			)""";
@@ -62,15 +69,15 @@ public interface ReportService {
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
-			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type, 
-			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance, 
+			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
+			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_distance,
 			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
-			 UNION SELECT 'Generated' AS "group", CASE 
-			    WHEN error IS NOT NULL THEN 'Error' 
+			 UNION SELECT 'Generated' AS "group", CASE
+			    WHEN error IS NOT NULL THEN 'Error'
 			    WHEN gen_count <= 0 THEN 'Filtered'
-				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type, 
-			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id, 
+				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
+			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
@@ -153,7 +160,7 @@ public interface ReportService {
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {
-						if (exclude.contains(fn))
+						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats"))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
 						if (outProps.contains(fn)) {
@@ -214,23 +221,34 @@ public interface ReportService {
 		}
 	}
 
-	default Optional<RunStatus> getRunStatus(Long runId) {
-		String sql = """
-				SELECT run.status, run.threads_count, COALESCE(finish - start, sum(duration)) AS time_duration,
-				    count(*) AS total,
-				    count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed,
-				    count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed,
-				    sum(duration) AS search_duration,
-				    count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count,
-					count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(json_extract(row, '$.actual_place'), ''), 1, INSTR(json_extract(row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5')) as partial_count,
-					sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes,
-					sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time
-				FROM
-				    run_result, run 
-				WHERE run.id = run_id AND run_id = ?
-				""";
+	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
+		String runResultActualPlaceSql = jsonExtractSafe("$.actual_place");
+		String prefixSQL =
+				"SELECT run.status, run.threads_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
+						" count(*) AS total," +
+						" count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed," +
+						" count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed," +
+						" count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count," +
+						" count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(" + runResultActualPlaceSql + ", ''), 1, INSTR(" + runResultActualPlaceSql + ", ' -') - 1) IN ('2','3','4','5')) as partial_count," +
+						" sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes," +
+						" sum(stat_time) FILTER (WHERE stat_time IS NOT NULL) AS total_time";
+
+		StringBuilder sql = new StringBuilder(prefixSQL);
+		if (isFull) {
+			sql.append(", sum(COALESCE(").append(jsonExtractSafe("$.stat_results")).append(", 0)) AS stat_results,");
+			sql.append("sum(COALESCE(").append(jsonExtractSafe("$.stat_amenity_count")).append(", 0)) AS stat_amenity_count, ");
+			sql.append("sum(COALESCE(").append(jsonExtractSafe("$.stat_address_count")).append(", 0)) AS stat_address_count");
+			for (BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName api : BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName.values()) {
+				String aliasSuffix = api.name().toLowerCase(java.util.Locale.US);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("$.stat_time_" + api.name())).append(", 0)) AS time_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("$.stat_bytes_" + api.name())).append(", 0)) AS bytes_").append(aliasSuffix);
+				sql.append(", sum(COALESCE(").append(jsonExtractSafe("$.stat_calls_" + api.name())).append(", 0)) AS calls_").append(aliasSuffix);
+			}
+		}
+		sql.append(" FROM run_result, run WHERE run.id = run_id AND run_id = ?");
+
 		try {
-			Map<String, Object> result = getJdbcTemplate().queryForMap(sql, runId);
+			Map<String, Object> result = getJdbcTemplate().queryForMap(sql.toString(), runId);
 			String status = (String) result.get("status");
 			if (status == null)
 				status = TestCase.Status.NEW.name();
@@ -244,8 +262,6 @@ public interface ReportService {
 			number = ((Number) result.get("failed"));
 			long failed = number == null ? 0 : number.longValue();
 
-			number = ((Number) result.get("search_duration"));
-			long searchDuration = number == null ? 0 : number.longValue();
 			number = ((Number) result.get("time_duration"));
 			long timeDuration = number == null ? 0 : number.longValue();
 			number = ((Number) result.get("threads_count"));
@@ -263,8 +279,87 @@ public interface ReportService {
 			number = ((Number) result.get("total_time"));
 			long totalTime = number == null ? 0 : number.longValue();
 
+			final long[] totalStats;
+			Map<String, long[]> mainStats = new HashMap<>();
+			Map<String, long[]> subStats = new LinkedHashMap<>();
+			if (isFull) {
+				number = ((Number) result.get("stat_results"));
+				long count1 = number == null ? 0 : number.longValue();
+				number = ((Number) result.get("stat_amenity_count"));
+				long count2 = number == null ? 0 : number.longValue();
+				number = ((Number) result.get("stat_address_count"));
+				long count3 = number == null ? 0 : number.longValue();
+				totalStats = new long[] { count1, count2, count3 };
+
+				for (BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName api : BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName.values()) {
+					String aliasSuffix = api.name().toLowerCase(java.util.Locale.US);
+					Number time = (Number) result.get("time_" + aliasSuffix);
+					Number bytes = (Number) result.get("bytes_" + aliasSuffix);
+					Number calls = (Number) result.get("calls_" + aliasSuffix);
+					mainStats.put(api.name(), new long[] {
+							time == null ? 0 : time.longValue(),
+							bytes == null ? 0 : bytes.longValue(),
+							calls == null ? 0 : calls.longValue()
+					});
+				}
+
+				String subStatsSql = """
+                    SELECT json_extract(ss.value, '$.api') api, json_extract(ss.value, '$.subApi') sub_api, json_extract(ss.value, '$.mapName') map_name,
+                    SUM(json_extract(ss.value, '$.time')) AS time,
+                    SUM(json_extract(ss.value, '$.count')) AS count,
+                    SUM(json_extract(ss.value, '$.bytes')) AS bytes,
+                    SUM(json_extract(ss.value, '$.calls')) AS calls,
+                    SUM(json_extract(ss.value, '$.blocksLoaded')) AS blocks_loaded,
+                    SUM(json_extract(ss.value, '$.objectsLoaded')) AS objects_loaded,
+                    SUM(json_extract(ss.value, '$.matchedObjects')) AS matched_objects,
+                    SUM(json_extract(ss.value, '$.maxObjectsPerBlock')) AS max_objects_per_block,
+                    SUM(json_extract(ss.value, '$.payloadBytesParsed')) AS payload_bytes_parsed,
+                    SUM(json_extract(ss.value, '$.decodeTime')) AS decode_time,
+                    SUM(json_extract(ss.value, '$.matcherTime')) AS matcher_time
+                    FROM run_result, json_each(CASE WHEN json_valid(row) THEN row END, '$.sub_stats') ss, run
+                    WHERE run.id = run_id AND run_id = ?
+                    GROUP BY json_extract(ss.value, '$.api'), json_extract(ss.value, '$.subApi'), json_extract(ss.value, '$.mapName')
+                    ORDER BY SUM(json_extract(ss.value, '$.time')) DESC""";
+				List<Map<String, Object>> subStatsRows = getJdbcTemplate().queryForList(subStatsSql, runId);
+				for (Map<String, Object> row : subStatsRows) {
+					String api = row.get("api") == null ? "" : row.get("api").toString();
+					String subApi = row.get("sub_api") == null ? "" : row.get("sub_api").toString();
+					String mapName = row.get("map_name") == null ? "" : row.get("map_name").toString();
+					if (api.isEmpty() || subApi.isEmpty() || mapName.isEmpty()) {
+						continue;
+					}
+					Number ssTime = (Number) row.get("time");
+					Number ssCount = (Number) row.get("count");
+					Number ssBytes = (Number) row.get("bytes");
+					Number ssCalls = (Number) row.get("calls");
+					Number ssBlocksLoaded = (Number) row.get("blocks_loaded");
+					Number ssObjectsLoaded = (Number) row.get("objects_loaded");
+					Number ssMatchedObjects = (Number) row.get("matched_objects");
+					Number ssMaxObjectsPerBlock = (Number) row.get("max_objects_per_block");
+					Number ssPayloadBytesParsed = (Number) row.get("payload_bytes_parsed");
+					Number ssDecodeTimeNs = (Number) row.get("decode_time");
+					Number ssMatcherTimeNs = (Number) row.get("matcher_time");
+					subStats.put(api + '|' + subApi + '|' + mapName, new long[] {
+							ssTime == null ? 0 : ssTime.longValue(),
+							ssCount == null ? 0 : ssCount.longValue(),
+							ssBytes == null ? 0 : ssBytes.longValue(),
+							ssCalls == null ? 0 : ssCalls.longValue(),
+							0,
+							ssBlocksLoaded == null ? 0 : ssBlocksLoaded.longValue(),
+							ssObjectsLoaded == null ? 0 : ssObjectsLoaded.longValue(),
+							ssMatchedObjects == null ? 0 : ssMatchedObjects.longValue(),
+							ssMaxObjectsPerBlock == null ? 0 : ssMaxObjectsPerBlock.longValue(),
+							0,
+							ssPayloadBytesParsed == null ? 0 : ssPayloadBytesParsed.longValue(),
+							ssDecodeTimeNs == null ? 0 : ssDecodeTimeNs.longValue(),
+							ssMatcherTimeNs == null ? 0 : ssMatcherTimeNs.longValue()
+					});
+				}
+			} else {
+				totalStats = null;
+			}
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					timeDuration, searchDuration, threadsCount, found, partial, totalBytes, totalTime, null, null);
+					timeDuration, threadsCount, found, partial, totalBytes, totalTime, totalStats, mainStats, subStats, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -280,7 +375,7 @@ public interface ReportService {
 
 		final RunStatus status;
 		if (runId != null) {
-			Optional<RunStatus> opt = getRunStatus(runId);
+			Optional<RunStatus> opt = getRunStatus(runId, true);
 			if (opt.isEmpty())
 				return Optional.empty();
 			status = opt.get();
@@ -304,10 +399,12 @@ public interface ReportService {
 		if (status == null) {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
-					caseStatus.failed(), caseStatus.duration(), caseStatus.duration(), 0, 0, 0, 0, 0, distanceHistogram, caseStatus);
+					caseStatus.failed(), caseStatus.duration(), 0, 0, 0,
+					0, 0, null, null, null,  distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.searchDuration, status.threadsCount, status.found(), status.partial(), status.totalBytes, status.totalTime, distanceHistogram, optCase.get());
+					status.duration(), status.threadsCount, status.found(), status.partial(),
+					status.totalBytes, status.totalTime, status.statsCounts, status.mainStats, status.subStats, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
 	}
@@ -432,65 +529,65 @@ public interface ReportService {
 					String statColCount = excelCol(c + 2);
 					// Row offset within this block
 					int rowOffset = 1;
-					for (int g = 0; g < groups.length; g++) {
-						// r1: groups[0] vs groups[g]
-						int r1Idx = rowOffset;
-						Row r1 = statSheet.getRow(r1Idx);
-						if (r1 == null) r1 = statSheet.createRow(r1Idx);
-						cell = r1.createCell(c);
-						cell.setCellValue(groups[0]);
-						cell = r1.createCell(c + 1);
-						cell.setCellValue(groups[g]);
-						cell = r1.createCell(c + 2);
-						cell.setCellFormula(String.format(
-								"COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
-								compColI, statColLeft, r1Idx, compColJ, statColRight));
-						Cell r1pct = r1.createCell(c + 3);
-						int sumIdx = rowOffset + 3;
-						r1pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r1Idx + 1, sumIdx + 1));
-						r1pct.setCellStyle(percentStyle);
+                    for (String group : groups) {
+                        // r1: groups[0] vs groups[g]
+                        int r1Idx = rowOffset;
+                        Row r1 = statSheet.getRow(r1Idx);
+                        if (r1 == null) r1 = statSheet.createRow(r1Idx);
+                        cell = r1.createCell(c);
+                        cell.setCellValue(groups[0]);
+                        cell = r1.createCell(c + 1);
+                        cell.setCellValue(group);
+                        cell = r1.createCell(c + 2);
+                        cell.setCellFormula(String.format(
+                                "COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
+                                compColI, statColLeft, r1Idx, compColJ, statColRight));
+                        Cell r1pct = r1.createCell(c + 3);
+                        int sumIdx = rowOffset + 3;
+                        r1pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r1Idx + 1, sumIdx + 1));
+                        r1pct.setCellStyle(percentStyle);
 
-						// r2: groups[1] vs groups[g]
-						int r2Idx = rowOffset + 1;
-						Row r2 = statSheet.getRow(r2Idx);
-						if (r2 == null) r2 = statSheet.createRow(r2Idx);
-						cell = r2.createCell(c);
-						cell.setCellValue(groups[1]);
-						cell = r2.createCell(c + 1);
-						cell.setCellValue(groups[g]);
-						cell = r2.createCell(c + 2);
-						cell.setCellFormula(String.format(
-								"COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
-								compColI, statColLeft, r2Idx, compColJ, statColRight));
-						Cell r2pct = r2.createCell(c + 3);
-						r2pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r2Idx + 1, sumIdx + 1));
-						r2pct.setCellStyle(percentStyle);
+                        // r2: groups[1] vs groups[g]
+                        int r2Idx = rowOffset + 1;
+                        Row r2 = statSheet.getRow(r2Idx);
+                        if (r2 == null) r2 = statSheet.createRow(r2Idx);
+                        cell = r2.createCell(c);
+                        cell.setCellValue(groups[1]);
+                        cell = r2.createCell(c + 1);
+                        cell.setCellValue(group);
+                        cell = r2.createCell(c + 2);
+                        cell.setCellFormula(String.format(
+                                "COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
+                                compColI, statColLeft, r2Idx, compColJ, statColRight));
+                        Cell r2pct = r2.createCell(c + 3);
+                        r2pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r2Idx + 1, sumIdx + 1));
+                        r2pct.setCellStyle(percentStyle);
 
-						// r3: groups[2] vs groups[g]
-						int r3Idx = rowOffset + 2;
-						Row r3 = statSheet.getRow(r3Idx);
-						if (r3 == null) r3 = statSheet.createRow(r3Idx);
-						cell = r3.createCell(c);
-						cell.setCellValue(groups[2]);
-						cell = r3.createCell(c + 1);
-						cell.setCellValue(groups[g]);
-						cell = r3.createCell(c + 2);
-						cell.setCellFormula(String.format(
-								"COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
-								compColI, statColLeft, r3Idx, compColJ, statColRight));
-						Cell r3pct = r3.createCell(c + 3);
-						r3pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r3Idx + 1, sumIdx + 1));
-						r3pct.setCellStyle(percentStyle);
+                        // r3: groups[2] vs groups[g]
+                        int r3Idx = rowOffset + 2;
+                        Row r3 = statSheet.getRow(r3Idx);
+                        if (r3 == null) r3 = statSheet.createRow(r3Idx);
+                        cell = r3.createCell(c);
+                        cell.setCellValue(groups[2]);
+                        cell = r3.createCell(c + 1);
+                        cell.setCellValue(group);
+                        cell = r3.createCell(c + 2);
+                        cell.setCellFormula(String.format(
+                                "COUNTIFS(Comparison!%1$s:%1$s,%2$s%3$d,Comparison!%4$s:%4$s,%5$s%3$d)",
+                                compColI, statColLeft, r3Idx, compColJ, statColRight));
+                        Cell r3pct = r3.createCell(c + 3);
+                        r3pct.setCellFormula(String.format("%1$s%2$d/%1$s%3$d", statColCount, r3Idx + 1, sumIdx + 1));
+                        r3pct.setCellStyle(percentStyle);
 
-						// r4: Sum row
-						Row r4 = statSheet.getRow(sumIdx);
-						if (r4 == null) r4 = statSheet.createRow(sumIdx);
-						cell = r4.createCell(c + 2);
-						cell.setCellFormula(String.format("SUM(%1$s%2$d:%1$s%3$d)", statColCount, r1Idx + 1, r3Idx + 1));
-						cell.setCellStyle(header);
+                        // r4: Sum row
+                        Row r4 = statSheet.getRow(sumIdx);
+                        if (r4 == null) r4 = statSheet.createRow(sumIdx);
+                        cell = r4.createCell(c + 2);
+                        cell.setCellFormula(String.format("SUM(%1$s%2$d:%1$s%3$d)", statColCount, r1Idx + 1, r3Idx + 1));
+                        cell.setCellStyle(header);
 
-						rowOffset += 4;
-					}
+                        rowOffset += 4;
+                    }
 
 					// Autosize all 4 columns for this block
 					for (int cc = c; cc < c + 4; cc++) {

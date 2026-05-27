@@ -36,14 +36,15 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 	
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 
+	boolean existsByUseridAndNameAndType(int userid, String name, String type);
+
 	Iterable<UserFile> findAllByUserid(int userid);
 
     @Query("SELECT uf FROM UserFile uf "
 			+ "WHERE uf.userid = :userid AND uf.name LIKE :folderName% AND uf.type = :type AND (uf.name, uf.updatetime) IN "
 			+ "(SELECT uft.name, MAX(uft.updatetime) FROM UserFile uft WHERE uft.userid = :userid GROUP BY uft.name)")
 	List<UserFile> findLatestFilesByFolderName(@Param("userid") int userid, @Param("folderName") String folderName, @Param("type") String type);
-	
-	
+
 //	@Modifying
 //	@Query("update UserFile uf set uf.details = ?1 where uf.id = ?2")
 //	@Transactional

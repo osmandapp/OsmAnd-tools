@@ -11,6 +11,9 @@ threads_number_0=1 # >100M
 # threads_number_2=30 # 13M-20M  Max RAM per process without simplifying: ~10 Gb
 # threads_number_3=30 # <14M  Max RAM per process without simplifying: ~5 Gb
 
+reprocess=false
+tile_range=""
+
 export QT_LOGGING_RULES="qt5ct.debug=false"
 export QT_QPA_PLATFORM=offscreen
 export TILES_PREFIX=${TILES_PREFIX:-""}
@@ -20,7 +23,7 @@ translation_script=contours.py
 neighbors_dir=""
 
 function usage {
-        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number] -n [neighbors-dir]}"
+        echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number] -n [neighbors-dir] -r -R [range]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
 	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
 	echo "-p: split lines by lenth"
@@ -29,25 +32,23 @@ function usage {
 	echo "-f: make contours in feet"
 	echo "-c: path to cutline in shp format"
 	echo "-n: path to directory with neighbor tiles (default: same as input directory)"
+	echo "-r: delete existing contour files if they exist before processing (instead of skipping)"
+	echo "-R [range]: limit processing to specified tile range"
+	echo "   Formats: N30-56E003-025 (same hemisphere)"
+	echo "            N40-41W108-E001 (different hemispheres)"
+	echo "            N10-S05W005-E010 (crossing equator and Greenwich)"
 }
 
 date
-while getopts ":i:o:m:spdt:fc:n:" opt; do
+while getopts ":i:o:m:spdt:fc:n:rR:" opt; do
   case $opt in
-    i) indir="$OPTARG"
-    ;;
-    o) outdir="$OPTARG"
-    ;;
-    m) TMP_DIR="$OPTARG"
-    ;;
-    s) smooth=true
-    ;;
-    p) split_lines=true
-    ;;
-    f) make_feet=true
-    ;;
-    d) simplify=true
-    ;;
+    i) indir="$OPTARG" ;;
+    o) outdir="$OPTARG" ;;
+    m) TMP_DIR="$OPTARG" ;;
+    s) smooth=true ;;
+    p) split_lines=true ;;
+    f) make_feet=true ;;
+    d) simplify=true ;;
     t) 
        threads_number_0="$OPTARG"
        threads_number_1="$OPTARG"
@@ -55,13 +56,11 @@ while getopts ":i:o:m:spdt:fc:n:" opt; do
        threads_number_3="$OPTARG"
        threads_number_is_set=true
     ;;
-    c) path_to_cutline="$OPTARG"
-    ;;
-    n) neighbors_dir="$OPTARG"  # Добавлено
-    ;;
-    \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2
-	usage
-    ;;
+    c) path_to_cutline="$OPTARG" ;;
+    n) neighbors_dir="$OPTARG" ;;
+    r) reprocess=true ;;
+    R) tile_range="$OPTARG" ;;
+    \?) echo -e "\033[91mInvalid option -$OPTARG\033[0m" >&2; usage; exit 1 ;;
   esac
 done
 
@@ -89,6 +88,84 @@ fi
 if [[ $smooth != "true" ]]; then
 	smooth=false
 fi
+
+# Parse tile range with support for different prefixes
+if [[ -n $tile_range ]]; then
+	if [[ $tile_range =~ ^([NS])([0-9]+)-([NS])([0-9]+)([EW])([0-9]+)-([EW])([0-9]+)$ ]]; then
+		range_lat_prefix_start="${BASH_REMATCH[1]}"
+		range_lat_start="${BASH_REMATCH[2]}"
+		range_lat_prefix_end="${BASH_REMATCH[3]}"
+		range_lat_end="${BASH_REMATCH[4]}"
+		range_lon_prefix_start="${BASH_REMATCH[5]}"
+		range_lon_start="${BASH_REMATCH[6]}"
+		range_lon_prefix_end="${BASH_REMATCH[7]}"
+		range_lon_end="${BASH_REMATCH[8]}"
+		
+	elif [[ $tile_range =~ ^([NS])([0-9]+)-([0-9]+)([EW])([0-9]+)-([0-9]+)$ ]]; then
+		range_lat_prefix_start="${BASH_REMATCH[1]}"
+		range_lat_start="${BASH_REMATCH[2]}"
+		range_lat_end="${BASH_REMATCH[3]}"
+		range_lat_prefix_end="$range_lat_prefix_start"
+		range_lon_prefix_start="${BASH_REMATCH[4]}"
+		range_lon_start="${BASH_REMATCH[5]}"
+		range_lon_end="${BASH_REMATCH[6]}"
+		range_lon_prefix_end="$range_lon_prefix_start"
+	else
+		echo -e "\033[91mInvalid tile range format: $tile_range\033[0m" >&2
+		echo "Expected formats:"
+		echo "  - Same hemisphere: N30-56E003-025"
+		echo "  - Different hemispheres: N40-41W108-E001 or N10-S05W005-E010"
+		usage
+		exit 1
+	fi
+	
+	range_lat_start_clean=$(echo "$range_lat_start" | sed 's/^0*//')
+	range_lat_end_clean=$(echo "$range_lat_end" | sed 's/^0*//')
+	range_lon_start_clean=$(echo "$range_lon_start" | sed 's/^0*//')
+	range_lon_end_clean=$(echo "$range_lon_end" | sed 's/^0*//')
+	
+	[[ -z "$range_lat_start_clean" ]] && range_lat_start_clean=0
+	[[ -z "$range_lat_end_clean" ]] && range_lat_end_clean=0
+	[[ -z "$range_lon_start_clean" ]] && range_lon_start_clean=0
+	[[ -z "$range_lon_end_clean" ]] && range_lon_end_clean=0
+	
+	range_lat_start_num=$((10#$range_lat_start_clean))
+	range_lat_end_num=$((10#$range_lat_end_clean))
+	range_lon_start_num=$((10#$range_lon_start_clean))
+	range_lon_end_num=$((10#$range_lon_end_clean))
+	
+	if [[ "$range_lat_prefix_start" == "S" ]]; then
+		range_lat_start_num=$((-$range_lat_start_num))
+	fi
+	if [[ "$range_lat_prefix_end" == "S" ]]; then
+		range_lat_end_num=$((-$range_lat_end_num))
+	fi
+	if [[ "$range_lon_prefix_start" == "W" ]]; then
+		range_lon_start_num=$((-$range_lon_start_num))
+	fi
+	if [[ "$range_lon_prefix_end" == "W" ]]; then
+		range_lon_end_num=$((-$range_lon_end_num))
+	fi
+	
+	if [[ $range_lat_start_num -lt $range_lat_end_num ]]; then
+		range_lat_min=$range_lat_start_num
+		range_lat_max=$range_lat_end_num
+	else
+		range_lat_min=$range_lat_end_num
+		range_lat_max=$range_lat_start_num
+	fi
+	
+	if [[ $range_lon_start_num -lt $range_lon_end_num ]]; then
+		range_lon_min=$range_lon_start_num
+		range_lon_max=$range_lon_end_num
+	else
+		range_lon_min=$range_lon_end_num
+		range_lon_max=$range_lon_start_num
+	fi
+	
+	echo "Range: lat ${range_lat_min}..${range_lat_max}, lon ${range_lon_min}..${range_lon_max}"
+fi
+
 if [[ -z $indir ]] ; then
 	echo "input dir is not defined"
 	usage
@@ -125,6 +202,12 @@ echo -e "\e[104msplit_lines: $split_lines\e[49m"
 echo -e "\e[104mmake_feet: $make_feet\e[49m"
 echo -e "\e[104misolines_step: $isolines_step\e[49m"
 echo -e "\e[104mpath_to_cutline: $path_to_cutline\e[49m"
+echo -e "\e[104mreprocess (force): $reprocess\e[49m"
+if [[ -n $tile_range ]]; then
+	echo -e "\e[104mtile range: $tile_range\e[49m"
+else
+	echo -e "\e[104mtile range: not set (all tiles)\e[49m"
+fi
 if [[ $threads_number_is_set ]]; then
 	echo -e "\e[104mthreads number: $threads_number_1\e[49m"
 fi
@@ -133,23 +216,52 @@ working_dir=$(pwd)
 cd $outdir
 rm -f $outdir/*.osm
 
-export outdir
-export TMP_DIR
-export working_dir
-export smooth
-export simplify
-export split_lines
-export make_feet
-export isolines_step
-export translation_script
-export path_to_cutline
-export neighbors_dir
+export outdir TMP_DIR working_dir smooth simplify split_lines make_feet \
+       isolines_step translation_script path_to_cutline neighbors_dir reprocess tile_range
+if [[ -n "${range_lat_min:-}" ]]; then
+	export range_lat_min range_lat_max range_lon_min range_lon_max
+fi
+
+PROCESSED_COUNT_FILE="${TMP_DIR}/processed_tiles_count"
+echo 0 > "$PROCESSED_COUNT_FILE"
 
 process_tiff ()
 {
 	. $working_dir/no_smoothing.ini
 	filenamefull=$(basename $1)
 	filename=${filenamefull%%.*}
+
+	# ==================== RANGE FILTER ====================
+	if [[ -n "${range_lat_min:-}" ]]; then
+		if [[ $filename =~ ^([NS])([0-9]+)([EW])([0-9]+)$ ]]; then
+			tile_lat_prefix="${BASH_REMATCH[1]}"
+			tile_lat_num=$((10#${BASH_REMATCH[2]}))
+			tile_lon_prefix="${BASH_REMATCH[3]}"
+			tile_lon_num=$((10#${BASH_REMATCH[4]}))
+			
+			if [[ "$tile_lat_prefix" == "S" ]]; then
+				tile_lat=$((-$tile_lat_num))
+			else
+				tile_lat=$tile_lat_num
+			fi
+			
+			if [[ "$tile_lon_prefix" == "W" ]]; then
+				tile_lon=$((-$tile_lon_num))
+			else
+				tile_lon=$tile_lon_num
+			fi
+			
+			if (( tile_lat < range_lat_min )) || (( tile_lat > range_lat_max )) || \
+			   (( tile_lon < range_lon_min )) || (( tile_lon > range_lon_max )); then
+				return 0
+			fi
+		else
+			echo "Skipping $filename (does not match expected tile name format)"
+			return 0
+		fi
+	fi
+	# =====================================================
+
 	indir=${1%/*}
 	highres_dir=${indir%/*}/$(basename $indir)_highres
 	filepath=$1
@@ -162,10 +274,20 @@ process_tiff ()
 		echo Using $filepath
 	fi
 	no_smooth=false
-	if [ ! -f $outdir/$filename.osm.bz2 ]; then
+
+	# ==================== REPROCESS LOGIC ====================
+	if [ -f $outdir/$filename.osm.bz2 ] && [ "$reprocess" != "true" ]; then
+		echo "Skipping "$1 "(already processed)"
+	else
+		if [ -f $outdir/$filename.osm.bz2 ]; then
+			echo "Removing existing contour file before reprocessing: $outdir/$filename.osm.bz2"
+			rm -f "$outdir/$filename.osm.bz2" "$outdir/$filename.osm" 2>/dev/null || true
+		fi
 		echo "----------------------------------------------"
 		echo "Processing "$filename
 		echo "----------------------------------------------"
+	# =====================================================
+
 		size_str=$(gdalinfo $filepath | grep "Size is" | sed 's/Size is //g')
 		width=$(echo $size_str | sed 's/,.*//')
 		height=$(echo $size_str | sed 's/.*,//')
@@ -435,7 +557,6 @@ process_tiff ()
 
         echo "Cropping by cutline …"
         time python3 $working_dir/run_alg.py -alg "native:clip" -param1 INPUT -value1 ${TMP_DIR}/$filename.shp -param2 OVERLAY -value2 $path_to_cutline -param3 OUTPUT -value3 ${TMP_DIR}/${filename}_cut.shp
-#             time ogr2ogr ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp -clipsrc $path_to_cutline
         if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
         if [ -f ${TMP_DIR}/${filename}_cut.shp ]; then
             mv ${TMP_DIR}/${filename}_cut.shp ${TMP_DIR}/$filename.shp
@@ -456,16 +577,28 @@ process_tiff ()
 		lbzip2 -f $outdir/$filename.osm
 		if [ $? -ne 0 ]; then echo $(date)' Error compressing OSM file' & exit 6;fi
 		if [ -f ${TMP_DIR}/$filename.shp ]; then rm ${TMP_DIR}/$filename.shp ${TMP_DIR}/$filename.dbf ${TMP_DIR}/$filename.prj ${TMP_DIR}/$filename.shx; fi
-	else echo "Skipping "$1 "(already processed)"
+		
+		current_count=$(cat "$PROCESSED_COUNT_FILE" 2>/dev/null || echo 0)
+		echo $((current_count + 1)) > "$PROCESSED_COUNT_FILE"
 	fi
 }
 export -f process_tiff
+export PROCESSED_COUNT_FILE
+
 find "$indir" -maxdepth 1 -type f -name "$TILES_PREFIX*.tif" | sort -R | parallel -P $threads_number_0 process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +100M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_0 --no-notice time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +19M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_1 --no-notice time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size +13M -size -20M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_2 --no-notice time process_tiff '{}'
-# find "$indir" -maxdepth 1 -type f -name "*.tif" -size -14M | sort -R | parallel $NON_INTERACTIVE_OPTIONS -P $threads_number_3 --no-notice time process_tiff '{}'
+
+if [ -f "$PROCESSED_COUNT_FILE" ]; then
+	processed_tiles_count=$(cat "$PROCESSED_COUNT_FILE")
+	rm -f "$PROCESSED_COUNT_FILE"
+else
+	processed_tiles_count=0
+fi
+
 rm -rf $outdir/processing || true
 rm -rf $outdir/symbology-style.db || true
 rm -rf $XDG_RUNTIME_DIR || true
+
 echo "Success $(date)"
+echo "----------------------------------------------"
+echo -e "\e[104mProcessed tiles count: $processed_tiles_count\e[49m"
+echo "----------------------------------------------"

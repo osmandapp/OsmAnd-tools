@@ -81,10 +81,9 @@ public class WeatherPrepareRasterSqliteRegions {
 				prefix = args[i].substring("--prefix=".length());
 			}
 		}
-		OsmandRegions or = new OsmandRegions();
-		BinaryMapIndexReader fl = or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries(false);
-		MapIndex mapIndex = fl.getMapIndexes().get(0);
+		MapIndex mapIndex = or.getReader().getMapIndexes().get(0);
 		int boundaryTag = mapIndex.getRule("osmand_region", "boundary");
 		int cnt = 1, proc = 1;
 		Set<String> failedCountries = new HashSet<String>();

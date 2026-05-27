@@ -1295,8 +1295,7 @@ public class WikiDatabasePreparation {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = dialect.getDatabaseConnection(wikiDB.getAbsolutePath(), log);
 		
-		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile();
+		OsmandRegions regions = new OsmandRegions(null);
 		regions.cacheAllCountries();
 		PreparedStatement wikiRegionPrep = conn
 				.prepareStatement("INSERT OR IGNORE INTO wiki_region(id, regionName) VALUES(?, ? )");
@@ -1487,8 +1486,7 @@ public class WikiDatabasePreparation {
 				new File(wikidataFile));
 		InputStream streamFile = progress.openFileInputStream();
 		InputSource is = getInputSource(streamFile);
-		OsmandRegions regions = new OsmandRegions();
-		regions.prepareFile();
+		OsmandRegions regions = new OsmandRegions(null);
 		regions.cacheAllCountries();
 		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions,
 				lastProcessedId);

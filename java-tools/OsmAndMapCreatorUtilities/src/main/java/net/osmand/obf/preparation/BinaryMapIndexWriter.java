@@ -105,6 +105,8 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.sf.junidecode.Junidecode;
 
+import static net.osmand.util.SearchAlgorithms.*;
+
 public class BinaryMapIndexWriter {
 
 	private RandomAccessFile raf;
@@ -991,14 +993,13 @@ public class BinaryMapIndexWriter {
 		log.info("ADDRESS INDEX SIZE : " + len);
 	}
 
-
-	public void writeAddressNameIndex(Map<String, List<MapObject>> namesIndex) throws IOException {
+	public void writeAddressNameIndex(Map<String, IndexAddressCreator.MapObjectIndex> namesIndex) throws IOException {
 		checkPeekState(ADDRESS_INDEX_INIT);
 		codedOutStream.writeTag(OsmAndAddressIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
 
 		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
-		for (Entry<String, List<MapObject>> entry : namesIndex.entrySet()) {
+		for (Entry<String, IndexAddressCreator.MapObjectIndex> entry : namesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
 
 			codedOutStream.writeTag(OsmAndAddressNameIndexData.ATOM_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
@@ -1008,8 +1009,18 @@ public class BinaryMapIndexWriter {
 				ref.writeReference(raf, getFilePointer());
 			}
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
-			// collapse same name ?
-			for (MapObject o : entry.getValue()) {
+			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
+			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
+			SuffixDictionary<MapObject> suffixDictionary = nameIndexBuildSuffixDictionary(entry.getKey(), objects,
+					indexEntry::getTokens);
+			if (suffixDictionary.dictionaryEntries.isEmpty()) {
+				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+			} else {
+				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+				}
+			}
+			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				// this is optional
 //				atom.setName(o.getName());
@@ -1037,6 +1048,12 @@ public class BinaryMapIndexWriter {
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
+				}
+				int[] bitsetWords = suffixDictionary.bitsets.get(o);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						atom.addSuffixesBitset(bitsetWord);
+					}
 				}
 				builder.addAtom(atom.build());
 			}
@@ -1733,7 +1750,6 @@ public class BinaryMapIndexWriter {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
 		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
@@ -1744,31 +1760,54 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
+			SuffixDictionary<PoiTileBox> suffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes,
+					box -> box.tokens);
+			if (suffixDictionary.dictionaryEntries.isEmpty()) {
+				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+			} else {
+				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
+					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+				}
+			}
 			for (PoiTileBox box : tileBoxes) {
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
+				int[] bitsetWords = suffixDictionary.bitsets.get(box);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						bs.addSuffixesBitset(bitsetWord);
+					}
+				}
 				bs.setShiftTo(0);
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-
-			codedOutStream.writeMessageNoTag(msg);
-			long endPointer = getFilePointer();
-
-			// first message
-			int accumulateSize = 4;
-			for (int i = tileBoxes.size() - 1; i >= 0; i--) {
+			byte[] msgBytes = msg.toByteArray();
+			codedOutStream.writeUInt32NoTag(msgBytes.length);
+			codedOutStream.flush();
+			long messageBodyStart = getFilePointer();
+			codedOutStream.writeRawBytes(msgBytes);
+			long currentOffsetInBody = 0;
+			for (String encodedSuffix : msg.getSuffixesDictionaryList()) {
+				currentOffsetInBody += CodedOutputStream.computeStringSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
+			}
+			for (int i = 0; i < tileBoxes.size(); i++) {
 				PoiTileBox box = tileBoxes.get(i);
 				if (!fpToWriteSeeks.containsKey(box)) {
 					fpToWriteSeeks.put(box, new ArrayList<BinaryFileReference>());
 				}
-				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(endPointer - accumulateSize, startPoiIndex));
-				accumulateSize += CodedOutputStream.computeMessageSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
-						msg.getAtoms(i));
-
+				OsmAndPoiNameIndexDataAtom atom = msg.getAtoms(i);
+				int atomSerializedSize = atom.getSerializedSize();
+				int atomFieldHeaderSize = CodedOutputStream.computeTagSize(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER)
+						+ CodedOutputStream.computeRawVarint32Size(atomSerializedSize);
+				long shiftPointer = messageBodyStart + currentOffsetInBody + atomFieldHeaderSize + atomSerializedSize - Integer.BYTES;
+				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(shiftPointer, startPoiIndex));
+				currentOffsetInBody += CodedOutputStream.computeMessageSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
 			}
 		}
 
@@ -1781,19 +1820,20 @@ public class BinaryMapIndexWriter {
 	private Map<String, BinaryFileReference> writeIndexedTable(int tag, Collection<String> indexedTable) throws IOException {
 		codedOutStream.writeTag(tag, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
 		preserveInt32Size();
-		Map<String, BinaryFileReference> res = new LinkedHashMap<String, BinaryFileReference>();
-		long init = getFilePointer();
-		for (String e : indexedTable) {
-			codedOutStream.writeString(OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER, e);
-			codedOutStream.writeTag(OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-			BinaryFileReference ref = BinaryFileReference.createShiftReference(getFilePointer(), init);
-			codedOutStream.writeFixed32NoTag(0);
-			res.put(e, ref);
+
+		IndexedStringTableNode root = new IndexedStringTableNode(this);
+		for (String key : indexedTable) {
+			if (key == null) {
+				continue;
+			}
+			root.addKey(key, 0);
 		}
+
+		Map<String, BinaryFileReference> res = new LinkedHashMap<>();
+		root.writeNode("", res, getFilePointer());
 		writeInt32Size();
 		return res;
 	}
-
 
 	public void writePoiDataAtom(long id, int x24shift, int y24shift,
 								 String type, String subtype, Map<PoiAdditionalType, String> additionalNames,

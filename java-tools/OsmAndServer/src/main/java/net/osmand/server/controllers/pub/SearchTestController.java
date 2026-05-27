@@ -3,7 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
-import net.osmand.server.api.searchtest.DataService;
+import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchService;
@@ -38,6 +38,8 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
 
+	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
+
 	@Autowired
 	private SearchTestRepositoryConfiguration dbCfg;
 	@Autowired
@@ -48,6 +50,11 @@ public class SearchTestController {
 		return "admin/search-test";
 	}
 
+	@GetMapping("/tag_values_classification")
+	public String tagValuesClassification(Model model) {
+		return "admin/tag_values_classification";
+	}
+	
 	@GetMapping(value = "/initialized", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Boolean> isInitialized() {
@@ -77,7 +84,7 @@ public class SearchTestController {
 	@GetMapping(value = "/runs/{runId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<RunStatus> getRunStatus(@PathVariable Long runId) {
-		return testSearchService.getRunStatus(runId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+		return testSearchService.getRunStatus(runId, false).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@GetMapping(value = "/cases/{caseId}/status", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -110,11 +117,15 @@ public class SearchTestController {
 	/**
 	 * The call create Run entity and do other heavy work asynchronously.
 	 */
-	@PostMapping(value = "/cases/{caseId:\\d+}/run", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/cases/{caseId:\\d+}/run", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public CompletableFuture<ResponseEntity<Run>> runTestCase(@PathVariable Long caseId,
-															  @RequestBody RunParam payload) {
-		return testSearchService.runTestCase(caseId, payload).thenApply(ResponseEntity::ok);
+															  @RequestBody RunTestCaseRequest request) {
+		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
+		SearchService.SearchOption options = request == null || request.options == null
+				? new SearchService.SearchOption(false, null, null, false,(net.osmand.search.core.ObjectType[]) null)
+				: request.options;
+		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}
 
 	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -208,14 +219,14 @@ public class SearchTestController {
 
 	@PutMapping(value = "/domains/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<SearchTestDatasetRepository.Domain> updateDomain(@PathVariable("id") Long id,
-																	 @RequestBody Map<String, String> updates) {
+	public ResponseEntity<SearchTestDatasetRepository.Domain> updateDomain(@PathVariable Long id,
+                                                                           @RequestBody Map<String, String> updates) {
 		return ResponseEntity.ok(testSearchService.updateDomain(id, updates));
 	}
 
 	@DeleteMapping(value = "/domains/{id}")
 	@ResponseBody
-	public ResponseEntity<Void> deleteDomain(@PathVariable("id") Long id) {
+	public ResponseEntity<Void> deleteDomain(@PathVariable Long id) {
 		boolean deleted = testSearchService.deleteDomain(id);
 		return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
 	}
@@ -355,31 +366,36 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
-	@GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/sections", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<DataService.ResultsWithStats> getResults(
+	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestParam String obf,
+	                                                        @RequestParam(required = false) String fieldPath) {
+		return ResponseEntity.ok(testSearchService.getSectionSizes(obf, fieldPath));
+	}
+
+	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
-			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestParam(required = false) Boolean unlimited) throws IOException {
+			@RequestBody SearchService.SearchOption options) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
 		}
-		return ResponseEntity.ok(testSearchService.getResults(
-				new SearchService.SearchContext(lat, lon, query, lang, false, radius, null, null),
-				new SearchService.SearchOption(unlimited == null || unlimited, null)));
+
+        SearchService.SearchContext ctx = new SearchService.SearchContext(lat, lon, query, lang, false, null, null);
+		return ResponseEntity.ok(testSearchService.getResults(ctx, options));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
 	@ResponseBody
 	public void downloadUnitTest(
 			@RequestParam String query,
-			@RequestParam(required = false) Double radius,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestBody(required = false) DataService.UnitTestPayload unitTest,
+			@RequestBody(required = false) OBFService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
@@ -387,8 +403,35 @@ public class SearchTestController {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
-				new SearchService.SearchContext(lat, lon, query, null, false, radius, null, null),
+				new SearchService.SearchContext(lat, lon, query, null, false, null, null),
 				response.getOutputStream());
 	}
 
+	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestParam String obf,
+															  @RequestParam(required = false) String prefix,
+															  @RequestParam(defaultValue = "0") int pageToShow,
+															  @RequestParam(defaultValue = "100") int pageSizeLimit,
+															  @RequestParam(required = false) String sortBy,
+															  @RequestParam(required = false) String sortOrder) {
+		return ResponseEntity.ok(testSearchService.getIndex(obf, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+	}
+
+	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam String obf,
+																 @RequestParam(required = false) String lang,
+																 @RequestParam(required = false) String regExp,
+																 @RequestParam(defaultValue = "0") int pageToShow,
+																 @RequestParam(defaultValue = "100") int pageSizeLimit,
+																 @RequestParam(required = false) String sortBy,
+																 @RequestParam(required = false) String sortOrder,
+																 @RequestParam(defaultValue = "true") boolean isFiltered,
+																 @RequestParam(defaultValue = "false") boolean invalidOnly,
+																 @RequestParam(required = false) String objectType,
+																 @RequestBody OBFService.IndexToken token) {
+		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+		return ResponseEntity.ok(objects);
+	}
 }

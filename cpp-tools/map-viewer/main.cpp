@@ -1258,12 +1258,6 @@ void keyboardHandler(unsigned char key, int x, int y)
         else
             while (!renderer->suspendSymbolsUpdate());
         return;
-    case ']':
-        if (renderer->isGpuWorkerPaused())
-            while (!renderer->resumeGpuWorker());
-        else
-            while (!renderer->suspendGpuWorker());
-        return;
     case '\\':
     {
         auto settings = renderer->getDebugSettings();
@@ -1724,11 +1718,6 @@ void displayHandler()
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols suspended ([)  : %1").arg(renderer->isSymbolsUpdateSuspended())));
-        verifyOpenGL();
-
-        glRasterPos2f(8, t - 16 * (++line));
-        glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("GPU worker paused (])  : %1").arg(renderer->isGpuWorkerPaused())));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));

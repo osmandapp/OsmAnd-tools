@@ -47,8 +47,7 @@ public class GenerateRegionTags {
 
 			File inputFile = new File(args[0]);
 			File targetFile = new File(args[1]);
-			OsmandRegions or = new OsmandRegions();
-			or.prepareFile();
+			OsmandRegions or = new OsmandRegions(null);
 			or.cacheAllCountries();
 			process(inputFile, targetFile, or);
 		} catch (Throwable e) {

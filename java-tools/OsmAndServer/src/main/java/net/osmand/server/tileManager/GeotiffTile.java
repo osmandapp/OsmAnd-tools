@@ -79,7 +79,7 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 	}
 
 	@Override
-	public void saveImageToCache(Object tile, File cacheFile) throws IOException {
+	public void saveTileToCache(Object tile, File cacheFile) throws IOException {
 		if (tile instanceof GeotiffTile gt) {
 			if (gt.runtimeImage != null) {
 				cacheFile.getParentFile().mkdirs();
@@ -96,13 +96,13 @@ public class GeotiffTile implements TileCacheProvider, Comparable<GeotiffTile> {
 	}
 
 	@Override
-	public BufferedImage getImg() {
+	public Object getTile() {
 		return runtimeImage;
 	}
 
 	@Override
-	public void setImg(BufferedImage img) {
-		runtimeImage = img;
+	public void setTile(Object tile) {
+		runtimeImage = (BufferedImage) tile;
 	}
 
 	@Override

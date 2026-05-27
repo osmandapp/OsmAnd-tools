@@ -347,8 +347,7 @@ public class CalculateOsmChangesets {
 	private static OsmandRegions initCountriesTable(Connection conn, boolean empty, Map<WorldRegion, Integer> map)
 			throws IOException, SQLException {
 
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		or.cacheAllCountries();
 		WorldRegion worldRegion = or.getWorldRegion();
 		boolean newCountriesInserted = false;

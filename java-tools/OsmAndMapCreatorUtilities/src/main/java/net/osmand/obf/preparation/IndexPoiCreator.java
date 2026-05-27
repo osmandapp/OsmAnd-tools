@@ -6,21 +6,8 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URL;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -62,8 +49,8 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
-import net.osmand.util.ArabicNormalizer;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -82,7 +69,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final int ZOOM_TO_WRITE_CATEGORIES_START = 12;
 	private static final int ZOOM_TO_WRITE_CATEGORIES_END = 16;
 	private static final double GEOCODING_DISTANCE = 150;
-	
+
 	private boolean useInMemoryCreator = true;
 	public static long GENERATE_OBJ_ID = -(1L << 10L);
 	public TLongHashSet generatedIds = new TLongHashSet();
@@ -223,7 +210,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 //				id = GENERATE_OBJ_ID--;
 				id = ObfConstants.createMapObjectIdFromOsmAndEntity(e);
 				if (e instanceof Relation) {
-					// other ids couldn't be duplicated 
+					// other ids couldn't be duplicated
 					while (generatedIds.contains(id)) {
 						id += 2;
 					}
@@ -389,7 +376,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
-	
+
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
 
@@ -648,7 +635,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName, 
+	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName,
 			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
 			closePreparedStatements(poiPreparedStatement);
@@ -771,7 +758,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
-
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -877,6 +863,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
+    private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
 	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
@@ -910,7 +897,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
 		Set<String> duplicateWikiWids = new HashSet<String>();
-		
+
 		while (rs.next()) {
 			int x = rs.getInt(1);
 			int y = rs.getInt(2);
@@ -937,8 +924,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			if (geocodingCtx != null && 
-					Algorithms.isEmpty(additionalTags.get(streetRuleType)) && 
+			if (geocodingCtx != null &&
+					Algorithms.isEmpty(additionalTags.get(streetRuleType)) &&
 					!Algorithms.isEmpty(additionalTags.get(nameRuleType))) {
 				long tm = System.currentTimeMillis();
 				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
@@ -1002,10 +989,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				int xs = x >> (31 - i);
 				int ys = y >> (31 - i);
 				Tree<PoiTileBox> subtree = null;
+				boolean finalLeafLevel = i == ZOOM_TO_SAVE_END;
 				for (Tree<PoiTileBox> sub : prevTree.getSubtrees()) {
 					if (sub.getNode().x == xs && sub.getNode().y == ys && sub.getNode().zoom == i) {
-						subtree = sub;
-						break;
+						if (!finalLeafLevel) {
+							subtree = sub;
+							break;
+						}
+						List<PoiData> existingPoiData = sub.getNode().poiData;
+						if (existingPoiData == null || existingPoiData.size() < MAX_OBJECTS_PER_BLOCK_LIMIT) {
+							subtree = sub;
+							break;
+						}
 					}
 				}
 				if (subtree == null) {
@@ -1077,7 +1072,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiTagGroups.put(rs.getLong(5), tagGroupIds);
 			}
 		}
-		
+
 		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
 				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
@@ -1112,22 +1107,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
     private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
-        name = Algorithms.normalizeSearchText(name);
-        Set<String> splitName = new HashSet<>(Algorithms.splitByWordsLowercase(name));
-        if (ArabicNormalizer.isSpecialArabic(name)) {
-            String arabic = ArabicNormalizer.normalize(name);
-            if (arabic != null && !arabic.equals(name)) {
-                splitName.addAll(Algorithms.splitByWordsLowercase(arabic));
-            }
-        }
-        for (String str : splitName) {
-            if (str.length() > ind) {
-                str = str.substring(0, ind);
-            }
-            if (!poiData.containsKey(str)) {
-                poiData.put(str, new LinkedHashSet<>());
-            }
-            poiData.get(str).add(data);
+        List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
+        SearchAlgorithms.removeCommonWords(splitName);
+        for (String token : splitName) {
+	        if (Algorithms.isEmpty(token)) {
+		        continue;
+	        }
+			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
+			if (Algorithms.isEmpty(str)) {
+				continue;
+			}
+		    if (!poiData.containsKey(str)) {
+		        poiData.put(str, new LinkedHashSet<>());
+		    }
+		    poiData.get(str).add(data);
+	        data.addToken(token);
         }
     }
 
@@ -1197,11 +1191,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories categories = new PoiCreatorCategories();
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
+		final Set<String> tokens = new LinkedHashSet<>();
 
 		public int getX() {
 			return x;
 		}
-
 
 		public int getY() {
 			return y;
@@ -1211,7 +1205,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return zoom;
 		}
 
-
+		public void addToken(String token) {
+			tokens.add(token);
+		}
 	}
 
 	private static class Tree<T> {

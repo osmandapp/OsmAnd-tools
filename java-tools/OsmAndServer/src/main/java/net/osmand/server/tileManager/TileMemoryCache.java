@@ -52,14 +52,14 @@ public class TileMemoryCache<T extends TileCacheProvider> {
 			SortedSet<T> sortedCache = Collections.synchronizedSortedSet(new TreeSet<>(cacheMap.values()));
 			List<T> imageTiles = new ArrayList<>();
 			for (T tile : sortedCache) {
-				if (tile.getImg() != null) {
+				if (tile.getTile() != null) {
 					imageTiles.add(tile);
 				}
 			}
 			if (imageTiles.size() >= MAX_RUNTIME_IMAGE_CACHE_SIZE) {
 				for (int i = 0; i < MAX_RUNTIME_IMAGE_CACHE_SIZE / 2; i++) {
 					T tile = imageTiles.get(i);
-					tile.setImg(null);
+					tile.setTile(null);
 				}
 			}
 			if (cacheMap.size() >= MAX_RUNTIME_TILES_CACHE_SIZE) {

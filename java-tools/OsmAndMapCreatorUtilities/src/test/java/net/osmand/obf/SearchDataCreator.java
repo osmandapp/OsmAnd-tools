@@ -2,6 +2,7 @@ package net.osmand.obf;
 
 
 import net.osmand.PlatformUtil;
+import net.osmand.binary.OsmandOdb;
 import org.apache.commons.logging.Log;
 
 import java.io.File;
@@ -39,8 +40,10 @@ class SearchDataCreator extends OBFDataCreator {
 		String outputFilePath = null;
 		List<String> jsonPaths = new ArrayList<>();
 		for (String arg : args) {
-			if (arg.startsWith("--")) {
-				combineParts.add(COMBINE_ARGS.get(arg));
+			if ("--address".equals(arg)) {
+				combineParts.add(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
+			} else if ("--poi".equals(arg)) {
+				combineParts.add(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
 			} else if (outputFilePath == null) {
 				outputFilePath = arg;
 			} else {
@@ -48,7 +51,8 @@ class SearchDataCreator extends OBFDataCreator {
 			}
 		}
 		if (combineParts.isEmpty()) {
-			combineParts.addAll(COMBINE_ARGS.values());
+			combineParts.add(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
+			combineParts.add(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER);
 		}
 		if (outputFilePath == null || jsonPaths.isEmpty()) {
 			throw new IOException("Output file or input JSON files are not specified");

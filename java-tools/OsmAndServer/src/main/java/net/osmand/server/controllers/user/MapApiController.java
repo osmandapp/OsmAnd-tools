@@ -7,6 +7,7 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
 
+import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
@@ -92,6 +93,9 @@ public class MapApiController {
 
 	@Autowired
 	private UserSubscriptionService userSubService;
+
+	@Autowired
+	private SmartFolderService smartFolderService;
 
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
@@ -256,6 +260,19 @@ public class MapApiController {
 		return okStatus();
 	}
 
+	@PostMapping(value = "/update-info", consumes = MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<String> updateInfo(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
+	                                         @RequestParam String name,
+	                                         @RequestParam(required = false)  Long updatetime) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		} else if (name.contains("/../") || !name.endsWith(INFO_FILE_EXT)) {
+			return ResponseEntity.badRequest().body(String.format("Invalid file name: %s", name));
+		}
+		return userdataService.updateGpxInfoFile(file, name, dev, updatetime);
+	}
+
 	@PostMapping(value = "/delete-file")
 	public ResponseEntity<String> deleteFile(@RequestParam String name, @RequestParam String type) {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
@@ -340,15 +357,23 @@ public class MapApiController {
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
-			String ext = nd.name.substring(nd.name.lastIndexOf('.') + 1);
-			boolean isGpx = "gpx".equalsIgnoreCase(ext);
+			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
+			boolean isGpx = GPX_FILE_EXT.equalsIgnoreCase(ext);
 
-			boolean isGPZTrack = nd.type.equalsIgnoreCase("gpx") && isGpx;
-			boolean isFavorite = nd.type.equals(FILE_TYPE_FAVOURITES) && isGpx;
+			boolean isGPZTrack = isGpx && nd.type.equalsIgnoreCase(FILE_TYPE_GPX);
+			boolean isFavorite = isGpx && nd.type.equals(FILE_TYPE_FAVOURITES);
+			boolean isInfoFile = nd.name.endsWith(INFO_FILE_SUFFIX);
 
 			if (isGPZTrack) {
-				JsonObject details = nd.details != null ? nd.details : new JsonObject();
+				JsonObject details = getOrCreateDetails(nd);
 				if (!webUserdataService.detailsPresent(details)) {
+					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
+				}
+				nd.details = webUserdataService.detailsForResponse(details);
+			}
+			if (isInfoFile) {
+				JsonObject details = getOrCreateDetails(nd);
+				if (!webUserdataService.detailsInfoPresent(details, nd.updatetimems)) {
 					details.add(UPDATE_DETAILS, gson.toJsonTree(nd.updatetimems));
 				}
 				nd.details = details;
@@ -366,6 +391,21 @@ public class MapApiController {
 				webUserdataService.addDeviceInformation(nd, devices);
 			}
 		}
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	private JsonObject getOrCreateDetails(UserFileNoData nd) {
+		JsonObject details = nd.details != null ? nd.details : new JsonObject();
+		return details;
+	}
+
+	@GetMapping(value = "/get-smart-folders", produces = "application/json")
+	public ResponseEntity<String> getSmartFolders() {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		List<SmartFolderService.SmartFolderWeb> res = smartFolderService.getSmartFoldersByUserId(dev.userid);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
@@ -401,6 +441,22 @@ public class MapApiController {
 		if (userFile != null) {
 			boolean isSimplified = simplified != null && simplified;
 			userdataService.getFile(userFile, response, request, name, type, dev, isSimplified);
+		}
+	}
+
+	@GetMapping(value = "/get-color-palette")
+	public ResponseEntity<String> getColorPalette() throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		CloudUserFilesRepository.UserFile userFile = userdataService.getUserFile(
+				"color-palette/user_palette_default.txt", "FILE", null, dev);
+		if (userFile == null) {
+			return ResponseEntity.ok("");
+		}
+		try (InputStream bin = new GZIPInputStream(userdataService.getInputStream(dev, userFile))) {
+			return ResponseEntity.ok(new String(bin.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
 		}
 	}
 
@@ -677,9 +733,8 @@ public class MapApiController {
 	@GetMapping(path = {"/regions-by-latlon"})
 	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<>();
-		if(osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions(null);
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));

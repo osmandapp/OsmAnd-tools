@@ -21,6 +21,9 @@ This guide explains all **required variables**, their purposes, and configuratio
 
 ## Prerequisites
 
+If a **new language was added** to website UI languages, add the new language code to the [Nginx config](https://github.com/osmandapp/web-server-config/blob/main/servers/osmand.net/nginx-sites-enabled/osmand-default) 
+as it was done in [this commit](https://github.com/osmandapp/web-server-config/pull/168/changes/bf6129f30813fc683e29e0ad49c35d47ef27a7e8.)
+
 Before running the script, ensure you have the following:
 
 - Linux system with `bash`, `git`, `python3`, and `yarn` installed.

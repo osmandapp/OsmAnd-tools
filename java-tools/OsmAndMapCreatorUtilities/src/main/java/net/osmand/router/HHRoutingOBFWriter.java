@@ -169,8 +169,7 @@ public class HHRoutingOBFWriter {
 			if (outFolder == null) {
 				outFolder = obfPolyFileIn.isDirectory() ? obfPolyFileIn : obfPolyFileIn.getParentFile();
 			}
-			OsmandRegions or = new OsmandRegions();
-			or.prepareFile();
+			OsmandRegions or = new OsmandRegions(null);
 			Map<String, LinkedList<BinaryMapDataObject>> downloadNames = or.cacheAllCountries();
 			List<File> obfPolyFiles = new ArrayList<>();
 			if (obfPolyFileIn.isDirectory()) {

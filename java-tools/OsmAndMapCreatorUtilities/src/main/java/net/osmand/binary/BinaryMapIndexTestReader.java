@@ -1,5 +1,7 @@
 package net.osmand.binary;
 
+import gnu.trove.map.hash.TIntObjectHashMap;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReaderStats.SearchStat;
 import net.osmand.data.Amenity;
@@ -26,6 +28,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	private List<City> cities = Collections.emptyList();
 	private List<City> matchedCities = Collections.emptyList();
 	private List<City> streetCities = Collections.emptyList();
+	private List<RouteDataObject> routingData = Collections.emptyList();
 
 	private BinaryMapIndexTestReader() throws IOException {
 		super(null, null, false);
@@ -107,7 +110,91 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 			reader.addressIndexes.add(region);
 			reader.indexes.add(region);
 		}
+		if (sourceJson.has("routing")) {
+			JSONArray routingArr = sourceJson.getJSONArray("routing");
+			List<RouteDataObject> routeObjects = new ArrayList<>();
+			BinaryMapRouteReaderAdapter.RouteRegion region = new BinaryMapRouteReaderAdapter.RouteRegion();
+			region.name = Algorithms.getFileNameWithoutExtension(jsonFile);
+			region.routeEncodingRules.add(null);
+			BinaryMapRouteReaderAdapter.RouteSubregion subregion = new BinaryMapRouteReaderAdapter.RouteSubregion(region);
+			subregion.filePointer = 1;
+			subregion.length = 1;
+			int left = Integer.MAX_VALUE;
+			int right = Integer.MIN_VALUE;
+			int top = Integer.MAX_VALUE;
+			int bottom = Integer.MIN_VALUE;
+			for (int i = 0; i < routingArr.length(); i++) {
+				JSONObject routeObj = routingArr.getJSONObject(i);
+				RouteDataObject route = parseRouteDataObject(routeObj, region);
+				if (route.getPointsLength() == 0) {
+					continue;
+				}
+				routeObjects.add(route);
+				for (int j = 0; j < route.getPointsLength(); j++) {
+					left = Math.min(left, route.getPoint31XTile(j));
+					right = Math.max(right, route.getPoint31XTile(j));
+					top = Math.min(top, route.getPoint31YTile(j));
+					bottom = Math.max(bottom, route.getPoint31YTile(j));
+				}
+			}
+			if (!routeObjects.isEmpty()) {
+				subregion.left = left;
+				subregion.right = right;
+				subregion.top = top;
+				subregion.bottom = bottom;
+				subregion.dataObjects = routeObjects;
+				region.filePointer = 1;
+				region.length = 1;
+				region.getSubregions().add(subregion);
+				reader.routingData = routeObjects;
+				reader.routingIndexes.add(region);
+				reader.indexes.add(region);
+			}
+		}
 		return reader;
+	}
+
+	private static RouteDataObject parseRouteDataObject(JSONObject routeObj,
+			BinaryMapRouteReaderAdapter.RouteRegion region) {
+		RouteDataObject route = new RouteDataObject(region);
+		route.id = routeObj.optLong("id");
+		route.pointsX = parseIntArray(routeObj.optJSONArray("pointsX"));
+		route.pointsY = parseIntArray(routeObj.optJSONArray("pointsY"));
+		JSONArray typesArr = routeObj.optJSONArray("types");
+		if (typesArr != null && typesArr.length() > 0) {
+			route.types = new int[typesArr.length()];
+			for (int i = 0; i < typesArr.length(); i++) {
+				JSONObject typeObj = typesArr.getJSONObject(i);
+				route.types[i] = region.findOrCreateRouteType(typeObj.optString("tag"), typeObj.optString("value", null));
+			}
+		}
+		JSONArray namesArr = routeObj.optJSONArray("names");
+		if (namesArr != null && namesArr.length() > 0) {
+			route.nameIds = new int[namesArr.length()];
+			route.names = new TIntObjectHashMap<>();
+			for (int i = 0; i < namesArr.length(); i++) {
+				JSONObject nameObj = namesArr.getJSONObject(i);
+				int ruleId = region.findOrCreateRouteType(nameObj.optString("tag"), null);
+				route.nameIds[i] = ruleId;
+				route.names.put(ruleId, nameObj.optString("value", null));
+			}
+		}
+		return route;
+	}
+
+	private static int[] parseIntArray(JSONArray arr) {
+		if (arr == null) {
+			return new int[0];
+		}
+		int[] values = new int[arr.length()];
+		for (int i = 0; i < arr.length(); i++) {
+			values[i] = arr.getInt(i);
+		}
+		return values;
+	}
+
+	public List<RouteDataObject> getRoutingData() {
+		return routingData;
 	}
 
 	@Override
@@ -200,12 +287,53 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
 	@Override
 	public boolean containsRouteData() {
-		return true;
+		return !routingData.isEmpty();
 	}
 
 	@Override
 	public boolean containsRouteData(int left31x, int top31y, int right31x, int bottom31y, int zoom) {
-		return true;
+		for (BinaryMapRouteReaderAdapter.RouteRegion region : routingIndexes) {
+			for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : region.getSubregions()) {
+				if (right31x >= subregion.left && left31x <= subregion.right
+						&& subregion.top <= bottom31y && subregion.bottom >= top31y) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public List<BinaryMapRouteReaderAdapter.RouteSubregion> searchRouteIndexTree(SearchRequest<?> req,
+			List<BinaryMapRouteReaderAdapter.RouteSubregion> list) {
+		List<BinaryMapRouteReaderAdapter.RouteSubregion> result = new ArrayList<>();
+		for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : list) {
+			if (req.intersects(subregion.left, subregion.top, subregion.right, subregion.bottom)) {
+				result.add(subregion);
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public void loadRouteIndexData(List<BinaryMapRouteReaderAdapter.RouteSubregion> toLoad,
+			ResultMatcher<RouteDataObject> matcher) {
+		for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : toLoad) {
+			if (subregion.dataObjects == null) {
+				continue;
+			}
+			for (RouteDataObject routeDataObject : subregion.dataObjects) {
+				matcher.publish(routeDataObject);
+				if (matcher.isCancelled()) {
+					return;
+				}
+			}
+		}
+	}
+
+	@Override
+	public List<RouteDataObject> loadRouteIndexData(BinaryMapRouteReaderAdapter.RouteSubregion rs) {
+		return rs.dataObjects == null ? Collections.emptyList() : rs.dataObjects;
 	}
 
 

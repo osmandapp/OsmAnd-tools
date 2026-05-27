@@ -279,7 +279,7 @@ public class GeotiffTileController {
 			return null;
 		}
 		tile.setRuntimeImage(img);
-		tile.saveImageToCache(tile, cacheFile);
+		tile.saveTileToCache(tile, cacheFile);
 		return img;
 	}
 

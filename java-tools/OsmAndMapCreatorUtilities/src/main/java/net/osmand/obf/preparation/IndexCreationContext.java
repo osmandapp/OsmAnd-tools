@@ -73,18 +73,17 @@ public class IndexCreationContext {
 	}
 
     @Nullable
-    private OsmandRegions prepareRegions() {
-        OsmandRegions or = new OsmandRegions();
-        try {
-            File loadedRegionsFile = refreshRegionsFileFromResources();
-            or.prepareFile(loadedRegionsFile.getAbsolutePath());
-            or.cacheAllCountries();
-        } catch (IOException e) {
-            log.error("Error preparing regions", e);
-            return null;
-        }
-        return or;
-    }
+	private OsmandRegions prepareRegions() {
+		try {
+			File loadedRegionsFile = refreshRegionsFileFromResources();
+			OsmandRegions or = new OsmandRegions(loadedRegionsFile.getAbsolutePath());
+			or.cacheAllCountries();
+			return or;
+		} catch (IOException e) {
+			log.error("Error preparing regions", e);
+			return null;
+		}
+	}
 
 	private File refreshRegionsFileFromResources() throws IOException {
 		final String REGIONS_OCBF = "regions.ocbf";
@@ -100,7 +99,14 @@ public class IndexCreationContext {
 		is.close();
 
 		File regionsFinalFile = new File(REGIONS_OCBF);
-		Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+		try {
+			Files.move(regionsTmpFile.toPath(), regionsFinalFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+		} catch (IOException e) {
+			log.error("Unable to refresh " + regionsTmpFile.getName() + ", now using previous " + REGIONS_OCBF);
+			if (!regionsTmpFile.delete()) {
+				regionsTmpFile.deleteOnExit();
+			}
+		}
 
 		return regionsFinalFile;
 	}

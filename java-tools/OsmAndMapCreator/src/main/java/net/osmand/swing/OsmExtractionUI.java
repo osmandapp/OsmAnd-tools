@@ -196,9 +196,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    mapPanel.addMapLocationListener(this);
 
 	    statusBarLabel = new JLabel();
-	    osmandRegions = new OsmandRegions();
-		try {
-			osmandRegions.prepareFile();
+	    try {
+	    	osmandRegions = new OsmandRegions(null);
 		} catch (IOException e2) {
 			e2.printStackTrace();
 			log.error(e2.getMessage(), e2);
@@ -412,7 +411,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 						locationString += " (CLOSED)";
 					}
 				}
-				String r = String.format("%s [%d, %s, %f] ", sr.localeName, sr.getFoundWordCount(), sr.objectType,
+				String altName = sr.alternateName != null ? "(" + sr.alternateName + ")" : "";
+				String r = String.format("%s %s [%d, %s, %f] ", sr.localeName, altName, sr.getFoundWordCount(), sr.objectType,
 						sr.getUnknownPhraseMatchWeight()) + locationString;
 				mi.setText(r);
 				mi.addActionListener(new ActionListener() {
