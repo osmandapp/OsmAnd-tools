@@ -35,6 +35,8 @@ import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
 
+import static java.lang.Double.parseDouble;
+
 @Service
 public class UserTranslationsService {
 
@@ -152,10 +154,10 @@ public class UserTranslationsService {
     }
 
 	private void shareLocationByUser(UserTranslation ust, int uid) {
-		if (!shareLocTranslationsByUser.containsKey(uid)) {
-			shareLocTranslationsByUser.putIfAbsent(uid, new ConcurrentLinkedDeque<UserTranslation>());
+		Deque<UserTranslation> deque = shareLocTranslationsByUser.computeIfAbsent(uid, k -> new ConcurrentLinkedDeque<>());
+		if (!deque.contains(ust)) {
+			deque.add(ust);
 		}
-		shareLocTranslationsByUser.get(uid).add(ust);
 	}
 	
 
@@ -216,7 +218,7 @@ public class UserTranslationsService {
 					simLon += (Math.random() - 0.5) * 0.001;
 					WptPt pt = new WptPt(simLat, simLon);
 					pt.setTime(System.currentTimeMillis());
-					pt.setSpeed(Math.random() * 5); // Random speed 0-5 m/s
+					pt.setSpeed((float) (Math.random() * 5)); // Random speed 0-5 m/s
 					sendLocation(null, user, pt);
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
@@ -275,19 +277,15 @@ public class UserTranslationsService {
 	public boolean sendDeviceMessage(CloudUserDevice dev, CloudUser pu, HttpServletRequest request) {
 		WptPt wptPt = new WptPt();
 		try {
-			wptPt.setLat(Double.parseDouble(request.getParameter("lat")));
-			wptPt.setLon(Double.parseDouble(request.getParameter("lon")));
+			wptPt.setLat(parseDouble(request.getParameter("lat")));
+			wptPt.setLon(parseDouble(request.getParameter("lon")));
 			wptPt.setTime(Long.parseLong(request.getParameter("timestamp")));
 		} catch (RuntimeException e) {
 			return false;
 		}
-		try {
-			wptPt.setHdop(Double.parseDouble(request.getParameter("hdop")));
-			wptPt.setEle(Double.parseDouble(request.getParameter("altitude")));
-			wptPt.setSpeed(Double.parseDouble(request.getParameter("speed")));
-		} catch (RuntimeException e) {
-			// ignore exception as they could flood
-		}
+		try { wptPt.setHdop((float) parseDouble(request.getParameter("hdop"))); } catch (RuntimeException e) { }
+		try { wptPt.setEle(parseDouble(request.getParameter("altitude"))); } catch (RuntimeException e) { }
+		try { wptPt.setSpeed((float) parseDouble(request.getParameter("speed"))); } catch (RuntimeException e) { }
 		sendLocation(dev, pu, wptPt);
 		return true;
 	}

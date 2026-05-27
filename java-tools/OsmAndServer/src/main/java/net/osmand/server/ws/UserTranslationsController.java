@@ -34,31 +34,25 @@ public class UserTranslationsController {
 	}
 	
 	@MessageMapping("/translation/{translationId}/startSharing")
-	public String startSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
+	public void startSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
 			Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		CloudUser user = userTranslationsService.getUser(principal, headers);
-		if (user == null) {
-			return null;
+		if (user == null || ust == null) {
+			return;
 		}
-		if (ust != null) {
-			userTranslationsService.startSharing(ust, user, headers);
-		}
-		return "OK";
+		userTranslationsService.startSharing(ust, user, headers);
 	}
-	
+
 	@MessageMapping("/translation/{translationId}/stopSharing")
-	public String stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
+	public void stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
 			Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		CloudUser user = userTranslationsService.getUser(principal, headers);
-		if (user == null) {
-			return null;
+		if (user == null || ust == null) {
+			return;
 		}
-		if (ust != null) {
-			userTranslationsService.stopSharing(ust, user, headers);
-		}
-		return "OK";
+		userTranslationsService.stopSharing(ust, user, headers);
 	}
 
 
@@ -72,16 +66,14 @@ public class UserTranslationsController {
 		}
 	}
 
-	// One time call (subscription) returns map with TRANSLATION_ID
+	// One time call — response is sent via /user/queue/updates (sendPrivateMessage)
 	@MessageMapping("/translation/create")
-	public Object createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
+	public void createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUser(principal, headers);
 		if (user == null) {
-			return null;
+			return;
 		}
-		return userTranslationsService.createTranslation(user, null, headers);
+		userTranslationsService.createTranslation(user, null, headers);
 	}
-
-	
 
 }

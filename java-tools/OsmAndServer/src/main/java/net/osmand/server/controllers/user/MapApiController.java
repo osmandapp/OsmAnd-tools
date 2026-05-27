@@ -53,7 +53,9 @@ import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.server.ws.UserTranslationsService;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -87,6 +89,9 @@ public class MapApiController {
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
+
+	@Autowired
+	UserTranslationsService userTranslationsService;
 
 	@Autowired
 	private EmailSenderService emailSender;
@@ -747,6 +752,20 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
+	}
+
+	@RequestMapping(path = {"/translation/msg"})
+	public ResponseEntity<String> sendTranslationMessage(HttpServletRequest request) {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		CloudUser user = usersRepository.findById(dev.userid);
+		if (user == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		boolean ok = userTranslationsService.sendDeviceMessage(dev, user, request);
+		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
 	}
 
 }
