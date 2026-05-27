@@ -29,7 +29,11 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -3684,5 +3688,278 @@ public interface OBFService extends BaseService {
 		comparator = comparator.thenComparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId())
 				.thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
 		return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
+	}
+	
+	default void generateDb(List<String> obfs, OutputStream out) throws IOException, SQLException {
+		if (obfs == null || obfs.isEmpty()) {
+			throw new IllegalArgumentException("OBF file list is required");
+		}
+		Path dbFile = Files.createTempFile("search-test-db-", ".sqlite");
+		try {
+			try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
+				createGenerateDbSchema(conn);
+				conn.setAutoCommit(false);
+				try {
+					populateDb(conn, obfs);
+					conn.commit();
+				} catch (Exception e) {
+					conn.rollback();
+					if (e instanceof SQLException sqlException) {
+						throw sqlException;
+					}
+					if (e instanceof IOException ioException) {
+						throw ioException;
+					}
+					throw new IOException("Failed to generate SQLite DB: " + e.getMessage(), e);
+				}
+			}
+			try (ZipOutputStream zip = new ZipOutputStream(out)) {
+				zip.putNextEntry(new ZipEntry("db.sqlite"));
+				Files.copy(dbFile, zip);
+				zip.closeEntry();
+				zip.finish();
+			}
+		} finally {
+			try {
+				Files.deleteIfExists(dbFile);
+			} catch (IOException e) {
+				getLogger().warn("Failed to delete temporary generated DB {}", dbFile, e);
+			}
+		}
+	}
+
+	private void createGenerateDbSchema(Connection conn) throws SQLException {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.execute("PRAGMA foreign_keys = ON");
+			stmt.execute("PRAGMA journal_mode = OFF");
+			stmt.execute("PRAGMA synchronous = OFF");
+			stmt.execute("""
+					CREATE TABLE OBF (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						name TEXT NOT NULL
+					)
+					""");
+			stmt.execute("""
+					CREATE TABLE Token (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						name TEXT NOT NULL UNIQUE,
+						isCommon INTEGER NOT NULL,
+						isFrequent INTEGER NOT NULL,
+						poiSize INTEGER NOT NULL DEFAULT 0,
+						poiCount INTEGER NOT NULL DEFAULT 0,
+						addressSize INTEGER NOT NULL DEFAULT 0,
+						addressCount INTEGER NOT NULL DEFAULT 0
+					)
+					""");
+			stmt.execute("""
+					CREATE TABLE "Object" (
+						obf_id INTEGER NOT NULL,
+						id INTEGER NOT NULL,
+						name TEXT,
+						lat REAL,
+						lon REAL,
+						"values" TEXT,
+						type TEXT,
+						osmId INTEGER,
+						osmType TEXT,
+						PRIMARY KEY (obf_id, id),
+						FOREIGN KEY (obf_id) REFERENCES OBF(id)
+					)
+					""");
+			stmt.execute("""
+					CREATE TABLE Posting (
+						obf_id INTEGER NOT NULL,
+						object_id INTEGER NOT NULL,
+						token_id INTEGER NOT NULL,
+						payloadOffset INTEGER NOT NULL,
+						sourceOffset INTEGER NOT NULL,
+						PRIMARY KEY (obf_id, token_id, object_id),
+						FOREIGN KEY (obf_id, object_id) REFERENCES "Object"(obf_id, id),
+						FOREIGN KEY (token_id) REFERENCES Token(id)
+					)
+					""");
+			stmt.execute("CREATE INDEX idx_posting_object ON Posting(obf_id, object_id)");
+			stmt.execute("CREATE INDEX idx_posting_token ON Posting(token_id)");
+		}
+	}
+
+	private void populateDb(Connection conn, List<String> obfs) throws SQLException, IOException {
+		Map<String, Long> tokenIds = new HashMap<>();
+		try (PreparedStatement insertObf = conn.prepareStatement("INSERT INTO OBF(name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+		     PreparedStatement insertToken = conn.prepareStatement("""
+				     INSERT INTO Token(name, isCommon, isFrequent, poiSize, poiCount, addressSize, addressCount)
+				     VALUES (?, ?, ?, ?, ?, ?, ?)
+				     ON CONFLICT(name) DO UPDATE SET
+				     	isCommon = CASE WHEN excluded.isCommon = 1 THEN 1 ELSE Token.isCommon END,
+				     	isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END,
+				     	poiSize = Token.poiSize + excluded.poiSize,
+				     	poiCount = Token.poiCount + excluded.poiCount,
+				     	addressSize = Token.addressSize + excluded.addressSize,
+				     	addressCount = Token.addressCount + excluded.addressCount
+				     """);
+		     PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM Token WHERE name = ?");
+		     PreparedStatement insertObject = conn.prepareStatement("""
+				     INSERT OR IGNORE INTO "Object"(obf_id, id, name, lat, lon, "values", type, osmId, osmType)
+				     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				     """);
+		     PreparedStatement insertPosting = conn.prepareStatement("""
+				     INSERT OR IGNORE INTO Posting(obf_id, object_id, token_id, payloadOffset, sourceOffset)
+				     VALUES (?, ?, ?, ?, ?)
+				     """)) {
+			for (String obf : obfs) {
+				if (Algorithms.isEmpty(obf)) {
+					continue;
+				}
+				long obfId = insertObfRow(insertObf, getObfFileName(obf));
+				Map<String, Integer> objectIds = new HashMap<>();
+				Set<Integer> usedObjectIds = new HashSet<>();
+				int[] nextObjectId = new int[] {1};
+				for (IndexToken token : loadAllGenerateDbTokens(obf)) {
+					if (token == null || Algorithms.isEmpty(token.name())) {
+						continue;
+					}
+					ObjectAddressPage objectsPage = getObjects(obf, "en", token, null, 0, Integer.MAX_VALUE, null, null, true, false, null);
+					long tokenId = upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token, objectsPage);
+					for (ObjectAddress objectAddress : objectsPage.content()) {
+						if (objectAddress == null || !objectAddress.isMatched()) {
+							continue;
+						}
+						int objectId = resolveGenerateDbObjectId(objectIds, usedObjectIds, nextObjectId, objectAddress);
+						if (!usedObjectIds.contains(objectId)) {
+							usedObjectIds.add(objectId);
+							insertGenerateDbObject(insertObject, obfId, objectId, objectAddress);
+						}
+						insertGenerateDbPosting(insertPosting, obfId, objectId, tokenId, objectAddress);
+					}
+				}
+			}
+		}
+	}
+
+	private long insertObfRow(PreparedStatement insertObf, String name) throws SQLException {
+		insertObf.setString(1, name);
+		insertObf.executeUpdate();
+		try (java.sql.ResultSet rs = insertObf.getGeneratedKeys()) {
+			if (rs.next()) {
+				return rs.getLong(1);
+			}
+		}
+		throw new SQLException("Failed to insert OBF row");
+	}
+
+	private List<IndexToken> loadAllGenerateDbTokens(String obf) {
+		List<IndexToken> tokens = new ArrayList<>();
+		int page = 0;
+		int pageSize = 100;
+		while (true) {
+			IndexTokenPage tokenPage = getIndex(obf, null, page, pageSize, "name", "asc");
+			tokens.addAll(tokenPage.content());
+			if (page + 1 >= tokenPage.totalPages()) {
+				break;
+			}
+			page++;
+		}
+		return tokens;
+	}
+
+	private long upsertGenerateDbToken(PreparedStatement insertToken,
+			PreparedStatement selectTokenId,
+			Map<String, Long> tokenIds,
+			IndexToken token,
+			ObjectAddressPage objectsPage) throws SQLException {
+		int[] countMetrics = objectsPage == null ? null : objectsPage.countMetrics();
+		int[] sizeMetrics = objectsPage == null ? null : objectsPage.sizeMetrics();
+		insertToken.setString(1, token.name());
+		insertToken.setInt(2, token.isCommon() ? 1 : 0);
+		insertToken.setInt(3, token.isFrequent() ? 1 : 0);
+		insertToken.setInt(4, metricValue(sizeMetrics, 6));
+		insertToken.setInt(5, metricValue(countMetrics, 3));
+		insertToken.setInt(6, metricValue(sizeMetrics, 8));
+		insertToken.setInt(7, metricValue(countMetrics, 5));
+		insertToken.executeUpdate();
+		Long cachedId = tokenIds.get(token.name());
+		if (cachedId != null) {
+			return cachedId;
+		}
+		selectTokenId.setString(1, token.name());
+		try (java.sql.ResultSet rs = selectTokenId.executeQuery()) {
+			if (rs.next()) {
+				long id = rs.getLong(1);
+				tokenIds.put(token.name(), id);
+				return id;
+			}
+		}
+		throw new SQLException("Failed to resolve token id for " + token.name());
+	}
+
+	private int metricValue(int[] metrics, int index) {
+		return metrics == null || index < 0 || index >= metrics.length ? 0 : metrics[index];
+	}
+
+	private int resolveGenerateDbObjectId(Map<String, Integer> objectIds,
+			Set<Integer> usedObjectIds,
+			int[] nextObjectId,
+			ObjectAddress objectAddress) {
+		String key = generateDbObjectKey(objectAddress);
+		Integer id = objectIds.get(key);
+		if (id != null) {
+			return id;
+		}
+		int sequenceId = objectAddress.sequenceId();
+		if (usedObjectIds.contains(sequenceId)) {
+			while (usedObjectIds.contains(nextObjectId[0])) {
+				nextObjectId[0]++;
+			}
+			sequenceId = nextObjectId[0]++;
+		}
+		objectIds.put(key, sequenceId);
+		return sequenceId;
+	}
+
+	private String generateDbObjectKey(ObjectAddress objectAddress) {
+		if (objectAddress.osmId() != null && !Algorithms.isEmpty(objectAddress.osmType())) {
+			return "osm:" + objectAddress.osmType() + ":" + objectAddress.osmId();
+		}
+		return "raw:" + objectAddress.sourceOffset() + ":" + objectAddress.payloadOffset() + ":"
+				+ objectAddress.type() + ":" + objectAddress.name();
+	}
+
+	private void insertGenerateDbObject(PreparedStatement insertObject,
+			long obfId,
+			int objectId,
+			ObjectAddress objectAddress) throws SQLException, IOException {
+		LatLon point = objectAddress.point();
+		insertObject.setLong(1, obfId);
+		insertObject.setInt(2, objectId);
+		insertObject.setString(3, objectAddress.name());
+		if (point == null) {
+			insertObject.setNull(4, java.sql.Types.REAL);
+			insertObject.setNull(5, java.sql.Types.REAL);
+		} else {
+			insertObject.setDouble(4, point.getLatitude());
+			insertObject.setDouble(5, point.getLongitude());
+		}
+		insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.values()));
+		insertObject.setString(7, objectAddress.type());
+		if (objectAddress.osmId() == null) {
+			insertObject.setNull(8, java.sql.Types.BIGINT);
+		} else {
+			insertObject.setLong(8, objectAddress.osmId());
+		}
+		insertObject.setString(9, objectAddress.osmType());
+		insertObject.executeUpdate();
+	}
+
+	private void insertGenerateDbPosting(PreparedStatement insertPosting,
+			long obfId,
+			int objectId,
+			long tokenId,
+			ObjectAddress objectAddress) throws SQLException {
+		insertPosting.setLong(1, obfId);
+		insertPosting.setInt(2, objectId);
+		insertPosting.setLong(3, tokenId);
+		insertPosting.setInt(4, objectAddress.payloadOffset());
+		insertPosting.setInt(5, objectAddress.sourceOffset());
+		insertPosting.executeUpdate();
 	}
 }

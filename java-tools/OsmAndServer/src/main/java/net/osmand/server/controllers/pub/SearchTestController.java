@@ -440,4 +440,17 @@ public class SearchTestController {
 		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
 		return ResponseEntity.ok(objects);
 	}
+
+	@PostMapping(value = "/generate", produces = "application/zip")
+	@ResponseBody
+	public void generateDb(
+			@RequestBody(required = false) List<String> OBFs,
+			HttpServletResponse response) throws IOException, SQLException {
+		if (OBFs == null || OBFs.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"db.zip\"");
+		testSearchService.generateDb(OBFs, response.getOutputStream());
+	}
 }
