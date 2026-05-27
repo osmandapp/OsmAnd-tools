@@ -322,36 +322,37 @@ public class MapApiController {
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
 
-	@GetMapping(value = "/rename-folder")
-	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
-	                                           @RequestParam String type,
-	                                           @RequestParam String newFolderName,
-	                                           @RequestParam(required = false) Boolean smart, 
-	                                           HttpSession session) throws IOException {
+	@GetMapping(value = "/update-smart-folder")
+	public ResponseEntity<String> updateSmartFolder(@RequestParam String folderName,
+	                                                @RequestParam String newFolderName,
+	                                                HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		if (!folderName.equals(newFolderName)) {
-			if (Boolean.TRUE.equals(smart)) {
-				return smartFolderService.renameSmartFolder(folderName, newFolderName, dev, session);
-			}
-			return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		if (folderName.equals(newFolderName)) {
+			return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
 		}
-		return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
+		return smartFolderService.updateSmartFolderByUserId(folderName, newFolderName, dev, session);
+	}
+
+	@GetMapping(value = "/rename-folder")
+	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
+	                                           @RequestParam String type,
+	                                           @RequestParam String newFolderName) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return userdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
 
 	@GetMapping(value = "/delete-folder")
 	public ResponseEntity<String> deleteFolder(@RequestParam String folderName,
-	                                           @RequestParam String type,
-	                                           @RequestParam(required = false) Boolean smart,
-	                                           HttpSession session) throws IOException {
+	                                           @RequestParam String type) {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
-		}
-		if (Boolean.TRUE.equals(smart)) {
-			return smartFolderService.deleteSmartFolder(folderName, dev, session);
 		}
 		return userdataService.deleteFolder(folderName, type, dev);
 	}

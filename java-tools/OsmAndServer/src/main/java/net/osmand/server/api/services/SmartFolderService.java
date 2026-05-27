@@ -88,10 +88,14 @@ public class SmartFolderService {
 		return smartFolderHelper;
 	}
 
-	public ResponseEntity<String> renameSmartFolder(String oldName, String newName,
-	                                                CloudUserDevicesRepository.CloudUserDevice dev,
-	                                                HttpSession session) throws IOException {
-		JSONArray folders = loadAndParseSmartFolders(dev.userid);
+	public ResponseEntity<String> updateSmartFolderByUserId(String oldName, String newName,
+	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                        HttpSession session) throws IOException {
+		JSONArray folders = null;
+		String trackFiltersSettings = getFiltersSettings(dev.userid);
+		if (trackFiltersSettings != null) {
+			folders = new JSONArray(trackFiltersSettings);
+		}
 		if (folders == null) {
 			return ResponseEntity.badRequest().body("Smart folders not found");
 		}
@@ -99,33 +103,12 @@ public class SmartFolderService {
 		if (index < 0) {
 			return ResponseEntity.badRequest().body("Smart folder '" + oldName + "' not found");
 		}
-
-		folders.getJSONObject(index).put(FOLDER_NAME_KEY, newName);
+		if (newName == null) {
+			folders.remove(index);
+		} else {
+			folders.getJSONObject(index).put(FOLDER_NAME_KEY, newName);
+		}
 		return uploadGeneralSettingsWithSmartFolders(dev, session, folders);
-	}
-
-	public ResponseEntity<String> deleteSmartFolder(String folderName,
-	                                                CloudUserDevicesRepository.CloudUserDevice dev,
-	                                                HttpSession session) throws IOException {
-		JSONArray folders = loadAndParseSmartFolders(dev.userid);
-		if (folders == null) {
-			return ResponseEntity.badRequest().body("Smart folders not found");
-		}
-		int index = findFolderIndex(folders, folderName);
-		if (index < 0) {
-			return ResponseEntity.badRequest().body("Smart folder '" + folderName + "' not found");
-		}
-
-		folders.remove(index);
-		return uploadGeneralSettingsWithSmartFolders(dev, session, folders);
-	}
-
-	private JSONArray loadAndParseSmartFolders(int userId) {
-		String trackFiltersSettings = getFiltersSettings(userId);
-		if (trackFiltersSettings == null) {
-			return null;
-		}
-		return new JSONArray(trackFiltersSettings);
 	}
 
 	private int findFolderIndex(JSONArray folders, String folderName) {
