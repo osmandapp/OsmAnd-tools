@@ -130,8 +130,19 @@ public interface OBFService extends BaseService {
 	}
 	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
+	List<String> OBF_CONTINENTS = List.of(
+			"asia",
+			"europe",
+			"africa",
+			"antarctica",
+			"australia-oceania",
+			"northamerica",
+			"centralamerica",
+			"southamerica");
+
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 	}
+	record ObfFileInfo(String path, String name, String continent, String country, String region) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
@@ -145,6 +156,87 @@ public interface OBFService extends BaseService {
 	record PoiAddress(String name, LatLon point, String value) {}
 	record HouseAddress(String name, LatLon point) {}
 	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {}
+
+	default List<ObfFileInfo> getObfFileInfos() throws IOException {
+		List<ObfFileInfo> result = new ArrayList<>();
+		for (String obf : getMapsService().getOBFs()) {
+			if (getObfFileName(obf).startsWith("World_base")) {
+				continue;
+			}
+			result.add(parseObfFileInfo(obf));
+		}
+		result.sort(Comparator.comparing(ObfFileInfo::name, String.CASE_INSENSITIVE_ORDER));
+		return result;
+	}
+
+	default ObfFileInfo parseObfFileInfo(String obf) {
+		String name = getObfFileName(obf);
+		String baseName = stripObfExtension(name);
+		String[] rawParts = baseName.split("_");
+		List<String> parts = new ArrayList<>();
+		for (String rawPart : rawParts) {
+			if (!Algorithms.isEmpty(rawPart)) {
+				parts.add(rawPart);
+			}
+		}
+		while (!parts.isEmpty() && parts.get(parts.size() - 1).matches("\\d+")) {
+			parts.remove(parts.size() - 1);
+		}
+		String continent = "";
+		int continentIndex = -1;
+		for (int i = parts.size() - 1; i >= 0; i--) {
+			String part = parts.get(i).toLowerCase(Locale.ROOT);
+			if (OBF_CONTINENTS.contains(part)) {
+				continent = part;
+				continentIndex = i;
+				break;
+			}
+		}
+		String country = continentIndex > 0 ? parts.get(0) : (!parts.isEmpty() ? parts.get(0) : "");
+		String region = "";
+		if (continentIndex > 1) {
+			region = String.join("_", parts.subList(1, continentIndex));
+		} else if (continentIndex < 0 && parts.size() > 1) {
+			region = String.join("_", parts.subList(1, parts.size()));
+		}
+		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region));
+	}
+
+	static String getObfFileName(String obf) {
+		if (obf == null) {
+			return "";
+		}
+		String normalized = obf.replace('\\', '/');
+		int index = normalized.lastIndexOf('/');
+		return index >= 0 ? normalized.substring(index + 1) : normalized;
+	}
+
+	static String stripObfExtension(String name) {
+		if (name == null) {
+			return "";
+		}
+		String lower = name.toLowerCase(Locale.ROOT);
+		return lower.endsWith(".obf") ? name.substring(0, name.length() - 4) : name;
+	}
+
+	static String normalizeObfDisplayName(String value) {
+		if (Algorithms.isEmpty(value)) {
+			return "";
+		}
+		String[] words = value.replace('_', ' ').split("\\s+");
+		List<String> normalizedWords = new ArrayList<>();
+		for (String word : words) {
+			if (Algorithms.isEmpty(word)) {
+				continue;
+			}
+			if ("us".equalsIgnoreCase(word)) {
+				normalizedWords.add("US");
+			} else {
+				normalizedWords.add(word);
+			}
+		}
+		return String.join(" ", normalizedWords);
+	}
 
 	final class RawPoiObject {
 		String name = "";

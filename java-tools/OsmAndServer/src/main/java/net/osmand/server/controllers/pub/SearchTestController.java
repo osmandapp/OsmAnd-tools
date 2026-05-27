@@ -352,6 +352,12 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon));
 	}
 
+	@GetMapping(value = "/obf-tags", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.ObfFileInfo>> getObfTags() throws IOException {
+		return ResponseEntity.ok(testSearchService.getObfFileInfos());
+	}
+
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
