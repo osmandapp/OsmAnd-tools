@@ -90,29 +90,29 @@ public class SmartFolderService {
 		return smartFolderHelper;
 	}
 
-	public ResponseEntity<String> renameSmartFolderByUserId(String name, String newName,
+	public ResponseEntity<String> renameSmartFolderByUserId(String folderName, String newFolderName,
 	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                        HttpSession session) throws IOException {
-		return modifySmartFolder(name, dev, session,
-				(helper, folder) -> helper.renameSmartFolder(folder, newName));
+		return modifySmartFolder(folderName, dev, session,
+				(helper, folder) -> helper.renameSmartFolder(folder, newFolderName));
 	}
 
-	public ResponseEntity<String> deleteSmartFolderByUserId(String name, String newName,
+	public ResponseEntity<String> deleteSmartFolderByUserId(String folderName,
 	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                        HttpSession session) throws IOException {
-		return modifySmartFolder(name, dev, session, SmartFolderHelper::deleteSmartFolder);
+		return modifySmartFolder(folderName, dev, session, SmartFolderHelper::deleteSmartFolder);
 	}
 
-	private ResponseEntity<String> modifySmartFolder(String name, CloudUserDevicesRepository.CloudUserDevice dev,
+	private ResponseEntity<String> modifySmartFolder(String folderName, CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                 HttpSession session,
 	                                                 BiConsumer<SmartFolderHelper, SmartFolder> action) throws IOException {
 		String generalSettings = getGeneralSettings(dev.userid);
 		String trackFiltersSettings = getFiltersSettings(generalSettings);
 		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
 		smartFolderHelper.readJson(trackFiltersSettings);
-		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(name);
+		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(folderName);
 		if (smartFolder == null) {
-			return ResponseEntity.badRequest().body("Smart folder " + name + " not found");
+			return ResponseEntity.badRequest().body("Smart folder " + folderName + " not found");
 		}
 		action.accept(smartFolderHelper, smartFolder);
 		String smartFoldersJsonStr = SmartFolderHelper.Companion.getJson().encodeToString(

@@ -343,7 +343,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return smartFolderService.deleteSmartFolderByUserId(folderName, null, dev, session);
+		return smartFolderService.deleteSmartFolderByUserId(folderName, dev, session);
 	}
 
 	@GetMapping(value = "/rename-folder")
