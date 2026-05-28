@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService, OBFService {
+public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, IndexService {
     /**
      * Lightweight DTO for listing test-cases with parent dataset name.
      */
@@ -631,7 +631,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	}
 
 	public static void main(String[] args) {
-		OBFService svc = new SearchTestService(null);
+		InspectorService svc = new SearchTestService(null);
 		
 		String mapDir = System.getenv("MAP_DIR");
 		if (mapDir == null || mapDir.trim().isEmpty()) {

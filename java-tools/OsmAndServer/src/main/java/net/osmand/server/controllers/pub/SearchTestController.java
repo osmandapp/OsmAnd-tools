@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
+import net.osmand.server.api.searchtest.DetectorService;
 import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -408,7 +409,7 @@ public class SearchTestController {
 
 	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.ResultsWithStats> getResults(
+	public ResponseEntity<DetectorService.ResultsWithStats> getResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam() Double lat,
@@ -428,7 +429,7 @@ public class SearchTestController {
 			@RequestParam String query,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestBody(required = false) OBFService.UnitTestPayload unitTest,
+			@RequestBody(required = false) DetectorService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
