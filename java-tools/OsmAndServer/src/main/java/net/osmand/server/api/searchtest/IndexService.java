@@ -2306,16 +2306,16 @@ public interface IndexService extends OBFService {
 		return file;
 	}
 
-	default List<TagsDatasource> getTagsDatasources() throws IOException {
+	default List<Datasource> getTagsDatasources() throws IOException {
 		Path dir = getTagsDatasourceDir();
-		List<TagsDatasource> result = new ArrayList<>();
+		List<Datasource> result = new ArrayList<>();
 		try (var stream = Files.list(dir)) {
 			stream.filter(Files::isRegularFile)
 					.filter(path -> path.getFileName().toString().endsWith(".db") || path.getFileName().toString().endsWith(".sqlite"))
 					.sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
 					.forEach(path -> {
 						try {
-							result.add(new TagsDatasource(path.getFileName().toString(), Files.size(path), Files.getLastModifiedTime(path).toMillis()));
+							result.add(new Datasource(path.getFileName().toString(), Files.size(path), Files.getLastModifiedTime(path).toMillis()));
 						} catch (IOException ignored) {
 						}
 					});
@@ -2348,10 +2348,10 @@ public interface IndexService extends OBFService {
 		}
 	}
 
-	default TagsDbTokenPage getTagsDbTokens(String datasource, String prefix, boolean poi, boolean perObf,
-			int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
+	default DbTokenPage getTagsDbTokens(String datasource, String prefix, String objectType, boolean perObf,
+	                                    int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
 		Path dbFile = resolveTagsDatasource(datasource);
-		String posting = poi ? "poi_posting" : "addr_posting";
+		String posting = getPostingSource(objectType);
 		String where = Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?";
 		String countSql = "SELECT COUNT(*) FROM token t" + where + " AND EXISTS (SELECT 1 FROM " + posting + " p WHERE p.token_id = t.id)";
 		if (where.isEmpty()) {
@@ -2374,8 +2374,8 @@ public interface IndexService extends OBFService {
 					+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
 					+ (Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?")
 					+ " GROUP BY t.id, t.name, t.isCommon, t.isFrequent ORDER BY " + orderColumn + " " + order + ", name ASC LIMIT ? OFFSET ?";
-			List<TagsDbToken> content = new ArrayList<>();
-			TagsDbTokenSummary summary = new TagsDbTokenSummary(0, 0, 0, 0, 0, 0);
+			List<DbToken> content = new ArrayList<>();
+			DbTokenSummary summary = new DbTokenSummary(0, 0, 0, 0, 0, 0);
 			try (PreparedStatement ps = conn.prepareStatement(sql)) {
 				int idx = 1;
 				if (!Algorithms.isEmpty(prefix)) {
@@ -2385,30 +2385,32 @@ public interface IndexService extends OBFService {
 				ps.setInt(idx, safePage * safeSize);
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
-						content.add(new TagsDbToken(rs.getLong(1), rs.getString(2), rs.getLong(5), rs.getLong(6),
+						content.add(new DbToken(rs.getLong(1), rs.getString(2), rs.getLong(5), rs.getLong(6),
 								rs.getInt(3) != 0, rs.getInt(4) != 0));
 					}
 				}
 			}
 			summary = buildTagsDbTokenSummary(conn, posting, prefix);
 			int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-			return new TagsDbTokenPage(content, safePage, safeSize, total, totalPages, summary);
+			return new DbTokenPage(content, safePage, safeSize, total, totalPages, summary);
 		}
 	}
 
-	default TagsDbObjectPage getTagsDbObjects(String datasource, long tokenId, boolean poi, boolean perObf, String regExp,
-			int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
+	default DbObjectPage getTagsDbObjects(String datasource, long tokenId, String objectType, boolean perObf, String regExp,
+	                                      int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
 		Path dbFile = resolveTagsDatasource(datasource);
-		String posting = poi ? "poi_posting" : "addr_posting";
+		String posting = getPostingSource(objectType);
 		String source = perObf ? posting : "(SELECT token_id, object_id, isAlone, MIN(sequenceId) sequenceId FROM " + posting + " GROUP BY token_id, object_id, isAlone)";
 		String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.\"values\" REGEXP ?)";
-		String base = " FROM " + source + " p JOIN \"object\" o ON o.id = p.object_id WHERE p.token_id = ?" + filter;
+		String obfJoin = perObf ? " LEFT JOIN obf b ON b.id = p.obf_id" : "";
+		String base = " FROM " + source + " p JOIN \"object\" o ON o.id = p.object_id" + obfJoin + " WHERE p.token_id = ?" + filter;
 		String normalizedSort = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.toLowerCase(Locale.ROOT);
 		String orderColumn = switch (normalizedSort) {
 			case "name" -> "o.name";
 			case "type" -> "o.type";
 			case "osmid" -> "o.id";
 			case "alone", "isalone" -> "p.isAlone";
+			case "obf", "obfname" -> perObf ? "b.name" : "p.sequenceId";
 			default -> "p.sequenceId";
 		};
 		String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
@@ -2416,9 +2418,10 @@ public interface IndexService extends OBFService {
 		int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
 		try (Connection conn = openTagsDbConnection(dbFile)) {
 			long total = queryLong(conn, "SELECT COUNT(*)" + base, tokenId, regExp, regExp);
-			String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.\"values\", o.type, o.id, o.osmType, p.isAlone" + base
+			String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.\"values\", o.type, o.id, o.osmType, p.isAlone"
+					+ (perObf ? ", b.name" : ", NULL") + base
 					+ " ORDER BY " + orderColumn + " " + order + ", p.sequenceId ASC LIMIT ? OFFSET ?";
-			List<TagsDbObject> content = new ArrayList<>();
+			List<DbObject> content = new ArrayList<>();
 			try (PreparedStatement ps = conn.prepareStatement(sql)) {
 				int idx = bindTagsObjectParams(ps, 1, tokenId, regExp);
 				ps.setInt(idx++, safeSize);
@@ -2429,14 +2432,32 @@ public interface IndexService extends OBFService {
 						Double lon = rs.getObject(4) == null ? null : rs.getDouble(4);
 						LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
 						Map<String, String> values = parseObjectValues(rs.getString(5));
-						content.add(new TagsDbObject(rs.getInt(1), rs.getString(2), point, values, rs.getString(6),
-								rs.getLong(7), rs.getString(8), rs.getInt(9) != 0));
+						content.add(new DbObject(rs.getInt(1), rs.getString(2), point, values, rs.getString(6),
+								rs.getLong(7), rs.getString(8), rs.getInt(9) != 0, getTagsObfDisplayName(rs.getString(10))));
 					}
 				}
 			}
 			int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-			return new TagsDbObjectPage(content, safePage, safeSize, total, totalPages);
+			return new DbObjectPage(content, safePage, safeSize, total, totalPages);
 		}
+	}
+
+	private String getTagsObfDisplayName(String name) {
+		if (Algorithms.isEmpty(name)) {
+			return "";
+		}
+		String fileName = Path.of(name).getFileName().toString();
+		int dot = fileName.lastIndexOf('.');
+		return dot > 0 ? fileName.substring(0, dot) : fileName;
+	}
+
+	private String getPostingSource(String objectType) {
+		String normalized = Algorithms.isEmpty(objectType) ? "all" : objectType.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "poi" -> "poi_posting";
+			case "address", "addr" -> "addr_posting";
+			default -> "(SELECT token_id, object_id, obf_id, sequenceId, isAlone FROM poi_posting UNION ALL SELECT token_id, object_id, obf_id, sequenceId, isAlone FROM addr_posting)";
+		};
 	}
 
 	private Connection openTagsDbConnection(Path dbFile) throws SQLException {
@@ -2481,7 +2502,7 @@ public interface IndexService extends OBFService {
 		return idx;
 	}
 
-	private TagsDbTokenSummary buildTagsDbTokenSummary(Connection conn, String posting, String prefix) throws SQLException {
+	private DbTokenSummary buildTagsDbTokenSummary(Connection conn, String posting, String prefix) throws SQLException {
 		String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), MAX(matched), MAX(alone) FROM ("
 				+ "SELECT t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END) alone "
 				+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
@@ -2492,8 +2513,8 @@ public interface IndexService extends OBFService {
 				ps.setString(1, prefix);
 			}
 			try (ResultSet rs = ps.executeQuery()) {
-				return rs.next() ? new TagsDbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6))
-						: new TagsDbTokenSummary(0, 0, 0, 0, 0, 0);
+				return rs.next() ? new DbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6))
+						: new DbTokenSummary(0, 0, 0, 0, 0, 0);
 			}
 		}
 	}

@@ -549,7 +549,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.TagsDatasource>> getTagsDatasources() throws IOException {
+	public ResponseEntity<List<OBFService.Datasource>> getTagsDatasources() throws IOException {
 		return ResponseEntity.ok(testSearchService.getTagsDatasources());
 	}
 
@@ -615,29 +615,29 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tokens", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.TagsDbTokenPage> getTagsDbTokens(@PathVariable String name,
-			@RequestParam(required = false) String prefix,
-			@RequestParam(defaultValue = "true") boolean poi,
-			@RequestParam(defaultValue = "false") boolean perObf,
-			@RequestParam(defaultValue = "0") int pageToShow,
-			@RequestParam(defaultValue = "100") int pageSizeLimit,
-			@RequestParam(required = false) String sortBy,
-			@RequestParam(required = false) String sortOrder) throws IOException, SQLException {
-		return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, poi, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
+	public ResponseEntity<OBFService.DbTokenPage> getTagsDbTokens(@PathVariable String name,
+	                                                              @RequestParam(required = false) String prefix,
+	                                                              @RequestParam(defaultValue = "all") String objectType,
+	                                                              @RequestParam(defaultValue = "false") boolean perObf,
+	                                                              @RequestParam(defaultValue = "0") int pageToShow,
+	                                                              @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                              @RequestParam(required = false) String sortBy,
+	                                                              @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, objectType, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@GetMapping(value = "/tags-datasources/{name}/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.TagsDbObjectPage> getTagsDbObjects(@PathVariable String name,
-			@RequestParam long tokenId,
-			@RequestParam(defaultValue = "true") boolean poi,
-			@RequestParam(defaultValue = "false") boolean perObf,
-			@RequestParam(required = false) String regExp,
-			@RequestParam(defaultValue = "0") int pageToShow,
-			@RequestParam(defaultValue = "100") int pageSizeLimit,
-			@RequestParam(required = false) String sortBy,
-			@RequestParam(required = false) String sortOrder) throws IOException, SQLException {
-		return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, poi, perObf, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder));
+	public ResponseEntity<OBFService.DbObjectPage> getTagsDbObjects(@PathVariable String name,
+	                                                                @RequestParam long tokenId,
+	                                                                @RequestParam(defaultValue = "all") String objectType,
+	                                                                @RequestParam(defaultValue = "false") boolean perObf,
+	                                                                @RequestParam(required = false) String regExp,
+	                                                                @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                @RequestParam(required = false) String sortBy,
+	                                                                @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)

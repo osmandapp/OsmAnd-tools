@@ -13,7 +13,6 @@ import net.osmand.util.MapUtils;
 import java.io.*;
 import java.text.Normalizer;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 public interface OBFService extends BaseService {
@@ -90,12 +89,12 @@ public interface OBFService extends BaseService {
 	record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
-	record TagsDatasource(String name, long size, long lastModified) {}
-	record TagsDbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
-	record TagsDbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
-	record TagsDbTokenPage(List<TagsDbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, TagsDbTokenSummary summary) {}
-	record TagsDbObject(int sequenceId, String name, LatLon point, Map<String, String> values, String type, Long osmId, String osmType, boolean isAlone) {}
-	record TagsDbObjectPage(List<TagsDbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+	record Datasource(String name, long size, long lastModified) {}
+	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
+	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
+	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
+	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> values, String type, Long osmId, String osmType, boolean isAlone, String obfName) {}
+	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
