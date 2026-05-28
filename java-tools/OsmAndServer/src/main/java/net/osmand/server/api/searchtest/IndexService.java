@@ -9,6 +9,7 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TransliterationHelper;
+import org.sqlite.Function;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
@@ -1813,26 +1815,7 @@ public interface IndexService extends OBFService {
 		}
 		Path dbFile = Files.createTempFile("search-test-db-", ".sqlite");
 		try {
-			try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
-				createGenerateDbSchema(conn);
-				conn.setAutoCommit(false);
-				try {
-					populateDb(conn, obfs, progressListener);
-					conn.commit();
-				} catch (Exception e) {
-					conn.rollback();
-					if (e instanceof CancellationException cancellationException) {
-						throw cancellationException;
-					}
-					if (e instanceof SQLException sqlException) {
-						throw sqlException;
-					}
-					if (e instanceof IOException ioException) {
-						throw ioException;
-					}
-					throw new IOException("Failed to generate SQLite DB: " + e.getMessage(), e);
-				}
-			}
+			generateDbFile(obfs, dbFile, progressListener);
 			try (ZipOutputStream zip = new ZipOutputStream(out)) {
 				zip.putNextEntry(new ZipEntry("db.sqlite"));
 				Files.copy(dbFile, zip);
@@ -1844,6 +1827,34 @@ public interface IndexService extends OBFService {
 				Files.deleteIfExists(dbFile);
 			} catch (IOException e) {
 				getLogger().warn("Failed to delete temporary generated DB {}", dbFile, e);
+			}
+		}
+	}
+
+	default void generateDbFile(List<String> obfs, Path dbFile, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+		if (obfs == null || obfs.isEmpty()) {
+			throw new IllegalArgumentException("OBF file list is required");
+		}
+		Files.createDirectories(dbFile.toAbsolutePath().getParent());
+		Files.deleteIfExists(dbFile);
+		try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
+			createGenerateDbSchema(conn);
+			conn.setAutoCommit(false);
+			try {
+				populateDb(conn, obfs, progressListener);
+				conn.commit();
+			} catch (Exception e) {
+				conn.rollback();
+				if (e instanceof CancellationException cancellationException) {
+					throw cancellationException;
+				}
+				if (e instanceof SQLException sqlException) {
+					throw sqlException;
+				}
+				if (e instanceof IOException ioException) {
+					throw ioException;
+				}
+				throw new IOException("Failed to generate SQLite DB: " + e.getMessage(), e);
 			}
 		}
 	}
@@ -1885,12 +1896,23 @@ public interface IndexService extends OBFService {
 					)
 					""");
 			stmt.execute("""
-					CREATE TABLE posting (
+					CREATE TABLE poi_posting (
 						obf_id INTEGER NOT NULL,
 						token_id INTEGER NOT NULL,
 						object_id INTEGER NOT NULL,
 						sequenceId INTEGER NOT NULL,
-						PRIMARY KEY (token_id, sequenceId, obf_id)
+						isAlone INTEGER NOT NULL DEFAULT 0,
+						PRIMARY KEY (token_id, object_id, obf_id)
+					)
+					""");
+			stmt.execute("""
+					CREATE TABLE addr_posting (
+						obf_id INTEGER NOT NULL,
+						token_id INTEGER NOT NULL,
+						object_id INTEGER NOT NULL,
+						sequenceId INTEGER NOT NULL,
+						isAlone INTEGER NOT NULL DEFAULT 0,
+						PRIMARY KEY (token_id, object_id, obf_id)
 					)
 					""");
 		}
@@ -1917,9 +1939,19 @@ public interface IndexService extends OBFService {
 				     INSERT OR IGNORE INTO "object"(id, name, lat, lon, "values", type, osmType)
 				     VALUES (?, ?, ?, ?, ?, ?, ?)
 				     """);
-		     PreparedStatement insertObfPosting = conn.prepareStatement("""
-				     INSERT INTO posting(obf_id, token_id, object_id, sequenceId)
-				     VALUES (?, ?, ?, ?)
+		     PreparedStatement insertPoiPosting = conn.prepareStatement("""
+				     INSERT INTO poi_posting(obf_id, token_id, object_id, sequenceId, isAlone)
+				     VALUES (?, ?, ?, ?, ?)
+				     ON CONFLICT(token_id, object_id, obf_id) DO UPDATE SET
+				     	sequenceId = MIN(poi_posting.sequenceId, excluded.sequenceId),
+				     	isAlone = CASE WHEN poi_posting.isAlone = 1 OR excluded.isAlone = 1 THEN 1 ELSE 0 END
+				     """);
+		     PreparedStatement insertAddrPosting = conn.prepareStatement("""
+				     INSERT INTO addr_posting(obf_id, token_id, object_id, sequenceId, isAlone)
+				     VALUES (?, ?, ?, ?, ?)
+				     ON CONFLICT(token_id, object_id, obf_id) DO UPDATE SET
+				     	sequenceId = MIN(addr_posting.sequenceId, excluded.sequenceId),
+				     	isAlone = CASE WHEN addr_posting.isAlone = 1 OR excluded.isAlone = 1 THEN 1 ELSE 0 END
 				     """)) {
 			int totalObfs = obfs.size();
 			Map<Integer, GenerateDbObfState> progressStates = new LinkedHashMap<>();
@@ -2006,7 +2038,7 @@ public interface IndexService extends OBFService {
 							}
 							insertGenerateDbObject(insertObject, objectAddress);
 							objectCounts.get(chunk.obfIndex()).incrementAndGet();
-							insertGenerateDbObfPosting(insertObfPosting, obfId, tokenId, objectAddress);
+							insertGenerateDbObfPosting(objectAddress.isPoi() ? insertPoiPosting : insertAddrPosting, obfId, tokenId, objectAddress);
 						}
 						incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
 					}
@@ -2239,6 +2271,238 @@ public interface IndexService extends OBFService {
 		insertObfPosting.setLong(2, tokenId);
 		insertObfPosting.setLong(3, objectAddress.osmId());
 		insertObfPosting.setInt(4, objectAddress.sequenceId());
+		insertObfPosting.setInt(5, objectAddress.isAlone() ? 1 : 0);
 		insertObfPosting.executeUpdate();
+	}
+
+	default Path getTagsDatasourceDir() throws IOException {
+		String url = getSearchTestDatasourceUrl();
+		if (Algorithms.isEmpty(url)) {
+			throw new IOException("spring.searchtestdatasource.url is not configured");
+		}
+		String path = url.startsWith("jdbc:sqlite:") ? url.substring("jdbc:sqlite:".length()) : url;
+		Path parent = Path.of(path).toAbsolutePath().getParent();
+		if (parent == null) {
+			throw new IOException("Could not resolve datasource parent directory");
+		}
+		Path dir = parent.resolve("tags_db");
+		Files.createDirectories(dir);
+		return dir;
+	}
+
+	default Path resolveTagsDatasource(String name) throws IOException {
+		if (Algorithms.isEmpty(name)) {
+			throw new IOException("Datasource name is required");
+		}
+		String fileName = Path.of(name).getFileName().toString();
+		if (!fileName.endsWith(".db") && !fileName.endsWith(".sqlite")) {
+			fileName += ".db";
+		}
+		Path dir = getTagsDatasourceDir();
+		Path file = dir.resolve(fileName).normalize();
+		if (!file.startsWith(dir)) {
+			throw new IOException("Invalid datasource name");
+		}
+		return file;
+	}
+
+	default List<TagsDatasource> getTagsDatasources() throws IOException {
+		Path dir = getTagsDatasourceDir();
+		List<TagsDatasource> result = new ArrayList<>();
+		try (var stream = Files.list(dir)) {
+			stream.filter(Files::isRegularFile)
+					.filter(path -> path.getFileName().toString().endsWith(".db") || path.getFileName().toString().endsWith(".sqlite"))
+					.sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
+					.forEach(path -> {
+						try {
+							result.add(new TagsDatasource(path.getFileName().toString(), Files.size(path), Files.getLastModifiedTime(path).toMillis()));
+						} catch (IOException ignored) {
+						}
+					});
+		}
+		return result;
+	}
+
+	default boolean deleteTagsDatasource(String name) throws IOException {
+		return Files.deleteIfExists(resolveTagsDatasource(name));
+	}
+
+	default void createTagsDatasource(String name, List<String> obfs, boolean overwrite, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+		Path dbFile = resolveTagsDatasource(name);
+		if (Files.exists(dbFile) && !overwrite) {
+			throw new IOException("Datasource already exists: " + dbFile.getFileName());
+		}
+		generateDbFile(obfs, dbFile, progressListener);
+	}
+
+	default void downloadTagsDatasource(String name, OutputStream out) throws IOException {
+		Path dbFile = resolveTagsDatasource(name);
+		if (!Files.exists(dbFile)) {
+			throw new IOException("Datasource not found: " + name);
+		}
+		try (ZipOutputStream zip = new ZipOutputStream(out)) {
+			zip.putNextEntry(new ZipEntry("db.sqlite"));
+			Files.copy(dbFile, zip);
+			zip.closeEntry();
+			zip.finish();
+		}
+	}
+
+	default TagsDbTokenPage getTagsDbTokens(String datasource, String prefix, boolean poi, boolean perObf,
+			int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
+		Path dbFile = resolveTagsDatasource(datasource);
+		String posting = poi ? "poi_posting" : "addr_posting";
+		String where = Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?";
+		String countSql = "SELECT COUNT(*) FROM token t" + where + " AND EXISTS (SELECT 1 FROM " + posting + " p WHERE p.token_id = t.id)";
+		if (where.isEmpty()) {
+			countSql = "SELECT COUNT(*) FROM token t WHERE EXISTS (SELECT 1 FROM " + posting + " p WHERE p.token_id = t.id)";
+		}
+		String normalizedSort = Algorithms.isEmpty(sortBy) ? "name" : sortBy.toLowerCase(Locale.ROOT);
+		String orderColumn = switch (normalizedSort) {
+			case "matched" -> "matched";
+			case "alone" -> "alone";
+			case "common" -> "isCommon";
+			case "frequent" -> "isFrequent";
+			default -> "name";
+		};
+		String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+		int safePage = Math.max(0, pageToShow);
+		int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
+		try (Connection conn = openTagsDbConnection(dbFile)) {
+			long total = queryLong(conn, countSql, prefix);
+			String sql = "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END) alone "
+					+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
+					+ (Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?")
+					+ " GROUP BY t.id, t.name, t.isCommon, t.isFrequent ORDER BY " + orderColumn + " " + order + ", name ASC LIMIT ? OFFSET ?";
+			List<TagsDbToken> content = new ArrayList<>();
+			TagsDbTokenSummary summary = new TagsDbTokenSummary(0, 0, 0, 0, 0, 0);
+			try (PreparedStatement ps = conn.prepareStatement(sql)) {
+				int idx = 1;
+				if (!Algorithms.isEmpty(prefix)) {
+					ps.setString(idx++, prefix);
+				}
+				ps.setInt(idx++, safeSize);
+				ps.setInt(idx, safePage * safeSize);
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						content.add(new TagsDbToken(rs.getLong(1), rs.getString(2), rs.getLong(5), rs.getLong(6),
+								rs.getInt(3) != 0, rs.getInt(4) != 0));
+					}
+				}
+			}
+			summary = buildTagsDbTokenSummary(conn, posting, prefix);
+			int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
+			return new TagsDbTokenPage(content, safePage, safeSize, total, totalPages, summary);
+		}
+	}
+
+	default TagsDbObjectPage getTagsDbObjects(String datasource, long tokenId, boolean poi, boolean perObf, String regExp,
+			int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
+		Path dbFile = resolveTagsDatasource(datasource);
+		String posting = poi ? "poi_posting" : "addr_posting";
+		String source = perObf ? posting : "(SELECT token_id, object_id, isAlone, MIN(sequenceId) sequenceId FROM " + posting + " GROUP BY token_id, object_id, isAlone)";
+		String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.\"values\" REGEXP ?)";
+		String base = " FROM " + source + " p JOIN \"object\" o ON o.id = p.object_id WHERE p.token_id = ?" + filter;
+		String normalizedSort = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.toLowerCase(Locale.ROOT);
+		String orderColumn = switch (normalizedSort) {
+			case "name" -> "o.name";
+			case "type" -> "o.type";
+			case "osmid" -> "o.id";
+			case "alone", "isalone" -> "p.isAlone";
+			default -> "p.sequenceId";
+		};
+		String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+		int safePage = Math.max(0, pageToShow);
+		int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
+		try (Connection conn = openTagsDbConnection(dbFile)) {
+			long total = queryLong(conn, "SELECT COUNT(*)" + base, tokenId, regExp, regExp);
+			String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.\"values\", o.type, o.id, o.osmType, p.isAlone" + base
+					+ " ORDER BY " + orderColumn + " " + order + ", p.sequenceId ASC LIMIT ? OFFSET ?";
+			List<TagsDbObject> content = new ArrayList<>();
+			try (PreparedStatement ps = conn.prepareStatement(sql)) {
+				int idx = bindTagsObjectParams(ps, 1, tokenId, regExp);
+				ps.setInt(idx++, safeSize);
+				ps.setInt(idx, safePage * safeSize);
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) {
+						Double lat = rs.getObject(3) == null ? null : rs.getDouble(3);
+						Double lon = rs.getObject(4) == null ? null : rs.getDouble(4);
+						LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
+						Map<String, String> values = parseObjectValues(rs.getString(5));
+						content.add(new TagsDbObject(rs.getInt(1), rs.getString(2), point, values, rs.getString(6),
+								rs.getLong(7), rs.getString(8), rs.getInt(9) != 0));
+					}
+				}
+			}
+			int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
+			return new TagsDbObjectPage(content, safePage, safeSize, total, totalPages);
+		}
+	}
+
+	private Connection openTagsDbConnection(Path dbFile) throws SQLException {
+		Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
+		conn.createStatement().execute("PRAGMA query_only = ON");
+		Function.create(conn, "REGEXP", new Function() {
+			@Override
+			protected void xFunc() throws SQLException {
+				String pattern = value_text(0);
+				String value = value_text(1);
+				result(pattern != null && value != null && Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(value).find() ? 1 : 0);
+			}
+		});
+		return conn;
+	}
+
+	private long queryLong(Connection conn, String sql, Object... params) throws SQLException {
+		try (PreparedStatement ps = conn.prepareStatement(sql)) {
+			int idx = 1;
+			for (Object param : params) {
+				if (param == null || (param instanceof String s && Algorithms.isEmpty(s))) {
+					continue;
+				}
+				if (param instanceof Number number) {
+					ps.setLong(idx++, number.longValue());
+				} else {
+					ps.setString(idx++, String.valueOf(param));
+				}
+			}
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getLong(1) : 0;
+			}
+		}
+	}
+
+	private int bindTagsObjectParams(PreparedStatement ps, int idx, long tokenId, String regExp) throws SQLException {
+		ps.setLong(idx++, tokenId);
+		if (!Algorithms.isEmpty(regExp)) {
+			ps.setString(idx++, regExp);
+			ps.setString(idx++, regExp);
+		}
+		return idx;
+	}
+
+	private TagsDbTokenSummary buildTagsDbTokenSummary(Connection conn, String posting, String prefix) throws SQLException {
+		String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), MAX(matched), MAX(alone) FROM ("
+				+ "SELECT t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END) alone "
+				+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
+				+ (Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?")
+				+ " GROUP BY t.id, t.isCommon, t.isFrequent)";
+		try (PreparedStatement ps = conn.prepareStatement(sql)) {
+			if (!Algorithms.isEmpty(prefix)) {
+				ps.setString(1, prefix);
+			}
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? new TagsDbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6))
+						: new TagsDbTokenSummary(0, 0, 0, 0, 0, 0);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, String> parseObjectValues(String json) throws IOException {
+		if (Algorithms.isEmpty(json)) {
+			return Collections.emptyMap();
+		}
+		return getObjectMapper().readValue(json, Map.class);
 	}
 }
