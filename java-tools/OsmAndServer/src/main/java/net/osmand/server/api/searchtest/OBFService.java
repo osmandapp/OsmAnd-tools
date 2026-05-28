@@ -383,6 +383,14 @@ public interface OBFService extends BaseService {
 					}
 					break;
 				}
+				case OsmandOdb.OsmAndPoiBoxDataAtom.SUBCATEGORIES_FIELD_NUMBER: {
+					StringBuilder valueBuilder = new StringBuilder();
+					BinaryMapPoiReaderAdapter.PoiSubType poiSubtype = poiRegion.getSubtypeFromId(codedIS.readUInt32(), valueBuilder);
+					if (poiSubtype != null && !poiRegion.getTopIndexSubTypes().contains(poiSubtype)) {
+						record.addDecodedTextTag(poiSubtype.name, decodePoiString(valueBuilder.toString()));
+					}
+					break;
+				}
 
 				case OsmandOdb.OsmAndPoiBoxDataAtom.NAME_FIELD_NUMBER:
 					record.name = decodePoiString(codedIS.readString());

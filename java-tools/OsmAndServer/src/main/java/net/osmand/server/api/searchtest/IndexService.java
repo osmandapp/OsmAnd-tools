@@ -930,7 +930,7 @@ public interface IndexService extends OBFService {
 				case OsmandOdb.CityIndex.CITY_TYPE_FIELD_NUMBER:
 					int type = codedIS.readUInt32();
 					City.CityType[] values = City.CityType.values();
-					if (type <= City.CityType.POSTCODE.ordinal()) {
+					if (type >= 0 && type < values.length) {
 						city = new City(values[type]);
 					}
 					break;
@@ -955,6 +955,8 @@ public interface IndexService extends OBFService {
 						String attributeTag = additionalTags.pollFirst();
 						if (attributeTag.startsWith("name:")) {
 							city.setName(attributeTag.substring("name:".length()), attributeValue);
+						} else {
+							city.setName(attributeTag, attributeValue);
 						}
 					}
 					break;
@@ -1029,6 +1031,8 @@ public interface IndexService extends OBFService {
 						String attributeTag = additionalTags.pollFirst();
 						if (attributeTag.startsWith("name:")) {
 							street.setName(attributeTag.substring("name:".length()), attributeValue);
+						} else {
+							street.setName(attributeTag, attributeValue);
 						}
 					}
 					break;
@@ -1069,7 +1073,29 @@ public interface IndexService extends OBFService {
 				}
 			}
 		}
-		return matches;
+		return matches || matchesAddressAttributeValues(city, matcher);
+	}
+
+	private boolean matchesAddressAttributeValues(MapObject object, CollatorStringMatcher matcher) {
+		if (object == null || matcher == null) {
+			return false;
+		}
+		Map<String, String> values = object.getNamesMap(true);
+		if (values == null || values.isEmpty()) {
+			return false;
+		}
+		for (Map.Entry<String, String> entry : values.entrySet()) {
+			String key = entry.getKey();
+			if (Amenity.NAME.equals(key) || "en".equals(key) || (key != null && key.startsWith("name:"))) {
+				continue;
+			}
+			if ("place".equals(key) || isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key)) {
+				if (matcher.matches(entry.getValue())) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private boolean matchesLegacyStreet(Street street, CollatorStringMatcher matcher) {
@@ -1085,7 +1111,7 @@ public interface IndexService extends OBFService {
 				}
 			}
 		}
-		return matches;
+		return matches || matchesAddressAttributeValues(street, matcher);
 	}
 
 	private void collectPoiObjectsByStoredOffsets(BinaryMapIndexReaderExt index,
@@ -1318,43 +1344,49 @@ public interface IndexService extends OBFService {
 		if (rawPoiObject == null || matcher == null) {
 			return false;
 		}
-		boolean matches = matcher.matches(safeLowerCase(rawPoiObject.name))
-				|| matcher.matches(safeLowerCase(getLegacyPoiEnName(rawPoiObject, true)));
-		if (!matches) {
-			for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
-				String key = entry.getKey();
-				if (key == null || !key.startsWith("name:") || "name:en".equals(key)) {
-					continue;
-				}
-				for (String value : entry.getValue()) {
-					matches = matcher.matches(safeLowerCase(value));
-					if (matches) {
-						break;
-					}
-				}
-				if (matches) {
-					break;
-				}
-			}
-			if (!matches) {
-				for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
-					String key = entry.getKey();
-					if (isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key)
-							|| isTagIndexedAsSearchRelated(key)) {
-						for (String value : entry.getValue()) {
-							matches = matcher.matches(value);
-							if (matches) {
-								break;
-							}
-						}
-					}
-					if (matches) {
-						break;
-					}
+		if (matcher.matches(safeLowerCase(rawPoiObject.name))
+				|| matcher.matches(safeLowerCase(getLegacyPoiEnName(rawPoiObject, true)))) {
+			return true;
+		}
+		if (matchesLegacyPoiOtherNames(rawPoiObject, matcher)) {
+			return true;
+		}
+		for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
+			String key = entry.getKey();
+			if (isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key)
+					|| isTagIndexedAsSearchRelated(key)) {
+				if (matchesAnyLegacyPoiValue(entry.getValue(), matcher, false)) {
+					return true;
 				}
 			}
 		}
-		return matches;
+		return false;
+	}
+
+	private boolean matchesLegacyPoiOtherNames(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
+		for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
+			String key = entry.getKey();
+			if (key == null || (!key.startsWith("name:") && !key.startsWith("name_"))) {
+				continue;
+			}
+			if (matchesAnyLegacyPoiValue(entry.getValue(), matcher, true)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean matchesAnyLegacyPoiValue(List<String> values, CollatorStringMatcher matcher, boolean lowerCase) {
+		if (values == null || values.isEmpty()) {
+			return false;
+		}
+		for (String value : values) {
+			String candidate = lowerCase ? safeLowerCase(value) : value;
+			if (matcher.matches(candidate)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private String getLegacyPoiEnName(RawPoiObject rawPoiObject, boolean transliterate) {
@@ -1431,6 +1463,9 @@ public interface IndexService extends OBFService {
 		Map<String, String> values = new LinkedHashMap<>();
 		if (mapObject == null) {
 			return values;
+		}
+		if (mapObject instanceof City city && city.getType() != null) {
+			values.put("place", City.CityType.valueToString(city.getType()));
 		}
 		String localizedName = mapObject.getName(lang);
 		if (!Algorithms.isEmpty(localizedName)) {
@@ -2352,11 +2387,9 @@ public interface IndexService extends OBFService {
 	                                    int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
 		Path dbFile = resolveTagsDatasource(datasource);
 		String posting = getPostingSource(objectType);
-		String where = Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?";
-		String countSql = "SELECT COUNT(*) FROM token t" + where + " AND EXISTS (SELECT 1 FROM " + posting + " p WHERE p.token_id = t.id)";
-		if (where.isEmpty()) {
-			countSql = "SELECT COUNT(*) FROM token t WHERE EXISTS (SELECT 1 FROM " + posting + " p WHERE p.token_id = t.id)";
-		}
+		String tokenFilter = getTokenSourceFilter(objectType);
+		String where = buildTagsDbTokenWhere(prefix, tokenFilter);
+		String countSql = "SELECT COUNT(*) FROM token t" + where;
 		String normalizedSort = Algorithms.isEmpty(sortBy) ? "name" : sortBy.toLowerCase(Locale.ROOT);
 		String orderColumn = switch (normalizedSort) {
 			case "matched" -> "matched";
@@ -2370,9 +2403,9 @@ public interface IndexService extends OBFService {
 		int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
 		try (Connection conn = openTagsDbConnection(dbFile)) {
 			long total = queryLong(conn, countSql, prefix);
-			String sql = "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END) alone "
-					+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
-					+ (Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?")
+			String sql = "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
+					+ "FROM token t LEFT JOIN " + posting + " p ON p.token_id = t.id"
+					+ where
 					+ " GROUP BY t.id, t.name, t.isCommon, t.isFrequent ORDER BY " + orderColumn + " " + order + ", name ASC LIMIT ? OFFSET ?";
 			List<DbToken> content = new ArrayList<>();
 			DbTokenSummary summary = new DbTokenSummary(0, 0, 0, 0, 0, 0);
@@ -2390,7 +2423,7 @@ public interface IndexService extends OBFService {
 					}
 				}
 			}
-			summary = buildTagsDbTokenSummary(conn, posting, prefix);
+			summary = buildTagsDbTokenSummary(conn, posting, prefix, tokenFilter);
 			int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
 			return new DbTokenPage(content, safePage, safeSize, total, totalPages, summary);
 		}
@@ -2460,6 +2493,26 @@ public interface IndexService extends OBFService {
 		};
 	}
 
+	private String getTokenSourceFilter(String objectType) {
+		String normalized = Algorithms.isEmpty(objectType) ? "all" : objectType.trim().toLowerCase(Locale.ROOT);
+		return switch (normalized) {
+			case "poi" -> "t.poiRefs > 0";
+			case "address", "addr" -> "t.addressRefs > 0";
+			default -> "";
+		};
+	}
+
+	private String buildTagsDbTokenWhere(String prefix, String tokenFilter) {
+		List<String> conditions = new ArrayList<>();
+		if (!Algorithms.isEmpty(prefix)) {
+			conditions.add("t.name REGEXP ?");
+		}
+		if (!Algorithms.isEmpty(tokenFilter)) {
+			conditions.add(tokenFilter);
+		}
+		return conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
+	}
+
 	private Connection openTagsDbConnection(Path dbFile) throws SQLException {
 		Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
 		conn.createStatement().execute("PRAGMA query_only = ON");
@@ -2502,11 +2555,11 @@ public interface IndexService extends OBFService {
 		return idx;
 	}
 
-	private DbTokenSummary buildTagsDbTokenSummary(Connection conn, String posting, String prefix) throws SQLException {
+	private DbTokenSummary buildTagsDbTokenSummary(Connection conn, String posting, String prefix, String tokenFilter) throws SQLException {
 		String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), MAX(matched), MAX(alone) FROM ("
-				+ "SELECT t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END) alone "
-				+ "FROM token t JOIN " + posting + " p ON p.token_id = t.id"
-				+ (Algorithms.isEmpty(prefix) ? "" : " WHERE t.name REGEXP ?")
+				+ "SELECT t.isCommon, t.isFrequent, COUNT(p.object_id) matched, COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
+				+ "FROM token t LEFT JOIN " + posting + " p ON p.token_id = t.id"
+				+ buildTagsDbTokenWhere(prefix, tokenFilter)
 				+ " GROUP BY t.id, t.isCommon, t.isFrequent)";
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 			if (!Algorithms.isEmpty(prefix)) {
