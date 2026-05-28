@@ -3587,6 +3587,7 @@ public interface OBFService extends BaseService {
 		Comparator<ObjectAddress> comparator = switch (normalizedSortBy) {
 			case "#", "sequence", "sequenceid" -> Comparator.comparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId());
 			case "type" -> Comparator.comparing(object -> object == null || object.type() == null ? "" : object.type(), String.CASE_INSENSITIVE_ORDER);
+			case "osmid" -> Comparator.comparingLong(object -> object == null || object.osmId() == null ? Long.MAX_VALUE : object.osmId());
 			case "matched" -> Comparator.comparingInt(object -> object != null && object.isMatched() ? 1 : 0);
 			default -> Comparator.comparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
 		};
@@ -3680,9 +3681,7 @@ public interface OBFService extends BaseService {
 					CREATE TABLE posting (
 						object_id INTEGER NOT NULL,
 						token_id INTEGER NOT NULL,
-						PRIMARY KEY (token_id, object_id),
-						FOREIGN KEY (object_id) REFERENCES "Object"(id),
-						FOREIGN KEY (token_id) REFERENCES Token(id)
+						PRIMARY KEY (token_id, object_id)
 					)
 					""");
 			stmt.execute("""
@@ -3691,16 +3690,9 @@ public interface OBFService extends BaseService {
 						token_id INTEGER NOT NULL,
 						object_id INTEGER NOT NULL,
 						sequenceId INTEGER NOT NULL,
-						payloadOffset INTEGER NOT NULL,
-						sourceOffset INTEGER NOT NULL,
-						PRIMARY KEY (obf_id, token_id, object_id),
-						FOREIGN KEY (obf_id) REFERENCES OBF(id),
-						FOREIGN KEY (token_id, object_id) REFERENCES posting(token_id, object_id)
+						PRIMARY KEY (obf_id, token_id, sequenceId)
 					)
 					""");
-			stmt.execute("CREATE INDEX idx_posting_object ON posting(object_id)");
-			stmt.execute("CREATE INDEX idx_posting_token ON posting(token_id)");
-			stmt.execute("CREATE INDEX idx_obf_posting_object ON obf_posting(object_id)");
 		}
 	}
 
@@ -3730,8 +3722,8 @@ public interface OBFService extends BaseService {
 				     VALUES (?, ?)
 				     """);
 		     PreparedStatement insertObfPosting = conn.prepareStatement("""
-				     INSERT OR IGNORE INTO obf_posting(obf_id, token_id, object_id, sequenceId, payloadOffset, sourceOffset)
-				     VALUES (?, ?, ?, ?, ?, ?)
+				     INSERT INTO obf_posting(obf_id, token_id, object_id, sequenceId)
+				     VALUES (?, ?, ?, ?)
 				     """)) {
 			int totalObfs = obfs.size();
 			Map<Integer, GenerateDbObfState> progressStates = new LinkedHashMap<>();
@@ -3782,9 +3774,8 @@ public interface OBFService extends BaseService {
 					notifyGenerateDbProgress(progressListener, "RUNNING", obfTokens.obfName(), obfTokens.obfIndex(), totalObfs,
 							0, obfTokens.tokens().size(), obfTokens.startMs(), null, progressStates);
 					for (int start = 0; start < obfTokens.tokens().size(); start += 10) {
-						int from = start;
-						int to = Math.min(start + 10, obfTokens.tokens().size());
-						List<IndexToken> tokenChunk = obfTokens.tokens().subList(from, to);
+                        int to = Math.min(start + 10, obfTokens.tokens().size());
+						List<IndexToken> tokenChunk = obfTokens.tokens().subList(start, to);
 						chunkService.submit(() -> loadGenerateDbTokenChunk(obfTokens, tokenChunk));
 						submittedChunks++;
 					}
@@ -4061,8 +4052,6 @@ public interface OBFService extends BaseService {
 		insertObfPosting.setLong(2, tokenId);
 		insertObfPosting.setLong(3, objectAddress.osmId());
 		insertObfPosting.setInt(4, objectAddress.sequenceId());
-		insertObfPosting.setInt(5, objectAddress.payloadOffset());
-		insertObfPosting.setInt(6, objectAddress.sourceOffset());
 		insertObfPosting.executeUpdate();
 	}
 }
