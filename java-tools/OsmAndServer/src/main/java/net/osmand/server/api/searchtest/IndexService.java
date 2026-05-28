@@ -1886,18 +1886,11 @@ public interface IndexService extends OBFService {
 					""");
 			stmt.execute("""
 					CREATE TABLE posting (
-						object_id INTEGER NOT NULL,
-						token_id INTEGER NOT NULL,
-						PRIMARY KEY (token_id, object_id)
-					)
-					""");
-			stmt.execute("""
-					CREATE TABLE obf_posting (
 						obf_id INTEGER NOT NULL,
 						token_id INTEGER NOT NULL,
 						object_id INTEGER NOT NULL,
 						sequenceId INTEGER NOT NULL,
-						PRIMARY KEY (obf_id, token_id, sequenceId)
+						PRIMARY KEY (token_id, sequenceId, obf_id)
 					)
 					""");
 		}
@@ -1924,12 +1917,8 @@ public interface IndexService extends OBFService {
 				     INSERT OR IGNORE INTO "object"(id, name, lat, lon, "values", type, osmType)
 				     VALUES (?, ?, ?, ?, ?, ?, ?)
 				     """);
-		     PreparedStatement insertPosting = conn.prepareStatement("""
-				     INSERT OR IGNORE INTO posting(token_id, object_id)
-				     VALUES (?, ?)
-				     """);
 		     PreparedStatement insertObfPosting = conn.prepareStatement("""
-				     INSERT INTO obf_posting(obf_id, token_id, object_id, sequenceId)
+				     INSERT INTO posting(obf_id, token_id, object_id, sequenceId)
 				     VALUES (?, ?, ?, ?)
 				     """)) {
 			int totalObfs = obfs.size();
@@ -2017,7 +2006,6 @@ public interface IndexService extends OBFService {
 							}
 							insertGenerateDbObject(insertObject, objectAddress);
 							objectCounts.get(chunk.obfIndex()).incrementAndGet();
-							insertGenerateDbPosting(insertPosting, tokenId, objectAddress);
 							insertGenerateDbObfPosting(insertObfPosting, obfId, tokenId, objectAddress);
 						}
 						incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
@@ -2241,14 +2229,6 @@ public interface IndexService extends OBFService {
 		insertObject.setString(6, objectAddress.type());
 		insertObject.setString(7, objectAddress.osmType());
 		insertObject.executeUpdate();
-	}
-
-	private void insertGenerateDbPosting(PreparedStatement insertPosting,
-			long tokenId,
-			ObjectAddress objectAddress) throws SQLException {
-		insertPosting.setLong(1, tokenId);
-		insertPosting.setLong(2, objectAddress.osmId());
-		insertPosting.executeUpdate();
 	}
 
 	private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
