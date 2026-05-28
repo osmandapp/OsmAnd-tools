@@ -88,8 +88,6 @@ public class RandomRouteTester {
 	}
 
 	public static int run(String[] args) throws Exception {
-		PlatformUtil.initOsmandRegionsAsTempFile();
-
 		RandomRouteTester test = new RandomRouteTester(args);
 
 		test.applyCommandLineOpts();

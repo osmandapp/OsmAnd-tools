@@ -112,8 +112,7 @@ public class WikipediaByCountryDivider {
 		if (!Algorithms.isEmpty(args.wikiRankingDB)) {
 			wikiRankingConn = (Connection) DBDialect.SQLITE.getDatabaseConnection(args.wikiRankingDB, log);
 		}
-		OsmandRegions regs = new OsmandRegions();
-		regs.prepareFile();
+		OsmandRegions regs = new OsmandRegions(null);
 		Map<String, LinkedList<BinaryMapDataObject>> mapObjects = regs.cacheAllCountries();
 		File rgns = new File(args.folder, "regions");
 		rgns.mkdirs();

@@ -211,8 +211,7 @@ public class FixBasemapRoads {
 	}
 
 	private OsmandRegions prepareRegions() throws IOException {
-		OsmandRegions or = new OsmandRegions();
-		or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		or.cacheAllCountries();
 		return or;
 	}

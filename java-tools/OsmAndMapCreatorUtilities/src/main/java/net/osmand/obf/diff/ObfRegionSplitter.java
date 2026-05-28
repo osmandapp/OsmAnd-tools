@@ -67,8 +67,7 @@ public class ObfRegionSplitter {
 		try {
 			ObfFileInMemory fl = new ObfFileInMemory();
 			fl.readObfFiles(Collections.singletonList(worldObf));
-			OsmandRegions osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+			OsmandRegions osmandRegions = new OsmandRegions(null);
 			osmandRegions.cacheAllCountries();
 
 			Map<String, Map<MapZoomPair, TLongObjectHashMap<BinaryMapDataObject>>> regionsMapData = splitRegionMapData(fl,osmandRegions);
