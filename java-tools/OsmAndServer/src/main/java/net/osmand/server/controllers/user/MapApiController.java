@@ -322,6 +322,30 @@ public class MapApiController {
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
 
+	@GetMapping(value = "/rename-smart-folder")
+	public ResponseEntity<String> renameSmartFolder(@RequestParam String folderName,
+	                                                @RequestParam String newFolderName,
+	                                                HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		if (folderName.equals(newFolderName)) {
+			return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
+		}
+		return smartFolderService.renameSmartFolderByUserId(folderName, newFolderName, dev, session);
+	}
+
+	@GetMapping(value = "/delete-smart-folder")
+	public ResponseEntity<String> deleteSmartFolder(@RequestParam String folderName,
+	                                                HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return smartFolderService.deleteSmartFolderByUserId(folderName, dev, session);
+	}
+
 	@GetMapping(value = "/rename-folder")
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
@@ -593,6 +617,7 @@ public class MapApiController {
 	                               @RequestParam String type,
 	                               @RequestParam(required = false) String folderName,
 								   @RequestParam(required = false) Boolean shared,
+								   @RequestParam(required = false) Boolean smart,
 	                               HttpServletResponse response) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
@@ -603,10 +628,18 @@ public class MapApiController {
 			}
 			return;
 		}
+		List<CloudUserFilesRepository.UserFile> files;
 		if (folderName != null) {
-			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
-		} else if (shared != null && shared) {
-			List<CloudUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			if (Boolean.TRUE.equals(smart)) {
+				files = smartFolderService.findSmartFolderFilesByName(folderName, dev);
+				if (files != null) {
+					userdataService.getBackupFolder(response, dev, null, format, type, files);
+				}
+			} else {
+				userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+			}
+		} else if (Boolean.TRUE.equals(shared)) {
+			files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
 			userdataService.getBackupFolder(response, dev, null, format, type, files);
 		}
 	}
