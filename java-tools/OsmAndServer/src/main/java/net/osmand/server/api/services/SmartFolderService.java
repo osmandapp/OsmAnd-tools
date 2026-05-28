@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.zip.GZIPInputStream;
 
 import static kotlinx.serialization.builtins.BuiltinSerializersKt.ListSerializer;
@@ -89,22 +90,31 @@ public class SmartFolderService {
 		return smartFolderHelper;
 	}
 
-	public ResponseEntity<String> updateSmartFolderByUserId(String oldName, String newName,
+	public ResponseEntity<String> renameSmartFolderByUserId(String name, String newName,
 	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                        HttpSession session) throws IOException {
+		return modifySmartFolder(name, dev, session,
+				(helper, folder) -> helper.renameSmartFolder(folder, newName));
+	}
+
+	public ResponseEntity<String> deleteSmartFolderByUserId(String name, String newName,
+	                                                        CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                        HttpSession session) throws IOException {
+		return modifySmartFolder(name, dev, session, SmartFolderHelper::deleteSmartFolder);
+	}
+
+	private ResponseEntity<String> modifySmartFolder(String name, CloudUserDevicesRepository.CloudUserDevice dev,
+	                                                 HttpSession session,
+	                                                 BiConsumer<SmartFolderHelper, SmartFolder> action) throws IOException {
 		String generalSettings = getGeneralSettings(dev.userid);
 		String trackFiltersSettings = getFiltersSettings(generalSettings);
 		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
 		smartFolderHelper.readJson(trackFiltersSettings);
-		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(oldName);
+		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(name);
 		if (smartFolder == null) {
-			return ResponseEntity.badRequest().body("Smart folder '" + oldName + "' not found");
+			return ResponseEntity.badRequest().body("Smart folder " + name + " not found");
 		}
-		if (newName == null) {
-			smartFolderHelper.deleteSmartFolder(smartFolder);
-		} else {
-			smartFolderHelper.renameSmartFolder(smartFolder, newName);
-		}
+		action.accept(smartFolderHelper, smartFolder);
 		String smartFoldersJsonStr = SmartFolderHelper.Companion.getJson().encodeToString(
 				ListSerializer(SmartFolder.Companion.serializer()), smartFolderHelper.getSmartFolders());
 		JSONObject generalSettingsJson = new JSONObject(generalSettings);

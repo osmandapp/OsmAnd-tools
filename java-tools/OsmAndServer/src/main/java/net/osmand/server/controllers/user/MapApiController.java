@@ -322,9 +322,9 @@ public class MapApiController {
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
 
-	@GetMapping(value = "/update-smart-folder")
-	public ResponseEntity<String> updateSmartFolder(@RequestParam String folderName,
-	                                                @RequestParam(required = false) String newFolderName,
+	@GetMapping(value = "/rename-smart-folder")
+	public ResponseEntity<String> renameSmartFolder(@RequestParam String folderName,
+	                                                @RequestParam String newFolderName,
 	                                                HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
@@ -333,7 +333,17 @@ public class MapApiController {
 		if (folderName.equals(newFolderName)) {
 			return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
 		}
-		return smartFolderService.updateSmartFolderByUserId(folderName, newFolderName, dev, session);
+		return smartFolderService.renameSmartFolderByUserId(folderName, newFolderName, dev, session);
+	}
+
+	@GetMapping(value = "/delete-smart-folder")
+	public ResponseEntity<String> deleteSmartFolder(@RequestParam String folderName,
+	                                                HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return smartFolderService.deleteSmartFolderByUserId(folderName, null, dev, session);
 	}
 
 	@GetMapping(value = "/rename-folder")
