@@ -105,7 +105,7 @@ public class SmartFolderService {
 
 	private ResponseEntity<String> modifySmartFolder(String folderName, CloudUserDevicesRepository.CloudUserDevice dev,
 	                                                 HttpSession session,
-	                                                 BiConsumer<SmartFolderHelper, SmartFolder> action) throws IOException {
+	                                                 BiConsumer<SmartFolderHelper, SmartFolder> folderModifier) throws IOException {
 		String generalSettings = getGeneralSettings(dev.userid);
 		String trackFiltersSettings = getFiltersSettings(generalSettings);
 		SmartFolderHelper smartFolderHelper = new SmartFolderHelper();
@@ -114,7 +114,7 @@ public class SmartFolderService {
 		if (smartFolder == null) {
 			return ResponseEntity.badRequest().body("Smart folder " + folderName + " not found");
 		}
-		action.accept(smartFolderHelper, smartFolder);
+		folderModifier.accept(smartFolderHelper, smartFolder);
 		String smartFoldersJsonStr = SmartFolderHelper.Companion.getJson().encodeToString(
 				ListSerializer(SmartFolder.Companion.serializer()), smartFolderHelper.getSmartFolders());
 		JSONObject generalSettingsJson = new JSONObject(generalSettings);
@@ -236,9 +236,12 @@ public class SmartFolderService {
 
 	public List<UserFile> findSmartFolderFilesByName(String folderName, CloudUserDevicesRepository.CloudUserDevice dev) {
 		SmartFolderHelper smartFolderHelper = initSmartFolderHelper(dev.userid);
+		if (smartFolderHelper == null) {
+			return null;
+		}
 		SmartFolder smartFolder = smartFolderHelper.getSmartFolder(folderName);
 		if (smartFolder == null) {
-			return List.of();
+			return null;
 		}
 		return smartFolder.getTrackItems().stream()
 				.map(trackItem -> userDataService.getUserFile(trackItem.getName(), FILE_TYPE_GPX, null, dev))
