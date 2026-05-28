@@ -46,6 +46,7 @@ public class SearchTestController {
 
 	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
 	public record GenerateDbJobResponse(String jobId) {}
+	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs) {}
 	public record GenerateDbJobStatus(String jobId, String status, String obfName, int obfIndex, int totalObfs,
 									  int processedTokens, int totalTokens, long elapsedMs, long estimatedMs,
 									  boolean downloadReady, String error, List<OBFService.GenerateDbObfProgress> obfs) {}
@@ -64,6 +65,7 @@ public class SearchTestController {
 		volatile String error = null;
 		volatile List<OBFService.GenerateDbObfProgress> obfs = Collections.emptyList();
 		volatile Path zipFile = null;
+		volatile String datasourceName = null;
 		volatile boolean cancelRequested = false;
 		volatile CompletableFuture<Void> future = null;
 	}
@@ -543,6 +545,99 @@ public class SearchTestController {
 		});
 		job.future = future;
 		return ResponseEntity.ok(new GenerateDbJobResponse(jobId));
+	}
+
+	@GetMapping(value = "/tags-datasources", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.TagsDatasource>> getTagsDatasources() throws IOException {
+		return ResponseEntity.ok(testSearchService.getTagsDatasources());
+	}
+
+	@PostMapping(value = "/tags-datasources/start", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobResponse> startTagsDatasource(@RequestBody CreateTagsDatasourceRequest request) {
+		if (request == null || request.obfs() == null || request.obfs().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		if (request.name() == null || request.name().trim().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datasource name is required");
+		}
+		String jobId = UUID.randomUUID().toString();
+		GenerateDbJob job = new GenerateDbJob();
+		job.totalObfs = request.obfs().size();
+		job.datasourceName = request.name();
+		GENERATE_DB_JOBS.put(jobId, job);
+		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+			try {
+				job.status = "RUNNING";
+				testSearchService.createTagsDatasource(request.name(), request.obfs(), Boolean.TRUE.equals(request.overwrite()), progress -> {
+					if (job.cancelRequested) {
+						throw new CancellationException("Generate DB job was canceled");
+					}
+					job.status = progress.status();
+					job.obfName = progress.obfName();
+					job.obfIndex = progress.obfIndex();
+					job.totalObfs = progress.totalObfs();
+					job.processedTokens = progress.processedTokens();
+					job.totalTokens = progress.totalTokens();
+					job.elapsedMs = progress.elapsedMs();
+					job.estimatedMs = progress.estimatedMs();
+					job.error = progress.error();
+					job.obfs = progress.obfs() == null ? Collections.emptyList() : progress.obfs();
+				});
+				job.status = job.cancelRequested ? "CANCELED" : "DONE";
+				job.estimatedMs = 0;
+			} catch (CancellationException e) {
+				job.status = "CANCELED";
+				job.error = null;
+			} catch (Exception e) {
+				job.status = job.cancelRequested ? "CANCELED" : "FAILED";
+				job.error = job.cancelRequested ? null : e.getMessage();
+			}
+		});
+		job.future = future;
+		return ResponseEntity.ok(new GenerateDbJobResponse(jobId));
+	}
+
+	@DeleteMapping(value = "/tags-datasources/{name}")
+	@ResponseBody
+	public ResponseEntity<Void> deleteTagsDatasource(@PathVariable String name) throws IOException {
+		return testSearchService.deleteTagsDatasource(name) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/download", produces = "application/zip")
+	@ResponseBody
+	public void downloadTagsDatasource(@PathVariable String name, HttpServletResponse response) throws IOException {
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + name + ".zip\"");
+		testSearchService.downloadTagsDatasource(name, response.getOutputStream());
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tokens", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.TagsDbTokenPage> getTagsDbTokens(@PathVariable String name,
+			@RequestParam(required = false) String prefix,
+			@RequestParam(defaultValue = "true") boolean poi,
+			@RequestParam(defaultValue = "false") boolean perObf,
+			@RequestParam(defaultValue = "0") int pageToShow,
+			@RequestParam(defaultValue = "100") int pageSizeLimit,
+			@RequestParam(required = false) String sortBy,
+			@RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, poi, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.TagsDbObjectPage> getTagsDbObjects(@PathVariable String name,
+			@RequestParam long tokenId,
+			@RequestParam(defaultValue = "true") boolean poi,
+			@RequestParam(defaultValue = "false") boolean perObf,
+			@RequestParam(required = false) String regExp,
+			@RequestParam(defaultValue = "0") int pageToShow,
+			@RequestParam(defaultValue = "100") int pageSizeLimit,
+			@RequestParam(required = false) String sortBy,
+			@RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, poi, perObf, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)

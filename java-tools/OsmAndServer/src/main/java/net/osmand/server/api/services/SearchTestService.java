@@ -78,6 +78,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 	@Value("${searchtest.csv.dir}")
 	private String csvDownloadingDir;
+	@Value("${spring.searchtestdatasource.url:}")
+	private String searchTestDatasourceUrl;
 	@Value("${osmand.web.location}")
 	private String webServerConfigDir;
 	@Value("${overpass.url}")
@@ -150,6 +152,11 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	@Override
 	public OsmAndMapsService getMapsService() {
 		return mapsService;
+	}
+
+	@Override
+	public String getSearchTestDatasourceUrl() {
+		return searchTestDatasourceUrl;
 	}
 
 	@Override

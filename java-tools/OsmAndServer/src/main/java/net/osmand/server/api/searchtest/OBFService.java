@@ -32,6 +32,7 @@ public interface OBFService extends BaseService {
 			});
 
 	OsmAndMapsService getMapsService();
+	String getSearchTestDatasourceUrl();
 
 	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
 		synchronized (INDEX_TOKENS_CACHE) {
@@ -89,6 +90,12 @@ public interface OBFService extends BaseService {
 	record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
+	record TagsDatasource(String name, long size, long lastModified) {}
+	record TagsDbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
+	record TagsDbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
+	record TagsDbTokenPage(List<TagsDbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, TagsDbTokenSummary summary) {}
+	record TagsDbObject(int sequenceId, String name, LatLon point, Map<String, String> values, String type, Long osmId, String osmType, boolean isAlone) {}
+	record TagsDbObjectPage(List<TagsDbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
