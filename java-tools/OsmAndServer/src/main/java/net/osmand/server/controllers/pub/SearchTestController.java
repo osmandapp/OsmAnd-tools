@@ -619,11 +619,38 @@ public class SearchTestController {
 	                                                              @RequestParam(required = false) String prefix,
 	                                                              @RequestParam(defaultValue = "all") String objectType,
 	                                                              @RequestParam(defaultValue = "false") boolean perObf,
+	                                                              @RequestParam(required = false) String tag,
+	                                                              @RequestParam(required = false) List<String> values,
 	                                                              @RequestParam(defaultValue = "0") int pageToShow,
 	                                                              @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                              @RequestParam(required = false) String sortBy,
 	                                                              @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
-		return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, objectType, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, objectType, perObf, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<String>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTagNames(name));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tag-values", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<String>> getTagsDbTagValues(@PathVariable String name,
+	                                                       @RequestParam String tag) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTagValues(name, tag));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
 	}
 
 	@GetMapping(value = "/tags-datasources/{name}/objects", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -633,11 +660,17 @@ public class SearchTestController {
 	                                                                @RequestParam(defaultValue = "all") String objectType,
 	                                                                @RequestParam(defaultValue = "false") boolean perObf,
 	                                                                @RequestParam(required = false) String regExp,
+	                                                                @RequestParam(required = false) String tag,
+	                                                                @RequestParam(required = false) List<String> values,
 	                                                                @RequestParam(defaultValue = "0") int pageToShow,
 	                                                                @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                                @RequestParam(required = false) String sortBy,
 	                                                                @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
-		return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
 	}
 
 	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)

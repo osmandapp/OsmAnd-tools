@@ -3,6 +3,7 @@ package net.osmand.server.api.searchtest;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
 import net.osmand.binary.*;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -77,10 +78,14 @@ public interface OBFService extends BaseService {
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
-	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> values, boolean isPoi, boolean isMatched, boolean isInvalidAtom, boolean isAlone, String type, Long osmId, String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
+	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
+	                     Map<String, Object> extraTags, boolean isPoi, boolean isMatched,
+	                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
+	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
+	record PoiCategoryMeta(String type, String subtype) {}
 	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
 	                          int totalTokens, long elapsedMs, long estimatedMs, String error,
 	                          List<GenerateDbObfProgress> obfs) {}
@@ -89,11 +94,13 @@ public interface OBFService extends BaseService {
 	record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
-	record Datasource(String name, long size, long lastModified) {}
+	record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
 	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
 	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
 	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
-	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> values, String type, Long osmId, String osmType, boolean isAlone, String obfName) {}
+	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
+	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
+	                boolean isAlone, String obfName) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
@@ -197,6 +204,9 @@ public interface OBFService extends BaseService {
 		String phone = "";
 		String description = "";
 		final LinkedHashMap<String, List<String>> decodedTextTags = new LinkedHashMap<>();
+		final LinkedHashMap<String, List<String>> decodedSubcategories = new LinkedHashMap<>();
+		final List<PoiCategoryMeta> decodedCategories = new ArrayList<>();
+		final LinkedHashMap<Integer, List<TagValuePair>> tagGroups = new LinkedHashMap<>();
 		double lat;
 		double lon;
 
@@ -210,6 +220,14 @@ public interface OBFService extends BaseService {
 			} else if (("name:en".equals(tag) || "name_en".equals(tag)) && Algorithms.isEmpty(nameEn)) {
 				nameEn = value;
 			}
+		}
+
+		void addDecodedSubcategory(String tag, String value) {
+			if (Algorithms.isEmpty(tag) || Algorithms.isEmpty(value)) {
+				return;
+			}
+			decodedSubcategories.computeIfAbsent(tag, ignored -> new ArrayList<>()).add(value);
+			addDecodedTextTag(tag, value);
 		}
 	}
 
@@ -244,6 +262,7 @@ public interface OBFService extends BaseService {
 		index.initCategories(poiRegion);
 		CodedInputStream codedIS = CodedInputStream.newInstance(randomAccessFile);
 		codedIS.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+		Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(codedIS, poiRegion);
 		codedIS.seek(poiRegion.getFilePointer());
 		long oldLimit = codedIS.pushLimitLong(poiRegion.getLength());
 		try {
@@ -256,7 +275,7 @@ public interface OBFService extends BaseService {
 					case OsmandOdb.OsmAndPoiIndex.POIDATA_FIELD_NUMBER: {
 						long length = InspectorService.readFixed32Length(codedIS);
 						long innerOldLimit = codedIS.pushLimitLong(length);
-						findPoiAddressesInBoxData(codedIS, poiRegion, poiPattern, normalizedPoiPattern, results);
+						findPoiAddressesInBoxData(codedIS, poiRegion, tagGroups, poiPattern, normalizedPoiPattern, results);
 						codedIS.popLimit(innerOldLimit);
 						break;
 					}
@@ -272,6 +291,7 @@ public interface OBFService extends BaseService {
 
 	default void findPoiAddressesInBoxData(CodedInputStream codedIS,
 			BinaryMapPoiReaderAdapter.PoiRegion poiRegion,
+			Map<Integer, List<TagValuePair>> tagGroups,
 			Pattern poiPattern,
 			Pattern normalizedPoiPattern,
 			List<PoiAddress> results) throws IOException {
@@ -296,7 +316,7 @@ public interface OBFService extends BaseService {
 				case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER: {
 					int len = codedIS.readRawVarint32();
 					long oldLimit = codedIS.pushLimitLong(len);
-					RawPoiObject objectRecord = readRawPoiObject(codedIS, x, y, zoom, poiRegion);
+					RawPoiObject objectRecord = readRawPoiObject(codedIS, x, y, zoom, poiRegion, tagGroups);
 					if (objectRecord != null) {
 						PoiAddress value = findRawValue(objectRecord, poiPattern, normalizedPoiPattern);
 						if (value != null) {
@@ -318,6 +338,15 @@ public interface OBFService extends BaseService {
 			int parentY,
 			int parentZoom,
 			BinaryMapPoiReaderAdapter.PoiRegion poiRegion) throws IOException {
+		return readRawPoiObject(codedIS, parentX, parentY, parentZoom, poiRegion, Collections.emptyMap());
+	}
+
+	default RawPoiObject readRawPoiObject(CodedInputStream codedIS,
+			int parentX,
+			int parentY,
+			int parentZoom,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion,
+			Map<Integer, List<TagValuePair>> tagGroupsById) throws IOException {
 		RawPoiObject record = new RawPoiObject();
 		List<String> textTags = new ArrayList<>();
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
@@ -376,10 +405,18 @@ public interface OBFService extends BaseService {
 						}
 					}
 					subtype = poiTypes.replaceDeprecatedSubtype(categoryType, subtype);
-					if (!poiTypes.isTypeForbidden(subtype) && amenityType == null) {
-						amenityType = categoryType;
-						record.type = categoryType == null ? "" : safeString(categoryType.getKeyName());
-						record.subType = safeString(subtype);
+					if (!poiTypes.isTypeForbidden(subtype)) {
+						String categoryKey = categoryType == null ? "" : safeString(categoryType.getKeyName());
+						if (!Algorithms.isEmpty(categoryKey) || !Algorithms.isEmpty(subtype)) {
+							record.decodedCategories.add(new PoiCategoryMeta(categoryKey, safeString(subtype)));
+						}
+						if (amenityType == null) {
+							amenityType = categoryType;
+							record.type = categoryKey;
+							record.subType = safeString(subtype);
+						} else if (amenityType == categoryType && !Algorithms.isEmpty(subtype)) {
+							record.subType = Algorithms.isEmpty(record.subType) ? subtype : record.subType + ";" + subtype;
+						}
 					}
 					break;
 				}
@@ -387,7 +424,7 @@ public interface OBFService extends BaseService {
 					StringBuilder valueBuilder = new StringBuilder();
 					BinaryMapPoiReaderAdapter.PoiSubType poiSubtype = poiRegion.getSubtypeFromId(codedIS.readUInt32(), valueBuilder);
 					if (poiSubtype != null && !poiRegion.getTopIndexSubTypes().contains(poiSubtype)) {
-						record.addDecodedTextTag(poiSubtype.name, decodePoiString(valueBuilder.toString()));
+						record.addDecodedSubcategory(poiSubtype.name, decodePoiString(valueBuilder.toString()));
 					}
 					break;
 				}
@@ -435,8 +472,131 @@ public interface OBFService extends BaseService {
 						codedIS.readInt32();
 					}
 					break;
+				case OsmandOdb.OsmAndPoiBoxDataAtom.TAGGROUPS_FIELD_NUMBER: {
+					int length = codedIS.readRawVarint32();
+					long oldLimit = codedIS.pushLimitLong(length);
+					while (codedIS.getBytesUntilLimit() > 0) {
+						int tagGroupId = codedIS.readUInt32();
+						List<TagValuePair> tagValues = tagGroupsById == null ? null : tagGroupsById.get(tagGroupId);
+						if (tagValues != null && !tagValues.isEmpty()) {
+							record.tagGroups.put(tagGroupId, tagValues);
+						}
+					}
+					codedIS.popLimit(oldLimit);
+					break;
+				}
 				default:
 					codedIS.skipField(tagValue);
+					break;
+			}
+		}
+	}
+
+	default Map<Integer, List<TagValuePair>> preloadPoiTagGroups(CodedInputStream codedIS,
+			BinaryMapPoiReaderAdapter.PoiRegion poiRegion) throws IOException {
+		Map<Integer, List<TagValuePair>> tagGroups = new LinkedHashMap<>();
+		codedIS.seek(poiRegion.getFilePointer());
+		long oldLimit = codedIS.pushLimitLong(poiRegion.getLength());
+		try {
+			while (true) {
+				int tagValue = codedIS.readTag();
+				int tag = WireFormat.getTagFieldNumber(tagValue);
+				switch (tag) {
+					case 0:
+						return tagGroups;
+					case OsmandOdb.OsmAndPoiIndex.BOXES_FIELD_NUMBER: {
+						long length = InspectorService.readFixed32Length(codedIS);
+						long boxOldLimit = codedIS.pushLimitLong(length);
+						readPoiBoxTagGroups(codedIS, tagGroups);
+						codedIS.popLimit(boxOldLimit);
+						break;
+					}
+					default:
+						InspectorService.skipUnknownField(codedIS, tagValue);
+						break;
+				}
+			}
+		} finally {
+			codedIS.popLimit(oldLimit);
+		}
+	}
+
+	default void readPoiBoxTagGroups(CodedInputStream codedIS,
+			Map<Integer, List<TagValuePair>> tagGroups) throws IOException {
+		while (true) {
+			int tagValue = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagValue);
+			switch (tag) {
+				case 0:
+					return;
+				case OsmandOdb.OsmAndPoiBox.TAGGROUPS_FIELD_NUMBER: {
+					int length = codedIS.readRawVarint32();
+					long oldLimit = codedIS.pushLimitLong(length);
+					readPoiTagGroups(codedIS, tagGroups);
+					codedIS.popLimit(oldLimit);
+					break;
+				}
+				case OsmandOdb.OsmAndPoiBox.SUBBOXES_FIELD_NUMBER: {
+					long length = InspectorService.readFixed32Length(codedIS);
+					long oldLimit = codedIS.pushLimitLong(length);
+					readPoiBoxTagGroups(codedIS, tagGroups);
+					codedIS.popLimit(oldLimit);
+					break;
+				}
+				default:
+					InspectorService.skipUnknownField(codedIS, tagValue);
+					break;
+			}
+		}
+	}
+
+	default void readPoiTagGroups(CodedInputStream codedIS,
+			Map<Integer, List<TagValuePair>> tagGroups) throws IOException {
+		while (true) {
+			int tagValue = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagValue);
+			switch (tag) {
+				case 0:
+					return;
+				case OsmandOdb.OsmAndPoiTagGroups.GROUPS_FIELD_NUMBER: {
+					int length = codedIS.readRawVarint32();
+					long oldLimit = codedIS.pushLimitLong(length);
+					readPoiTagGroup(codedIS, tagGroups);
+					codedIS.popLimit(oldLimit);
+					break;
+				}
+				default:
+					InspectorService.skipUnknownField(codedIS, tagValue);
+					break;
+			}
+		}
+	}
+
+	default void readPoiTagGroup(CodedInputStream codedIS,
+			Map<Integer, List<TagValuePair>> tagGroups) throws IOException {
+		int id = -1;
+		List<String> tagValues = new ArrayList<>();
+		while (true) {
+			int tagValue = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagValue);
+			switch (tag) {
+				case 0:
+					if (id > 0 && tagValues.size() > 1 && tagValues.size() % 2 == 0) {
+						List<TagValuePair> pairs = new ArrayList<>();
+						for (int i = 0; i < tagValues.size(); i += 2) {
+							pairs.add(new TagValuePair(tagValues.get(i), tagValues.get(i + 1), -1));
+						}
+						tagGroups.put(id, pairs);
+					}
+					return;
+				case OsmandOdb.OsmAndPoiTagGroup.ID_FIELD_NUMBER:
+					id = codedIS.readUInt32();
+					break;
+				case OsmandOdb.OsmAndPoiTagGroup.TAGVALUES_FIELD_NUMBER:
+					tagValues.add(decodePoiString(codedIS.readString()).intern());
+					break;
+				default:
+					InspectorService.skipUnknownField(codedIS, tagValue);
 					break;
 			}
 		}
