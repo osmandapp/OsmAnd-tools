@@ -2837,15 +2837,15 @@ public interface IndexService extends OBFService {
             params.add(jsonPath(tag.substring("common.".length()), false));
             params.addAll(cleanValues);
         } else if (tag.startsWith("extra.")) {
-            conditions.add("json_extract(o.extraTags, ?) IN (" + placeholders + ")");
-            params.add(jsonPath(tag.substring("extra.".length()), true));
+            conditions.add(extraTagJsonTreeCondition(tag.substring("extra.".length()), placeholders));
+            params.addAll(extraTagJsonTreeParams(tag.substring("extra.".length())));
             params.addAll(cleanValues);
         } else {
             conditions.add("json_extract(o.commonTags, ?) IN (" + placeholders + ")");
             params.add(jsonPath(tag, false));
             params.addAll(cleanValues);
-            conditions.add("json_extract(o.extraTags, ?) IN (" + placeholders + ")");
-            params.add(jsonPath(tag, true));
+            conditions.add(extraTagJsonTreeCondition(tag, placeholders));
+            params.addAll(extraTagJsonTreeParams(tag));
             params.addAll(cleanValues);
         }
         return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
@@ -2858,15 +2858,41 @@ public interface IndexService extends OBFService {
             conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
             params.add(jsonPath(tag.substring("common.".length()), false));
         } else if (tag.startsWith("extra.")) {
-            conditions.add("json_type(o.extraTags, ?) IS NOT NULL");
-            params.add(jsonPath(tag.substring("extra.".length()), true));
+            conditions.add(extraTagJsonTreeExistenceCondition(tag.substring("extra.".length())));
+            params.addAll(extraTagJsonTreeParams(tag.substring("extra.".length())));
         } else {
             conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
             params.add(jsonPath(tag, false));
-            conditions.add("json_type(o.extraTags, ?) IS NOT NULL");
-            params.add(jsonPath(tag, true));
+            conditions.add(extraTagJsonTreeExistenceCondition(tag));
+            params.addAll(extraTagJsonTreeParams(tag));
         }
         return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
+    }
+
+    private String extraTagJsonTreeCondition(String tag, String placeholders) {
+        return "EXISTS (SELECT 1 FROM json_tree(o.extraTags) e WHERE e.atom IS NOT NULL AND e.key = ? "
+                + "AND (e.path = ? OR e.path LIKE ?) AND e.atom IN (" + placeholders + "))";
+    }
+
+    private String extraTagJsonTreeExistenceCondition(String tag) {
+        return "EXISTS (SELECT 1 FROM json_tree(o.extraTags) e WHERE e.atom IS NOT NULL AND e.key = ? "
+                + "AND (e.path = ? OR e.path LIKE ?))";
+    }
+
+    private List<Object> extraTagJsonTreeParams(String tag) {
+        String normalized = safeString(tag);
+        int dot = normalized.lastIndexOf('.');
+        String parent = dot < 0 ? "" : normalized.substring(0, dot);
+        String key = dot < 0 ? normalized : normalized.substring(dot + 1);
+        String path = jsonTreePath(parent);
+        return List.of(key, path, path + "[%]");
+    }
+
+    private String jsonTreePath(String tag) {
+        if (Algorithms.isEmpty(tag)) {
+            return "$";
+        }
+        return "$." + tag;
     }
 
     private String jsonPath(String tag, boolean nested) {
