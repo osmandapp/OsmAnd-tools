@@ -527,7 +527,7 @@ public interface IndexService extends OBFService {
         for (String candidateName : candidateNames) {
             List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName);
             SearchAlgorithms.removeCommonWords(tokens);
-            if (tokens.contains(tokenName)) {
+            if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;
             }
         }
