@@ -1968,10 +1968,25 @@ public interface IndexService extends OBFService {
                     """);
             stmt.execute("""
                     CREATE TABLE tag (
-                    	tag TEXT NOT NULL,
-                    	value TEXT NOT NULL,
+                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    	name TEXT NOT NULL,
                     	type TEXT,
-                    	PRIMARY KEY (tag, value, type)
+                    	UNIQUE(name, type)
+                    )
+                    """);
+            stmt.execute("""
+                    CREATE TABLE value (
+                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    	tag_id INTEGER NOT NULL,
+                    	value TEXT NOT NULL,
+                    	UNIQUE(tag_id, value)
+                    )
+                    """);
+            stmt.execute("""
+                    CREATE TABLE token_tag (
+                    	token_id INTEGER NOT NULL,
+                    	tag_id INTEGER NOT NULL,
+                    	PRIMARY KEY (tag_id, token_id)
                     )
                     """);
             stmt.execute("""
@@ -2019,8 +2034,17 @@ public interface IndexService extends OBFService {
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      """);
              PreparedStatement insertTag = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO tag(tag, value, type)
-                     VALUES (?, ?, ?)
+                     INSERT OR IGNORE INTO tag(name, type)
+                     VALUES (?, ?)
+                     """);
+             PreparedStatement selectTagId = conn.prepareStatement("SELECT id FROM tag WHERE name = ? AND type = ?");
+             PreparedStatement insertValue = conn.prepareStatement("""
+                     INSERT OR IGNORE INTO value(tag_id, value)
+                     VALUES (?, ?)
+                     """);
+             PreparedStatement insertTokenTag = conn.prepareStatement("""
+                     INSERT OR IGNORE INTO token_tag(token_id, tag_id)
+                     VALUES (?, ?)
                      """);
              PreparedStatement insertPoiPosting = conn.prepareStatement("""
                      INSERT INTO poi_posting(obf_id, token_id, object_id, sequenceId, isAlone)
@@ -2041,6 +2065,8 @@ public interface IndexService extends OBFService {
             Map<Integer, Long> obfIds = new HashMap<>();
             Map<Integer, AtomicInteger> objectCounts = new HashMap<>();
             Map<Integer, AtomicInteger> skippedWithoutOsmIds = new HashMap<>();
+            Map<String, Long> tagIds = new HashMap<>();
+            Map<Long, List<Long>> objectTagIds = new HashMap<>();
             for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
                 String obf = obfs.get(obfIndex);
                 if (Algorithms.isEmpty(obf)) {
@@ -2120,11 +2146,16 @@ public interface IndexService extends OBFService {
                                 continue;
                             }
                             boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress);
+                            List<Long> addressTagIds;
                             if (insertedObject) {
-                                insertGenerateDbTags(insertTag, objectAddress);
+                                addressTagIds = insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, objectAddress);
+                                objectTagIds.put(objectAddress.osmId(), addressTagIds);
+                            } else {
+                                addressTagIds = objectTagIds.getOrDefault(objectAddress.osmId(), Collections.emptyList());
                             }
                             objectCounts.get(chunk.obfIndex()).incrementAndGet();
                             insertGenerateDbObfPosting(objectAddress.isPoi() ? insertPoiPosting : insertAddrPosting, obfId, tokenId, objectAddress);
+                            insertGenerateDbTokenTags(insertTokenTag, tokenId, addressTagIds);
                         }
                         incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
                     }
@@ -2327,16 +2358,26 @@ public interface IndexService extends OBFService {
         return insertObject.executeUpdate() > 0;
     }
 
-    private void insertGenerateDbTags(PreparedStatement insertTag, ObjectAddress objectAddress) throws SQLException {
+    private List<Long> insertGenerateDbTags(PreparedStatement insertTag,
+                                            PreparedStatement selectTagId,
+                                            PreparedStatement insertValue,
+                                            Map<String, Long> tagIds,
+                                            ObjectAddress objectAddress) throws SQLException {
         Map<String, List<String>> commonTags = flattenTags(objectAddress.commonTags());
         Map<String, List<String>> extraTags = flattenTags(objectAddress.extraTags());
         Set<String> duplicateNames = new HashSet<>(commonTags.keySet());
         duplicateNames.retainAll(extraTags.keySet());
-        insertGenerateDbTags(insertTag, commonTags, "common", duplicateNames);
-        insertGenerateDbTags(insertTag, extraTags, "extra", duplicateNames);
+        Set<Long> result = new LinkedHashSet<>();
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, result, commonTags, "common", duplicateNames);
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, result, extraTags, "extra", duplicateNames);
+        return new ArrayList<>(result);
     }
 
     private void insertGenerateDbTags(PreparedStatement insertTag,
+                                      PreparedStatement selectTagId,
+                                      PreparedStatement insertValue,
+                                      Map<String, Long> tagIds,
+                                      Set<Long> result,
                                       Map<String, List<String>> tags,
                                       String type,
                                       Set<String> duplicateNames) throws SQLException {
@@ -2349,15 +2390,55 @@ public interface IndexService extends OBFService {
                 continue;
             }
             String storedTag = duplicateNames != null && duplicateNames.contains(tag) ? type + "." + tag : tag;
+            long tagId = upsertGenerateDbTag(insertTag, selectTagId, tagIds, storedTag, type);
+            result.add(tagId);
             for (String value : entry.getValue()) {
                 if (Algorithms.isEmpty(value)) {
                     continue;
                 }
-                insertTag.setString(1, storedTag);
-                insertTag.setString(2, value);
-                insertTag.setString(3, type);
-                insertTag.executeUpdate();
+                insertValue.setLong(1, tagId);
+                insertValue.setString(2, value);
+                insertValue.executeUpdate();
             }
+        }
+    }
+
+    private long upsertGenerateDbTag(PreparedStatement insertTag,
+                                     PreparedStatement selectTagId,
+                                     Map<String, Long> tagIds,
+                                     String name,
+                                     String type) throws SQLException {
+        String key = name + "\u0000" + type;
+        Long cached = tagIds.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        insertTag.setString(1, name);
+        insertTag.setString(2, type);
+        insertTag.executeUpdate();
+        selectTagId.setString(1, name);
+        selectTagId.setString(2, type);
+        try (ResultSet rs = selectTagId.executeQuery()) {
+            if (rs.next()) {
+                long id = rs.getLong(1);
+                tagIds.put(key, id);
+                return id;
+            }
+        }
+        throw new SQLException("Failed to resolve tag id for " + name);
+    }
+
+    private void insertGenerateDbTokenTags(PreparedStatement insertTokenTag, long tokenId, List<Long> tagIds) throws SQLException {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+        for (Long tagId : tagIds) {
+            if (tagId == null) {
+                continue;
+            }
+            insertTokenTag.setLong(1, tokenId);
+            insertTokenTag.setLong(2, tagId);
+            insertTokenTag.executeUpdate();
         }
     }
 
@@ -2485,14 +2566,21 @@ public interface IndexService extends OBFService {
         }
     }
 
-    default List<String> getTagsDbTagNames(String datasource) throws IOException, SQLException {
+    default List<DbTagName> getTagsDbTagNames(String datasource) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
+        String sql = """
+                SELECT t.name, COUNT(DISTINCT tt.token_id) tokens
+                FROM tag t
+                LEFT JOIN token_tag tt ON tt.tag_id = t.id
+                GROUP BY t.name
+                ORDER BY t.name COLLATE NOCASE ASC
+                """;
         try (Connection conn = openTagsDbConnection(dbFile);
-             PreparedStatement ps = conn.prepareStatement("SELECT DISTINCT tag FROM tag ORDER BY tag COLLATE NOCASE ASC");
+             PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            List<String> result = new ArrayList<>();
+            List<DbTagName> result = new ArrayList<>();
             while (rs.next()) {
-                result.add(rs.getString(1));
+                result.add(new DbTagName(rs.getString(1), rs.getLong(2)));
             }
             return result;
         }
@@ -2504,7 +2592,13 @@ public interface IndexService extends OBFService {
             return Collections.emptyList();
         }
         try (Connection conn = openTagsDbConnection(dbFile);
-             PreparedStatement ps = conn.prepareStatement("SELECT DISTINCT value FROM tag WHERE tag = ? ORDER BY value COLLATE NOCASE ASC")) {
+             PreparedStatement ps = conn.prepareStatement("""
+                     SELECT DISTINCT v.value
+                     FROM value v
+                     JOIN tag t ON t.id = v.tag_id
+                     WHERE t.name = ?
+                     ORDER BY v.value COLLATE NOCASE ASC
+                     """)) {
             ps.setString(1, tag);
             try (ResultSet rs = ps.executeQuery()) {
                 List<String> result = new ArrayList<>();
@@ -2725,12 +2819,15 @@ public interface IndexService extends OBFService {
     }
 
     private TagFilter buildTagFilter(String tag, List<String> values) {
-        if (Algorithms.isEmpty(tag) || values == null || values.isEmpty()) {
+        if (Algorithms.isEmpty(tag)) {
             return new TagFilter(false, "", Collections.emptyList());
+        }
+        if (values == null || values.isEmpty()) {
+            return buildTagExistenceFilter(tag);
         }
         List<String> cleanValues = values.stream().filter(v -> !Algorithms.isEmpty(v)).toList();
         if (cleanValues.isEmpty()) {
-            return new TagFilter(false, "", Collections.emptyList());
+            return buildTagExistenceFilter(tag);
         }
         List<String> conditions = new ArrayList<>();
         List<Object> params = new ArrayList<>();
@@ -2750,6 +2847,24 @@ public interface IndexService extends OBFService {
             conditions.add("json_extract(o.extraTags, ?) IN (" + placeholders + ")");
             params.add(jsonPath(tag, true));
             params.addAll(cleanValues);
+        }
+        return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
+    }
+
+    private TagFilter buildTagExistenceFilter(String tag) {
+        List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+        if (tag.startsWith("common.")) {
+            conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
+            params.add(jsonPath(tag.substring("common.".length()), false));
+        } else if (tag.startsWith("extra.")) {
+            conditions.add("json_type(o.extraTags, ?) IS NOT NULL");
+            params.add(jsonPath(tag.substring("extra.".length()), true));
+        } else {
+            conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
+            params.add(jsonPath(tag, false));
+            conditions.add("json_type(o.extraTags, ?) IS NOT NULL");
+            params.add(jsonPath(tag, true));
         }
         return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
     }

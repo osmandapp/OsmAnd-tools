@@ -634,7 +634,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<String>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
+	public ResponseEntity<List<OBFService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagNames(name));
 		} catch (SQLException e) {

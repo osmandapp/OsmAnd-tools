@@ -95,6 +95,7 @@ public interface OBFService extends BaseService {
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
 	record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
+	record DbTagName(String name, long tokens) {}
 	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
 	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
 	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
