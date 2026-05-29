@@ -575,14 +575,14 @@ public class WebUserdataService {
 
 	@Transactional
 	public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type,
-	                                           CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
+	                                           CloudUserDevicesRepository.CloudUserDevice dev, HttpSession session) throws IOException {
 		Iterable<CloudUserFilesRepository.UserFile> files = userFilesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
 		for (CloudUserFilesRepository.UserFile file : files) {
 			if (file.name.endsWith(INFO_FILE_EXT)) {
 				continue; // handled inside renameFile via renameInfoFile
 			}
 			String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
-			ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false, null);
+			ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false, session);
 			if (!response.getStatusCode().is2xxSuccessful()) {
 				return response;
 			}
