@@ -349,12 +349,13 @@ public class MapApiController {
 	@GetMapping(value = "/rename-folder")
 	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
 	                                           @RequestParam String type,
-	                                           @RequestParam String newFolderName) throws IOException {
+	                                           @RequestParam String newFolderName,
+	                                           HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		return webUserdataService.renameFolder(folderName, newFolderName, type, dev, session);
 	}
 
 	@GetMapping(value = "/delete-folder")
