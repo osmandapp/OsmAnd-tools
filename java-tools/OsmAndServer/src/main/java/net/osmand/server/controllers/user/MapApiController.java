@@ -354,7 +354,7 @@ public class MapApiController {
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		return webUserdataService.renameFolder(folderName, newFolderName, type, dev);
 	}
 
 	@GetMapping(value = "/delete-folder")
