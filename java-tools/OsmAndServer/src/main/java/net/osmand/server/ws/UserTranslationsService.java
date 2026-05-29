@@ -145,6 +145,9 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		translations.put(ust.getId(), ust);
+		// Clear stale location history so startSharing doesn't seed the new
+		// translation with a point from a previous session.
+		locationByUser.remove(user.id);
 		shareLocationByUser(ust, user.id);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		if (headers != null) {
@@ -244,6 +247,7 @@ public class UserTranslationsService {
 			}
 		}
 		ust.clearLocation(userId);
+		locationByUser.remove(userId);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
